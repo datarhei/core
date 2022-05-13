@@ -1,0 +1,8 @@
+.DS_Store
+.env
+/data/**
+/test/**
+Dockerfile*
+*.md
+.github/*
+.github_build/*

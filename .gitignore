@@ -1,0 +1,17 @@
+.DS_Store
+.env
+/core*
+/import*
+/data/**
+/test/**
+.vscode
+
+*.ts
+*.ts.tmp
+*.m3u8
+
+*.mp4
+*.avi
+*.flv
+
+.VSCodeCounter
