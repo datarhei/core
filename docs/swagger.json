@@ -4,15 +4,15 @@
         "description": "Expose REST API for the datarhei Core",
         "title": "datarhei Core API",
         "contact": {
-            "name": "datarhei.com",
+            "name": "datarhei Core Support",
             "url": "https://www.datarhei.com",
-            "email": "support@datarhei.com"
+            "email": "hello@datarhei.com"
         },
         "license": {
-            "name": "Apache License Version 2.0",
+            "name": "Apache 2.0",
             "url": "https://github.com/datarhei/core/blob/main/LICENSE"
         },
-        "version": "6.0"
+        "version": "3.0"
     },
     "basePath": "/",
     "paths": {
@@ -53,7 +53,9 @@
                 "summary": "Load GraphQL playground",
                 "operationId": "graph-playground",
                 "responses": {
-                    "200": {}
+                    "200": {
+                        "description": ""
+                    }
                 }
             }
         },
@@ -770,9 +772,7 @@
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     },
                     "400": {
                         "description": "Bad Request",
@@ -813,17 +813,13 @@
                         "name": "data",
                         "in": "body",
                         "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1230,9 +1226,7 @@
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1280,17 +1274,13 @@
                         "name": "data",
                         "in": "body",
                         "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.Metadata"
-                        }
+                        "schema": {}
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1832,12 +1822,6 @@
                         "schema": {
                             "$ref": "#/definitions/api.SessionsSummary"
                         }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
                     }
                 }
             }
@@ -1868,12 +1852,6 @@
                         "description": "Active sessions listing",
                         "schema": {
                             "$ref": "#/definitions/api.SessionsActive"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -2216,14 +2194,12 @@
                     "type": "string"
                 },
                 "input": {
-                    "type": "object",
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
                 "looping": {
                     "type": "boolean"
                 },
                 "output": {
-                    "type": "object",
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
                 "queue": {
@@ -2277,7 +2253,6 @@
                     "type": "integer"
                 },
                 "version": {
-                    "type": "object",
                     "$ref": "#/definitions/api.Version"
                 }
             }
@@ -2302,14 +2277,464 @@
         "api.Config": {
             "type": "object",
             "properties": {
-                "client": {
+                "config": {
+                    "$ref": "#/definitions/api.ConfigData"
+                },
+                "created_at": {
                     "type": "string"
                 },
-                "token": {
+                "loaded_at": {
                     "type": "string"
                 },
-                "url": {
+                "overrides": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "api.ConfigData": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "api": {
+                    "type": "object",
+                    "properties": {
+                        "access": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "https": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "object",
+                            "properties": {
+                                "auth0": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "type": "boolean"
+                                        },
+                                        "tenants": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/config.Auth0Tenant"
+                                            }
+                                        }
+                                    }
+                                },
+                                "disable_localhost": {
+                                    "type": "boolean"
+                                },
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "jwt": {
+                                    "type": "object",
+                                    "properties": {
+                                        "secret": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "password": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "read_only": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "db": {
+                    "type": "object",
+                    "properties": {
+                        "dir": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "debug": {
+                    "type": "object",
+                    "properties": {
+                        "force_gc": {
+                            "type": "integer"
+                        },
+                        "profiling": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "ffmpeg": {
+                    "type": "object",
+                    "properties": {
+                        "access": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "output": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "binary": {
+                            "type": "string"
+                        },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "max_history": {
+                                    "type": "integer"
+                                },
+                                "max_lines": {
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "max_processes": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "host": {
+                    "type": "object",
+                    "properties": {
+                        "auto": {
+                            "type": "boolean"
+                        },
+                        "name": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "log": {
+                    "type": "object",
+                    "properties": {
+                        "level": {
+                            "type": "string",
+                            "enum": [
+                                "debug",
+                                "info",
+                                "warn",
+                                "error",
+                                "silent"
+                            ]
+                        },
+                        "max_lines": {
+                            "type": "integer"
+                        },
+                        "topics": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "enable_prometheus": {
+                            "type": "boolean"
+                        },
+                        "interval_sec": {
+                            "description": "seconds",
+                            "type": "integer"
+                        },
+                        "range_sec": {
+                            "description": "seconds",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "playout": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "max_port": {
+                            "type": "integer"
+                        },
+                        "min_port": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "router": {
+                    "type": "object",
+                    "properties": {
+                        "blocked_prefixes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "routes": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "ui_path": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "rtmp": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "app": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "enable_tls": {
+                            "type": "boolean"
+                        },
+                        "token": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "token": {
+                            "type": "string"
+                        },
+                        "url": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "sessions": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "ip_ignorelist": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "max_bitrate_mbit": {
+                            "type": "integer"
+                        },
+                        "max_sessions": {
+                            "type": "integer"
+                        },
+                        "persist": {
+                            "type": "boolean"
+                        },
+                        "persist_interval_sec": {
+                            "type": "integer"
+                        },
+                        "session_timeout_sec": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "storage": {
+                    "type": "object",
+                    "properties": {
+                        "cors": {
+                            "type": "object",
+                            "properties": {
+                                "origins": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "disk": {
+                            "type": "object",
+                            "properties": {
+                                "cache": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "type": "boolean"
+                                        },
+                                        "max_file_size_mbytes": {
+                                            "type": "integer"
+                                        },
+                                        "max_size_mbytes": {
+                                            "type": "integer"
+                                        },
+                                        "ttl_seconds": {
+                                            "type": "integer"
+                                        },
+                                        "types": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "dir": {
+                                    "type": "string"
+                                },
+                                "max_size_mbytes": {
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "memory": {
+                            "type": "object",
+                            "properties": {
+                                "auth": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "type": "boolean"
+                                        },
+                                        "password": {
+                                            "type": "string"
+                                        },
+                                        "username": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "max_size_mbytes": {
+                                    "type": "integer"
+                                },
+                                "purge": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "mimetypes_file": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "tls": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "auto": {
+                            "type": "boolean"
+                        },
+                        "cert_file": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "key_file": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "update_check": {
+                    "type": "boolean"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },
@@ -2359,22 +2784,16 @@
                 "query": {
                     "type": "string"
                 },
-                "variables": {
-                    "type": "object"
-                }
+                "variables": {}
             }
         },
         "api.GraphResponse": {
             "type": "object",
             "properties": {
-                "data": {
-                    "type": "object"
-                },
+                "data": {},
                 "errors": {
                     "type": "array",
-                    "items": {
-                        "type": "object"
-                    }
+                    "items": {}
                 }
             }
         },
@@ -2416,9 +2835,6 @@
                 }
             }
         },
-        "api.Metadata": {
-            "type": "object"
-        },
         "api.MetricsQuery": {
             "type": "object",
             "properties": {
@@ -2431,7 +2847,7 @@
                         "$ref": "#/definitions/api.MetricsQueryMetric"
                     }
                 },
-                "timeframe_sec": {
+                "timerange_sec": {
                     "type": "integer"
                 }
             }
@@ -2453,11 +2869,17 @@
         "api.MetricsResponse": {
             "type": "object",
             "properties": {
+                "interval_sec": {
+                    "type": "integer"
+                },
                 "metrics": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/api.MetricsResponseMetric"
                     }
+                },
+                "timerange_sec": {
+                    "type": "integer"
                 }
             }
         },
@@ -2476,11 +2898,19 @@
                 "values": {
                     "type": "array",
                     "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "number"
-                        }
+                        "$ref": "#/definitions/api.MetricsResponseValue"
                     }
+                }
+            }
+        },
+        "api.MetricsResponseValue": {
+            "type": "object",
+            "properties": {
+                "ts": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
                 }
             }
         },
@@ -2490,9 +2920,7 @@
                 "aqueue": {
                     "type": "integer"
                 },
-                "debug": {
-                    "type": "object"
-                },
+                "debug": {},
                 "drop": {
                     "type": "integer"
                 },
@@ -2512,14 +2940,12 @@
                     "type": "string"
                 },
                 "input": {
-                    "type": "object",
                     "$ref": "#/definitions/api.PlayoutStatusIO"
                 },
                 "looping": {
                     "type": "boolean"
                 },
                 "output": {
-                    "type": "object",
                     "$ref": "#/definitions/api.PlayoutStatusIO"
                 },
                 "queue": {
@@ -2529,7 +2955,6 @@
                     "type": "integer"
                 },
                 "swap": {
-                    "type": "object",
                     "$ref": "#/definitions/api.PlayoutStatusSwap"
                 },
                 "url": {
@@ -2655,7 +3080,6 @@
             "type": "object",
             "properties": {
                 "config": {
-                    "type": "object",
                     "$ref": "#/definitions/api.ProcessConfig"
                 },
                 "created_at": {
@@ -2664,19 +3088,14 @@
                 "id": {
                     "type": "string"
                 },
-                "metadata": {
-                    "type": "object",
-                    "$ref": "#/definitions/api.Metadata"
-                },
+                "metadata": {},
                 "reference": {
                     "type": "string"
                 },
                 "report": {
-                    "type": "object",
                     "$ref": "#/definitions/api.ProcessReport"
                 },
                 "state": {
-                    "type": "object",
                     "$ref": "#/definitions/api.ProcessState"
                 },
                 "type": {
@@ -2687,10 +3106,8 @@
         "api.ProcessConfig": {
             "type": "object",
             "required": [
-                "id",
                 "input",
-                "output",
-                "type"
+                "output"
             ],
             "properties": {
                 "autostart": {
@@ -2706,7 +3123,6 @@
                     }
                 },
                 "limits": {
-                    "type": "object",
                     "$ref": "#/definitions/api.ProcessConfigLimits"
                 },
                 "options": {
@@ -2736,7 +3152,8 @@
                 "type": {
                     "type": "string",
                     "enum": [
-                        "ffmpeg"
+                        "ffmpeg",
+                        ""
                     ]
                 }
             }
@@ -2744,12 +3161,17 @@
         "api.ProcessConfigIO": {
             "type": "object",
             "required": [
-                "address",
-                "id"
+                "address"
             ],
             "properties": {
                 "address": {
                     "type": "string"
+                },
+                "cleanup": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessConfigIOCleanup"
+                    }
                 },
                 "id": {
                     "type": "string"
@@ -2759,6 +3181,26 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "api.ProcessConfigIOCleanup": {
+            "type": "object",
+            "required": [
+                "pattern"
+            ],
+            "properties": {
+                "max_file_age_seconds": {
+                    "type": "integer"
+                },
+                "max_files": {
+                    "type": "integer"
+                },
+                "pattern": {
+                    "type": "string"
+                },
+                "purge_on_delete": {
+                    "type": "boolean"
                 }
             }
         },
@@ -2853,7 +3295,6 @@
                     "type": "string"
                 },
                 "progress": {
-                    "type": "object",
                     "$ref": "#/definitions/api.Progress"
                 },
                 "reconnect_seconds": {
@@ -2921,7 +3362,6 @@
                 },
                 "avstream": {
                     "description": "avstream",
-                    "type": "object",
                     "$ref": "#/definitions/api.AVstream"
                 },
                 "bitrate_kbit": {
@@ -3074,11 +3514,9 @@
             "type": "object",
             "properties": {
                 "active": {
-                    "type": "object",
                     "$ref": "#/definitions/api.SessionSummaryActive"
                 },
                 "summary": {
-                    "type": "object",
                     "$ref": "#/definitions/api.SessionSummarySummary"
                 }
             }
@@ -3389,9 +3827,11 @@
                             "type": "boolean"
                         },
                         "interval_sec": {
+                            "description": "seconds",
                             "type": "integer"
                         },
                         "range_sec": {
+                            "description": "seconds",
                             "type": "integer"
                         }
                     }
@@ -3427,6 +3867,9 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        },
+                        "ui_path": {
+                            "type": "string"
                         }
                     }
                 },
@@ -3464,7 +3907,7 @@
                         }
                     }
                 },
-                "stats": {
+                "sessions": {
                     "type": "object",
                     "properties": {
                         "enable": {
@@ -3590,6 +4033,9 @@
                             "type": "string"
                         }
                     }
+                },
+                "update_check": {
+                    "type": "boolean"
                 },
                 "version": {
                     "type": "integer"

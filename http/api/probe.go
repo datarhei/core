@@ -17,11 +17,11 @@ type ProbeIO struct {
 	Type     string      `json:"type"`
 	Codec    string      `json:"codec"`
 	Coder    string      `json:"coder"`
-	Bitrate  json.Number `json:"bitrate_kbps"`
-	Duration json.Number `json:"duration_sec"`
+	Bitrate  json.Number `json:"bitrate_kbps" swaggertype:"number"`
+	Duration json.Number `json:"duration_sec"  swaggertype:"number"`
 
 	// video
-	FPS    json.Number `json:"fps"`
+	FPS    json.Number `json:"fps" swaggertype:"number"`
 	Pixfmt string      `json:"pix_fmt"`
 	Width  uint64      `json:"width"`
 	Height uint64      `json:"height"`

@@ -17,10 +17,7 @@ func DevicesV4L() ([]HWDevice, error) {
 	cmd := exec.Command("v4l2-ctl", "--list-devices")
 	cmd.Env = []string{}
 	cmd.Stdout = buf
-	err := cmd.Run()
-	if err != nil {
-		return devices, err
-	}
+	cmd.Run()
 
 	devices = parseV4LDevices(buf)
 

@@ -55,7 +55,11 @@ func NewHLSWithConfig(config HLSConfig) echo.MiddlewareFunc {
 	}
 
 	if config.EgressCollector == nil {
-		config.EgressCollector = DefaultHTTPConfig.Collector
+		config.EgressCollector = DefaultHLSConfig.EgressCollector
+	}
+
+	if config.IngressCollector == nil {
+		config.IngressCollector = DefaultHLSConfig.IngressCollector
 	}
 
 	hls := hls{

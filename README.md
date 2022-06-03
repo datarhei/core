@@ -1,24 +1,24 @@
 # Core
 
-The cloud-native a/v media processor.
+The cloud-native audio/video processing API.
 
 datarhei Core is management for FFmpeg processes without development effort. It is a central interface for mapping AV processes, is responsible for design and management, and provides all necessary interfaces to access the video content. The included control for FFmpeg can keep all used functions reliable and executable without the need for software developers to take care of it. In addition, process and resource limitation for all FFmpeg processes protects the host system from application overload. The overall system gives access to current process values (CPU, RAM) and complete control of system resources and loads with statistical access to process data and current and historical logs.
 
 ## Features
 
--  Unrestricted FFmpeg process management
--  Optimized for long-running tasks
--  In-Memory- and Disk-Filesystem for media assets
--  HTTP and RTMP services
--  Let's Encrypt for HTTPS and RTMPS
--  HLS/DASH Session tracking with bandwidth and current viewer limiters
--  Multiple resource limiters and monitoring
--  FFmpeg progress data
--  Metrics incl. Prometheus support
--  Logging and debugging for FFmpeg processes with history
--  Multiple auth. by JWT and Auth0
--  100% JSON REST API (Swagger documented)
--  GraphQL for metrics, process, and progress data
+-   Unrestricted FFmpeg process management
+-   Optimized for long-running tasks
+-   In-Memory- and Disk-Filesystem for media assets
+-   HTTP and RTMP services
+-   Let's Encrypt for HTTPS and RTMPS
+-   HLS/DASH Session tracking with bandwidth and current viewer limiters
+-   Multiple resource limiters and monitoring
+-   FFmpeg progress data
+-   Metrics incl. Prometheus support
+-   Logging and debugging for FFmpeg processes with history
+-   Multiple auth. by JWT and Auth0
+-   100% JSON REST API (Swagger documented)
+-   GraphQL for metrics, process, and progress data
 
 ## Quick start
 
@@ -355,7 +355,7 @@ input addresses or the output addresses. These patterns are regular expressions 
 environment variables `CORE_FFMPEG_ACCESS_INPUT` and `CORE_FFMPEG_ACCESS_OUTPUT.` The expressions need to be space-separated, e.g.
 `HTTPS?:// RTSP:// RTMP://`. If one of the lists is empty, then no restriction on input, resp. The output will be applied.
 
-Independently of the value of `CORE_FFMPEG_ACCESS_OUTPUT` there's a check that verifies that output can only be written to the specified `CORE_STORAGE_DISK_DIR` and works as follows: If the address has a protocol specifier other than `file:,` then no further checks will be applied. If the protocol is `file:` or no protocol specifier is given, the address is assumed to be a path that is checked against the path shown in `CORE_STORAGE_DISK_DIR.` 
+Independently of the value of `CORE_FFMPEG_ACCESS_OUTPUT` there's a check that verifies that output can only be written to the specified `CORE_STORAGE_DISK_DIR` and works as follows: If the address has a protocol specifier other than `file:,` then no further checks will be applied. If the protocol is `file:` or no protocol specifier is given, the address is assumed to be a path that is checked against the path shown in `CORE_STORAGE_DISK_DIR.`
 
 It will be rejected if the address is outside the `CORE_STORAGE_DISK_DIR` directory. Otherwise, the protocol `file:` will be prepended. If you give some expressions for `CORE_FFMPEG_ACCESS_OUTPUT,` you should also allow `file:.`
 
@@ -495,9 +495,9 @@ http http://localhost:8080/api/v3/process "Authorization: Bearer eyJhbGciOiJIUzI
 
 | Method | Path                  | Description                                                                                                          |
 | ------ | --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| GET    | /api/v3/config        | Retrieve the current config without the override values from the environment variables.           |
-| GET    | /api/v3/config/active | Retrieve the current config with the override values from the environment variables are taken into account.       |
-| PUT    | /api/v3/config        | Store a new config. Only some values are respected, and the new config will only be used after a restart.              |
+| GET    | /api/v3/config        | Retrieve the current config without the override values from the environment variables.                              |
+| GET    | /api/v3/config/active | Retrieve the current config with the override values from the environment variables are taken into account.          |
+| PUT    | /api/v3/config        | Store a new config. Only some values are respected, and the new config will only be used after a restart.            |
 | GET    | /api/v3/config/reload | Reload the config. The config will be re-read and validated from the store. It will cause a restart of all services. |
 
 When retrieving the config via the API, critical values (such as passwords) will be disguised if not required otherwise.
@@ -531,7 +531,8 @@ With the process API call, you can manage different FFmpeg processes. A process 
             "cleanup": [{
                 "pattern": "(memfs|diskfs):...",
                 "max_files: "number,
-                "max_file_age_seconds": "number"
+                "max_file_age_seconds": "number",
+                "purge_on_delete: "(true|false)"
             }]
         },
         ... list of outputs ...
@@ -556,7 +557,8 @@ permitted maximum age for the files matching that pattern. The pattern starts wi
 which filesystem this rule is designated to. Then a [glob pattern](https://pkg.go.dev/path/filepath#Match) follows to
 identify the files. If `max_files` is set to a number > 0, then the oldest files from the matching files will be deleted if
 the list of matching files is longer than that number. If `max_file_age_seconds` is set to a number > 0, then all files
-that are older than this number of seconds from the matching files will be deleted.
+that are older than this number of seconds from the matching files will be deleted. If `purge_on_delete` is set to `true`,
+then all matching files will be deleted when the process is deleted.
 
 The API calls are
 
@@ -975,5 +977,4 @@ Before committing changes, you should run `make commit` to ensure that the sourc
 
 ## License
 
-See the [LICENSE](./LICENSE) file for licensing information.
-
+datarhei/core is licensed under the Apache License 2.0

@@ -20,15 +20,15 @@ type ProgressIO struct {
 	Codec   string      `json:"codec"`
 	Coder   string      `json:"coder"`
 	Frame   uint64      `json:"frame"`
-	FPS     json.Number `json:"fps"`
+	FPS     json.Number `json:"fps" swaggertype:"number"`
 	Packet  uint64      `json:"packet"`
-	PPS     json.Number `json:"pps"`
-	Size    uint64      `json:"size_kb"`      // kbytes
-	Bitrate json.Number `json:"bitrate_kbit"` // kbit/s
+	PPS     json.Number `json:"pps" swaggertype:"number"`
+	Size    uint64      `json:"size_kb"`                           // kbytes
+	Bitrate json.Number `json:"bitrate_kbit" swaggertype:"number"` // kbit/s
 
 	// Video
 	Pixfmt    string      `json:"pix_fmt,omitempty"`
-	Quantizer json.Number `json:"q,omitempty"`
+	Quantizer json.Number `json:"q,omitempty" swaggertype:"number"`
 	Width     uint64      `json:"width,omitempty"`
 	Height    uint64      `json:"height,omitempty"`
 
@@ -81,12 +81,12 @@ type Progress struct {
 	Output    []ProgressIO `json:"outputs"`
 	Frame     uint64       `json:"frame"`
 	Packet    uint64       `json:"packet"`
-	FPS       json.Number  `json:"fps"`
-	Quantizer json.Number  `json:"q"`
+	FPS       json.Number  `json:"fps" swaggertype:"number"`
+	Quantizer json.Number  `json:"q" swaggertype:"number"`
 	Size      uint64       `json:"size_kb"` // kbytes
-	Time      json.Number  `json:"time"`
-	Bitrate   json.Number  `json:"bitrate_kbit"` // kbit/s
-	Speed     json.Number  `json:"speed"`
+	Time      json.Number  `json:"time" swaggertype:"number"`
+	Bitrate   json.Number  `json:"bitrate_kbit" swaggertype:"number"` // kbit/s
+	Speed     json.Number  `json:"speed" swaggertype:"number"`
 	Drop      uint64       `json:"drop"`
 	Dup       uint64       `json:"dup"`
 }

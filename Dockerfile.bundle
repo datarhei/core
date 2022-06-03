@@ -1,28 +1,14 @@
-ARG GOLANG_IMAGE=golang:1.18.2-alpine3.15
+ARG CORE_IMAGE=datarhei/base:alpine-core-latest
 
-ARG FFMPEG_IMAGE=datarhei/base:alpine-ffmpeg-3.15-4.4.2
+ARG FFMPEG_IMAGE=datarhei/base:alpine-ffmpeg-latest
 
-FROM $GOLANG_IMAGE as builder
-
-COPY . /dist/core
-
-RUN apk add \
-		git \
-		make && \
-	cd /dist/core && \
-	go version && \
-	make release && \
-	make import
+FROM $CORE_IMAGE as core
 
 FROM $FFMPEG_IMAGE
 
-COPY --from=builder /dist/core/core /core/bin/core
-COPY --from=builder /dist/core/import /core/bin/import
-COPY --from=builder /dist/core/mime.types /core/mime.types
-COPY --from=builder /dist/core/run.sh /core/bin/run.sh
+COPY --from=core /core /core
 
-RUN ffmpeg -buildconf && \
-	mkdir /core/config /core/data
+RUN ffmpeg -buildconf
 
 ENV CORE_CONFIGFILE=/core/config/config.json
 ENV CORE_STORAGE_DISK_DIR=/core/data

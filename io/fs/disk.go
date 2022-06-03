@@ -204,17 +204,13 @@ func (fs *diskFilesystem) Files() int64 {
 }
 
 func (fs *diskFilesystem) Symlink(oldname, newname string) error {
-	if !filepath.IsAbs(oldname) {
-		return nil
-	}
-
-	oldname = filepath.Join(fs.dir, oldname)
+	oldname = filepath.Join(fs.dir, filepath.Clean("/"+oldname))
 
 	if !filepath.IsAbs(newname) {
 		return nil
 	}
 
-	newname = filepath.Join(fs.dir, newname)
+	newname = filepath.Join(fs.dir, filepath.Clean("/"+newname))
 
 	err := os.Symlink(oldname, newname)
 
@@ -222,11 +218,7 @@ func (fs *diskFilesystem) Symlink(oldname, newname string) error {
 }
 
 func (fs *diskFilesystem) Open(path string) File {
-	if !filepath.IsAbs(path) {
-		return nil
-	}
-
-	path = filepath.Join(fs.dir, path)
+	path = filepath.Join(fs.dir, filepath.Clean("/"+path))
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -243,16 +235,7 @@ func (fs *diskFilesystem) Open(path string) File {
 }
 
 func (fs *diskFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
-	if !filepath.IsAbs(path) {
-		return -1, false, fmt.Errorf("Invalid path")
-	}
-
-	path = filepath.Join(fs.dir, path)
-
-	// Check that we're not leaving our base directory
-	if !strings.HasPrefix(path, fs.dir) {
-		return -1, false, fmt.Errorf("Invalid path")
-	}
+	path = filepath.Join(fs.dir, filepath.Clean("/"+path))
 
 	replace := true
 
@@ -283,11 +266,7 @@ func (fs *diskFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
 }
 
 func (fs *diskFilesystem) Delete(path string) int64 {
-	if !filepath.IsAbs(path) {
-		return -1
-	}
-
-	path = filepath.Join(fs.dir, path)
+	path = filepath.Join(fs.dir, filepath.Clean("/"+path))
 
 	finfo, err := os.Stat(path)
 	if err != nil {

@@ -8,7 +8,7 @@ all: build
 
 ## build: Build core (default)
 build:
-	go build -o core$(OSARCH)
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core${OSARCH}
 
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:
@@ -34,6 +34,7 @@ fmt:
 update:
 	go get -u
 	@-$(MAKE) tidy
+	@-$(MAKE) vendor
 
 ## tidy: Tidy up go.mod
 tidy:
@@ -53,7 +54,7 @@ lint:
 
 ## import: Build import binary
 import:
-	cd app/import && go build -o ../../import -ldflags="-s -w"
+	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -ldflags="-s -w"
 
 ## coverage: Generate code coverage analysis
 coverage:
@@ -66,13 +67,13 @@ commit: vet fmt lint test build
 
 ## release: Build a release binary of core
 release:
-	go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
 
 ## docker: Build standard Docker image
 docker:
 	docker build -t core:$(SHORTCOMMIT) .
 
-.PHONY: help build swagger test vet fmt vendor commit coverage lint release import
+.PHONY: help build swagger test vet fmt vendor commit coverage lint release import update
 
 ## help: Show all commands
 help: Makefile

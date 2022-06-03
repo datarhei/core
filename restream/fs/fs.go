@@ -16,9 +16,10 @@ type Config struct {
 }
 
 type Pattern struct {
-	Pattern    string
-	MaxFiles   uint
-	MaxFileAge time.Duration
+	Pattern       string
+	MaxFiles      uint
+	MaxFileAge    time.Duration
+	PurgeOnDelete bool
 }
 
 type Filesystem interface {
@@ -116,7 +117,11 @@ func (fs *filesystem) UnsetCleanup(id string) {
 	fs.cleanupLock.Lock()
 	defer fs.cleanupLock.Unlock()
 
+	patterns, _ := fs.cleanupPatterns[id]
+
 	delete(fs.cleanupPatterns, id)
+
+	fs.purge(patterns)
 }
 
 func (fs *filesystem) cleanup() {
@@ -146,6 +151,20 @@ func (fs *filesystem) cleanup() {
 					}
 				}
 			}
+		}
+	}
+}
+
+func (fs *filesystem) purge(patterns []Pattern) {
+	for _, pattern := range patterns {
+		if !pattern.PurgeOnDelete {
+			continue
+		}
+
+		files := fs.Filesystem.List(pattern.Pattern)
+		for _, f := range files {
+			fs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
+			fs.Filesystem.Delete(f.Name())
 		}
 	}
 }

@@ -69,6 +69,8 @@ func (h *DiskFSHandler) GetFile(c echo.Context) error {
 	c.Response().Header().Set("Last-Modified", stat.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 
 	if path, ok := stat.IsLink(); ok {
+		path = filepath.Clean("/" + path)
+
 		if path[0] == '/' {
 			path = path[1:]
 		}

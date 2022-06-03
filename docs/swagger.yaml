@@ -16,12 +16,10 @@ definitions:
         type: string
       input:
         $ref: '#/definitions/api.AVstreamIO'
-        type: object
       looping:
         type: boolean
       output:
         $ref: '#/definitions/api.AVstreamIO'
-        type: object
       queue:
         type: integer
     type: object
@@ -57,7 +55,6 @@ definitions:
         type: integer
       version:
         $ref: '#/definitions/api.Version'
-        type: object
     type: object
   api.Command:
     properties:
@@ -73,12 +70,304 @@ definitions:
     type: object
   api.Config:
     properties:
-      client:
+      config:
+        $ref: '#/definitions/api.ConfigData'
+      created_at:
         type: string
-      token:
+      loaded_at:
         type: string
-      url:
+      overrides:
+        items:
+          type: string
+        type: array
+      updated_at:
         type: string
+    type: object
+  api.ConfigData:
+    properties:
+      address:
+        type: string
+      api:
+        properties:
+          access:
+            properties:
+              http:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              https:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+          auth:
+            properties:
+              auth0:
+                properties:
+                  enable:
+                    type: boolean
+                  tenants:
+                    items:
+                      $ref: '#/definitions/config.Auth0Tenant'
+                    type: array
+                type: object
+              disable_localhost:
+                type: boolean
+              enable:
+                type: boolean
+              jwt:
+                properties:
+                  secret:
+                    type: string
+                type: object
+              password:
+                type: string
+              username:
+                type: string
+            type: object
+          read_only:
+            type: boolean
+        type: object
+      created_at:
+        type: string
+      db:
+        properties:
+          dir:
+            type: string
+        type: object
+      debug:
+        properties:
+          force_gc:
+            type: integer
+          profiling:
+            type: boolean
+        type: object
+      ffmpeg:
+        properties:
+          access:
+            properties:
+              input:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              output:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+          binary:
+            type: string
+          log:
+            properties:
+              max_history:
+                type: integer
+              max_lines:
+                type: integer
+            type: object
+          max_processes:
+            type: integer
+        type: object
+      host:
+        properties:
+          auto:
+            type: boolean
+          name:
+            items:
+              type: string
+            type: array
+        type: object
+      id:
+        type: string
+      log:
+        properties:
+          level:
+            enum:
+            - debug
+            - info
+            - warn
+            - error
+            - silent
+            type: string
+          max_lines:
+            type: integer
+          topics:
+            items:
+              type: string
+            type: array
+        type: object
+      metrics:
+        properties:
+          enable:
+            type: boolean
+          enable_prometheus:
+            type: boolean
+          interval_sec:
+            description: seconds
+            type: integer
+          range_sec:
+            description: seconds
+            type: integer
+        type: object
+      name:
+        type: string
+      playout:
+        properties:
+          enable:
+            type: boolean
+          max_port:
+            type: integer
+          min_port:
+            type: integer
+        type: object
+      router:
+        properties:
+          blocked_prefixes:
+            items:
+              type: string
+            type: array
+          routes:
+            additionalProperties:
+              type: string
+            type: object
+          ui_path:
+            type: string
+        type: object
+      rtmp:
+        properties:
+          address:
+            type: string
+          app:
+            type: string
+          enable:
+            type: boolean
+          enable_tls:
+            type: boolean
+          token:
+            type: string
+        type: object
+      service:
+        properties:
+          enable:
+            type: boolean
+          token:
+            type: string
+          url:
+            type: string
+        type: object
+      sessions:
+        properties:
+          enable:
+            type: boolean
+          ip_ignorelist:
+            items:
+              type: string
+            type: array
+          max_bitrate_mbit:
+            type: integer
+          max_sessions:
+            type: integer
+          persist:
+            type: boolean
+          persist_interval_sec:
+            type: integer
+          session_timeout_sec:
+            type: integer
+        type: object
+      storage:
+        properties:
+          cors:
+            properties:
+              origins:
+                items:
+                  type: string
+                type: array
+            type: object
+          disk:
+            properties:
+              cache:
+                properties:
+                  enable:
+                    type: boolean
+                  max_file_size_mbytes:
+                    type: integer
+                  max_size_mbytes:
+                    type: integer
+                  ttl_seconds:
+                    type: integer
+                  types:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              dir:
+                type: string
+              max_size_mbytes:
+                type: integer
+            type: object
+          memory:
+            properties:
+              auth:
+                properties:
+                  enable:
+                    type: boolean
+                  password:
+                    type: string
+                  username:
+                    type: string
+                type: object
+              max_size_mbytes:
+                type: integer
+              purge:
+                type: boolean
+            type: object
+          mimetypes_file:
+            type: string
+        type: object
+      tls:
+        properties:
+          address:
+            type: string
+          auto:
+            type: boolean
+          cert_file:
+            type: string
+          enable:
+            type: boolean
+          key_file:
+            type: string
+        type: object
+      update_check:
+        type: boolean
+      version:
+        type: integer
     type: object
   api.ConfigError:
     additionalProperties:
@@ -110,16 +399,13 @@ definitions:
     properties:
       query:
         type: string
-      variables:
-        type: object
+      variables: {}
     type: object
   api.GraphResponse:
     properties:
-      data:
-        type: object
+      data: {}
       errors:
-        items:
-          type: object
+        items: {}
         type: array
     type: object
   api.JWT:
@@ -147,8 +433,6 @@ definitions:
     - password
     - username
     type: object
-  api.Metadata:
-    type: object
   api.MetricsQuery:
     properties:
       interval_sec:
@@ -157,7 +441,7 @@ definitions:
         items:
           $ref: '#/definitions/api.MetricsQueryMetric'
         type: array
-      timeframe_sec:
+      timerange_sec:
         type: integer
     type: object
   api.MetricsQueryMetric:
@@ -171,10 +455,14 @@ definitions:
     type: object
   api.MetricsResponse:
     properties:
+      interval_sec:
+        type: integer
       metrics:
         items:
           $ref: '#/definitions/api.MetricsResponseMetric'
         type: array
+      timerange_sec:
+        type: integer
     type: object
   api.MetricsResponseMetric:
     properties:
@@ -186,17 +474,21 @@ definitions:
         type: string
       values:
         items:
-          items:
-            type: number
-          type: array
+          $ref: '#/definitions/api.MetricsResponseValue'
         type: array
+    type: object
+  api.MetricsResponseValue:
+    properties:
+      ts:
+        type: string
+      value:
+        type: number
     type: object
   api.PlayoutStatus:
     properties:
       aqueue:
         type: integer
-      debug:
-        type: object
+      debug: {}
       drop:
         type: integer
       dup:
@@ -211,19 +503,16 @@ definitions:
         type: string
       input:
         $ref: '#/definitions/api.PlayoutStatusIO'
-        type: object
       looping:
         type: boolean
       output:
         $ref: '#/definitions/api.PlayoutStatusIO'
-        type: object
       queue:
         type: integer
       stream:
         type: integer
       swap:
         $ref: '#/definitions/api.PlayoutStatusSwap'
-        type: object
       url:
         type: string
     type: object
@@ -307,22 +596,17 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/api.ProcessConfig'
-        type: object
       created_at:
         type: integer
       id:
         type: string
-      metadata:
-        $ref: '#/definitions/api.Metadata'
-        type: object
+      metadata: {}
       reference:
         type: string
       report:
         $ref: '#/definitions/api.ProcessReport'
-        type: object
       state:
         $ref: '#/definitions/api.ProcessState'
-        type: object
       type:
         type: string
     type: object
@@ -338,7 +622,6 @@ definitions:
         type: array
       limits:
         $ref: '#/definitions/api.ProcessConfigLimits'
-        type: object
       options:
         items:
           type: string
@@ -358,17 +641,20 @@ definitions:
       type:
         enum:
         - ffmpeg
+        - ""
         type: string
     required:
-    - id
     - input
     - output
-    - type
     type: object
   api.ProcessConfigIO:
     properties:
       address:
         type: string
+      cleanup:
+        items:
+          $ref: '#/definitions/api.ProcessConfigIOCleanup'
+        type: array
       id:
         type: string
       options:
@@ -377,7 +663,19 @@ definitions:
         type: array
     required:
     - address
-    - id
+    type: object
+  api.ProcessConfigIOCleanup:
+    properties:
+      max_file_age_seconds:
+        type: integer
+      max_files:
+        type: integer
+      pattern:
+        type: string
+      purge_on_delete:
+        type: boolean
+    required:
+    - pattern
     type: object
   api.ProcessConfigLimits:
     properties:
@@ -440,7 +738,6 @@ definitions:
         type: string
       progress:
         $ref: '#/definitions/api.Progress'
-        type: object
       reconnect_seconds:
         type: integer
       runtime_seconds:
@@ -486,7 +783,6 @@ definitions:
       avstream:
         $ref: '#/definitions/api.AVstream'
         description: avstream
-        type: object
       bitrate_kbit:
         description: kbit/s
         type: number
@@ -589,10 +885,8 @@ definitions:
     properties:
       active:
         $ref: '#/definitions/api.SessionSummaryActive'
-        type: object
       summary:
         $ref: '#/definitions/api.SessionSummarySummary'
-        type: object
     type: object
   api.SessionSummaryActive:
     properties:
@@ -795,8 +1089,10 @@ definitions:
           enable_prometheus:
             type: boolean
           interval_sec:
+            description: seconds
             type: integer
           range_sec:
+            description: seconds
             type: integer
         type: object
       name:
@@ -820,6 +1116,8 @@ definitions:
             additionalProperties:
               type: string
             type: object
+          ui_path:
+            type: string
         type: object
       rtmp:
         properties:
@@ -843,7 +1141,7 @@ definitions:
           url:
             type: string
         type: object
-      stats:
+      sessions:
         properties:
           enable:
             type: boolean
@@ -925,6 +1223,8 @@ definitions:
           key_file:
             type: string
         type: object
+      update_check:
+        type: boolean
       version:
         type: integer
     type: object
@@ -1114,14 +1414,14 @@ definitions:
 info:
   contact:
     email: hello@datarhei.com
-    name: datarheiCORE Support
+    name: datarhei Core Support
     url: https://www.datarhei.com
-  description: Expose REST API for the datarheiCORE
+  description: Expose REST API for the datarhei Core
   license:
-    name: ???
-    url: nothing
+    name: Apache 2.0
+    url: https://github.com/datarhei/core/blob/main/LICENSE
   title: datarhei Core API
-  version: "6.0"
+  version: "3.0"
 paths:
   /{path}:
     get:
@@ -1173,7 +1473,8 @@ paths:
       produces:
       - text/html
       responses:
-        "200": {}
+        "200":
+          description: ""
       security:
       - ApiKeyAuth: []
       summary: Load GraphQL playground
@@ -1639,8 +1940,7 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/api.Metadata'
+          schema: {}
         "400":
           description: Bad Request
           schema:
@@ -1667,15 +1967,13 @@ paths:
         in: body
         name: data
         required: true
-        schema:
-          $ref: '#/definitions/api.Metadata'
+        schema: {}
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/api.Metadata'
+          schema: {}
         "400":
           description: Bad Request
           schema:
@@ -1943,8 +2241,7 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/api.Metadata'
+          schema: {}
         "400":
           description: Bad Request
           schema:
@@ -1977,15 +2274,13 @@ paths:
         in: body
         name: data
         required: true
-        schema:
-          $ref: '#/definitions/api.Metadata'
+        schema: {}
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/api.Metadata'
+          schema: {}
         "400":
           description: Bad Request
           schema:
@@ -2340,10 +2635,6 @@ paths:
           description: Sessions summary
           schema:
             $ref: '#/definitions/api.SessionsSummary'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Get a summary of all active and past sessions
@@ -2364,10 +2655,6 @@ paths:
           description: Active sessions listing
           schema:
             $ref: '#/definitions/api.SessionsActive'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Get a minimal summary of all active sessions

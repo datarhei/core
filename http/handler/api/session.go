@@ -31,7 +31,6 @@ func NewSession(registry session.Registry) *SessionHandler {
 // @Security ApiKeyAuth
 // @Param collectors query string false "Comma separated list of collectors"
 // @Success 200 {object} api.SessionsSummary "Sessions summary"
-// @Failure 404 {object} api.Error
 // @Router /api/v3/session [get]
 func (s *SessionHandler) Summary(c echo.Context) error {
 	collectors := strings.Split(util.DefaultQuery(c, "collectors", ""), ",")
@@ -39,13 +38,8 @@ func (s *SessionHandler) Summary(c echo.Context) error {
 	sessionsSummary := make(api.SessionsSummary)
 
 	for _, name := range collectors {
-		collector := s.registry.Collector(name)
-		if collector == nil {
-			return api.Err(http.StatusNotFound, "Unknown collector", "Registered collectors are: %s", strings.Join(s.registry.Collectors(), ", "))
-		}
-
 		summary := api.SessionSummary{}
-		summary.Unmarshal(collector.Summary())
+		summary.Unmarshal(s.registry.Summary(name))
 
 		sessionsSummary[name] = summary
 	}
@@ -61,7 +55,6 @@ func (s *SessionHandler) Summary(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Param collectors query string false "Comma separated list of collectors"
 // @Success 200 {object} api.SessionsActive "Active sessions listing"
-// @Failure 404 {object} api.Error
 // @Router /api/v3/session/active [get]
 func (s *SessionHandler) Active(c echo.Context) error {
 	collectors := strings.Split(util.DefaultQuery(c, "collectors", ""), ",")
@@ -69,14 +62,10 @@ func (s *SessionHandler) Active(c echo.Context) error {
 	sessionsActive := make(api.SessionsActive)
 
 	for _, name := range collectors {
-		collector := s.registry.Collector(name)
-		if collector == nil {
-			return api.Err(http.StatusNotFound, "Unknown collector", "Registered collectors are: %s", strings.Join(s.registry.Collectors(), ", "))
-		}
+		sessions := s.registry.Active(name)
+		active := []api.Session{}
 
-		sessions := collector.Active()
-
-		active := make([]api.Session, len(sessions))
+		active = make([]api.Session, len(sessions))
 
 		for i, s := range sessions {
 			active[i].Unmarshal(s)

@@ -30,8 +30,8 @@ type Session struct {
 	Extra     string      `json:"extra"`
 	RxBytes   uint64      `json:"bytes_rx"`
 	TxBytes   uint64      `json:"bytes_tx"`
-	RxBitrate json.Number `json:"bandwidth_rx_kbit"` // kbit/s
-	TxBitrate json.Number `json:"bandwidth_tx_kbit"` // kbit/s
+	RxBitrate json.Number `json:"bandwidth_rx_kbit" swaggertype:"number"` // kbit/s
+	TxBitrate json.Number `json:"bandwidth_tx_kbit" swaggertype:"number"` // kbit/s
 }
 
 func (s *Session) Unmarshal(sess session.Session) {
@@ -51,11 +51,11 @@ func (s *Session) Unmarshal(sess session.Session) {
 type SessionSummaryActive struct {
 	SessionList  []Session   `json:"list"`
 	Sessions     uint64      `json:"sessions"`
-	RxBitrate    json.Number `json:"bandwidth_rx_mbit"` // mbit/s
-	TxBitrate    json.Number `json:"bandwidth_tx_mbit"` // mbit/s
+	RxBitrate    json.Number `json:"bandwidth_rx_mbit" swaggertype:"number"` // mbit/s
+	TxBitrate    json.Number `json:"bandwidth_tx_mbit" swaggertype:"number"` // mbit/s
 	MaxSessions  uint64      `json:"max_sessions"`
-	MaxRxBitrate json.Number `json:"max_bandwidth_rx_mbit"` // mbit/s
-	MaxTxBitrate json.Number `json:"max_bandwidth_tx_mbit"` // mbit/s
+	MaxRxBitrate json.Number `json:"max_bandwidth_rx_mbit" swaggertype:"number"` // mbit/s
+	MaxTxBitrate json.Number `json:"max_bandwidth_tx_mbit" swaggertype:"number"` // mbit/s
 }
 
 // SessionSummarySummary represents the summary (history) of all finished sessions

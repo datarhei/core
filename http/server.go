@@ -1,13 +1,13 @@
 // @title datarhei Core API
-// @version 6.0
-// @description Expose REST API for the datarheiCORE
+// @version 3.0
+// @description Expose REST API for the datarhei Core
 
-// @contact.name datarheiCORE Support
+// @contact.name datarhei Core Support
 // @contact.url https://www.datarhei.com
 // @contact.email hello@datarhei.com
 
-// @license.name ???
-// @license.url nothing
+// @license.name Apache 2.0
+// @license.url https://github.com/datarhei/core/blob/main/LICENSE
 
 // @BasePath /
 

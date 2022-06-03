@@ -270,7 +270,13 @@ func (e *Event) WithField(key string, value interface{}) Logger {
 	})
 }
 
+const maxFields = 1024
+
 func (e *Event) WithFields(f Fields) Logger {
+	if maxFields-len(e.Data)-len(f) < 0 {
+		return e
+	}
+
 	data := make(Fields, len(e.Data)+len(f))
 	for k, v := range e.Data {
 		data[k] = v

@@ -3,9 +3,10 @@ package app
 import "github.com/datarhei/core/process"
 
 type ConfigIOCleanup struct {
-	Pattern    string `json:"pattern"`
-	MaxFiles   uint   `json:"max_files"`
-	MaxFileAge uint   `json:"max_file_age_seconds"`
+	Pattern       string `json:"pattern"`
+	MaxFiles      uint   `json:"max_files"`
+	MaxFileAge    uint   `json:"max_file_age_seconds"`
+	PurgeOnDelete bool   `json:"purge_on_delete"`
 }
 
 type ConfigIO struct {

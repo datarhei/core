@@ -29,9 +29,10 @@ type ProcessConfigIO struct {
 }
 
 type ProcessConfigIOCleanup struct {
-	Pattern    string `json:"pattern" validate:"required"`
-	MaxFiles   uint   `json:"max_files"`
-	MaxFileAge uint   `json:"max_file_age_seconds"`
+	Pattern       string `json:"pattern" validate:"required"`
+	MaxFiles      uint   `json:"max_files"`
+	MaxFileAge    uint   `json:"max_file_age_seconds"`
+	PurgeOnDelete bool   `json:"purge_on_delete"`
 }
 
 type ProcessConfigLimits struct {
@@ -91,9 +92,10 @@ func (cfg *ProcessConfig) Marshal() *app.Config {
 
 		for _, c := range x.Cleanup {
 			output.Cleanup = append(output.Cleanup, app.ConfigIOCleanup{
-				Pattern:    c.Pattern,
-				MaxFiles:   c.MaxFiles,
-				MaxFileAge: c.MaxFileAge,
+				Pattern:       c.Pattern,
+				MaxFiles:      c.MaxFiles,
+				MaxFileAge:    c.MaxFileAge,
+				PurgeOnDelete: c.PurgeOnDelete,
 			})
 		}
 
@@ -237,7 +239,7 @@ type ProcessState struct {
 	LastLog   string      `json:"last_logline"`
 	Progress  *Progress   `json:"progress"`
 	Memory    uint64      `json:"memory_bytes"`
-	CPU       json.Number `json:"cpu_usage"`
+	CPU       json.Number `json:"cpu_usage" swaggertype:"number"`
 	Command   []string    `json:"command"`
 }
 
