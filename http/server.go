@@ -338,13 +338,19 @@ func NewServer(config Config) (Server, error) {
 		s.router.Use(s.middleware.cors)
 	}
 
-	s.router.Use(middleware.RemoveTrailingSlashWithConfig(middleware.TrailingSlashConfig{
-		RedirectCode: 301,
-	}))
-
 	// Add static routes
 	if path, target := config.Router.StaticRoute(); len(target) != 0 {
 		group := s.router.Group(path)
+		group.Use(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
+			Skipper: func(c echo.Context) bool {
+				if path == c.Request().URL.Path {
+					return false
+				}
+
+				return true
+			},
+			RedirectCode: 301,
+		}))
 		group.Use(middleware.StaticWithConfig(middleware.StaticConfig{
 			Skipper:    middleware.DefaultSkipper,
 			Root:       target,
@@ -359,6 +365,18 @@ func NewServer(config Config) (Server, error) {
 
 	for prefix, target := range config.Router.DirRoutes() {
 		group := s.router.Group(prefix)
+		group.Use(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
+			Skipper: func(prefix string) func(c echo.Context) bool {
+				return func(c echo.Context) bool {
+					if prefix == c.Request().URL.Path {
+						return false
+					}
+
+					return true
+				}
+			}(prefix),
+			RedirectCode: 301,
+		}))
 		group.Use(middleware.StaticWithConfig(middleware.StaticConfig{
 			Skipper:    middleware.DefaultSkipper,
 			Root:       target,
