@@ -25,7 +25,7 @@ datarhei Core is management for FFmpeg processes without development effort. It 
 1. Run the Docker image
 
 ```sh
-docker run --name core -d
+docker run --name core -d \
     -e CORE_API_AUTH_USERNAME=admin \
     -e CORE_API_AUTH_PASSWORD=secret \
     -p 8080:8080 \
