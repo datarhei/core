@@ -2,6 +2,11 @@
 
 The cloud-native audio/video processing API.
 
+[![License: MIT](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)]([https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0))
+[![CodeQL](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/datarhei/core)](https://goreportcard.com/report/github.com/datarhei/core)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/datarhei/core)](https://pkg.go.dev/github.com/datarhei/core)
+
 datarhei Core is management for FFmpeg processes without development effort. It is a central interface for mapping AV processes, is responsible for design and management, and provides all necessary interfaces to access the video content. The included control for FFmpeg can keep all used functions reliable and executable without the need for software developers to take care of it. In addition, process and resource limitation for all FFmpeg processes protects the host system from application overload. The overall system gives access to current process values (CPU, RAM) and complete control of system resources and loads with statistical access to process data and current and historical logs.
 
 ## Features
