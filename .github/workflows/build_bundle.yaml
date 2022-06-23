@@ -60,8 +60,8 @@ jobs:
           context: .
           file: ./Dockerfile.bundle
           build-args: |
-            GOLANG_IMAGE=${{ env.GOLANG_IMAGE }}
-            FFMPEG_IMAGE=${{ env.FFMPEG_IMAGE }}
+            CORE_IMAGE=datarhei/base:${{ env.OS_NAME }}-core-${{ env.OS_VERSION }}-${{ env.CORE_VERSION }}
+            FFMPEG_IMAGE=datarhei/base:${{ env.OS_NAME }}-ffmpeg-${{ env.OS_VERSION }}-${{ env.FFMPEG_VERSION }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
