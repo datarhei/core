@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 // LRUConfig is the configuration for a new LRU cache

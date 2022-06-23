@@ -7,7 +7,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 func (r *queryResolver) Log(ctx context.Context) ([]string, error) {

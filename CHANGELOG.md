@@ -1,5 +1,15 @@
 # Core
 
+#### Core v16.8.0 > ?
+
+-   Add experimental SRT connection stats and logs
+-   Hide /config/reload endpoint in reade-only mode
+-   Add SRT server (datarhei/gosrt)
+-   Create v16 in go.mod
+-   Fix data races, tests, lint, and update dependencies
+-   Add trailing slash for routed directories (datarhei/restreamer#340)
+-   Allow relative URLs in content in static routes
+
 #### Core v16.7.2 > v16.8.0
 
 -   Add purge_on_delete function

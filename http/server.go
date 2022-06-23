@@ -7,13 +7,14 @@
 // @contact.email hello@datarhei.com
 
 // @license.name Apache 2.0
-// @license.url https://github.com/datarhei/core/blob/main/LICENSE
+// @license.url https://github.com/datarhei/core/v16/blob/main/LICENSE
 
 // @BasePath /
 
 // @securityDefinitions.apikey ApiKeyAuth
 // @in header
 // @name Authorization
+// @Param Authorization header string true "Insert your access token" default(Bearer <Add access token here>)
 
 // @securityDefinitions.apikey ApiRefreshKeyAuth
 // @in header
@@ -30,33 +31,34 @@ package http
 import (
 	"net/http"
 
-	"github.com/datarhei/core/config"
-	"github.com/datarhei/core/http/cache"
-	"github.com/datarhei/core/http/errorhandler"
-	"github.com/datarhei/core/http/graph/resolver"
-	"github.com/datarhei/core/http/handler"
-	api "github.com/datarhei/core/http/handler/api"
-	"github.com/datarhei/core/http/jwt"
-	"github.com/datarhei/core/http/router"
-	"github.com/datarhei/core/http/validator"
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/monitor"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/prometheus"
-	"github.com/datarhei/core/restream"
-	"github.com/datarhei/core/rtmp"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/http/cache"
+	"github.com/datarhei/core/v16/http/errorhandler"
+	"github.com/datarhei/core/v16/http/graph/resolver"
+	"github.com/datarhei/core/v16/http/handler"
+	api "github.com/datarhei/core/v16/http/handler/api"
+	"github.com/datarhei/core/v16/http/jwt"
+	"github.com/datarhei/core/v16/http/router"
+	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/monitor"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/prometheus"
+	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/rtmp"
+	"github.com/datarhei/core/v16/session"
+	"github.com/datarhei/core/v16/srt"
 
-	mwbodysize "github.com/datarhei/core/http/middleware/bodysize"
-	mwcache "github.com/datarhei/core/http/middleware/cache"
-	mwcors "github.com/datarhei/core/http/middleware/cors"
-	mwgzip "github.com/datarhei/core/http/middleware/gzip"
-	mwiplimit "github.com/datarhei/core/http/middleware/iplimit"
-	mwlog "github.com/datarhei/core/http/middleware/log"
-	mwmime "github.com/datarhei/core/http/middleware/mime"
-	mwredirect "github.com/datarhei/core/http/middleware/redirect"
-	mwsession "github.com/datarhei/core/http/middleware/session"
+	mwbodysize "github.com/datarhei/core/v16/http/middleware/bodysize"
+	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
+	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
+	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
+	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
+	mwlog "github.com/datarhei/core/v16/http/middleware/log"
+	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
+	mwredirect "github.com/datarhei/core/v16/http/middleware/redirect"
+	mwsession "github.com/datarhei/core/v16/http/middleware/session"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -64,7 +66,7 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger" // echo-swagger middleware
 
 	// Expose the API docs
-	_ "github.com/datarhei/core/docs"
+	_ "github.com/datarhei/core/v16/docs"
 )
 
 var ListenAndServe = http.ListenAndServe
@@ -82,6 +84,7 @@ type Config struct {
 	Profiling     bool
 	Cors          CorsConfig
 	RTMP          rtmp.Server
+	SRT           srt.Server
 	JWT           jwt.JWT
 	Config        config.Store
 	Cache         cache.Cacher
@@ -126,6 +129,7 @@ type server struct {
 		memfs     *api.MemFSHandler
 		diskfs    *api.DiskFSHandler
 		rtmp      *api.RTMPHandler
+		srt       *api.SRTHandler
 		config    *api.ConfigHandler
 		session   *api.SessionHandler
 		widget    *api.WidgetHandler
@@ -248,6 +252,12 @@ func NewServer(config Config) (Server, error) {
 		)
 	}
 
+	if config.SRT != nil {
+		s.v3handler.srt = api.NewSRT(
+			config.SRT,
+		)
+	}
+
 	if config.Config != nil {
 		s.v3handler.config = api.NewConfig(
 			config.Config,
@@ -343,11 +353,7 @@ func NewServer(config Config) (Server, error) {
 		group := s.router.Group(path)
 		group.Use(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 			Skipper: func(c echo.Context) bool {
-				if path == c.Request().URL.Path {
-					return false
-				}
-
-				return true
+				return path != c.Request().URL.Path
 			},
 			RedirectCode: 301,
 		}))
@@ -368,11 +374,7 @@ func NewServer(config Config) (Server, error) {
 		group.Use(middleware.AddTrailingSlashWithConfig(middleware.TrailingSlashConfig{
 			Skipper: func(prefix string) func(c echo.Context) bool {
 				return func(c echo.Context) bool {
-					if prefix == c.Request().URL.Path {
-						return false
-					}
-
-					return true
+					return prefix != c.Request().URL.Path
 				}
 			}(prefix),
 			RedirectCode: 301,
@@ -609,13 +611,18 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/rtmp", s.v3handler.rtmp.ListChannels)
 	}
 
+	// v3 SRT
+	if s.v3handler.srt != nil {
+		v3.GET("/srt", s.v3handler.srt.ListChannels)
+	}
+
 	// v3 Config
 	if s.v3handler.config != nil {
 		v3.GET("/config", s.v3handler.config.Get)
-		v3.GET("/config/reload", s.v3handler.config.Reload)
 
 		if !s.readOnly {
 			v3.PUT("/config", s.v3handler.config.Set)
+			v3.GET("/config/reload", s.v3handler.config.Reload)
 		}
 	}
 

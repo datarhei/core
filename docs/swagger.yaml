@@ -301,6 +301,17 @@ definitions:
           session_timeout_sec:
             type: integer
         type: object
+      srt:
+        properties:
+          address:
+            type: string
+          enable:
+            type: boolean
+          passphrase:
+            type: string
+          token:
+            type: string
+        type: object
       storage:
         properties:
           cors:
@@ -834,6 +845,11 @@ definitions:
       name:
         type: string
     type: object
+  api.SRTChannel:
+    properties:
+      name:
+        type: string
+    type: object
   api.Session:
     properties:
       bandwidth_rx_kbit:
@@ -1160,6 +1176,17 @@ definitions:
           session_timeout_sec:
             type: integer
         type: object
+      srt:
+        properties:
+          address:
+            type: string
+          enable:
+            type: boolean
+          passphrase:
+            type: string
+          token:
+            type: string
+        type: object
       storage:
         properties:
           cors:
@@ -1419,7 +1446,7 @@ info:
   description: Expose REST API for the datarhei Core
   license:
     name: Apache 2.0
-    url: https://github.com/datarhei/core/blob/main/LICENSE
+    url: https://github.com/datarhei/core/v16/blob/main/LICENSE
   title: datarhei Core API
   version: "3.0"
 paths:
@@ -2605,7 +2632,7 @@ paths:
       summary: Get the state of a process
   /api/v3/rtmp:
     get:
-      description: List all currently publishing streams
+      description: List all currently publishing RTMP streams
       operationId: rtmp-3-list-channels
       produces:
       - application/json
@@ -2618,7 +2645,7 @@ paths:
             type: array
       security:
       - ApiKeyAuth: []
-      summary: List all publishing streams
+      summary: List all publishing RTMP streams
   /api/v3/session:
     get:
       description: Get a summary of all active and past sessions of the given collector
@@ -2686,6 +2713,22 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Refresh FFmpeg capabilities
+  /api/v3/srt:
+    get:
+      description: List all currently publishing SRT streams
+      operationId: srt-3-list-channels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.SRTChannel'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all publishing SRT treams
   /api/v3/widget/process/{id}:
     get:
       description: Fetch minimal statistics about a process, which is not protected

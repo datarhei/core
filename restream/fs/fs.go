@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
 )
 
 type Config struct {
@@ -117,7 +117,7 @@ func (fs *filesystem) UnsetCleanup(id string) {
 	fs.cleanupLock.Lock()
 	defer fs.cleanupLock.Unlock()
 
-	patterns, _ := fs.cleanupPatterns[id]
+	patterns := fs.cleanupPatterns[id]
 
 	delete(fs.cleanupPatterns, id)
 

@@ -3,7 +3,7 @@ package iplimit
 import (
 	"net/http"
 
-	"github.com/datarhei/core/net"
+	"github.com/datarhei/core/v16/net"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

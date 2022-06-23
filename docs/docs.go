@@ -17,7 +17,7 @@ const docTemplate = `{
         },
         "license": {
             "name": "Apache 2.0",
-            "url": "https://github.com/datarhei/core/blob/main/LICENSE"
+            "url": "https://github.com/datarhei/core/v16/blob/main/LICENSE"
         },
         "version": "{{.Version}}"
     },
@@ -1784,11 +1784,11 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all currently publishing streams",
+                "description": "List all currently publishing RTMP streams",
                 "produces": [
                     "application/json"
                 ],
-                "summary": "List all publishing streams",
+                "summary": "List all publishing RTMP streams",
                 "operationId": "rtmp-3-list-channels",
                 "responses": {
                     "200": {
@@ -1906,6 +1906,32 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.Skills"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/srt": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all currently publishing SRT streams",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "List all publishing SRT treams",
+                "operationId": "srt-3-list-channels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.SRTChannel"
+                            }
                         }
                     }
                 }
@@ -2637,6 +2663,23 @@ const docTemplate = `{
                         },
                         "session_timeout_sec": {
                             "type": "integer"
+                        }
+                    }
+                },
+                "srt": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "passphrase": {
+                            "type": "string"
+                        },
+                        "token": {
+                            "type": "string"
                         }
                     }
                 },
@@ -3447,6 +3490,14 @@ const docTemplate = `{
                 }
             }
         },
+        "api.SRTChannel": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "api.Session": {
             "type": "object",
             "properties": {
@@ -3941,6 +3992,23 @@ const docTemplate = `{
                         },
                         "session_timeout_sec": {
                             "type": "integer"
+                        }
+                    }
+                },
+                "srt": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "passphrase": {
+                            "type": "string"
+                        },
+                        "token": {
+                            "type": "string"
                         }
                     }
                 },

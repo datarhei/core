@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/http/cors"
+	"github.com/datarhei/core/v16/http/cors"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/cache"
-	"github.com/datarhei/core/http/handler/util"
-	"github.com/datarhei/core/io/fs"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/cache"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
 )

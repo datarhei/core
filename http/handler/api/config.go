@@ -3,9 +3,9 @@ package api
 import (
 	"net/http"
 
-	"github.com/datarhei/core/config"
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/handler/util"
+	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
 
 	"github.com/labstack/echo/v4"
 )

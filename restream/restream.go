@@ -10,17 +10,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/ffmpeg/parse"
-	"github.com/datarhei/core/ffmpeg/skills"
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/net/url"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/restream/app"
-	rfs "github.com/datarhei/core/restream/fs"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/ffmpeg/parse"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/net/url"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/app"
+	rfs "github.com/datarhei/core/v16/restream/fs"
+	"github.com/datarhei/core/v16/restream/store"
 )
 
 // The Restreamer interface
@@ -118,20 +118,23 @@ func New(config Config) (Restreamer, error) {
 		r.store = store.NewDummyStore(store.DummyConfig{})
 	}
 
-	r.fs.diskfs = rfs.New(rfs.Config{
-		FS:     config.DiskFS,
-		Logger: r.logger.WithComponent("DiskFS"),
-	})
-	if r.fs.diskfs == nil {
+	if config.DiskFS != nil {
+		r.fs.diskfs = rfs.New(rfs.Config{
+			FS:     config.DiskFS,
+			Logger: r.logger.WithComponent("DiskFS"),
+		})
+	} else {
 		r.fs.diskfs = rfs.New(rfs.Config{
 			FS: fs.NewDummyFilesystem(),
 		})
 	}
-	r.fs.memfs = rfs.New(rfs.Config{
-		FS:     config.MemFS,
-		Logger: r.logger.WithComponent("MemFS"),
-	})
-	if r.fs.memfs == nil {
+
+	if config.MemFS != nil {
+		r.fs.memfs = rfs.New(rfs.Config{
+			FS:     config.MemFS,
+			Logger: r.logger.WithComponent("MemFS"),
+		})
+	} else {
 		r.fs.memfs = rfs.New(rfs.Config{
 			FS: fs.NewDummyFilesystem(),
 		})
@@ -1250,7 +1253,7 @@ func (r *restream) GetPlayout(id, inputid string) (string, error) {
 	}
 
 	if !task.valid {
-		return "", fmt.Errorf("Invalid process definition")
+		return "", fmt.Errorf("invalid process definition")
 	}
 
 	port, ok := task.playout[inputid]

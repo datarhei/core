@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/datarhei/core/math/rand"
+	"github.com/datarhei/core/v16/math/rand"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
@@ -135,6 +135,12 @@ type Data struct {
 		App       string `json:"app"`
 		Token     string `json:"token"`
 	} `json:"rtmp"`
+	SRT struct {
+		Enable     bool   `json:"enable"`
+		Address    string `json:"address"`
+		Passphrase string `json:"passphrase"`
+		Token      string `json:"token"`
+	} `json:"srt"`
 	FFmpeg struct {
 		Binary       string `json:"binary"`
 		MaxProcesses int64  `json:"max_processes"`
@@ -227,6 +233,7 @@ func NewConfigFrom(d *Config) *Config {
 	data.TLS = d.TLS
 	data.Storage = d.Storage
 	data.RTMP = d.RTMP
+	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
 	data.Debug = d.Debug
@@ -338,6 +345,12 @@ func (d *Config) init() {
 	d.val(newAddressValue(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
 	d.val(newStringValue(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.val(newStringValue(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
+
+	// SRT
+	d.val(newBoolValue(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
+	d.val(newAddressValue(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
+	d.val(newStringValue(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
+	d.val(newStringValue(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
 
 	// FFmpeg
 	d.val(newExecValue(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)

@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/datarhei/core/config"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/store"
 
 	_ "github.com/joho/godotenv/autoload"
 )

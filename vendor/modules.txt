@@ -1,4 +1,4 @@
-# github.com/99designs/gqlgen v0.17.9
+# github.com/99designs/gqlgen v0.17.10
 ## explicit
 github.com/99designs/gqlgen
 github.com/99designs/gqlgen/api
@@ -28,22 +28,25 @@ github.com/99designs/gqlgen/plugin/servergen
 github.com/KyleBanks/depth
 # github.com/agnivade/levenshtein v1.1.1
 github.com/agnivade/levenshtein
-# github.com/alecthomas/jsonschema v0.0.0-20211228220459-151e3c21f49d
-## explicit
-github.com/alecthomas/jsonschema
-# github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
-## explicit
-github.com/alecthomas/template
-github.com/alecthomas/template/parse
 # github.com/atrox/haikunatorgo/v2 v2.0.1
 ## explicit
 github.com/atrox/haikunatorgo/v2
+# github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c
+github.com/benburkert/openpgp/aes/keywrap
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.2
 github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/datarhei/gosrt v0.1.1
+## explicit
+github.com/datarhei/gosrt
+github.com/datarhei/gosrt/internal/circular
+github.com/datarhei/gosrt/internal/congestion
+github.com/datarhei/gosrt/internal/crypto
+github.com/datarhei/gosrt/internal/net
+github.com/datarhei/gosrt/internal/packet
 # github.com/datarhei/joy4 v0.0.0-20210125162555-2102a8289cce
 ## explicit
 github.com/datarhei/joy4/av
@@ -110,6 +113,9 @@ github.com/hashicorp/golang-lru/simplelru
 # github.com/iancoleman/orderedmap v0.2.0
 ## explicit
 github.com/iancoleman/orderedmap
+# github.com/invopop/jsonschema v0.4.0
+## explicit
+github.com/invopop/jsonschema
 # github.com/joho/godotenv v1.4.0
 ## explicit
 github.com/joho/godotenv
@@ -167,7 +173,7 @@ github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.34.0
+# github.com/prometheus/common v0.35.0
 ## explicit
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
@@ -178,7 +184,7 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/russross/blackfriday/v2 v2.1.0
 github.com/russross/blackfriday/v2
-# github.com/shirou/gopsutil/v3 v3.22.4
+# github.com/shirou/gopsutil/v3 v3.22.5
 ## explicit
 github.com/shirou/gopsutil/v3/cpu
 github.com/shirou/gopsutil/v3/disk
@@ -186,16 +192,16 @@ github.com/shirou/gopsutil/v3/internal/common
 github.com/shirou/gopsutil/v3/mem
 github.com/shirou/gopsutil/v3/net
 github.com/shirou/gopsutil/v3/process
-# github.com/stretchr/testify v1.7.1
+# github.com/stretchr/testify v1.7.2
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/swaggo/echo-swagger v1.3.2
+# github.com/swaggo/echo-swagger v1.3.3
 ## explicit
 github.com/swaggo/echo-swagger
-# github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2
+# github.com/swaggo/files v0.0.0-20220610200504-28940afbdbfe
 github.com/swaggo/files
-# github.com/swaggo/swag v1.8.2
+# github.com/swaggo/swag v1.8.3
 ## explicit
 github.com/swaggo/swag
 # github.com/tklauser/go-sysconf v0.3.10
@@ -209,7 +215,7 @@ github.com/urfave/cli/v2
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasttemplate v1.2.1
 github.com/valyala/fasttemplate
-# github.com/vektah/gqlparser/v2 v2.4.4
+# github.com/vektah/gqlparser/v2 v2.4.5
 ## explicit
 github.com/vektah/gqlparser/v2
 github.com/vektah/gqlparser/v2/ast
@@ -234,13 +240,14 @@ github.com/yusufpapurcu/wmi
 ## explicit
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/sha3
-# golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
+# golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 ## explicit
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20220526153639-5463443f8c37
+# golang.org/x/net v0.0.0-20220617184016-355a448f1bc9
 ## explicit
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
@@ -249,12 +256,14 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/webdav
 golang.org/x/net/webdav/internal/xml
-# golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+# golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c
+## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+golang.org/x/sys/windows/registry
 # golang.org/x/text v0.3.7
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
@@ -264,10 +273,11 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20220411224347-583f2d630306
+# golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.1.10
+# golang.org/x/tools v0.1.11
+## explicit
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/buildutil
 golang.org/x/tools/go/gcexportdata
@@ -288,9 +298,6 @@ golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
-# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-golang.org/x/xerrors
-golang.org/x/xerrors/internal
 # google.golang.org/protobuf v1.28.0
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -322,5 +329,5 @@ google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+# gopkg.in/yaml.v3 v3.0.1
 gopkg.in/yaml.v3

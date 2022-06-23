@@ -3,8 +3,8 @@ package monitor
 import (
 	"strconv"
 
-	"github.com/datarhei/core/monitor/metric"
-	"github.com/datarhei/core/restream"
+	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/datarhei/core/v16/restream"
 )
 
 type restreamCollector struct {

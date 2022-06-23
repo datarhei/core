@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/monitor/metric"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/monitor/metric"
 )
 
 type filesystemCollector struct {

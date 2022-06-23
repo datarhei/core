@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 // MemConfig is the config that is required for creating
@@ -305,7 +305,7 @@ func (fs *memFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
 		if newSize > fs.maxSize {
 			if !fs.purge {
 				fs.dataPool.Put(data)
-				return -1, false, fmt.Errorf("Not enough space on device")
+				return -1, false, fmt.Errorf("not enough space on device")
 			}
 
 			if replace {

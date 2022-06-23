@@ -10,8 +10,6 @@ import (
 
 // DevicesV4L returns a list of available V4L devices
 func DevicesV4L() ([]HWDevice, error) {
-	devices := []HWDevice{}
-
 	buf := bytes.NewBuffer(nil)
 
 	cmd := exec.Command("v4l2-ctl", "--list-devices")
@@ -19,7 +17,7 @@ func DevicesV4L() ([]HWDevice, error) {
 	cmd.Stdout = buf
 	cmd.Run()
 
-	devices = parseV4LDevices(buf)
+	devices := parseV4LDevices(buf)
 
 	return devices, nil
 }

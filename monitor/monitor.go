@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/monitor/metric"
+	"github.com/datarhei/core/v16/monitor/metric"
 )
 
 type Monitor interface {

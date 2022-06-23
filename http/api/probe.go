@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 // ProbeIO represents a stream of a probed file
@@ -17,11 +17,11 @@ type ProbeIO struct {
 	Type     string      `json:"type"`
 	Codec    string      `json:"codec"`
 	Coder    string      `json:"coder"`
-	Bitrate  json.Number `json:"bitrate_kbps" swaggertype:"number"`
-	Duration json.Number `json:"duration_sec"  swaggertype:"number"`
+	Bitrate  json.Number `json:"bitrate_kbps" swaggertype:"number" jsonschema:"type=number"`
+	Duration json.Number `json:"duration_sec"  swaggertype:"number" jsonschema:"type=number"`
 
 	// video
-	FPS    json.Number `json:"fps" swaggertype:"number"`
+	FPS    json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 	Pixfmt string      `json:"pix_fmt"`
 	Width  uint64      `json:"width"`
 	Height uint64      `json:"height"`

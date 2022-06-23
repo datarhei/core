@@ -1,6 +1,6 @@
 package app
 
-import "github.com/datarhei/core/process"
+import "github.com/datarhei/core/v16/process"
 
 type ConfigIOCleanup struct {
 	Pattern       string `json:"pattern"`

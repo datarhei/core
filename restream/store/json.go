@@ -7,9 +7,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/datarhei/core/encoding/json"
-	"github.com/datarhei/core/io/file"
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/log"
 )
 
 type JSONConfig struct {

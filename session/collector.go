@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/io/file"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net"
+	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net"
 
 	"github.com/prep/average"
 )

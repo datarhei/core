@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"github.com/datarhei/core/monitor/metric"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/datarhei/core/v16/session"
 )
 
 type sessionCollector struct {

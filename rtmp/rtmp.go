@@ -2,6 +2,7 @@
 package rtmp
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"path/filepath"
@@ -9,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/session"
 
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/av/pktque"
@@ -38,7 +39,7 @@ type client struct {
 
 	collector session.Collector
 
-	done chan struct{}
+	cancel context.CancelFunc
 }
 
 func newClient(conn *rtmp.Conn, id string, collector session.Collector) *client {
@@ -48,22 +49,23 @@ func newClient(conn *rtmp.Conn, id string, collector session.Collector) *client 
 		createdAt: time.Now(),
 
 		collector: collector,
-
-		done: make(chan struct{}),
 	}
 
-	go c.ticker()
+	var ctx context.Context
+	ctx, c.cancel = context.WithCancel(context.Background())
+
+	go c.ticker(ctx)
 
 	return c
 }
 
-func (c *client) ticker() {
+func (c *client) ticker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-c.done:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			txbytes := c.conn.TxBytes()
@@ -79,7 +81,7 @@ func (c *client) ticker() {
 }
 
 func (c *client) Close() {
-	close(c.done)
+	c.cancel()
 }
 
 // channel represents a stream that is sent to the server

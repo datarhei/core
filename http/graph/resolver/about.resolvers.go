@@ -7,9 +7,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/datarhei/core/app"
-	"github.com/datarhei/core/http/graph/models"
-	"github.com/datarhei/core/http/graph/scalars"
+	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/http/graph/scalars"
 )
 
 func (r *queryResolver) About(ctx context.Context) (*models.About, error) {

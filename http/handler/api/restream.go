@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/handler/util"
-	"github.com/datarhei/core/restream"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/restream"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"

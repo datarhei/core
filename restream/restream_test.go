@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/restream/app"
 	"github.com/stretchr/testify/require"
 )
 

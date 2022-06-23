@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/http/handler/util"
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/log"
 
 	"github.com/labstack/echo/v4"
 )

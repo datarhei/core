@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/psutil"
+	"github.com/datarhei/core/v16/psutil"
 )
 
 type LimitFunc func(cpu float64, memory uint64)

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/datarhei/core/ffmpeg/skills"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
 )
 
 // SkillsFilter represents an ffmpeg filter

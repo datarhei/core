@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/mock"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/mock"
 
 	"github.com/labstack/echo/v4"
 )
@@ -45,7 +45,7 @@ func TestAddProcessMissingField(t *testing.T) {
 
 	data := mock.Read(t, "./fixtures/addProcessMissingField.json")
 
-	mock.Request(t, http.StatusBadRequest, router, "POST", "/", data)
+	mock.Request(t, http.StatusOK, router, "POST", "/", data)
 }
 
 func TestAddProcessInvalidType(t *testing.T) {

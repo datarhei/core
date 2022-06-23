@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/mock"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/mock"
+	"github.com/datarhei/core/v16/session"
 
 	"github.com/labstack/echo/v4"
 )

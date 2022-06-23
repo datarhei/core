@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 
 	"github.com/stretchr/testify/require"
 )

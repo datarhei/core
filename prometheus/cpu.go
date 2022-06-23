@@ -1,7 +1,7 @@
 package prometheus
 
 import (
-	"github.com/datarhei/core/monitor/metric"
+	"github.com/datarhei/core/v16/monitor/metric"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

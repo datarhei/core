@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net/url"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/restream/app"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net/url"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/session"
 )
 
 // Parser is an extension to the process.Parser interface
@@ -133,6 +133,7 @@ func New(config Config) Parser {
 	p.re.drop = regexp.MustCompile(`drop=\s*([0-9]+)`)
 	p.re.dup = regexp.MustCompile(`dup=\s*([0-9]+)`)
 
+	p.lock.prelude.Lock()
 	p.prelude.headLines = config.PreludeHeadLines
 	if p.prelude.headLines <= 0 {
 		p.prelude.headLines = 100
@@ -142,7 +143,9 @@ func New(config Config) Parser {
 		p.prelude.tailLines = 50
 	}
 	p.prelude.tail = ring.New(p.prelude.tailLines)
+	p.lock.prelude.Unlock()
 
+	p.lock.log.Lock()
 	p.log = ring.New(config.LogLines)
 
 	if p.logHistoryLength > 0 {
@@ -154,6 +157,7 @@ func New(config Config) Parser {
 	}
 
 	p.logStart = time.Now()
+	p.lock.log.Unlock()
 
 	p.ResetStats()
 
@@ -168,7 +172,9 @@ func (p *parser) Parse(line string) uint64 {
 	isAVstreamProgress := strings.HasPrefix(line, "avstream.progress:")
 
 	if p.logStart.IsZero() {
+		p.lock.log.Lock()
 		p.logStart = time.Now()
+		p.lock.log.Unlock()
 	}
 
 	if !p.prelude.done {
@@ -199,7 +205,10 @@ func (p *parser) Parse(line string) uint64 {
 				}).Error().Log("Failed parsing outputs")
 			} else {
 				p.logger.WithField("prelude", p.Prelude()).Debug().Log("")
+
+				p.lock.prelude.Lock()
 				p.prelude.done = true
+				p.lock.prelude.Unlock()
 			}
 
 			return 0
@@ -211,7 +220,10 @@ func (p *parser) Parse(line string) uint64 {
 			}
 
 			p.logger.WithField("prelude", p.Prelude()).Debug().Log("")
+
+			p.lock.prelude.Lock()
 			p.prelude.done = true
+			p.lock.prelude.Unlock()
 		}
 	}
 
@@ -219,17 +231,17 @@ func (p *parser) Parse(line string) uint64 {
 		// Write the current non-progress line to the log
 		p.addLog(line)
 
+		p.lock.prelude.Lock()
 		if !p.prelude.done {
 			if len(p.prelude.data) < p.prelude.headLines {
 				p.prelude.data = append(p.prelude.data, line)
 			} else {
-				p.lock.prelude.Lock()
 				p.prelude.tail.Value = line
 				p.prelude.tail = p.prelude.tail.Next()
-				p.lock.prelude.Unlock()
 				p.prelude.truncatedLines++
 			}
 		}
+		p.lock.prelude.Unlock()
 
 		return 0
 	}
@@ -508,7 +520,9 @@ func (p *parser) Progress() app.Progress {
 }
 
 func (p *parser) Prelude() []string {
+	p.lock.prelude.RLock()
 	if p.prelude.data == nil {
+		p.lock.prelude.RUnlock()
 		return []string{}
 	}
 
@@ -516,8 +530,6 @@ func (p *parser) Prelude() []string {
 	copy(prelude, p.prelude.data)
 
 	tail := []string{}
-
-	p.lock.prelude.RLock()
 
 	p.prelude.tail.Do(func(l interface{}) {
 		if l == nil {
@@ -734,24 +746,25 @@ func (p *parser) ResetStats() {
 	p.progress.ffmpeg = ffmpegProgress{}
 	p.progress.avstream = make(map[string]ffmpegAVstream)
 
+	p.lock.prelude.Lock()
 	p.prelude.done = false
+	p.lock.prelude.Unlock()
 }
 
 func (p *parser) ResetLog() {
 	p.storeLogHistory()
 
-	p.prelude.data = []string{}
 	p.lock.prelude.Lock()
+	p.prelude.data = []string{}
 	p.prelude.tail = ring.New(p.prelude.tailLines)
-	p.lock.prelude.Unlock()
 	p.prelude.truncatedLines = 0
 	p.prelude.done = false
+	p.lock.prelude.Unlock()
 
 	p.lock.log.Lock()
 	p.log = ring.New(p.logLines)
-	p.lock.log.Unlock()
-
 	p.logStart = time.Now()
+	p.lock.log.Unlock()
 }
 
 // Report represents a log report, including the prelude and the last log lines
@@ -777,10 +790,13 @@ func (p *parser) storeLogHistory() {
 
 func (p *parser) Report() Report {
 	h := Report{
-		CreatedAt: p.logStart,
-		Prelude:   p.Prelude(),
-		Log:       p.Log(),
+		Prelude: p.Prelude(),
+		Log:     p.Log(),
 	}
+
+	p.lock.log.RLock()
+	h.CreatedAt = p.logStart
+	p.lock.log.RUnlock()
 
 	return h
 }

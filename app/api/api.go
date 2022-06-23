@@ -15,25 +15,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/app"
-	"github.com/datarhei/core/config"
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/http"
-	"github.com/datarhei/core/http/cache"
-	"github.com/datarhei/core/http/jwt"
-	"github.com/datarhei/core/http/router"
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/math/rand"
-	"github.com/datarhei/core/monitor"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/prometheus"
-	"github.com/datarhei/core/restream"
-	"github.com/datarhei/core/restream/store"
-	"github.com/datarhei/core/rtmp"
-	"github.com/datarhei/core/service"
-	"github.com/datarhei/core/session"
-	"github.com/datarhei/core/update"
+	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/http"
+	"github.com/datarhei/core/v16/http/cache"
+	"github.com/datarhei/core/v16/http/jwt"
+	"github.com/datarhei/core/v16/http/router"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/math/rand"
+	"github.com/datarhei/core/v16/monitor"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/prometheus"
+	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/store"
+	"github.com/datarhei/core/v16/rtmp"
+	"github.com/datarhei/core/v16/service"
+	"github.com/datarhei/core/v16/session"
+	"github.com/datarhei/core/v16/srt"
+	"github.com/datarhei/core/v16/update"
 
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -64,6 +65,7 @@ type api struct {
 	diskfs        fs.Filesystem
 	memfs         fs.Filesystem
 	rtmpserver    rtmp.Server
+	srtserver     srt.Server
 	metrics       monitor.HistoryMonitor
 	prom          prometheus.Metrics
 	service       service.Service
@@ -76,9 +78,6 @@ type api struct {
 
 	errorChan chan error
 
-	startOnce sync.Once
-	stopOnce  sync.Once
-
 	gcTickerStop context.CancelFunc
 
 	log struct {
@@ -89,6 +88,7 @@ type api struct {
 			main    log.Logger
 			sidecar log.Logger
 			rtmp    log.Logger
+			srt     log.Logger
 		}
 	}
 
@@ -319,6 +319,11 @@ func (a *api) start() error {
 			return fmt.Errorf("unable to register session collector: %w", err)
 		}
 
+		srt, err := sessions.Register("srt", config)
+		if err != nil {
+			return fmt.Errorf("unable to register session collector: %w", err)
+		}
+
 		if _, err := sessions.Register("http", config); err != nil {
 			return fmt.Errorf("unable to register session collector: %w", err)
 		}
@@ -333,13 +338,20 @@ func (a *api) start() error {
 		}
 
 		hls.AddCompanion(rtmp)
+		hls.AddCompanion(srt)
 		hls.AddCompanion(ffmpeg)
 
 		rtmp.AddCompanion(hls)
 		rtmp.AddCompanion(ffmpeg)
+		rtmp.AddCompanion(srt)
+
+		srt.AddCompanion(hls)
+		srt.AddCompanion(ffmpeg)
+		srt.AddCompanion(rtmp)
 
 		ffmpeg.AddCompanion(hls)
 		ffmpeg.AddCompanion(rtmp)
+		ffmpeg.AddCompanion(srt)
 	} else {
 		sessions, _ := session.New(session.Config{})
 		a.sessions = sessions
@@ -674,13 +686,31 @@ func (a *api) start() error {
 		}
 
 		rtmpserver, err := rtmp.New(config)
-
 		if err != nil {
 			return fmt.Errorf("unable to create RMTP server: %w", err)
 		}
 
 		a.log.logger.rtmp = config.Logger
 		a.rtmpserver = rtmpserver
+	}
+
+	if cfg.SRT.Enable {
+		config := srt.Config{
+			Addr:         cfg.SRT.Address,
+			Passphrase:   cfg.SRT.Passphrase,
+			Token:        cfg.SRT.Token,
+			Logger:       a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
+			Collector:    a.sessions.Collector("srt"),
+			SRTLogTopics: []string{"handshake", "connection"},
+		}
+
+		srtserver, err := srt.New(config)
+		if err != nil {
+			return fmt.Errorf("unable to create SRT server: %w", err)
+		}
+
+		a.log.logger.srt = config.Logger
+		a.srtserver = srtserver
 	}
 
 	logcontext := "HTTP"
@@ -733,6 +763,7 @@ func (a *api) start() error {
 			Origins: cfg.Storage.CORS.Origins,
 		},
 		RTMP:     a.rtmpserver,
+		SRT:      a.srtserver,
 		JWT:      a.httpjwt,
 		Config:   a.config.store,
 		Cache:    a.cache,
@@ -794,6 +825,7 @@ func (a *api) start() error {
 				Origins: cfg.Storage.CORS.Origins,
 			},
 			RTMP:     a.rtmpserver,
+			SRT:      a.srtserver,
 			JWT:      a.httpjwt,
 			Config:   a.config.store,
 			Cache:    a.cache,
@@ -882,6 +914,34 @@ func (a *api) start() error {
 				} else {
 					err = nil
 				}
+			}
+
+			sendError(err)
+		}()
+	}
+
+	if a.srtserver != nil {
+		wgStart.Add(1)
+		a.wgStop.Add(1)
+
+		go func() {
+			logger := a.log.logger.srt
+
+			defer func() {
+				logger.Info().Log("Server exited")
+				a.wgStop.Done()
+			}()
+
+			wgStart.Done()
+
+			var err error
+
+			logger.Info().Log("Server started")
+			err = a.srtserver.ListenAndServe()
+			if err != nil && err != srt.ErrServerClosed {
+				err = fmt.Errorf("SRT server: %w", err)
+			} else {
+				err = nil
 			}
 
 			sendError(err)
@@ -1029,6 +1089,14 @@ func (a *api) stop() {
 	if a.cache != nil {
 		a.cache.Purge()
 		a.cache = nil
+	}
+
+	// Stop the SRT server
+	if a.srtserver != nil {
+		a.log.logger.srt.Info().Log("Stopping ...")
+
+		a.srtserver.Close()
+		a.srtserver = nil
 	}
 
 	// Stop the RTMP server

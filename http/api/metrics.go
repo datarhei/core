@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/datarhei/core/monitor"
+	"github.com/datarhei/core/v16/monitor"
 )
 
 type MetricsQueryMetric struct {

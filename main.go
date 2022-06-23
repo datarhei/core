@@ -4,8 +4,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/datarhei/core/app/api"
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/app/api"
+	"github.com/datarhei/core/v16/log"
 
 	_ "github.com/joho/godotenv/autoload"
 )

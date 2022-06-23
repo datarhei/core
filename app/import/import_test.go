@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/datarhei/core/encoding/json"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/stretchr/testify/require"
 )

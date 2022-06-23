@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/datarhei/core/config"
-	"github.com/datarhei/core/http/mock"
+	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/http/mock"
 	"github.com/labstack/echo/v4"
 )
 
@@ -51,6 +51,7 @@ func TestConfigSet(t *testing.T) {
 	cfg := config.New()
 	cfg.DB.Dir = "."
 	cfg.Storage.Disk.Dir = "."
+	cfg.Storage.MimeTypes = ""
 
 	encoder := json.NewEncoder(&data)
 	encoder.Encode(cfg)

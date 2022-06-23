@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/http/cors"
+	"github.com/datarhei/core/v16/http/cors"
 )
 
 type value interface {

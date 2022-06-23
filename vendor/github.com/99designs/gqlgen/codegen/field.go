@@ -71,7 +71,7 @@ func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, e
 		log.Println(err.Error())
 	}
 
-	if f.IsResolver && !f.TypeReference.IsPtr() && f.TypeReference.IsStruct() {
+	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() && f.TypeReference.IsStruct() {
 		f.TypeReference = b.Binder.PointerTo(f.TypeReference)
 	}
 
@@ -557,7 +557,20 @@ func (f *Field) CallArgs() string {
 	}
 
 	for _, arg := range f.Args {
-		args = append(args, "fc.Args["+strconv.Quote(arg.Name)+"].("+templates.CurrentImports.LookupType(arg.TypeReference.GO)+")")
+		tmp := "fc.Args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+
+		if types.IsInterface(arg.TypeReference.GO) {
+			tmp = fmt.Sprintf(`
+				func () interface{} {
+					if fc.Args["%s"] == nil {
+						return nil
+					}
+					return fc.Args["%s"].(interface{})
+				}()`, arg.Name, arg.Name,
+			)
+		}
+
+		args = append(args, tmp)
 	}
 
 	return strings.Join(args, ", ")

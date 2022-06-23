@@ -6,7 +6,7 @@ package resolver
 import (
 	"context"
 
-	"github.com/datarhei/core/http/graph/models"
+	"github.com/datarhei/core/v16/http/graph/models"
 )
 
 func (r *queryResolver) Processes(ctx context.Context) ([]*models.Process, error) {

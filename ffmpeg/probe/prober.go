@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Parser interface {

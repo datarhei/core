@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 // DiskConfig is the config required to create a new disk
@@ -241,7 +241,7 @@ func (fs *diskFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return -1, false, fmt.Errorf("Creating file failed: %w", err)
+		return -1, false, fmt.Errorf("creating file failed: %w", err)
 	}
 
 	var f *os.File
@@ -251,7 +251,7 @@ func (fs *diskFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
 	if err != nil {
 		f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
-			return -1, false, fmt.Errorf("Creating file failed: %w", err)
+			return -1, false, fmt.Errorf("creating file failed: %w", err)
 		}
 
 		replace = false
@@ -259,7 +259,7 @@ func (fs *diskFilesystem) Store(path string, r io.Reader) (int64, bool, error) {
 
 	size, err := f.ReadFrom(r)
 	if err != nil {
-		return -1, false, fmt.Errorf("Reading data failed: %w", err)
+		return -1, false, fmt.Errorf("reading data failed: %w", err)
 	}
 
 	return size, !replace, nil
