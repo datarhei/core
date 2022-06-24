@@ -326,7 +326,7 @@ func (s *server) srtlogListener(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			return
 		case l := <-s.srtlogger.Listen():
 			s.srtlogLock.Lock()
 			if buf := s.srtlog[l.Topic]; buf == nil {
