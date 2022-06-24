@@ -49,6 +49,7 @@ func TestConfigSet(t *testing.T) {
 	var data bytes.Buffer
 
 	cfg := config.New()
+	cfg.FFmpeg.Binary = "true"
 	cfg.DB.Dir = "."
 	cfg.Storage.Disk.Dir = "."
 	cfg.Storage.MimeTypes = ""

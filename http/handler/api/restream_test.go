@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/labstack/echo/v4"
 )
@@ -16,18 +17,24 @@ type Response struct {
 	Data    interface{}
 }
 
-func getDummyRestreamHandler() *RestreamHandler {
-	rs := mock.DummyRestreamer()
+func getDummyRestreamHandler() (*RestreamHandler, error) {
+	rs, err := mock.DummyRestreamer("../../mock")
+	if err != nil {
+		return nil, err
+	}
 
 	handler := NewRestream(rs)
 
-	return handler
+	return handler, nil
 }
 
-func getDummyRestreamRouter() *echo.Echo {
+func getDummyRestreamRouter() (*echo.Echo, error) {
 	router := mock.DummyEcho()
 
-	restream := getDummyRestreamHandler()
+	restream, err := getDummyRestreamHandler()
+	if err != nil {
+		return nil, err
+	}
 
 	router.GET("/", restream.GetAll)
 	router.POST("/", restream.Add)
@@ -37,11 +44,12 @@ func getDummyRestreamRouter() *echo.Echo {
 	router.DELETE("/:id", restream.Delete)
 	router.PUT("/:id/command", restream.Command)
 
-	return router
+	return router, nil
 }
 
 func TestAddProcessMissingField(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcessMissingField.json")
 
@@ -49,7 +57,8 @@ func TestAddProcessMissingField(t *testing.T) {
 }
 
 func TestAddProcessInvalidType(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcessInvalidType.json")
 
@@ -57,7 +66,8 @@ func TestAddProcessInvalidType(t *testing.T) {
 }
 
 func TestAddProcess(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcess.json")
 
@@ -67,13 +77,15 @@ func TestAddProcess(t *testing.T) {
 }
 
 func TestRemoveUnknownProcess(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	mock.Request(t, http.StatusNotFound, router, "DELETE", "/foobar", nil)
 }
 
 func TestRemoveProcess(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/removeProcess.json")
 
@@ -82,7 +94,8 @@ func TestRemoveProcess(t *testing.T) {
 }
 
 func TestProcessInfo(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcess.json")
 
@@ -93,13 +106,15 @@ func TestProcessInfo(t *testing.T) {
 }
 
 func TestProcessReportNotFound(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	mock.Request(t, http.StatusNotFound, router, "GET", "/test/report", nil)
 }
 
 func TestProcessReport(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcess.json")
 
@@ -110,14 +125,16 @@ func TestProcessReport(t *testing.T) {
 }
 
 func TestProcessCommandNotFound(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	command := mock.Read(t, "./fixtures/commandStart.json")
 	mock.Request(t, http.StatusBadRequest, router, "PUT", "/test/command", command)
 }
 
 func TestProcessCommandInvalid(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcess.json")
 
@@ -128,7 +145,8 @@ func TestProcessCommandInvalid(t *testing.T) {
 }
 
 func TestProcessCommand(t *testing.T) {
-	router := getDummyRestreamRouter()
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
 
 	data := mock.Read(t, "./fixtures/addProcess.json")
 

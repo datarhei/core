@@ -1,26 +1,40 @@
 package restream
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
+
 	"github.com/stretchr/testify/require"
 )
 
-func getDummyRestreamer(portrange net.Portranger) Restreamer {
-	ffmpeg, _ := ffmpeg.New(ffmpeg.Config{
-		Binary:    "ffmpeg",
+func getDummyRestreamer(portrange net.Portranger) (Restreamer, error) {
+	binary, err := testhelper.BuildBinary("ffmpeg", "../internal/testhelper")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build helper program: %w", err)
+	}
+
+	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
+		Binary:    binary,
 		Portrange: portrange,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	rs, _ := New(Config{
+	rs, err := New(Config{
 		FFmpeg: ffmpeg,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return rs
+	return rs, nil
 }
 
 func getDummyProcess() *app.Config {
@@ -61,10 +75,11 @@ func getDummyProcess() *app.Config {
 }
 
 func TestAddProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
+	require.NotNil(t, process)
 
 	_, err = rs.GetProcess(process.ID)
 	require.NotEqual(t, nil, err, "Unset process found (%s)", process.ID)
@@ -80,7 +95,9 @@ func TestAddProcess(t *testing.T) {
 }
 
 func TestAutostartProcess(t *testing.T) {
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
+
 	process := getDummyProcess()
 	process.Autostart = true
 
@@ -93,9 +110,8 @@ func TestAutostartProcess(t *testing.T) {
 }
 
 func TestAddInvalidProcess(t *testing.T) {
-	var err error = nil
-
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
 	// Invalid process ID
 	process := getDummyProcess()
@@ -162,9 +178,9 @@ func TestAddInvalidProcess(t *testing.T) {
 }
 
 func TestRemoveProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	err = rs.AddProcess(process)
@@ -178,9 +194,9 @@ func TestRemoveProcess(t *testing.T) {
 }
 
 func TestGetProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -194,9 +210,9 @@ func TestGetProcess(t *testing.T) {
 }
 
 func TestStartProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -220,9 +236,9 @@ func TestStartProcess(t *testing.T) {
 }
 
 func TestStopProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -245,9 +261,9 @@ func TestStopProcess(t *testing.T) {
 }
 
 func TestRestartProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -270,9 +286,9 @@ func TestRestartProcess(t *testing.T) {
 }
 
 func TestReloadProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -301,7 +317,9 @@ func TestReloadProcess(t *testing.T) {
 }
 
 func TestProcessData(t *testing.T) {
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
+
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -320,9 +338,9 @@ func TestProcessData(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -353,9 +371,9 @@ func TestLog(t *testing.T) {
 }
 
 func TestPlayoutNoRange(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
@@ -373,11 +391,12 @@ func TestPlayoutNoRange(t *testing.T) {
 }
 
 func TestPlayoutRange(t *testing.T) {
-	var err error = nil
+	portrange, err := net.NewPortrange(3000, 3001)
+	require.NoError(t, err)
 
-	portrange, _ := net.NewPortrange(3000, 3001)
+	rs, err := getDummyRestreamer(portrange)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(portrange)
 	process := getDummyProcess()
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
@@ -396,9 +415,9 @@ func TestPlayoutRange(t *testing.T) {
 }
 
 func TestAddressReference(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process1 := getDummyProcess()
 	process2 := getDummyProcess()
 
@@ -428,7 +447,10 @@ func TestAddressReference(t *testing.T) {
 }
 
 func TestOutputAddressValidation(t *testing.T) {
-	rs := getDummyRestreamer(nil).(*restream)
+	rsi, err := getDummyRestreamer(nil)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
 
 	type res struct {
 		path string

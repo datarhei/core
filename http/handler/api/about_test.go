@@ -6,23 +6,29 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/labstack/echo/v4"
 )
 
-func getDummyAboutRouter() *echo.Echo {
+func getDummyAboutRouter() (*echo.Echo, error) {
 	router := mock.DummyEcho()
 
-	rs := mock.DummyRestreamer()
+	rs, err := mock.DummyRestreamer("../../mock")
+	if err != nil {
+		return nil, err
+	}
 
 	handler := NewAbout(rs, []string{})
 
 	router.Add("GET", "/", handler.About)
 
-	return router
+	return router, nil
 }
 
 func TestAbout(t *testing.T) {
-	router := getDummyAboutRouter()
+	router, err := getDummyAboutRouter()
+	require.NoError(t, err)
 
 	response := mock.Request(t, http.StatusOK, router, "GET", "/", nil)
 
