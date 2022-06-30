@@ -725,24 +725,30 @@ func (r *restream) validateInputAddress(address, basedir string) (string, error)
 }
 
 func (r *restream) validateOutputAddress(address, basedir string) (string, bool, error) {
-	if strings.HasPrefix(address, "tee:") {
-		address = strings.TrimPrefix(address, "tee:")
+	if strings.Contains(address, "|") {
 		addresses := strings.Split(address, "|")
 
 		isFile := false
 
-		for _, a := range addresses {
-			_, file, err := r.validateOutputAddress(a, basedir)
+		teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
+
+		for i, a := range addresses {
+			options := teeOptions.FindString(a)
+			a = teeOptions.ReplaceAllString(a, "")
+
+			va, file, err := r.validateOutputAddress(a, basedir)
 			if err != nil {
-				return "tee:" + address, false, err
+				return address, false, err
 			}
 
 			if file {
 				isFile = true
 			}
+
+			addresses[i] = options + va
 		}
 
-		return "tee:" + address, isFile, nil
+		return strings.Join(addresses, "|"), isFile, nil
 	}
 
 	address = strings.TrimPrefix(address, "file:")

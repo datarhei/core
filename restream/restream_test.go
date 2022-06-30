@@ -458,17 +458,19 @@ func TestOutputAddressValidation(t *testing.T) {
 	}
 
 	paths := map[string]res{
-		"/dev/null":                   {"file:/dev/null", false},
-		"/dev/../etc/passwd":          {"/etc/passwd", true},
-		"/dev/fb0":                    {"file:/dev/fb0", false},
-		"/etc/passwd":                 {"/etc/passwd", true},
-		"/core/data/../../etc/passwd": {"/etc/passwd", true},
-		"/core/data/./etc/passwd":     {"file:/core/data/etc/passwd", false},
-		"file:/core/data/foobar":      {"file:/core/data/foobar", false},
-		"http://example.com":          {"http://example.com", false},
-		"-":                           {"pipe:", false},
-		"tee:/core/data/foobar|http://example.com": {"tee:/core/data/foobar|http://example.com", false},
-		"tee:/core/data/foobar|/etc/passwd":        {"tee:/core/data/foobar|/etc/passwd", true},
+		"/dev/null":                            {"file:/dev/null", false},
+		"/dev/../etc/passwd":                   {"/etc/passwd", true},
+		"/dev/fb0":                             {"file:/dev/fb0", false},
+		"/etc/passwd":                          {"/etc/passwd", true},
+		"/core/data/../../etc/passwd":          {"/etc/passwd", true},
+		"/core/data/./etc/passwd":              {"file:/core/data/etc/passwd", false},
+		"file:/core/data/foobar":               {"file:/core/data/foobar", false},
+		"http://example.com":                   {"http://example.com", false},
+		"-":                                    {"pipe:", false},
+		"/core/data/foobar|http://example.com": {"file:/core/data/foobar|http://example.com", false},
+		"/core/data/foobar|/etc/passwd":        {"/core/data/foobar|/etc/passwd", true},
+		"[f=null]-|[f=null]-":                  {"[f=null]pipe:|[f=null]pipe:", false},
+		"[onfail=ignore]/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/": {"[onfail=ignore]file:/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/", false},
 	}
 
 	for path, r := range paths {

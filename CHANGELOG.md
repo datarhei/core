@@ -2,6 +2,7 @@
 
 #### Core v16.8.0 > ?
 
+-   Fix output address validation for tee outputs
 -   Fix updating process config
 -   Add experimental SRT connection stats and logs
 -   Hide /config/reload endpoint in reade-only mode
