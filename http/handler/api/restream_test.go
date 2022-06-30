@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -74,6 +76,74 @@ func TestAddProcess(t *testing.T) {
 	response := mock.Request(t, http.StatusOK, router, "POST", "/", data)
 
 	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+}
+
+func TestUpdateProcessInvalid(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	update := bytes.Buffer{}
+	_, err = update.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	proc := api.ProcessConfig{}
+	err = json.Unmarshal(update.Bytes(), &proc)
+	require.NoError(t, err)
+
+	// invalid address
+	proc.Output[0].Address = ""
+
+	encoded, err := json.Marshal(&proc)
+	require.NoError(t, err)
+
+	update.Reset()
+	_, err = update.Write(encoded)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/"+proc.ID, &update)
+	mock.Request(t, http.StatusOK, router, "GET", "/"+proc.ID, nil)
+}
+
+func TestUpdateProcess(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	update := bytes.Buffer{}
+	_, err = update.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	proc := api.ProcessConfig{}
+	err = json.Unmarshal(update.Bytes(), &proc)
+	require.NoError(t, err)
+
+	// invalid address
+	proc.ID = "test2"
+
+	encoded, err := json.Marshal(&proc)
+	require.NoError(t, err)
+
+	update.Reset()
+	_, err = update.Write(encoded)
+	require.NoError(t, err)
+
+	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", &update)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	mock.Request(t, http.StatusNotFound, router, "GET", "/test", nil)
+	mock.Request(t, http.StatusOK, router, "GET", "/test2", nil)
 }
 
 func TestRemoveUnknownProcess(t *testing.T) {

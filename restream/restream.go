@@ -33,6 +33,7 @@ type Restreamer interface {
 	AddProcess(config *app.Config) error                       // add a new process
 	GetProcessIDs() []string                                   // get a list of all process IDs
 	DeleteProcess(id string) error                             // delete a process
+	UpdateProcess(id string, config *app.Config) error         // update a process
 	StartProcess(id string) error                              // start a process
 	StopProcess(id string) error                               // stop a process
 	RestartProcess(id string) error                            // restart a process
@@ -821,6 +822,51 @@ func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (s
 	}
 
 	return address, fmt.Errorf("the process '%s' has no outputs with the ID '%s' (%s)", matches[1], matches[2], address)
+}
+
+func (r *restream) UpdateProcess(id string, config *app.Config) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	t, err := r.createTask(config)
+	if err != nil {
+		return err
+	}
+
+	task, ok := r.tasks[id]
+	if !ok {
+		return fmt.Errorf("unknown process ID (%s)", id)
+	}
+
+	t.process.Order = task.process.Order
+
+	if id != t.id {
+		_, ok := r.tasks[t.id]
+		if ok {
+			return fmt.Errorf("the process ID '%s' already exists", t.id)
+		}
+	}
+
+	if err := r.stopProcess(id); err != nil {
+		return err
+	}
+
+	if err := r.deleteProcess(id); err != nil {
+		return err
+	}
+
+	r.tasks[t.id] = t
+
+	// set filesystem cleanup rules
+	r.setCleanup(t.id, t.config)
+
+	if t.process.Order == "start" {
+		r.startProcess(t.id)
+	}
+
+	r.save()
+
+	return nil
 }
 
 func (r *restream) GetProcessIDs() []string {

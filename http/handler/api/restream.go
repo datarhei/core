@@ -60,7 +60,9 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
 	}
 
-	return c.JSON(http.StatusOK, process)
+	p, _ := h.getProcess(config.ID, "config")
+
+	return c.JSON(http.StatusOK, p.Config)
 }
 
 // GetAll returns all known processes
@@ -182,40 +184,15 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
-	}
-
-	if len(process.Input) == 0 && len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
-	}
-
 	config := process.Marshal()
 
-	fstate, err := h.restream.GetProcessState(id)
-	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+	if err := h.restream.UpdateProcess(id, config); err != nil {
+		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
 	}
 
-	order := fstate.Order
+	p, _ := h.getProcess(config.ID, "config")
 
-	if err := h.restream.StopProcess(id); err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
-	}
-
-	if err := h.restream.DeleteProcess(id); err != nil {
-		return api.Err(http.StatusBadRequest, "Process can't be deleted", "%s", err)
-	}
-
-	if err := h.restream.AddProcess(config); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err)
-	}
-
-	if order == "start" {
-		h.restream.StartProcess(process.ID)
-	}
-
-	return c.JSON(http.StatusOK, process)
+	return c.JSON(http.StatusOK, p.Config)
 }
 
 // Command issues a command to a process
