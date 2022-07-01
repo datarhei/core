@@ -729,7 +729,9 @@ func (r *restream) validateInputAddress(address, basedir string) (string, error)
 }
 
 func (r *restream) validateOutputAddress(address, basedir string) (string, bool, error) {
-	if strings.Contains(address, "|") {
+	// If the address contains a "|" or it starts with a "[", then assume that it
+	// is an address for the tee muxer.
+	if strings.Contains(address, "|") || strings.HasPrefix(address, "[") {
 		addresses := strings.Split(address, "|")
 
 		isFile := false

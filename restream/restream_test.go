@@ -469,6 +469,7 @@ func TestOutputAddressValidation(t *testing.T) {
 		"-":                                    {"pipe:", false},
 		"/core/data/foobar|http://example.com": {"file:/core/data/foobar|http://example.com", false},
 		"/core/data/foobar|/etc/passwd":        {"/core/data/foobar|/etc/passwd", true},
+		"[f=mpegts]udp://10.0.1.255:1234/":     {"[f=mpegts]udp://10.0.1.255:1234/", false},
 		"[f=null]-|[f=null]-":                  {"[f=null]pipe:|[f=null]pipe:", false},
 		"[onfail=ignore]/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/": {"[onfail=ignore]file:/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/", false},
 	}
