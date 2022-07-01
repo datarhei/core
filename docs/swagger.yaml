@@ -307,6 +307,15 @@ definitions:
             type: string
           enable:
             type: boolean
+          log:
+            properties:
+              enable:
+                type: boolean
+              topics:
+                items:
+                  type: string
+                type: array
+            type: object
           passphrase:
             type: string
           token:
@@ -854,7 +863,7 @@ definitions:
       log:
         additionalProperties:
           items:
-            type: string
+            $ref: '#/definitions/api.SRTLog'
           type: array
         type: object
       publisher:
@@ -873,11 +882,20 @@ definitions:
       log:
         additionalProperties:
           items:
-            type: string
+            $ref: '#/definitions/api.SRTLog'
           type: array
         type: object
       stats:
         $ref: '#/definitions/api.SRTStatistics'
+    type: object
+  api.SRTLog:
+    properties:
+      msg:
+        items:
+          type: string
+        type: array
+      ts:
+        type: integer
     type: object
   api.SRTStatistics:
     properties:
@@ -1392,6 +1410,15 @@ definitions:
             type: string
           enable:
             type: boolean
+          log:
+            properties:
+              enable:
+                type: boolean
+              topics:
+                items:
+                  type: string
+                type: array
+            type: object
           passphrase:
             type: string
           token:

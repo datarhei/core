@@ -140,6 +140,10 @@ type Data struct {
 		Address    string `json:"address"`
 		Passphrase string `json:"passphrase"`
 		Token      string `json:"token"`
+		Log        struct {
+			Enable bool     `json:"enable"`
+			Topics []string `json:"topics"`
+		} `json:"log"`
 	} `json:"srt"`
 	FFmpeg struct {
 		Binary       string `json:"binary"`
@@ -262,6 +266,8 @@ func NewConfigFrom(d *Config) *Config {
 
 	data.Sessions.IPIgnoreList = copyStringSlice(d.Sessions.IPIgnoreList)
 
+	data.SRT.Log.Topics = copyStringSlice(d.SRT.Log.Topics)
+
 	data.Router.BlockedPrefixes = copyStringSlice(d.Router.BlockedPrefixes)
 	data.Router.Routes = copyStringMap(d.Router.Routes)
 
@@ -351,6 +357,8 @@ func (d *Config) init() {
 	d.val(newAddressValue(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
 	d.val(newStringValue(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
 	d.val(newStringValue(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
+	d.val(newBoolValue(&d.SRT.Log.Enable, false), "srt.log.enable", "CORE_SRT_LOG_ENABLE", nil, "Enable SRT server logging", false, false)
+	d.val(newStringListValue(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
 	d.val(newExecValue(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)

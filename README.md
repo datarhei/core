@@ -133,6 +133,8 @@ The currently known environment variables (but not all will be respected) are:
 | CORE_SRT_ADDRESS                          | `:6000`      | SRT server listen address.                                                                                                                                                           |
 | CORE_SRT_PASSPHRASE                       | (not set)    | SRT passphrase.                                                                                                                                                                      |
 | CORE_SRT_TOKEN                            | (not set)    | SRT token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                     |
+| CORE_SRT_LOG_ENABLE                       | `false`      | Enable SRT server logging.                                                                                                                                                           |
+| CORE_SRT_LOG_TOPICS                       | (not set)    | List topics to log from SRT server. See https://github.com/datarhei/gosrt#logging.                                                                                                   |
 | CORE_FFMPEG_BINARY                        | `ffmpeg`     | Path to FFmpeg binary.                                                                                                                                                               |
 | CORE_FFMPEG_MAXPROCESSES                  | `0`          | Max. allowed simultaneously running FFmpeg instances. Any value <= 0 means unlimited.                                                                                                |
 | CORE_FFMPEG_ACCESS_INPUT_ALLOW            | (not set)    | List of pattern for allowed input URI (space-separated), leave emtpy to allow any.                                                                                                   |
@@ -262,7 +264,11 @@ All other values will be filled with default values and persisted on disk. The e
         "enable": false,
         "address": ":6000",
         "passphrase": "",
-        "token": ""
+        "token": "",
+        "log": {
+            "enable": false,
+            "topics": [],
+        }
     },
     "ffmpeg": {
         "binary": "ffmpeg",

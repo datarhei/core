@@ -2675,6 +2675,20 @@ const docTemplate = `{
                         "enable": {
                             "type": "boolean"
                         },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "topics": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
                         "passphrase": {
                             "type": "string"
                         },
@@ -3504,7 +3518,7 @@ const docTemplate = `{
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/api.SRTLog"
                         }
                     }
                 },
@@ -3533,12 +3547,26 @@ const docTemplate = `{
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/api.SRTLog"
                         }
                     }
                 },
                 "stats": {
                     "$ref": "#/definitions/api.SRTStatistics"
+                }
+            }
+        },
+        "api.SRTLog": {
+            "type": "object",
+            "properties": {
+                "msg": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ts": {
+                    "type": "integer"
                 }
             }
         },
@@ -4240,6 +4268,20 @@ const docTemplate = `{
                         },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "topics": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
                         },
                         "passphrase": {
                             "type": "string"

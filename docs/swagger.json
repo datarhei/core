@@ -2667,6 +2667,20 @@
                         "enable": {
                             "type": "boolean"
                         },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "topics": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
                         "passphrase": {
                             "type": "string"
                         },
@@ -3496,7 +3510,7 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/api.SRTLog"
                         }
                     }
                 },
@@ -3525,12 +3539,26 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/api.SRTLog"
                         }
                     }
                 },
                 "stats": {
                     "$ref": "#/definitions/api.SRTStatistics"
+                }
+            }
+        },
+        "api.SRTLog": {
+            "type": "object",
+            "properties": {
+                "msg": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ts": {
+                    "type": "integer"
                 }
             }
         },
@@ -4232,6 +4260,20 @@
                         },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "topics": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
                         },
                         "passphrase": {
                             "type": "string"

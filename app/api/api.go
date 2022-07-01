@@ -696,12 +696,15 @@ func (a *api) start() error {
 
 	if cfg.SRT.Enable {
 		config := srt.Config{
-			Addr:         cfg.SRT.Address,
-			Passphrase:   cfg.SRT.Passphrase,
-			Token:        cfg.SRT.Token,
-			Logger:       a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
-			Collector:    a.sessions.Collector("srt"),
-			SRTLogTopics: []string{"listen", "handshake", "connection"},
+			Addr:       cfg.SRT.Address,
+			Passphrase: cfg.SRT.Passphrase,
+			Token:      cfg.SRT.Token,
+			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
+			Collector:  a.sessions.Collector("srt"),
+		}
+
+		if cfg.SRT.Log.Enable {
+			config.SRTLogTopics = cfg.SRT.Log.Topics
 		}
 
 		srtserver, err := srt.New(config)
