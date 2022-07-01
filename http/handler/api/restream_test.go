@@ -110,7 +110,7 @@ func TestUpdateProcessInvalid(t *testing.T) {
 	mock.Request(t, http.StatusOK, router, "GET", "/"+proc.ID, nil)
 }
 
-func TestUpdateProcess(t *testing.T) {
+func TestUpdateReplaceProcess(t *testing.T) {
 	router, err := getDummyRestreamRouter()
 	require.NoError(t, err)
 
@@ -128,7 +128,38 @@ func TestUpdateProcess(t *testing.T) {
 	err = json.Unmarshal(update.Bytes(), &proc)
 	require.NoError(t, err)
 
-	// invalid address
+	encoded, err := json.Marshal(&proc)
+	require.NoError(t, err)
+
+	update.Reset()
+	_, err = update.Write(encoded)
+	require.NoError(t, err)
+
+	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", &update)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+}
+
+func TestUpdateNewProcess(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	update := bytes.Buffer{}
+	_, err = update.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	proc := api.ProcessConfig{}
+	err = json.Unmarshal(update.Bytes(), &proc)
+	require.NoError(t, err)
+
 	proc.ID = "test2"
 
 	encoded, err := json.Marshal(&proc)
@@ -144,6 +175,15 @@ func TestUpdateProcess(t *testing.T) {
 
 	mock.Request(t, http.StatusNotFound, router, "GET", "/test", nil)
 	mock.Request(t, http.StatusOK, router, "GET", "/test2", nil)
+}
+
+func TestUpdateNonExistentProcess(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+
+	mock.Request(t, http.StatusNotFound, router, "PUT", "/test", data)
 }
 
 func TestRemoveUnknownProcess(t *testing.T) {

@@ -2,6 +2,7 @@ package restream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -352,6 +353,9 @@ func (r *restream) CreatedAt() time.Time {
 	return r.createdAt
 }
 
+var ErrUnknownProcess = errors.New("unknown process")
+var ErrProcessExists = errors.New("process already exists")
+
 func (r *restream) AddProcess(config *app.Config) error {
 	r.lock.RLock()
 	t, err := r.createTask(config)
@@ -366,7 +370,7 @@ func (r *restream) AddProcess(config *app.Config) error {
 
 	_, ok := r.tasks[t.id]
 	if ok {
-		return fmt.Errorf("the process ID '%s' already exists", t.id)
+		return ErrProcessExists
 	}
 
 	r.tasks[t.id] = t
@@ -841,7 +845,7 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	t.process.Order = task.process.Order
@@ -849,7 +853,7 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	if id != t.id {
 		_, ok := r.tasks[t.id]
 		if ok {
-			return fmt.Errorf("the process ID '%s' already exists", t.id)
+			return ErrProcessExists
 		}
 	}
 
@@ -896,7 +900,7 @@ func (r *restream) GetProcess(id string) (*app.Process, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return &app.Process{}, fmt.Errorf("unknown process ID (%s)", id)
+		return &app.Process{}, ErrUnknownProcess
 	}
 
 	process := task.process.Clone()
@@ -921,7 +925,7 @@ func (r *restream) DeleteProcess(id string) error {
 func (r *restream) deleteProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if task.process.Order != "stop" {
@@ -954,7 +958,7 @@ func (r *restream) StartProcess(id string) error {
 func (r *restream) startProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -997,7 +1001,7 @@ func (r *restream) StopProcess(id string) error {
 func (r *restream) stopProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	status := task.ffmpeg.Status()
@@ -1025,7 +1029,7 @@ func (r *restream) RestartProcess(id string) error {
 func (r *restream) restartProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -1058,7 +1062,7 @@ func (r *restream) ReloadProcess(id string) error {
 func (r *restream) reloadProcess(id string) error {
 	t, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	t.valid = false
@@ -1122,7 +1126,7 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return state, fmt.Errorf("unknown process ID (%s)", id)
+		return state, ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -1183,7 +1187,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return &app.Log{}, fmt.Errorf("unknown process ID (%s)", id)
+		return &app.Log{}, ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -1301,7 +1305,7 @@ func (r *restream) GetPlayout(id, inputid string) (string, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return "", fmt.Errorf("unknown process ID '%s'", id)
+		return "", ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -1326,7 +1330,7 @@ func (r *restream) SetProcessMetadata(id, key string, data interface{}) error {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if task.metadata == nil {
@@ -1354,7 +1358,7 @@ func (r *restream) GetProcessMetadata(id, key string) (interface{}, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return nil, fmt.Errorf("unknown process ID '%s'", id)
+		return nil, ErrUnknownProcess
 	}
 
 	if len(key) == 0 {
