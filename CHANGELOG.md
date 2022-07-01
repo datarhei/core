@@ -4,9 +4,9 @@
 
 -   Fix output address validation for tee outputs
 -   Fix updating process config
--   Add experimental SRT connection stats and logs
+-   Add experimental SRT connection stats and logs API
 -   Hide /config/reload endpoint in reade-only mode
--   Add SRT server (datarhei/gosrt)
+-   Add experimental SRT server (datarhei/gosrt)
 -   Create v16 in go.mod
 -   Fix data races, tests, lint, and update dependencies
 -   Add trailing slash for routed directories (datarhei/restreamer#340)

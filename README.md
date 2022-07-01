@@ -1,5 +1,8 @@
 # Core
 
+[![CodeQL](https://github.com/datarhei/core/workflows/CodeQL/badge.svg)](https://github.com/datarhei/core/actions?query=workflow%3ACodeQL)
+![Docker Pulls](https://img.shields.io/docker/pulls/datarhei/core.svg?maxAge=604800&label=Docker%20Pulls)
+
 The cloud-native audio/video processing API.
 
 datarhei Core is management for FFmpeg processes without development effort. It is a central interface for mapping AV processes, is responsible for design and management, and provides all necessary interfaces to access the video content. The included control for FFmpeg can keep all used functions reliable and executable without the need for software developers to take care of it. In addition, process and resource limitation for all FFmpeg processes protects the host system from application overload. The overall system gives access to current process values (CPU, RAM) and complete control of system resources and loads with statistical access to process data and current and historical logs.
@@ -44,8 +47,8 @@ docker run --name core -d
 
 Native (linux/amd64,linux/arm64,linux/arm/v7)
 
--   datarhei/base:alpine-core-latest
--   datarhei/base:ubuntu-core-latest
+-   datarhei/base:core-alpine-latest
+-   datarhei/base:core-ubuntu-latest
 
 Bundle with FFmpeg (linux/amd64,linux/arm64,linux/arm/v7)
 
@@ -126,6 +129,10 @@ The currently known environment variables (but not all will be respected) are:
 | CORE_RTMP_ADDRESS                         | `:1935`      | RTMP server listen address.                                                                                                                                                          |
 | CORE_RTMP_APP                             | `/`          | RTMP app for publishing.                                                                                                                                                             |
 | CORE_RTMP_TOKEN                           | (not set)    | RTMP token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                    |
+| CORE_SRT_ENABLE                           | `false`      | Enable SRT server.                                                                                                                                                                   |
+| CORE_SRT_ADDRESS                          | `:6000`      | SRT server listen address.                                                                                                                                                           |
+| CORE_SRT_PASSPHRASE                       | (not set)    | SRT passphrase.                                                                                                                                                                      |
+| CORE_SRT_TOKEN                            | (not set)    | SRT token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                     |
 | CORE_FFMPEG_BINARY                        | `ffmpeg`     | Path to FFmpeg binary.                                                                                                                                                               |
 | CORE_FFMPEG_MAXPROCESSES                  | `0`          | Max. allowed simultaneously running FFmpeg instances. Any value <= 0 means unlimited.                                                                                                |
 | CORE_FFMPEG_ACCESS_INPUT_ALLOW            | (not set)    | List of pattern for allowed input URI (space-separated), leave emtpy to allow any.                                                                                                   |
@@ -251,6 +258,12 @@ All other values will be filled with default values and persisted on disk. The e
         "app": "/",
         "token": ""
     },
+    "srt": {
+        "enable": false,
+        "address": ":6000",
+        "passphrase": "",
+        "token": ""
+    },
     "ffmpeg": {
         "binary": "ffmpeg",
         "max_processes": 0,
@@ -365,11 +378,31 @@ If you set a value for `CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES`, which is larger 
 
 ## RTMP
 
-The datarhei Core includes a simple RTMP server for publishing and playing streams. Set the environment variable `CORE_RTMP_ENABLE` to `true` to enable the RTMP server. It is listening on `CORE_RTMP_ADDRESS.` Use `CORE_RTMP_APP` to limit the app a stream can be published on, e.g. `/live` to require URLs to start with `/live`. To prevent anybody can publish streams, set `CORE_RTMP_TOKEN` to a secret only known to the publishers. The token has to be put in the query of the stream URL, e.g. `/live/stream?token=...`.
+The datarhei Core includes a simple RTMP server for publishing and playing streams. Set the environment variable `CORE_RTMP_ENABLE` to `true` to enable the RTMP server. It is listening on `CORE_RTMP_ADDRESS`. Use `CORE_RTMP_APP` to limit the app a stream can be published on, e.g. `/live` to require URLs to start with `/live`. To prevent anybody can publish streams, set `CORE_RTMP_TOKEN` to a secret only known to the publishers and subscribers. The token has to be put in the query of the stream URL, e.g. `/live/stream?token=...`.
 
 | Method | Path         | Description                           |
 | ------ | ------------ | ------------------------------------- |
 | GET    | /api/v3/rtmp | List all currently published streams. |
+
+## SRT
+
+The datarhei Core includes a simple SRT server for publishing and playing streams. Set the environment variable `CORE_SRT_ENABLE` to `true` to enable the SRT server. It is listening on `CORE_SRT_ADDRESS`.
+
+The `streamid` is formatted according to Appendix B of the [SRT specs](https://datatracker.ietf.org/doc/html/draft-sharabayko-srt#appendix-B). The following keys are supported:
+
+| Key     | Descriptions                                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `m`     | The connection mode, either `publish` for publishing a stream or `request` for subscribing to a published stream. |
+| `r`     | Name of the resource.                                                                                             |
+| `token` | A token to prevent anybody to publish or subscribe to a stream. This is set with `CORE_SRT_TOKEN`.                |
+
+An example publishing streamid: `#!:m=publish,r=12345,token=foobar`.
+
+With your SRT client, connect to the SRT server always in `caller` mode.
+
+| Method | Path        | Description                           |
+| ------ | ----------- | ------------------------------------- |
+| GET    | /api/v3/srt | List all currently published streams. |
 
 ## Playout
 

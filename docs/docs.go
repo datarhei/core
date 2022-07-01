@@ -1918,7 +1918,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all currently publishing SRT streams",
+                "description": "List all currently publishing SRT streams. This endpoint is EXPERIMENTAL and may change in future.",
                 "produces": [
                     "application/json"
                 ],
@@ -1930,7 +1930,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.SRTChannel"
+                                "$ref": "#/definitions/api.SRTChannels"
                             }
                         }
                     }
@@ -3490,11 +3490,248 @@ const docTemplate = `{
                 }
             }
         },
-        "api.SRTChannel": {
+        "api.SRTChannels": {
             "type": "object",
             "properties": {
-                "name": {
-                    "type": "string"
+                "connections": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/api.SRTConnection"
+                    }
+                },
+                "log": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "publisher": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "subscriber": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        },
+        "api.SRTConnection": {
+            "type": "object",
+            "properties": {
+                "log": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/api.SRTStatistics"
+                }
+            }
+        },
+        "api.SRTStatistics": {
+            "type": "object",
+            "properties": {
+                "avail_recv_buf_bytes": {
+                    "description": "The available space in the receiver's buffer, in bytes",
+                    "type": "integer"
+                },
+                "avail_send_buf_bytes": {
+                    "description": "The available space in the sender's buffer, in bytes",
+                    "type": "integer"
+                },
+                "bandwidth_mbit": {
+                    "description": "Estimated bandwidth of the network link, in Mbps",
+                    "type": "number"
+                },
+                "flight_size_pkt": {
+                    "description": "The number of packets in flight",
+                    "type": "integer"
+                },
+                "flow_window_pkt": {
+                    "description": "The maximum number of packets that can be \"in flight\"",
+                    "type": "integer"
+                },
+                "max_bandwidth_mbit": {
+                    "description": "Transmission bandwidth limit, in Mbps",
+                    "type": "number"
+                },
+                "mss_bytes": {
+                    "description": "Maximum Segment Size (MSS), in bytes",
+                    "type": "integer"
+                },
+                "pkt_recv_avg_belated_time_ms": {
+                    "description": "Accumulated difference between the current time and the time-to-play of a packet that is received late",
+                    "type": "integer"
+                },
+                "pkt_send_period_us": {
+                    "description": "Current minimum time interval between which consecutive packets are sent, in microseconds",
+                    "type": "number"
+                },
+                "recv_ack_pkt": {
+                    "description": "The total number of received ACK (Acknowledgement) control packets",
+                    "type": "integer"
+                },
+                "recv_buf_bytes": {
+                    "description": "Instantaneous (current) value of pktRcvBuf, expressed in bytes, including payload and all headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "recv_buf_ms": {
+                    "description": "The timespan (msec) of acknowledged packets in the receiver's buffer",
+                    "type": "integer"
+                },
+                "recv_buf_pkt": {
+                    "description": "The number of acknowledged packets in receiver's buffer",
+                    "type": "integer"
+                },
+                "recv_bytes": {
+                    "description": "Same as pktRecv, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "recv_drop_bytes": {
+                    "description": "Same as pktRcvDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "recv_drop_pkt": {
+                    "description": "The total number of dropped by the SRT receiver and, as a result, not delivered to the upstream application DATA packets",
+                    "type": "integer"
+                },
+                "recv_km_pkt": {
+                    "description": "The total number of received KM (Key Material) control packets",
+                    "type": "integer"
+                },
+                "recv_loss__bytes": {
+                    "description": "Same as pktRcvLoss, but expressed in bytes, including payload and all the headers (IP, TCP, SRT), bytes for the presently missing (either reordered or lost) packets' payloads are estimated based on the average packet size",
+                    "type": "integer"
+                },
+                "recv_loss_pkt": {
+                    "description": "The total number of SRT DATA packets detected as presently missing (either reordered or lost) at the receiver side",
+                    "type": "integer"
+                },
+                "recv_nak_pkt": {
+                    "description": "The total number of received NAK (Negative Acknowledgement) control packets",
+                    "type": "integer"
+                },
+                "recv_pkt": {
+                    "description": "The total number of received DATA packets, including retransmitted packets",
+                    "type": "integer"
+                },
+                "recv_retran_pkts": {
+                    "description": "The total number of retransmitted packets registered at the receiver side",
+                    "type": "integer"
+                },
+                "recv_tsbpd_delay_ms": {
+                    "description": "Timestamp-based Packet Delivery Delay value set on the socket via SRTO_RCVLATENCY or SRTO_LATENCY",
+                    "type": "integer"
+                },
+                "recv_undecrypt_bytes": {
+                    "description": "Same as pktRcvUndecrypt, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "recv_undecrypt_pkt": {
+                    "description": "The total number of packets that failed to be decrypted at the receiver side",
+                    "type": "integer"
+                },
+                "recv_unique_bytes": {
+                    "description": "Same as pktRecvUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "recv_unique_pkt": {
+                    "description": "The total number of unique original, retransmitted or recovered by the packet filter DATA packets received in time, decrypted without errors and, as a result, scheduled for delivery to the upstream application by the SRT receiver.",
+                    "type": "integer"
+                },
+                "reorder_tolerance_pkt": {
+                    "description": "Instant value of the packet reorder tolerance",
+                    "type": "integer"
+                },
+                "rtt_ms": {
+                    "description": "Smoothed round-trip time (SRTT), an exponentially-weighted moving average (EWMA) of an endpoint's RTT samples, in milliseconds",
+                    "type": "number"
+                },
+                "send_buf_bytes": {
+                    "description": "Instantaneous (current) value of pktSndBuf, but expressed in bytes, including payload and all headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "send_buf_ms": {
+                    "description": "The timespan (msec) of packets in the sender's buffer (unacknowledged packets)",
+                    "type": "integer"
+                },
+                "send_buf_pkt": {
+                    "description": "The number of packets in the sender's buffer that are already scheduled for sending or even possibly sent, but not yet acknowledged",
+                    "type": "integer"
+                },
+                "send_drop_bytes": {
+                    "description": "Same as pktSndDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "send_drop_pkt": {
+                    "description": "The total number of dropped by the SRT sender DATA packets that have no chance to be delivered in time",
+                    "type": "integer"
+                },
+                "send_duration_us": {
+                    "description": "The total accumulated time in microseconds, during which the SRT sender has some data to transmit, including packets that have been sent, but not yet acknowledged",
+                    "type": "integer"
+                },
+                "send_km_pkt": {
+                    "description": "The total number of sent KM (Key Material) control packets",
+                    "type": "integer"
+                },
+                "send_loss_pkt": {
+                    "description": "The total number of data packets considered or reported as lost at the sender side. Does not correspond to the packets detected as lost at the receiver side.",
+                    "type": "integer"
+                },
+                "send_tsbpd_delay_ms": {
+                    "description": "Timestamp-based Packet Delivery Delay value of the peer",
+                    "type": "integer"
+                },
+                "sent_ack_pkt": {
+                    "description": "The total number of sent ACK (Acknowledgement) control packets",
+                    "type": "integer"
+                },
+                "sent_bytes": {
+                    "description": "Same as pktSent, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "sent_nak_pkt": {
+                    "description": "The total number of sent NAK (Negative Acknowledgement) control packets",
+                    "type": "integer"
+                },
+                "sent_pkt": {
+                    "description": "The total number of sent DATA packets, including retransmitted packets",
+                    "type": "integer"
+                },
+                "sent_retrans_bytes": {
+                    "description": "Same as pktRetrans, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "sent_retrans_pkt": {
+                    "description": "The total number of retransmitted packets sent by the SRT sender",
+                    "type": "integer"
+                },
+                "sent_unique__bytes": {
+                    "description": "Same as pktSentUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
+                    "type": "integer"
+                },
+                "sent_unique_pkt": {
+                    "description": "The total number of unique DATA packets sent by the SRT sender",
+                    "type": "integer"
+                },
+                "timestamp_ms": {
+                    "description": "The time elapsed, in milliseconds, since the SRT socket has been created",
+                    "type": "integer"
                 }
             }
         },
