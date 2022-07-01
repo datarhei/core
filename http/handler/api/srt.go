@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/srt"
 
 	"github.com/labstack/echo/v4"
@@ -13,7 +14,7 @@ type SRTHandler struct {
 	srt srt.Server
 }
 
-// NewRTMP returns a new SRT type. You have to provide a SRT server instance.
+// NewSRT returns a new SRT type. You have to provide a SRT server instance.
 func NewSRT(srt srt.Server) *SRTHandler {
 	return &SRTHandler{
 		srt: srt,
@@ -22,14 +23,17 @@ func NewSRT(srt srt.Server) *SRTHandler {
 
 // ListChannels lists all currently publishing SRT streams
 // @Summary List all publishing SRT treams
-// @Description List all currently publishing SRT streams
+// @Description List all currently publishing SRT streams. This endpoint is EXPERIMENTAL and may change in future.
 // @ID srt-3-list-channels
 // @Produce json
-// @Success 200 {array} api.SRTChannel
+// @Success 200 {array} api.SRTChannels
 // @Security ApiKeyAuth
 // @Router /api/v3/srt [get]
 func (srth *SRTHandler) ListChannels(c echo.Context) error {
 	channels := srth.srt.Channels()
 
-	return c.JSON(http.StatusOK, channels)
+	srtchannels := api.SRTChannels{}
+	srtchannels.Unmarshal(&channels)
+
+	return c.JSON(http.StatusOK, srtchannels)
 }

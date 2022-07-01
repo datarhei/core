@@ -254,8 +254,13 @@ func (s *server) Close() {
 	s.srtloggerCancel()
 }
 
+type Log struct {
+	Timestamp time.Time
+	Message   []string
+}
+
 type Connection struct {
-	Log   map[string][]string
+	Log   map[string][]Log
 	Stats srt.Statistics
 }
 
@@ -263,7 +268,7 @@ type Channels struct {
 	Publisher   map[string]uint32
 	Subscriber  map[string][]uint32
 	Connections map[uint32]Connection
-	Log         map[string][]string
+	Log         map[string][]Log
 }
 
 func (s *server) Channels() Channels {
@@ -271,7 +276,7 @@ func (s *server) Channels() Channels {
 		Publisher:   map[string]uint32{},
 		Subscriber:  map[string][]uint32{},
 		Connections: map[uint32]Connection{},
-		Log:         map[string][]string{},
+		Log:         map[string][]Log{},
 	}
 
 	s.lock.RLock()
@@ -281,7 +286,7 @@ func (s *server) Channels() Channels {
 
 		st.Connections[socketId] = Connection{
 			Stats: ch.publisher.conn.Stats(),
-			Log:   map[string][]string{},
+			Log:   map[string][]Log{},
 		}
 
 		for _, c := range ch.subscriber {
@@ -290,7 +295,7 @@ func (s *server) Channels() Channels {
 
 			st.Connections[socketId] = Connection{
 				Stats: c.conn.Stats(),
-				Log:   map[string][]string{},
+				Log:   map[string][]Log{},
 			}
 		}
 	}
@@ -306,14 +311,17 @@ func (s *server) Channels() Channels {
 
 			ll := l.(srt.Log)
 
-			message := fmt.Sprintf("%s [%d] %s", ll.Time.Format("2006-01-02 15:04:05"), ll.SocketId, ll.Message)
-
-			st.Log[topic] = append(st.Log[topic], message)
+			log := Log{
+				Timestamp: ll.Time,
+				Message:   strings.Split(ll.Message, "\n"),
+			}
 
 			if ll.SocketId != 0 {
 				if _, ok := st.Connections[ll.SocketId]; ok {
-					st.Connections[ll.SocketId].Log[topic] = append(st.Connections[ll.SocketId].Log[topic], message)
+					st.Connections[ll.SocketId].Log[topic] = append(st.Connections[ll.SocketId].Log[topic], log)
 				}
+			} else {
+				st.Log[topic] = append(st.Log[topic], log)
 			}
 		})
 	}
@@ -420,9 +428,19 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 		return srt.REJECT
 	}
 
-	if req.IsEncrypted() {
+	if len(s.passphrase) != 0 {
+		if !req.IsEncrypted() {
+			s.log("CONNECT", "FORBIDDEN", si.resource, "connection has to be encrypted", client)
+			return srt.REJECT
+		}
+
 		if err := req.SetPassphrase(s.passphrase); err != nil {
 			s.log("CONNECT", "FORBIDDEN", si.resource, err.Error(), client)
+			return srt.REJECT
+		}
+	} else {
+		if req.IsEncrypted() {
+			s.log("CONNECT", "INVALID", si.resource, "connection must not be encrypted", client)
 			return srt.REJECT
 		}
 	}
