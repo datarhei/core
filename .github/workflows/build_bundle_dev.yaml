@@ -1,30 +1,18 @@
-name: 'Build datarhei/base:alpine-core-dev'
+name: 'Build datarhei/core:dev'
 
 on:
   workflow_dispatch:
   workflow_call:
   push:
-    branches:
-      - dev
+    branches-ignore:
+      - '**'
 
 jobs:
   docker:
     runs-on: [self-hosted]
-    strategy:
-      matrix:
-        branch:
-          - dev
-
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-        with:
-          ref: ${{ matrix.branch }}
-
-      - uses: actions-ecosystem/action-get-latest-tag@v1
-        id: get-latest-tag
-        with:
-          semver_only: true
 
       - uses: cardinalby/export-env-action@v1
         with:
@@ -33,14 +21,12 @@ jobs:
           expandWithJobEnv: 'true'
           expand: 'true'
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
+      - uses: cardinalby/export-env-action@v1
         with:
-          images: |
-            datarhei/base
-          tags: |
-            type=raw,value=${{ env.OS_NAME }}-core-dev,enable=${{ matrix.branch == 'dev' }}
+          envFile: '.github_build/Build.bundle.env'
+          export: 'true'
+          expandWithJobEnv: 'true'
+          expand: 'true'
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@master
@@ -71,16 +57,13 @@ jobs:
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          file: ./Dockerfile
+          file: ./Dockerfile.bundle
           build-args: |
-            BUILD_IMAGE=${{ env.OS_NAME }}:${{ env.OS_VERSION }}
-            GOLANG_IMAGE=${{ env.GOLANG_IMAGE }}
+            CORE_IMAGE=datarhei/base:${{ env.OS_NAME }}-core-dev
+            FFMPEG_IMAGE=datarhei/base:${{ env.OS_NAME }}-ffmpeg-${{ env.OS_VERSION }}-${{ env.FFMPEG_VERSION }}
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            datarhei/core:dev
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
-  dockerBundle:
-    uses: ./.github/workflows/build_bundle_dev.yaml
-    secrets: inherit
