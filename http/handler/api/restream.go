@@ -188,10 +188,10 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 
 	if err := h.restream.UpdateProcess(id, config); err != nil {
 		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "Process not found: %s", id)
+			return api.Err(http.StatusNotFound, "Process not found", "%s", id)
 		}
 
-		return api.Err(http.StatusBadRequest, "Process can't be updated: %s", err)
+		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
 	}
 
 	p, _ := h.getProcess(config.ID, "config")

@@ -647,8 +647,10 @@ Currently supported placeholders are:
 | `{inputid}`   | Will be replaced by the ID of the input.                  | `input.address`, `input.options`                                                                                        |
 | `{outputid}`  | Will be replaced by the ID of the output.                 | `output.address`, `output.options`, `output.cleanup.pattern`                                                            |
 
-Before replacing the placeholder in the process, all references will be resolved, i.e., you can put the placeholder also in the params for an
-option.
+Before replacing the placeholders in the process config, all references (see below) will be resolved.
+
+If the value that gets filled in on the place of the placeholder needs escaping, you can define the character to be escaped in the placeholder by adding it to the placeholder name and prefix it with a `^`.
+E.g. escape all `:` in the value (`http://example.com:8080`) for `{memfs}` placeholder, write `{memfs^:}`. It will then be replaced by `http\://example.com\:8080`. The escape character is always `\`.
 
 ### References
 

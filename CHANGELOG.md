@@ -2,6 +2,7 @@
 
 #### Core v16.8.0 > ?
 
+-   Add optional escape character to process placeholder
 -   Fix output address validation for tee outputs
 -   Fix updating process config
 -   Add experimental SRT connection stats and logs API

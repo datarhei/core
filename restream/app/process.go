@@ -1,6 +1,11 @@
 package app
 
-import "github.com/datarhei/core/v16/process"
+import (
+	"regexp"
+	"strings"
+
+	"github.com/datarhei/core/v16/process"
+)
 
 type ConfigIOCleanup struct {
 	Pattern       string `json:"pattern"`
@@ -73,6 +78,120 @@ func (config *Config) Clone() *Config {
 	copy(clone.Options, config.Options)
 
 	return clone
+}
+
+func replace(what, placeholder, value string) string {
+	re, err := regexp.Compile(`{` + regexp.QuoteMeta(placeholder) + `(\^(.))?}`)
+	if err != nil {
+		return what
+	}
+
+	innerRe := re.Copy()
+	what = re.ReplaceAllStringFunc(what, func(match string) string {
+		matches := innerRe.FindStringSubmatch(match)
+		var v string
+
+		if matches[2] != "" {
+			v = strings.ReplaceAll(value, matches[2], `\`+matches[2])
+		} else {
+			v = value
+		}
+
+		return strings.Replace(match, match, v, 1)
+	})
+
+	return what
+}
+
+// ReplacePlaceholders replaces all placeholders in the config. The config
+// will be modified in place.
+func (config *Config) ResolvePlaceholders(basediskfs, basememfs string) {
+	for i, option := range config.Options {
+		// Replace any known placeholders
+		option = replace(option, "diskfs", basediskfs)
+
+		config.Options[i] = option
+	}
+
+	// Resolving the given inputs
+	for i, input := range config.Input {
+		// Replace any known placeholders
+		input.ID = replace(input.ID, "processid", config.ID)
+		input.ID = replace(input.ID, "reference", config.Reference)
+		input.Address = replace(input.Address, "inputid", input.ID)
+		input.Address = replace(input.Address, "processid", config.ID)
+		input.Address = replace(input.Address, "reference", config.Reference)
+		input.Address = replace(input.Address, "diskfs", basediskfs)
+		input.Address = replace(input.Address, "memfs", basememfs)
+
+		for j, option := range input.Options {
+			// Replace any known placeholders
+			option = replace(option, "inputid", input.ID)
+			option = replace(option, "processid", config.ID)
+			option = replace(option, "reference", config.Reference)
+			option = replace(option, "diskfs", basediskfs)
+			option = replace(option, "memfs", basememfs)
+
+			input.Options[j] = option
+		}
+
+		config.Input[i] = input
+	}
+
+	// Resolving the given outputs
+	for i, output := range config.Output {
+		// Replace any known placeholders
+		output.ID = replace(output.ID, "processid", config.ID)
+		output.Address = replace(output.Address, "outputid", output.ID)
+		output.Address = replace(output.Address, "processid", config.ID)
+		output.Address = replace(output.Address, "reference", config.Reference)
+		output.Address = replace(output.Address, "diskfs", basediskfs)
+		output.Address = replace(output.Address, "memfs", basememfs)
+
+		for j, option := range output.Options {
+			// Replace any known placeholders
+			option = replace(option, "outputid", output.ID)
+			option = replace(option, "processid", config.ID)
+			option = replace(option, "reference", config.Reference)
+			option = replace(option, "diskfs", basediskfs)
+			option = replace(option, "memfs", basememfs)
+
+			output.Options[j] = option
+		}
+
+		for j, cleanup := range output.Cleanup {
+			// Replace any known placeholders
+			cleanup.Pattern = replace(cleanup.Pattern, "outputid", output.ID)
+			cleanup.Pattern = replace(cleanup.Pattern, "processid", config.ID)
+			cleanup.Pattern = replace(cleanup.Pattern, "reference", config.Reference)
+
+			output.Cleanup[j] = cleanup
+		}
+
+		config.Output[i] = output
+	}
+}
+
+// CreateCommand created the FFmpeg command from this config.
+func (config *Config) CreateCommand() []string {
+	var command []string
+
+	// Copy global options
+	command = append(command, config.Options...)
+
+	for _, input := range config.Input {
+		// Add the resolved input to the process command
+		command = append(command, input.Options...)
+		command = append(command, "-i", input.Address)
+	}
+
+	for _, output := range config.Output {
+		// Add the resolved output to the process command
+		command = append(command, output.Options...)
+		command = append(command, output.Address)
+	}
+
+	return command
 }
 
 type Process struct {

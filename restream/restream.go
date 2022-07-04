@@ -268,7 +268,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+		t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
 
 		tasks[id] = t
 	}
@@ -304,7 +304,7 @@ func (r *restream) load() error {
 			continue
 		}
 
-		t.command = r.createCommand(t.config)
+		t.command = t.config.CreateCommand()
 		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
 
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
@@ -418,7 +418,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -435,7 +435,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		return nil, err
 	}
 
-	t.command = r.createCommand(t.config)
+	t.command = t.config.CreateCommand()
 	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
@@ -543,94 +543,6 @@ func (r *restream) unsetPlayoutPorts(t *task) {
 	}
 
 	t.playout = nil
-}
-
-func (r *restream) resolvePlaceholders(config *app.Config, basediskfs, basememfs string) {
-	for i, option := range config.Options {
-		// Replace any known placeholders
-		option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-
-		config.Options[i] = option
-	}
-
-	// Resolving the given inputs
-	for i, input := range config.Input {
-		// Replace any known placeholders
-		input.ID = strings.Replace(input.ID, "{processid}", config.ID, -1)
-		input.ID = strings.Replace(input.ID, "{reference}", config.Reference, -1)
-		input.Address = strings.Replace(input.Address, "{inputid}", input.ID, -1)
-		input.Address = strings.Replace(input.Address, "{processid}", config.ID, -1)
-		input.Address = strings.Replace(input.Address, "{reference}", config.Reference, -1)
-		input.Address = strings.Replace(input.Address, "{diskfs}", basediskfs, -1)
-		input.Address = strings.Replace(input.Address, "{memfs}", basememfs, -1)
-
-		for j, option := range input.Options {
-			// Replace any known placeholders
-			option = strings.Replace(option, "{inputid}", input.ID, -1)
-			option = strings.Replace(option, "{processid}", config.ID, -1)
-			option = strings.Replace(option, "{reference}", config.Reference, -1)
-			option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-			option = strings.Replace(option, "{memfs}", basememfs, -1)
-
-			input.Options[j] = option
-		}
-
-		config.Input[i] = input
-	}
-
-	// Resolving the given outputs
-	for i, output := range config.Output {
-		// Replace any known placeholders
-		output.ID = strings.Replace(output.ID, "{processid}", config.ID, -1)
-		output.Address = strings.Replace(output.Address, "{outputid}", output.ID, -1)
-		output.Address = strings.Replace(output.Address, "{processid}", config.ID, -1)
-		output.Address = strings.Replace(output.Address, "{reference}", config.Reference, -1)
-		output.Address = strings.Replace(output.Address, "{diskfs}", basediskfs, -1)
-		output.Address = strings.Replace(output.Address, "{memfs}", basememfs, -1)
-
-		for j, option := range output.Options {
-			// Replace any known placeholders
-			option = strings.Replace(option, "{outputid}", output.ID, -1)
-			option = strings.Replace(option, "{processid}", config.ID, -1)
-			option = strings.Replace(option, "{reference}", config.Reference, -1)
-			option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-			option = strings.Replace(option, "{memfs}", basememfs, -1)
-
-			output.Options[j] = option
-		}
-
-		for j, cleanup := range output.Cleanup {
-			// Replace any known placeholders
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{outputid}", output.ID, -1)
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{processid}", config.ID, -1)
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{reference}", config.Reference, -1)
-
-			output.Cleanup[j] = cleanup
-		}
-
-		config.Output[i] = output
-	}
-}
-
-func (r *restream) createCommand(config *app.Config) []string {
-	var command []string
-
-	// Copy global options
-	command = append(command, config.Options...)
-
-	for _, input := range config.Input {
-		// Add the resolved input to the process command
-		command = append(command, input.Options...)
-		command = append(command, "-i", input.Address)
-	}
-
-	for _, output := range config.Output {
-		// Add the resolved output to the process command
-		command = append(command, output.Options...)
-		command = append(command, output.Address)
-	}
-
-	return command
 }
 
 func (r *restream) validateConfig(config *app.Config) (bool, error) {
@@ -1071,7 +983,7 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.config = t.process.Config.Clone()
 
-	r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -1088,7 +1000,7 @@ func (r *restream) reloadProcess(id string) error {
 		return err
 	}
 
-	t.command = r.createCommand(t.config)
+	t.command = t.config.CreateCommand()
 
 	order := "stop"
 	if t.process.Order == "start" {
