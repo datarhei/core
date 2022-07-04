@@ -86,9 +86,8 @@ func replace(what, placeholder, value string) string {
 		return what
 	}
 
-	innerRe := re.Copy()
 	what = re.ReplaceAllStringFunc(what, func(match string) string {
-		matches := innerRe.FindStringSubmatch(match)
+		matches := re.FindStringSubmatch(match)
 		var v string
 
 		if matches[2] != "" {
