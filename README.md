@@ -404,7 +404,9 @@ The `streamid` is formatted according to Appendix B of the [SRT specs](https://d
 
 An example publishing streamid: `#!:m=publish,r=12345,token=foobar`.
 
-With your SRT client, connect to the SRT server always in `caller` mode.
+With your SRT client, connect to the SRT server always in `caller` mode, e.g. `srt://127.0.0.1:6000?mode=caller&streamid=#!:m=publish,r=12345,token=foobar&passphrase=foobarfoobar&transmode=live`.
+
+Via the API you can gather statistics of the currently connected SRT clients.
 
 | Method | Path        | Description                           |
 | ------ | ----------- | ------------------------------------- |
