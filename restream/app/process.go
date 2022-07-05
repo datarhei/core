@@ -88,12 +88,13 @@ func replace(what, placeholder, value string) string {
 
 	what = re.ReplaceAllStringFunc(what, func(match string) string {
 		matches := re.FindStringSubmatch(match)
-		var v string
+		v := value
 
 		if matches[2] != "" {
-			v = strings.ReplaceAll(value, matches[2], `\`+matches[2])
-		} else {
-			v = value
+			if matches[2] != `\` {
+				v = strings.ReplaceAll(v, `\`, `\\`)
+			}
+			v = strings.ReplaceAll(v, matches[2], `\`+matches[2])
 		}
 
 		return strings.Replace(match, match, v, 1)
