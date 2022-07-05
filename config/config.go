@@ -568,6 +568,14 @@ func (d *Config) Validate(resetLogs bool) {
 		if !d.TLS.Enable {
 			d.log("error", d.findVariable("rtmp.enable_tls"), "RTMPS server can only be enabled if TLS is enabled")
 		}
+
+		if len(d.RTMP.AddressTLS) == 0 {
+			d.log("error", d.findVariable("rtmp.address_tls"), "RTMPS server address must be set")
+		}
+
+		if d.RTMP.Address == d.RTMP.AddressTLS {
+			d.log("error", d.findVariable("rtmp.address"), "The RTMP and RTMPS server can't listen on the same address")
+		}
 	}
 
 	// If CORE_MEMFS_USERNAME and CORE_MEMFS_PASSWORD are set, automatically active/deactivate Basic-Auth for memfs

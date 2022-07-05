@@ -2,6 +2,7 @@
 
 #### Core v16.8.0 > ?
 
+-   Allow RTMP server if RTMPS server is enabled
 -   Add optional escape character to process placeholder
 -   Fix output address validation for tee outputs
 -   Fix updating process config

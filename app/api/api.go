@@ -88,6 +88,7 @@ type api struct {
 			main    log.Logger
 			sidecar log.Logger
 			rtmp    log.Logger
+			rtmps   log.Logger
 			srt     log.Logger
 		}
 	}
@@ -669,11 +670,14 @@ func (a *api) start() error {
 	}
 
 	if cfg.RTMP.Enable {
+		a.log.logger.rtmp = a.log.logger.core.WithComponent("RTMP").WithField("address", cfg.RTMP.Address)
+
 		config := rtmp.Config{
 			Addr:      cfg.RTMP.Address,
+			TLSAddr:   cfg.RTMP.AddressTLS,
 			App:       cfg.RTMP.App,
 			Token:     cfg.RTMP.Token,
-			Logger:    a.log.logger.core.WithComponent("RTMP").WithField("address", cfg.RTMP.Address),
+			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
 		}
 
@@ -682,7 +686,9 @@ func (a *api) start() error {
 				GetCertificate: autocertManager.GetCertificate,
 			}
 
-			config.Logger = config.Logger.WithComponent("RTMPS")
+			config.Logger = config.Logger.WithComponent("RTMP/S")
+
+			a.log.logger.rtmps = a.log.logger.core.WithComponent("RTMPS").WithField("address", cfg.RTMP.AddressTLS)
 		}
 
 		rtmpserver, err := rtmp.New(config)
@@ -690,7 +696,6 @@ func (a *api) start() error {
 			return fmt.Errorf("unable to create RMTP server: %w", err)
 		}
 
-		a.log.logger.rtmp = config.Logger
 		a.rtmpserver = rtmpserver
 	}
 
@@ -901,7 +906,33 @@ func (a *api) start() error {
 
 			var err error
 
-			if cfg.TLS.Enable && cfg.RTMP.EnableTLS {
+			logger.Info().Log("Server started")
+			err = a.rtmpserver.ListenAndServe()
+			if err != nil && err != rtmp.ErrServerClosed {
+				err = fmt.Errorf("RTMP server: %w", err)
+			} else {
+				err = nil
+			}
+
+			sendError(err)
+		}()
+
+		if cfg.TLS.Enable && cfg.RTMP.EnableTLS {
+			wgStart.Add(1)
+			a.wgStop.Add(1)
+
+			go func() {
+				logger := a.log.logger.rtmps
+
+				defer func() {
+					logger.Info().Log("Server exited")
+					a.wgStop.Done()
+				}()
+
+				wgStart.Done()
+
+				var err error
+
 				logger.Info().Log("Server started")
 				err = a.rtmpserver.ListenAndServeTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile)
 				if err != nil && err != rtmp.ErrServerClosed {
@@ -909,18 +940,8 @@ func (a *api) start() error {
 				} else {
 					err = nil
 				}
-			} else {
-				logger.Info().Log("Server started")
-				err = a.rtmpserver.ListenAndServe()
-				if err != nil && err != rtmp.ErrServerClosed {
-					err = fmt.Errorf("RTMP server: %w", err)
-				} else {
-					err = nil
-				}
-			}
-
-			sendError(err)
-		}()
+			}()
+		}
 	}
 
 	if a.srtserver != nil {
@@ -1105,6 +1126,10 @@ func (a *api) stop() {
 	// Stop the RTMP server
 	if a.rtmpserver != nil {
 		a.log.logger.rtmp.Info().Log("Stopping ...")
+
+		if a.log.logger.rtmps != nil {
+			a.log.logger.rtmps.Info().Log("Stopping ...")
+		}
 
 		a.rtmpserver.Close()
 		a.rtmpserver = nil

@@ -4,6 +4,7 @@ package rtmp
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
@@ -175,6 +176,9 @@ type Config struct {
 	// The address the RTMP server should listen on, e.g. ":1935"
 	Addr string
 
+	// The address the RTMPS server should listen on, e.g. ":1936"
+	TLSAddr string
+
 	// The app path for the streams, e.g. "/live". Optional. Defaults
 	// to "/".
 	App string
@@ -216,7 +220,8 @@ type server struct {
 	collector session.Collector
 
 	// A joy4 RTMP server instance
-	server *rtmp.Server
+	server    *rtmp.Server
+	tlsServer *rtmp.Server
 
 	// Map of publishing channels and a lock to serialize
 	// access to the map.
@@ -231,7 +236,7 @@ func New(config Config) (Server, error) {
 	}
 
 	if config.Logger == nil {
-		config.Logger = log.New("RTMP")
+		config.Logger = log.New("")
 	}
 
 	s := &server{
@@ -247,9 +252,17 @@ func New(config Config) (Server, error) {
 
 	s.server = &rtmp.Server{
 		Addr:          config.Addr,
-		TLSConfig:     config.TLSConfig.Clone(),
 		HandlePlay:    s.handlePlay,
 		HandlePublish: s.handlePublish,
+	}
+
+	if len(config.TLSAddr) != 0 {
+		s.tlsServer = &rtmp.Server{
+			Addr:          config.TLSAddr,
+			TLSConfig:     config.TLSConfig.Clone(),
+			HandlePlay:    s.handlePlay,
+			HandlePublish: s.handlePublish,
+		}
 	}
 
 	s.channels = make(map[string]*channel)
@@ -265,12 +278,20 @@ func (s *server) ListenAndServe() error {
 }
 
 func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
-	return s.server.ListenAndServeTLS(certFile, keyFile)
+	if s.tlsServer == nil {
+		return fmt.Errorf("RTMPS server is not configured")
+	}
+
+	return s.tlsServer.ListenAndServeTLS(certFile, keyFile)
 }
 
 func (s *server) Close() {
 	// Stop listening
 	s.server.Close()
+
+	if s.tlsServer != nil {
+		s.tlsServer.Close()
+	}
 
 	s.lock.Lock()
 	defer s.lock.Unlock()

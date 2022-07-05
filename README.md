@@ -127,6 +127,7 @@ The currently known environment variables (but not all will be respected) are:
 | CORE_RTMP_ENABLE                          | `false`      | Enable RTMP server.                                                                                                                                                                  |
 | CORE_RTMP_ENABLE_TLS                      | `false`      | Enable RTMP over TLS (RTMPS). Requires `CORE_TLS_ENABLE` to be `true`.                                                                                                               |
 | CORE_RTMP_ADDRESS                         | `:1935`      | RTMP server listen address.                                                                                                                                                          |
+| CORE_RTMP_ADDRESS_TLS                     | `:1936`      | RTMPS server listen address.                                                                                                                                                         |
 | CORE_RTMP_APP                             | `/`          | RTMP app for publishing.                                                                                                                                                             |
 | CORE_RTMP_TOKEN                           | (not set)    | RTMP token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                    |
 | CORE_SRT_ENABLE                           | `false`      | Enable SRT server.                                                                                                                                                                   |
@@ -257,6 +258,7 @@ All other values will be filled with default values and persisted on disk. The e
         "enable": false,
         "enable_tls": false,
         "address": ":1935",
+        "address_tls": ":1936",
         "app": "/",
         "token": ""
     },
@@ -385,6 +387,8 @@ If you set a value for `CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES`, which is larger 
 ## RTMP
 
 The datarhei Core includes a simple RTMP server for publishing and playing streams. Set the environment variable `CORE_RTMP_ENABLE` to `true` to enable the RTMP server. It is listening on `CORE_RTMP_ADDRESS`. Use `CORE_RTMP_APP` to limit the app a stream can be published on, e.g. `/live` to require URLs to start with `/live`. To prevent anybody can publish streams, set `CORE_RTMP_TOKEN` to a secret only known to the publishers and subscribers. The token has to be put in the query of the stream URL, e.g. `/live/stream?token=...`.
+
+For additionaly enabling the RTMPS server, set the config variable `rtmp.enable_tls` or environment variable `CORE_RTMP_ENABLE_TLS` to `true`. This requires `tls.enable` or `CORE_TLS_ENABLE` to be set to to `true`. Use `rtmp.address_tls` or `CORE_RTMP_ADDRESS_TLS` to set the listen address for the RTMPS server.
 
 | Method | Path         | Description                           |
 | ------ | ------------ | ------------------------------------- |
