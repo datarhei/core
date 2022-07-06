@@ -644,20 +644,24 @@ A command is defined as:
 
 Currently supported placeholders are:
 
-| Placeholder   | Description                                               | Location                                                                                                                |
-| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `{diskfs}`    | Will be replaced by the provided `CORE_STORAGE_DISK_DIR`. | `options`, `input.address`, `input.options`, `output.address`, `output.options`                                         |
-| `{memfs}`     | Will be replace by the base URL of the MemFS.             | `input.address`, `input.options`, `output.address`, `output.options`                                                    |
-| `{processid}` | Will be replaced by the ID of the process.                | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
-| `{reference}` | Will be replaced by the reference of the process          | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
-| `{inputid}`   | Will be replaced by the ID of the input.                  | `input.address`, `input.options`                                                                                        |
-| `{outputid}`  | Will be replaced by the ID of the output.                 | `output.address`, `output.options`, `output.cleanup.pattern`                                                            |
+| Placeholder   | Description                                                                                                                                            | Location                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `{diskfs}`    | Will be replaced by the provided `CORE_STORAGE_DISK_DIR`.                                                                                              | `options`, `input.address`, `input.options`, `output.address`, `output.options`                                         |
+| `{memfs}`     | Will be replace by the base URL of the MemFS.                                                                                                          | `input.address`, `input.options`, `output.address`, `output.options`                                                    |
+| `{processid}` | Will be replaced by the ID of the process.                                                                                                             | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
+| `{reference}` | Will be replaced by the reference of the process                                                                                                       | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
+| `{inputid}`   | Will be replaced by the ID of the input.                                                                                                               | `input.address`, `input.options`                                                                                        |
+| `{outputid}`  | Will be replaced by the ID of the output.                                                                                                              | `output.address`, `output.options`, `output.cleanup.pattern`                                                            |
+| `{rtmp}`      | Will be replaced by the internal address of the RTMP server. Requires parameter `name` (name of the stream).                                           | `input.address`, `output.address`                                                                                       |
+| `{srt}`       | Will be replaced by the internal address of the SRT server. Requires parameter `name` (name of the stream) and `mode` (either `publish` or `request`). | `input.address`, `output.address`                                                                                       |
 
 Before replacing the placeholders in the process config, all references (see below) will be resolved.
 
 If the value that gets filled in on the place of the placeholder needs escaping, you can define the character to be escaped in the placeholder by adding it to the placeholder name and prefix it with a `^`.
 E.g. escape all `:` in the value (`http://example.com:8080`) for `{memfs}` placeholder, write `{memfs^:}`. It will then be replaced by `http\://example.com\:8080`. The escape character is always `\`. In
 case there are `\` in the value, they will also get escaped. If the placeholder doesn't imply escaping, the value will be uses as-is.
+
+Add parameters to a placeholder by appending a comma separated list of key/values, e.g. `{placeholder,key1=value1,key2=value2}`. This can be combined with escaping.
 
 ### References
 

@@ -29,6 +29,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
 	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/store"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
@@ -75,6 +76,7 @@ type api struct {
 	sidecarserver *gohttp.Server
 	httpjwt       jwt.JWT
 	update        update.Checker
+	replacer      replace.Replacer
 
 	errorChan chan error
 
@@ -439,12 +441,50 @@ func (a *api) start() error {
 
 	a.ffmpeg = ffmpeg
 
+	a.replacer = replace.New()
+
+	{
+		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
+		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
+
+		if cfg.RTMP.Enable {
+			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
+
+			template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
+			if len(cfg.RTMP.Token) != 0 {
+				template += "?token=" + cfg.RTMP.Token
+			}
+
+			a.replacer.RegisterTemplate("rtmp", template)
+		}
+
+		if cfg.SRT.Enable {
+			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
+
+			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid=#!:m={mode},r={name}"
+			if len(cfg.SRT.Token) != 0 {
+				template += ",token=" + cfg.SRT.Token
+			}
+			if len(cfg.SRT.Passphrase) != 0 {
+				template += "&passphrase=" + cfg.SRT.Passphrase
+			}
+			a.replacer.RegisterTemplate("srt", template)
+		}
+	}
+
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
 		Name:         cfg.Name,
 		Store:        store,
 		DiskFS:       a.diskfs,
 		MemFS:        a.memfs,
+		Replace:      a.replacer,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
 		Logger:       a.log.logger.core.WithComponent("Process"),
@@ -940,6 +980,8 @@ func (a *api) start() error {
 				} else {
 					err = nil
 				}
+
+				sendError(err)
 			}()
 		}
 	}

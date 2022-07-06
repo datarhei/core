@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -771,4 +772,36 @@ func (u *urlValue) Validate() error {
 
 func (u *urlValue) IsEmpty() bool {
 	return len(string(*u)) == 0
+}
+
+// absolute path
+
+type absolutePathValue string
+
+func newAbsolutePathValue(p *string, val string) *absolutePathValue {
+	*p = filepath.Clean(val)
+	return (*absolutePathValue)(p)
+}
+
+func (s *absolutePathValue) Set(val string) error {
+	*s = absolutePathValue(filepath.Clean(val))
+	return nil
+}
+
+func (s *absolutePathValue) String() string {
+	return string(*s)
+}
+
+func (s *absolutePathValue) Validate() error {
+	path := string(*s)
+
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("%s is not an absolute path", path)
+	}
+
+	return nil
+}
+
+func (s *absolutePathValue) IsEmpty() bool {
+	return len(string(*s)) == 0
 }

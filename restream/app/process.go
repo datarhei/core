@@ -1,10 +1,8 @@
 package app
 
 import (
-	"regexp"
-	"strings"
-
 	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/replace"
 )
 
 type ConfigIOCleanup struct {
@@ -80,35 +78,12 @@ func (config *Config) Clone() *Config {
 	return clone
 }
 
-func replace(what, placeholder, value string) string {
-	re, err := regexp.Compile(`{` + regexp.QuoteMeta(placeholder) + `(\^(.))?}`)
-	if err != nil {
-		return what
-	}
-
-	what = re.ReplaceAllStringFunc(what, func(match string) string {
-		matches := re.FindStringSubmatch(match)
-		v := value
-
-		if matches[2] != "" {
-			if matches[2] != `\` {
-				v = strings.ReplaceAll(v, `\`, `\\`)
-			}
-			v = strings.ReplaceAll(v, matches[2], `\\`+matches[2])
-		}
-
-		return strings.Replace(match, match, v, 1)
-	})
-
-	return what
-}
-
 // ReplacePlaceholders replaces all placeholders in the config. The config
 // will be modified in place.
-func (config *Config) ResolvePlaceholders(basediskfs, basememfs string) {
+func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 	for i, option := range config.Options {
 		// Replace any known placeholders
-		option = replace(option, "diskfs", basediskfs)
+		option = r.Replace(option, "diskfs", "")
 
 		config.Options[i] = option
 	}
@@ -116,21 +91,23 @@ func (config *Config) ResolvePlaceholders(basediskfs, basememfs string) {
 	// Resolving the given inputs
 	for i, input := range config.Input {
 		// Replace any known placeholders
-		input.ID = replace(input.ID, "processid", config.ID)
-		input.ID = replace(input.ID, "reference", config.Reference)
-		input.Address = replace(input.Address, "inputid", input.ID)
-		input.Address = replace(input.Address, "processid", config.ID)
-		input.Address = replace(input.Address, "reference", config.Reference)
-		input.Address = replace(input.Address, "diskfs", basediskfs)
-		input.Address = replace(input.Address, "memfs", basememfs)
+		input.ID = r.Replace(input.ID, "processid", config.ID)
+		input.ID = r.Replace(input.ID, "reference", config.Reference)
+		input.Address = r.Replace(input.Address, "inputid", input.ID)
+		input.Address = r.Replace(input.Address, "processid", config.ID)
+		input.Address = r.Replace(input.Address, "reference", config.Reference)
+		input.Address = r.Replace(input.Address, "diskfs", "")
+		input.Address = r.Replace(input.Address, "memfs", "")
+		input.Address = r.Replace(input.Address, "rtmp", "")
+		input.Address = r.Replace(input.Address, "srt", "")
 
 		for j, option := range input.Options {
 			// Replace any known placeholders
-			option = replace(option, "inputid", input.ID)
-			option = replace(option, "processid", config.ID)
-			option = replace(option, "reference", config.Reference)
-			option = replace(option, "diskfs", basediskfs)
-			option = replace(option, "memfs", basememfs)
+			option = r.Replace(option, "inputid", input.ID)
+			option = r.Replace(option, "processid", config.ID)
+			option = r.Replace(option, "reference", config.Reference)
+			option = r.Replace(option, "diskfs", "")
+			option = r.Replace(option, "memfs", "")
 
 			input.Options[j] = option
 		}
@@ -141,29 +118,31 @@ func (config *Config) ResolvePlaceholders(basediskfs, basememfs string) {
 	// Resolving the given outputs
 	for i, output := range config.Output {
 		// Replace any known placeholders
-		output.ID = replace(output.ID, "processid", config.ID)
-		output.Address = replace(output.Address, "outputid", output.ID)
-		output.Address = replace(output.Address, "processid", config.ID)
-		output.Address = replace(output.Address, "reference", config.Reference)
-		output.Address = replace(output.Address, "diskfs", basediskfs)
-		output.Address = replace(output.Address, "memfs", basememfs)
+		output.ID = r.Replace(output.ID, "processid", config.ID)
+		output.Address = r.Replace(output.Address, "outputid", output.ID)
+		output.Address = r.Replace(output.Address, "processid", config.ID)
+		output.Address = r.Replace(output.Address, "reference", config.Reference)
+		output.Address = r.Replace(output.Address, "diskfs", "")
+		output.Address = r.Replace(output.Address, "memfs", "")
+		output.Address = r.Replace(output.Address, "rtmp", "")
+		output.Address = r.Replace(output.Address, "srt", "")
 
 		for j, option := range output.Options {
 			// Replace any known placeholders
-			option = replace(option, "outputid", output.ID)
-			option = replace(option, "processid", config.ID)
-			option = replace(option, "reference", config.Reference)
-			option = replace(option, "diskfs", basediskfs)
-			option = replace(option, "memfs", basememfs)
+			option = r.Replace(option, "outputid", output.ID)
+			option = r.Replace(option, "processid", config.ID)
+			option = r.Replace(option, "reference", config.Reference)
+			option = r.Replace(option, "diskfs", "")
+			option = r.Replace(option, "memfs", "")
 
 			output.Options[j] = option
 		}
 
 		for j, cleanup := range output.Cleanup {
 			// Replace any known placeholders
-			cleanup.Pattern = replace(cleanup.Pattern, "outputid", output.ID)
-			cleanup.Pattern = replace(cleanup.Pattern, "processid", config.ID)
-			cleanup.Pattern = replace(cleanup.Pattern, "reference", config.Reference)
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID)
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID)
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference)
 
 			output.Cleanup[j] = cleanup
 		}

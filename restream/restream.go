@@ -21,6 +21,7 @@ import (
 	"github.com/datarhei/core/v16/process"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
+	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/store"
 )
 
@@ -59,6 +60,7 @@ type Config struct {
 	Store        store.Store
 	DiskFS       fs.Filesystem
 	MemFS        fs.Filesystem
+	Replace      replace.Replacer
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
 	Logger       log.Logger
@@ -92,6 +94,7 @@ type restream struct {
 		memfs        rfs.Filesystem
 		stopObserver context.CancelFunc
 	}
+	replace  replace.Replacer
 	tasks    map[string]*task
 	logger   log.Logger
 	metadata map[string]interface{}
@@ -109,6 +112,7 @@ func New(config Config) (Restreamer, error) {
 		name:      config.Name,
 		createdAt: time.Now(),
 		store:     config.Store,
+		replace:   config.Replace,
 		logger:    config.Logger,
 	}
 
@@ -140,6 +144,10 @@ func New(config Config) (Restreamer, error) {
 		r.fs.memfs = rfs.New(rfs.Config{
 			FS: fs.NewDummyFilesystem(),
 		})
+	}
+
+	if r.replace == nil {
+		r.replace = replace.New()
 	}
 
 	r.ffmpeg = config.FFmpeg
@@ -268,7 +276,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
+		t.config.ResolvePlaceholders(r.replace)
 
 		tasks[id] = t
 	}
@@ -418,7 +426,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -983,7 +991,7 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.config = t.process.Config.Clone()
 
-	t.config.ResolvePlaceholders(r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {

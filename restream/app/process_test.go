@@ -6,26 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReplace(t *testing.T) {
-	foobar := `;:.,-_$\£!^`
-
-	samples := [][2]string{
-		{"{foobar}", foobar},
-		{"{foobar^:}", `;\:.,-_$\\£!^`},
-		{"{foobar^:}barfoo{foobar^:}", `;\:.,-_$\\£!^barfoo;\:.,-_$\\£!^`},
-		{"{foobar^:.}", "{foobar^:.}"},
-		{"{foobar^}", "{foobar^}"},
-		{"{barfoo^:}", "{barfoo^:}"},
-		{"{foobar^^}", `;:.,-_$\\£!\^`},
-		{`{foobar^\}`, `;:.,-_$\\£!^`},
-	}
-
-	for _, e := range samples {
-		replaced := replace(e[0], "foobar", foobar)
-		require.Equal(t, e[1], replaced, e[0])
-	}
-}
-
 func TestCreateCommand(t *testing.T) {
 	config := &Config{
 		Options: []string{"-global", "global"},
