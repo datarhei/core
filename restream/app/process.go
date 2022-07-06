@@ -94,7 +94,7 @@ func replace(what, placeholder, value string) string {
 			if matches[2] != `\` {
 				v = strings.ReplaceAll(v, `\`, `\\`)
 			}
-			v = strings.ReplaceAll(v, matches[2], `\`+matches[2])
+			v = strings.ReplaceAll(v, matches[2], `\\`+matches[2])
 		}
 
 		return strings.Replace(match, match, v, 1)
