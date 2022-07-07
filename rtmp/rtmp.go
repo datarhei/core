@@ -322,7 +322,7 @@ func (s *server) log(who, action, path, message string, client net.Addr) {
 		"who":    who,
 		"action": action,
 		"path":   path,
-		"client": client,
+		"client": client.String(),
 	}).Log(message)
 }
 
