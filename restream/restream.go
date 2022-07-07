@@ -585,11 +585,6 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
 		}
-
-		ok := r.ffmpeg.ValidateInputAddress(io.Address)
-		if !ok {
-			return false, fmt.Errorf("the address for input '#%s:%s' is not allowed (%s)", config.ID, io.ID, io.Address)
-		}
 	}
 
 	if len(config.Output) == 0 {
@@ -628,11 +623,6 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 		if isFile {
 			hasFiles = true
 		}
-
-		ok := r.ffmpeg.ValidateOutputAddress(io.Address)
-		if !ok {
-			return false, fmt.Errorf("the address for output '#%s:%s' is not allowed (%s)", config.ID, io.ID, io.Address)
-		}
 	}
 
 	return hasFiles, nil
@@ -643,6 +633,10 @@ func (r *restream) validateInputAddress(address, basedir string) (string, error)
 		if err := url.Validate(address); err != nil {
 			return address, err
 		}
+	}
+
+	if !r.ffmpeg.ValidateInputAddress(address) {
+		return address, fmt.Errorf("address is not allowed")
 	}
 
 	return address, nil
@@ -683,6 +677,11 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 		if err := url.Validate(address); err != nil {
 			return address, false, err
 		}
+
+		if !r.ffmpeg.ValidateOutputAddress(address) {
+			return address, false, fmt.Errorf("address is not allowed")
+		}
+
 		return address, false, nil
 	}
 
@@ -696,11 +695,19 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 	}
 
 	if strings.HasPrefix(address, "/dev/") {
+		if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+			return address, false, fmt.Errorf("address is not allowed")
+		}
+
 		return "file:" + address, false, nil
 	}
 
 	if !strings.HasPrefix(address, basedir) {
 		return address, false, fmt.Errorf("%s is not inside of %s", address, basedir)
+	}
+
+	if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+		return address, false, fmt.Errorf("address is not allowed")
 	}
 
 	return "file:" + address, true, nil
