@@ -1,6 +1,6 @@
 # Core
 
-#### Core v16.8.0 > ?
+#### Core v16.8.0 > v16.9.0
 
 -   Add new placeholders and parameters for placeholder
 -   Allow RTMP server if RTMPS server is enabled
