@@ -1059,7 +1059,7 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	}
 
 	if !task.valid {
-		return state, fmt.Errorf("invalid process definition")
+		return state, nil
 	}
 
 	status := task.ffmpeg.Status()
@@ -1120,7 +1120,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 	}
 
 	if !task.valid {
-		return &app.Log{}, fmt.Errorf("invalid process definition")
+		return &app.Log{}, nil
 	}
 
 	log := &app.Log{}
