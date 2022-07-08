@@ -933,6 +933,10 @@ func (r *restream) stopProcess(id string) error {
 		return ErrUnknownProcess
 	}
 
+	if task.ffmpeg == nil {
+		return nil
+	}
+
 	status := task.ffmpeg.Status()
 
 	if task.process.Order == "stop" && status.Order == "stop" {
