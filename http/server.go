@@ -30,6 +30,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/http/cache"
@@ -333,7 +334,13 @@ func NewServer(config Config) (Server, error) {
 	s.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
 	s.router.Validator = validator.New()
 	s.router.Use(s.middleware.log)
-	s.router.Use(middleware.Recover())
+	s.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
+			rows := strings.Split(string(stack), "\n")
+			s.logger.Error().WithField("stack", rows).Log("recovered from a panic")
+			return nil
+		},
+	}))
 	s.router.Use(mwbodysize.New())
 	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
 		Collector: config.Sessions.Collector("http"),
