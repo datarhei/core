@@ -447,35 +447,31 @@ func (a *api) start() error {
 		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
 		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
 
-		if cfg.RTMP.Enable {
-			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
-			if len(host) == 0 {
-				host = "localhost"
-			}
-
-			template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
-			if len(cfg.RTMP.Token) != 0 {
-				template += "?token=" + cfg.RTMP.Token
-			}
-
-			a.replacer.RegisterTemplate("rtmp", template)
+		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
+		if len(host) == 0 {
+			host = "localhost"
 		}
 
-		if cfg.SRT.Enable {
-			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
-			if len(host) == 0 {
-				host = "localhost"
-			}
-
-			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid=#!:m={mode},r={name}"
-			if len(cfg.SRT.Token) != 0 {
-				template += ",token=" + cfg.SRT.Token
-			}
-			if len(cfg.SRT.Passphrase) != 0 {
-				template += "&passphrase=" + cfg.SRT.Passphrase
-			}
-			a.replacer.RegisterTemplate("srt", template)
+		template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
+		if len(cfg.RTMP.Token) != 0 {
+			template += "?token=" + cfg.RTMP.Token
 		}
+
+		a.replacer.RegisterTemplate("rtmp", template)
+
+		host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
+		if len(host) == 0 {
+			host = "localhost"
+		}
+
+		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid=#!:m={mode},r={name}"
+		if len(cfg.SRT.Token) != 0 {
+			template += ",token=" + cfg.SRT.Token
+		}
+		if len(cfg.SRT.Passphrase) != 0 {
+			template += "&passphrase=" + cfg.SRT.Passphrase
+		}
+		a.replacer.RegisterTemplate("srt", template)
 	}
 
 	restream, err := restream.New(restream.Config{
