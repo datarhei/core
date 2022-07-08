@@ -177,7 +177,7 @@ type Packet interface {
 	SetData([]byte)
 	Len() uint64
 	Unmarshal(data []byte) error
-	Marshal(w io.Writer)
+	Marshal(w io.Writer) error
 	Dump() string
 	MarshalCIF(c CIF)
 	UnmarshalCIF(c CIF) error
@@ -259,6 +259,7 @@ func NewPacket(addr net.Addr, rawdata []byte) Packet {
 
 	if len(rawdata) != 0 {
 		if err := p.Unmarshal(rawdata); err != nil {
+			p.Decommission()
 			return nil
 		}
 	}
@@ -267,6 +268,10 @@ func NewPacket(addr net.Addr, rawdata []byte) Packet {
 }
 
 func (p *pkt) Decommission() {
+	if p.payload == nil {
+		return
+	}
+
 	payloadPool.Put(p.payload)
 	p.payload = nil
 }
@@ -351,8 +356,12 @@ func (p *pkt) Unmarshal(data []byte) error {
 	return nil
 }
 
-func (p *pkt) Marshal(w io.Writer) {
+func (p *pkt) Marshal(w io.Writer) error {
 	var buffer [16]byte
+
+	if p.payload == nil {
+		return fmt.Errorf("invalid payload")
+	}
 
 	if p.header.IsControlPacket {
 		binary.BigEndian.PutUint16(buffer[0:], p.header.ControlType)  // control type
@@ -384,6 +393,8 @@ func (p *pkt) Marshal(w io.Writer) {
 
 	w.Write(buffer[0:])
 	w.Write(p.payload.Bytes())
+
+	return nil
 }
 
 func (p *pkt) Dump() string {

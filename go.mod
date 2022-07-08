@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/99designs/gqlgen v0.17.12
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/datarhei/gosrt v0.1.1
+	github.com/datarhei/gosrt v0.1.2
 	github.com/datarhei/joy4 v0.0.0-20210125162555-2102a8289cce
 	github.com/go-openapi/spec v0.20.6 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect

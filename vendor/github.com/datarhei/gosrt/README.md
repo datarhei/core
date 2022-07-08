@@ -42,7 +42,7 @@ go get github.com/datarhei/gosrt
 # Caller example
 
 ```
-import github.com/datarhei/gosrt
+import "github.com/datarhei/gosrt"
 
 conn, err := srt.Dial("srt", "golang.org:6000", srt.Config{
     StreamId: "...",
@@ -70,7 +70,7 @@ In the `contrib/client` directory you'll find a complete example of a SRT client
 # Listener example
 
 ```
-import github.com/datarhei/gosrt
+import "github.com/datarhei/gosrt"
 
 ln, err := srt.Listen("srt", ":6000", srt.Config{...})
 if err != nil {

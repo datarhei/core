@@ -262,7 +262,12 @@ func Listen(network, address string, config Config) (Listener, error) {
 				continue
 			}
 
-			ln.rcvQueue <- p
+			// non-blocking
+			select {
+			case ln.rcvQueue <- p:
+			default:
+				ln.log("listen", func() string { return "receive queue is full" })
+			}
 		}
 	}()
 
@@ -503,7 +508,11 @@ func (ln *listener) writer(ctx context.Context) {
 		case p := <-ln.sndQueue:
 			data.Reset()
 
-			p.Marshal(&data)
+			if err := p.Marshal(&data); err != nil {
+				p.Decommission()
+				ln.log("packet:send:error", func() string { return "marshalling packet failed" })
+				continue
+			}
 
 			buffer := data.Bytes()
 

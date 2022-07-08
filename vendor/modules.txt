@@ -39,7 +39,7 @@ github.com/beorn7/perks/quantile
 github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/datarhei/gosrt v0.1.1
+# github.com/datarhei/gosrt v0.1.2
 ## explicit
 github.com/datarhei/gosrt
 github.com/datarhei/gosrt/internal/circular
