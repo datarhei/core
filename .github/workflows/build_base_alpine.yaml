@@ -53,7 +53,7 @@ jobs:
           build-args: |
             BUILD_IMAGE=${{ env.OS_NAME }}:${{ env.OS_VERSION }}
             GOLANG_IMAGE=${{ env.GOLANG_IMAGE }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
           push: true
           tags: |
             datarhei/base:${{ env.OS_NAME }}-core-${{ env.OS_VERSION }}-${{ env.CORE_VERSION }}
