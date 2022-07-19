@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/ffmpeg/prelude"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net/url"
 	"github.com/datarhei/core/v16/process"
@@ -552,131 +553,60 @@ func (p *parser) Prelude() []string {
 }
 
 func (p *parser) parsePrelude() bool {
-	process := ffmpegProcess{}
-
 	p.lock.progress.Lock()
 	defer p.lock.progress.Unlock()
 
-	// Input #0, lavfi, from 'testsrc=size=1280x720:rate=25':
-	// Input #1, lavfi, from 'anullsrc=r=44100:cl=stereo':
-	// Output #0, hls, to './data/testsrc.m3u8':
-	reFormat := regexp.MustCompile(`^(Input|Output) #([0-9]+), (.*?), (from|to) '([^']+)`)
-
-	// Stream #0:0: Video: rawvideo (RGB[24] / 0x18424752), rgb24, 1280x720 [SAR 1:1 DAR 16:9], 25 tbr, 25 tbn, 25 tbc
-	// Stream #1:0: Audio: pcm_u8, 44100 Hz, stereo, u8, 705 kb/s
-	// Stream #0:0: Video: h264 (libx264), yuv420p(progressive), 1280x720 [SAR 1:1 DAR 16:9], q=-1--1, 25 fps, 90k tbn, 25 tbc
-	// Stream #0:1(eng): Audio: aac (LC), 44100 Hz, stereo, fltp, 64 kb/s
-	reStream := regexp.MustCompile(`Stream #([0-9]+):([0-9]+)(?:\(([a-z]+)\))?: (Video|Audio|Subtitle): (.*)`)
-	reStreamCodec := regexp.MustCompile(`^([^\s,]+)`)
-	reStreamVideoSize := regexp.MustCompile(`, ([0-9]+)x([0-9]+)`)
-	//reStreamVideoFPS := regexp.MustCompile(`, ([0-9]+) fps`)
-	reStreamAudio := regexp.MustCompile(`, ([0-9]+) Hz, ([^,]+)`)
-	//reStreamBitrate := regexp.MustCompile(`, ([0-9]+) kb/s`)
-
-	reStreamMapping := regexp.MustCompile(`^Stream mapping:`)
-	reStreamMap := regexp.MustCompile(`^[\s]+Stream #[0-9]+:[0-9]+`)
-
-	//format := InputOutput{}
-
-	formatType := ""
-	formatURL := ""
-
-	var noutputs int
-	streamMapping := false
-
 	data := p.Prelude()
 
-	for _, line := range data {
-		if reStreamMapping.MatchString(line) {
-			streamMapping = true
-			continue
-		}
+	inputs, outputs, noutputs := prelude.Parse(data)
 
-		if streamMapping {
-			if reStreamMap.MatchString(line) {
-				noutputs++
-			} else {
-				streamMapping = false
-			}
-
-			continue
-		}
-
-		if matches := reFormat.FindStringSubmatch(line); matches != nil {
-			formatType = strings.ToLower(matches[1])
-			formatURL = matches[5]
-
-			continue
-		}
-
-		if matches := reStream.FindStringSubmatch(line); matches != nil {
-			format := ffmpegProcessIO{}
-
-			format.Address = formatURL
-			if ip, _ := url.Lookup(format.Address); len(ip) != 0 {
-				format.IP = ip
-			}
-
-			if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-				format.Index = x
-			}
-
-			if x, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
-				format.Stream = x
-			}
-			format.Type = strings.ToLower(matches[4])
-
-			streamDetail := matches[5]
-
-			if matches = reStreamCodec.FindStringSubmatch(streamDetail); matches != nil {
-				format.Codec = matches[1]
-			}
-			/*
-				if matches = reStreamBitrate.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseFloat(matches[1], 64); err == nil {
-						format.Bitrate = x
-					}
-				}
-			*/
-			if format.Type == "video" {
-				if matches = reStreamVideoSize.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-						format.Width = x
-					}
-					if x, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
-						format.Height = x
-					}
-				}
-				/*
-					if matches = reStreamVideoFPS.FindStringSubmatch(streamDetail); matches != nil {
-						if x, err := strconv.ParseFloat(matches[1], 64); err == nil {
-							format.FPS = x
-						}
-					}
-				*/
-			} else if format.Type == "audio" {
-				if matches = reStreamAudio.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-						format.Sampling = x
-					}
-					format.Layout = matches[2]
-				}
-			}
-
-			if formatType == "input" {
-				process.input = append(process.input, format)
-			} else {
-				process.output = append(process.output, format)
-			}
-		}
-	}
-
-	if len(process.output) != noutputs {
+	if len(outputs) != noutputs {
 		return false
 	}
 
-	p.process.input = process.input
-	p.process.output = process.output
+	for _, in := range inputs {
+		io := ffmpegProcessIO{
+			Address:  in.Address,
+			Format:   in.Format,
+			Index:    in.Index,
+			Stream:   in.Stream,
+			Type:     in.Type,
+			Codec:    in.Codec,
+			Pixfmt:   in.Pixfmt,
+			Width:    in.Width,
+			Height:   in.Height,
+			Sampling: in.Sampling,
+			Layout:   in.Layout,
+		}
+
+		if ip, _ := url.Lookup(io.Address); len(ip) != 0 {
+			io.IP = ip
+		}
+
+		p.process.input = append(p.process.input, io)
+	}
+
+	for _, out := range outputs {
+		io := ffmpegProcessIO{
+			Address:  out.Address,
+			Format:   out.Format,
+			Index:    out.Index,
+			Stream:   out.Stream,
+			Type:     out.Type,
+			Codec:    out.Codec,
+			Pixfmt:   out.Pixfmt,
+			Width:    out.Width,
+			Height:   out.Height,
+			Sampling: out.Sampling,
+			Layout:   out.Layout,
+		}
+
+		if ip, _ := url.Lookup(io.Address); len(ip) != 0 {
+			io.IP = ip
+		}
+
+		p.process.output = append(p.process.output, io)
+	}
 
 	return true
 }
