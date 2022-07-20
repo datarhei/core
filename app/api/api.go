@@ -154,6 +154,12 @@ func (a *api) Reload() error {
 	}
 
 	cfg := store.Get()
+	if err := cfg.Migrate(); err == nil {
+		store.Set(cfg)
+	} else {
+		return err
+	}
+
 	cfg.Merge()
 
 	if len(cfg.Host.Name) == 0 && cfg.Host.Auto {

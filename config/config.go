@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/datarhei/core/v16/math/rand"
@@ -13,6 +15,8 @@ import (
 	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
 )
+
+const version int64 = 2
 
 type variable struct {
 	value       value    // The actual value
@@ -479,6 +483,36 @@ func (d *Config) Merge() {
 	}
 }
 
+// Migrate will migrate some settings, depending on the version it finds. Migrations
+// are only going upwards,i.e. from a lower version to a higher version.
+func (d *Config) Migrate() error {
+	if d.Version == 1 {
+		if !strings.HasPrefix(d.RTMP.App, "/") {
+			d.RTMP.App = "/" + d.RTMP.App
+		}
+
+		if d.RTMP.EnableTLS {
+			d.RTMP.Enable = true
+			d.RTMP.AddressTLS = d.RTMP.Address
+			host, sport, err := net.SplitHostPort(d.RTMP.Address)
+			if err != nil {
+				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
+			}
+
+			port, err := strconv.Atoi(sport)
+			if err != nil {
+				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
+			}
+
+			d.RTMP.Address = net.JoinHostPort(host, strconv.Itoa(port-1))
+		}
+
+		d.Version = 2
+	}
+
+	return nil
+}
+
 // Validate validates the current state of the Config for completeness and sanity. Errors are
 // written to the log. Use resetLogs to indicate to reset the logs prior validation.
 func (d *Config) Validate(resetLogs bool) {
@@ -486,8 +520,8 @@ func (d *Config) Validate(resetLogs bool) {
 		d.logs = nil
 	}
 
-	if d.Version != 1 {
-		d.log("error", d.findVariable("version"), "unknown configuration layout version")
+	if d.Version != version {
+		d.log("error", d.findVariable("version"), "unknown configuration layout version (found version %d, expecting version %d)", d.Version, version)
 
 		return
 	}
@@ -565,6 +599,10 @@ func (d *Config) Validate(resetLogs bool) {
 
 	// If TLS for RTMP is enabled, TLS must be enabled
 	if d.RTMP.EnableTLS {
+		if !d.RTMP.Enable {
+			d.log("error", d.findVariable("rtmp.enable"), "RTMP server must be enabled if RTMPS server is enabled")
+		}
+
 		if !d.TLS.Enable {
 			d.log("error", d.findVariable("rtmp.enable_tls"), "RTMPS server can only be enabled if TLS is enabled")
 		}
@@ -573,7 +611,7 @@ func (d *Config) Validate(resetLogs bool) {
 			d.log("error", d.findVariable("rtmp.address_tls"), "RTMPS server address must be set")
 		}
 
-		if d.RTMP.Address == d.RTMP.AddressTLS {
+		if d.RTMP.Enable && d.RTMP.Address == d.RTMP.AddressTLS {
 			d.log("error", d.findVariable("rtmp.address"), "The RTMP and RTMPS server can't listen on the same address")
 		}
 	}
