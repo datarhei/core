@@ -284,7 +284,7 @@ func NewConfigFrom(d *Config) *Config {
 }
 
 func (d *Config) init() {
-	d.val(newInt64Value(&d.Version, 1), "version", "", nil, "Configuration file layout version", true, false)
+	d.val(newInt64Value(&d.Version, version), "version", "", nil, "Configuration file layout version", true, false)
 	d.val(newTimeValue(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
 	d.val(newStringValue(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
 	d.val(newStringValue(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
