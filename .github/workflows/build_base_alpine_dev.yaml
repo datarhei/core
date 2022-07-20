@@ -84,3 +84,6 @@ jobs:
   dockerBundle:
     uses: ./.github/workflows/build_bundle_dev.yaml
     secrets: inherit
+  dockerBundleRpi:
+    uses: ./.github/workflows/build_bundle-rpi_dev.yaml
+    secrets: inherit
