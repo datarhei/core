@@ -1,12 +1,10 @@
 # Core
-
-[![CodeQL](https://github.com/datarhei/core/workflows/CodeQL/badge.svg)](https://github.com/datarhei/core/actions?query=workflow%3ACodeQL)
-![Docker Pulls](https://img.shields.io/docker/pulls/datarhei/core.svg?maxAge=604800&label=Docker%20Pulls)
-
 The cloud-native audio/video processing API.
 
 [![License: MIT](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)]([https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0))
 [![CodeQL](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml)
+[![tests](https://github.com/datarhei/core/actions/workflows/go-tests.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/go-tests.yml)
+[![codecov](https://codecov.io/gh/datarhei/core/branch/main/graph/badge.svg?token=90YMPZRAFK)](https://codecov.io/gh/datarhei/core)
 [![Go Report Card](https://goreportcard.com/badge/github.com/datarhei/core)](https://goreportcard.com/report/github.com/datarhei/core)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/datarhei/core)](https://pkg.go.dev/github.com/datarhei/core)
 
