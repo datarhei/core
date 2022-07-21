@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/datarhei/core/http/graph/models"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/monitor"
-	"github.com/datarhei/core/restream"
+	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/monitor"
+	"github.com/datarhei/core/v16/restream"
 )
 
 // This file will not be regenerated automatically.

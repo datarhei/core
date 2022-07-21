@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/datarhei/core/encoding/json"
+	"github.com/datarhei/core/v16/encoding/json"
 
 	"github.com/labstack/echo/v4"
 )

@@ -1,7 +1,7 @@
 package probe
 
 import (
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 type probeIO struct {

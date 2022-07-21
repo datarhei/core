@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

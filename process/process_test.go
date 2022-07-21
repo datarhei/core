@@ -1,11 +1,11 @@
 package process
 
 import (
-	"os/exec"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcess(t *testing.T) {
@@ -18,21 +18,21 @@ func TestProcess(t *testing.T) {
 		StaleTimeout: 0,
 	})
 
-	assert.Equal(t, "finished", p.Status().State)
+	require.Equal(t, "finished", p.Status().State)
 
 	p.Start()
 
-	assert.Equal(t, "running", p.Status().State)
+	require.Equal(t, "running", p.Status().State)
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, "running", p.Status().State)
+	require.Equal(t, "running", p.Status().State)
 
 	p.Stop()
 
 	time.Sleep(2 * time.Second)
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 }
 
 func TestReconnectProcess(t *testing.T) {
@@ -50,11 +50,11 @@ func TestReconnectProcess(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	assert.Equal(t, "finished", p.Status().State)
+	require.Equal(t, "finished", p.Status().State)
 
 	p.Stop()
 
-	assert.Equal(t, "finished", p.Status().State)
+	require.Equal(t, "finished", p.Status().State)
 }
 
 func TestStaleProcess(t *testing.T) {
@@ -71,11 +71,11 @@ func TestStaleProcess(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 
 	p.Stop()
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 }
 
 func TestStaleReconnectProcess(t *testing.T) {
@@ -92,11 +92,11 @@ func TestStaleReconnectProcess(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 
 	p.Stop()
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 }
 
 func TestNonExistingProcess(t *testing.T) {
@@ -114,11 +114,11 @@ func TestNonExistingProcess(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	assert.Equal(t, "failed", p.Status().State)
+	require.Equal(t, "failed", p.Status().State)
 
 	p.Stop()
 
-	assert.Equal(t, "failed", p.Status().State)
+	require.Equal(t, "failed", p.Status().State)
 }
 
 func TestNonExistingReconnectProcess(t *testing.T) {
@@ -136,18 +136,18 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, "failed", p.Status().State)
+	require.Equal(t, "failed", p.Status().State)
 
 	p.Stop()
 
-	assert.Equal(t, "failed", p.Status().State)
+	require.Equal(t, "failed", p.Status().State)
 }
 
 func TestProcessFailed(t *testing.T) {
 	p, _ := New(Config{
-		Binary: "ffmpeg",
+		Binary: "sleep",
 		Args: []string{
-			"-i",
+			"hello",
 		},
 		Reconnect:    false,
 		StaleTimeout: 0,
@@ -159,24 +159,22 @@ func TestProcessFailed(t *testing.T) {
 
 	p.Stop()
 
-	assert.Equal(t, "failed", p.Status().State)
+	require.Equal(t, "failed", p.Status().State)
 }
 
 func TestFFmpegKill(t *testing.T) {
+	binary, err := testhelper.BuildBinary("sigint", "../internal/testhelper")
+	require.NoError(t, err, "Failed to build helper program")
+
 	p, _ := New(Config{
-		Binary: "ffmpeg",
-		Args: []string{
-			"-f", "lavfi",
-			"-i", "testsrc2",
-			"-codec", "copy",
-			"-f", "null",
-			"-",
-		},
+		Binary:       binary,
+		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
 	})
 
-	p.Start()
+	err = p.Start()
+	require.NoError(t, err)
 
 	time.Sleep(5 * time.Second)
 
@@ -184,23 +182,22 @@ func TestFFmpegKill(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	assert.Equal(t, "finished", p.Status().State)
+	require.Equal(t, "finished", p.Status().State)
 }
 
 func TestProcessForceKill(t *testing.T) {
-	if err := exec.Command("go", "build", "-o", "./helper/ignoresigint", "./helper").Run(); err != nil {
-		t.Errorf("Failed to build helper program: %s", err)
-		return
-	}
+	binary, err := testhelper.BuildBinary("ignoresigint", "../internal/testhelper")
+	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
-		Binary:       "./helper/ignoresigint",
+		Binary:       binary,
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
 	})
 
-	p.Start()
+	err = p.Start()
+	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
 
@@ -208,9 +205,9 @@ func TestProcessForceKill(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	assert.Equal(t, "finishing", p.Status().State)
+	require.Equal(t, "finishing", p.Status().State)
 
 	time.Sleep(5 * time.Second)
 
-	assert.Equal(t, "killed", p.Status().State)
+	require.Equal(t, "killed", p.Status().State)
 }

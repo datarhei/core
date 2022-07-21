@@ -168,9 +168,9 @@ rules:
 				continue rules
 			}
 
-			switch value.(type) {
+			switch value := value.(type) {
 			case string:
-				if !re.MatchString(value.(string)) {
+				if !re.MatchString(value) {
 					continue rules
 				}
 			}

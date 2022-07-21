@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/datarhei/core/http/graph/models"
-	"github.com/datarhei/core/playout"
+	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/playout"
 )
 
 func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, input string) (*models.RawAVstream, error) {

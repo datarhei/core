@@ -3,6 +3,8 @@ package probe
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestProber(t *testing.T) {
@@ -38,6 +40,14 @@ Input #3, mov,mp4,m4a,3gp,3g2,mj2, from 'movie.mp4':
   Duration: 00:01:02.28, start: 0.000000, bitrate: 5895 kb/s
     Stream #3:0(eng): Video: h264 (Main) (avc1 / 0x31637661), yuvj420p(pc, bt709), 2560x1440 [SAR 1:1 DAR 16:9], 5894 kb/s, 23.98 fps, 25 tbr, 90k tbn, 50 tbc (default)
     Stream #3:1(por): Subtitle: subrip
+Input #4, mpegts, from 'srt://localhost:6000?mode=caller&transtype=live&streamid=#!:m=request,r=ingest/ad045490-8233-4f31-a296-ea5771a340ac&passphrase=foobarfoobar':
+  Duration: N/A, start: 71.786667, bitrate: N/A
+	Program 1
+		Metadata:
+			service_name    : Service01
+			service_provider: FFmpeg
+	Stream #4:0[0x100]: Video: h264 (Main) ([27][0][0][0] / 0x001B), yuv420p(tv, smpte170m/bt709/bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], 25 tbr, 90k tbn
+	Stream #4:1[0x101]: Audio: aac (LC) ([15][0][0][0] / 0x000F), 48000 Hz, stereo, fltp, 162 kb/s
 Stream mapping:
   Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (libx264))
   Stream #1:0 -> #0:1 (pcm_u8 (native) -> aac (native))
@@ -51,230 +61,107 @@ Press [q] to stop, [?] for help`
 
 	prober.ResetStats()
 
-	if len(prober.inputs) != 5 {
-		t.Errorf("#inputs: want=5, have=%d\n", len(prober.inputs))
-		return
-	}
+	require.Equal(t, 7, len(prober.inputs))
 
 	i := prober.inputs[0]
 
-	if i.Address != "testsrc=size=1280x720:rate=25" {
-		t.Errorf("#input0.address: want=testsrc=size=1280x720:rate=25, have=%s\n", i.Address)
-	}
-
-	if i.Format != "lavfi" {
-		t.Errorf("#input0.format: want=lavfi, have=%s\n", i.Format)
-	}
-
-	if i.Index != 0 {
-		t.Errorf("#input0.index: want=0, have=%d\n", i.Index)
-	}
-
-	if i.Stream != 0 {
-		t.Errorf("#input0.stream: want=0, have=%d\n", i.Stream)
-	}
-
-	if i.Language != "und" {
-		t.Errorf("#input0.language: want=und, have=%s\n", i.Language)
-	}
-
-	if i.Type != "video" {
-		t.Errorf("#input0.type: want=video, have=%s\n", i.Type)
-	}
-
-	if i.Codec != "rawvideo" {
-		t.Errorf("#input0.codec: want=rawvideo, have=%s\n", i.Codec)
-	}
-
-	if i.Bitrate != 0 {
-		t.Errorf("#input0.bitrate: want=0, have=%f\n", i.Bitrate)
-	}
-
-	if i.Duration != 0 {
-		t.Errorf("#input0.duration: want=0, have=%f\n", i.Duration)
-	}
-
-	if i.FPS != 0 {
-		t.Errorf("#input0.fps: want=0, have=%f\n", i.FPS)
-	}
-
-	if i.Pixfmt != "rgb24" {
-		t.Errorf("#input0.pixfmt: want=rgb24, have=%s\n", i.Pixfmt)
-	}
-
-	if i.Width != 1280 {
-		t.Errorf("#input0.width: want=1280, have=%d\n", i.Width)
-	}
-
-	if i.Height != 720 {
-		t.Errorf("#input0.height: want=720, have=%d\n", i.Height)
-	}
+	require.Equal(t, "testsrc=size=1280x720:rate=25", i.Address)
+	require.Equal(t, "lavfi", i.Format)
+	require.Equal(t, uint64(0), i.Index)
+	require.Equal(t, uint64(0), i.Stream)
+	require.Equal(t, "und", i.Language)
+	require.Equal(t, "video", i.Type)
+	require.Equal(t, "rawvideo", i.Codec)
+	require.Equal(t, 0.0, i.Bitrate)
+	require.Equal(t, 0.0, i.Duration)
+	require.Equal(t, 0.0, i.FPS)
+	require.Equal(t, "rgb24", i.Pixfmt)
+	require.Equal(t, uint64(1280), i.Width)
+	require.Equal(t, uint64(720), i.Height)
 
 	i = prober.inputs[1]
 
-	if i.Address != "anullsrc=r=44100:cl=stereo" {
-		t.Errorf("#input1.address: want=anullsrc=r=44100:cl=stereo, have=%s\n", i.Address)
-	}
-
-	if i.Format != "lavfi" {
-		t.Errorf("#input1.format: want=lavfi, have=%s\n", i.Format)
-	}
-
-	if i.Index != 1 {
-		t.Errorf("#input1.index: want=1, have=%d\n", i.Index)
-	}
-
-	if i.Stream != 0 {
-		t.Errorf("#input1.stream: want=0, have=%d\n", i.Stream)
-	}
-
-	if i.Language != "und" {
-		t.Errorf("#input1.language: want=und, have=%s\n", i.Language)
-	}
-
-	if i.Type != "audio" {
-		t.Errorf("#input1.type: want=audio, have=%s\n", i.Type)
-	}
-
-	if i.Codec != "pcm_u8" {
-		t.Errorf("#input1.codec: want=pcm_u8, have=%s\n", i.Codec)
-	}
-
-	if i.Bitrate != 705 {
-		t.Errorf("#input1.bitrate: want=705, have=%f\n", i.Bitrate)
-	}
-
-	if i.Duration != 0 {
-		t.Errorf("#input1.duration: want=0, have=%f\n", i.Duration)
-	}
-
-	if i.Sampling != 44100 {
-		t.Errorf("#input1.sampling: want=44100, have=%d\n", i.Sampling)
-	}
-
-	if i.Layout != "stereo" {
-		t.Errorf("#input1.layout: want=stereo, have=%s\n", i.Layout)
-	}
+	require.Equal(t, "anullsrc=r=44100:cl=stereo", i.Address)
+	require.Equal(t, "lavfi", i.Format)
+	require.Equal(t, uint64(1), i.Index)
+	require.Equal(t, uint64(0), i.Stream)
+	require.Equal(t, "und", i.Language)
+	require.Equal(t, "audio", i.Type)
+	require.Equal(t, "pcm_u8", i.Codec)
+	require.Equal(t, 705.0, i.Bitrate)
+	require.Equal(t, 0.0, i.Duration)
+	require.Equal(t, uint64(44100), i.Sampling)
+	require.Equal(t, "stereo", i.Layout)
 
 	i = prober.inputs[2]
 
-	if i.Address != "playout:rtmp://l5gn74l5-vpu.livespotting.com/live/0chl6hu7_360?token=m5ZuiCQYRlIon8" {
-		t.Errorf("#input2.address: want=playout:rtmp://l5gn74l5-vpu.livespotting.com/live/0chl6hu7_360?token=m5ZuiCQYRlIon8, have=%s\n", i.Address)
-	}
-
-	if i.Format != "playout" {
-		t.Errorf("#input2.format: want=playout, have=%s\n", i.Format)
-	}
-
-	if i.Index != 2 {
-		t.Errorf("#input2.index: want=2, have=%d\n", i.Index)
-	}
-
-	if i.Stream != 0 {
-		t.Errorf("#input2.stream: want=0, have=%d\n", i.Stream)
-	}
-
-	if i.Language != "und" {
-		t.Errorf("#input2.language: want=und, have=%s\n", i.Language)
-	}
-
-	if i.Type != "video" {
-		t.Errorf("#input2.type: want=video, have=%s\n", i.Type)
-	}
-
-	if i.Codec != "h264" {
-		t.Errorf("#input2.codec: want=h264, have=%s\n", i.Codec)
-	}
-
-	if i.Bitrate != 265 {
-		t.Errorf("#input2.bitrate: want=265, have=%f\n", i.Bitrate)
-	}
-
-	if i.Duration != 0 {
-		t.Errorf("#input2.duration: want=0, have=%f\n", i.Duration)
-	}
-
-	if i.FPS != 10 {
-		t.Errorf("#input2.fps: want=10, have=%f\n", i.FPS)
-	}
-
-	if i.Pixfmt != "yuvj420p" {
-		t.Errorf("#input2.pixfmt: want=yuvj420p, have=%s\n", i.Pixfmt)
-	}
-
-	if i.Width != 640 {
-		t.Errorf("#input2.width: want=640, have=%d\n", i.Width)
-	}
-
-	if i.Height != 360 {
-		t.Errorf("#input2.height: want=360, have=%d\n", i.Height)
-	}
+	require.Equal(t, "playout:rtmp://l5gn74l5-vpu.livespotting.com/live/0chl6hu7_360?token=m5ZuiCQYRlIon8", i.Address)
+	require.Equal(t, "playout", i.Format)
+	require.Equal(t, uint64(2), i.Index)
+	require.Equal(t, uint64(0), i.Stream)
+	require.Equal(t, "und", i.Language)
+	require.Equal(t, "video", i.Type)
+	require.Equal(t, "h264", i.Codec)
+	require.Equal(t, 265.0, i.Bitrate)
+	require.Equal(t, 0.0, i.Duration)
+	require.Equal(t, 10.0, i.FPS)
+	require.Equal(t, "yuvj420p", i.Pixfmt)
+	require.Equal(t, uint64(640), i.Width)
+	require.Equal(t, uint64(360), i.Height)
 
 	i = prober.inputs[3]
 
-	if i.Address != "movie.mp4" {
-		t.Errorf("#input3.address: want=movie.mp4, have=%s\n", i.Address)
-	}
-
-	if i.Format != "mov,mp4,m4a,3gp,3g2,mj2" {
-		t.Errorf("#input3.format: want=mov,mp4,m4a,3gp,3g2,mj2, have=%s\n", i.Format)
-	}
-
-	if i.Index != 3 {
-		t.Errorf("#input3.index: want=3, have=%d\n", i.Index)
-	}
-
-	if i.Stream != 0 {
-		t.Errorf("#input3.stream: want=0, have=%d\n", i.Stream)
-	}
-
-	if i.Language != "eng" {
-		t.Errorf("#input3.language: want=eng, have=%s\n", i.Language)
-	}
-
-	if i.Type != "video" {
-		t.Errorf("#input3.type: want=video, have=%s\n", i.Type)
-	}
-
-	if i.Codec != "h264" {
-		t.Errorf("#input3.codec: want=h264, have=%s\n", i.Codec)
-	}
-
-	if i.Bitrate != 5894 {
-		t.Errorf("#input3.bitrate: want=5894, have=%f\n", i.Bitrate)
-	}
-
-	if i.Duration != 62.28 {
-		t.Errorf("#input3.duration: want=62.82, have=%f\n", i.Duration)
-	}
-
-	if i.FPS != 23.98 {
-		t.Errorf("#input3.fps: want=23.98, have=%f\n", i.FPS)
-	}
-
-	if i.Pixfmt != "yuvj420p" {
-		t.Errorf("#input3.pixfmt: want=yuvj420p, have=%s\n", i.Pixfmt)
-	}
-
-	if i.Width != 2560 {
-		t.Errorf("#input3.width: want=2560, have=%d\n", i.Width)
-	}
-
-	if i.Height != 1440 {
-		t.Errorf("#input3.height: want=1440, have=%d\n", i.Height)
-	}
+	require.Equal(t, "movie.mp4", i.Address)
+	require.Equal(t, "mov,mp4,m4a,3gp,3g2,mj2", i.Format)
+	require.Equal(t, uint64(3), i.Index)
+	require.Equal(t, uint64(0), i.Stream)
+	require.Equal(t, "eng", i.Language)
+	require.Equal(t, "video", i.Type)
+	require.Equal(t, "h264", i.Codec)
+	require.Equal(t, 5894.0, i.Bitrate)
+	require.Equal(t, 62.28, i.Duration)
+	require.Equal(t, 23.98, i.FPS)
+	require.Equal(t, "yuvj420p", i.Pixfmt)
+	require.Equal(t, uint64(2560), i.Width)
+	require.Equal(t, uint64(1440), i.Height)
 
 	i = prober.inputs[4]
 
-	if i.Language != "por" {
-		t.Errorf("#input4.language: want=por, have=%s\n", i.Language)
-	}
+	require.Equal(t, "movie.mp4", i.Address)
+	require.Equal(t, "mov,mp4,m4a,3gp,3g2,mj2", i.Format)
+	require.Equal(t, uint64(3), i.Index)
+	require.Equal(t, uint64(1), i.Stream)
+	require.Equal(t, "por", i.Language)
+	require.Equal(t, "subtitle", i.Type)
+	require.Equal(t, "subrip", i.Codec)
 
-	if i.Type != "subtitle" {
-		t.Errorf("#input4.type: want=subtitle, have=%s\n", i.Type)
-	}
+	i = prober.inputs[5]
 
-	if i.Codec != "subrip" {
-		t.Errorf("#input4.codec: want=subtip, have=%s\n", i.Codec)
-	}
+	require.Equal(t, "srt://localhost:6000?mode=caller&transtype=live&streamid=#!:m=request,r=ingest/ad045490-8233-4f31-a296-ea5771a340ac&passphrase=foobarfoobar", i.Address)
+	require.Equal(t, "mpegts", i.Format)
+	require.Equal(t, uint64(4), i.Index)
+	require.Equal(t, uint64(0), i.Stream)
+	require.Equal(t, "und", i.Language)
+	require.Equal(t, "video", i.Type)
+	require.Equal(t, "h264", i.Codec)
+	require.Equal(t, 0.0, i.Bitrate)
+	require.Equal(t, 0.0, i.Duration)
+	require.Equal(t, 0.0, i.FPS)
+	require.Equal(t, "yuv420p", i.Pixfmt)
+	require.Equal(t, uint64(1920), i.Width)
+	require.Equal(t, uint64(1080), i.Height)
+
+	i = prober.inputs[6]
+
+	require.Equal(t, "srt://localhost:6000?mode=caller&transtype=live&streamid=#!:m=request,r=ingest/ad045490-8233-4f31-a296-ea5771a340ac&passphrase=foobarfoobar", i.Address)
+	require.Equal(t, "mpegts", i.Format)
+	require.Equal(t, uint64(4), i.Index)
+	require.Equal(t, uint64(1), i.Stream)
+	require.Equal(t, "und", i.Language)
+	require.Equal(t, "audio", i.Type)
+	require.Equal(t, "aac", i.Codec)
+	require.Equal(t, 162.0, i.Bitrate)
+	require.Equal(t, 0.0, i.Duration)
+	require.Equal(t, uint64(48000), i.Sampling)
+	require.Equal(t, "stereo", i.Layout)
 }

@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 type DummyConfig struct {

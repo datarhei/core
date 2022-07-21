@@ -2,6 +2,7 @@ package restream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -10,17 +11,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/ffmpeg/parse"
-	"github.com/datarhei/core/ffmpeg/skills"
-	"github.com/datarhei/core/io/fs"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/net/url"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/restream/app"
-	rfs "github.com/datarhei/core/restream/fs"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/ffmpeg/parse"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/net/url"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/app"
+	rfs "github.com/datarhei/core/v16/restream/fs"
+	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/store"
 )
 
 // The Restreamer interface
@@ -33,6 +35,7 @@ type Restreamer interface {
 	AddProcess(config *app.Config) error                       // add a new process
 	GetProcessIDs() []string                                   // get a list of all process IDs
 	DeleteProcess(id string) error                             // delete a process
+	UpdateProcess(id string, config *app.Config) error         // update a process
 	StartProcess(id string) error                              // start a process
 	StopProcess(id string) error                               // stop a process
 	RestartProcess(id string) error                            // restart a process
@@ -57,6 +60,7 @@ type Config struct {
 	Store        store.Store
 	DiskFS       fs.Filesystem
 	MemFS        fs.Filesystem
+	Replace      replace.Replacer
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
 	Logger       log.Logger
@@ -90,6 +94,7 @@ type restream struct {
 		memfs        rfs.Filesystem
 		stopObserver context.CancelFunc
 	}
+	replace  replace.Replacer
 	tasks    map[string]*task
 	logger   log.Logger
 	metadata map[string]interface{}
@@ -107,6 +112,7 @@ func New(config Config) (Restreamer, error) {
 		name:      config.Name,
 		createdAt: time.Now(),
 		store:     config.Store,
+		replace:   config.Replace,
 		logger:    config.Logger,
 	}
 
@@ -118,23 +124,30 @@ func New(config Config) (Restreamer, error) {
 		r.store = store.NewDummyStore(store.DummyConfig{})
 	}
 
-	r.fs.diskfs = rfs.New(rfs.Config{
-		FS:     config.DiskFS,
-		Logger: r.logger.WithComponent("DiskFS"),
-	})
-	if r.fs.diskfs == nil {
+	if config.DiskFS != nil {
+		r.fs.diskfs = rfs.New(rfs.Config{
+			FS:     config.DiskFS,
+			Logger: r.logger.WithComponent("DiskFS"),
+		})
+	} else {
 		r.fs.diskfs = rfs.New(rfs.Config{
 			FS: fs.NewDummyFilesystem(),
 		})
 	}
-	r.fs.memfs = rfs.New(rfs.Config{
-		FS:     config.MemFS,
-		Logger: r.logger.WithComponent("MemFS"),
-	})
-	if r.fs.memfs == nil {
+
+	if config.MemFS != nil {
+		r.fs.memfs = rfs.New(rfs.Config{
+			FS:     config.MemFS,
+			Logger: r.logger.WithComponent("MemFS"),
+		})
+	} else {
 		r.fs.memfs = rfs.New(rfs.Config{
 			FS: fs.NewDummyFilesystem(),
 		})
+	}
+
+	if r.replace == nil {
+		r.replace = replace.New()
 	}
 
 	r.ffmpeg = config.FFmpeg
@@ -263,7 +276,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+		t.config.ResolvePlaceholders(r.replace)
 
 		tasks[id] = t
 	}
@@ -299,7 +312,7 @@ func (r *restream) load() error {
 			continue
 		}
 
-		t.command = r.createCommand(t.config)
+		t.command = t.config.CreateCommand()
 		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
 
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
@@ -348,6 +361,9 @@ func (r *restream) CreatedAt() time.Time {
 	return r.createdAt
 }
 
+var ErrUnknownProcess = errors.New("unknown process")
+var ErrProcessExists = errors.New("process already exists")
+
 func (r *restream) AddProcess(config *app.Config) error {
 	r.lock.RLock()
 	t, err := r.createTask(config)
@@ -362,7 +378,7 @@ func (r *restream) AddProcess(config *app.Config) error {
 
 	_, ok := r.tasks[t.id]
 	if ok {
-		return fmt.Errorf("the process ID '%s' already exists", t.id)
+		return ErrProcessExists
 	}
 
 	r.tasks[t.id] = t
@@ -410,7 +426,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -427,7 +443,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		return nil, err
 	}
 
-	t.command = r.createCommand(t.config)
+	t.command = t.config.CreateCommand()
 	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
@@ -537,94 +553,6 @@ func (r *restream) unsetPlayoutPorts(t *task) {
 	t.playout = nil
 }
 
-func (r *restream) resolvePlaceholders(config *app.Config, basediskfs, basememfs string) {
-	for i, option := range config.Options {
-		// Replace any known placeholders
-		option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-
-		config.Options[i] = option
-	}
-
-	// Resolving the given inputs
-	for i, input := range config.Input {
-		// Replace any known placeholders
-		input.ID = strings.Replace(input.ID, "{processid}", config.ID, -1)
-		input.ID = strings.Replace(input.ID, "{reference}", config.Reference, -1)
-		input.Address = strings.Replace(input.Address, "{inputid}", input.ID, -1)
-		input.Address = strings.Replace(input.Address, "{processid}", config.ID, -1)
-		input.Address = strings.Replace(input.Address, "{reference}", config.Reference, -1)
-		input.Address = strings.Replace(input.Address, "{diskfs}", basediskfs, -1)
-		input.Address = strings.Replace(input.Address, "{memfs}", basememfs, -1)
-
-		for j, option := range input.Options {
-			// Replace any known placeholders
-			option = strings.Replace(option, "{inputid}", input.ID, -1)
-			option = strings.Replace(option, "{processid}", config.ID, -1)
-			option = strings.Replace(option, "{reference}", config.Reference, -1)
-			option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-			option = strings.Replace(option, "{memfs}", basememfs, -1)
-
-			input.Options[j] = option
-		}
-
-		config.Input[i] = input
-	}
-
-	// Resolving the given outputs
-	for i, output := range config.Output {
-		// Replace any known placeholders
-		output.ID = strings.Replace(output.ID, "{processid}", config.ID, -1)
-		output.Address = strings.Replace(output.Address, "{outputid}", output.ID, -1)
-		output.Address = strings.Replace(output.Address, "{processid}", config.ID, -1)
-		output.Address = strings.Replace(output.Address, "{reference}", config.Reference, -1)
-		output.Address = strings.Replace(output.Address, "{diskfs}", basediskfs, -1)
-		output.Address = strings.Replace(output.Address, "{memfs}", basememfs, -1)
-
-		for j, option := range output.Options {
-			// Replace any known placeholders
-			option = strings.Replace(option, "{outputid}", output.ID, -1)
-			option = strings.Replace(option, "{processid}", config.ID, -1)
-			option = strings.Replace(option, "{reference}", config.Reference, -1)
-			option = strings.Replace(option, "{diskfs}", basediskfs, -1)
-			option = strings.Replace(option, "{memfs}", basememfs, -1)
-
-			output.Options[j] = option
-		}
-
-		for j, cleanup := range output.Cleanup {
-			// Replace any known placeholders
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{outputid}", output.ID, -1)
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{processid}", config.ID, -1)
-			cleanup.Pattern = strings.Replace(cleanup.Pattern, "{reference}", config.Reference, -1)
-
-			output.Cleanup[j] = cleanup
-		}
-
-		config.Output[i] = output
-	}
-}
-
-func (r *restream) createCommand(config *app.Config) []string {
-	var command []string
-
-	// Copy global options
-	command = append(command, config.Options...)
-
-	for _, input := range config.Input {
-		// Add the resolved input to the process command
-		command = append(command, input.Options...)
-		command = append(command, "-i", input.Address)
-	}
-
-	for _, output := range config.Output {
-		// Add the resolved output to the process command
-		command = append(command, output.Options...)
-		command = append(command, output.Address)
-	}
-
-	return command
-}
-
 func (r *restream) validateConfig(config *app.Config) (bool, error) {
 	if len(config.Input) == 0 {
 		return false, fmt.Errorf("at least one input must be defined for the process '%s'", config.ID)
@@ -656,11 +584,6 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 		io.Address, err = r.validateInputAddress(io.Address, r.fs.diskfs.Base())
 		if err != nil {
 			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
-		}
-
-		ok := r.ffmpeg.ValidateInputAddress(io.Address)
-		if !ok {
-			return false, fmt.Errorf("the address for input '#%s:%s' is not allowed (%s)", config.ID, io.ID, io.Address)
 		}
 	}
 
@@ -700,11 +623,6 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 		if isFile {
 			hasFiles = true
 		}
-
-		ok := r.ffmpeg.ValidateOutputAddress(io.Address)
-		if !ok {
-			return false, fmt.Errorf("the address for output '#%s:%s' is not allowed (%s)", config.ID, io.ID, io.Address)
-		}
 	}
 
 	return hasFiles, nil
@@ -717,28 +635,40 @@ func (r *restream) validateInputAddress(address, basedir string) (string, error)
 		}
 	}
 
+	if !r.ffmpeg.ValidateInputAddress(address) {
+		return address, fmt.Errorf("address is not allowed")
+	}
+
 	return address, nil
 }
 
 func (r *restream) validateOutputAddress(address, basedir string) (string, bool, error) {
-	if strings.HasPrefix(address, "tee:") {
-		address = strings.TrimPrefix(address, "tee:")
+	// If the address contains a "|" or it starts with a "[", then assume that it
+	// is an address for the tee muxer.
+	if strings.Contains(address, "|") || strings.HasPrefix(address, "[") {
 		addresses := strings.Split(address, "|")
 
 		isFile := false
 
-		for _, a := range addresses {
-			_, file, err := r.validateOutputAddress(a, basedir)
+		teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
+
+		for i, a := range addresses {
+			options := teeOptions.FindString(a)
+			a = teeOptions.ReplaceAllString(a, "")
+
+			va, file, err := r.validateOutputAddress(a, basedir)
 			if err != nil {
-				return "tee:" + address, false, err
+				return address, false, err
 			}
 
 			if file {
 				isFile = true
 			}
+
+			addresses[i] = options + va
 		}
 
-		return "tee:" + address, isFile, nil
+		return strings.Join(addresses, "|"), isFile, nil
 	}
 
 	address = strings.TrimPrefix(address, "file:")
@@ -747,6 +677,11 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 		if err := url.Validate(address); err != nil {
 			return address, false, err
 		}
+
+		if !r.ffmpeg.ValidateOutputAddress(address) {
+			return address, false, fmt.Errorf("address is not allowed")
+		}
+
 		return address, false, nil
 	}
 
@@ -760,11 +695,19 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 	}
 
 	if strings.HasPrefix(address, "/dev/") {
+		if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+			return address, false, fmt.Errorf("address is not allowed")
+		}
+
 		return "file:" + address, false, nil
 	}
 
 	if !strings.HasPrefix(address, basedir) {
 		return address, false, fmt.Errorf("%s is not inside of %s", address, basedir)
+	}
+
+	if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+		return address, false, fmt.Errorf("address is not allowed")
 	}
 
 	return "file:" + address, true, nil
@@ -820,6 +763,51 @@ func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (s
 	return address, fmt.Errorf("the process '%s' has no outputs with the ID '%s' (%s)", matches[1], matches[2], address)
 }
 
+func (r *restream) UpdateProcess(id string, config *app.Config) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	t, err := r.createTask(config)
+	if err != nil {
+		return err
+	}
+
+	task, ok := r.tasks[id]
+	if !ok {
+		return ErrUnknownProcess
+	}
+
+	t.process.Order = task.process.Order
+
+	if id != t.id {
+		_, ok := r.tasks[t.id]
+		if ok {
+			return ErrProcessExists
+		}
+	}
+
+	if err := r.stopProcess(id); err != nil {
+		return err
+	}
+
+	if err := r.deleteProcess(id); err != nil {
+		return err
+	}
+
+	r.tasks[t.id] = t
+
+	// set filesystem cleanup rules
+	r.setCleanup(t.id, t.config)
+
+	if t.process.Order == "start" {
+		r.startProcess(t.id)
+	}
+
+	r.save()
+
+	return nil
+}
+
 func (r *restream) GetProcessIDs() []string {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -841,7 +829,7 @@ func (r *restream) GetProcess(id string) (*app.Process, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return &app.Process{}, fmt.Errorf("unknown process ID (%s)", id)
+		return &app.Process{}, ErrUnknownProcess
 	}
 
 	process := task.process.Clone()
@@ -866,7 +854,7 @@ func (r *restream) DeleteProcess(id string) error {
 func (r *restream) deleteProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if task.process.Order != "stop" {
@@ -899,7 +887,7 @@ func (r *restream) StartProcess(id string) error {
 func (r *restream) startProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -942,7 +930,11 @@ func (r *restream) StopProcess(id string) error {
 func (r *restream) stopProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
+	}
+
+	if task.ffmpeg == nil {
+		return nil
 	}
 
 	status := task.ffmpeg.Status()
@@ -970,7 +962,7 @@ func (r *restream) RestartProcess(id string) error {
 func (r *restream) restartProcess(id string) error {
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if !task.valid {
@@ -1003,14 +995,14 @@ func (r *restream) ReloadProcess(id string) error {
 func (r *restream) reloadProcess(id string) error {
 	t, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	t.valid = false
 
 	t.config = t.process.Config.Clone()
 
-	r.resolvePlaceholders(t.config, r.fs.diskfs.Base(), r.fs.memfs.Base())
+	t.config.ResolvePlaceholders(r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -1027,7 +1019,7 @@ func (r *restream) reloadProcess(id string) error {
 		return err
 	}
 
-	t.command = r.createCommand(t.config)
+	t.command = t.config.CreateCommand()
 
 	order := "stop"
 	if t.process.Order == "start" {
@@ -1067,11 +1059,11 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return state, fmt.Errorf("unknown process ID (%s)", id)
+		return state, ErrUnknownProcess
 	}
 
 	if !task.valid {
-		return state, fmt.Errorf("invalid process definition")
+		return state, nil
 	}
 
 	status := task.ffmpeg.Status()
@@ -1128,11 +1120,11 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return &app.Log{}, fmt.Errorf("unknown process ID (%s)", id)
+		return &app.Log{}, ErrUnknownProcess
 	}
 
 	if !task.valid {
-		return &app.Log{}, fmt.Errorf("invalid process definition")
+		return &app.Log{}, nil
 	}
 
 	log := &app.Log{}
@@ -1246,11 +1238,11 @@ func (r *restream) GetPlayout(id, inputid string) (string, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return "", fmt.Errorf("unknown process ID '%s'", id)
+		return "", ErrUnknownProcess
 	}
 
 	if !task.valid {
-		return "", fmt.Errorf("Invalid process definition")
+		return "", fmt.Errorf("invalid process definition")
 	}
 
 	port, ok := task.playout[inputid]
@@ -1271,7 +1263,7 @@ func (r *restream) SetProcessMetadata(id, key string, data interface{}) error {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return fmt.Errorf("unknown process ID (%s)", id)
+		return ErrUnknownProcess
 	}
 
 	if task.metadata == nil {
@@ -1299,7 +1291,7 @@ func (r *restream) GetProcessMetadata(id, key string) (interface{}, error) {
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return nil, fmt.Errorf("unknown process ID '%s'", id)
+		return nil, ErrUnknownProcess
 	}
 
 	if len(key) == 0 {

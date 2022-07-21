@@ -1,5 +1,8 @@
 # Core
 
+[![CodeQL](https://github.com/datarhei/core/workflows/CodeQL/badge.svg)](https://github.com/datarhei/core/actions?query=workflow%3ACodeQL)
+![Docker Pulls](https://img.shields.io/docker/pulls/datarhei/core.svg?maxAge=604800&label=Docker%20Pulls)
+
 The cloud-native audio/video processing API.
 
 [![License: MIT](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)]([https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0))
@@ -49,8 +52,8 @@ docker run --name core -d \
 
 Native (linux/amd64,linux/arm64,linux/arm/v7)
 
--   datarhei/base:alpine-core-latest
--   datarhei/base:ubuntu-core-latest
+-   datarhei/base:core-alpine-latest
+-   datarhei/base:core-ubuntu-latest
 
 Bundle with FFmpeg (linux/amd64,linux/arm64,linux/arm/v7)
 
@@ -129,8 +132,15 @@ The currently known environment variables (but not all will be respected) are:
 | CORE_RTMP_ENABLE                          | `false`      | Enable RTMP server.                                                                                                                                                                  |
 | CORE_RTMP_ENABLE_TLS                      | `false`      | Enable RTMP over TLS (RTMPS). Requires `CORE_TLS_ENABLE` to be `true`.                                                                                                               |
 | CORE_RTMP_ADDRESS                         | `:1935`      | RTMP server listen address.                                                                                                                                                          |
+| CORE_RTMP_ADDRESS_TLS                     | `:1936`      | RTMPS server listen address.                                                                                                                                                         |
 | CORE_RTMP_APP                             | `/`          | RTMP app for publishing.                                                                                                                                                             |
 | CORE_RTMP_TOKEN                           | (not set)    | RTMP token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                    |
+| CORE_SRT_ENABLE                           | `false`      | Enable SRT server.                                                                                                                                                                   |
+| CORE_SRT_ADDRESS                          | `:6000`      | SRT server listen address.                                                                                                                                                           |
+| CORE_SRT_PASSPHRASE                       | (not set)    | SRT passphrase.                                                                                                                                                                      |
+| CORE_SRT_TOKEN                            | (not set)    | SRT token for publishing and playing. The token is the value of the URL query parameter `token`.                                                                                     |
+| CORE_SRT_LOG_ENABLE                       | `false`      | Enable SRT server logging.                                                                                                                                                           |
+| CORE_SRT_LOG_TOPICS                       | (not set)    | List topics to log from SRT server. See https://github.com/datarhei/gosrt#logging.                                                                                                   |
 | CORE_FFMPEG_BINARY                        | `ffmpeg`     | Path to FFmpeg binary.                                                                                                                                                               |
 | CORE_FFMPEG_MAXPROCESSES                  | `0`          | Max. allowed simultaneously running FFmpeg instances. Any value <= 0 means unlimited.                                                                                                |
 | CORE_FFMPEG_ACCESS_INPUT_ALLOW            | (not set)    | List of pattern for allowed input URI (space-separated), leave emtpy to allow any.                                                                                                   |
@@ -253,8 +263,19 @@ All other values will be filled with default values and persisted on disk. The e
         "enable": false,
         "enable_tls": false,
         "address": ":1935",
+        "address_tls": ":1936",
         "app": "/",
         "token": ""
+    },
+    "srt": {
+        "enable": false,
+        "address": ":6000",
+        "passphrase": "",
+        "token": "",
+        "log": {
+            "enable": false,
+            "topics": [],
+        }
     },
     "ffmpeg": {
         "binary": "ffmpeg",
@@ -370,11 +391,35 @@ If you set a value for `CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES`, which is larger 
 
 ## RTMP
 
-The datarhei Core includes a simple RTMP server for publishing and playing streams. Set the environment variable `CORE_RTMP_ENABLE` to `true` to enable the RTMP server. It is listening on `CORE_RTMP_ADDRESS.` Use `CORE_RTMP_APP` to limit the app a stream can be published on, e.g. `/live` to require URLs to start with `/live`. To prevent anybody can publish streams, set `CORE_RTMP_TOKEN` to a secret only known to the publishers. The token has to be put in the query of the stream URL, e.g. `/live/stream?token=...`.
+The datarhei Core includes a simple RTMP server for publishing and playing streams. Set the environment variable `CORE_RTMP_ENABLE` to `true` to enable the RTMP server. It is listening on `CORE_RTMP_ADDRESS`. Use `CORE_RTMP_APP` to limit the app a stream can be published on, e.g. `/live` to require URLs to start with `/live`. To prevent anybody can publish streams, set `CORE_RTMP_TOKEN` to a secret only known to the publishers and subscribers. The token has to be put in the query of the stream URL, e.g. `/live/stream?token=...`.
+
+For additionaly enabling the RTMPS server, set the config variable `rtmp.enable_tls` or environment variable `CORE_RTMP_ENABLE_TLS` to `true`. This requires `tls.enable` or `CORE_TLS_ENABLE` to be set to to `true`. Use `rtmp.address_tls` or `CORE_RTMP_ADDRESS_TLS` to set the listen address for the RTMPS server.
 
 | Method | Path         | Description                           |
 | ------ | ------------ | ------------------------------------- |
 | GET    | /api/v3/rtmp | List all currently published streams. |
+
+## SRT
+
+The datarhei Core includes a simple SRT server for publishing and playing streams. Set the environment variable `CORE_SRT_ENABLE` to `true` to enable the SRT server. It is listening on `CORE_SRT_ADDRESS`.
+
+The `streamid` is formatted according to Appendix B of the [SRT specs](https://datatracker.ietf.org/doc/html/draft-sharabayko-srt#appendix-B). The following keys are supported:
+
+| Key     | Descriptions                                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `m`     | The connection mode, either `publish` for publishing a stream or `request` for subscribing to a published stream. |
+| `r`     | Name of the resource.                                                                                             |
+| `token` | A token to prevent anybody to publish or subscribe to a stream. This is set with `CORE_SRT_TOKEN`.                |
+
+An example publishing streamid: `#!:m=publish,r=12345,token=foobar`.
+
+With your SRT client, connect to the SRT server always in `caller` mode, e.g. `srt://127.0.0.1:6000?mode=caller&streamid=#!:m=publish,r=12345,token=foobar&passphrase=foobarfoobar&transmode=live`.
+
+Via the API you can gather statistics of the currently connected SRT clients.
+
+| Method | Path        | Description                           |
+| ------ | ----------- | ------------------------------------- |
+| GET    | /api/v3/srt | List all currently published streams. |
 
 ## Playout
 
@@ -604,17 +649,24 @@ A command is defined as:
 
 Currently supported placeholders are:
 
-| Placeholder   | Description                                               | Location                                                                                                                |
-| ------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `{diskfs}`    | Will be replaced by the provided `CORE_STORAGE_DISK_DIR`. | `options`, `input.address`, `input.options`, `output.address`, `output.options`                                         |
-| `{memfs}`     | Will be replace by the base URL of the MemFS.             | `input.address`, `input.options`, `output.address`, `output.options`                                                    |
-| `{processid}` | Will be replaced by the ID of the process.                | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
-| `{reference}` | Will be replaced by the reference of the process          | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
-| `{inputid}`   | Will be replaced by the ID of the input.                  | `input.address`, `input.options`                                                                                        |
-| `{outputid}`  | Will be replaced by the ID of the output.                 | `output.address`, `output.options`, `output.cleanup.pattern`                                                            |
+| Placeholder   | Description                                                                                                                                            | Location                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `{diskfs}`    | Will be replaced by the provided `CORE_STORAGE_DISK_DIR`.                                                                                              | `options`, `input.address`, `input.options`, `output.address`, `output.options`                                         |
+| `{memfs}`     | Will be replace by the base URL of the MemFS.                                                                                                          | `input.address`, `input.options`, `output.address`, `output.options`                                                    |
+| `{processid}` | Will be replaced by the ID of the process.                                                                                                             | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
+| `{reference}` | Will be replaced by the reference of the process                                                                                                       | `input.id`, `input.address`, `input.options`, `output.id`, `output.address`, `output.options`, `output.cleanup.pattern` |
+| `{inputid}`   | Will be replaced by the ID of the input.                                                                                                               | `input.address`, `input.options`                                                                                        |
+| `{outputid}`  | Will be replaced by the ID of the output.                                                                                                              | `output.address`, `output.options`, `output.cleanup.pattern`                                                            |
+| `{rtmp}`      | Will be replaced by the internal address of the RTMP server. Requires parameter `name` (name of the stream).                                           | `input.address`, `output.address`                                                                                       |
+| `{srt}`       | Will be replaced by the internal address of the SRT server. Requires parameter `name` (name of the stream) and `mode` (either `publish` or `request`). | `input.address`, `output.address`                                                                                       |
 
-Before replacing the placeholder in the process, all references will be resolved, i.e., you can put the placeholder also in the params for an
-option.
+Before replacing the placeholders in the process config, all references (see below) will be resolved.
+
+If the value that gets filled in on the place of the placeholder needs escaping, you can define the character to be escaped in the placeholder by adding it to the placeholder name and prefix it with a `^`.
+E.g. escape all `:` in the value (`http://example.com:8080`) for `{memfs}` placeholder, write `{memfs^:}`. It will then be replaced by `http\://example.com\:8080`. The escape character is always `\`. In
+case there are `\` in the value, they will also get escaped. If the placeholder doesn't imply escaping, the value will be uses as-is.
+
+Add parameters to a placeholder by appending a comma separated list of key/values, e.g. `{placeholder,key1=value1,key2=value2}`. This can be combined with escaping.
 
 ### References
 
@@ -923,7 +975,7 @@ available. If authentication is enabled, you have to provide the token in the he
 
 ### Requirement
 
--   Go v1.16+ ([Download here](https://golang.org/dl/))
+-   Go v1.18+ ([Download here](https://golang.org/dl/))
 
 ### Build
 

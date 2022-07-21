@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/datarhei/core/http/graph/graph"
-	"github.com/datarhei/core/http/graph/resolver"
+	"github.com/datarhei/core/v16/http/graph/graph"
+	"github.com/datarhei/core/v16/http/graph/resolver"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"

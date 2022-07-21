@@ -69,15 +69,15 @@ func TestPutPort(t *testing.T) {
 }
 
 func TestClampRange(t *testing.T) {
-	portrange, _ := NewPortrange(0, 70000)
+	portrange, _ := NewPortrange(65000, 70000)
 
 	port, _ := portrange.Get()
 
-	assert.Equal(t, 1, port)
+	assert.Equal(t, 65000, port)
 
-	portrange.Put(1)
+	portrange.Put(65000)
 
-	for i := 1; i <= 65535; i++ {
+	for i := 65000; i <= 65535; i++ {
 		port, _ := portrange.Get()
 		assert.Equal(t, i, port, "at index %d", i)
 	}

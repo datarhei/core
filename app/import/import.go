@@ -15,12 +15,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/encoding/json"
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/ffmpeg/skills"
-	"github.com/datarhei/core/restream"
-	"github.com/datarhei/core/restream/app"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/google/uuid"
 )

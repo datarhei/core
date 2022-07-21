@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/handler/util"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/session"
 
 	"github.com/labstack/echo/v4"
 )
@@ -63,9 +63,8 @@ func (s *SessionHandler) Active(c echo.Context) error {
 
 	for _, name := range collectors {
 		sessions := s.registry.Active(name)
-		active := []api.Session{}
 
-		active = make([]api.Session, len(sessions))
+		active := make([]api.Session, len(sessions))
 
 		for i, s := range sessions {
 			active[i].Unmarshal(s)

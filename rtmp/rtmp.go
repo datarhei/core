@@ -2,15 +2,17 @@
 package rtmp
 
 import (
+	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/session"
 
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/av/pktque"
@@ -38,7 +40,7 @@ type client struct {
 
 	collector session.Collector
 
-	done chan struct{}
+	cancel context.CancelFunc
 }
 
 func newClient(conn *rtmp.Conn, id string, collector session.Collector) *client {
@@ -48,22 +50,23 @@ func newClient(conn *rtmp.Conn, id string, collector session.Collector) *client 
 		createdAt: time.Now(),
 
 		collector: collector,
-
-		done: make(chan struct{}),
 	}
 
-	go c.ticker()
+	var ctx context.Context
+	ctx, c.cancel = context.WithCancel(context.Background())
+
+	go c.ticker(ctx)
 
 	return c
 }
 
-func (c *client) ticker() {
+func (c *client) ticker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-c.done:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			txbytes := c.conn.TxBytes()
@@ -79,7 +82,7 @@ func (c *client) ticker() {
 }
 
 func (c *client) Close() {
-	close(c.done)
+	c.cancel()
 }
 
 // channel represents a stream that is sent to the server
@@ -173,6 +176,9 @@ type Config struct {
 	// The address the RTMP server should listen on, e.g. ":1935"
 	Addr string
 
+	// The address the RTMPS server should listen on, e.g. ":1936"
+	TLSAddr string
+
 	// The app path for the streams, e.g. "/live". Optional. Defaults
 	// to "/".
 	App string
@@ -214,7 +220,8 @@ type server struct {
 	collector session.Collector
 
 	// A joy4 RTMP server instance
-	server *rtmp.Server
+	server    *rtmp.Server
+	tlsServer *rtmp.Server
 
 	// Map of publishing channels and a lock to serialize
 	// access to the map.
@@ -229,7 +236,7 @@ func New(config Config) (Server, error) {
 	}
 
 	if config.Logger == nil {
-		config.Logger = log.New("RTMP")
+		config.Logger = log.New("")
 	}
 
 	s := &server{
@@ -245,9 +252,17 @@ func New(config Config) (Server, error) {
 
 	s.server = &rtmp.Server{
 		Addr:          config.Addr,
-		TLSConfig:     config.TLSConfig.Clone(),
 		HandlePlay:    s.handlePlay,
 		HandlePublish: s.handlePublish,
+	}
+
+	if len(config.TLSAddr) != 0 {
+		s.tlsServer = &rtmp.Server{
+			Addr:          config.TLSAddr,
+			TLSConfig:     config.TLSConfig.Clone(),
+			HandlePlay:    s.handlePlay,
+			HandlePublish: s.handlePublish,
+		}
 	}
 
 	s.channels = make(map[string]*channel)
@@ -263,12 +278,20 @@ func (s *server) ListenAndServe() error {
 }
 
 func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
-	return s.server.ListenAndServeTLS(certFile, keyFile)
+	if s.tlsServer == nil {
+		return fmt.Errorf("RTMPS server is not configured")
+	}
+
+	return s.tlsServer.ListenAndServeTLS(certFile, keyFile)
 }
 
 func (s *server) Close() {
 	// Stop listening
 	s.server.Close()
+
+	if s.tlsServer != nil {
+		s.tlsServer.Close()
+	}
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -299,7 +322,7 @@ func (s *server) log(who, action, path, message string, client net.Addr) {
 		"who":    who,
 		"action": action,
 		"path":   path,
-		"client": client,
+		"client": client.String(),
 	}).Log(message)
 }
 

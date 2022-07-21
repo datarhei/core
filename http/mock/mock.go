@@ -3,39 +3,53 @@ package mock
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/http/errorhandler"
-	"github.com/datarhei/core/http/validator"
-	"github.com/datarhei/core/restream"
-	"github.com/datarhei/core/restream/store"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/errorhandler"
+	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/store"
 
-	"github.com/alecthomas/jsonschema"
+	"github.com/invopop/jsonschema"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func DummyRestreamer() restream.Restreamer {
+func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
+	binary, err := testhelper.BuildBinary("ffmpeg", filepath.Join(pathPrefix, "../../internal/testhelper"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to build helper program: %w", err)
+	}
+
 	store := store.NewDummyStore(store.DummyConfig{})
 
-	ffmpeg, _ := ffmpeg.New(ffmpeg.Config{
-		Binary: "ffmpeg",
+	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
+		Binary: binary,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	rs, _ := restream.New(restream.Config{
+	rs, err := restream.New(restream.Config{
 		Store:  store,
 		FFmpeg: ffmpeg,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return rs
+	return rs, nil
 }
 
 func DummyEcho() *echo.Echo {

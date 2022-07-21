@@ -3,15 +3,16 @@ package ffmpeg
 import (
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
 
-	"github.com/datarhei/core/ffmpeg/parse"
-	"github.com/datarhei/core/ffmpeg/probe"
-	"github.com/datarhei/core/ffmpeg/skills"
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/ffmpeg/parse"
+	"github.com/datarhei/core/v16/ffmpeg/probe"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/session"
 )
 
 type FFmpeg interface {
@@ -64,7 +65,8 @@ type ffmpeg struct {
 
 	collector session.Collector
 
-	states process.States
+	states     process.States
+	statesLock sync.RWMutex
 }
 
 func New(config Config) (FFmpeg, error) {
@@ -120,6 +122,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		OnStart:        config.OnStart,
 		OnExit:         config.OnExit,
 		OnStateChange: func(from, to string) {
+			f.statesLock.Lock()
 			switch to {
 			case "finished":
 				f.states.Finished++
@@ -135,6 +138,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 				f.states.Killed++
 			default:
 			}
+			f.statesLock.Unlock()
 
 			if config.OnStateChange != nil {
 				config.OnStateChange(from, to)
@@ -196,5 +200,8 @@ func (f *ffmpeg) PutPort(port int) {
 }
 
 func (f *ffmpeg) States() process.States {
+	f.statesLock.RLock()
+	defer f.statesLock.RUnlock()
+
 	return f.states
 }

@@ -1,6 +1,6 @@
 package api
 
-import "github.com/datarhei/core/playout"
+import "github.com/datarhei/core/v16/playout"
 
 type PlayoutStatusIO struct {
 	State  string `json:"state" enums:"running,idle" jsonschema:"enum=running,enum=idle"`

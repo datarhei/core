@@ -2,13 +2,17 @@ COMMIT := $(shell if [ -d .git ]; then git rev-parse HEAD; else echo "unknown"; 
 SHORTCOMMIT := $(shell echo $(COMMIT) | head -c 7)
 BRANCH := $(shell if [ -d .git ]; then git rev-parse --abbrev-ref HEAD; else echo "master"; fi)
 BUILD := $(shell date -u "+%Y-%m-%dT%H:%M:%SZ")
-OSARCH := $(shell if [ "${GOOS}" -a "${GOARCH}" ]; then echo "-${GOOS}-${GOARCH}"; else echo ""; fi)
+BINSUFFIX := $(shell if [ "${GOOS}" -a "${GOARCH}" ]; then echo "-${GOOS}-${GOARCH}"; else echo ""; fi)
 
 all: build
 
 ## build: Build core (default)
 build:
-	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core${OSARCH}
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core${BINSUFFIX}
+
+# github workflow workaround
+build_linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core
 
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:
@@ -20,7 +24,7 @@ gqlgen:
 
 ## test: Run all tests
 test:
-	go test -coverprofile=/dev/null ./...
+	go test -race -coverprofile=/dev/null -v ./...
 
 ## vet: Analyze code for potential errors
 vet:
@@ -54,11 +58,15 @@ lint:
 
 ## import: Build import binary
 import:
+	cd app/import && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../import -ldflags="-s -w"
+
+# github workflow workaround
+import_linux:
 	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -ldflags="-s -w"
 
 ## coverage: Generate code coverage analysis
 coverage:
-	go test -coverprofile test/cover.out ./...
+	go test -race -coverprofile test/cover.out ./...
 	go tool cover -html=test/cover.out -o test/cover.html
 
 ## commit: Prepare code for commit (vet, fmt, test)
@@ -67,6 +75,10 @@ commit: vet fmt lint test build
 
 ## release: Build a release binary of core
 release:
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
+
+# github workflow workaround
+release_linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
 
 ## docker: Build standard Docker image

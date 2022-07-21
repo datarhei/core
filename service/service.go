@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/monitor/metric"
-	"github.com/datarhei/core/service/api"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/datarhei/core/v16/service/api"
 )
 
 // Config is the configuration for the service

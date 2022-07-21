@@ -6,6 +6,7 @@ package process
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -16,8 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/psutil"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/psutil"
 )
 
 // Process represents a process and ways to control it
@@ -168,7 +169,7 @@ type process struct {
 	stale  struct {
 		last    time.Time
 		timeout time.Duration
-		done    chan struct{}
+		cancel  context.CancelFunc
 		lock    sync.Mutex
 	}
 	reconn struct {
@@ -177,10 +178,11 @@ type process struct {
 		timer  *time.Timer
 		lock   sync.Mutex
 	}
-	killTimer   *time.Timer
-	logger      log.Logger
-	debuglogger log.Logger
-	callbacks   struct {
+	killTimer     *time.Timer
+	killTimerLock sync.Mutex
+	logger        log.Logger
+	debuglogger   log.Logger
+	callbacks     struct {
 		onStart       func()
 		onStop        func()
 		onStateChange func(from, to string)
@@ -502,7 +504,13 @@ func (p *process) start() error {
 
 	// Start the stale timeout if enabled
 	if p.stale.timeout != 0 {
-		go p.staler()
+		var ctx context.Context
+
+		p.stale.lock.Lock()
+		ctx, p.stale.cancel = context.WithCancel(context.Background())
+		p.stale.lock.Unlock()
+
+		go p.staler(ctx)
 	}
 
 	return nil
@@ -584,9 +592,11 @@ func (p *process) stop() error {
 		} else {
 			// Set up a timer to kill the process with SIGKILL in case SIGINT didn't have
 			// an effect.
+			p.killTimerLock.Lock()
 			p.killTimer = time.AfterFunc(5*time.Second, func() {
 				p.cmd.Process.Kill()
 			})
+			p.killTimerLock.Unlock()
 		}
 	}
 
@@ -643,9 +653,8 @@ func (p *process) unreconnect() {
 // staler checks if the currently running process is stale, i.e. the reader
 // didn't update the time of the last read. If the timeout is reached, the
 // process will be stopped such that it can restart automatically afterwards.
-func (p *process) staler() {
+func (p *process) staler(ctx context.Context) {
 	p.stale.lock.Lock()
-	p.stale.done = make(chan struct{})
 	p.stale.last = time.Now()
 	p.stale.lock.Unlock()
 
@@ -656,7 +665,7 @@ func (p *process) staler() {
 
 	for {
 		select {
-		case <-p.stale.done:
+		case <-ctx.Done():
 			p.debuglogger.Debug().Log("Stopping stale watcher")
 			return
 		case t := <-ticker.C:
@@ -772,16 +781,18 @@ func (p *process) waiter() {
 	p.limits.Stop()
 
 	// Stop the kill timer
+	p.killTimerLock.Lock()
 	if p.killTimer != nil {
 		p.killTimer.Stop()
 		p.killTimer = nil
 	}
+	p.killTimerLock.Unlock()
 
 	// Stop the stale progress timer
 	p.stale.lock.Lock()
-	if p.stale.done != nil {
-		close(p.stale.done)
-		p.stale.done = nil
+	if p.stale.cancel != nil {
+		p.stale.cancel()
+		p.stale.cancel = nil
 	}
 	p.stale.lock.Unlock()
 

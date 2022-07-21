@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/datarhei/core/app"
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/restream"
+	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/restream"
 
 	"github.com/labstack/echo/v4"
 )

@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"github.com/datarhei/core/config"
+	"github.com/datarhei/core/v16/config"
 )
 
 // ConfigData embeds config.Data
@@ -41,6 +41,7 @@ func (rscfg *SetConfig) MergeTo(cfg *config.Config) {
 	cfg.TLS = rscfg.TLS
 	cfg.Storage = rscfg.Storage
 	cfg.RTMP = rscfg.RTMP
+	cfg.SRT = rscfg.SRT
 	cfg.FFmpeg = rscfg.FFmpeg
 	cfg.Playout = rscfg.Playout
 	cfg.Debug = rscfg.Debug

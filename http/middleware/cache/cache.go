@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/datarhei/core/http/cache"
+	"github.com/datarhei/core/v16/http/cache"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

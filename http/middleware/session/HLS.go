@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/session"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -113,10 +113,11 @@ func (h *hls) handleIngress(c echo.Context, next echo.HandlerFunc) error {
 				// Register a new session
 				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 				h.ingressCollector.RegisterAndActivate(path, reference, path, "")
-
-				h.ingressCollector.Ingress(path, headerSize(req.Header))
-				h.ingressCollector.Ingress(path, r.size)
+				h.ingressCollector.Extra(path, req.Header.Get("User-Agent"))
 			}
+
+			h.ingressCollector.Ingress(path, headerSize(req.Header))
+			h.ingressCollector.Ingress(path, r.size)
 
 			segments := r.getSegments(urlpath.Dir(path))
 

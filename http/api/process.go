@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/restream/app"
 	"github.com/lithammer/shortuuid/v4"
 )
 
@@ -239,7 +239,7 @@ type ProcessState struct {
 	LastLog   string      `json:"last_logline"`
 	Progress  *Progress   `json:"progress"`
 	Memory    uint64      `json:"memory_bytes"`
-	CPU       json.Number `json:"cpu_usage" swaggertype:"number"`
+	CPU       json.Number `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"`
 	Command   []string    `json:"command"`
 }
 

@@ -7,9 +7,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/datarhei/core/http/graph/models"
-	"github.com/datarhei/core/http/graph/scalars"
-	"github.com/datarhei/core/monitor/metric"
+	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/http/graph/scalars"
+	"github.com/datarhei/core/v16/monitor/metric"
 )
 
 func (r *queryResolver) Metrics(ctx context.Context, query models.MetricsInput) (*models.Metrics, error) {

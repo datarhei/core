@@ -10,11 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
-	"github.com/datarhei/core/net/url"
-	"github.com/datarhei/core/process"
-	"github.com/datarhei/core/restream/app"
-	"github.com/datarhei/core/session"
+	"github.com/datarhei/core/v16/ffmpeg/prelude"
+	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net/url"
+	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/session"
 )
 
 // Parser is an extension to the process.Parser interface
@@ -133,6 +134,7 @@ func New(config Config) Parser {
 	p.re.drop = regexp.MustCompile(`drop=\s*([0-9]+)`)
 	p.re.dup = regexp.MustCompile(`dup=\s*([0-9]+)`)
 
+	p.lock.prelude.Lock()
 	p.prelude.headLines = config.PreludeHeadLines
 	if p.prelude.headLines <= 0 {
 		p.prelude.headLines = 100
@@ -142,7 +144,9 @@ func New(config Config) Parser {
 		p.prelude.tailLines = 50
 	}
 	p.prelude.tail = ring.New(p.prelude.tailLines)
+	p.lock.prelude.Unlock()
 
+	p.lock.log.Lock()
 	p.log = ring.New(config.LogLines)
 
 	if p.logHistoryLength > 0 {
@@ -154,6 +158,7 @@ func New(config Config) Parser {
 	}
 
 	p.logStart = time.Now()
+	p.lock.log.Unlock()
 
 	p.ResetStats()
 
@@ -168,7 +173,9 @@ func (p *parser) Parse(line string) uint64 {
 	isAVstreamProgress := strings.HasPrefix(line, "avstream.progress:")
 
 	if p.logStart.IsZero() {
+		p.lock.log.Lock()
 		p.logStart = time.Now()
+		p.lock.log.Unlock()
 	}
 
 	if !p.prelude.done {
@@ -199,7 +206,10 @@ func (p *parser) Parse(line string) uint64 {
 				}).Error().Log("Failed parsing outputs")
 			} else {
 				p.logger.WithField("prelude", p.Prelude()).Debug().Log("")
+
+				p.lock.prelude.Lock()
 				p.prelude.done = true
+				p.lock.prelude.Unlock()
 			}
 
 			return 0
@@ -211,7 +221,10 @@ func (p *parser) Parse(line string) uint64 {
 			}
 
 			p.logger.WithField("prelude", p.Prelude()).Debug().Log("")
+
+			p.lock.prelude.Lock()
 			p.prelude.done = true
+			p.lock.prelude.Unlock()
 		}
 	}
 
@@ -219,17 +232,17 @@ func (p *parser) Parse(line string) uint64 {
 		// Write the current non-progress line to the log
 		p.addLog(line)
 
+		p.lock.prelude.Lock()
 		if !p.prelude.done {
 			if len(p.prelude.data) < p.prelude.headLines {
 				p.prelude.data = append(p.prelude.data, line)
 			} else {
-				p.lock.prelude.Lock()
 				p.prelude.tail.Value = line
 				p.prelude.tail = p.prelude.tail.Next()
-				p.lock.prelude.Unlock()
 				p.prelude.truncatedLines++
 			}
 		}
+		p.lock.prelude.Unlock()
 
 		return 0
 	}
@@ -508,7 +521,9 @@ func (p *parser) Progress() app.Progress {
 }
 
 func (p *parser) Prelude() []string {
+	p.lock.prelude.RLock()
 	if p.prelude.data == nil {
+		p.lock.prelude.RUnlock()
 		return []string{}
 	}
 
@@ -516,8 +531,6 @@ func (p *parser) Prelude() []string {
 	copy(prelude, p.prelude.data)
 
 	tail := []string{}
-
-	p.lock.prelude.RLock()
 
 	p.prelude.tail.Do(func(l interface{}) {
 		if l == nil {
@@ -540,131 +553,60 @@ func (p *parser) Prelude() []string {
 }
 
 func (p *parser) parsePrelude() bool {
-	process := ffmpegProcess{}
-
 	p.lock.progress.Lock()
 	defer p.lock.progress.Unlock()
 
-	// Input #0, lavfi, from 'testsrc=size=1280x720:rate=25':
-	// Input #1, lavfi, from 'anullsrc=r=44100:cl=stereo':
-	// Output #0, hls, to './data/testsrc.m3u8':
-	reFormat := regexp.MustCompile(`^(Input|Output) #([0-9]+), (.*?), (from|to) '([^']+)`)
-
-	// Stream #0:0: Video: rawvideo (RGB[24] / 0x18424752), rgb24, 1280x720 [SAR 1:1 DAR 16:9], 25 tbr, 25 tbn, 25 tbc
-	// Stream #1:0: Audio: pcm_u8, 44100 Hz, stereo, u8, 705 kb/s
-	// Stream #0:0: Video: h264 (libx264), yuv420p(progressive), 1280x720 [SAR 1:1 DAR 16:9], q=-1--1, 25 fps, 90k tbn, 25 tbc
-	// Stream #0:1(eng): Audio: aac (LC), 44100 Hz, stereo, fltp, 64 kb/s
-	reStream := regexp.MustCompile(`Stream #([0-9]+):([0-9]+)(?:\(([a-z]+)\))?: (Video|Audio|Subtitle): (.*)`)
-	reStreamCodec := regexp.MustCompile(`^([^\s,]+)`)
-	reStreamVideoSize := regexp.MustCompile(`, ([0-9]+)x([0-9]+)`)
-	//reStreamVideoFPS := regexp.MustCompile(`, ([0-9]+) fps`)
-	reStreamAudio := regexp.MustCompile(`, ([0-9]+) Hz, ([^,]+)`)
-	//reStreamBitrate := regexp.MustCompile(`, ([0-9]+) kb/s`)
-
-	reStreamMapping := regexp.MustCompile(`^Stream mapping:`)
-	reStreamMap := regexp.MustCompile(`^[\s]+Stream #[0-9]+:[0-9]+`)
-
-	//format := InputOutput{}
-
-	formatType := ""
-	formatURL := ""
-
-	var noutputs int
-	streamMapping := false
-
 	data := p.Prelude()
 
-	for _, line := range data {
-		if reStreamMapping.MatchString(line) {
-			streamMapping = true
-			continue
-		}
+	inputs, outputs, noutputs := prelude.Parse(data)
 
-		if streamMapping {
-			if reStreamMap.MatchString(line) {
-				noutputs++
-			} else {
-				streamMapping = false
-			}
-
-			continue
-		}
-
-		if matches := reFormat.FindStringSubmatch(line); matches != nil {
-			formatType = strings.ToLower(matches[1])
-			formatURL = matches[5]
-
-			continue
-		}
-
-		if matches := reStream.FindStringSubmatch(line); matches != nil {
-			format := ffmpegProcessIO{}
-
-			format.Address = formatURL
-			if ip, _ := url.Lookup(format.Address); len(ip) != 0 {
-				format.IP = ip
-			}
-
-			if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-				format.Index = x
-			}
-
-			if x, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
-				format.Stream = x
-			}
-			format.Type = strings.ToLower(matches[4])
-
-			streamDetail := matches[5]
-
-			if matches = reStreamCodec.FindStringSubmatch(streamDetail); matches != nil {
-				format.Codec = matches[1]
-			}
-			/*
-				if matches = reStreamBitrate.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseFloat(matches[1], 64); err == nil {
-						format.Bitrate = x
-					}
-				}
-			*/
-			if format.Type == "video" {
-				if matches = reStreamVideoSize.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-						format.Width = x
-					}
-					if x, err := strconv.ParseUint(matches[2], 10, 64); err == nil {
-						format.Height = x
-					}
-				}
-				/*
-					if matches = reStreamVideoFPS.FindStringSubmatch(streamDetail); matches != nil {
-						if x, err := strconv.ParseFloat(matches[1], 64); err == nil {
-							format.FPS = x
-						}
-					}
-				*/
-			} else if format.Type == "audio" {
-				if matches = reStreamAudio.FindStringSubmatch(streamDetail); matches != nil {
-					if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-						format.Sampling = x
-					}
-					format.Layout = matches[2]
-				}
-			}
-
-			if formatType == "input" {
-				process.input = append(process.input, format)
-			} else {
-				process.output = append(process.output, format)
-			}
-		}
-	}
-
-	if len(process.output) != noutputs {
+	if len(outputs) != noutputs {
 		return false
 	}
 
-	p.process.input = process.input
-	p.process.output = process.output
+	for _, in := range inputs {
+		io := ffmpegProcessIO{
+			Address:  in.Address,
+			Format:   in.Format,
+			Index:    in.Index,
+			Stream:   in.Stream,
+			Type:     in.Type,
+			Codec:    in.Codec,
+			Pixfmt:   in.Pixfmt,
+			Width:    in.Width,
+			Height:   in.Height,
+			Sampling: in.Sampling,
+			Layout:   in.Layout,
+		}
+
+		if ip, _ := url.Lookup(io.Address); len(ip) != 0 {
+			io.IP = ip
+		}
+
+		p.process.input = append(p.process.input, io)
+	}
+
+	for _, out := range outputs {
+		io := ffmpegProcessIO{
+			Address:  out.Address,
+			Format:   out.Format,
+			Index:    out.Index,
+			Stream:   out.Stream,
+			Type:     out.Type,
+			Codec:    out.Codec,
+			Pixfmt:   out.Pixfmt,
+			Width:    out.Width,
+			Height:   out.Height,
+			Sampling: out.Sampling,
+			Layout:   out.Layout,
+		}
+
+		if ip, _ := url.Lookup(io.Address); len(ip) != 0 {
+			io.IP = ip
+		}
+
+		p.process.output = append(p.process.output, io)
+	}
 
 	return true
 }
@@ -734,24 +676,25 @@ func (p *parser) ResetStats() {
 	p.progress.ffmpeg = ffmpegProgress{}
 	p.progress.avstream = make(map[string]ffmpegAVstream)
 
+	p.lock.prelude.Lock()
 	p.prelude.done = false
+	p.lock.prelude.Unlock()
 }
 
 func (p *parser) ResetLog() {
 	p.storeLogHistory()
 
-	p.prelude.data = []string{}
 	p.lock.prelude.Lock()
+	p.prelude.data = []string{}
 	p.prelude.tail = ring.New(p.prelude.tailLines)
-	p.lock.prelude.Unlock()
 	p.prelude.truncatedLines = 0
 	p.prelude.done = false
+	p.lock.prelude.Unlock()
 
 	p.lock.log.Lock()
 	p.log = ring.New(p.logLines)
-	p.lock.log.Unlock()
-
 	p.logStart = time.Now()
+	p.lock.log.Unlock()
 }
 
 // Report represents a log report, including the prelude and the last log lines
@@ -777,10 +720,13 @@ func (p *parser) storeLogHistory() {
 
 func (p *parser) Report() Report {
 	h := Report{
-		CreatedAt: p.logStart,
-		Prelude:   p.Prelude(),
-		Log:       p.Log(),
+		Prelude: p.Prelude(),
+		Log:     p.Log(),
 	}
+
+	p.lock.log.RLock()
+	h.CreatedAt = p.logStart
+	p.lock.log.RUnlock()
 
 	return h
 }

@@ -1,5 +1,20 @@
 # Core
 
+#### Core v16.8.0 > v16.9.0
+
+-   Add new placeholders and parameters for placeholder
+-   Allow RTMP server if RTMPS server is enabled. In case you already had RTMPS enabled it will listen on the same port as before. An RTMP server will be started additionally listening on a lower port number. The RTMP app is required to start with a slash.
+-   Add optional escape character to process placeholder
+-   Fix output address validation for tee outputs
+-   Fix updating process config
+-   Add experimental SRT connection stats and logs API
+-   Hide /config/reload endpoint in reade-only mode
+-   Add experimental SRT server (datarhei/gosrt)
+-   Create v16 in go.mod
+-   Fix data races, tests, lint, and update dependencies
+-   Add trailing slash for routed directories (datarhei/restreamer#340)
+-   Allow relative URLs in content in static routes
+
 #### Core v16.7.2 > v16.8.0
 
 -   Add purge_on_delete function

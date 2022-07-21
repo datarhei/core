@@ -6,7 +6,7 @@ package resolver
 import (
 	"context"
 
-	"github.com/datarhei/core/http/graph/graph"
+	"github.com/datarhei/core/v16/http/graph/graph"
 )
 
 func (r *mutationResolver) Ping(ctx context.Context) (string, error) {

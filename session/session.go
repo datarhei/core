@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 	"github.com/prep/average"
 )
 
@@ -77,6 +77,9 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 		pendingTimeout = timeout
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.stale = time.AfterFunc(pendingTimeout, func() {
 		s.close()
 	})
@@ -84,7 +87,10 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 
 func (s *session) close() {
 	s.sessionClose.Do(func() {
+		s.lock.Lock()
 		s.stale.Stop()
+		s.lock.Unlock()
+
 		close(s.tickerStop)
 		s.rxBitrate.Stop()
 		s.txBitrate.Stop()

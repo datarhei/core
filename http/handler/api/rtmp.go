@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/datarhei/core/http/api"
-	"github.com/datarhei/core/rtmp"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/rtmp"
 
 	"github.com/labstack/echo/v4"
 )
@@ -21,9 +21,9 @@ func NewRTMP(rtmp rtmp.Server) *RTMPHandler {
 	}
 }
 
-// ListChannels lists all currently publishing streams
-// @Summary List all publishing streams
-// @Description List all currently publishing streams
+// ListChannels lists all currently publishing RTMP streams
+// @Summary List all publishing RTMP streams
+// @Description List all currently publishing RTMP streams
 // @ID rtmp-3-list-channels
 // @Produce json
 // @Success 200 {array} api.RTMPChannel

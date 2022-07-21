@@ -11,9 +11,9 @@ model:
 
 models:
     Uint64:
-        model: github.com/datarhei/core/http/graph/scalars.Uint64
+        model: github.com/datarhei/core/v16/http/graph/scalars.Uint64
     MetricsResponseValue:
-        model: github.com/datarhei/core/http/graph/scalars.MetricsResponseValue
+        model: github.com/datarhei/core/v16/http/graph/scalars.MetricsResponseValue
 
 resolver:
     layout: follow-schema

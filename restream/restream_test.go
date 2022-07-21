@@ -1,26 +1,42 @@
 package restream
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/ffmpeg"
-	"github.com/datarhei/core/net"
-	"github.com/datarhei/core/restream/app"
+	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/restream/app"
+
 	"github.com/stretchr/testify/require"
 )
 
-func getDummyRestreamer(portrange net.Portranger) Restreamer {
-	ffmpeg, _ := ffmpeg.New(ffmpeg.Config{
-		Binary:    "ffmpeg",
-		Portrange: portrange,
-	})
+func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator) (Restreamer, error) {
+	binary, err := testhelper.BuildBinary("ffmpeg", "../internal/testhelper")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build helper program: %w", err)
+	}
 
-	rs, _ := New(Config{
+	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
+		Binary:          binary,
+		Portrange:       portrange,
+		ValidatorInput:  validatorIn,
+		ValidatorOutput: validatorOut,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rs, err := New(Config{
 		FFmpeg: ffmpeg,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return rs
+	return rs, nil
 }
 
 func getDummyProcess() *app.Config {
@@ -61,10 +77,11 @@ func getDummyProcess() *app.Config {
 }
 
 func TestAddProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
+	require.NotNil(t, process)
 
 	_, err = rs.GetProcess(process.ID)
 	require.NotEqual(t, nil, err, "Unset process found (%s)", process.ID)
@@ -80,7 +97,9 @@ func TestAddProcess(t *testing.T) {
 }
 
 func TestAutostartProcess(t *testing.T) {
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
+
 	process := getDummyProcess()
 	process.Autostart = true
 
@@ -93,9 +112,8 @@ func TestAutostartProcess(t *testing.T) {
 }
 
 func TestAddInvalidProcess(t *testing.T) {
-	var err error = nil
-
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
 	// Invalid process ID
 	process := getDummyProcess()
@@ -162,9 +180,9 @@ func TestAddInvalidProcess(t *testing.T) {
 }
 
 func TestRemoveProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	err = rs.AddProcess(process)
@@ -178,9 +196,9 @@ func TestRemoveProcess(t *testing.T) {
 }
 
 func TestGetProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -194,9 +212,9 @@ func TestGetProcess(t *testing.T) {
 }
 
 func TestStartProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -220,9 +238,9 @@ func TestStartProcess(t *testing.T) {
 }
 
 func TestStopProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -245,9 +263,9 @@ func TestStopProcess(t *testing.T) {
 }
 
 func TestRestartProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -270,9 +288,9 @@ func TestRestartProcess(t *testing.T) {
 }
 
 func TestReloadProcess(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -301,7 +319,9 @@ func TestReloadProcess(t *testing.T) {
 }
 
 func TestProcessData(t *testing.T) {
-	rs := getDummyRestreamer(nil)
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
+
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -320,9 +340,9 @@ func TestProcessData(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
@@ -353,9 +373,9 @@ func TestLog(t *testing.T) {
 }
 
 func TestPlayoutNoRange(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process := getDummyProcess()
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
@@ -373,11 +393,12 @@ func TestPlayoutNoRange(t *testing.T) {
 }
 
 func TestPlayoutRange(t *testing.T) {
-	var err error = nil
+	portrange, err := net.NewPortrange(3000, 3001)
+	require.NoError(t, err)
 
-	portrange, _ := net.NewPortrange(3000, 3001)
+	rs, err := getDummyRestreamer(portrange, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(portrange)
 	process := getDummyProcess()
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
@@ -396,9 +417,9 @@ func TestPlayoutRange(t *testing.T) {
 }
 
 func TestAddressReference(t *testing.T) {
-	var err error = nil
+	rs, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
 
-	rs := getDummyRestreamer(nil)
 	process1 := getDummyProcess()
 	process2 := getDummyProcess()
 
@@ -427,8 +448,84 @@ func TestAddressReference(t *testing.T) {
 	require.Equal(t, nil, err, "should resolve reference")
 }
 
+func TestConfigValidation(t *testing.T) {
+	rsi, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
+
+	config := getDummyProcess()
+
+	_, err = rs.validateConfig(config)
+	require.NoError(t, err)
+
+	config.Input = []app.ConfigIO{}
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config = getDummyProcess()
+	config.Input[0].ID = ""
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config = getDummyProcess()
+	config.Input[0].Address = ""
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config = getDummyProcess()
+	config.Output = []app.ConfigIO{}
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config = getDummyProcess()
+	config.Output[0].ID = ""
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config = getDummyProcess()
+	config.Output[0].Address = ""
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+}
+
+func TestConfigValidationFFmpeg(t *testing.T) {
+	valIn, err := ffmpeg.NewValidator([]string{"^https?://"}, nil)
+	require.NoError(t, err)
+
+	valOut, err := ffmpeg.NewValidator([]string{"^https?://", "^rtmp://"}, nil)
+	require.NoError(t, err)
+
+	rsi, err := getDummyRestreamer(nil, valIn, valOut)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
+
+	config := getDummyProcess()
+
+	_, err = rs.validateConfig(config)
+	require.Error(t, err)
+
+	config.Input[0].Address = "http://stream.example.com/master.m3u8"
+	config.Output[0].Address = "http://stream.example.com/master2.m3u8"
+
+	_, err = rs.validateConfig(config)
+	require.NoError(t, err)
+
+	config.Output[0].Address = "[f=flv]http://stream.example.com/master2.m3u8"
+	_, err = rs.validateConfig(config)
+	require.NoError(t, err)
+
+	config.Output[0].Address = "[f=hls]http://stream.example.com/master2.m3u8|[f=flv]rtmp://stream.example.com/stream"
+	_, err = rs.validateConfig(config)
+	require.NoError(t, err)
+}
+
 func TestOutputAddressValidation(t *testing.T) {
-	rs := getDummyRestreamer(nil).(*restream)
+	rsi, err := getDummyRestreamer(nil, nil, nil)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
 
 	type res struct {
 		path string
@@ -436,17 +533,20 @@ func TestOutputAddressValidation(t *testing.T) {
 	}
 
 	paths := map[string]res{
-		"/dev/null":                   {"file:/dev/null", false},
-		"/dev/../etc/passwd":          {"/etc/passwd", true},
-		"/dev/fb0":                    {"file:/dev/fb0", false},
-		"/etc/passwd":                 {"/etc/passwd", true},
-		"/core/data/../../etc/passwd": {"/etc/passwd", true},
-		"/core/data/./etc/passwd":     {"file:/core/data/etc/passwd", false},
-		"file:/core/data/foobar":      {"file:/core/data/foobar", false},
-		"http://example.com":          {"http://example.com", false},
-		"-":                           {"pipe:", false},
-		"tee:/core/data/foobar|http://example.com": {"tee:/core/data/foobar|http://example.com", false},
-		"tee:/core/data/foobar|/etc/passwd":        {"tee:/core/data/foobar|/etc/passwd", true},
+		"/dev/null":                            {"file:/dev/null", false},
+		"/dev/../etc/passwd":                   {"/etc/passwd", true},
+		"/dev/fb0":                             {"file:/dev/fb0", false},
+		"/etc/passwd":                          {"/etc/passwd", true},
+		"/core/data/../../etc/passwd":          {"/etc/passwd", true},
+		"/core/data/./etc/passwd":              {"file:/core/data/etc/passwd", false},
+		"file:/core/data/foobar":               {"file:/core/data/foobar", false},
+		"http://example.com":                   {"http://example.com", false},
+		"-":                                    {"pipe:", false},
+		"/core/data/foobar|http://example.com": {"file:/core/data/foobar|http://example.com", false},
+		"/core/data/foobar|/etc/passwd":        {"/core/data/foobar|/etc/passwd", true},
+		"[f=mpegts]udp://10.0.1.255:1234/":     {"[f=mpegts]udp://10.0.1.255:1234/", false},
+		"[f=null]-|[f=null]-":                  {"[f=null]pipe:|[f=null]pipe:", false},
+		"[onfail=ignore]/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/": {"[onfail=ignore]file:/core/data/archive-20121107.mkv|[f=mpegts]udp://10.0.1.255:1234/", false},
 	}
 
 	for path, r := range paths {

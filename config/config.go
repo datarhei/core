@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/datarhei/core/math/rand"
+	"github.com/datarhei/core/v16/math/rand"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
 )
+
+const version int64 = 2
 
 type variable struct {
 	value       value    // The actual value
@@ -129,12 +133,23 @@ type Data struct {
 		MimeTypes string `json:"mimetypes_file"`
 	} `json:"storage"`
 	RTMP struct {
-		Enable    bool   `json:"enable"`
-		EnableTLS bool   `json:"enable_tls"`
-		Address   string `json:"address"`
-		App       string `json:"app"`
-		Token     string `json:"token"`
+		Enable     bool   `json:"enable"`
+		EnableTLS  bool   `json:"enable_tls"`
+		Address    string `json:"address"`
+		AddressTLS string `json:"address_tls"`
+		App        string `json:"app"`
+		Token      string `json:"token"`
 	} `json:"rtmp"`
+	SRT struct {
+		Enable     bool   `json:"enable"`
+		Address    string `json:"address"`
+		Passphrase string `json:"passphrase"`
+		Token      string `json:"token"`
+		Log        struct {
+			Enable bool     `json:"enable"`
+			Topics []string `json:"topics"`
+		} `json:"log"`
+	} `json:"srt"`
 	FFmpeg struct {
 		Binary       string `json:"binary"`
 		MaxProcesses int64  `json:"max_processes"`
@@ -227,6 +242,7 @@ func NewConfigFrom(d *Config) *Config {
 	data.TLS = d.TLS
 	data.Storage = d.Storage
 	data.RTMP = d.RTMP
+	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
 	data.Debug = d.Debug
@@ -255,6 +271,8 @@ func NewConfigFrom(d *Config) *Config {
 
 	data.Sessions.IPIgnoreList = copyStringSlice(d.Sessions.IPIgnoreList)
 
+	data.SRT.Log.Topics = copyStringSlice(d.SRT.Log.Topics)
+
 	data.Router.BlockedPrefixes = copyStringSlice(d.Router.BlockedPrefixes)
 	data.Router.Routes = copyStringMap(d.Router.Routes)
 
@@ -266,7 +284,7 @@ func NewConfigFrom(d *Config) *Config {
 }
 
 func (d *Config) init() {
-	d.val(newInt64Value(&d.Version, 1), "version", "", nil, "Configuration file layout version", true, false)
+	d.val(newInt64Value(&d.Version, version), "version", "", nil, "Configuration file layout version", true, false)
 	d.val(newTimeValue(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
 	d.val(newStringValue(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
 	d.val(newStringValue(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
@@ -336,8 +354,17 @@ func (d *Config) init() {
 	d.val(newBoolValue(&d.RTMP.Enable, false), "rtmp.enable", "CORE_RTMP_ENABLE", nil, "Enable RTMP server", false, false)
 	d.val(newBoolValue(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
 	d.val(newAddressValue(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
-	d.val(newStringValue(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
+	d.val(newAddressValue(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
+	d.val(newAbsolutePathValue(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.val(newStringValue(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
+
+	// SRT
+	d.val(newBoolValue(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
+	d.val(newAddressValue(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
+	d.val(newStringValue(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
+	d.val(newStringValue(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
+	d.val(newBoolValue(&d.SRT.Log.Enable, false), "srt.log.enable", "CORE_SRT_LOG_ENABLE", nil, "Enable SRT server logging", false, false)
+	d.val(newStringListValue(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
 	d.val(newExecValue(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
@@ -456,6 +483,36 @@ func (d *Config) Merge() {
 	}
 }
 
+// Migrate will migrate some settings, depending on the version it finds. Migrations
+// are only going upwards,i.e. from a lower version to a higher version.
+func (d *Config) Migrate() error {
+	if d.Version == 1 {
+		if !strings.HasPrefix(d.RTMP.App, "/") {
+			d.RTMP.App = "/" + d.RTMP.App
+		}
+
+		if d.RTMP.EnableTLS {
+			d.RTMP.Enable = true
+			d.RTMP.AddressTLS = d.RTMP.Address
+			host, sport, err := net.SplitHostPort(d.RTMP.Address)
+			if err != nil {
+				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
+			}
+
+			port, err := strconv.Atoi(sport)
+			if err != nil {
+				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
+			}
+
+			d.RTMP.Address = net.JoinHostPort(host, strconv.Itoa(port-1))
+		}
+
+		d.Version = 2
+	}
+
+	return nil
+}
+
 // Validate validates the current state of the Config for completeness and sanity. Errors are
 // written to the log. Use resetLogs to indicate to reset the logs prior validation.
 func (d *Config) Validate(resetLogs bool) {
@@ -463,8 +520,8 @@ func (d *Config) Validate(resetLogs bool) {
 		d.logs = nil
 	}
 
-	if d.Version != 1 {
-		d.log("error", d.findVariable("version"), "unknown configuration layout version")
+	if d.Version != version {
+		d.log("error", d.findVariable("version"), "unknown configuration layout version (found version %d, expecting version %d)", d.Version, version)
 
 		return
 	}
@@ -542,8 +599,20 @@ func (d *Config) Validate(resetLogs bool) {
 
 	// If TLS for RTMP is enabled, TLS must be enabled
 	if d.RTMP.EnableTLS {
+		if !d.RTMP.Enable {
+			d.log("error", d.findVariable("rtmp.enable"), "RTMP server must be enabled if RTMPS server is enabled")
+		}
+
 		if !d.TLS.Enable {
 			d.log("error", d.findVariable("rtmp.enable_tls"), "RTMPS server can only be enabled if TLS is enabled")
+		}
+
+		if len(d.RTMP.AddressTLS) == 0 {
+			d.log("error", d.findVariable("rtmp.address_tls"), "RTMPS server address must be set")
+		}
+
+		if d.RTMP.Enable && d.RTMP.Address == d.RTMP.AddressTLS {
+			d.log("error", d.findVariable("rtmp.address"), "The RTMP and RTMPS server can't listen on the same address")
 		}
 	}
 

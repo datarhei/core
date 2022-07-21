@@ -3,7 +3,7 @@ package monitor
 import (
 	"time"
 
-	"github.com/datarhei/core/monitor/metric"
+	"github.com/datarhei/core/v16/monitor/metric"
 )
 
 type uptimeCollector struct {

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/datarhei/core/encoding/json"
-	"github.com/datarhei/core/io/file"
+	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/io/file"
 )
 
 type jsonStore struct {

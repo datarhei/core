@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/psutil"
+	"github.com/datarhei/core/v16/psutil"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +28,11 @@ func (p *psproc) VirtualMemory() (uint64, error) {
 func (p *psproc) Stop() {}
 
 func TestCPULimit(t *testing.T) {
+	lock := sync.Mutex{}
+
+	lock.Lock()
 	done := false
+	lock.Unlock()
 
 	go func() {
 		wg := sync.WaitGroup{}
@@ -46,16 +50,25 @@ func TestCPULimit(t *testing.T) {
 
 		wg.Wait()
 
+		lock.Lock()
 		done = true
+		lock.Unlock()
 	}()
 
 	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
 		return done
 	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func TestCPULimitWaitFor(t *testing.T) {
+	lock := sync.Mutex{}
+
+	lock.Lock()
 	done := false
+	lock.Unlock()
 
 	go func() {
 		wg := sync.WaitGroup{}
@@ -74,16 +87,25 @@ func TestCPULimitWaitFor(t *testing.T) {
 
 		wg.Wait()
 
+		lock.Lock()
 		done = true
+		lock.Unlock()
 	}()
 
 	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
 		return done
 	}, 10*time.Second, 1*time.Second)
 }
 
 func TestMemoryLimit(t *testing.T) {
+	lock := sync.Mutex{}
+
+	lock.Lock()
 	done := false
+	lock.Unlock()
 
 	go func() {
 		wg := sync.WaitGroup{}
@@ -101,16 +123,25 @@ func TestMemoryLimit(t *testing.T) {
 
 		wg.Wait()
 
+		lock.Lock()
 		done = true
+		lock.Unlock()
 	}()
 
 	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
 		return done
 	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func TestMemoryLimitWaitFor(t *testing.T) {
+	lock := sync.Mutex{}
+
+	lock.Lock()
 	done := false
+	lock.Unlock()
 
 	go func() {
 		wg := sync.WaitGroup{}
@@ -129,10 +160,15 @@ func TestMemoryLimitWaitFor(t *testing.T) {
 
 		wg.Wait()
 
+		lock.Lock()
 		done = true
+		lock.Unlock()
 	}()
 
 	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
 		return done
 	}, 10*time.Second, 1*time.Second)
 }

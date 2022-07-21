@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/io/fs"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/stretchr/testify/require"
 )
 

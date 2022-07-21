@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/datarhei/core/log"
+	"github.com/datarhei/core/v16/log"
 )
 
 // Config is the configuration for creating a new registry
