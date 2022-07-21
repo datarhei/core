@@ -17,7 +17,7 @@ jobs:
 
       - uses: cardinalby/export-env-action@v1
         with:
-          envFile: '.github_build/Build.alpine.env'
+          envFile: '.github_build/Build.ubuntu.env'
           export: 'true'
           expandWithJobEnv: 'true'
           expand: 'true'
