@@ -15,7 +15,7 @@ datarhei Core is management for FFmpeg processes without development effort. It 
 -   Unrestricted FFmpeg process management
 -   Optimized for long-running tasks
 -   In-Memory- and Disk-Filesystem for media assets
--   HTTP and RTMP services
+-   HTTP/S, RTMP/S and SRT services
 -   Let's Encrypt for HTTPS and RTMPS
 -   HLS/DASH Session tracking with bandwidth and current viewer limiters
 -   Multiple resource limiters and monitoring
