@@ -4,6 +4,10 @@ ARG BUILD_IMAGE=alpine:3.15
 
 FROM $GOLANG_IMAGE as builder
 
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=""
+
 COPY . /dist/core
 
 RUN apk add \
