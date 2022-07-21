@@ -1,12 +1,8 @@
-ARG GOLANG_IMAGE=golang:1.17.6-alpine3.15
+ARG GOLANG_IMAGE=golang:1.18.4-alpine3.15
 
 ARG BUILD_IMAGE=alpine:3.15
 
 FROM $GOLANG_IMAGE as builder
-
-ENV CGO_ENABLED=0
-ENV GOOS=linux
-ENV GOARCH=""
 
 COPY . /dist/core
 
@@ -15,8 +11,8 @@ RUN apk add \
 		make && \
 	cd /dist/core && \
 	go version && \
-	make release && \
-	make import
+	make release_linux && \
+	make import_linux
 
 FROM $BUILD_IMAGE
 

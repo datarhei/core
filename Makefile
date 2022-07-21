@@ -10,6 +10,10 @@ all: build
 build:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core${BINSUFFIX}
 
+# github workflow workaround
+build_linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core
+
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:
 	swag init -g http/server.go
@@ -56,6 +60,10 @@ lint:
 import:
 	cd app/import && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../import -ldflags="-s -w"
 
+# github workflow workaround
+import_linux:
+	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -ldflags="-s -w"
+
 ## coverage: Generate code coverage analysis
 coverage:
 	go test -race -coverprofile test/cover.out ./...
@@ -68,6 +76,10 @@ commit: vet fmt lint test build
 ## release: Build a release binary of core
 release:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
+
+# github workflow workaround
+release_linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
 
 ## docker: Build standard Docker image
 docker:
