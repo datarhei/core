@@ -81,12 +81,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
-<<<<<<< HEAD
   dockerBundle:
     uses: ./.github/workflows/build_bundle_dev.yaml
     secrets: inherit
   dockerBundleRpi:
     uses: ./.github/workflows/build_bundle-rpi_dev.yaml
     secrets: inherit
-=======
->>>>>>> dev
