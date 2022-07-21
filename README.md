@@ -970,7 +970,7 @@ available. If authentication is enabled, you have to provide the token in the he
 
 ### Requirement
 
--   Go v1.16+ ([Download here](https://golang.org/dl/))
+-   Go v1.18+ ([Download here](https://golang.org/dl/))
 
 ### Build
 
