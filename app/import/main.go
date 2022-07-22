@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/datarhei/core/v16/config"
@@ -11,23 +12,28 @@ import (
 )
 
 func main() {
-	if ok := doImport(); !ok {
-		os.Exit(1)
-	}
-}
-
-func doImport() bool {
 	logger := log.New("Import").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithField("version", "v1")
-
-	logger.Info().Log("Database import")
 
 	configstore, err := config.NewJSONStore(os.Getenv("CORE_CONFIGFILE"), nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
-		return false
+		os.Exit(1)
 	}
 
+	if err := doImport(logger, configstore); err != nil {
+		os.Exit(1)
+	}
+}
+
+func doImport(logger log.Logger, configstore config.Store) error {
+	if logger == nil {
+		logger = log.New("")
+	}
+
+	logger.Info().Log("Database import")
+
 	cfg := configstore.Get()
+	cfg.Migrate()
 
 	// Merging the persisted config with the environment variables
 	cfg.Merge()
@@ -35,6 +41,7 @@ func doImport() bool {
 	cfg.Validate(false)
 	if cfg.HasErrors() {
 		logger.Error().Log("The configuration contains errors")
+		messages := []string{}
 		cfg.Messages(func(level string, v config.Variable, message string) {
 			if level == "error" {
 				logger.Error().WithFields(log.Fields{
@@ -43,10 +50,12 @@ func doImport() bool {
 					"env":         v.EnvName,
 					"description": v.Description,
 				}).Log(message)
+
+				messages = append(messages, v.Name+": "+message)
 			}
 		})
 
-		return false
+		return fmt.Errorf("the configuration contains errors: %v", messages)
 	}
 
 	logger.Info().Log("Checking for database ...")
@@ -59,12 +68,12 @@ func doImport() bool {
 	if _, err := os.Stat(v1filename); err != nil {
 		if os.IsNotExist(err) {
 			logger.Info().Log("Database doesn't exist and nothing will be imported")
-			return true
+			return nil
 		}
 
 		logger.Error().WithError(err).Log("Checking for v1 database")
 
-		return false
+		return fmt.Errorf("checking for v1 database: %w", err)
 	}
 
 	logger.Info().Log("Found database")
@@ -77,14 +86,14 @@ func doImport() bool {
 	data, err := datastore.Load()
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading new database failed")
-		return false
+		return fmt.Errorf("loading new database failed: %w", err)
 	}
 
 	// Check if the existing DB has already some data in it.
 	// If it's not empty, we will not import any v1 DB.
 	if !data.IsEmpty() {
 		logger.Info().Log("There's already information stored in the new database and the v1 database will not be imported")
-		return true
+		return nil
 	}
 
 	logger.Info().Log("Importing database ...")
@@ -97,17 +106,18 @@ func doImport() bool {
 	r, err := importV1(v1filename, importConfig)
 	if err != nil {
 		logger.Error().WithError(err).Log("Importing database failed")
-		return false
+		return fmt.Errorf("importing database failed: %w", err)
 	}
 
 	// Persist the imported DB
 	if err := datastore.Store(r); err != nil {
 		logger.Error().WithError(err).Log("Storing imported data to new database failed")
-		return false
+		return fmt.Errorf("storing imported data to new database failed: %w", err)
 	}
 
 	// Get the unmerged config for persisting
 	cfg = configstore.Get()
+	cfg.Migrate()
 
 	// Add static routes to mimic the old URLs
 	cfg.Router.Routes["/hls/live.stream.m3u8"] = "/memfs/" + importConfig.id + ".m3u8"
@@ -117,10 +127,10 @@ func doImport() bool {
 	// Persist the modified config
 	if err := configstore.Set(cfg); err != nil {
 		logger.Error().WithError(err).Log("Storing adjusted config failed")
-		return false
+		return fmt.Errorf("storing adjusted config failed: %w", err)
 	}
 
 	logger.Info().Log("Successfully imported data")
 
-	return true
+	return nil
 }
