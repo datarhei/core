@@ -178,7 +178,11 @@ func (p *parser) Parse(line string) uint64 {
 		p.lock.log.Unlock()
 	}
 
-	if !p.prelude.done {
+	p.lock.prelude.Lock()
+	preludeDone := p.prelude.done
+	p.lock.prelude.Unlock()
+
+	if !preludeDone {
 		if isAVstreamProgress {
 			return 0
 		}
