@@ -3,7 +3,6 @@ package flv
 import (
 	"bufio"
 	"fmt"
-	"github.com/datarhei/joy4/utils/bits/pio"
 	"github.com/datarhei/joy4/av"
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/codec"
@@ -11,6 +10,7 @@ import (
 	"github.com/datarhei/joy4/codec/fake"
 	"github.com/datarhei/joy4/codec/h264parser"
 	"github.com/datarhei/joy4/format/flv/flvio"
+	"github.com/datarhei/joy4/utils/bits/pio"
 	"io"
 )
 

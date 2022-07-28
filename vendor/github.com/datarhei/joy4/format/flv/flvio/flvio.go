@@ -2,8 +2,8 @@ package flvio
 
 import (
 	"fmt"
-	"github.com/datarhei/joy4/utils/bits/pio"
 	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/utils/bits/pio"
 	"io"
 	"time"
 )

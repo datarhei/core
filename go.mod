@@ -6,7 +6,7 @@ require (
 	github.com/99designs/gqlgen v0.17.12
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/datarhei/gosrt v0.1.2
-	github.com/datarhei/joy4 v0.0.0-20210125162555-2102a8289cce
+	github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/google/uuid v1.3.0
