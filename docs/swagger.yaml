@@ -264,6 +264,8 @@ definitions:
         properties:
           address:
             type: string
+          address_tls:
+            type: string
           app:
             type: string
           enable:
@@ -1367,6 +1369,8 @@ definitions:
         properties:
           address:
             type: string
+          address_tls:
+            type: string
           app:
             type: string
           enable:
@@ -2047,7 +2051,7 @@ paths:
   /api/v3/fs/mem/{path}:
     delete:
       description: Remove a file from the memory filesystem
-      operationId: memfs-delete-file-api
+      operationId: memfs-3-delete-file
       parameters:
       - description: Path to file
         in: path
@@ -2070,7 +2074,7 @@ paths:
       summary: Remove a file from the memory filesystem
     get:
       description: Fetch a file from the memory filesystem
-      operationId: memfs-3-get-file-api
+      operationId: memfs-3-get-file
       parameters:
       - description: Path to file
         in: path
@@ -2133,7 +2137,7 @@ paths:
       consumes:
       - application/data
       description: Writes or overwrites a file on the memory filesystem
-      operationId: memfs-3-put-file-api
+      operationId: memfs-3-put-file
       parameters:
       - description: Path to file
         in: path
@@ -2276,7 +2280,7 @@ paths:
     get:
       description: List all known processes. Use the query parameter to filter the
         listed processes.
-      operationId: restream-3-get-all
+      operationId: process-3-get-all
       parameters:
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
@@ -2309,7 +2313,7 @@ paths:
       consumes:
       - application/json
       description: Add a new FFmpeg process
-      operationId: restream-3-add
+      operationId: process-3-add
       parameters:
       - description: Process config
         in: body
@@ -2334,7 +2338,7 @@ paths:
   /api/v3/process/{id}:
     delete:
       description: Delete a process by its ID
-      operationId: restream-3-delete
+      operationId: process-3-delete
       parameters:
       - description: Process ID
         in: path
@@ -2358,7 +2362,7 @@ paths:
     get:
       description: List a process by its ID. Use the filter parameter to specifiy
         the level of detail of the output.
-      operationId: restream-3-get
+      operationId: process-3-get
       parameters:
       - description: Process ID
         in: path
@@ -2388,7 +2392,7 @@ paths:
       consumes:
       - application/json
       description: Replace an existing process. This is a shortcut for DELETE+POST.
-      operationId: restream-3-update
+      operationId: process-3-update
       parameters:
       - description: Process ID
         in: path
@@ -2424,7 +2428,7 @@ paths:
       consumes:
       - application/json
       description: 'Issue a command to a process: start, stop, reload, restart'
-      operationId: restream-3-command
+      operationId: process-3-command
       parameters:
       - description: Process ID
         in: path
@@ -2459,7 +2463,7 @@ paths:
     get:
       description: Get the configuration of a process. This is the configuration as
         provided by Add or Update.
-      operationId: restream-3-get-config
+      operationId: process-3-get-config
       parameters:
       - description: Process ID
         in: path
@@ -2488,7 +2492,7 @@ paths:
     get:
       description: Retrieve the previously stored JSON metadata under the given key.
         If the key is empty, all metadata will be returned.
-      operationId: restream-3-get-process-metadata
+      operationId: process-3-get-process-metadata
       parameters:
       - description: Process ID
         in: path
@@ -2521,7 +2525,7 @@ paths:
       description: Add arbitrary JSON metadata under the given key. If the key exists,
         all already stored metadata with this key will be overwritten. If the key
         doesn't exist, it will be created.
-      operationId: restream-3-set-process-metadata
+      operationId: process-3-set-process-metadata
       parameters:
       - description: Process ID
         in: path
@@ -2561,7 +2565,7 @@ paths:
       consumes:
       - application/octet-stream
       description: Upload an error frame which will be encoded immediately
-      operationId: restream-3-playout-errorframe
+      operationId: process-3-playout-errorframe
       parameters:
       - description: Process ID
         in: path
@@ -2608,7 +2612,7 @@ paths:
   /api/v3/process/{id}/playout/{inputid}/errorframe/encode:
     get:
       description: Immediately encode the errorframe (if available and looping)
-      operationId: restream-3-playout-errorframencode
+      operationId: process-3-playout-errorframencode
       parameters:
       - description: Process ID
         in: path
@@ -2643,7 +2647,7 @@ paths:
     get:
       description: Get the last keyframe of an input of a process. The extension of
         the name determines the return type.
-      operationId: restream-3-playout-keyframe
+      operationId: process-3-playout-keyframe
       parameters:
       - description: Process ID
         in: path
@@ -2684,7 +2688,7 @@ paths:
     get:
       description: Close the current input stream such that it will be automatically
         re-opened
-      operationId: restream-3-playout-reopen-input
+      operationId: process-3-playout-reopen-input
       parameters:
       - description: Process ID
         in: path
@@ -2717,7 +2721,7 @@ paths:
   /api/v3/process/{id}/playout/{inputid}/status:
     get:
       description: Get the current playout status of an input of a process
-      operationId: restream-3-playout-status
+      operationId: process-3-playout-status
       parameters:
       - description: Process ID
         in: path
@@ -2753,7 +2757,7 @@ paths:
       - text/plain
       description: Replace the current stream with the one from the given URL. The
         switch will only happen if the stream parameters match.
-      operationId: restream-3-playout-stream
+      operationId: process-3-playout-stream
       parameters:
       - description: Process ID
         in: path
@@ -2794,7 +2798,7 @@ paths:
     get:
       description: Probe an existing process to get a detailed stream information
         on the inputs
-      operationId: restream-3-probe
+      operationId: process-3-probe
       parameters:
       - description: Process ID
         in: path
@@ -2814,7 +2818,7 @@ paths:
   /api/v3/process/{id}/report:
     get:
       description: Get the logs and the log history of a process
-      operationId: restream-3-get-report
+      operationId: process-3-get-report
       parameters:
       - description: Process ID
         in: path
@@ -2842,7 +2846,7 @@ paths:
   /api/v3/process/{id}/state:
     get:
       description: Get the state and progress data of a process
-      operationId: restream-3-get-state
+      operationId: process-3-get-state
       parameters:
       - description: Process ID
         in: path

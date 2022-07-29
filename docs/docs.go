@@ -546,7 +546,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Fetch a file from the memory filesystem",
-                "operationId": "memfs-3-get-file-api",
+                "operationId": "memfs-3-get-file",
                 "parameters": [
                     {
                         "type": "string",
@@ -592,7 +592,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Add a file to the memory filesystem",
-                "operationId": "memfs-3-put-file-api",
+                "operationId": "memfs-3-put-file",
                 "parameters": [
                     {
                         "type": "string",
@@ -646,7 +646,7 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "summary": "Remove a file from the memory filesystem",
-                "operationId": "memfs-delete-file-api",
+                "operationId": "memfs-3-delete-file",
                 "parameters": [
                     {
                         "type": "string",
@@ -893,7 +893,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "List all known processes",
-                "operationId": "restream-3-get-all",
+                "operationId": "process-3-get-all",
                 "parameters": [
                     {
                         "type": "string",
@@ -940,7 +940,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Add a new process",
-                "operationId": "restream-3-add",
+                "operationId": "process-3-add",
                 "parameters": [
                     {
                         "description": "Process config",
@@ -980,7 +980,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "List a process by its ID",
-                "operationId": "restream-3-get",
+                "operationId": "process-3-get",
                 "parameters": [
                     {
                         "type": "string",
@@ -1025,7 +1025,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Replace an existing process",
-                "operationId": "restream-3-update",
+                "operationId": "process-3-update",
                 "parameters": [
                     {
                         "type": "string",
@@ -1076,7 +1076,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Delete a process by its ID",
-                "operationId": "restream-3-delete",
+                "operationId": "process-3-delete",
                 "parameters": [
                     {
                         "type": "string",
@@ -1117,7 +1117,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Issue a command to a process",
-                "operationId": "restream-3-command",
+                "operationId": "process-3-command",
                 "parameters": [
                     {
                         "type": "string",
@@ -1170,7 +1170,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Get the configuration of a process",
-                "operationId": "restream-3-get-config",
+                "operationId": "process-3-get-config",
                 "parameters": [
                     {
                         "type": "string",
@@ -1214,7 +1214,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Retrieve JSON metadata stored with a process under a key",
-                "operationId": "restream-3-get-process-metadata",
+                "operationId": "process-3-get-process-metadata",
                 "parameters": [
                     {
                         "type": "string",
@@ -1261,7 +1261,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Add JSON metadata with a process under the given key",
-                "operationId": "restream-3-set-process-metadata",
+                "operationId": "process-3-set-process-metadata",
                 "parameters": [
                     {
                         "type": "string",
@@ -1318,7 +1318,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Encode the errorframe",
-                "operationId": "restream-3-playout-errorframencode",
+                "operationId": "process-3-playout-errorframencode",
                 "parameters": [
                     {
                         "type": "string",
@@ -1373,7 +1373,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Upload an error frame",
-                "operationId": "restream-3-playout-errorframe",
+                "operationId": "process-3-playout-errorframe",
                 "parameters": [
                     {
                         "type": "string",
@@ -1445,7 +1445,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Get the last keyframe",
-                "operationId": "restream-3-playout-keyframe",
+                "operationId": "process-3-playout-keyframe",
                 "parameters": [
                     {
                         "type": "string",
@@ -1503,7 +1503,7 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "summary": "Close the current input stream",
-                "operationId": "restream-3-playout-reopen-input",
+                "operationId": "process-3-playout-reopen-input",
                 "parameters": [
                     {
                         "type": "string",
@@ -1554,7 +1554,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Get the current playout status",
-                "operationId": "restream-3-playout-status",
+                "operationId": "process-3-playout-status",
                 "parameters": [
                     {
                         "type": "string",
@@ -1609,7 +1609,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Switch to a new stream",
-                "operationId": "restream-3-playout-stream",
+                "operationId": "process-3-playout-stream",
                 "parameters": [
                     {
                         "type": "string",
@@ -1669,7 +1669,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Probe a process",
-                "operationId": "restream-3-probe",
+                "operationId": "process-3-probe",
                 "parameters": [
                     {
                         "type": "string",
@@ -1701,7 +1701,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Get the logs of a process",
-                "operationId": "restream-3-get-report",
+                "operationId": "process-3-get-report",
                 "parameters": [
                     {
                         "type": "string",
@@ -1745,7 +1745,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Get the state of a process",
-                "operationId": "restream-3-get-state",
+                "operationId": "process-3-get-state",
                 "parameters": [
                     {
                         "type": "string",
@@ -2607,6 +2607,9 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "address": {
+                            "type": "string"
+                        },
+                        "address_tls": {
                             "type": "string"
                         },
                         "app": {
@@ -4201,6 +4204,9 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "address": {
+                            "type": "string"
+                        },
+                        "address_tls": {
                             "type": "string"
                         },
                         "app": {

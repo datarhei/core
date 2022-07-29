@@ -31,7 +31,7 @@ func NewMemFS(fs fs.Filesystem) *MemFSHandler {
 // GetFileAPI returns the file at the given path
 // @Summary Fetch a file from the memory filesystem
 // @Description Fetch a file from the memory filesystem
-// @ID memfs-3-get-file-api
+// @ID memfs-3-get-file
 // @Produce application/data
 // @Produce json
 // @Param path path string true "Path to file"
@@ -47,7 +47,7 @@ func (h *MemFSHandler) GetFile(c echo.Context) error {
 // PutFileAPI adds or overwrites a file at the given path
 // @Summary Add a file to the memory filesystem
 // @Description Writes or overwrites a file on the memory filesystem
-// @ID memfs-3-put-file-api
+// @ID memfs-3-put-file
 // @Accept application/data
 // @Produce text/plain
 // @Produce json
@@ -65,7 +65,7 @@ func (h *MemFSHandler) PutFile(c echo.Context) error {
 // DeleteFileAPI removes a file from the filesystem
 // @Summary Remove a file from the memory filesystem
 // @Description Remove a file from the memory filesystem
-// @ID memfs-delete-file-api
+// @ID memfs-3-delete-file
 // @Produce text/plain
 // @Param path path string true "Path to file"
 // @Success 200 {string} string
