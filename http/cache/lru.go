@@ -11,23 +11,25 @@ import (
 
 // LRUConfig is the configuration for a new LRU cache
 type LRUConfig struct {
-	TTL         time.Duration // For how long the object should stay in cache
-	MaxSize     uint64        // Max. size of the cache, 0 for unlimited, bytes
-	MaxFileSize uint64        // Max. file size allowed to put in cache, 0 for unlimited, bytes
-	Extensions  []string      // List of file extension allowed to cache, empty list for all files
-	Logger      log.Logger
+	TTL             time.Duration // For how long the object should stay in cache
+	MaxSize         uint64        // Max. size of the cache, 0 for unlimited, bytes
+	MaxFileSize     uint64        // Max. file size allowed to put in cache, 0 for unlimited, bytes
+	AllowExtensions []string      // List of file extension allowed to cache, empty list for all files
+	BlockExtensions []string      // List of file extensions not allowed to cache, empty list for none
+	Logger          log.Logger
 }
 
 type lrucache struct {
-	ttl         time.Duration
-	maxSize     uint64
-	maxFileSize uint64
-	extensions  []string
-	objects     map[string]*list.Element
-	list        *list.List
-	size        uint64
-	lock        sync.Mutex
-	logger      log.Logger
+	ttl             time.Duration
+	maxSize         uint64
+	maxFileSize     uint64
+	allowExtensions []string
+	blockExtensions []string
+	objects         map[string]*list.Element
+	list            *list.List
+	size            uint64
+	lock            sync.Mutex
+	logger          log.Logger
 }
 
 type value struct {
@@ -53,11 +55,14 @@ func NewLRUCache(config LRUConfig) (Cacher, error) {
 	}
 
 	if cache.logger == nil {
-		cache.logger = log.New("HTTPCache")
+		cache.logger = log.New("")
 	}
 
-	cache.extensions = make([]string, len(config.Extensions))
-	copy(cache.extensions, config.Extensions)
+	cache.allowExtensions = make([]string, len(config.AllowExtensions))
+	copy(cache.allowExtensions, config.AllowExtensions)
+
+	cache.blockExtensions = make([]string, len(config.BlockExtensions))
+	copy(cache.blockExtensions, config.BlockExtensions)
 
 	return cache, nil
 }
@@ -199,19 +204,27 @@ func (c *lrucache) TTL() time.Duration {
 }
 
 func (c *lrucache) IsExtensionCacheable(extension string) bool {
-	if len(c.extensions) == 0 {
+	if len(c.allowExtensions) == 0 && len(c.blockExtensions) == 0 {
 		return true
 	}
 
-	cacheable := false
-	for _, e := range c.extensions {
+	for _, e := range c.blockExtensions {
 		if extension == e {
-			cacheable = true
-			break
+			return false
 		}
 	}
 
-	return cacheable
+	if len(c.allowExtensions) == 0 {
+		return true
+	}
+
+	for _, e := range c.allowExtensions {
+		if extension == e {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *lrucache) IsSizeCacheable(size uint64) bool {

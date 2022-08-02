@@ -154,11 +154,6 @@ func (a *api) Reload() error {
 	}
 
 	cfg := store.Get()
-	if err := cfg.Migrate(); err == nil {
-		store.Set(cfg)
-	} else {
-		return err
-	}
 
 	cfg.Merge()
 
@@ -631,11 +626,12 @@ func (a *api) start() error {
 
 	if cfg.Storage.Disk.Cache.Enable {
 		diskCache, err := cache.NewLRUCache(cache.LRUConfig{
-			TTL:         time.Duration(cfg.Storage.Disk.Cache.TTL) * time.Second,
-			MaxSize:     cfg.Storage.Disk.Cache.Size * 1024 * 1024,
-			MaxFileSize: cfg.Storage.Disk.Cache.FileSize * 1024 * 1024,
-			Extensions:  cfg.Storage.Disk.Cache.Types,
-			Logger:      a.log.logger.core.WithComponent("HTTPCache"),
+			TTL:             time.Duration(cfg.Storage.Disk.Cache.TTL) * time.Second,
+			MaxSize:         cfg.Storage.Disk.Cache.Size * 1024 * 1024,
+			MaxFileSize:     cfg.Storage.Disk.Cache.FileSize * 1024 * 1024,
+			AllowExtensions: cfg.Storage.Disk.Cache.Types.Allow,
+			BlockExtensions: cfg.Storage.Disk.Cache.Types.Block,
+			Logger:          a.log.logger.core.WithComponent("HTTPCache"),
 		})
 
 		if err != nil {

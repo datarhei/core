@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/datarhei/core/v16/math/rand"
@@ -16,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const version int64 = 2
+const version int64 = 3
 
 type variable struct {
 	value       value    // The actual value
@@ -51,157 +49,8 @@ type Auth0Tenant struct {
 	Users    []string `json:"users"`
 }
 
-// Data is the actual configuration data for the app
-type Data struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LoadedAt        time.Time `json:"-"`
-	UpdatedAt       time.Time `json:"-"`
-	Version         int64     `json:"version" jsonschema:"minimum=1,maximum=1"`
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	Address         string    `json:"address"`
-	CheckForUpdates bool      `json:"update_check"`
-	Log             struct {
-		Level    string   `json:"level" enums:"debug,info,warn,error,silent" jsonschema:"enum=debug,enum=info,enum=warn,enum=error,enum=silent"`
-		Topics   []string `json:"topics"`
-		MaxLines int      `json:"max_lines"`
-	} `json:"log"`
-	DB struct {
-		Dir string `json:"dir"`
-	} `json:"db"`
-	Host struct {
-		Name []string `json:"name"`
-		Auto bool     `json:"auto"`
-	} `json:"host"`
-	API struct {
-		ReadOnly bool `json:"read_only"`
-		Access   struct {
-			HTTP struct {
-				Allow []string `json:"allow"`
-				Block []string `json:"block"`
-			} `json:"http"`
-			HTTPS struct {
-				Allow []string `json:"allow"`
-				Block []string `json:"block"`
-			} `json:"https"`
-		} `json:"access"`
-		Auth struct {
-			Enable           bool   `json:"enable"`
-			DisableLocalhost bool   `json:"disable_localhost"`
-			Username         string `json:"username"`
-			Password         string `json:"password"`
-			JWT              struct {
-				Secret string `json:"secret"`
-			} `json:"jwt"`
-			Auth0 struct {
-				Enable  bool          `json:"enable"`
-				Tenants []Auth0Tenant `json:"tenants"`
-			} `json:"auth0"`
-		} `json:"auth"`
-	} `json:"api"`
-	TLS struct {
-		Address  string `json:"address"`
-		Enable   bool   `json:"enable"`
-		Auto     bool   `json:"auto"`
-		CertFile string `json:"cert_file"`
-		KeyFile  string `json:"key_file"`
-	} `json:"tls"`
-	Storage struct {
-		Disk struct {
-			Dir   string `json:"dir"`
-			Size  int64  `json:"max_size_mbytes"`
-			Cache struct {
-				Enable   bool     `json:"enable"`
-				Size     uint64   `json:"max_size_mbytes"`
-				TTL      int64    `json:"ttl_seconds"`
-				FileSize uint64   `json:"max_file_size_mbytes"`
-				Types    []string `json:"types"`
-			} `json:"cache"`
-		} `json:"disk"`
-		Memory struct {
-			Auth struct {
-				Enable   bool   `json:"enable"`
-				Username string `json:"username"`
-				Password string `json:"password"`
-			} `json:"auth"`
-			Size  int64 `json:"max_size_mbytes"`
-			Purge bool  `json:"purge"`
-		} `json:"memory"`
-		CORS struct {
-			Origins []string `json:"origins"`
-		} `json:"cors"`
-		MimeTypes string `json:"mimetypes_file"`
-	} `json:"storage"`
-	RTMP struct {
-		Enable     bool   `json:"enable"`
-		EnableTLS  bool   `json:"enable_tls"`
-		Address    string `json:"address"`
-		AddressTLS string `json:"address_tls"`
-		App        string `json:"app"`
-		Token      string `json:"token"`
-	} `json:"rtmp"`
-	SRT struct {
-		Enable     bool   `json:"enable"`
-		Address    string `json:"address"`
-		Passphrase string `json:"passphrase"`
-		Token      string `json:"token"`
-		Log        struct {
-			Enable bool     `json:"enable"`
-			Topics []string `json:"topics"`
-		} `json:"log"`
-	} `json:"srt"`
-	FFmpeg struct {
-		Binary       string `json:"binary"`
-		MaxProcesses int64  `json:"max_processes"`
-		Access       struct {
-			Input struct {
-				Allow []string `json:"allow"`
-				Block []string `json:"block"`
-			} `json:"input"`
-			Output struct {
-				Allow []string `json:"allow"`
-				Block []string `json:"block"`
-			} `json:"output"`
-		} `json:"access"`
-		Log struct {
-			MaxLines   int `json:"max_lines"`
-			MaxHistory int `json:"max_history"`
-		} `json:"log"`
-	} `json:"ffmpeg"`
-	Playout struct {
-		Enable  bool `json:"enable"`
-		MinPort int  `json:"min_port"`
-		MaxPort int  `json:"max_port"`
-	} `json:"playout"`
-	Debug struct {
-		Profiling bool `json:"profiling"`
-		ForceGC   int  `json:"force_gc"`
-	} `json:"debug"`
-	Metrics struct {
-		Enable           bool  `json:"enable"`
-		EnablePrometheus bool  `json:"enable_prometheus"`
-		Range            int64 `json:"range_sec"`    // seconds
-		Interval         int64 `json:"interval_sec"` // seconds
-	} `json:"metrics"`
-	Sessions struct {
-		Enable          bool     `json:"enable"`
-		IPIgnoreList    []string `json:"ip_ignorelist"`
-		SessionTimeout  int      `json:"session_timeout_sec"`
-		Persist         bool     `json:"persist"`
-		PersistInterval int      `json:"persist_interval_sec"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit"`
-		MaxSessions     uint64   `json:"max_sessions"`
-	} `json:"sessions"`
-	Service struct {
-		Enable bool   `json:"enable"`
-		Token  string `json:"token"`
-		URL    string `json:"url"`
-	} `json:"service"`
-	Router struct {
-		BlockedPrefixes []string          `json:"blocked_prefixes"`
-		Routes          map[string]string `json:"routes"`
-		UIPath          string            `json:"ui_path"`
-	} `json:"router"`
+type DataVersion struct {
+	Version int64 `json:"version"`
 }
 
 // Config is a wrapper for Data
@@ -214,11 +63,11 @@ type Config struct {
 
 // New returns a Config which is initialized with its default values
 func New() *Config {
-	data := &Config{}
+	config := &Config{}
 
-	data.init()
+	config.init()
 
-	return data
+	return config
 }
 
 // NewConfigFrom returns a clone of a Config
@@ -263,6 +112,8 @@ func NewConfigFrom(d *Config) *Config {
 	data.API.Auth.Auth0.Tenants = copyTenantSlice(d.API.Auth.Auth0.Tenants)
 
 	data.Storage.CORS.Origins = copyStringSlice(d.Storage.CORS.Origins)
+	data.Storage.Disk.Cache.Types.Allow = copyStringSlice(d.Storage.Disk.Cache.Types.Allow)
+	data.Storage.Disk.Cache.Types.Block = copyStringSlice(d.Storage.Disk.Cache.Types.Block)
 
 	data.FFmpeg.Access.Input.Allow = copyStringSlice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copyStringSlice(d.FFmpeg.Access.Input.Block)
@@ -338,7 +189,8 @@ func (d *Config) init() {
 	d.val(newUint64Value(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
 	d.val(newInt64Value(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
 	d.val(newUint64Value(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
-	d.val(newStringListValue(&d.Storage.Disk.Cache.Types, []string{}, " "), "storage.disk.cache.types", "CORE_STORAGE_DISK_CACHE_TYPES", nil, "File extensions to cache, empty for all", false, false)
+	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
+	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
 
 	// Storage (Memory)
 	d.val(newBoolValue(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
@@ -481,36 +333,6 @@ func (d *Config) Merge() {
 
 		v.merged = true
 	}
-}
-
-// Migrate will migrate some settings, depending on the version it finds. Migrations
-// are only going upwards,i.e. from a lower version to a higher version.
-func (d *Config) Migrate() error {
-	if d.Version == 1 {
-		if !strings.HasPrefix(d.RTMP.App, "/") {
-			d.RTMP.App = "/" + d.RTMP.App
-		}
-
-		if d.RTMP.EnableTLS {
-			d.RTMP.Enable = true
-			d.RTMP.AddressTLS = d.RTMP.Address
-			host, sport, err := net.SplitHostPort(d.RTMP.Address)
-			if err != nil {
-				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
-			}
-
-			port, err := strconv.Atoi(sport)
-			if err != nil {
-				return fmt.Errorf("migrating rtmp.address to rtmp.address_tls failed: %w", err)
-			}
-
-			d.RTMP.Address = net.JoinHostPort(host, strconv.Itoa(port-1))
-		}
-
-		d.Version = 2
-	}
-
-	return nil
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are

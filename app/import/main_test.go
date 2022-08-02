@@ -11,8 +11,6 @@ func TestImport(t *testing.T) {
 	configstore := config.NewDummyStore()
 
 	cfg := configstore.Get()
-	cfg.Version = 1
-	cfg.Migrate()
 
 	err := configstore.Set(cfg)
 	require.NoError(t, err)

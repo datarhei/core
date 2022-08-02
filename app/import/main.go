@@ -33,7 +33,6 @@ func doImport(logger log.Logger, configstore config.Store) error {
 	logger.Info().Log("Database import")
 
 	cfg := configstore.Get()
-	cfg.Migrate()
 
 	// Merging the persisted config with the environment variables
 	cfg.Merge()
@@ -117,7 +116,6 @@ func doImport(logger log.Logger, configstore config.Store) error {
 
 	// Get the unmerged config for persisting
 	cfg = configstore.Get()
-	cfg.Migrate()
 
 	// Add static routes to mimic the old URLs
 	cfg.Router.Routes["/hls/live.stream.m3u8"] = "/memfs/" + importConfig.id + ".m3u8"

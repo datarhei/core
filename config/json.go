@@ -3,7 +3,6 @@ package config
 import (
 	gojson "encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -102,7 +101,7 @@ func (c *jsonStore) Reload() error {
 	return nil
 }
 
-func (c *jsonStore) load(data *Config) error {
+func (c *jsonStore) load(config *Config) error {
 	if len(c.path) == 0 {
 		return nil
 	}
@@ -111,17 +110,56 @@ func (c *jsonStore) load(data *Config) error {
 		return nil
 	}
 
-	jsondata, err := ioutil.ReadFile(c.path)
+	jsondata, err := os.ReadFile(c.path)
 	if err != nil {
 		return err
 	}
 
-	if err = gojson.Unmarshal(jsondata, data); err != nil {
+	dataV3 := &Data{}
+
+	version := DataVersion{}
+
+	if err = gojson.Unmarshal(jsondata, &version); err != nil {
 		return json.FormatError(jsondata, err)
 	}
 
-	data.LoadedAt = time.Now()
-	data.UpdatedAt = data.LoadedAt
+	if version.Version == 1 {
+		dataV1 := &dataV1{}
+
+		if err = gojson.Unmarshal(jsondata, dataV1); err != nil {
+			return json.FormatError(jsondata, err)
+		}
+
+		dataV2, err := NewV2FromV1(dataV1)
+		if err != nil {
+			return err
+		}
+
+		dataV3, err = NewV3FromV2(dataV2)
+		if err != nil {
+			return err
+		}
+	} else if version.Version == 2 {
+		dataV2 := &dataV2{}
+
+		if err = gojson.Unmarshal(jsondata, dataV2); err != nil {
+			return json.FormatError(jsondata, err)
+		}
+
+		dataV3, err = NewV3FromV2(dataV2)
+		if err != nil {
+			return err
+		}
+	} else if version.Version == 3 {
+		if err = gojson.Unmarshal(jsondata, dataV3); err != nil {
+			return json.FormatError(jsondata, err)
+		}
+	}
+
+	config.Data = *dataV3
+
+	config.LoadedAt = time.Now()
+	config.UpdatedAt = config.LoadedAt
 
 	return nil
 }
@@ -140,7 +178,7 @@ func (c *jsonStore) store(data *Config) error {
 
 	dir, filename := filepath.Split(c.path)
 
-	tmpfile, err := ioutil.TempFile(dir, filename)
+	tmpfile, err := os.CreateTemp(dir, filename)
 	if err != nil {
 		return err
 	}

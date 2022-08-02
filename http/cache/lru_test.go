@@ -8,11 +8,12 @@ import (
 )
 
 var defaultConfig = LRUConfig{
-	TTL:         time.Hour,
-	MaxSize:     128,
-	MaxFileSize: 0,
-	Extensions:  []string{".html", ".js", ".jpg"},
-	Logger:      nil,
+	TTL:             time.Hour,
+	MaxSize:         128,
+	MaxFileSize:     0,
+	AllowExtensions: []string{".html", ".js", ".jpg"},
+	BlockExtensions: []string{".m3u8"},
+	Logger:          nil,
 }
 
 func getCache(t *testing.T) *lrucache {
@@ -27,8 +28,6 @@ func TestNew(t *testing.T) {
 		TTL:         time.Hour,
 		MaxSize:     128,
 		MaxFileSize: 129,
-		Extensions:  []string{},
-		Logger:      nil,
 	})
 	require.NotEqual(t, nil, err)
 
@@ -36,8 +35,6 @@ func TestNew(t *testing.T) {
 		TTL:         time.Hour,
 		MaxSize:     0,
 		MaxFileSize: 129,
-		Extensions:  []string{},
-		Logger:      nil,
 	})
 	require.Equal(t, nil, err)
 
@@ -45,8 +42,6 @@ func TestNew(t *testing.T) {
 		TTL:         time.Hour,
 		MaxSize:     128,
 		MaxFileSize: 127,
-		Extensions:  []string{},
-		Logger:      nil,
 	})
 	require.Equal(t, nil, err)
 }
@@ -144,13 +139,24 @@ func TestLRU(t *testing.T) {
 	require.NotEqual(t, nil, data)
 }
 
-func TestExtension(t *testing.T) {
+func TestAllowExtension(t *testing.T) {
 	cache := getCache(t)
 
 	r := cache.IsExtensionCacheable(".html")
 	require.Equal(t, true, r)
 
 	r = cache.IsExtensionCacheable(".png")
+	require.Equal(t, false, r)
+}
+
+func TestBlockExtension(t *testing.T) {
+	cache := getCache(t)
+	cache.allowExtensions = []string{}
+
+	r := cache.IsExtensionCacheable(".html")
+	require.Equal(t, true, r)
+
+	r = cache.IsExtensionCacheable(".m3u8")
 	require.Equal(t, false, r)
 }
 

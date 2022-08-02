@@ -1,7 +1,8 @@
 # Core
+
 The cloud-native audio/video processing API.
 
-[![License: MIT](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)]([https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0))
+[![License: MIT](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)](<[https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0)>)
 [![CodeQL](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml)
 [![tests](https://github.com/datarhei/core/actions/workflows/go-tests.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/go-tests.yml)
 [![codecov](https://codecov.io/gh/datarhei/core/branch/main/graph/badge.svg?token=90YMPZRAFK)](https://codecov.io/gh/datarhei/core)
@@ -119,7 +120,8 @@ The currently known environment variables (but not all will be respected) are:
 | CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES     | `0`          | Max. allowed cache size, 0 for unlimited.                                                                                                                                            |
 | CORE_STORAGE_DISK_CACHE_TTLSECONDS        | `300`        | Seconds to keep files in cache.                                                                                                                                                      |
 | CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES | `1`          | Max. file size to put in cache.                                                                                                                                                      |
-| CORE_STORAGE_DISK_CACHE_TYPES             | (not set)    | List of file extensions to cache (space-separated, e.g. ".html .js"), empty for all.                                                                                                 |
+| CORE_STORAGE_DISK_CACHE_TYPES_ALLOW       | (not set)    | List of file extensions to cache (space-separated, e.g. ".html .js"), empty for all.                                                                                                 |
+| CORE_STORAGE_DISK_CACHE_TYPES_BLOCK       | (not set)    | List of file extensions not to cache (space-separated, e.g. ".m3u8 .mpd"), empty for none.                                                                                           |
 | CORE_STORAGE_MEMORY_AUTH_ENABLE           | `true`       | Enable basic auth for PUT,POST, and DELETE on /memfs.                                                                                                                                |
 | CORE_STORAGE_MEMORY_AUTH_USERNAME         | (not set)    | Username for Basic-Auth of `/memfs`. Required if auth is enabled.                                                                                                                    |
 | CORE_STORAGE_MEMORY_AUTH_PASSWORD         | (not set)    | Password for Basic-Auth of `/memfs`. Required if auth is enabled.                                                                                                                    |
@@ -180,7 +182,7 @@ All other values will be filled with default values and persisted on disk. The e
 
 ```
 {
-    "version": 1,
+    "version": 3,
     "id": "[will be generated if not given]",
     "name": "[will be generated if not given]",
     "address": ":8080",
@@ -238,7 +240,10 @@ All other values will be filled with default values and persisted on disk. The e
                 "max_size_mbytes": 0,
                 "ttl_seconds": 300,
                 "max_file_size_mbytes": 1,
-                "types": []
+                "types": {
+                    "allow": [],
+                    "block": []
+                }
             }
         },
         "memory": {
