@@ -75,11 +75,11 @@ commit: vet fmt lint test build
 
 ## release: Build a release binary of core
 release:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
 
 # github workflow workaround
 release_linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/app.Commit=$(COMMIT) -X github.com/datarhei/core/app.Branch=$(BRANCH) -X github.com/datarhei/core/app.Build=$(BUILD)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
 
 ## docker: Build standard Docker image
 docker:
