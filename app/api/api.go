@@ -211,6 +211,8 @@ func (a *api) Reload() error {
 		"version":     app.Version.String(),
 		"repository":  "https://github.com/datarhei/core",
 		"license":     "Apache License Version 2.0",
+		"arch":        app.Arch,
+		"compiler":    app.Compiler,
 	}
 
 	if len(app.Commit) != 0 && len(app.Branch) != 0 {
