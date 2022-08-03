@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
@@ -77,6 +78,7 @@ type api struct {
 	httpjwt       jwt.JWT
 	update        update.Checker
 	replacer      replace.Replacer
+	cluster       cluster.Cluster
 
 	errorChan chan error
 
@@ -495,6 +497,14 @@ func (a *api) start() error {
 
 	a.restream = restream
 
+	if cluster, err := cluster.New(cluster.ClusterConfig{
+		Logger: a.log.logger.core.WithComponent("Cluster"),
+	}); err != nil {
+		return fmt.Errorf("unable to create cluster: %w", err)
+	} else {
+		a.cluster = cluster
+	}
+
 	var httpjwt jwt.JWT
 
 	if cfg.API.Auth.Enable {
@@ -818,6 +828,7 @@ func (a *api) start() error {
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
+		Cluster:  a.cluster,
 	})
 
 	if err != nil {
@@ -880,6 +891,7 @@ func (a *api) start() error {
 			Sessions: a.sessions,
 			Router:   router,
 			ReadOnly: cfg.API.ReadOnly,
+			Cluster:  a.cluster,
 		})
 
 		if err != nil {
@@ -1110,6 +1122,10 @@ func (a *api) stop() {
 	if a.state == "idle" {
 		logger.Info().Log("Complete")
 		return
+	}
+
+	if a.cluster != nil {
+		a.cluster.Stop()
 	}
 
 	// Stop JWT authentication

@@ -160,7 +160,7 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 
 // Update replaces an existing process
 // @Summary Replace an existing process
-// @Description Replace an existing process. This is a shortcut for DELETE+POST.
+// @Description Replace an existing process
 // @ID process-3-update
 // @Accept json
 // @Produce json

@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/99designs/gqlgen v0.17.12
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/datarhei/gosrt v0.1.2
 	github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36

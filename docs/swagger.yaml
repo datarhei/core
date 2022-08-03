@@ -56,6 +56,22 @@ definitions:
       version:
         $ref: '#/definitions/api.Version'
     type: object
+  api.ClusterNode:
+    properties:
+      address:
+        type: string
+      state:
+        type: string
+    type: object
+  api.ClusterNodeConfig:
+    properties:
+      address:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
   api.Command:
     properties:
       command:
@@ -345,9 +361,16 @@ definitions:
                   ttl_seconds:
                     type: integer
                   types:
-                    items:
-                      type: string
-                    type: array
+                    properties:
+                      allow:
+                        items:
+                          type: string
+                        type: array
+                      block:
+                        items:
+                          type: string
+                        type: array
+                    type: object
                 type: object
               dir:
                 type: string
@@ -1450,9 +1473,16 @@ definitions:
                   ttl_seconds:
                     type: integer
                   types:
-                    items:
-                      type: string
-                    type: array
+                    properties:
+                      allow:
+                        items:
+                          type: string
+                        type: array
+                      block:
+                        items:
+                          type: string
+                        type: array
+                    type: object
                 type: object
               dir:
                 type: string
@@ -1837,6 +1867,141 @@ paths:
           schema:
             type: string
       summary: Swagger UI for this API
+  /api/v3/cluster/node:
+    post:
+      consumes:
+      - application/json
+      description: Add a new node to the cluster
+      operationId: cluster-3-add-node
+      parameters:
+      - description: Node config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClusterNodeConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new node
+  /api/v3/cluster/node/{id}:
+    delete:
+      description: Delete a node by its ID
+      operationId: cluster-3-delete-node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a node by its ID
+    get:
+      description: List a node by its ID
+      operationId: cluster-3-get-node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterNode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List a node by its ID
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing Node
+      operationId: cluster-3-update-node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Node config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClusterNodeConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an existing Node
+  /api/v3/cluster/node/{id}/proxy:
+    get:
+      description: List the files of a node by its ID
+      operationId: cluster-3-get-node-proxy
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List the files of a node by its ID
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration
@@ -2391,7 +2556,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Replace an existing process. This is a shortcut for DELETE+POST.
+      description: Replace an existing process
       operationId: process-3-update
       parameters:
       - description: Process ID

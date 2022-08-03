@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
@@ -92,6 +93,7 @@ type Config struct {
 	Sessions      session.Registry
 	Router        router.Router
 	ReadOnly      bool
+	Cluster       cluster.Cluster
 }
 
 type MemFSConfig struct {
@@ -135,6 +137,7 @@ type server struct {
 		session   *api.SessionHandler
 		widget    *api.WidgetHandler
 		resources *api.MetricsHandler
+		cluster   *api.ClusterHandler
 	}
 
 	middleware struct {
@@ -301,6 +304,10 @@ func NewServer(config Config) (Server, error) {
 	s.v3handler.resources = api.NewMetrics(api.MetricsConfig{
 		Metrics: config.Metrics,
 	})
+
+	if config.Cluster != nil {
+		s.v3handler.cluster = api.NewCluster(config.Cluster)
+	}
 
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
 		Prefixes: map[string][]string{
@@ -637,6 +644,18 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.session != nil {
 		v3.GET("/session", s.v3handler.session.Summary)
 		v3.GET("/session/active", s.v3handler.session.Active)
+	}
+
+	// v3 Cluster
+	if s.v3handler.cluster != nil {
+		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
+		v3.GET("/cluster/node/:id/proxy", s.v3handler.cluster.GetNodeProxy)
+
+		if !s.readOnly {
+			v3.POST("/cluster/node", s.v3handler.cluster.AddNode)
+			v3.PUT("/cluster/node/:id", s.v3handler.cluster.UpdateNode)
+			v3.DELETE("/cluster/node/:id", s.v3handler.cluster.DeleteNode)
+		}
 	}
 
 	// v3 Log
