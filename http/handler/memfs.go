@@ -47,7 +47,10 @@ func (h *MemFSHandler) GetFile(c echo.Context) error {
 
 	defer file.Close()
 
-	stat, _ := file.Stat()
+	stat, err := file.Stat()
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "File.Stat() failed", "%s", err)
+	}
 
 	c.Response().Header().Set("Last-Modified", stat.ModTime().UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 

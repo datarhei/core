@@ -15,9 +15,10 @@ type NodeReader interface {
 }
 
 type NodeState struct {
-	ID    string
-	State string
-	Files []string
+	ID         string
+	State      string
+	Files      []string
+	LastUpdate time.Time
 }
 
 type nodeState string
@@ -110,7 +111,8 @@ func (n *node) State() NodeState {
 	defer n.lock.RUnlock()
 
 	state := NodeState{
-		ID: n.peer.ID(),
+		ID:         n.peer.ID(),
+		LastUpdate: n.lastUpdate,
 	}
 
 	if n.state == stateDisconnected || time.Since(n.lastUpdate) > 2*time.Second {
@@ -131,6 +133,8 @@ func (n *node) stop() {
 func (n *node) files() {
 	files, err := n.peer.MemFSList("name", "asc")
 
+	n.lastUpdate = time.Now()
+
 	if err != nil {
 		n.fileList = nil
 		n.state = stateDisconnected
@@ -144,8 +148,6 @@ func (n *node) files() {
 	for i, file := range files {
 		n.fileList[i] = file.Name
 	}
-
-	n.lastUpdate = time.Now()
 
 	return
 }

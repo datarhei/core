@@ -89,8 +89,10 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 	state := peer.State()
 
 	node := api.ClusterNode{
-		Address: peer.Address(),
-		State:   state.State,
+		Address:    peer.Address(),
+		ID:         state.ID,
+		LastUpdate: state.LastUpdate.Unix(),
+		State:      state.State,
 	}
 
 	return c.JSON(http.StatusOK, node)

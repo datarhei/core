@@ -7,8 +7,10 @@ type ClusterNodeConfig struct {
 }
 
 type ClusterNode struct {
-	Address string `json:"address"`
-	State   string `json:"state"`
+	Address    string `json:"address"`
+	ID         string `json:"id"`
+	LastUpdate int64  `json:"last_update"`
+	State      string `json:"state"`
 }
 
 type ClusterNodeFiles []string

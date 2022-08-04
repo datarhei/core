@@ -36,6 +36,7 @@ import (
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
+	clusterfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/graph/resolver"
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
@@ -227,8 +228,13 @@ func NewServer(config Config) (Server, error) {
 			config.MemFS.Filesystem,
 		)
 
+		filesystem := config.MemFS.Filesystem
+		if config.Cluster != nil {
+			filesystem = clusterfs.NewClusterFS("TODO", filesystem, config.Cluster)
+		}
+
 		s.handler.memfs = handler.NewMemFS(
-			config.MemFS.Filesystem,
+			filesystem,
 		)
 	}
 
