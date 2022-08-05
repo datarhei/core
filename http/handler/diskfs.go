@@ -49,7 +49,10 @@ func (h *DiskFSHandler) GetFile(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "File not found", path)
 	}
 
-	stat, _ := file.Stat()
+	stat, err := file.Stat()
+	if err != nil {
+		return api.Err(http.StatusNotFound, "File not found", path)
+	}
 
 	if stat.IsDir() {
 		path = filepath.Join(path, "index.html")
@@ -61,7 +64,10 @@ func (h *DiskFSHandler) GetFile(c echo.Context) error {
 			return api.Err(http.StatusNotFound, "File not found", path)
 		}
 
-		stat, _ = file.Stat()
+		stat, err = file.Stat()
+		if err != nil {
+			return api.Err(http.StatusNotFound, "File not found", path)
+		}
 	}
 
 	defer file.Close()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ type Cluster interface {
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
 	Stop()
-	GetFile(path string) (string, error)
+	GetURL(path string) (string, error)
 }
 
 type ClusterConfig struct {
@@ -35,6 +36,8 @@ type cluster struct {
 	cancel context.CancelFunc
 	once   sync.Once
 
+	prefix *regexp.Regexp
+
 	logger log.Logger
 }
 
@@ -45,6 +48,7 @@ func New(config ClusterConfig) (Cluster, error) {
 		idupdate: map[string]time.Time{},
 		fileid:   map[string]string{},
 		updates:  make(chan NodeState, 64),
+		prefix:   regexp.MustCompile(`^[a-z]+:`),
 		logger:   config.Logger,
 	}
 
@@ -170,7 +174,7 @@ func (c *cluster) GetNode(id string) (NodeReader, error) {
 	return node, nil
 }
 
-func (c *cluster) GetFile(path string) (string, error) {
+func (c *cluster) GetURL(path string) (string, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -199,7 +203,20 @@ func (c *cluster) GetFile(path string) (string, error) {
 		return "", fmt.Errorf("file not found")
 	}
 
-	url := node.Address() + "/" + filepath.Join("memfs", path)
+	// Remove prefix from path
+	prefix := c.prefix.FindString(path)
+	path = c.prefix.ReplaceAllString(path, "")
+
+	url := ""
+
+	if prefix == "memfs:" {
+		url = node.Address() + "/" + filepath.Join("memfs", path)
+	} else if prefix == "diskfs:" {
+		url = node.Address() + path
+	} else {
+		c.logger.Debug().WithField("path", path).WithField("prefix", prefix).Log("unknown prefix")
+		return "", fmt.Errorf("file not found")
+	}
 
 	c.logger.Debug().WithField("url", url).Log("file cluster url")
 

@@ -16,12 +16,14 @@ type Filesystem interface {
 type filesystem struct {
 	fs.Filesystem
 
+	what    string
 	cluster cluster.Cluster
 }
 
 func NewClusterFS(what string, fs fs.Filesystem, cluster cluster.Cluster) Filesystem {
 	f := &filesystem{
 		Filesystem: fs,
+		what:       what,
 		cluster:    cluster,
 	}
 
@@ -35,7 +37,7 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	url, err := fs.cluster.GetFile(path)
+	url, err := fs.cluster.GetURL(fs.what + ":" + path)
 	if err != nil {
 		return nil
 	}

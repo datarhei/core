@@ -131,11 +131,12 @@ func (n *node) stop() {
 }
 
 func (n *node) files() {
-	files, err := n.peer.MemFSList("name", "asc")
+	memfsfiles, errMemfs := n.peer.MemFSList("name", "asc")
+	diskfsfiles, errDiskfs := n.peer.DiskFSList("name", "asc")
 
 	n.lastUpdate = time.Now()
 
-	if err != nil {
+	if errMemfs != nil || errDiskfs != nil {
 		n.fileList = nil
 		n.state = stateDisconnected
 		return
@@ -143,10 +144,18 @@ func (n *node) files() {
 
 	n.state = stateConnected
 
-	n.fileList = make([]string, len(files))
+	n.fileList = make([]string, len(memfsfiles)+len(diskfsfiles))
 
-	for i, file := range files {
-		n.fileList[i] = file.Name
+	nfiles := 0
+
+	for _, file := range memfsfiles {
+		n.fileList[nfiles] = "memfs:" + file.Name
+		nfiles++
+	}
+
+	for _, file := range diskfsfiles {
+		n.fileList[nfiles] = "diskfs:" + file.Name
+		nfiles++
 	}
 
 	return

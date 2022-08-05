@@ -184,8 +184,13 @@ func NewServer(config Config) (Server, error) {
 		config.Cache,
 	)
 
+	filesystem := config.DiskFS
+	if config.Cluster != nil {
+		filesystem = clusterfs.NewClusterFS("diskfs", filesystem, config.Cluster)
+	}
+
 	s.handler.diskfs = handler.NewDiskFS(
-		config.DiskFS,
+		filesystem,
 		config.Cache,
 	)
 
@@ -230,7 +235,7 @@ func NewServer(config Config) (Server, error) {
 
 		filesystem := config.MemFS.Filesystem
 		if config.Cluster != nil {
-			filesystem = clusterfs.NewClusterFS("TODO", filesystem, config.Cluster)
+			filesystem = clusterfs.NewClusterFS("memfs", filesystem, config.Cluster)
 		}
 
 		s.handler.memfs = handler.NewMemFS(
