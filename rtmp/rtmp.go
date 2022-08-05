@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 
@@ -194,6 +195,8 @@ type Config struct {
 	// ListenAndServe, so it's not possible to modify the configuration
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
+
+	Cluster cluster.Cluster
 }
 
 // Server represents a RTMP server
@@ -227,6 +230,8 @@ type server struct {
 	// access to the map.
 	channels map[string]*channel
 	lock     sync.RWMutex
+
+	cluster cluster.Cluster
 }
 
 // New creates a new RTMP server according to the given config
@@ -244,6 +249,7 @@ func New(config Config) (Server, error) {
 		token:     config.Token,
 		logger:    config.Logger,
 		collector: config.Collector,
+		cluster:   config.Cluster,
 	}
 
 	if s.collector == nil {
@@ -397,7 +403,22 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 		s.log("PLAY", "STOP", conn.URL.Path, "", client)
 	} else {
-		s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
+		// Check in the cluster for that stream
+		if s.cluster != nil {
+			url, err := s.cluster.GetURL("rtmp:" + conn.URL.Path)
+			if err != nil {
+				s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
+			} else {
+				s.log("PLAY", "PROXYSTART", url, "", client)
+
+				src, _ := avutil.Open(url)
+				avutil.CopyFile(conn, src)
+
+				s.log("PLAY", "PROXYSTOP", url, "", client)
+			}
+		} else {
+			s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
+		}
 	}
 
 	conn.Close()

@@ -3,8 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
 
@@ -36,8 +34,6 @@ type cluster struct {
 	cancel context.CancelFunc
 	once   sync.Once
 
-	prefix *regexp.Regexp
-
 	logger log.Logger
 }
 
@@ -48,7 +44,6 @@ func New(config ClusterConfig) (Cluster, error) {
 		idupdate: map[string]time.Time{},
 		fileid:   map[string]string{},
 		updates:  make(chan NodeState, 64),
-		prefix:   regexp.MustCompile(`^[a-z]+:`),
 		logger:   config.Logger,
 	}
 
@@ -203,18 +198,9 @@ func (c *cluster) GetURL(path string) (string, error) {
 		return "", fmt.Errorf("file not found")
 	}
 
-	// Remove prefix from path
-	prefix := c.prefix.FindString(path)
-	path = c.prefix.ReplaceAllString(path, "")
-
-	url := ""
-
-	if prefix == "memfs:" {
-		url = node.Address() + "/" + filepath.Join("memfs", path)
-	} else if prefix == "diskfs:" {
-		url = node.Address() + path
-	} else {
-		c.logger.Debug().WithField("path", path).WithField("prefix", prefix).Log("unknown prefix")
+	url, err := node.GetURL(path)
+	if err != nil {
+		c.logger.Debug().WithField("path", path).Log("invalid path")
 		return "", fmt.Errorf("file not found")
 	}
 

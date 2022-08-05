@@ -729,6 +729,7 @@ func (a *api) start() error {
 			Token:     cfg.RTMP.Token,
 			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
+			Cluster:   a.cluster,
 		}
 
 		if autocertManager != nil && cfg.RTMP.EnableTLS {
