@@ -9,13 +9,27 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
+type ClusterReader interface {
+	GetURL(path string) (string, error)
+}
+
+type dummyClusterReader struct{}
+
+func NewDummyClusterReader() ClusterReader {
+	return &dummyClusterReader{}
+}
+
+func (r *dummyClusterReader) GetURL(path string) (string, error) {
+	return "", fmt.Errorf("not implemented in dummy cluster")
+}
+
 type Cluster interface {
 	AddNode(address, username, password string) (string, error)
 	RemoveNode(id string) error
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
 	Stop()
-	GetURL(path string) (string, error)
+	ClusterReader
 }
 
 type ClusterConfig struct {
@@ -64,7 +78,7 @@ func New(config ClusterConfig) (Cluster, error) {
 					"node":  state.ID,
 					"state": state.State,
 					"files": len(state.Files),
-				}).Log("got update")
+				}).Log("Got update")
 
 				c.lock.Lock()
 
@@ -125,6 +139,11 @@ func (c *cluster) AddNode(address, username, password string) (string, error) {
 
 	c.nodes[id] = node
 
+	c.logger.Info().WithFields(log.Fields{
+		"address": address,
+		"id":      id,
+	}).Log("Added node")
+
 	return id, nil
 }
 
@@ -140,6 +159,10 @@ func (c *cluster) RemoveNode(id string) error {
 	node.stop()
 
 	delete(c.nodes, id)
+
+	c.logger.Info().WithFields(log.Fields{
+		"id": id,
+	}).Log("Removed node")
 
 	return nil
 }
@@ -173,38 +196,36 @@ func (c *cluster) GetURL(path string) (string, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	c.logger.Debug().WithField("path", path).Log("opening")
-
 	id, ok := c.fileid[path]
 	if !ok {
-		c.logger.Debug().WithField("path", path).Log("not found")
+		c.logger.Debug().WithField("path", path).Log("Not found")
 		return "", fmt.Errorf("file not found")
 	}
 
 	ts, ok := c.idupdate[id]
 	if !ok {
-		c.logger.Debug().WithField("path", path).Log("no age information found")
+		c.logger.Debug().WithField("path", path).Log("No age information found")
 		return "", fmt.Errorf("file not found")
 	}
 
 	if time.Since(ts) > 2*time.Second {
-		c.logger.Debug().WithField("path", path).Log("file too old")
+		c.logger.Debug().WithField("path", path).Log("File too old")
 		return "", fmt.Errorf("file not found")
 	}
 
 	node, ok := c.nodes[id]
 	if !ok {
-		c.logger.Debug().WithField("path", path).Log("unknown node")
+		c.logger.Debug().WithField("path", path).Log("Unknown node")
 		return "", fmt.Errorf("file not found")
 	}
 
 	url, err := node.GetURL(path)
 	if err != nil {
-		c.logger.Debug().WithField("path", path).Log("invalid path")
+		c.logger.Debug().WithField("path", path).Log("Invalid path")
 		return "", fmt.Errorf("file not found")
 	}
 
-	c.logger.Debug().WithField("url", url).Log("file cluster url")
+	c.logger.Debug().WithField("url", url).Log("File cluster url")
 
 	return url, nil
 }

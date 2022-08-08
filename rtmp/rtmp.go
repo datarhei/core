@@ -196,7 +196,7 @@ type Config struct {
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
 
-	Cluster cluster.Cluster
+	Cluster cluster.ClusterReader
 }
 
 // Server represents a RTMP server
@@ -231,7 +231,7 @@ type server struct {
 	channels map[string]*channel
 	lock     sync.RWMutex
 
-	cluster cluster.Cluster
+	cluster cluster.ClusterReader
 }
 
 // New creates a new RTMP server according to the given config
@@ -254,6 +254,10 @@ func New(config Config) (Server, error) {
 
 	if s.collector == nil {
 		s.collector = session.NewNullCollector()
+	}
+
+	if s.cluster == nil {
+		s.cluster = cluster.NewDummyClusterReader()
 	}
 
 	s.server = &rtmp.Server{
@@ -404,16 +408,15 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		s.log("PLAY", "STOP", conn.URL.Path, "", client)
 	} else {
 		// Check in the cluster for that stream
-		if s.cluster != nil {
-			url, err := s.cluster.GetURL("rtmp:" + conn.URL.Path)
+		url, err := s.cluster.GetURL("rtmp:" + conn.URL.Path)
+		if err == nil {
+			src, err := avutil.Open(url)
 			if err != nil {
+				s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
 				s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
 			} else {
 				s.log("PLAY", "PROXYSTART", url, "", client)
-
-				src, _ := avutil.Open(url)
 				avutil.CopyFile(conn, src)
-
 				s.log("PLAY", "PROXYSTOP", url, "", client)
 			}
 		} else {

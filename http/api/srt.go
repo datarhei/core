@@ -1,8 +1,6 @@
 package api
 
 import (
-	"github.com/datarhei/core/v16/srt"
-
 	gosrt "github.com/datarhei/gosrt"
 )
 
@@ -109,56 +107,11 @@ type SRTConnection struct {
 	Stats SRTStatistics       `json:"stats"`
 }
 
-// Unmarshal converts the SRT connection into API representation
-func (s *SRTConnection) Unmarshal(ss *srt.Connection) {
-	s.Log = make(map[string][]SRTLog)
-	s.Stats.Unmarshal(&ss.Stats)
-
-	for k, v := range ss.Log {
-		s.Log[k] = make([]SRTLog, len(v))
-		for i, l := range v {
-			s.Log[k][i].Timestamp = l.Timestamp.UnixMilli()
-			s.Log[k][i].Message = l.Message
-		}
-	}
-}
-
-// SRTChannels represents all current SRT connections
-type SRTChannels struct {
-	Publisher   map[string]uint32        `json:"publisher"`
-	Subscriber  map[string][]uint32      `json:"subscriber"`
+// SRTChannel represents a SRT publishing connection with its subscribers
+type SRTChannel struct {
+	Name        string                   `json:"name"`
+	SocketId    uint32                   `json:"socketid"`
+	Subscriber  []uint32                 `json:"subscriber"`
 	Connections map[uint32]SRTConnection `json:"connections"`
 	Log         map[string][]SRTLog      `json:"log"`
-}
-
-// Unmarshal converts the SRT channels into API representation
-func (s *SRTChannels) Unmarshal(ss *srt.Channels) {
-	s.Publisher = make(map[string]uint32)
-	s.Subscriber = make(map[string][]uint32)
-	s.Connections = make(map[uint32]SRTConnection)
-	s.Log = make(map[string][]SRTLog)
-
-	for k, v := range ss.Publisher {
-		s.Publisher[k] = v
-	}
-
-	for k, v := range ss.Subscriber {
-		vv := make([]uint32, len(v))
-		copy(vv, v)
-		s.Subscriber[k] = vv
-	}
-
-	for k, v := range ss.Connections {
-		c := s.Connections[k]
-		c.Unmarshal(&v)
-		s.Connections[k] = c
-	}
-
-	for k, v := range ss.Log {
-		s.Log[k] = make([]SRTLog, len(v))
-		for i, l := range v {
-			s.Log[k][i].Timestamp = l.Timestamp.UnixMilli()
-			s.Log[k][i].Message = l.Message
-		}
-	}
 }

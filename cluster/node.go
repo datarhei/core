@@ -57,7 +57,7 @@ type node struct {
 	rtmpAddress   string
 	rtmpToken     string
 	hasSRT        bool
-	srtPort       string
+	srtAddress    string
 	srtPassphrase string
 	srtToken      string
 
@@ -127,12 +127,13 @@ func newNode(address, username, password string, updates chan<- NodeState) (*nod
 
 	if config.Config.SRT.Enable {
 		n.hasSRT = true
+		n.srtAddress = "srt://"
 
 		_, port, err := net.SplitHostPort(config.Config.SRT.Address)
 		if err != nil {
 			n.hasSRT = false
 		} else {
-			n.srtPort = port
+			n.srtAddress += host + ":" + port
 			n.srtPassphrase = config.Config.SRT.Passphrase
 			n.srtToken = config.Config.SRT.Token
 		}
@@ -203,10 +204,11 @@ func (n *node) files() {
 	memfsfiles, errMemfs := n.peer.MemFSList("name", "asc")
 	diskfsfiles, errDiskfs := n.peer.DiskFSList("name", "asc")
 	rtmpfiles, errRTMP := n.peer.RTMPChannels()
+	srtfiles, errSRT := n.peer.SRTChannels()
 
 	n.lastUpdate = time.Now()
 
-	if errMemfs != nil || errDiskfs != nil || errRTMP != nil {
+	if errMemfs != nil || errDiskfs != nil || errRTMP != nil || errSRT != nil {
 		n.fileList = nil
 		n.state = stateDisconnected
 		return
@@ -214,7 +216,7 @@ func (n *node) files() {
 
 	n.state = stateConnected
 
-	n.fileList = make([]string, len(memfsfiles)+len(diskfsfiles)+len(rtmpfiles))
+	n.fileList = make([]string, len(memfsfiles)+len(diskfsfiles)+len(rtmpfiles)+len(srtfiles))
 
 	nfiles := 0
 
@@ -230,6 +232,11 @@ func (n *node) files() {
 
 	for _, file := range rtmpfiles {
 		n.fileList[nfiles] = "rtmp:" + file.Name
+		nfiles++
+	}
+
+	for _, file := range srtfiles {
+		n.fileList[nfiles] = "srt:" + file.Name
 		nfiles++
 	}
 
@@ -252,6 +259,16 @@ func (n *node) GetURL(path string) (string, error) {
 		if len(n.rtmpToken) != 0 {
 			u += "?token=" + url.QueryEscape(n.rtmpToken)
 		}
+	} else if prefix == "srt:" {
+		u = n.srtAddress + "?mode=caller"
+		if len(n.srtPassphrase) != 0 {
+			u += "&passphrase=" + url.QueryEscape(n.srtPassphrase)
+		}
+		streamid := "#!:m=request,r=" + path
+		if len(n.srtToken) != 0 {
+			streamid += ",token=" + n.srtToken
+		}
+		u += "&streamid=" + url.QueryEscape(streamid)
 	} else {
 		return "", fmt.Errorf("unknown prefix")
 	}

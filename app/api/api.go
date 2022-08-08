@@ -757,6 +757,7 @@ func (a *api) start() error {
 			Token:      cfg.SRT.Token,
 			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
 			Collector:  a.sessions.Collector("srt"),
+			Cluster:    a.cluster,
 		}
 
 		if cfg.SRT.Log.Enable {

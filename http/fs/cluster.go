@@ -17,7 +17,7 @@ type filesystem struct {
 	fs.Filesystem
 
 	what    string
-	cluster cluster.Cluster
+	cluster cluster.ClusterReader
 }
 
 func NewClusterFS(what string, fs fs.Filesystem, cluster cluster.Cluster) Filesystem {
