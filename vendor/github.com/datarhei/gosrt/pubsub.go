@@ -12,7 +12,7 @@ import (
 // PubSub is a publish/subscriber service for SRT connections.
 type PubSub interface {
 	// Publish accepts a SRT connection where it reads from. It blocks
-	// until the connection closes. The returned error indicated why it
+	// until the connection closes. The returned error indicates why it
 	// stopped. There can be only one publisher.
 	Publish(c Conn) error
 
@@ -21,6 +21,11 @@ type PubSub interface {
 	// disconnects, io.EOF is returned. There can be an arbitrary number
 	// of subscribers.
 	Subscribe(c Conn) error
+}
+
+type packetReadWriter interface {
+	readPacket() (packet.Packet, error)
+	writePacket(p packet.Packet) error
 }
 
 // pubSub is an implementation of the PubSub interface
@@ -102,28 +107,30 @@ func (pb *pubSub) Publish(c Conn) error {
 
 	var p packet.Packet
 	var err error
-	conn, ok := c.(*srtConn)
+	conn, ok := c.(packetReadWriter)
 	if !ok {
 		err := fmt.Errorf("the provided connection is not a SRT connection")
 		pb.logger.Print("pubsub:error", 0, 1, func() string { return err.Error() })
 		return err
 	}
 
-	pb.logger.Print("pubsub:publish", conn.SocketId(), 1, func() string { return "new publisher" })
+	socketId := c.SocketId()
+
+	pb.logger.Print("pubsub:publish", socketId, 1, func() string { return "new publisher" })
 
 	pb.publish = true
 
 	for {
 		p, err = conn.readPacket()
 		if err != nil {
-			pb.logger.Print("pubsub:error", conn.SocketId(), 1, func() string { return err.Error() })
+			pb.logger.Print("pubsub:error", socketId, 1, func() string { return err.Error() })
 			break
 		}
 
 		select {
 		case pb.incoming <- p:
 		default:
-			pb.logger.Print("pubsub:error", conn.SocketId(), 1, func() string { return "incoming queue is full" })
+			pb.logger.Print("pubsub:error", socketId, 1, func() string { return "incoming queue is full" })
 		}
 	}
 
@@ -135,7 +142,7 @@ func (pb *pubSub) Publish(c Conn) error {
 func (pb *pubSub) Subscribe(c Conn) error {
 	l := make(chan packet.Packet, 1024)
 	socketId := c.SocketId()
-	conn, ok := c.(*srtConn)
+	conn, ok := c.(packetReadWriter)
 	if !ok {
 		err := fmt.Errorf("the provided connection is not a SRT connection")
 		pb.logger.Print("pubsub:error", 0, 1, func() string { return err.Error() })

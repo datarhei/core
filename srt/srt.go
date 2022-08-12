@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -193,6 +192,7 @@ type server struct {
 	// Map of publishing channels and a lock to serialize access to the map. The map
 	// index is the name of the resource.
 	channels map[string]*channel
+	proxy    map[string]*proxy
 	lock     sync.RWMutex
 
 	logger log.Logger
@@ -234,6 +234,7 @@ func New(config Config) (Server, error) {
 	s.srtlogLock.Unlock()
 
 	s.channels = make(map[string]*channel)
+	s.proxy = make(map[string]*proxy)
 
 	srtconfig := srt.DefaultConfig()
 
@@ -287,6 +288,8 @@ type Channel struct {
 func (s *server) Channels() []Channel {
 	channels := []Channel{}
 
+	socket2channel := map[uint32]int{}
+
 	s.lock.RLock()
 	for id, ch := range s.channels {
 		socketId := ch.publisher.conn.SocketId()
@@ -297,6 +300,8 @@ func (s *server) Channels() []Channel {
 			Connections: map[uint32]Connection{},
 			Log:         map[string][]Log{},
 		}
+
+		socket2channel[socketId] = len(channels)
 
 		channel.Connections[socketId] = Connection{
 			Stats: ch.publisher.conn.Stats(),
@@ -311,37 +316,52 @@ func (s *server) Channels() []Channel {
 				Stats: c.conn.Stats(),
 				Log:   map[string][]Log{},
 			}
+
+			socket2channel[socketId] = len(channels)
 		}
 
 		channels = append(channels, channel)
 	}
 	s.lock.RUnlock()
-	/*
-		s.srtlogLock.RLock()
-		for topic, buf := range s.srtlog {
-			buf.Do(func(l interface{}) {
-				if l == nil {
-					return
-				}
 
-				ll := l.(srt.Log)
+	s.srtlogLock.RLock()
+	for topic, buf := range s.srtlog {
+		buf.Do(func(l interface{}) {
+			if l == nil {
+				return
+			}
 
-				log := Log{
-					Timestamp: ll.Time,
-					Message:   strings.Split(ll.Message, "\n"),
-				}
+			ll := l.(srt.Log)
 
-				if ll.SocketId != 0 {
-					if _, ok := st.Connections[ll.SocketId]; ok {
-						st.Connections[ll.SocketId].Log[topic] = append(st.Connections[ll.SocketId].Log[topic], log)
-					}
-				} else {
-					st.Log[topic] = append(st.Log[topic], log)
-				}
-			})
-		}
-		s.srtlogLock.RUnlock()
-	*/
+			log := Log{
+				Timestamp: ll.Time,
+				Message:   strings.Split(ll.Message, "\n"),
+			}
+
+			if ll.SocketId == 0 {
+				return
+			}
+
+			ch, ok := socket2channel[ll.SocketId]
+			if !ok {
+				return
+			}
+
+			channel := channels[ch]
+
+			conn, ok := channel.Connections[ll.SocketId]
+			if !ok {
+				return
+			}
+
+			conn.Log[topic] = append(conn.Log[topic], log)
+
+			channel.Connections[ll.SocketId] = conn
+
+			channels[ch] = channel
+		})
+	}
+	s.srtlogLock.RUnlock()
 
 	return channels
 }
@@ -497,6 +517,7 @@ func (s *server) handlePublish(conn srt.Conn) {
 
 	s.log("PUBLISH", "START", si.resource, "", client)
 
+	// Blocks until connection closes
 	ch.pubsub.Publish(conn)
 
 	s.lock.Lock()
@@ -510,6 +531,12 @@ func (s *server) handlePublish(conn srt.Conn) {
 	conn.Close()
 }
 
+type proxy struct {
+	listeners uint64
+	pubsub    srt.PubSub
+	publisher srt.Conn
+}
+
 func (s *server) handleSubscribe(conn srt.Conn) {
 	defer conn.Close()
 
@@ -518,58 +545,96 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 
 	si, _ := parseStreamId(streamId)
 
-	// Look for the stream
+	// Look for the stream locally
 	s.lock.RLock()
 	ch := s.channels[si.resource]
 	s.lock.RUnlock()
 
-	if ch == nil {
-		srturl, err := s.cluster.GetURL("srt:" + si.resource)
-		if err == nil {
-			u, err := url.Parse(srturl)
-			if err != nil {
-				s.logger.Error().WithField("address", srturl).WithError(err).Log("Parsing proxy address failed")
-				s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
-				return
-			}
-			config := srt.DefaultConfig()
-			config.Latency = 200 * time.Millisecond
-			if err := config.UnmarshalURL(srturl); err != nil {
-				s.logger.Error().WithField("address", srturl).WithError(err).Log("Parsing proxy address failed")
-				s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
-				return
-			}
-			src, err := srt.Dial("srt", u.Host, config)
-			if err != nil {
-				s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
-				s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
-			} else {
-				s.log("SUBSCRIBE", "PROXYSTART", srturl, "", client)
-				buffer := make([]byte, srt.MAX_MSS_SIZE)
-				for {
-					n, err := src.Read(buffer)
-					if err != nil {
-						if err != io.EOF {
-							s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address aborted")
-						}
-						break
-					}
-					conn.Write(buffer[:n])
-				}
-				s.log("SUBSCRIBE", "PROXYSTOP", srturl, "", client)
-			}
-		} else {
-			s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
-		}
-	} else {
+	if ch != nil {
 		s.log("SUBSCRIBE", "START", si.resource, "", client)
 
 		id := ch.AddSubscriber(conn, si.resource)
 
+		// Blocks until connection closes
 		ch.pubsub.Subscribe(conn)
 
 		s.log("SUBSCRIBE", "STOP", si.resource, "", client)
 
 		ch.RemoveSubscriber(id)
+
+		return
+	}
+
+	// Check if the stream is already proxied
+	s.lock.Lock()
+	p := s.proxy[si.resource]
+
+	if p == nil {
+		// Check in the cluster for the stream and proxy it
+		srturl, err := s.cluster.GetURL("srt:" + si.resource)
+		if err != nil {
+			s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
+			return
+		}
+
+		config := srt.DefaultConfig()
+		config.Latency = 200 * time.Millisecond // This might be a value obtained from the cluster
+		host, err := config.UnmarshalURL(srturl)
+		if err != nil {
+			s.logger.Error().WithField("address", srturl).WithError(err).Log("Parsing proxy address failed")
+			s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
+			return
+		}
+		src, err := srt.Dial("srt", host, config)
+		if err != nil {
+			s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
+			s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
+			return
+		}
+
+		s.log("SUBSCRIBE", "PROXYPUBLISHSTART", srturl, "", client)
+
+		p = &proxy{
+			pubsub:    srt.NewPubSub(srt.PubSubConfig{}),
+			publisher: src,
+		}
+
+		go func(resource string, p *proxy) {
+			err := p.pubsub.Publish(p.publisher)
+			if err != io.EOF {
+				s.logger.Error().WithField("address", srturl).WithError(err).Log("Publish failed")
+			}
+
+			p.publisher.Close()
+
+			s.log("SUBSCRIBE", "PROXYPUBLISHSTOP", srturl, "", client)
+
+			s.lock.Lock()
+			delete(s.proxy, resource)
+			s.lock.Unlock()
+		}(si.resource, p)
+
+		s.proxy[si.resource] = p
+	}
+	s.lock.Unlock()
+
+	if p != nil {
+		p.listeners++
+
+		s.log("SUBSCRIBE", "PROXYSTART", conn.StreamId(), "", client)
+
+		// Blocks until connection closes
+		err := p.pubsub.Subscribe(conn)
+		if err != io.EOF {
+			s.logger.Error().WithField("streamid", conn.StreamId()).WithError(err).Log("Subscribe failed")
+		}
+
+		s.log("SUBSCRIBE", "PROXYSTOP", conn.StreamId(), "", client)
+
+		p.listeners--
+
+		if p.listeners <= 0 {
+			p.publisher.Close()
+		}
 	}
 }
