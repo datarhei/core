@@ -60,6 +60,10 @@ definitions:
     properties:
       address:
         type: string
+      id:
+        type: string
+      last_update:
+        type: integer
       state:
         type: string
     type: object
@@ -879,7 +883,7 @@ definitions:
       name:
         type: string
     type: object
-  api.SRTChannels:
+  api.SRTChannel:
     properties:
       connections:
         additionalProperties:
@@ -891,16 +895,14 @@ definitions:
             $ref: '#/definitions/api.SRTLog'
           type: array
         type: object
-      publisher:
-        additionalProperties:
-          type: integer
-        type: object
+      name:
+        type: string
+      socketid:
+        type: integer
       subscriber:
-        additionalProperties:
-          items:
-            type: integer
-          type: array
-        type: object
+        items:
+          type: integer
+        type: array
     type: object
   api.SRTConnection:
     properties:
@@ -1867,6 +1869,26 @@ paths:
           schema:
             type: string
       summary: Swagger UI for this API
+  /api/v3/cluster:
+    get:
+      description: List of nodes in the cluster
+      operationId: cluster-3-get-cluster
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClusterNode'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List of nodes in the cluster
   /api/v3/cluster/node:
     post:
       consumes:
@@ -3131,7 +3153,9 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.SRTChannels'
+              items:
+                $ref: '#/definitions/api.SRTChannel'
+              type: array
             type: array
       security:
       - ApiKeyAuth: []

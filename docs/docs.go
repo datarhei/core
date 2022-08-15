@@ -209,6 +209,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of nodes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "List of nodes in the cluster",
+                "operationId": "cluster-3-get-cluster",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterNode"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/node": {
             "post": {
                 "security": [
@@ -2142,7 +2174,10 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.SRTChannels"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/api.SRTChannel"
+                                }
                             }
                         }
                     }
@@ -2508,6 +2543,12 @@ const docTemplate = `{
             "properties": {
                 "address": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_update": {
+                    "type": "integer"
                 },
                 "state": {
                     "type": "string"
@@ -3755,7 +3796,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.SRTChannels": {
+        "api.SRTChannel": {
             "type": "object",
             "properties": {
                 "connections": {
@@ -3773,19 +3814,16 @@ const docTemplate = `{
                         }
                     }
                 },
-                "publisher": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
+                "name": {
+                    "type": "string"
+                },
+                "socketid": {
+                    "type": "integer"
                 },
                 "subscriber": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        }
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
                     }
                 }
             }

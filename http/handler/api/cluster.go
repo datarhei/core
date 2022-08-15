@@ -22,6 +22,35 @@ func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	}
 }
 
+// GetCluster returns the list of nodes in the cluster
+// @Summary List of nodes in the cluster
+// @Description List of nodes in the cluster
+// @ID cluster-3-get-cluster
+// @Produce json
+// @Success 200 {array} api.ClusterNode
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster [get]
+func (h *ClusterHandler) GetCluster(c echo.Context) error {
+	nodes := h.cluster.ListNodes()
+
+	list := []api.ClusterNode{}
+
+	for _, node := range nodes {
+		state := node.State()
+		n := api.ClusterNode{
+			Address:    node.Address(),
+			ID:         state.ID,
+			LastUpdate: state.LastUpdate.Unix(),
+			State:      state.State,
+		}
+
+		list = append(list, n)
+	}
+
+	return c.JSON(http.StatusOK, list)
+}
+
 // AddNode adds a new node
 // @Summary Add a new node
 // @Description Add a new node to the cluster
