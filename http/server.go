@@ -83,7 +83,7 @@ type Config struct {
 	MimeTypesFile string
 	DiskFS        fs.Filesystem
 	MemFS         MemFSConfig
-	IPLimiter     net.IPLimiter
+	IPLimiter     net.IPLimitValidator
 	Profiling     bool
 	Cors          CorsConfig
 	RTMP          rtmp.Server

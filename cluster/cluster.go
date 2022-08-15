@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/net"
 )
 
 type ClusterReader interface {
@@ -33,7 +34,8 @@ type Cluster interface {
 }
 
 type ClusterConfig struct {
-	Logger log.Logger
+	IPLimiter net.IPLimiter
+	Logger    log.Logger
 }
 
 type cluster struct {
@@ -41,6 +43,8 @@ type cluster struct {
 	idfiles  map[string][]string
 	idupdate map[string]time.Time
 	fileid   map[string]string
+
+	limiter net.IPLimiter
 
 	updates chan NodeState
 
@@ -57,8 +61,13 @@ func New(config ClusterConfig) (Cluster, error) {
 		idfiles:  map[string][]string{},
 		idupdate: map[string]time.Time{},
 		fileid:   map[string]string{},
+		limiter:  config.IPLimiter,
 		updates:  make(chan NodeState, 64),
 		logger:   config.Logger,
+	}
+
+	if c.limiter == nil {
+		c.limiter = net.NewNullIPLimiter()
 	}
 
 	if c.logger == nil {
@@ -134,7 +143,13 @@ func (c *cluster) AddNode(address, username, password string) (string, error) {
 	defer c.lock.Unlock()
 
 	if _, ok := c.nodes[id]; ok {
+		node.stop()
 		return id, nil
+	}
+
+	ips := node.IPs()
+	for _, ip := range ips {
+		c.limiter.AddBlock(ip)
 	}
 
 	c.nodes[id] = node
@@ -159,6 +174,12 @@ func (c *cluster) RemoveNode(id string) error {
 	node.stop()
 
 	delete(c.nodes, id)
+
+	ips := node.IPs()
+
+	for _, ip := range ips {
+		c.limiter.RemoveBlock(ip)
+	}
 
 	c.logger.Info().WithFields(log.Fields{
 		"id": id,

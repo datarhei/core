@@ -17,6 +17,7 @@ import (
 
 type NodeReader interface {
 	Address() string
+	IPs() []string
 	State() NodeState
 }
 
@@ -40,6 +41,7 @@ const (
 
 type node struct {
 	address    string
+	ips        []string
 	state      nodeState
 	username   string
 	password   string
@@ -75,8 +77,14 @@ func newNode(address, username, password string, updates chan<- NodeState) (*nod
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
 
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return nil, fmt.Errorf("lookup failed: %w", err)
+	}
+
 	n := &node{
 		address:  address,
+		ips:      addrs,
 		username: username,
 		password: password,
 		state:    stateDisconnected,
@@ -172,6 +180,10 @@ func (n *node) Address() string {
 	return n.address
 }
 
+func (n *node) IPs() []string {
+	return n.ips
+}
+
 func (n *node) ID() string {
 	return n.peer.ID()
 }
@@ -239,8 +251,6 @@ func (n *node) files() {
 		n.fileList[nfiles] = "srt:" + file.Name
 		nfiles++
 	}
-
-	return
 }
 
 func (n *node) GetURL(path string) (string, error) {

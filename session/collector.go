@@ -188,7 +188,7 @@ type CollectorConfig struct {
 
 	// Limiter is an IPLimiter. It is used to query whether a session for an IP
 	// should be created.
-	Limiter net.IPLimiter
+	Limiter net.IPLimitValidator
 
 	// InactiveTimeout is the duration of how long a not yet activated session is kept.
 	// A session gets activated with the first ingress or egress bytes.
@@ -253,7 +253,7 @@ type collector struct {
 	inactiveTimeout time.Duration
 	sessionTimeout  time.Duration
 
-	limiter net.IPLimiter
+	limiter net.IPLimitValidator
 
 	companions []Collector
 

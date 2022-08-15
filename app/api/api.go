@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	golog "log"
 	gonet "net"
 	gohttp "net/http"
@@ -62,23 +61,24 @@ type API interface {
 }
 
 type api struct {
-	restream      restream.Restreamer
-	ffmpeg        ffmpeg.FFmpeg
-	diskfs        fs.Filesystem
-	memfs         fs.Filesystem
-	rtmpserver    rtmp.Server
-	srtserver     srt.Server
-	metrics       monitor.HistoryMonitor
-	prom          prometheus.Metrics
-	service       service.Service
-	sessions      session.Registry
-	cache         cache.Cacher
-	mainserver    *gohttp.Server
-	sidecarserver *gohttp.Server
-	httpjwt       jwt.JWT
-	update        update.Checker
-	replacer      replace.Replacer
-	cluster       cluster.Cluster
+	restream        restream.Restreamer
+	ffmpeg          ffmpeg.FFmpeg
+	diskfs          fs.Filesystem
+	memfs           fs.Filesystem
+	rtmpserver      rtmp.Server
+	srtserver       srt.Server
+	metrics         monitor.HistoryMonitor
+	prom            prometheus.Metrics
+	service         service.Service
+	sessions        session.Registry
+	sessionsLimiter net.IPLimiter
+	cache           cache.Cacher
+	mainserver      *gohttp.Server
+	sidecarserver   *gohttp.Server
+	httpjwt         jwt.JWT
+	update          update.Checker
+	replacer        replace.Replacer
+	cluster         cluster.Cluster
 
 	errorChan chan error
 
@@ -122,7 +122,7 @@ func New(configpath string, logwriter io.Writer) (API, error) {
 	a.log.writer = logwriter
 
 	if a.log.writer == nil {
-		a.log.writer = ioutil.Discard
+		a.log.writer = io.Discard
 	}
 
 	a.errorChan = make(chan error, 1)
@@ -300,6 +300,8 @@ func (a *api) start() error {
 		if err != nil {
 			return fmt.Errorf("incorret IP ranges for the statistics provided: %w", err)
 		}
+
+		a.sessionsLimiter = iplimiter
 
 		config := session.CollectorConfig{
 			MaxTxBitrate:    cfg.Sessions.MaxBitrate * 1024 * 1024,
@@ -498,7 +500,8 @@ func (a *api) start() error {
 	a.restream = restream
 
 	if cluster, err := cluster.New(cluster.ClusterConfig{
-		Logger: a.log.logger.core.WithComponent("Cluster"),
+		IPLimiter: a.sessionsLimiter,
+		Logger:    a.log.logger.core.WithComponent("Cluster"),
 	}); err != nil {
 		return fmt.Errorf("unable to create cluster: %w", err)
 	} else {
@@ -778,7 +781,7 @@ func (a *api) start() error {
 		logcontext = "HTTPS"
 	}
 
-	var iplimiter net.IPLimiter
+	var iplimiter net.IPLimitValidator
 
 	if cfg.TLS.Enable {
 		limiter, err := net.NewIPLimiter(cfg.API.Access.HTTPS.Block, cfg.API.Access.HTTPS.Allow)
