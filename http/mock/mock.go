@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,7 +57,7 @@ func DummyEcho() *echo.Echo {
 	router.HideBanner = true
 	router.HidePort = true
 	router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
-	router.Logger.SetOutput(ioutil.Discard)
+	router.Logger.SetOutput(io.Discard)
 	router.Validator = validator.New()
 
 	return router
@@ -89,7 +89,7 @@ func CheckResponse(t *testing.T, res *http.Response) *Response {
 		Code: res.StatusCode,
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.Equal(t, nil, err)
 
 	if strings.Contains(res.Header.Get("Content-Type"), "application/json") {
@@ -122,7 +122,7 @@ func Validate(t *testing.T, datatype, data interface{}) bool {
 }
 
 func Read(t *testing.T, path string) io.Reader {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	require.Equal(t, nil, err)
 
 	return bytes.NewReader(data)

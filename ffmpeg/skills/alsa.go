@@ -3,7 +3,7 @@ package skills
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
+	"os"
 	"regexp"
 )
 
@@ -16,14 +16,14 @@ type alsaCard struct {
 func DevicesALSA() ([]HWDevice, error) {
 	devices := []HWDevice{}
 
-	content, err := ioutil.ReadFile("/proc/asound/cards")
+	content, err := os.ReadFile("/proc/asound/cards")
 	if err != nil {
 		return devices, err
 	}
 
 	cards := parseALSACards(content)
 
-	content, err = ioutil.ReadFile("/proc/asound/devices")
+	content, err = os.ReadFile("/proc/asound/devices")
 	if err != nil {
 		return devices, err
 	}

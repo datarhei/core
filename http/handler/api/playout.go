@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -59,7 +59,7 @@ func (h *PlayoutHandler) Status(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}
@@ -122,7 +122,7 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}
@@ -162,7 +162,7 @@ func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}
@@ -195,7 +195,7 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
 
-	data, err := ioutil.ReadAll(c.Request().Body)
+	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Failed to read request body", "%s", err)
 	}
@@ -210,7 +210,7 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err = ioutil.ReadAll(response.Body)
+	data, err = io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}
@@ -249,7 +249,7 @@ func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}
@@ -281,7 +281,7 @@ func (h *PlayoutHandler) SetStream(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
 
-	data, err := ioutil.ReadAll(c.Request().Body)
+	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Failed to read request body", "%s", err)
 	}
@@ -296,7 +296,7 @@ func (h *PlayoutHandler) SetStream(c echo.Context) error {
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err = ioutil.ReadAll(response.Body)
+	data, err = io.ReadAll(response.Body)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err)
 	}

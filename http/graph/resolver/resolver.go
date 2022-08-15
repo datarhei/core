@@ -2,7 +2,7 @@ package resolver
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -79,7 +79,7 @@ func (r *queryResolver) playoutRequest(method, addr, path, contentType string, d
 	defer response.Body.Close()
 
 	// Read the whole response
-	data, err = ioutil.ReadAll(response.Body)
+	data, err = io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

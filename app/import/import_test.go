@@ -2,7 +2,6 @@ package main
 
 import (
 	gojson "encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -51,7 +50,7 @@ func testV1Import(t *testing.T, v1Fixture, v4Fixture string, config importConfig
 	require.Equal(t, nil, err)
 
 	// Read the wanted result
-	wantdatav4, err := ioutil.ReadFile(v4Fixture)
+	wantdatav4, err := os.ReadFile(v4Fixture)
 	require.Equal(t, nil, err)
 
 	var wantv4 store.StoreData

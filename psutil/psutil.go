@@ -285,7 +285,8 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	}
 
 	s := &cpuTimesStat{
-		total:  times[0].Total(),
+		total: times[0].User + times[0].System + times[0].Idle + times[0].Nice + times[0].Iowait + times[0].Irq +
+			times[0].Softirq + times[0].Steal + times[0].Guest + times[0].GuestNice,
 		system: times[0].System,
 		user:   times[0].User,
 		idle:   times[0].Idle,

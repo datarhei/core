@@ -6,7 +6,7 @@ import (
 	"crypto"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -324,7 +324,7 @@ func (j *jwksImpl) refresh() (err error) {
 
 	// Read the raw JWKs from the body of the response.
 	var jwksBytes []byte
-	if jwksBytes, err = ioutil.ReadAll(resp.Body); err != nil {
+	if jwksBytes, err = io.ReadAll(resp.Body); err != nil {
 		return err
 	}
 

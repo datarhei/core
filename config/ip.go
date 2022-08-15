@@ -1,7 +1,7 @@
 package config
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -58,7 +58,7 @@ func doRequest(url string) string {
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ""
 	}

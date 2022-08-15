@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"sync"
@@ -179,7 +179,7 @@ func (s *checker) check() error {
 		return fmt.Errorf("request failed: %s", http.StatusText(res.StatusCode))
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("error reading response: %w", err)
 	}
