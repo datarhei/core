@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/http/api"
@@ -146,6 +147,8 @@ func (h *ClusterHandler) GetNodeProxy(c echo.Context) error {
 	}
 
 	state := peer.State()
+
+	sort.Strings(state.Files)
 
 	return c.JSON(http.StatusOK, state.Files)
 }

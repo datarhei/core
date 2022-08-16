@@ -45,10 +45,10 @@ type ClusterConfig struct {
 }
 
 type cluster struct {
-	nodes    map[string]*node
-	idfiles  map[string][]string
-	idupdate map[string]time.Time
-	fileid   map[string]string
+	nodes    map[string]*node     // List of known nodes
+	idfiles  map[string][]string  // Map from nodeid to list of files
+	idupdate map[string]time.Time // Map from nodeid to time of last update
+	fileid   map[string]string    // Map from file name to nodeid
 
 	limiter net.IPLimiter
 
