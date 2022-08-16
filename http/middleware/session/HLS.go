@@ -186,7 +186,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 				// Add the new session's top bitrate to the ingress top bitrate
 				resultingBitrate := currentBitrate + streamBitrate
 
-				if resultingBitrate <= 0.5 || resultingBitrate >= maxBitrate {
+				if resultingBitrate >= maxBitrate {
 					return echo.NewHTTPError(509, "Bitrate limit exceeded")
 				}
 			}

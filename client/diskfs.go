@@ -37,9 +37,13 @@ func (r *restclient) DiskFSList(sort, order string) ([]api.FileInfo, error) {
 }
 
 func (r *restclient) DiskFSHasFile(path string) bool {
-	_, err := r.call("GET", "/fs/disk"+path, "", nil)
+	_, err := r.call("HEAD", "/fs/disk"+path, "", nil)
 
 	return err == nil
+}
+
+func (r *restclient) DiskFSGetFile(path string) (io.ReadCloser, error) {
+	return r.stream("GET", "/fs/disk"+path, "", nil)
 }
 
 func (r *restclient) DiskFSDeleteFile(path string) error {

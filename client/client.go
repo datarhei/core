@@ -39,12 +39,14 @@ type RestClient interface {
 	ConfigReload() error                   // GET /config/reload
 
 	DiskFSList(sort, order string) ([]api.FileInfo, error) // GET /fs/disk
-	DiskFSHasFile(path string) bool                        // GET /fs/disk/{path}
+	DiskFSHasFile(path string) bool                        // HEAD /fs/disk/{path}
+	DiskFSGetFile(path string) (io.ReadCloser, error)      // GET /fs/disk/{path}
 	DiskFSDeleteFile(path string) error                    // DELETE /fs/disk/{path}
 	DiskFSAddFile(path string, data io.Reader) error       // PUT /fs/disk/{path}
 
 	MemFSList(sort, order string) ([]api.FileInfo, error) // GET /fs/mem
-	MemFSHasFile(path string) bool                        // GET /fs/mem/{path}
+	MemFSHasFile(path string) bool                        // HEAD /fs/mem/{path}
+	MemFSGetFile(path string) (io.ReadCloser, error)      // GET /fs/mem/{path}
 	MemFSDeleteFile(path string) error                    // DELETE /fs/mem/{path}
 	MemFSAddFile(path string, data io.Reader) error       // PUT /fs/mem/{path}
 
@@ -235,9 +237,11 @@ func (r *restclient) login() error {
 		return fmt.Errorf("wrong username and/or password")
 	}
 
+	data, _ := io.ReadAll(body)
+
 	jwt := api.JWT{}
 
-	json.Unmarshal(body, &jwt)
+	json.Unmarshal(data, &jwt)
 
 	r.accessToken = jwt.AccessToken
 	r.refreshToken = jwt.RefreshToken
@@ -277,9 +281,11 @@ func (r *restclient) refresh() error {
 		return fmt.Errorf("invalid refresh token")
 	}
 
+	data, _ := io.ReadAll(body)
+
 	jwt := api.JWTRefresh{}
 
-	json.Unmarshal(body, &jwt)
+	json.Unmarshal(data, &jwt)
 
 	r.accessToken = jwt.AccessToken
 
@@ -305,14 +311,16 @@ func (r *restclient) info() (api.About, error) {
 		return api.About{}, fmt.Errorf("access to API failed (%d)", status)
 	}
 
+	data, _ := io.ReadAll(body)
+
 	about := api.About{}
 
-	json.Unmarshal(body, &about)
+	json.Unmarshal(data, &about)
 
 	return about, nil
 }
 
-func (r *restclient) call(method, path, contentType string, data io.Reader) ([]byte, error) {
+func (r *restclient) stream(method, path, contentType string, data io.Reader) (io.ReadCloser, error) {
 	req, err := http.NewRequest(method, r.address+r.prefix+"/v3"+path, data)
 	if err != nil {
 		return nil, err
@@ -345,7 +353,11 @@ func (r *restclient) call(method, path, contentType string, data io.Reader) ([]b
 	if status < 200 || status >= 300 {
 		e := api.Error{}
 
-		json.Unmarshal(body, &e)
+		defer body.Close()
+
+		x, _ := io.ReadAll(body)
+
+		json.Unmarshal(x, &e)
 
 		return nil, fmt.Errorf("%w", e)
 	}
@@ -353,15 +365,24 @@ func (r *restclient) call(method, path, contentType string, data io.Reader) ([]b
 	return body, nil
 }
 
-func (r *restclient) request(req *http.Request) (int, []byte, error) {
+func (r *restclient) call(method, path, contentType string, data io.Reader) ([]byte, error) {
+	body, err := r.stream(method, path, contentType, data)
+	if err != nil {
+		return nil, err
+	}
+
+	defer body.Close()
+
+	x, _ := io.ReadAll(body)
+
+	return x, nil
+}
+
+func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return -1, nil, err
 	}
 
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	return resp.StatusCode, body, nil
+	return resp.StatusCode, resp.Body, nil
 }

@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -253,7 +254,7 @@ func (n *node) files() {
 	}
 }
 
-func (n *node) GetURL(path string) (string, error) {
+func (n *node) getURL(path string) (string, error) {
 	// Remove prefix from path
 	prefix := n.prefix.FindString(path)
 	path = n.prefix.ReplaceAllString(path, "")
@@ -284,4 +285,18 @@ func (n *node) GetURL(path string) (string, error) {
 	}
 
 	return u, nil
+}
+
+func (n *node) getFile(path string) (io.ReadCloser, error) {
+	// Remove prefix from path
+	prefix := n.prefix.FindString(path)
+	path = n.prefix.ReplaceAllString(path, "")
+
+	if prefix == "memfs:" {
+		return n.peer.MemFSGetFile(path)
+	} else if prefix == "diskfs:" {
+		return n.peer.DiskFSGetFile(path)
+	}
+
+	return nil, fmt.Errorf("unknown prefix")
 }

@@ -2,7 +2,6 @@ package fs
 
 import (
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/datarhei/core/v16/cluster"
@@ -37,27 +36,13 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	url, err := fs.cluster.GetURL(fs.what + ":" + path)
-	if err != nil {
-		return nil
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil
-	}
-
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-	}
-
-	resp, err := client.Do(req)
+	data, err := fs.cluster.GetFile(fs.what + ":" + path)
 	if err != nil {
 		return nil
 	}
 
 	file := &file{
-		ReadCloser: resp.Body,
+		ReadCloser: data,
 		name:       path,
 	}
 

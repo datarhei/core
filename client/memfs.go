@@ -26,9 +26,13 @@ func (r *restclient) MemFSList(sort, order string) ([]api.FileInfo, error) {
 }
 
 func (r *restclient) MemFSHasFile(path string) bool {
-	_, err := r.call("GET", "/fs/mem"+path, "", nil)
+	_, err := r.call("HEAD", "/fs/mem"+path, "", nil)
 
 	return err == nil
+}
+
+func (r *restclient) MemFSGetFile(path string) (io.ReadCloser, error) {
+	return r.stream("GET", "/fs/mem"+path, "", nil)
 }
 
 func (r *restclient) MemFSDeleteFile(path string) error {

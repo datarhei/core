@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 type ClusterReader interface {
 	GetURL(path string) (string, error)
+	GetFile(path string) (io.ReadCloser, error)
 }
 
 type dummyClusterReader struct{}
@@ -22,6 +24,10 @@ func NewDummyClusterReader() ClusterReader {
 
 func (r *dummyClusterReader) GetURL(path string) (string, error) {
 	return "", fmt.Errorf("not implemented in dummy cluster")
+}
+
+func (r *dummyClusterReader) GetFile(path string) (io.ReadCloser, error) {
+	return nil, fmt.Errorf("not implemented in dummy cluster")
 }
 
 type Cluster interface {
@@ -240,7 +246,7 @@ func (c *cluster) GetURL(path string) (string, error) {
 		return "", fmt.Errorf("file not found")
 	}
 
-	url, err := node.GetURL(path)
+	url, err := node.getURL(path)
 	if err != nil {
 		c.logger.Debug().WithField("path", path).Log("Invalid path")
 		return "", fmt.Errorf("file not found")
@@ -249,4 +255,42 @@ func (c *cluster) GetURL(path string) (string, error) {
 	c.logger.Debug().WithField("url", url).Log("File cluster url")
 
 	return url, nil
+}
+
+func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	id, ok := c.fileid[path]
+	if !ok {
+		c.logger.Debug().WithField("path", path).Log("Not found")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	ts, ok := c.idupdate[id]
+	if !ok {
+		c.logger.Debug().WithField("path", path).Log("No age information found")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	if time.Since(ts) > 2*time.Second {
+		c.logger.Debug().WithField("path", path).Log("File too old")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	node, ok := c.nodes[id]
+	if !ok {
+		c.logger.Debug().WithField("path", path).Log("Unknown node")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	data, err := node.getFile(path)
+	if err != nil {
+		c.logger.Debug().WithField("path", path).Log("Invalid path")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	c.logger.Debug().WithField("path", path).Log("File cluster path")
+
+	return data, nil
 }
