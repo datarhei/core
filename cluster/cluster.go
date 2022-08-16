@@ -40,11 +40,14 @@ type Cluster interface {
 }
 
 type ClusterConfig struct {
+	ID        string
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
 }
 
 type cluster struct {
+	id string
+
 	nodes    map[string]*node     // List of known nodes
 	idfiles  map[string][]string  // Map from nodeid to list of files
 	idupdate map[string]time.Time // Map from nodeid to time of last update
@@ -63,6 +66,7 @@ type cluster struct {
 
 func New(config ClusterConfig) (Cluster, error) {
 	c := &cluster{
+		id:       config.ID,
 		nodes:    map[string]*node{},
 		idfiles:  map[string][]string{},
 		idupdate: map[string]time.Time{},
@@ -144,6 +148,10 @@ func (c *cluster) AddNode(address, username, password string) (string, error) {
 	}
 
 	id := node.ID()
+
+	if id == c.id {
+		return "", fmt.Errorf("can't add myself as node or a node with the same ID")
+	}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()

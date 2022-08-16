@@ -500,6 +500,7 @@ func (a *api) start() error {
 	a.restream = restream
 
 	if cluster, err := cluster.New(cluster.ClusterConfig{
+		ID:        cfg.ID,
 		IPLimiter: a.sessionsLimiter,
 		Logger:    a.log.logger.core.WithComponent("Cluster"),
 	}); err != nil {
