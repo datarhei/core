@@ -204,7 +204,7 @@ func (r *restream) Stop() {
 		// Start() they will get restarted.
 		for id, t := range r.tasks {
 			if t.ffmpeg != nil {
-				t.ffmpeg.Stop()
+				t.ffmpeg.Stop(true)
 			}
 
 			r.unsetCleanup(id)
@@ -996,7 +996,7 @@ func (r *restream) stopProcess(id string) error {
 
 	task.process.Order = "stop"
 
-	task.ffmpeg.Stop()
+	task.ffmpeg.Stop(true)
 
 	r.nProc--
 
@@ -1024,7 +1024,7 @@ func (r *restream) restartProcess(id string) error {
 		return nil
 	}
 
-	task.ffmpeg.Kill()
+	task.ffmpeg.Kill(true)
 
 	return nil
 }

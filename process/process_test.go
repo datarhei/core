@@ -28,7 +28,7 @@ func TestProcess(t *testing.T) {
 
 	require.Equal(t, "running", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	time.Sleep(2 * time.Second)
 
@@ -52,7 +52,7 @@ func TestReconnectProcess(t *testing.T) {
 
 	require.Equal(t, "finished", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "finished", p.Status().State)
 }
@@ -73,7 +73,7 @@ func TestStaleProcess(t *testing.T) {
 
 	require.Equal(t, "killed", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "killed", p.Status().State)
 }
@@ -94,7 +94,7 @@ func TestStaleReconnectProcess(t *testing.T) {
 
 	require.Equal(t, "killed", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "killed", p.Status().State)
 }
@@ -116,7 +116,7 @@ func TestNonExistingProcess(t *testing.T) {
 
 	require.Equal(t, "failed", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "failed", p.Status().State)
 }
@@ -138,7 +138,7 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 
 	require.Equal(t, "failed", p.Status().State)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "failed", p.Status().State)
 }
@@ -157,9 +157,33 @@ func TestProcessFailed(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	p.Stop()
+	p.Stop(false)
 
 	require.Equal(t, "failed", p.Status().State)
+}
+
+func TestFFmpegWaitStop(t *testing.T) {
+	binary, err := testhelper.BuildBinary("sigintwait", "../internal/testhelper")
+	require.NoError(t, err, "Failed to build helper program")
+
+	p, _ := New(Config{
+		Binary:       binary,
+		Args:         []string{},
+		Reconnect:    false,
+		StaleTimeout: 0,
+		OnExit: func() {
+			time.Sleep(2 * time.Second)
+		},
+	})
+
+	err = p.Start()
+	require.NoError(t, err)
+
+	time.Sleep(4 * time.Second)
+
+	p.Stop(true)
+
+	require.Equal(t, "finished", p.Status().State)
 }
 
 func TestFFmpegKill(t *testing.T) {
@@ -178,7 +202,7 @@ func TestFFmpegKill(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	p.Stop()
+	p.Stop(false)
 
 	time.Sleep(3 * time.Second)
 
@@ -201,7 +225,7 @@ func TestProcessForceKill(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	p.Stop()
+	p.Stop(false)
 
 	time.Sleep(1 * time.Second)
 
