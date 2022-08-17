@@ -48,7 +48,7 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/datarhei/gosrt v0.2.1-0.20220812130440-71bf5952f57e
+# github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5
 ## explicit; go 1.16
 github.com/datarhei/gosrt
 github.com/datarhei/gosrt/internal/circular

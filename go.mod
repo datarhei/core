@@ -6,7 +6,7 @@ require (
 	github.com/99designs/gqlgen v0.17.13
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/datarhei/gosrt v0.2.1-0.20220812130440-71bf5952f57e
+	github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5
 	github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/gobwas/glob v0.2.3

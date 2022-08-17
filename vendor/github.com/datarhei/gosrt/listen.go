@@ -157,7 +157,8 @@ type listener struct {
 // The address has the form "host:port".
 //
 // Examples:
-//  Listen("srt", "127.0.0.1:3000", DefaultConfig())
+//
+//	Listen("srt", "127.0.0.1:3000", DefaultConfig())
 //
 // In case of an error, the returned Listener is nil and the error is non-nil.
 func Listen(network, address string, config Config) (Listener, error) {
@@ -177,36 +178,45 @@ func Listen(network, address string, config Config) (Listener, error) {
 		config: config,
 	}
 
-	raddr, err := net.ResolveUDPAddr("udp", address)
+	lc := net.ListenConfig{
+		Control: func(network, address string, c syscall.RawConn) error {
+			var opErr error
+			err := c.Control(func(fd uintptr) {
+				// Set REUSEPORT
+				opErr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+				if opErr != nil {
+					return
+				}
+
+				// Set TOS
+				if config.IPTOS > 0 {
+					opErr = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TOS, config.IPTOS)
+					if opErr != nil {
+						return
+					}
+				}
+
+				// Set TTL
+				if config.IPTTL > 0 {
+					opErr = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TTL, config.IPTTL)
+					if opErr != nil {
+						return
+					}
+				}
+			})
+			if err != nil {
+				return err
+			}
+			return opErr
+		},
+	}
+
+	lp, err := lc.ListenPacket(context.Background(), "udp", address)
 	if err != nil {
-		return nil, fmt.Errorf("listen: unable to resolve address: %w", err)
+		return nil, fmt.Errorf("listen: %w", err)
 	}
 
-	pc, err := net.ListenUDP("udp", raddr)
-	if err != nil {
-		return nil, fmt.Errorf("listen: failed listening: %w", err)
-	}
-
-	file, err := pc.File()
-	if err != nil {
-		return nil, err
-	}
-
-	// Set TOS
-	if config.IPTOS > 0 {
-		err = syscall.SetsockoptInt(int(file.Fd()), syscall.IPPROTO_IP, syscall.IP_TOS, config.IPTOS)
-		if err != nil {
-			return nil, fmt.Errorf("listen: failed setting socket option TOS: %w", err)
-		}
-	}
-
-	// Set TTL
-	if config.IPTTL > 0 {
-		err = syscall.SetsockoptInt(int(file.Fd()), syscall.IPPROTO_IP, syscall.IP_TTL, config.IPTTL)
-		if err != nil {
-			return nil, fmt.Errorf("listen: failed setting socket option TTL: %w", err)
-		}
-	}
+	pc := lp.(*net.UDPConn)
 
 	ln.pc = pc
 	ln.addr = pc.LocalAddr()

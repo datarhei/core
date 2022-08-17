@@ -76,8 +76,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:ma
 github.com/cpuguy83/go-md2man/v2 v2.0.1 h1:r/myEWzV9lfsM1tFLgDyu0atFtJ1fXn261LKYj/3DxU=
 github.com/cpuguy83/go-md2man/v2 v2.0.1/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/datarhei/gosrt v0.2.1-0.20220812130440-71bf5952f57e h1:0TwcuTPTumn12D0AGfephlJr5FZ/wDG31BHjaOCIN9E=
-github.com/datarhei/gosrt v0.2.1-0.20220812130440-71bf5952f57e/go.mod h1:wyoTu+DG45XRuCgEq/y+R8nhZCrJbOyQKn+SwNrNVZ8=
+github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5 h1:lTmd1w7UpULXD/B6LfRu4QJHDILq9W5atyLP+RCkoMA=
+github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5/go.mod h1:wyoTu+DG45XRuCgEq/y+R8nhZCrJbOyQKn+SwNrNVZ8=
 github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36 h1:ppjcv7wazy4d7vANREERXkSAUnhV/nfT2a+13u4ZijQ=
 github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36/go.mod h1:Jcw/6jZDQQmPx8A7INEkXmuEF7E9jjBbSTfVSLwmiQw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
