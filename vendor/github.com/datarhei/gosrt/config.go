@@ -218,17 +218,17 @@ func DefaultConfig() Config {
 
 // UnmarshalURL takes a SRT URL and parses out the configuration. A SRT URL is
 // srt://[host]:[port]?[key1]=[value1]&[key2]=[value2]...
-func (c *Config) UnmarshalURL(addr string) error {
+func (c *Config) UnmarshalURL(addr string) (string, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if u.Scheme != "srt" {
-		return fmt.Errorf("the URL doesn't seem to be an srt:// URL")
+		return "", fmt.Errorf("the URL doesn't seem to be an srt:// URL")
 	}
 
-	return c.UnmarshalQuery(u.RawQuery)
+	return u.Host, c.UnmarshalQuery(u.RawQuery)
 }
 
 // UnmarshalQuery parses a query string and interprets it as a configuration

@@ -66,7 +66,8 @@ type connResponse struct {
 // The address is of the form "host:port".
 //
 // Example:
-//  Dial("srt", "127.0.0.1:3000", DefaultConfig())
+//
+//	Dial("srt", "127.0.0.1:3000", DefaultConfig())
 //
 // In case of an error the returned Conn is nil and the error is non-nil.
 func Dial(network, address string, config Config) (Conn, error) {
@@ -663,6 +664,17 @@ func (dl *dialer) Read(p []byte) (n int, err error) {
 	return dl.conn.Read(p)
 }
 
+func (dl *dialer) readPacket() (packet.Packet, error) {
+	if err := dl.checkConnection(); err != nil {
+		return nil, err
+	}
+
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	return dl.conn.readPacket()
+}
+
 func (dl *dialer) Write(p []byte) (n int, err error) {
 	if err := dl.checkConnection(); err != nil {
 		return 0, err
@@ -672,6 +684,17 @@ func (dl *dialer) Write(p []byte) (n int, err error) {
 	defer dl.connLock.RUnlock()
 
 	return dl.conn.Write(p)
+}
+
+func (dl *dialer) writePacket(p packet.Packet) error {
+	if err := dl.checkConnection(); err != nil {
+		return err
+	}
+
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	return dl.conn.writePacket(p)
 }
 
 func (dl *dialer) SetDeadline(t time.Time) error      { return dl.conn.SetDeadline(t) }

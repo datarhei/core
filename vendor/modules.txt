@@ -45,7 +45,7 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/datarhei/gosrt v0.1.2
+# github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5
 ## explicit; go 1.16
 github.com/datarhei/gosrt
 github.com/datarhei/gosrt/internal/circular
@@ -281,7 +281,7 @@ github.com/xrash/smetrics
 # github.com/yusufpapurcu/wmi v1.2.2
 ## explicit; go 1.16
 github.com/yusufpapurcu/wmi
-# golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+# golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 ## explicit; go 1.17
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert

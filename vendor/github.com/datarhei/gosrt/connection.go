@@ -93,6 +93,7 @@ type srtConn struct {
 
 	config Config
 
+	cryptoLock             sync.Mutex
 	crypto                 crypto.Crypto
 	keyBaseEncryption      packet.PacketEncryption
 	kmPreAnnounceCountdown uint64
@@ -453,6 +454,7 @@ func (c *srtConn) pop(p packet.Packet) {
 	p.Header().DestinationSocketId = c.peerSocketId
 
 	if !p.Header().IsControlPacket {
+		c.cryptoLock.Lock()
 		if c.crypto != nil {
 			p.Header().KeyBaseEncryptionFlag = c.keyBaseEncryption
 			c.crypto.EncryptOrDecryptPayload(p.Data(), p.Header().KeyBaseEncryptionFlag, p.Header().PacketSequenceNumber.Val())
@@ -483,6 +485,7 @@ func (c *srtConn) pop(p packet.Packet) {
 				c.crypto.GenerateSEK(c.keyBaseEncryption.Opposite())
 			}
 		}
+		c.cryptoLock.Unlock()
 
 		c.log("data:send:dump", func() string { return p.Dump() })
 	}
@@ -614,6 +617,7 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 
 		c.log("data:recv:dump", func() string { return p.Dump() })
 
+		c.cryptoLock.Lock()
 		if c.crypto != nil {
 			if header.KeyBaseEncryptionFlag != 0 {
 				if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
@@ -625,6 +629,7 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 				c.statistics.byteRecvUndecrypt += p.Len()
 			}
 		}
+		c.cryptoLock.Unlock()
 
 		// Put the packet into receive congestion control
 		c.recv.Push(p)
@@ -759,8 +764,11 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 
 	c.statistics.pktRecvKM++
 
+	c.cryptoLock.Lock()
+
 	if c.crypto == nil {
 		c.log("control:recv:KM:error", func() string { return "connection is not encrypted" })
+		c.cryptoLock.Unlock()
 		return
 	}
 
@@ -769,6 +777,7 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 	if err := p.UnmarshalCIF(cif); err != nil {
 		c.statistics.pktRecvInvalid++
 		c.log("control:recv:KM:error", func() string { return fmt.Sprintf("invalid KM: %s", err) })
+		c.cryptoLock.Unlock()
 		return
 	}
 
@@ -779,15 +788,23 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 		c.log("control:recv:KM:error", func() string {
 			return "invalid KM. wants to reset the key that is already in use"
 		})
+		c.cryptoLock.Unlock()
 		return
 	}
 
 	if err := c.crypto.UnmarshalKM(cif, c.config.Passphrase); err != nil {
 		c.statistics.pktRecvInvalid++
 		c.log("control:recv:KM:error", func() string { return fmt.Sprintf("invalid KM: %s", err) })
+		c.cryptoLock.Unlock()
 		return
 	}
 
+	// Switch the keys
+	c.keyBaseEncryption = c.keyBaseEncryption.Opposite()
+
+	c.cryptoLock.Unlock()
+
+	// Send KM Response
 	p.Header().SubType = packet.EXTTYPE_KMRSP
 
 	c.statistics.pktSentKM++
@@ -800,6 +817,9 @@ func (c *srtConn) handleKMResponse(p packet.Packet) {
 	c.log("control:recv:KM:dump", func() string { return p.Dump() })
 
 	c.statistics.pktRecvKM++
+
+	c.cryptoLock.Lock()
+	defer c.cryptoLock.Unlock()
 
 	if c.crypto == nil {
 		c.log("control:recv:KM:error", func() string { return "connection is not encrypted" })

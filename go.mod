@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/99designs/gqlgen v0.17.12
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/datarhei/gosrt v0.1.2
+	github.com/datarhei/gosrt v0.2.1-0.20220817065416-5d1fd7a090e5
 	github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/gobwas/glob v0.2.3
@@ -24,7 +24,7 @@ require (
 	github.com/swaggo/swag v1.8.3
 	github.com/vektah/gqlparser/v2 v2.4.6
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 )
 
