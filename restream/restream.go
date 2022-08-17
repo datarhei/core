@@ -14,6 +14,7 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
@@ -33,7 +34,7 @@ type Restreamer interface {
 	Start()                                                    // start all processes that have a "start" order
 	Stop()                                                     // stop all running process but keep their "start" order
 	AddProcess(config *app.Config) error                       // add a new process
-	GetProcessIDs() []string                                   // get a list of all process IDs
+	GetProcessIDs(idpattern, refpattern string) []string       // get a list of process IDs based on patterns for ID and reference
 	DeleteProcess(id string) error                             // delete a process
 	UpdateProcess(id string, config *app.Config) error         // update a process
 	StartProcess(id string) error                              // start a process
@@ -808,14 +809,64 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	return nil
 }
 
-func (r *restream) GetProcessIDs() []string {
+func (r *restream) GetProcessIDs(idpattern, refpattern string) []string {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	ids := make([]string, len(r.tasks))
+	if len(idpattern) == 0 && len(refpattern) == 0 {
+		ids := make([]string, len(r.tasks))
+		i := 0
+
+		for id := range r.tasks {
+			ids[i] = id
+			i++
+		}
+
+		return ids
+	}
+
+	idmap := map[string]int{}
+
+	if len(idpattern) != 0 {
+		for id := range r.tasks {
+			match, err := glob.Match(idpattern, id)
+			if err != nil {
+				return nil
+			}
+
+			if !match {
+				continue
+			}
+
+			idmap[id] = 1
+		}
+	}
+
+	if len(refpattern) != 0 {
+		for _, t := range r.tasks {
+			match, err := glob.Match(refpattern, t.reference)
+			if err != nil {
+				return nil
+			}
+
+			if !match {
+				continue
+			}
+
+			if _, ok := idmap[t.id]; ok {
+				idmap[t.id]++
+			}
+		}
+	}
+
+	ids := make([]string, len(idmap))
 	i := 0
 
-	for id := range r.tasks {
+	for id, count := range idmap {
+		if count == 1 {
+			continue
+		}
+
 		ids[i] = id
 		i++
 	}

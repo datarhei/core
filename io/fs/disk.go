@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -296,7 +297,7 @@ func (fs *diskFilesystem) List(pattern string) []FileInfo {
 		}
 
 		if len(pattern) != 0 {
-			if ok, _ := filepath.Match(pattern, name); !ok {
+			if ok, _ := glob.Match(pattern, name, '/'); !ok {
 				return
 			}
 		}

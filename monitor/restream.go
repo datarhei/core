@@ -57,7 +57,7 @@ func (c *restreamCollector) Collect() metric.Metrics {
 		"starting":  0,
 	}
 
-	ids := c.r.GetProcessIDs()
+	ids := c.r.GetProcessIDs("", "")
 
 	for _, id := range ids {
 		state, _ := c.r.GetProcessState(id)

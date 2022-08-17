@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -427,7 +427,7 @@ func (fs *memFilesystem) List(pattern string) []FileInfo {
 
 	for _, file := range fs.files {
 		if len(pattern) != 0 {
-			if ok, _ := filepath.Match(pattern, file.name); !ok {
+			if ok, _ := glob.Match(pattern, file.name, '/'); !ok {
 				continue
 			}
 		}

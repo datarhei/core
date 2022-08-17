@@ -9,6 +9,7 @@ require (
 	github.com/datarhei/gosrt v0.2.1-0.20220812130440-71bf5952f57e
 	github.com/datarhei/joy4 v0.0.0-20220728180719-f752080f4a36
 	github.com/go-playground/validator/v10 v10.11.0
+	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/google/uuid v1.3.0
 	github.com/invopop/jsonschema v0.4.0
