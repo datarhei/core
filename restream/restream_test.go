@@ -206,7 +206,7 @@ func TestGetProcess(t *testing.T) {
 	_, err = rs.GetProcess(process.ID)
 	require.Equal(t, nil, err, "Process not found (%s)", process.ID)
 
-	list := rs.GetProcessIDs()
+	list := rs.GetProcessIDs("", "")
 	require.Len(t, list, 1, "expected 1 process")
 	require.Equal(t, process.ID, list[0], "expected same process ID")
 }

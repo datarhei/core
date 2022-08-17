@@ -70,9 +70,11 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Description List all known processes. Use the query parameter to filter the listed processes.
 // @ID process-3-get-all
 // @Produce json
-// @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output"
-// @Param reference query string false "Return only these process that have this reference value. Overrides a list of IDs. If empty, the reference will be ignored"
-// @Param id query string false "Comma separated list of process ids to list"
+// @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
+// @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
+// @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
+// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern."
+// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern."
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/process [get]
@@ -82,8 +84,10 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
 	})
+	idpattern := util.DefaultQuery(c, "idpattern", "")
+	refpattern := util.DefaultQuery(c, "refpattern", "")
 
-	ids := h.restream.GetProcessIDs()
+	ids := h.restream.GetProcessIDs(idpattern, refpattern)
 
 	processes := []api.Process{}
 

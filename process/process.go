@@ -88,31 +88,37 @@ type Status struct {
 // States
 //
 // finished - Process has been stopped
-//    starting - if process has been actively started or has been waiting for reconnect (order=start, reconnect=any)
-//    finished - if process shall not reconnect (order=stop, reconnect=any)
+//
+//	starting - if process has been actively started or has been waiting for reconnect (order=start, reconnect=any)
+//	finished - if process shall not reconnect (order=stop, reconnect=any)
 //
 // starting - Process is about to start
-//    finishing - if process should be immediately stopped (order=stop, reconnect=any)
-//    running - if process could be started (order=start, reconnect=any)
-//    failed - if process couldn't be started (e.g. binary not found) (order=start, reconnect=any)
+//
+//	finishing - if process should be immediately stopped (order=stop, reconnect=any)
+//	running - if process could be started (order=start, reconnect=any)
+//	failed - if process couldn't be started (e.g. binary not found) (order=start, reconnect=any)
 //
 // running - Process is running
-//    finished - if process exited normally (order=any, reconnect=any)
-//    finishing - if process has been actively stopped (order=stop, reconnect=any)
-//    failed - if process exited abnormally (order=any, reconnect=any)
-//    killed - if process has been actively killed with SIGKILL (order=any, reconnect=any)
+//
+//	finished - if process exited normally (order=any, reconnect=any)
+//	finishing - if process has been actively stopped (order=stop, reconnect=any)
+//	failed - if process exited abnormally (order=any, reconnect=any)
+//	killed - if process has been actively killed with SIGKILL (order=any, reconnect=any)
 //
 // finishing - Process has been actively stopped and will be killed
-//    finished - if process has been actively killed with SIGINT and ffmpeg exited normally (order=stop, reconnect=any)
-//    killed - if process has been actively killed with SIGKILL (order=stop, reconnect=any)
+//
+//	finished - if process has been actively killed with SIGINT and ffmpeg exited normally (order=stop, reconnect=any)
+//	killed - if process has been actively killed with SIGKILL (order=stop, reconnect=any)
 //
 // failed - Process has been failed either by starting or during running
-//    starting - if process has been waiting for reconnect (order=start, reconnect=true)
-//    failed - if process shall not reconnect (order=any, reconnect=false)
+//
+//	starting - if process has been waiting for reconnect (order=start, reconnect=true)
+//	failed - if process shall not reconnect (order=any, reconnect=false)
 //
 // killed - Process has been stopped
-//    starting - if process has been waiting for reconnect (order=start, reconnect=true)
-//    killed - if process shall not reconnect (order=start, reconnect=false)
+//
+//	starting - if process has been waiting for reconnect (order=start, reconnect=true)
+//	killed - if process shall not reconnect (order=start, reconnect=false)
 type stateType string
 
 const (

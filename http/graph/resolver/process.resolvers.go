@@ -10,7 +10,7 @@ import (
 )
 
 func (r *queryResolver) Processes(ctx context.Context) ([]*models.Process, error) {
-	ids := r.Restream.GetProcessIDs()
+	ids := r.Restream.GetProcessIDs("", "")
 
 	procs := []*models.Process{}
 
