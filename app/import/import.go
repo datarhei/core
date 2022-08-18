@@ -6,7 +6,6 @@ package main
 import (
 	gojson "encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net/url"
 	"os"
@@ -503,7 +502,7 @@ func importV1(path string, cfg importConfig) (store.StoreData, error) {
 
 	r := store.NewStoreData()
 
-	jsondata, err := ioutil.ReadFile(path)
+	jsondata, err := os.ReadFile(path)
 	if err != nil {
 		return r, fmt.Errorf("failed to read data from %s: %w", path, err)
 	}

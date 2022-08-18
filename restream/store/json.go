@@ -3,7 +3,6 @@ package store
 import (
 	gojson "encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -78,7 +77,7 @@ func (s *jsonStore) store(data StoreData) error {
 		return err
 	}
 
-	tmpfile, err := ioutil.TempFile(s.dir, s.filename)
+	tmpfile, err := os.CreateTemp(s.dir, s.filename)
 	if err != nil {
 		return err
 	}
@@ -122,7 +121,7 @@ func (s *jsonStore) load(version uint64) (StoreData, error) {
 		return r, err
 	}
 
-	jsondata, err := ioutil.ReadFile(filename)
+	jsondata, err := os.ReadFile(filename)
 	if err != nil {
 		return r, err
 	}

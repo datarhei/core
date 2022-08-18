@@ -1,7 +1,7 @@
 package api
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -96,7 +96,7 @@ func (h *MemFSHandler) PatchFile(c echo.Context) error {
 
 	req := c.Request()
 
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Failed reading request body", "%s", err)
 	}

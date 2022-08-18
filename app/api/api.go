@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	golog "log"
 	gonet "net"
 	gohttp "net/http"
@@ -120,7 +119,7 @@ func New(configpath string, logwriter io.Writer) (API, error) {
 	a.log.writer = logwriter
 
 	if a.log.writer == nil {
-		a.log.writer = ioutil.Discard
+		a.log.writer = io.Discard
 	}
 
 	a.errorChan = make(chan error, 1)

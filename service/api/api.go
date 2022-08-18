@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -149,14 +148,14 @@ func (a *api) refreshAccessToken(refreshToken string) error {
 			return errStatusAuthorization
 		}
 
-		data, _ := ioutil.ReadAll(res.Body)
+		data, _ := io.ReadAll(res.Body)
 		return statusError{
 			code:     res.StatusCode,
 			response: data,
 		}
 	}
 
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return statusError{
 			code: res.StatusCode,
@@ -199,14 +198,14 @@ func (a *api) call(method, path string, body io.Reader) ([]byte, error) {
 			return nil, errStatusAuthorization
 		}
 
-		data, _ := ioutil.ReadAll(res.Body)
+		data, _ := io.ReadAll(res.Body)
 		return nil, statusError{
 			code:     res.StatusCode,
 			response: data,
 		}
 	}
 
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response: %w", statusError{
 			code: res.StatusCode,

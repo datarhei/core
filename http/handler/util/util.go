@@ -2,7 +2,7 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"strings"
 
@@ -24,7 +24,7 @@ func ShouldBindJSONValidation(c echo.Context, obj interface{}, validate bool) er
 		return fmt.Errorf("request doesn't contain JSON content")
 	}
 
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return err
 	}

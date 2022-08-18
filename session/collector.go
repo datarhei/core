@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -461,7 +460,7 @@ func (c *collector) loadHistory(path string, data *history) {
 	c.lock.persist.Lock()
 	defer c.lock.persist.Unlock()
 
-	jsondata, err := ioutil.ReadFile(path)
+	jsondata, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
@@ -489,7 +488,7 @@ func (c *collector) saveHistory(path string, data *history) {
 	dir := filepath.Dir(path)
 	filename := filepath.Base(path)
 
-	tmpfile, err := ioutil.TempFile(dir, filename)
+	tmpfile, err := os.CreateTemp(dir, filename)
 	if err != nil {
 		return
 	}
