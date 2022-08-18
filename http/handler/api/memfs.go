@@ -125,7 +125,7 @@ func (h *MemFSHandler) PatchFile(c echo.Context) error {
 // @Param order query string false "asc, desc"
 // @Success 200 {array} api.FileInfo
 // @Security ApiKeyAuth
-// @Router /api/v3/fs/mem/ [get]
+// @Router /api/v3/fs/mem [get]
 func (h *MemFSHandler) ListFiles(c echo.Context) error {
 	pattern := util.DefaultQuery(c, "glob", "")
 	sortby := util.DefaultQuery(c, "sort", "none")

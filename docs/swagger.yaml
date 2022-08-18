@@ -2084,7 +2084,7 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Reload the currently active configuration
-  /api/v3/fs/disk/:
+  /api/v3/fs/disk:
     get:
       description: List all files on the filesystem. The listing can be ordered by
         name, size, or date of last modification in ascending or descending order.
@@ -2205,7 +2205,7 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add a file to the filesystem
-  /api/v3/fs/mem/:
+  /api/v3/fs/mem:
     get:
       description: List all files on the memory filesystem. The listing can be ordered
         by name, size, or date of last modification in ascending or descending order.
@@ -2471,18 +2471,29 @@ paths:
       parameters:
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
-          output
+          output.
         in: query
         name: filter
         type: string
-      - description: Return only these process that have this reference value. Overrides
-          a list of IDs. If empty, the reference will be ignored
+      - description: Return only these process that have this reference value. If
+          empty, the reference will be ignored.
         in: query
         name: reference
         type: string
-      - description: Comma separated list of process ids to list
+      - description: Comma separated list of process ids to list. Overrides the reference.
+          If empty all IDs will be returned.
         in: query
         name: id
+        type: string
+      - description: Glob pattern for process IDs. If empty all IDs will be returned.
+          Intersected with results from refpattern.
+        in: query
+        name: idpattern
+        type: string
+      - description: Glob pattern for process references. If empty all IDs will be
+          returned. Intersected with results from idpattern.
+        in: query
+        name: refpattern
         type: string
       produces:
       - application/json
