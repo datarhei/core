@@ -111,6 +111,7 @@ func (fs *filesystem) SetCleanup(id string, patterns []Pattern) {
 
 	fs.cleanupPatterns[id] = append(fs.cleanupPatterns[id], patterns...)
 }
+
 func (fs *filesystem) UnsetCleanup(id string) {
 	fs.logger.Debug().WithField("id", id).Log("Remove pattern group")
 
@@ -118,7 +119,6 @@ func (fs *filesystem) UnsetCleanup(id string) {
 	defer fs.cleanupLock.Unlock()
 
 	patterns := fs.cleanupPatterns[id]
-
 	delete(fs.cleanupPatterns, id)
 
 	fs.purge(patterns)
@@ -155,7 +155,7 @@ func (fs *filesystem) cleanup() {
 	}
 }
 
-func (fs *filesystem) purge(patterns []Pattern) {
+func (fs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
 	for _, pattern := range patterns {
 		if !pattern.PurgeOnDelete {
 			continue
@@ -165,8 +165,11 @@ func (fs *filesystem) purge(patterns []Pattern) {
 		for _, f := range files {
 			fs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
 			fs.Filesystem.Delete(f.Name())
+			nfiles++
 		}
 	}
+
+	return
 }
 
 func (fs *filesystem) cleanupTicker(ctx context.Context, interval time.Duration) {
