@@ -302,7 +302,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/disk/": {
+        "/api/v3/fs/disk": {
             "get": {
                 "security": [
                     {
@@ -487,7 +487,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/mem/": {
+        "/api/v3/fs/mem": {
             "get": {
                 "security": [
                     {
@@ -897,20 +897,32 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output",
+                        "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
                         "name": "filter",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Return only these process that have this reference value. Overrides a list of IDs. If empty, the reference will be ignored",
+                        "description": "Return only these process that have this reference value. If empty, the reference will be ignored.",
                         "name": "reference",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Comma separated list of process ids to list",
+                        "description": "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned.",
                         "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern.",
+                        "name": "idpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern.",
+                        "name": "refpattern",
                         "in": "query"
                     }
                 ],
@@ -2733,9 +2745,20 @@ const docTemplate = `{
                                             "type": "integer"
                                         },
                                         "types": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
+                                            "type": "object",
+                                            "properties": {
+                                                "allow": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "block": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -4330,9 +4353,20 @@ const docTemplate = `{
                                             "type": "integer"
                                         },
                                         "types": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
+                                            "type": "object",
+                                            "properties": {
+                                                "allow": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "block": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
                                             }
                                         }
                                     }

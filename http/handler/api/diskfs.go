@@ -160,7 +160,7 @@ func (h *DiskFSHandler) DeleteFile(c echo.Context) error {
 // @Param order query string false "asc, desc"
 // @Success 200 {array} api.FileInfo
 // @Security ApiKeyAuth
-// @Router /api/v3/fs/disk/ [get]
+// @Router /api/v3/fs/disk [get]
 func (h *DiskFSHandler) ListFiles(c echo.Context) error {
 	pattern := util.DefaultQuery(c, "glob", "")
 	sortby := util.DefaultQuery(c, "sort", "none")
