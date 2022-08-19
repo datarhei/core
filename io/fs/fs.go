@@ -67,7 +67,7 @@ type Filesystem interface {
 	Store(path string, r io.Reader) (int64, bool, error)
 
 	// Delete removes a file at the given path from the filesystem. Returns the size of
-	// the remove file in bytes. The size is negative if the file doesn't exist.
+	// the removed file in bytes. The size is negative if the file doesn't exist.
 	Delete(path string) int64
 
 	// DeleteAll removes all files from the filesystem. Returns the size of the

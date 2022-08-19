@@ -81,6 +81,7 @@ type Config struct {
 	MimeTypesFile string
 	DiskFS        fs.Filesystem
 	MemFS         MemFSConfig
+	S3FS          MemFSConfig
 	IPLimiter     net.IPLimiter
 	Profiling     bool
 	Cors          CorsConfig
@@ -115,6 +116,7 @@ type server struct {
 	handler struct {
 		about      *api.AboutHandler
 		memfs      *handler.MemFSHandler
+		s3fs       *handler.MemFSHandler
 		diskfs     *handler.DiskFSHandler
 		prometheus *handler.PrometheusHandler
 		profiling  *handler.ProfilingHandler
@@ -128,6 +130,7 @@ type server struct {
 		restream  *api.RestreamHandler
 		playout   *api.PlayoutHandler
 		memfs     *api.MemFSHandler
+		s3fs      *api.MemFSHandler
 		diskfs    *api.DiskFSHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
@@ -229,6 +232,16 @@ func NewServer(config Config) (Server, error) {
 		)
 	}
 
+	if config.S3FS.Filesystem != nil {
+		s.v3handler.s3fs = api.NewMemFS(
+			config.S3FS.Filesystem,
+		)
+
+		s.handler.s3fs = handler.NewMemFS(
+			config.S3FS.Filesystem,
+		)
+	}
+
 	if config.Prometheus != nil {
 		s.handler.prometheus = handler.NewPrometheus(
 			config.Prometheus.HTTPHandler(),
@@ -307,6 +320,7 @@ func NewServer(config Config) (Server, error) {
 			"/":      config.Cors.Origins,
 			"/api":   {"*"},
 			"/memfs": config.Cors.Origins,
+			"/s3":    config.Cors.Origins,
 		},
 	}); err != nil {
 		return nil, err
@@ -491,6 +505,46 @@ func (s *server) setRoutes() {
 		}
 	}
 
+	// S3 FS
+	if s.handler.s3fs != nil {
+		memfs := s.router.Group("/s3fs/*")
+		memfs.Use(mwmime.NewWithConfig(mwmime.Config{
+			MimeTypesFile:      s.mimeTypesFile,
+			DefaultContentType: "application/data",
+		}))
+		memfs.Use(mwgzip.NewWithConfig(mwgzip.Config{
+			Level:        mwgzip.BestSpeed,
+			MinLength:    1000,
+			ContentTypes: s.gzip.mimetypes,
+		}))
+		if s.middleware.session != nil {
+			memfs.Use(s.middleware.session)
+		}
+
+		memfs.HEAD("", s.handler.s3fs.GetFile)
+		memfs.GET("", s.handler.s3fs.GetFile)
+
+		var authmw echo.MiddlewareFunc
+
+		if s.memfs.enableAuth {
+			authmw = middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+				if username == s.memfs.username && password == s.memfs.password {
+					return true, nil
+				}
+
+				return false, nil
+			})
+
+			memfs.POST("", s.handler.s3fs.PutFile, authmw)
+			memfs.PUT("", s.handler.s3fs.PutFile, authmw)
+			memfs.DELETE("", s.handler.s3fs.DeleteFile, authmw)
+		} else {
+			memfs.POST("", s.handler.s3fs.PutFile)
+			memfs.PUT("", s.handler.s3fs.PutFile)
+			memfs.DELETE("", s.handler.s3fs.DeleteFile)
+		}
+	}
+
 	// Prometheus metrics
 	if s.handler.prometheus != nil {
 		metrics := s.router.Group("/metrics")
@@ -594,6 +648,18 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.DELETE("/fs/mem/*", s.v3handler.memfs.DeleteFile)
 			v3.PUT("/fs/mem/*", s.v3handler.memfs.PutFile)
 			v3.PATCH("/fs/mem/*", s.v3handler.memfs.PatchFile)
+		}
+	}
+
+	// v3 S3 FS
+	if s.v3handler.s3fs != nil {
+		v3.GET("/fs/s3", s.v3handler.s3fs.ListFiles)
+		v3.GET("/fs/s3/*", s.v3handler.s3fs.GetFile)
+
+		if !s.readOnly {
+			v3.DELETE("/fs/s3/*", s.v3handler.s3fs.DeleteFile)
+			v3.PUT("/fs/s3/*", s.v3handler.s3fs.PutFile)
+			v3.PATCH("/fs/s3/*", s.v3handler.s3fs.PatchFile)
 		}
 	}
 

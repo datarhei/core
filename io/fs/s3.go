@@ -6,11 +6,13 @@ import (
 	"io"
 	"time"
 
+	"github.com/datarhei/core/v16/glob"
+	"github.com/datarhei/core/v16/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-type S3FSConfig struct {
+type S3Config struct {
 	Base            string
 	Endpoint        string
 	AccessKeyID     string
@@ -18,6 +20,8 @@ type S3FSConfig struct {
 	Region          string
 	Bucket          string
 	UseSSL          bool
+
+	Logger log.Logger
 }
 
 type s3fs struct {
@@ -31,9 +35,11 @@ type s3fs struct {
 	useSSL          bool
 
 	client *minio.Client
+
+	logger log.Logger
 }
 
-func NewS3FS(config S3FSConfig) (Filesystem, error) {
+func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	fs := &s3fs{
 		base:            config.Base,
 		endpoint:        config.Endpoint,
@@ -42,6 +48,11 @@ func NewS3FS(config S3FSConfig) (Filesystem, error) {
 		region:          config.Region,
 		bucket:          config.Bucket,
 		useSSL:          config.UseSSL,
+		logger:          config.Logger,
+	}
+
+	if fs.logger == nil {
+		fs.logger = log.New("")
 	}
 
 	client, err := minio.New(fs.endpoint, &minio.Options{
@@ -52,6 +63,29 @@ func NewS3FS(config S3FSConfig) (Filesystem, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	fs.logger = fs.logger.WithFields(log.Fields{
+		"bucket":   fs.bucket,
+		"region":   fs.region,
+		"endpoint": fs.endpoint,
+	})
+
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
+	defer cancel()
+
+	err = client.MakeBucket(ctx, fs.bucket, minio.MakeBucketOptions{Region: fs.region})
+	if err != nil {
+		exists, errBucketExists := client.BucketExists(ctx, fs.bucket)
+		if errBucketExists != nil {
+			return nil, err
+		}
+
+		if exists {
+			fs.logger.Debug().Log("Bucket already exists")
+		}
+	} else {
+		fs.logger.Debug().Log("Bucket created")
 	}
 
 	fs.client = client
@@ -70,7 +104,15 @@ func (fs *s3fs) Rebase(base string) error {
 }
 
 func (fs *s3fs) Size() (int64, int64) {
-	return -1, -1
+	size := int64(0)
+
+	files := fs.List("")
+
+	for _, file := range files {
+		size += file.Size()
+	}
+
+	return size, -1
 }
 
 func (fs *s3fs) Resize(size int64) {}
@@ -80,18 +122,15 @@ func (fs *s3fs) Files() int64 {
 	defer cancel()
 
 	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-		WithVersions: false,
-		WithMetadata: false,
-		Prefix:       "",
-		Recursive:    true,
-		MaxKeys:      0,
-		StartAfter:   "",
-		UseV1:        false,
+		Recursive: true,
 	})
 
 	nfiles := int64(0)
 
-	for range ch {
+	for object := range ch {
+		if object.Err != nil {
+			fs.logger.WithError(object.Err).Log("Listing object failed")
+		}
 		nfiles++
 	}
 
@@ -107,13 +146,14 @@ func (fs *s3fs) Open(path string) File {
 	defer cancel()
 
 	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
-
 	if err != nil {
+		fs.logger.Debug().WithField("key", path).Log("Not found")
 		return nil
 	}
 
 	stat, err := object.Stat()
 	if err != nil {
+		fs.logger.Debug().WithField("key", path).Log("Stat failed")
 		return nil
 	}
 
@@ -123,6 +163,8 @@ func (fs *s3fs) Open(path string) File {
 		size:         stat.Size,
 		lastModified: stat.LastModified,
 	}
+
+	fs.logger.Debug().WithField("key", stat.Key).Log("Opened")
 
 	return file
 }
@@ -161,8 +203,14 @@ func (fs *s3fs) Store(path string, r io.Reader) (int64, bool, error) {
 		Internal:                minio.AdvancedPutOptions{},
 	})
 	if err != nil {
+		fs.logger.WithError(err).WithField("key", path).Log("Failed to store file")
 		return -1, false, err
 	}
+
+	fs.logger.Debug().WithFields(log.Fields{
+		"key":       path,
+		"overwrite": overwrite,
+	}).Log("Stored")
 
 	return info.Size, overwrite, nil
 }
@@ -173,6 +221,7 @@ func (fs *s3fs) Delete(path string) int64 {
 
 	stat, err := fs.client.StatObject(ctx, fs.bucket, path, minio.StatObjectOptions{})
 	if err != nil {
+		fs.logger.Debug().WithField("key", path).Log("Not found")
 		return -1
 	}
 
@@ -180,8 +229,11 @@ func (fs *s3fs) Delete(path string) int64 {
 		GovernanceBypass: true,
 	})
 	if err != nil {
+		fs.logger.WithError(err).WithField("key", stat.Key).Log("Failed to delete file")
 		return -1
 	}
+
+	fs.logger.Debug().WithField("key", stat.Key).Log("Deleted")
 
 	return stat.Size
 }
@@ -202,7 +254,7 @@ func (fs *s3fs) DeleteAll() int64 {
 			Recursive: true,
 		}) {
 			if object.Err != nil {
-				//log.Fatalln(object.Err)
+				fs.logger.WithError(object.Err).Log("Listing object failed")
 				continue
 			}
 			totalSize += object.Size
@@ -213,8 +265,10 @@ func (fs *s3fs) DeleteAll() int64 {
 	for err := range fs.client.RemoveObjects(context.Background(), fs.bucket, objectsCh, minio.RemoveObjectsOptions{
 		GovernanceBypass: true,
 	}) {
-		fmt.Println("Error detected during deletion: ", err)
+		fs.logger.WithError(err.Err).WithField("key", err.ObjectName).Log("Deleting object failed")
 	}
+
+	fs.logger.Debug().Log("Deleted all files")
 
 	return totalSize
 }
@@ -237,7 +291,14 @@ func (fs *s3fs) List(pattern string) []FileInfo {
 
 	for object := range ch {
 		if object.Err != nil {
-			return nil
+			fs.logger.WithError(object.Err).Log("Listing object failed")
+			continue
+		}
+
+		if len(pattern) != 0 {
+			if ok, _ := glob.Match(pattern, object.Key, '/'); !ok {
+				continue
+			}
 		}
 
 		f := &s3FileInfo{
