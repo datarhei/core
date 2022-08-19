@@ -132,7 +132,7 @@ func NewDiskFilesystem(config DiskConfig) (Filesystem, error) {
 	}
 
 	if fs.logger == nil {
-		fs.logger = log.New("DiskFS")
+		fs.logger = log.New("")
 	}
 
 	if err := fs.Rebase(config.Dir); err != nil {

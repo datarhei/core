@@ -143,7 +143,7 @@ func NewMemFilesystem(config MemConfig) Filesystem {
 	}
 
 	if fs.logger == nil {
-		fs.logger = log.New("MemFS")
+		fs.logger = log.New("")
 	}
 
 	fs.files = make(map[string]*memFile)
