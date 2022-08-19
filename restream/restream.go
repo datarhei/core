@@ -826,6 +826,7 @@ func (r *restream) GetProcessIDs(idpattern, refpattern string) []string {
 	}
 
 	idmap := map[string]int{}
+	count := 0
 
 	if len(idpattern) != 0 {
 		for id := range r.tasks {
@@ -838,8 +839,10 @@ func (r *restream) GetProcessIDs(idpattern, refpattern string) []string {
 				continue
 			}
 
-			idmap[id] = 1
+			idmap[id]++
 		}
+
+		count++
 	}
 
 	if len(refpattern) != 0 {
@@ -853,22 +856,20 @@ func (r *restream) GetProcessIDs(idpattern, refpattern string) []string {
 				continue
 			}
 
-			if _, ok := idmap[t.id]; ok {
-				idmap[t.id]++
-			}
+			idmap[t.id]++
 		}
+
+		count++
 	}
 
-	ids := make([]string, len(idmap))
-	i := 0
+	ids := []string{}
 
-	for id, count := range idmap {
-		if count == 1 {
+	for id, n := range idmap {
+		if n != count {
 			continue
 		}
 
-		ids[i] = id
-		i++
+		ids = append(ids, id)
 	}
 
 	return ids
