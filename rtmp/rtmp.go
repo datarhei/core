@@ -101,15 +101,17 @@ type channel struct {
 
 	collector session.Collector
 	path      string
+	reference string
 
 	publisher  *client
 	subscriber map[string]*client
 	lock       sync.RWMutex
 }
 
-func newChannel(conn *rtmp.Conn, collector session.Collector) *channel {
+func newChannel(conn *rtmp.Conn, reference string, collector session.Collector) *channel {
 	ch := &channel{
 		path:       conn.URL.Path,
+		reference:  reference,
 		publisher:  newClient(conn, conn.URL.Path, collector),
 		subscriber: make(map[string]*client),
 		collector:  collector,
@@ -119,8 +121,7 @@ func newChannel(conn *rtmp.Conn, collector session.Collector) *channel {
 	ip, _, _ := net.SplitHostPort(addr)
 
 	if collector.IsCollectableIP(ip) {
-		reference := strings.TrimSuffix(filepath.Base(conn.URL.Path), filepath.Ext(conn.URL.Path))
-		collector.RegisterAndActivate(conn.URL.Path, reference, "publish:"+conn.URL.Path, addr)
+		collector.RegisterAndActivate(ch.path, ch.reference, "publish:"+ch.path, addr)
 	}
 
 	return ch
@@ -144,8 +145,7 @@ func (ch *channel) AddSubscriber(conn *rtmp.Conn) string {
 	client := newClient(conn, addr, ch.collector)
 
 	if ch.collector.IsCollectableIP(ip) {
-		reference := strings.TrimSuffix(filepath.Base(conn.URL.Path), filepath.Ext(conn.URL.Path))
-		ch.collector.RegisterAndActivate(addr, reference, "play:"+conn.URL.Path, addr)
+		ch.collector.RegisterAndActivate(addr, ch.reference, "play:"+ch.path, addr)
 	}
 
 	ch.lock.Lock()
@@ -437,8 +437,10 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 
 	ch := s.channels[conn.URL.Path]
 	if ch == nil {
+		reference := strings.TrimPrefix(strings.TrimSuffix(conn.URL.Path, filepath.Ext(conn.URL.Path)), s.app+"/")
+
 		// Create a new channel
-		ch = newChannel(conn, s.collector)
+		ch = newChannel(conn, reference, s.collector)
 		ch.metadata = conn.GetMetaData()
 		ch.queue = pubsub.NewQueue()
 		ch.queue.WriteHeader(streams)
