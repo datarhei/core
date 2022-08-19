@@ -13,13 +13,13 @@ import (
 
 type WidgetConfig struct {
 	Restream restream.Restreamer
-	Registry session.Registry
+	Registry session.RegistryReader
 }
 
 // The WidgetHandler type provides handlers for the widget API
 type WidgetHandler struct {
 	restream restream.Restreamer
-	registry session.Registry
+	registry session.RegistryReader
 }
 
 // NewWidget return a new Widget type

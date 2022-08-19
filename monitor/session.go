@@ -7,7 +7,7 @@ import (
 
 type sessionCollector struct {
 	prefix            string
-	r                 session.Registry
+	r                 session.RegistryReader
 	collectors        []string
 	totalDescr        *metric.Description
 	limitDescr        *metric.Description
@@ -20,7 +20,7 @@ type sessionCollector struct {
 	maxRxBitrateDescr *metric.Description
 }
 
-func NewSessionCollector(r session.Registry, collectors []string) metric.Collector {
+func NewSessionCollector(r session.RegistryReader, collectors []string) metric.Collector {
 	c := &sessionCollector{
 		prefix:     "session",
 		r:          r,

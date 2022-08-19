@@ -91,7 +91,7 @@ type Config struct {
 	JWT           jwt.JWT
 	Config        config.Store
 	Cache         cache.Cacher
-	Sessions      session.Registry
+	Sessions      session.RegistryReader
 	Router        router.Router
 	ReadOnly      bool
 	Cluster       cluster.Cluster

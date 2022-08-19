@@ -22,6 +22,20 @@ type Config struct {
 	Logger log.Logger
 }
 
+type RegistryReader interface {
+	// Collectors returns an array of all registered IDs
+	Collectors() []string
+
+	// Collector returns the collector with the ID, or nil if the ID is not registered
+	Collector(id string) Collector
+
+	// Summary returns the summary from a collector with the ID, or an empty summary if the ID is not registered
+	Summary(id string) Summary
+
+	// Active returns the active sessions from a collector with the ID, or an empty list if the ID is not registered
+	Active(id string) []Session
+}
+
 // The Registry interface
 type Registry interface {
 	// Register returns a new collector from conf and registers it under the id and error is nil. In case of error
@@ -34,17 +48,7 @@ type Registry interface {
 	// UnregisterAll unregisters al registered collectors
 	UnregisterAll()
 
-	// Collectors returns an array of all registered IDs
-	Collectors() []string
-
-	// Collector returns the collector with the ID, or nil if the ID is not registered
-	Collector(id string) Collector
-
-	// Summary returns the summary from a collector with the ID, or an empty summary if the ID is not registered
-	Summary(id string) Summary
-
-	// Active returns the active sessions from a collector with the ID, or an empty list if the ID is not registered
-	Active(id string) []Session
+	RegistryReader
 }
 
 type registry struct {

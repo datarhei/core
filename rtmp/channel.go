@@ -4,8 +4,6 @@ import (
 	"context"
 	"net"
 	"net/url"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -87,6 +85,7 @@ type channel struct {
 
 	collector session.Collector
 	path      string
+	reference string
 
 	publisher  *client
 	subscriber map[string]*client
@@ -95,9 +94,10 @@ type channel struct {
 	isProxy bool
 }
 
-func newChannel(conn connection, u *url.URL, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
+func newChannel(conn connection, u *url.URL, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
 	ch := &channel{
 		path:       u.Path,
+		reference:  reference,
 		publisher:  newClient(conn, u.Path, collector),
 		subscriber: make(map[string]*client),
 		collector:  collector,
@@ -106,12 +106,13 @@ func newChannel(conn connection, u *url.URL, remote net.Addr, streams []av.Codec
 		isProxy:    isProxy,
 	}
 
+	ch.queue.WriteHeader(streams)
+
 	addr := remote.String()
 	ip, _, _ := net.SplitHostPort(addr)
 
 	if collector.IsCollectableIP(ip) {
-		reference := strings.TrimSuffix(filepath.Base(u.Path), filepath.Ext(u.Path))
-		collector.RegisterAndActivate(u.Path, reference, "publish:"+u.Path, addr)
+		collector.RegisterAndActivate(ch.path, ch.reference, "publish:"+ch.path, addr)
 	}
 
 	return ch
@@ -135,8 +136,7 @@ func (ch *channel) AddSubscriber(conn *rtmp.Conn) string {
 	client := newClient(conn, addr, ch.collector)
 
 	if ch.collector.IsCollectableIP(ip) {
-		reference := strings.TrimSuffix(filepath.Base(conn.URL.Path), filepath.Ext(conn.URL.Path))
-		ch.collector.RegisterAndActivate(addr, reference, "play:"+conn.URL.Path, addr)
+		ch.collector.RegisterAndActivate(addr, ch.reference, "play:"+conn.URL.Path, addr)
 	}
 
 	ch.lock.Lock()

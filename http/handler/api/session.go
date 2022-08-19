@@ -13,11 +13,11 @@ import (
 
 // The SessionHandler type provides handlers to retrieve session information
 type SessionHandler struct {
-	registry session.Registry
+	registry session.RegistryReader
 }
 
 // NewSession returns a new Session type. You have to provide a session registry.
-func NewSession(registry session.Registry) *SessionHandler {
+func NewSession(registry session.RegistryReader) *SessionHandler {
 	return &SessionHandler{
 		registry: registry,
 	}

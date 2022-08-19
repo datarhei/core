@@ -913,7 +913,6 @@ func (r *restream) deleteProcess(id string) error {
 	}
 
 	r.unsetPlayoutPorts(task)
-
 	r.unsetCleanup(id)
 
 	delete(r.tasks, id)

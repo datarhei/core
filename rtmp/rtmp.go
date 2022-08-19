@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -349,9 +350,10 @@ func (s *server) publish(src connection, u *url.URL, remote net.Addr, isProxy bo
 
 	ch := s.channels[u.Path]
 	if ch == nil {
+		reference := strings.TrimPrefix(strings.TrimSuffix(u.Path, filepath.Ext(u.Path)), s.app+"/")
+
 		// Create a new channel
-		ch = newChannel(src, u, remote, streams, isProxy, s.collector)
-		ch.queue.WriteHeader(streams)
+		ch = newChannel(src, u, reference, remote, streams, isProxy, s.collector)
 
 		for _, stream := range streams {
 			typ := stream.Type()
