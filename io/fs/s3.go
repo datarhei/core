@@ -76,18 +76,20 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	defer cancel()
 
-	err = client.MakeBucket(ctx, fs.bucket, minio.MakeBucketOptions{Region: fs.region})
-	if err != nil {
-		exists, errBucketExists := client.BucketExists(ctx, fs.bucket)
-		if errBucketExists != nil {
-			return nil, err
-		}
+	exists, errBucketExists := client.BucketExists(ctx, fs.bucket)
+	if errBucketExists != nil {
+		return nil, err
+	}
 
-		if exists {
-			fs.logger.Debug().Log("Bucket already exists")
-		}
+	if exists {
+		fs.logger.Debug().Log("Bucket already exists")
 	} else {
-		fs.logger.Debug().Log("Bucket created")
+		err = client.MakeBucket(ctx, fs.bucket, minio.MakeBucketOptions{Region: fs.region})
+		if err != nil {
+			return nil, err
+		} else {
+			fs.logger.Debug().Log("Bucket created")
+		}
 	}
 
 	fs.client = client
