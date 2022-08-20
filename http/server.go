@@ -507,22 +507,22 @@ func (s *server) setRoutes() {
 
 	// S3 FS
 	if s.handler.s3fs != nil {
-		memfs := s.router.Group("/s3fs/*")
-		memfs.Use(mwmime.NewWithConfig(mwmime.Config{
+		s3fs := s.router.Group("/s3/*")
+		s3fs.Use(mwmime.NewWithConfig(mwmime.Config{
 			MimeTypesFile:      s.mimeTypesFile,
 			DefaultContentType: "application/data",
 		}))
-		memfs.Use(mwgzip.NewWithConfig(mwgzip.Config{
+		s3fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
 			Level:        mwgzip.BestSpeed,
 			MinLength:    1000,
 			ContentTypes: s.gzip.mimetypes,
 		}))
 		if s.middleware.session != nil {
-			memfs.Use(s.middleware.session)
+			s3fs.Use(s.middleware.session)
 		}
 
-		memfs.HEAD("", s.handler.s3fs.GetFile)
-		memfs.GET("", s.handler.s3fs.GetFile)
+		s3fs.HEAD("", s.handler.s3fs.GetFile)
+		s3fs.GET("", s.handler.s3fs.GetFile)
 
 		var authmw echo.MiddlewareFunc
 
@@ -535,13 +535,17 @@ func (s *server) setRoutes() {
 				return false, nil
 			})
 
-			memfs.POST("", s.handler.s3fs.PutFile, authmw)
-			memfs.PUT("", s.handler.s3fs.PutFile, authmw)
-			memfs.DELETE("", s.handler.s3fs.DeleteFile, authmw)
+			s3fs.POST("", s.handler.s3fs.PutFile, authmw)
+			s3fs.PUT("", s.handler.s3fs.PutFile, authmw)
+			s3fs.DELETE("", s.handler.s3fs.DeleteFile, authmw)
 		} else {
-			memfs.POST("", s.handler.s3fs.PutFile)
-			memfs.PUT("", s.handler.s3fs.PutFile)
-			memfs.DELETE("", s.handler.s3fs.DeleteFile)
+			s3fs.POST("", s.handler.s3fs.PutFile)
+			s3fs.PUT("", s.handler.s3fs.PutFile)
+			s3fs.DELETE("", s.handler.s3fs.DeleteFile)
+		}
+
+		if s.middleware.cache != nil {
+			s3fs.Use(s.middleware.cache)
 		}
 	}
 

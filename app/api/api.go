@@ -410,31 +410,39 @@ func (a *api) start() error {
 		a.memfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
 	}
 
-	baseS3FS := url.URL{
-		Scheme: "http",
-		Path:   "/s3",
-	}
+	if cfg.Storage.S3.Enable {
+		baseS3FS := url.URL{
+			Scheme: "http",
+			Path:   "/s3",
+		}
 
-	host, port, _ = gonet.SplitHostPort(cfg.Address)
-	if len(host) == 0 {
-		baseS3FS.Host = "localhost:" + port
-	} else {
-		baseS3FS.Host = cfg.Address
-	}
+		host, port, _ := gonet.SplitHostPort(cfg.Address)
+		if len(host) == 0 {
+			baseS3FS.Host = "localhost:" + port
+		} else {
+			baseS3FS.Host = cfg.Address
+		}
 
-	if cfg.Storage.Memory.Auth.Enable {
-		baseS3FS.User = url.UserPassword(cfg.Storage.Memory.Auth.Username, cfg.Storage.Memory.Auth.Password)
-	}
+		if cfg.Storage.Memory.Auth.Enable {
+			baseS3FS.User = url.UserPassword(cfg.Storage.Memory.Auth.Username, cfg.Storage.Memory.Auth.Password)
+		}
 
-	s3fs, err := fs.NewS3Filesystem(fs.S3Config{
-		Base:   baseS3FS.String(),
-		Logger: a.log.logger.core.WithComponent("S3FS"),
-	})
-	if err != nil {
-		return err
-	}
+		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
+			Base:            baseS3FS.String(),
+			Endpoint:        cfg.Storage.S3.Endpoint,
+			AccessKeyID:     cfg.Storage.S3.AccessKeyID,
+			SecretAccessKey: cfg.Storage.S3.SecretAccessKey,
+			Region:          cfg.Storage.S3.Region,
+			Bucket:          cfg.Storage.S3.Bucket,
+			UseSSL:          cfg.Storage.S3.UseSSL,
+			Logger:          a.log.logger.core.WithComponent("S3"),
+		})
+		if err != nil {
+			return err
+		}
 
-	a.s3fs = s3fs
+		a.s3fs = s3fs
+	}
 
 	var portrange net.Portranger
 
@@ -580,7 +588,9 @@ func (a *api) start() error {
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Base()))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
-	metrics.Register(monitor.NewFilesystemCollector("s3fs", a.s3fs))
+	if a.s3fs != nil {
+		metrics.Register(monitor.NewFilesystemCollector("s3fs", a.s3fs))
+	}
 	metrics.Register(monitor.NewRestreamCollector(a.restream))
 	metrics.Register(monitor.NewFFmpegCollector(a.ffmpeg))
 	metrics.Register(monitor.NewSessionCollector(a.sessions, []string{}))
@@ -834,9 +844,9 @@ func (a *api) start() error {
 			Filesystem: a.memfs,
 		},
 		S3FS: http.MemFSConfig{
-			EnableAuth: cfg.Storage.Memory.Auth.Enable,
-			Username:   cfg.Storage.Memory.Auth.Username,
-			Password:   cfg.Storage.Memory.Auth.Password,
+			EnableAuth: cfg.Storage.S3.Auth.Enable,
+			Username:   cfg.Storage.S3.Auth.Username,
+			Password:   cfg.Storage.S3.Auth.Password,
 			Filesystem: a.s3fs,
 		},
 		IPLimiter: iplimiter,
@@ -902,9 +912,9 @@ func (a *api) start() error {
 				Filesystem: a.memfs,
 			},
 			S3FS: http.MemFSConfig{
-				EnableAuth: cfg.Storage.Memory.Auth.Enable,
-				Username:   cfg.Storage.Memory.Auth.Username,
-				Password:   cfg.Storage.Memory.Auth.Password,
+				EnableAuth: cfg.Storage.S3.Auth.Enable,
+				Username:   cfg.Storage.S3.Auth.Username,
+				Password:   cfg.Storage.S3.Auth.Password,
 				Filesystem: a.s3fs,
 			},
 			IPLimiter: iplimiter,

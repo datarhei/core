@@ -71,6 +71,8 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 		"endpoint": fs.endpoint,
 	})
 
+	fs.logger.Debug().Log("Connected")
+
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	defer cancel()
 
@@ -142,8 +144,9 @@ func (fs *s3fs) Symlink(oldname, newname string) error {
 }
 
 func (fs *s3fs) Open(path string) File {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+	ctx := context.Background()
 
 	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
 	if err != nil {
