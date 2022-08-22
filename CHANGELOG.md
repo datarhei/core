@@ -1,5 +1,15 @@
 # Core
 
+### Core v16.9.1 > v16.10.0
+
+-   Fix wrong path for swagger definition
+-   Fix process cleanup on delete
+-   Add process id and reference glob pattern matching
+-   Fix SRT blocking port on restart (upgrade datarhei/gosrt)
+-   Fix RTMP communication (datarhei/restreamer#385)
+-   Fix injecting commit, branch, and build info
+-   Add cache block list for extensions not to cache
+
 #### Core v16.9.0 > v16.9.1
 
 -   Fix v1 import app
