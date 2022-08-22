@@ -44,6 +44,9 @@ type Filesystem interface {
 	// Rebase sets a new base path for this filesystem
 	Rebase(string) error
 
+	// Type returns the type of this filesystem
+	Type() string
+
 	// Size returns the consumed size and capacity of the filesystem in bytes. The
 	// capacity is negative if the filesystem can consume as much space as it can.
 	Size() (int64, int64)

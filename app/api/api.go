@@ -19,6 +19,7 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
+	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/io/fs"
@@ -60,24 +61,23 @@ type API interface {
 }
 
 type api struct {
-	restream        restream.Restreamer
-	ffmpeg          ffmpeg.FFmpeg
-	diskfs          fs.Filesystem
-	memfs           fs.Filesystem
-	s3fs            fs.Filesystem
-	rtmpserver      rtmp.Server
-	srtserver       srt.Server
-	metrics         monitor.HistoryMonitor
-	prom            prometheus.Metrics
-	service         service.Service
-	sessions        session.Registry
-	sessionsLimiter net.IPLimiter
-	cache           cache.Cacher
-	mainserver      *gohttp.Server
-	sidecarserver   *gohttp.Server
-	httpjwt         jwt.JWT
-	update          update.Checker
-	replacer        replace.Replacer
+	restream      restream.Restreamer
+	ffmpeg        ffmpeg.FFmpeg
+	diskfs        fs.Filesystem
+	memfs         fs.Filesystem
+	s3fs          fs.Filesystem
+	rtmpserver    rtmp.Server
+	srtserver     srt.Server
+	metrics       monitor.HistoryMonitor
+	prom          prometheus.Metrics
+	service       service.Service
+	sessions      session.Registry
+	cache         cache.Cacher
+	mainserver    *gohttp.Server
+	sidecarserver *gohttp.Server
+	httpjwt       jwt.JWT
+	update        update.Checker
+	replacer      replace.Replacer
 
 	errorChan chan error
 
@@ -372,7 +372,7 @@ func (a *api) start() error {
 	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
 		Dir:    cfg.Storage.Disk.Dir,
 		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
-		Logger: a.log.logger.core.WithComponent("DiskFS"),
+		Logger: a.log.logger.core.WithComponent("FS"),
 	})
 	if err != nil {
 		return err
@@ -401,7 +401,7 @@ func (a *api) start() error {
 			Base:   baseMemFS.String(),
 			Size:   cfg.Storage.Memory.Size * 1024 * 1024,
 			Purge:  cfg.Storage.Memory.Purge,
-			Logger: a.log.logger.core.WithComponent("MemFS"),
+			Logger: a.log.logger.core.WithComponent("FS"),
 		})
 
 		a.memfs = memfs
@@ -435,7 +435,7 @@ func (a *api) start() error {
 			Region:          cfg.Storage.S3.Region,
 			Bucket:          cfg.Storage.S3.Bucket,
 			UseSSL:          cfg.Storage.S3.UseSSL,
-			Logger:          a.log.logger.core.WithComponent("S3"),
+			Logger:          a.log.logger.core.WithComponent("FS"),
 		})
 		if err != nil {
 			return err
@@ -665,7 +665,7 @@ func (a *api) start() error {
 	}
 
 	if cfg.Storage.Disk.Cache.Enable {
-		diskCache, err := cache.NewLRUCache(cache.LRUConfig{
+		cache, err := cache.NewLRUCache(cache.LRUConfig{
 			TTL:             time.Duration(cfg.Storage.Disk.Cache.TTL) * time.Second,
 			MaxSize:         cfg.Storage.Disk.Cache.Size * 1024 * 1024,
 			MaxFileSize:     cfg.Storage.Disk.Cache.FileSize * 1024 * 1024,
@@ -675,10 +675,10 @@ func (a *api) start() error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("unable to create disk cache: %w", err)
+			return fmt.Errorf("unable to create cache: %w", err)
 		}
 
-		a.cache = diskCache
+		a.cache = cache
 	}
 
 	var autocertManager *autocert.Manager
@@ -829,25 +829,50 @@ func (a *api) start() error {
 
 	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
 
-	mainserverhandler, err := http.NewServer(http.Config{
+	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
 		Restream:      a.restream,
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypes,
-		DiskFS:        a.diskfs,
-		MemFS: http.MemFSConfig{
-			EnableAuth: cfg.Storage.Memory.Auth.Enable,
-			Username:   cfg.Storage.Memory.Auth.Username,
-			Password:   cfg.Storage.Memory.Auth.Password,
-			Filesystem: a.memfs,
-		},
-		S3FS: http.MemFSConfig{
-			EnableAuth: cfg.Storage.S3.Auth.Enable,
-			Username:   cfg.Storage.S3.Auth.Username,
-			Password:   cfg.Storage.S3.Auth.Password,
-			Filesystem: a.s3fs,
+		Filesystems: []httpfs.FS{
+			{
+				Name:               "diskfs",
+				Mountpoint:         "/",
+				AllowWrite:         false,
+				Username:           "",
+				Password:           "",
+				DefaultFile:        "index.html",
+				DefaultContentType: "text/html",
+				Gzip:               true,
+				Filesystem:         diskfs,
+				Cache:              a.cache,
+			},
+			{
+				Name:               "memfs",
+				Mountpoint:         "/memfs",
+				AllowWrite:         cfg.Storage.Memory.Auth.Enable,
+				Username:           cfg.Storage.Memory.Auth.Username,
+				Password:           cfg.Storage.Memory.Auth.Password,
+				DefaultFile:        "",
+				DefaultContentType: "application/data",
+				Gzip:               true,
+				Filesystem:         a.memfs,
+				Cache:              a.cache,
+			},
+			{
+				Name:               "s3fs",
+				Mountpoint:         "/s3",
+				AllowWrite:         cfg.Storage.S3.Auth.Enable,
+				Username:           cfg.Storage.S3.Auth.Username,
+				Password:           cfg.Storage.S3.Auth.Password,
+				DefaultFile:        "",
+				DefaultContentType: "application/data",
+				Gzip:               true,
+				Filesystem:         a.s3fs,
+				Cache:              a.cache,
+			},
 		},
 		IPLimiter: iplimiter,
 		Profiling: cfg.Debug.Profiling,
@@ -858,11 +883,12 @@ func (a *api) start() error {
 		SRT:      a.srtserver,
 		JWT:      a.httpjwt,
 		Config:   a.config.store,
-		Cache:    a.cache,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
-	})
+	}
+
+	mainserverhandler, err := http.NewServer(serverConfig)
 
 	if err != nil {
 		return fmt.Errorf("unable to create server: %w", err)
@@ -897,40 +923,10 @@ func (a *api) start() error {
 
 		a.log.logger.sidecar = a.log.logger.core.WithComponent("HTTP").WithField("address", cfg.Address)
 
-		sidecarserverhandler, err := http.NewServer(http.Config{
-			Logger:        a.log.logger.sidecar,
-			LogBuffer:     a.log.buffer,
-			Restream:      a.restream,
-			Metrics:       a.metrics,
-			Prometheus:    a.prom,
-			MimeTypesFile: cfg.Storage.MimeTypes,
-			DiskFS:        a.diskfs,
-			MemFS: http.MemFSConfig{
-				EnableAuth: cfg.Storage.Memory.Auth.Enable,
-				Username:   cfg.Storage.Memory.Auth.Username,
-				Password:   cfg.Storage.Memory.Auth.Password,
-				Filesystem: a.memfs,
-			},
-			S3FS: http.MemFSConfig{
-				EnableAuth: cfg.Storage.S3.Auth.Enable,
-				Username:   cfg.Storage.S3.Auth.Username,
-				Password:   cfg.Storage.S3.Auth.Password,
-				Filesystem: a.s3fs,
-			},
-			IPLimiter: iplimiter,
-			Profiling: cfg.Debug.Profiling,
-			Cors: http.CorsConfig{
-				Origins: cfg.Storage.CORS.Origins,
-			},
-			RTMP:     a.rtmpserver,
-			SRT:      a.srtserver,
-			JWT:      a.httpjwt,
-			Config:   a.config.store,
-			Cache:    a.cache,
-			Sessions: a.sessions,
-			Router:   router,
-			ReadOnly: cfg.API.ReadOnly,
-		})
+		serverConfig.Logger = a.log.logger.sidecar
+		serverConfig.IPLimiter = iplimiter
+
+		sidecarserverhandler, err := http.NewServer(serverConfig)
 
 		if err != nil {
 			return fmt.Errorf("unable to create sidecar HTTP server: %w", err)

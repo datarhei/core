@@ -66,6 +66,7 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	}
 
 	fs.logger = fs.logger.WithFields(log.Fields{
+		"type":     "s3",
 		"bucket":   fs.bucket,
 		"region":   fs.region,
 		"endpoint": fs.endpoint,
@@ -105,6 +106,10 @@ func (fs *s3fs) Rebase(base string) error {
 	fs.base = base
 
 	return nil
+}
+
+func (fs *s3fs) Type() string {
+	return "s3fs"
 }
 
 func (fs *s3fs) Size() (int64, int64) {

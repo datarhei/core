@@ -146,6 +146,8 @@ func NewMemFilesystem(config MemConfig) Filesystem {
 		fs.logger = log.New("")
 	}
 
+	fs.logger = fs.logger.WithField("type", "mem")
+
 	fs.files = make(map[string]*memFile)
 
 	fs.dataPool = sync.Pool{
@@ -170,6 +172,10 @@ func (fs *memFilesystem) Rebase(base string) error {
 	fs.base = base
 
 	return nil
+}
+
+func (fs *memFilesystem) Type() string {
+	return "memfs"
 }
 
 func (fs *memFilesystem) Size() (int64, int64) {

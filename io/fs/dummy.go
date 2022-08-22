@@ -24,6 +24,7 @@ type dummyFilesystem struct{}
 
 func (d *dummyFilesystem) Base() string                                 { return "/" }
 func (d *dummyFilesystem) Rebase(string) error                          { return nil }
+func (d *dummyFilesystem) Type() string                                 { return "dummy" }
 func (d *dummyFilesystem) Size() (int64, int64)                         { return 0, -1 }
 func (d *dummyFilesystem) Resize(int64)                                 {}
 func (d *dummyFilesystem) Files() int64                                 { return 0 }
