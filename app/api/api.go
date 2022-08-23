@@ -423,8 +423,8 @@ func (a *api) start() error {
 			baseS3FS.Host = cfg.Address
 		}
 
-		if cfg.Storage.Memory.Auth.Enable {
-			baseS3FS.User = url.UserPassword(cfg.Storage.Memory.Auth.Username, cfg.Storage.Memory.Auth.Password)
+		if cfg.Storage.S3.Auth.Enable {
+			baseS3FS.User = url.UserPassword(cfg.Storage.S3.Auth.Username, cfg.Storage.S3.Auth.Password)
 		}
 
 		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
@@ -484,6 +484,13 @@ func (a *api) start() error {
 	{
 		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
 		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
+
+		a.replacer.RegisterTemplate("fs:diskfs", a.diskfs.Base())
+		a.replacer.RegisterTemplate("fs:memfs", a.memfs.Base())
+
+		if a.s3fs != nil {
+			a.replacer.RegisterTemplate("fs:s3fs", a.s3fs.Base())
+		}
 
 		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
 		if len(host) == 0 {
