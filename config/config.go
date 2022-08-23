@@ -49,6 +49,22 @@ type Auth0Tenant struct {
 	Users    []string `json:"users"`
 }
 
+type S3Storage struct {
+	Name       string `json:"name"`
+	Mountpoint string `json:"mountpoint"`
+	Auth       struct {
+		Enable   bool   `json:"enable"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	} `json:"auth"`
+	Endpoint        string `json:"endpoint"`
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+	Bucket          string `json:"bucket"`
+	Region          string `json:"region"`
+	UseSSL          bool   `json:"use_ssl"`
+}
+
 type DataVersion struct {
 	Version int64 `json:"version"`
 }
@@ -200,16 +216,7 @@ func (d *Config) init() {
 	d.val(newBoolValue(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
 
 	// Storage (S3)
-	d.val(newBoolValue(&d.Storage.S3.Enable, true), "storage.s3.enable", "CORE_STORAGE_S3_ENABLE", nil, "Enable S3 storage", false, false)
-	d.val(newBoolValue(&d.Storage.S3.Auth.Enable, true), "storage.s3.auth.enable", "CORE_STORAGE_S3_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /s3", false, false)
-	d.val(newStringValue(&d.Storage.S3.Auth.Username, "admin"), "storage.s3.auth.username", "CORE_STORAGE_S3_AUTH_USERNAME", nil, "Username for Basic-Auth of /s3", false, false)
-	d.val(newStringValue(&d.Storage.S3.Auth.Password, rand.StringAlphanumeric(18)), "storage.s3.auth.password", "CORE_STORAGE_S3_AUTH_PASSWORD", nil, "Password for Basic-Auth of /s3", false, true)
-	d.val(newStringValue(&d.Storage.S3.Endpoint, ""), "storage.s3.endpoint", "CORE_STORAGE_S3_ENDPOINT", nil, "S3 host", false, false)
-	d.val(newStringValue(&d.Storage.S3.AccessKeyID, ""), "storage.s3.acces_key_id", "CORE_STORAGE_S3_ACCESS_KEY_ID", nil, "S3 access key ID", false, false)
-	d.val(newStringValue(&d.Storage.S3.SecretAccessKey, ""), "storage.s3.secret_access_key", "CORE_STORAGE_S3_SECRET_ACCESS_KEY", nil, "S3 secret access key", false, true)
-	d.val(newStringValue(&d.Storage.S3.Bucket, ""), "storage.s3.bucket", "CORE_STORAGE_S3_BUCKET", nil, "Bucket name, will be created if it doesn't exists", false, false)
-	d.val(newStringValue(&d.Storage.S3.Region, ""), "storage.s3.region", "CORE_STORAGE_S3_REGION", nil, "S3 region", false, false)
-	d.val(newBoolValue(&d.Storage.S3.UseSSL, true), "storage.s3.use_ssl", "CORE_STORAGE_S3_USE_SSL", nil, "Enable SSL for communication (recommended)", false, false)
+	d.val(newS3StorageListValue(&d.Storage.S3, []S3Storage{}, "|"), "storage.s3", "CORE_STORAGE_S3", nil, "List of S3 storage URLS", false, false)
 
 	// Storage (CORS)
 	d.val(newCORSOriginsValue(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)

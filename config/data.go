@@ -81,20 +81,7 @@ type Data struct {
 			Size  int64 `json:"max_size_mbytes"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
-		S3 struct {
-			Enable bool `json:"enable"`
-			Auth   struct {
-				Enable   bool   `json:"enable"`
-				Username string `json:"username"`
-				Password string `json:"password"`
-			} `json:"auth"`
-			Endpoint        string `json:"endpoint"`
-			AccessKeyID     string `json:"access_key_id"`
-			SecretAccessKey string `json:"secret_access_key"`
-			Bucket          string `json:"bucket"`
-			Region          string `json:"region"`
-			UseSSL          bool   `json:"use_ssl"`
-		} `json:"s3"`
+		S3   []S3Storage `json:"s3"`
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`

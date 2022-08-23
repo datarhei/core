@@ -65,7 +65,7 @@ type api struct {
 	ffmpeg        ffmpeg.FFmpeg
 	diskfs        fs.Filesystem
 	memfs         fs.Filesystem
-	s3fs          fs.Filesystem
+	s3fs          map[string]fs.Filesystem
 	rtmpserver    rtmp.Server
 	srtserver     srt.Server
 	metrics       monitor.HistoryMonitor
@@ -115,6 +115,7 @@ var ErrConfigReload = fmt.Errorf("configuration reload")
 func New(configpath string, logwriter io.Writer) (API, error) {
 	a := &api{
 		state: "idle",
+		s3fs:  map[string]fs.Filesystem{},
 	}
 
 	a.config.path = configpath
@@ -375,7 +376,7 @@ func (a *api) start() error {
 		Logger: a.log.logger.core.WithComponent("FS"),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("disk filesystem: %w", err)
 	}
 
 	a.diskfs = diskfs
@@ -410,10 +411,10 @@ func (a *api) start() error {
 		a.memfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
 	}
 
-	if cfg.Storage.S3.Enable {
+	for _, s3 := range cfg.Storage.S3 {
 		baseS3FS := url.URL{
 			Scheme: "http",
-			Path:   "/s3",
+			Path:   s3.Mountpoint,
 		}
 
 		host, port, _ := gonet.SplitHostPort(cfg.Address)
@@ -423,25 +424,29 @@ func (a *api) start() error {
 			baseS3FS.Host = cfg.Address
 		}
 
-		if cfg.Storage.S3.Auth.Enable {
-			baseS3FS.User = url.UserPassword(cfg.Storage.S3.Auth.Username, cfg.Storage.S3.Auth.Password)
+		if s3.Auth.Enable {
+			baseS3FS.User = url.UserPassword(s3.Auth.Username, s3.Auth.Password)
 		}
 
 		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
 			Base:            baseS3FS.String(),
-			Endpoint:        cfg.Storage.S3.Endpoint,
-			AccessKeyID:     cfg.Storage.S3.AccessKeyID,
-			SecretAccessKey: cfg.Storage.S3.SecretAccessKey,
-			Region:          cfg.Storage.S3.Region,
-			Bucket:          cfg.Storage.S3.Bucket,
-			UseSSL:          cfg.Storage.S3.UseSSL,
+			Endpoint:        s3.Endpoint,
+			AccessKeyID:     s3.AccessKeyID,
+			SecretAccessKey: s3.SecretAccessKey,
+			Region:          s3.Region,
+			Bucket:          s3.Bucket,
+			UseSSL:          s3.UseSSL,
 			Logger:          a.log.logger.core.WithComponent("FS"),
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("s3 filesystem (%s): %w", s3.Name, err)
 		}
 
-		a.s3fs = s3fs
+		if _, ok := a.s3fs[s3.Name]; ok {
+			return fmt.Errorf("the name '%s' for a filesystem is already in use", s3.Name)
+		}
+
+		a.s3fs[s3.Name] = s3fs
 	}
 
 	var portrange net.Portranger
@@ -449,18 +454,18 @@ func (a *api) start() error {
 	if cfg.Playout.Enable {
 		portrange, err = net.NewPortrange(cfg.Playout.MinPort, cfg.Playout.MaxPort)
 		if err != nil {
-			return err
+			return fmt.Errorf("playout port range: %w", err)
 		}
 	}
 
 	validatorIn, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Input.Allow, cfg.FFmpeg.Access.Input.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("input address validator: %w", err)
 	}
 
 	validatorOut, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Output.Allow, cfg.FFmpeg.Access.Output.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("output address validator: %w", err)
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
@@ -474,7 +479,7 @@ func (a *api) start() error {
 		Collector:        a.sessions.Collector("ffmpeg"),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create ffmpeg: %w", err)
 	}
 
 	a.ffmpeg = ffmpeg
@@ -488,8 +493,8 @@ func (a *api) start() error {
 		a.replacer.RegisterTemplate("fs:diskfs", a.diskfs.Base())
 		a.replacer.RegisterTemplate("fs:memfs", a.memfs.Base())
 
-		if a.s3fs != nil {
-			a.replacer.RegisterTemplate("fs:s3fs", a.s3fs.Base())
+		for name, s3 := range a.s3fs {
+			a.replacer.RegisterTemplate("fs:"+name, s3.Base())
 		}
 
 		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
@@ -595,8 +600,8 @@ func (a *api) start() error {
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Base()))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
-	if a.s3fs != nil {
-		metrics.Register(monitor.NewFilesystemCollector("s3fs", a.s3fs))
+	for name, fs := range a.s3fs {
+		metrics.Register(monitor.NewFilesystemCollector(name, fs))
 	}
 	metrics.Register(monitor.NewRestreamCollector(a.restream))
 	metrics.Register(monitor.NewFFmpegCollector(a.ffmpeg))
@@ -865,18 +870,18 @@ func (a *api) start() error {
 		},
 	}
 
-	if a.s3fs != nil {
+	for _, s3 := range cfg.Storage.S3 {
 		filesystems = append(filesystems, httpfs.FS{
-			Name:               "s3fs",
-			Mountpoint:         "/s3",
+			Name:               s3.Name,
+			Mountpoint:         s3.Mountpoint,
 			AllowWrite:         true,
-			EnableAuth:         cfg.Storage.S3.Auth.Enable,
-			Username:           cfg.Storage.S3.Auth.Username,
-			Password:           cfg.Storage.S3.Auth.Password,
+			EnableAuth:         s3.Auth.Enable,
+			Username:           s3.Auth.Username,
+			Password:           s3.Auth.Password,
 			DefaultFile:        "",
 			DefaultContentType: "application/data",
 			Gzip:               true,
-			Filesystem:         a.s3fs,
+			Filesystem:         a.s3fs[s3.Name],
 			Cache:              a.cache,
 		})
 	}
