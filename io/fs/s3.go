@@ -62,7 +62,7 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("can't connect to s3 endpoint %s: %w", fs.endpoint, err)
 	}
 
 	fs.logger = fs.logger.WithFields(log.Fields{
@@ -77,17 +77,20 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(30*time.Second))
 	defer cancel()
 
-	exists, errBucketExists := client.BucketExists(ctx, fs.bucket)
-	if errBucketExists != nil {
-		return nil, err
+	exists, err := client.BucketExists(ctx, fs.bucket)
+	if err != nil {
+		fs.logger.WithError(err).Log("Can't access bucket")
+		return nil, fmt.Errorf("can't access bucket %s: %w", fs.bucket, err)
 	}
 
 	if exists {
 		fs.logger.Debug().Log("Bucket already exists")
 	} else {
+		fs.logger.Debug().Log("Bucket doesn't exists")
 		err = client.MakeBucket(ctx, fs.bucket, minio.MakeBucketOptions{Region: fs.region})
 		if err != nil {
-			return nil, err
+			fs.logger.WithError(err).Log("Can't create bucket")
+			return nil, fmt.Errorf("can't create bucket %s: %w", fs.bucket, err)
 		} else {
 			fs.logger.Debug().Log("Bucket created")
 		}
