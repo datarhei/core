@@ -10,6 +10,8 @@ type FS struct {
 	Mountpoint string
 
 	AllowWrite bool
+
+	EnableAuth bool
 	Username   string
 	Password   string
 

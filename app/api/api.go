@@ -829,6 +829,51 @@ func (a *api) start() error {
 
 	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
 
+	filesystems := []httpfs.FS{
+		{
+			Name:               "diskfs",
+			Mountpoint:         "",
+			AllowWrite:         false,
+			EnableAuth:         false,
+			Username:           "",
+			Password:           "",
+			DefaultFile:        "index.html",
+			DefaultContentType: "text/html",
+			Gzip:               true,
+			Filesystem:         diskfs,
+			Cache:              a.cache,
+		},
+		{
+			Name:               "memfs",
+			Mountpoint:         "/memfs",
+			AllowWrite:         true,
+			EnableAuth:         cfg.Storage.Memory.Auth.Enable,
+			Username:           cfg.Storage.Memory.Auth.Username,
+			Password:           cfg.Storage.Memory.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.memfs,
+			Cache:              nil,
+		},
+	}
+
+	if a.s3fs != nil {
+		filesystems = append(filesystems, httpfs.FS{
+			Name:               "s3fs",
+			Mountpoint:         "/s3",
+			AllowWrite:         true,
+			EnableAuth:         cfg.Storage.S3.Auth.Enable,
+			Username:           cfg.Storage.S3.Auth.Username,
+			Password:           cfg.Storage.S3.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.s3fs,
+			Cache:              a.cache,
+		})
+	}
+
 	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
@@ -836,46 +881,9 @@ func (a *api) start() error {
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypes,
-		Filesystems: []httpfs.FS{
-			{
-				Name:               "diskfs",
-				Mountpoint:         "/",
-				AllowWrite:         false,
-				Username:           "",
-				Password:           "",
-				DefaultFile:        "index.html",
-				DefaultContentType: "text/html",
-				Gzip:               true,
-				Filesystem:         diskfs,
-				Cache:              a.cache,
-			},
-			{
-				Name:               "memfs",
-				Mountpoint:         "/memfs",
-				AllowWrite:         cfg.Storage.Memory.Auth.Enable,
-				Username:           cfg.Storage.Memory.Auth.Username,
-				Password:           cfg.Storage.Memory.Auth.Password,
-				DefaultFile:        "",
-				DefaultContentType: "application/data",
-				Gzip:               true,
-				Filesystem:         a.memfs,
-				Cache:              a.cache,
-			},
-			{
-				Name:               "s3fs",
-				Mountpoint:         "/s3",
-				AllowWrite:         cfg.Storage.S3.Auth.Enable,
-				Username:           cfg.Storage.S3.Auth.Username,
-				Password:           cfg.Storage.S3.Auth.Password,
-				DefaultFile:        "",
-				DefaultContentType: "application/data",
-				Gzip:               true,
-				Filesystem:         a.s3fs,
-				Cache:              a.cache,
-			},
-		},
-		IPLimiter: iplimiter,
-		Profiling: cfg.Debug.Profiling,
+		Filesystems:   filesystems,
+		IPLimiter:     iplimiter,
+		Profiling:     cfg.Debug.Profiling,
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},

@@ -424,7 +424,15 @@ func (s *server) setRoutes() {
 
 	// Mount filesystems
 	for _, filesystem := range s.filesystems {
-		fs := s.router.Group(filesystem.Mountpoint + "/*")
+		// Define a local variable because later in the loop we have a closure
+		filesystem := filesystem
+
+		mountpoint := filesystem.Mountpoint + "/*"
+		if filesystem.Mountpoint == "/" {
+			mountpoint = "/*"
+		}
+
+		fs := s.router.Group(mountpoint)
 		fs.Use(mwmime.NewWithConfig(mwmime.Config{
 			MimeTypesFile:      s.mimeTypesFile,
 			DefaultContentType: filesystem.DefaultContentType,
@@ -448,22 +456,24 @@ func (s *server) setRoutes() {
 		fs.GET("", filesystem.handler.GetFile)
 		fs.HEAD("", filesystem.handler.GetFile)
 
-		if len(filesystem.Username) != 0 || len(filesystem.Password) != 0 {
-			authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-				if username == filesystem.Username && password == filesystem.Password {
-					return true, nil
-				}
+		if filesystem.AllowWrite {
+			if filesystem.EnableAuth {
+				authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+					if username == filesystem.Username && password == filesystem.Password {
+						return true, nil
+					}
 
-				return false, nil
-			})
+					return false, nil
+				})
 
-			fs.POST("", filesystem.handler.PutFile, authmw)
-			fs.PUT("", filesystem.handler.PutFile, authmw)
-			fs.DELETE("", filesystem.handler.DeleteFile, authmw)
-		} else {
-			fs.POST("", filesystem.handler.PutFile)
-			fs.PUT("", filesystem.handler.PutFile)
-			fs.DELETE("", filesystem.handler.DeleteFile)
+				fs.POST("", filesystem.handler.PutFile, authmw)
+				fs.PUT("", filesystem.handler.PutFile, authmw)
+				fs.DELETE("", filesystem.handler.DeleteFile, authmw)
+			} else {
+				fs.POST("", filesystem.handler.PutFile)
+				fs.PUT("", filesystem.handler.PutFile)
+				fs.DELETE("", filesystem.handler.DeleteFile)
+			}
 		}
 	}
 
