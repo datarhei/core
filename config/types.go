@@ -339,7 +339,7 @@ func (s *s3StorageListValue) String() string {
 			}
 
 			if len(t.Auth.Password) != 0 {
-				v.Set("password", t.Auth.Password)
+				v.Set("password", "---")
 			}
 		}
 
