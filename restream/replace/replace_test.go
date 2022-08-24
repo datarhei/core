@@ -34,15 +34,29 @@ func TestReplace(t *testing.T) {
 
 func TestReplaceTemplate(t *testing.T) {
 	r := New()
-	r.RegisterTemplate("foobar", "Hello {who}! {what}?")
+	r.RegisterTemplate("foo:bar", "Hello {who}! {what}?")
 
-	replaced := r.Replace("{foobar,who=World}", "foobar", "")
+	replaced := r.Replace("{foo:bar,who=World}", "foo:bar", "")
 	require.Equal(t, "Hello World! {what}?", replaced)
 
-	replaced = r.Replace("{foobar,who=World,what=E%3dmc^2}", "foobar", "")
+	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "")
 	require.Equal(t, "Hello World! E=mc^2?", replaced)
 
-	replaced = r.Replace("{foobar^:,who=World,what=E%3dmc:2}", "foobar", "")
+	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "")
+	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
+}
+
+func TestReplaceTemplateFunc(t *testing.T) {
+	r := New()
+	r.RegisterTemplateFunc("foo:bar", func() string { return "Hello {who}! {what}?" })
+
+	replaced := r.Replace("{foo:bar,who=World}", "foo:bar", "")
+	require.Equal(t, "Hello World! {what}?", replaced)
+
+	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "")
+	require.Equal(t, "Hello World! E=mc^2?", replaced)
+
+	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "")
 	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
 }
 
@@ -61,4 +75,13 @@ func TestReplaceCompileTemplate(t *testing.T) {
 		replaced := r.compileTemplate(e[0], e[1])
 		require.Equal(t, e[2], replaced, e[0])
 	}
+}
+
+func TestReplaceGlob(t *testing.T) {
+	r := New()
+	r.RegisterTemplate("foo:bar", "Hello foobar")
+	r.RegisterTemplate("foo:baz", "Hello foobaz")
+
+	replaced := r.Replace("{foo:baz}, {foo:bar}", "foo:*", "")
+	require.Equal(t, "Hello foobaz, Hello foobar", replaced)
 }

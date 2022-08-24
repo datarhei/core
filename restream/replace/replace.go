@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/datarhei/core/v16/glob"
 )
 
 type Replacer interface {
@@ -24,7 +26,8 @@ type Replacer interface {
 	// the value of the corresponding key in the parameters.
 	// If the value is an empty string, the registered templates will be searched for that
 	// placeholder. If no template is found, the placeholder will be replaced by the empty string.
-	// A placeholder name may consist on of the letters a-z.
+	// A placeholder name may consist on of the letters a-z and ':'. The placeholder may contain
+	// a glob pattern to find the appropriate template.
 	Replace(str, placeholder, value string) string
 }
 
@@ -39,8 +42,8 @@ type replacer struct {
 func New() Replacer {
 	r := &replacer{
 		templates:  make(map[string]func() string),
-		re:         regexp.MustCompile(`{([a-z]+)(?:\^(.))?(?:,(.*?))?}`),
-		templateRe: regexp.MustCompile(`{([a-z]+)}`),
+		re:         regexp.MustCompile(`{([a-z:]+)(?:\^(.))?(?:,(.*?))?}`),
+		templateRe: regexp.MustCompile(`{([a-z:]+)}`),
 	}
 
 	return r
@@ -57,7 +60,8 @@ func (r *replacer) RegisterTemplateFunc(placeholder string, template func() stri
 func (r *replacer) Replace(str, placeholder, value string) string {
 	str = r.re.ReplaceAllStringFunc(str, func(match string) string {
 		matches := r.re.FindStringSubmatch(match)
-		if matches[1] != placeholder {
+
+		if ok, _ := glob.Match(placeholder, matches[1], ':'); !ok {
 			return match
 		}
 
@@ -66,7 +70,7 @@ func (r *replacer) Replace(str, placeholder, value string) string {
 
 		// Check for a registered template
 		if len(v) == 0 {
-			tmplFunc, ok := r.templates[placeholder]
+			tmplFunc, ok := r.templates[matches[1]]
 			if ok {
 				v = tmplFunc()
 			}

@@ -84,6 +84,7 @@ func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 	for i, option := range config.Options {
 		// Replace any known placeholders
 		option = r.Replace(option, "diskfs", "")
+		option = r.Replace(option, "fs:disk", "")
 
 		config.Options[i] = option
 	}
@@ -98,6 +99,7 @@ func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 		input.Address = r.Replace(input.Address, "reference", config.Reference)
 		input.Address = r.Replace(input.Address, "diskfs", "")
 		input.Address = r.Replace(input.Address, "memfs", "")
+		input.Address = r.Replace(input.Address, "fs:*", "")
 		input.Address = r.Replace(input.Address, "rtmp", "")
 		input.Address = r.Replace(input.Address, "srt", "")
 
@@ -108,6 +110,7 @@ func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 			option = r.Replace(option, "reference", config.Reference)
 			option = r.Replace(option, "diskfs", "")
 			option = r.Replace(option, "memfs", "")
+			option = r.Replace(option, "fs:*", "")
 
 			input.Options[j] = option
 		}
@@ -124,6 +127,7 @@ func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 		output.Address = r.Replace(output.Address, "reference", config.Reference)
 		output.Address = r.Replace(output.Address, "diskfs", "")
 		output.Address = r.Replace(output.Address, "memfs", "")
+		output.Address = r.Replace(output.Address, "fs:*", "")
 		output.Address = r.Replace(output.Address, "rtmp", "")
 		output.Address = r.Replace(output.Address, "srt", "")
 
@@ -134,6 +138,7 @@ func (config *Config) ResolvePlaceholders(r replace.Replacer) {
 			option = r.Replace(option, "reference", config.Reference)
 			option = r.Replace(option, "diskfs", "")
 			option = r.Replace(option, "memfs", "")
+			option = r.Replace(option, "fs:*", "")
 
 			output.Options[j] = option
 		}
