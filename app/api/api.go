@@ -490,8 +490,8 @@ func (a *api) start() error {
 		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
 		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
 
-		a.replacer.RegisterTemplate("fs:diskfs", a.diskfs.Base())
-		a.replacer.RegisterTemplate("fs:memfs", a.memfs.Base())
+		a.replacer.RegisterTemplate("fs:disk", a.diskfs.Base())
+		a.replacer.RegisterTemplate("fs:mem", a.memfs.Base())
 
 		for name, s3 := range a.s3fs {
 			a.replacer.RegisterTemplate("fs:"+name, s3.Base())
@@ -843,7 +843,7 @@ func (a *api) start() error {
 
 	filesystems := []httpfs.FS{
 		{
-			Name:               "diskfs",
+			Name:               "disk",
 			Mountpoint:         "",
 			AllowWrite:         false,
 			EnableAuth:         false,
@@ -856,7 +856,7 @@ func (a *api) start() error {
 			Cache:              a.cache,
 		},
 		{
-			Name:               "memfs",
+			Name:               "mem",
 			Mountpoint:         "/memfs",
 			AllowWrite:         true,
 			EnableAuth:         cfg.Storage.Memory.Auth.Enable,
