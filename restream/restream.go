@@ -59,6 +59,7 @@ type Config struct {
 	ID           string
 	Name         string
 	Store        store.Store
+	Filesystems  []fs.Filesystem
 	DiskFS       fs.Filesystem
 	MemFS        fs.Filesystem
 	Replace      replace.Replacer
@@ -188,7 +189,7 @@ func (r *restream) Start() {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		r.fs.stopObserver = cancel
-		go r.observe(ctx, 10*time.Second)
+		go r.observe(ctx, r.fs.diskfs, 10*time.Second)
 
 		r.stopOnce = sync.Once{}
 	})
@@ -219,7 +220,7 @@ func (r *restream) Stop() {
 	})
 }
 
-func (r *restream) observe(ctx context.Context, interval time.Duration) {
+func (r *restream) observe(ctx context.Context, fs fs.Filesystem, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -228,14 +229,14 @@ func (r *restream) observe(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			size, limit := r.fs.diskfs.Size()
+			size, limit := fs.Size()
 			isFull := false
 			if limit > 0 && size >= limit {
 				isFull = true
 			}
 
 			if isFull {
-				// Stop all tasks that write to disk
+				// Stop all tasks that write to this filesystem
 				r.lock.Lock()
 				for id, t := range r.tasks {
 					if !t.valid {
@@ -250,7 +251,7 @@ func (r *restream) observe(ctx context.Context, interval time.Duration) {
 						continue
 					}
 
-					r.logger.Warn().Log("Shutting down because disk is full")
+					r.logger.Warn().Log("Shutting down because filesystem is full")
 					r.stopProcess(id)
 				}
 				r.lock.Unlock()
