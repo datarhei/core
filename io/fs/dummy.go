@@ -20,8 +20,11 @@ func (d *dummyFile) Close() error               { return nil }
 func (d *dummyFile) Name() string               { return "" }
 func (d *dummyFile) Stat() (FileInfo, error)    { return &dummyFileInfo{}, nil }
 
-type dummyFilesystem struct{}
+type dummyFilesystem struct {
+	name string
+}
 
+func (d *dummyFilesystem) Name() string                                 { return d.name }
 func (d *dummyFilesystem) Base() string                                 { return "/" }
 func (d *dummyFilesystem) Rebase(string) error                          { return nil }
 func (d *dummyFilesystem) Type() string                                 { return "dummy" }
@@ -36,6 +39,8 @@ func (d *dummyFilesystem) DeleteAll() int64                             { return
 func (d *dummyFilesystem) List(string) []FileInfo                       { return []FileInfo{} }
 
 // NewDummyFilesystem return a dummy filesystem
-func NewDummyFilesystem() Filesystem {
-	return &dummyFilesystem{}
+func NewDummyFilesystem(name string) Filesystem {
+	return &dummyFilesystem{
+		name: name,
+	}
 }

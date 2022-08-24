@@ -38,6 +38,9 @@ type File interface {
 
 // Filesystem is an interface that provides access to a filesystem.
 type Filesystem interface {
+	// Name returns the name of this filesystem
+	Name() string
+
 	// Base returns the base path of this filesystem
 	Base() string
 

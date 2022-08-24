@@ -15,6 +15,9 @@ import (
 // MemConfig is the config that is required for creating
 // a new memory filesystem.
 type MemConfig struct {
+	// Namee is the name of the filesystem
+	Name string
+
 	// Base is the base path to be reported for this filesystem
 	Base string
 
@@ -107,6 +110,7 @@ func (f *memFile) Close() error {
 }
 
 type memFilesystem struct {
+	name string
 	base string
 
 	// Mapping of path to file
@@ -136,6 +140,7 @@ type memFilesystem struct {
 // the Filesystem interface.
 func NewMemFilesystem(config MemConfig) Filesystem {
 	fs := &memFilesystem{
+		name:    config.Name,
 		base:    config.Base,
 		maxSize: config.Size,
 		purge:   config.Purge,
@@ -162,6 +167,10 @@ func NewMemFilesystem(config MemConfig) Filesystem {
 	}).Debug().Log("Created")
 
 	return fs
+}
+
+func (fs *memFilesystem) Name() string {
+	return fs.name
 }
 
 func (fs *memFilesystem) Base() string {

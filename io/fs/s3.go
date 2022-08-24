@@ -13,6 +13,8 @@ import (
 )
 
 type S3Config struct {
+	// Namee is the name of the filesystem
+	Name            string
 	Base            string
 	Endpoint        string
 	AccessKeyID     string
@@ -25,6 +27,7 @@ type S3Config struct {
 }
 
 type s3fs struct {
+	name string
 	base string
 
 	endpoint        string
@@ -41,6 +44,7 @@ type s3fs struct {
 
 func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	fs := &s3fs{
+		name:            config.Name,
 		base:            config.Base,
 		endpoint:        config.Endpoint,
 		accessKeyID:     config.AccessKeyID,
@@ -99,6 +103,10 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	fs.client = client
 
 	return fs, nil
+}
+
+func (fs *s3fs) Name() string {
+	return fs.name
 }
 
 func (fs *s3fs) Base() string {

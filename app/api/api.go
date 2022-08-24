@@ -371,6 +371,7 @@ func (a *api) start() error {
 	})
 
 	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
+		Name:   "disk",
 		Dir:    cfg.Storage.Disk.Dir,
 		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
 		Logger: a.log.logger.core.WithComponent("FS"),
@@ -399,6 +400,7 @@ func (a *api) start() error {
 
 	if a.memfs == nil {
 		memfs := fs.NewMemFilesystem(fs.MemConfig{
+			Name:   "mem",
 			Base:   baseMemFS.String(),
 			Size:   cfg.Storage.Memory.Size * 1024 * 1024,
 			Purge:  cfg.Storage.Memory.Purge,
@@ -429,6 +431,7 @@ func (a *api) start() error {
 		}
 
 		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
+			Name:            s3.Name,
 			Base:            baseS3FS.String(),
 			Endpoint:        s3.Endpoint,
 			AccessKeyID:     s3.AccessKeyID,
@@ -524,10 +527,20 @@ func (a *api) start() error {
 		a.replacer.RegisterTemplate("srt", template)
 	}
 
+	filesystems := []fs.Filesystem{
+		a.diskfs,
+		a.memfs,
+	}
+
+	for _, fs := range a.s3fs {
+		filesystems = append(filesystems, fs)
+	}
+
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
 		Name:         cfg.Name,
 		Store:        store,
+		Filesystems:  filesystems,
 		DiskFS:       a.diskfs,
 		MemFS:        a.memfs,
 		Replace:      a.replacer,
@@ -841,9 +854,9 @@ func (a *api) start() error {
 
 	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
 
-	filesystems := []httpfs.FS{
+	httpfilesystems := []httpfs.FS{
 		{
-			Name:               "disk",
+			Name:               a.diskfs.Name(),
 			Mountpoint:         "",
 			AllowWrite:         false,
 			EnableAuth:         false,
@@ -852,11 +865,11 @@ func (a *api) start() error {
 			DefaultFile:        "index.html",
 			DefaultContentType: "text/html",
 			Gzip:               true,
-			Filesystem:         diskfs,
+			Filesystem:         a.diskfs,
 			Cache:              a.cache,
 		},
 		{
-			Name:               "mem",
+			Name:               a.memfs.Name(),
 			Mountpoint:         "/memfs",
 			AllowWrite:         true,
 			EnableAuth:         cfg.Storage.Memory.Auth.Enable,
@@ -871,7 +884,7 @@ func (a *api) start() error {
 	}
 
 	for _, s3 := range cfg.Storage.S3 {
-		filesystems = append(filesystems, httpfs.FS{
+		httpfilesystems = append(httpfilesystems, httpfs.FS{
 			Name:               s3.Name,
 			Mountpoint:         s3.Mountpoint,
 			AllowWrite:         true,
@@ -893,7 +906,7 @@ func (a *api) start() error {
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypes,
-		Filesystems:   filesystems,
+		Filesystems:   httpfilesystems,
 		IPLimiter:     iplimiter,
 		Profiling:     cfg.Debug.Profiling,
 		Cors: http.CorsConfig{
