@@ -140,7 +140,10 @@ func NewDiskFilesystem(config DiskConfig) (Filesystem, error) {
 		fs.logger = log.New("")
 	}
 
-	fs.logger = fs.logger.WithField("type", "disk")
+	fs.logger = fs.logger.WithFields(log.Fields{
+		"name": fs.name,
+		"type": "disk",
+	})
 
 	if err := fs.Rebase(config.Dir); err != nil {
 		return nil, err

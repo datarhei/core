@@ -70,6 +70,7 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	}
 
 	fs.logger = fs.logger.WithFields(log.Fields{
+		"name":     fs.name,
 		"type":     "s3",
 		"bucket":   fs.bucket,
 		"region":   fs.region,

@@ -162,6 +162,7 @@ func NewMemFilesystem(config MemConfig) Filesystem {
 	}
 
 	fs.logger.WithFields(log.Fields{
+		"name":       fs.name,
 		"size_bytes": fs.maxSize,
 		"purge":      fs.purge,
 	}).Debug().Log("Created")

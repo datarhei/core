@@ -541,8 +541,6 @@ func (a *api) start() error {
 		Name:         cfg.Name,
 		Store:        store,
 		Filesystems:  filesystems,
-		DiskFS:       a.diskfs,
-		MemFS:        a.memfs,
 		Replace:      a.replacer,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
