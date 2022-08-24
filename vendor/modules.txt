@@ -1,4 +1,4 @@
-# github.com/99designs/gqlgen v0.17.12
+# github.com/99designs/gqlgen v0.17.15
 ## explicit; go 1.16
 github.com/99designs/gqlgen
 github.com/99designs/gqlgen/api
@@ -93,11 +93,11 @@ github.com/go-openapi/jsonpointer
 ## explicit; go 1.13
 github.com/go-openapi/jsonreference
 github.com/go-openapi/jsonreference/internal
-# github.com/go-openapi/spec v0.20.6
+# github.com/go-openapi/spec v0.20.7
 ## explicit; go 1.13
 github.com/go-openapi/spec
-# github.com/go-openapi/swag v0.21.1
-## explicit; go 1.11
+# github.com/go-openapi/swag v0.22.3
+## explicit; go 1.18
 github.com/go-openapi/swag
 # github.com/go-playground/locales v0.14.0
 ## explicit; go 1.13
@@ -161,7 +161,7 @@ github.com/klauspost/compress/s2
 # github.com/klauspost/cpuid/v2 v2.1.0
 ## explicit; go 1.15
 github.com/klauspost/cpuid/v2
-# github.com/labstack/echo/v4 v4.7.2
+# github.com/labstack/echo/v4 v4.8.0
 ## explicit; go 1.17
 github.com/labstack/echo/v4
 github.com/labstack/echo/v4/middleware
@@ -185,17 +185,11 @@ github.com/lufia/plan9stats
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/matryer/moq v0.2.7
-## explicit; go 1.14
-github.com/matryer/moq
-github.com/matryer/moq/internal/registry
-github.com/matryer/moq/internal/template
-github.com/matryer/moq/pkg/moq
-# github.com/mattn/go-colorable v0.1.12
-## explicit; go 1.13
+# github.com/mattn/go-colorable v0.1.13
+## explicit; go 1.15
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.14
-## explicit; go 1.12
+# github.com/mattn/go-isatty v0.0.16
+## explicit; go 1.15
 github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 ## explicit
@@ -237,8 +231,8 @@ github.com/power-devops/perfstat
 # github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 ## explicit
 github.com/prep/average
-# github.com/prometheus/client_golang v1.12.2
-## explicit; go 1.13
+# github.com/prometheus/client_golang v1.13.0
+## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
@@ -261,7 +255,7 @@ github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/shirou/gopsutil/v3 v3.22.6
+# github.com/shirou/gopsutil/v3 v3.22.7
 ## explicit; go 1.15
 github.com/shirou/gopsutil/v3/cpu
 github.com/shirou/gopsutil/v3/disk
@@ -272,17 +266,17 @@ github.com/shirou/gopsutil/v3/process
 # github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/stretchr/testify v1.7.5
+# github.com/stretchr/testify v1.8.0
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# github.com/swaggo/echo-swagger v1.3.3
+# github.com/swaggo/echo-swagger v1.3.4
 ## explicit; go 1.15
 github.com/swaggo/echo-swagger
 # github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a
 ## explicit; go 1.15
 github.com/swaggo/files
-# github.com/swaggo/swag v1.8.3
+# github.com/swaggo/swag v1.8.4
 ## explicit; go 1.18
 github.com/swaggo/swag
 # github.com/tklauser/go-sysconf v0.3.10
@@ -300,7 +294,7 @@ github.com/valyala/bytebufferpool
 # github.com/valyala/fasttemplate v1.2.1
 ## explicit; go 1.12
 github.com/valyala/fasttemplate
-# github.com/vektah/gqlparser/v2 v2.4.6
+# github.com/vektah/gqlparser/v2 v2.4.8
 ## explicit; go 1.16
 github.com/vektah/gqlparser/v2
 github.com/vektah/gqlparser/v2/ast
@@ -324,7 +318,7 @@ github.com/xrash/smetrics
 # github.com/yusufpapurcu/wmi v1.2.2
 ## explicit; go 1.16
 github.com/yusufpapurcu/wmi
-# golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
+# golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
 ## explicit; go 1.17
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
@@ -337,7 +331,7 @@ golang.org/x/crypto/sha3
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20220722155237-a158d28d115b
+# golang.org/x/net v0.0.0-20220822230855-b0a4917ee28c
 ## explicit; go 1.17
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
@@ -347,7 +341,7 @@ golang.org/x/net/idna
 golang.org/x/net/publicsuffix
 golang.org/x/net/webdav
 golang.org/x/net/webdav/internal/xml
-# golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
+# golang.org/x/sys v0.0.0-20220823224334-20c2bfdbfe24
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -423,7 +417,7 @@ google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/ini.v1 v1.66.6
+# gopkg.in/ini.v1 v1.67.0
 ## explicit
 gopkg.in/ini.v1
 # gopkg.in/yaml.v2 v2.4.0
