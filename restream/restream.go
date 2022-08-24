@@ -91,7 +91,7 @@ type restream struct {
 	nProc     int64
 	fs        struct {
 		list         []rfs.Filesystem
-		diskfs       rfs.Filesystem
+		diskfs       []rfs.Filesystem
 		stopObserver context.CancelFunc
 	}
 	replace  replace.Replacer
@@ -132,9 +132,9 @@ func New(config Config) (Restreamer, error) {
 
 		r.fs.list = append(r.fs.list, fs)
 
-		// TODO: This is just to make the input and output address validator happy for now. This needs to be replaced with a more general approach.
+		// Add the diskfs filesystems also to a separate array. We need it later for input and output validation
 		if fs.Type() == "diskfs" {
-			r.fs.diskfs = fs
+			r.fs.diskfs = append(r.fs.diskfs, fs)
 		}
 	}
 
@@ -595,8 +595,15 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		io.Address, err = r.validateInputAddress(io.Address, r.fs.diskfs.Base())
-		if err != nil {
+		maxFails := 0
+		for _, fs := range r.fs.diskfs {
+			io.Address, err = r.validateInputAddress(io.Address, fs.Base())
+			if err != nil {
+				maxFails++
+			}
+		}
+
+		if maxFails == len(r.fs.diskfs) {
 			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
 		}
 	}
@@ -627,15 +634,21 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		isFile := false
+		maxFails := 0
+		for _, fs := range r.fs.diskfs {
+			isFile := false
+			io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Base())
+			if err != nil {
+				maxFails++
+			}
 
-		io.Address, isFile, err = r.validateOutputAddress(io.Address, r.fs.diskfs.Base())
-		if err != nil {
-			return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+			if isFile {
+				hasFiles = true
+			}
 		}
 
-		if isFile {
-			hasFiles = true
+		if maxFails == len(r.fs.diskfs) {
+			return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
 		}
 	}
 
