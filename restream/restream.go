@@ -595,16 +595,23 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		maxFails := 0
-		for _, fs := range r.fs.diskfs {
-			io.Address, err = r.validateInputAddress(io.Address, fs.Base())
-			if err != nil {
-				maxFails++
+		if len(r.fs.diskfs) != 0 {
+			maxFails := 0
+			for _, fs := range r.fs.diskfs {
+				io.Address, err = r.validateInputAddress(io.Address, fs.Base())
+				if err != nil {
+					maxFails++
+				}
 			}
-		}
 
-		if maxFails == len(r.fs.diskfs) {
-			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+			if maxFails == len(r.fs.diskfs) {
+				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+			}
+		} else {
+			io.Address, err = r.validateInputAddress(io.Address, "/")
+			if err != nil {
+				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+			}
 		}
 	}
 
@@ -634,21 +641,33 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		maxFails := 0
-		for _, fs := range r.fs.diskfs {
+		if len(r.fs.diskfs) != 0 {
+			maxFails := 0
+			for _, fs := range r.fs.diskfs {
+				isFile := false
+				io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Base())
+				if err != nil {
+					maxFails++
+				}
+
+				if isFile {
+					hasFiles = true
+				}
+			}
+
+			if maxFails == len(r.fs.diskfs) {
+				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+			}
+		} else {
 			isFile := false
-			io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Base())
+			io.Address, isFile, err = r.validateOutputAddress(io.Address, "/")
 			if err != nil {
-				maxFails++
+				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
 			}
 
 			if isFile {
 				hasFiles = true
 			}
-		}
-
-		if maxFails == len(r.fs.diskfs) {
-			return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
 		}
 	}
 
