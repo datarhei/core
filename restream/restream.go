@@ -128,7 +128,7 @@ func New(config Config) (Restreamer, error) {
 	if config.DiskFS != nil {
 		r.fs.diskfs = rfs.New(rfs.Config{
 			FS:     config.DiskFS,
-			Logger: r.logger.WithComponent("DiskFS"),
+			Logger: r.logger.WithComponent("Cleanup").WithField("type", "diskfs"),
 		})
 	} else {
 		r.fs.diskfs = rfs.New(rfs.Config{
@@ -139,7 +139,7 @@ func New(config Config) (Restreamer, error) {
 	if config.MemFS != nil {
 		r.fs.memfs = rfs.New(rfs.Config{
 			FS:     config.MemFS,
-			Logger: r.logger.WithComponent("MemFS"),
+			Logger: r.logger.WithComponent("Cleanup").WithField("type", "memfs"),
 		})
 	} else {
 		r.fs.memfs = rfs.New(rfs.Config{
@@ -478,7 +478,7 @@ func (r *restream) setCleanup(id string, config *app.Config) {
 					},
 				})
 			} else if strings.HasPrefix(c.Pattern, "diskfs:") {
-				r.fs.memfs.SetCleanup(id, []rfs.Pattern{
+				r.fs.diskfs.SetCleanup(id, []rfs.Pattern{
 					{
 						Pattern:       strings.TrimPrefix(c.Pattern, "diskfs:"),
 						MaxFiles:      c.MaxFiles,
