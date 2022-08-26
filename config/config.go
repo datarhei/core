@@ -190,7 +190,7 @@ func (d *Config) init() {
 	d.val(newInt64Value(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
 	d.val(newUint64Value(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
 	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
-	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
+	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
 
 	// Storage (Memory)
 	d.val(newBoolValue(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
