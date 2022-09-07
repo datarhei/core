@@ -2,6 +2,7 @@
 package log
 
 import (
+	"io"
 	"net/http"
 	"time"
 
@@ -45,40 +46,92 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			start := time.Now()
 
 			req := c.Request()
+
+			var reader io.ReadCloser
+			r := &sizeReadCloser{}
+
+			if req.Body != nil {
+				reader = req.Body
+				r.ReadCloser = req.Body
+				req.Body = r
+			}
+
 			res := c.Response()
+
+			writer := res.Writer
+			w := &sizeWriter{
+				ResponseWriter: res.Writer,
+			}
+			res.Writer = w
 
 			path := req.URL.Path
 			raw := req.URL.RawQuery
 
-			if err := next(c); err != nil {
-				c.Error(err)
-			}
+			defer func() {
+				res.Writer = writer
+				req.Body = reader
 
-			latency := time.Since(start)
+				latency := time.Since(start)
 
-			if raw != "" {
-				path = path + "?" + raw
-			}
+				if raw != "" {
+					path = path + "?" + raw
+				}
 
-			logger := config.Logger.WithFields(log.Fields{
-				"client":      c.RealIP(),
-				"method":      req.Method,
-				"path":        path,
-				"proto":       req.Proto,
-				"status":      res.Status,
-				"status_text": http.StatusText(res.Status),
-				"size_bytes":  res.Size,
-				"latency_ms":  latency.Milliseconds(),
-				"user_agent":  req.Header.Get("User-Agent"),
-			})
+				logger := config.Logger.WithFields(log.Fields{
+					"client":        c.RealIP(),
+					"method":        req.Method,
+					"path":          path,
+					"proto":         req.Proto,
+					"status":        res.Status,
+					"status_text":   http.StatusText(res.Status),
+					"tx_size_bytes": w.size,
+					"rx_size_bytes": r.size,
+					"latency_ms":    latency.Milliseconds(),
+					"user_agent":    req.Header.Get("User-Agent"),
+				})
 
-			if res.Status >= 400 {
-				logger.Warn().Log("")
-			}
+				if res.Status >= 400 {
+					logger.Warn().Log("")
+				}
 
-			logger.Debug().Log("")
+				logger.Debug().Log("")
+			}()
 
-			return nil
+			return next(c)
 		}
 	}
+}
+
+type sizeWriter struct {
+	http.ResponseWriter
+
+	size int64
+}
+
+func (w *sizeWriter) Write(body []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(body)
+
+	w.size += int64(n)
+
+	return n, err
+}
+
+type sizeReadCloser struct {
+	io.ReadCloser
+
+	size int64
+}
+
+func (r *sizeReadCloser) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+
+	r.size += int64(n)
+
+	return n, err
+}
+
+func (r *sizeReadCloser) Close() error {
+	err := r.ReadCloser.Close()
+
+	return err
 }

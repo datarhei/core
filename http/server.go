@@ -51,7 +51,6 @@ import (
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
 
-	mwbodysize "github.com/datarhei/core/v16/http/middleware/bodysize"
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
@@ -341,7 +340,6 @@ func NewServer(config Config) (Server, error) {
 			return nil
 		},
 	}))
-	s.router.Use(mwbodysize.New())
 	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
 		Collector: config.Sessions.Collector("http"),
 	}))
