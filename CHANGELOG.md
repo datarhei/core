@@ -2,6 +2,10 @@
 
 ### Core v16.9.1 > v16.10.0
 
+-   Add /v3/metrics (get) endpoint to list all known metrics
+-   Add logging HTTP request and response body sizes
+-   Exclude .m3u8 and .mpd files from disk cache by default
+-   Fix assigning cleanup rules for diskfs
 -   Fix wrong path for swagger definition
 -   Fix process cleanup on delete
 -   Add process id and reference glob pattern matching
