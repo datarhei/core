@@ -409,9 +409,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) setRoutes() {
 	gzipMiddleware := mwgzip.NewWithConfig(mwgzip.Config{
-		Level:        mwgzip.BestSpeed,
-		MinLength:    1000,
-		ContentTypes: []string{""},
+		Level:     mwgzip.BestSpeed,
+		MinLength: 1000,
+		Skipper:   mwgzip.ContentTypeSkipper(nil),
 	})
 
 	// API router grouo
@@ -444,9 +444,9 @@ func (s *server) setRoutes() {
 		DefaultContentType: "text/html",
 	}))
 	fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-		Level:        mwgzip.BestSpeed,
-		MinLength:    1000,
-		ContentTypes: s.gzip.mimetypes,
+		Level:     mwgzip.BestSpeed,
+		MinLength: 1000,
+		Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
 	}))
 	if s.middleware.cache != nil {
 		fs.Use(s.middleware.cache)
@@ -467,9 +467,9 @@ func (s *server) setRoutes() {
 			DefaultContentType: "application/data",
 		}))
 		memfs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-			Level:        mwgzip.BestSpeed,
-			MinLength:    1000,
-			ContentTypes: s.gzip.mimetypes,
+			Level:     mwgzip.BestSpeed,
+			MinLength: 1000,
+			Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
 		}))
 		if s.middleware.session != nil {
 			memfs.Use(s.middleware.session)

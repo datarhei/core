@@ -2,6 +2,7 @@ package gzip
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"io"
 	"net"
@@ -25,15 +26,16 @@ type Config struct {
 	// Length threshold before gzip compression
 	// is used. Optional. Default value 0
 	MinLength int
-
-	// Content-Types to compress. Empty for all
-	// files. Optional. Default value "text/plain" and "text/html"
-	ContentTypes []string
 }
 
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
+	wroteBody         bool
+	minLength         int
+	minLengthExceeded bool
+	buffer            bytes.Buffer
+	code              int
 }
 
 const gzipScheme = "gzip"
@@ -47,10 +49,32 @@ const (
 
 // DefaultConfig is the default Gzip middleware config.
 var DefaultConfig = Config{
-	Skipper:      middleware.DefaultSkipper,
-	Level:        -1,
-	MinLength:    0,
-	ContentTypes: []string{"text/plain", "text/html"},
+	Skipper:   middleware.DefaultSkipper,
+	Level:     DefaultCompression,
+	MinLength: 0,
+}
+
+// ContentTypesSkipper returns a Skipper based on the list of content types
+// that should be compressed. If the list is empty, all responses will be
+// compressed.
+func ContentTypeSkipper(contentTypes []string) middleware.Skipper {
+	return func(c echo.Context) bool {
+		// If no allowed content types are given, compress all
+		if len(contentTypes) == 0 {
+			return false
+		}
+
+		// Iterate through the allowed content types and don't skip if the content type matches
+		responseContentType := c.Response().Header().Get(echo.HeaderContentType)
+
+		for _, contentType := range contentTypes {
+			if strings.Contains(responseContentType, contentType) {
+				return false
+			}
+		}
+
+		return true
+	}
 }
 
 // New returns a middleware which compresses HTTP response using gzip compression
@@ -75,10 +99,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.MinLength = DefaultConfig.MinLength
 	}
 
-	if config.ContentTypes == nil {
-		config.ContentTypes = DefaultConfig.ContentTypes
-	}
-
 	pool := gzipPool(config)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -89,8 +109,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			res := c.Response()
 			res.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
-			if shouldCompress(c, config.ContentTypes) {
-				res.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+
+			if strings.Contains(c.Request().Header.Get(echo.HeaderAcceptEncoding), gzipScheme) {
 				i := pool.Get()
 				w, ok := i.(*gzip.Writer)
 				if !ok {
@@ -98,8 +118,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				}
 				rw := res.Writer
 				w.Reset(rw)
+				grw := &gzipResponseWriter{Writer: w, ResponseWriter: rw, minLength: config.MinLength}
+
 				defer func() {
-					if res.Size == 0 {
+					if !grw.wroteBody {
 						if res.Header().Get(echo.HeaderContentEncoding) == gzipScheme {
 							res.Header().Del(echo.HeaderContentEncoding)
 						}
@@ -108,41 +130,23 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						// See issue #424, #407.
 						res.Writer = rw
 						w.Reset(io.Discard)
+					} else if !grw.minLengthExceeded {
+						// Write uncompressed response
+						res.Writer = rw
+						grw.ResponseWriter.WriteHeader(grw.code)
+						grw.buffer.WriteTo(rw)
+						w.Reset(io.Discard)
 					}
 					w.Close()
 					pool.Put(w)
 				}()
-				grw := &gzipResponseWriter{Writer: w, ResponseWriter: rw}
+
 				res.Writer = grw
 			}
+
 			return next(c)
 		}
 	}
-}
-
-func shouldCompress(c echo.Context, contentTypes []string) bool {
-	if !strings.Contains(c.Request().Header.Get(echo.HeaderAcceptEncoding), gzipScheme) ||
-		strings.Contains(c.Request().Header.Get("Connection"), "Upgrade") ||
-		strings.Contains(c.Request().Header.Get(echo.HeaderContentType), "text/event-stream") {
-
-		return false
-	}
-
-	// If no allowed content types are given, compress all
-	if len(contentTypes) == 0 {
-		return true
-	}
-
-	// Iterate through the allowed content types and return true if the content type matches
-	responseContentType := c.Response().Header().Get(echo.HeaderContentType)
-
-	for _, contentType := range contentTypes {
-		if strings.Contains(responseContentType, contentType) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (w *gzipResponseWriter) WriteHeader(code int) {
@@ -150,12 +154,32 @@ func (w *gzipResponseWriter) WriteHeader(code int) {
 		w.ResponseWriter.Header().Del(echo.HeaderContentEncoding)
 	}
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
-	w.ResponseWriter.WriteHeader(code)
+
+	// Delay writing of the header until we know if we'll actually compress the response
+	w.code = code
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if w.Header().Get(echo.HeaderContentType) == "" {
 		w.Header().Set(echo.HeaderContentType, http.DetectContentType(b))
+	}
+
+	w.wroteBody = true
+
+	if !w.minLengthExceeded {
+		n, err := w.buffer.Write(b)
+
+		if w.buffer.Len() >= w.minLength {
+			w.minLengthExceeded = true
+
+			// The minimum length is exceeded, add Content-Encoding header and write the header
+			w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+			w.ResponseWriter.WriteHeader(w.code)
+
+			return w.Writer.Write(w.buffer.Bytes())
+		} else {
+			return n, err
+		}
 	}
 
 	return w.Writer.Write(b)
