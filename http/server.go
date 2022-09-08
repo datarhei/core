@@ -640,6 +640,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 Log
 	v3.GET("/log", s.v3handler.log.Log)
 
-	// v3 Resources
+	// v3 Metrics
+	v3.GET("/metrics", s.v3handler.resources.Describe)
 	v3.POST("/metrics", s.v3handler.resources.Metrics)
 }

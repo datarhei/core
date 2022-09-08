@@ -7,6 +7,12 @@ import (
 	"github.com/datarhei/core/v16/monitor"
 )
 
+type MetricsDescription struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Labels      []string `json:"labels"`
+}
+
 type MetricsQueryMetric struct {
 	Name   string            `json:"name"`
 	Labels map[string]string `json:"labels"`

@@ -20,11 +20,11 @@ func NewCPUCollector() metric.Collector {
 		ncpu: 1,
 	}
 
-	c.ncpuDescr = metric.NewDesc("cpu_ncpu", "", nil)
-	c.systemDescr = metric.NewDesc("cpu_system", "", nil)
-	c.userDescr = metric.NewDesc("cpu_user", "", nil)
-	c.idleDescr = metric.NewDesc("cpu_idle", "", nil)
-	c.otherDescr = metric.NewDesc("cpu_other", "", nil)
+	c.ncpuDescr = metric.NewDesc("cpu_ncpu", "Number of logical CPUs in the system", nil)
+	c.systemDescr = metric.NewDesc("cpu_system", "Percentage of CPU used for the system", nil)
+	c.userDescr = metric.NewDesc("cpu_user", "Percentage of CPU used for the user", nil)
+	c.idleDescr = metric.NewDesc("cpu_idle", "Percentage of idle CPU", nil)
+	c.otherDescr = metric.NewDesc("cpu_other", "Percentage of CPU used for other subsystems", nil)
 
 	if ncpu, err := psutil.CPUCounts(true); err == nil {
 		c.ncpu = ncpu

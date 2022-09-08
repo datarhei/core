@@ -10,9 +10,26 @@ import (
 	"github.com/datarhei/core/v16/monitor/metric"
 )
 
-type Monitor interface {
-	Register(c metric.Collector)
+type Reader interface {
 	Collect(patterns []metric.Pattern) metric.Metrics
+	Describe() []*metric.Description
+}
+
+type Monitor interface {
+	Reader
+	Register(c metric.Collector)
+	UnregisterAll()
+}
+
+type HistoryReader interface {
+	Reader
+	History(timerange, interval time.Duration, patterns []metric.Pattern) []HistoryMetrics
+	Resolution() (timerange, interval time.Duration)
+}
+
+type HistoryMonitor interface {
+	HistoryReader
+	Register(c metric.Collector)
 	UnregisterAll()
 }
 
@@ -75,6 +92,26 @@ func (m *monitor) Collect(patterns []metric.Pattern) metric.Metrics {
 	return metrics
 }
 
+func (m *monitor) Describe() []*metric.Description {
+	descriptors := []*metric.Description{}
+	collectors := map[metric.Collector]struct{}{}
+
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	for _, c := range m.collectors {
+		if _, ok := collectors[c]; ok {
+			continue
+		}
+
+		collectors[c] = struct{}{}
+
+		descriptors = append(descriptors, c.Describe()...)
+	}
+
+	return descriptors
+}
+
 func (m *monitor) UnregisterAll() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -84,12 +121,6 @@ func (m *monitor) UnregisterAll() {
 	}
 
 	m.collectors = make(map[string]metric.Collector)
-}
-
-type HistoryMonitor interface {
-	Monitor
-	History(timerange, interval time.Duration, patterns []metric.Pattern) []HistoryMetrics
-	Resolution() (timerange, interval time.Duration)
 }
 
 type historyMonitor struct {
@@ -209,6 +240,10 @@ func (m *historyMonitor) Collect(patterns []metric.Pattern) metric.Metrics {
 	return m.monitor.Collect(patterns)
 }
 
+func (m *historyMonitor) Describe() []*metric.Description {
+	return m.monitor.Describe()
+}
+
 func (m *historyMonitor) UnregisterAll() {
 	m.monitor.UnregisterAll()
 
@@ -326,14 +361,4 @@ func (m *historyMonitor) resample(values []HistoryMetrics, timerange, interval t
 	}
 
 	return v
-}
-
-type Reader interface {
-	Collect(patterns []metric.Pattern) metric.Metrics
-}
-
-type HistoryReader interface {
-	Reader
-	History(timerange, interval time.Duration, patterns []metric.Pattern) []HistoryMetrics
-	Resolution() (timerange, interval time.Duration)
 }
