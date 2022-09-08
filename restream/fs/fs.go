@@ -53,52 +53,52 @@ type filesystem struct {
 }
 
 func New(config Config) Filesystem {
-	fs := &filesystem{
+	rfs := &filesystem{
 		Filesystem: config.FS,
 		logger:     config.Logger,
 	}
 
-	if fs.logger == nil {
-		fs.logger = log.New("")
+	if rfs.logger == nil {
+		rfs.logger = log.New("")
 	}
 
-	fs.cleanupPatterns = make(map[string][]Pattern)
+	rfs.cleanupPatterns = make(map[string][]Pattern)
 
 	// already drain the stop
-	fs.stopOnce.Do(func() {})
+	rfs.stopOnce.Do(func() {})
 
-	return fs
+	return rfs
 }
 
-func (fs *filesystem) Start() {
-	fs.startOnce.Do(func() {
+func (rfs *filesystem) Start() {
+	rfs.startOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
-		fs.stopTicker = cancel
-		go fs.cleanupTicker(ctx, time.Second)
+		rfs.stopTicker = cancel
+		go rfs.cleanupTicker(ctx, time.Second)
 
-		fs.stopOnce = sync.Once{}
+		rfs.stopOnce = sync.Once{}
 
-		fs.logger.Debug().Log("Starting cleanup")
+		rfs.logger.Debug().Log("Starting cleanup")
 	})
 }
 
-func (fs *filesystem) Stop() {
-	fs.stopOnce.Do(func() {
-		fs.stopTicker()
+func (rfs *filesystem) Stop() {
+	rfs.stopOnce.Do(func() {
+		rfs.stopTicker()
 
-		fs.startOnce = sync.Once{}
+		rfs.startOnce = sync.Once{}
 
-		fs.logger.Debug().Log("Stopping cleanup")
+		rfs.logger.Debug().Log("Stopping cleanup")
 	})
 }
 
-func (fs *filesystem) SetCleanup(id string, patterns []Pattern) {
+func (rfs *filesystem) SetCleanup(id string, patterns []Pattern) {
 	if len(patterns) == 0 {
 		return
 	}
 
 	for _, p := range patterns {
-		fs.logger.Debug().WithFields(log.Fields{
+		rfs.logger.Debug().WithFields(log.Fields{
 			"id":           id,
 			"pattern":      p.Pattern,
 			"max_files":    p.MaxFiles,
@@ -106,38 +106,47 @@ func (fs *filesystem) SetCleanup(id string, patterns []Pattern) {
 		}).Log("Add pattern")
 	}
 
-	fs.cleanupLock.Lock()
-	defer fs.cleanupLock.Unlock()
+	rfs.cleanupLock.Lock()
+	defer rfs.cleanupLock.Unlock()
 
-	fs.cleanupPatterns[id] = append(fs.cleanupPatterns[id], patterns...)
+	rfs.cleanupPatterns[id] = append(rfs.cleanupPatterns[id], patterns...)
 }
 
-func (fs *filesystem) UnsetCleanup(id string) {
-	fs.logger.Debug().WithField("id", id).Log("Remove pattern group")
+func (rfs *filesystem) UnsetCleanup(id string) {
+	rfs.logger.Debug().WithField("id", id).Log("Remove pattern group")
 
-	fs.cleanupLock.Lock()
-	defer fs.cleanupLock.Unlock()
+	rfs.cleanupLock.Lock()
+	defer rfs.cleanupLock.Unlock()
 
-	patterns := fs.cleanupPatterns[id]
-	delete(fs.cleanupPatterns, id)
+	patterns := rfs.cleanupPatterns[id]
+	delete(rfs.cleanupPatterns, id)
 
-	fs.purge(patterns)
+	rfs.purge(patterns)
 }
 
-func (fs *filesystem) cleanup() {
-	fs.cleanupLock.RLock()
-	defer fs.cleanupLock.RUnlock()
+func (rfs *filesystem) cleanup() {
+	rfs.cleanupLock.RLock()
+	defer rfs.cleanupLock.RUnlock()
 
-	for _, patterns := range fs.cleanupPatterns {
+	for _, patterns := range rfs.cleanupPatterns {
 		for _, pattern := range patterns {
-			files := fs.Filesystem.List(pattern.Pattern)
+			filesAndDirs := rfs.Filesystem.List(pattern.Pattern)
+
+			files := []fs.FileInfo{}
+			for _, f := range filesAndDirs {
+				if f.IsDir() {
+					continue
+				}
+
+				files = append(files, f)
+			}
 
 			sort.Slice(files, func(i, j int) bool { return files[i].ModTime().Before(files[j].ModTime()) })
 
 			if pattern.MaxFiles > 0 && uint(len(files)) > pattern.MaxFiles {
 				for i := uint(0); i < uint(len(files))-pattern.MaxFiles; i++ {
-					fs.logger.Debug().WithField("path", files[i].Name()).Log("Remove file because MaxFiles is exceeded")
-					fs.Filesystem.Delete(files[i].Name())
+					rfs.logger.Debug().WithField("path", files[i].Name()).Log("Remove file because MaxFiles is exceeded")
+					rfs.Filesystem.Delete(files[i].Name())
 				}
 			}
 
@@ -146,8 +155,8 @@ func (fs *filesystem) cleanup() {
 
 				for _, f := range files {
 					if f.ModTime().Before(bestBefore) {
-						fs.logger.Debug().WithField("path", f.Name()).Log("Remove file because MaxFileAge is exceeded")
-						fs.Filesystem.Delete(f.Name())
+						rfs.logger.Debug().WithField("path", f.Name()).Log("Remove file because MaxFileAge is exceeded")
+						rfs.Filesystem.Delete(f.Name())
 					}
 				}
 			}
@@ -155,16 +164,17 @@ func (fs *filesystem) cleanup() {
 	}
 }
 
-func (fs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
+func (rfs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
 	for _, pattern := range patterns {
 		if !pattern.PurgeOnDelete {
 			continue
 		}
 
-		files := fs.Filesystem.List(pattern.Pattern)
+		files := rfs.Filesystem.List(pattern.Pattern)
+		sort.Slice(files, func(i, j int) bool { return len(files[i].Name()) > len(files[j].Name()) })
 		for _, f := range files {
-			fs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
-			fs.Filesystem.Delete(f.Name())
+			rfs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
+			rfs.Filesystem.Delete(f.Name())
 			nfiles++
 		}
 	}
@@ -172,7 +182,7 @@ func (fs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
 	return
 }
 
-func (fs *filesystem) cleanupTicker(ctx context.Context, interval time.Duration) {
+func (rfs *filesystem) cleanupTicker(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -181,7 +191,7 @@ func (fs *filesystem) cleanupTicker(ctx context.Context, interval time.Duration)
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			fs.cleanup()
+			rfs.cleanup()
 		}
 	}
 }

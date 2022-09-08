@@ -54,6 +54,7 @@ import (
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
+	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
@@ -144,6 +145,7 @@ type server struct {
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
+		hlsrewrite echo.MiddlewareFunc
 	}
 
 	memfs struct {
@@ -183,6 +185,10 @@ func NewServer(config Config) (Server, error) {
 		config.DiskFS,
 		config.Cache,
 	)
+
+	s.middleware.hlsrewrite = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
+		PathPrefix: config.DiskFS.Base(),
+	})
 
 	s.memfs.enableAuth = config.MemFS.EnableAuth
 	s.memfs.username = config.MemFS.Username
@@ -444,6 +450,10 @@ func (s *server) setRoutes() {
 	}))
 	if s.middleware.cache != nil {
 		fs.Use(s.middleware.cache)
+	}
+	fs.Use(s.middleware.hlsrewrite)
+	if s.middleware.session != nil {
+		fs.Use(s.middleware.session)
 	}
 
 	fs.GET("", s.handler.diskfs.GetFile)

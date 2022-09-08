@@ -51,7 +51,7 @@ type hls struct {
 // NewHLS returns a new HLS session middleware
 func NewHLSWithConfig(config HLSConfig) echo.MiddlewareFunc {
 	if config.Skipper == nil {
-		config.Skipper = DefaultHTTPConfig.Skipper
+		config.Skipper = DefaultHLSConfig.Skipper
 	}
 
 	if config.EgressCollector == nil {

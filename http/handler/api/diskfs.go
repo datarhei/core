@@ -193,14 +193,18 @@ func (h *DiskFSHandler) ListFiles(c echo.Context) error {
 
 	sort.Slice(files, sortFunc)
 
-	var fileinfos []api.FileInfo = make([]api.FileInfo, len(files))
+	fileinfos := []api.FileInfo{}
 
-	for i, f := range files {
-		fileinfos[i] = api.FileInfo{
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+
+		fileinfos = append(fileinfos, api.FileInfo{
 			Name:    f.Name(),
 			Size:    f.Size(),
 			LastMod: f.ModTime().Unix(),
-		}
+		})
 	}
 
 	return c.JSON(http.StatusOK, fileinfos)
