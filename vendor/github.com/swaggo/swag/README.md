@@ -29,6 +29,7 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
  - [Examples](#examples)
 	- [Descriptions over multiple lines](#descriptions-over-multiple-lines)
 	- [User defined structure with an array type](#user-defined-structure-with-an-array-type)
+	- [Function scoped struct declaration](#function-scoped-struct-declaration)
 	- [Model composition in response](#model-composition-in-response)
 	- [Add a headers in response](#add-a-headers-in-response)
 	- [Use multiple path params](#use-multiple-path-params)
@@ -99,6 +100,7 @@ OPTIONS:
    --codeExampleFiles value, --cef value  Parse folder containing code example files to use for the x-codeSamples extension, disabled by default
    --parseInternal                        Parse go files in internal packages, disabled by default (default: false)
    --generatedTime                        Generate timestamp at the top of docs.go, disabled by default (default: false)
+   --requiredByDefault                    Set validation required for all fields by default (default: false)
    --parseDepth value                     Dependency parse depth (default: 100)
    --instanceName value                   This parameter can be used to name different swagger document instances. It is optional.
    --overridesFile value                  File to read global type overrides from. (default: ".swaggo")
@@ -127,8 +129,10 @@ OPTIONS:
 - [echo](http://github.com/swaggo/echo-swagger)
 - [buffalo](https://github.com/swaggo/buffalo-swagger)
 - [net/http](https://github.com/swaggo/http-swagger)
+- [gorilla/mux](https://github.com/swaggo/http-swagger)
+- [go-chi/chi](https://github.com/swaggo/http-swagger)
 - [flamingo](https://github.com/i-love-flamingo/swagger)
-- [fiber](https://github.com/arsmn/fiber-swagger)
+- [fiber](https://github.com/gofiber/swagger)
 - [atreugo](https://github.com/Nerzal/atreugo-swagger)
 
 ## How to use it with Gin
@@ -488,7 +492,7 @@ type Foo struct {
 
 Field Name | Type | Description
 ---|:---:|---
-<a name="validate"></a>validate | `string` | 	Determines the validation for the parameter. Possible values are: `required`.
+<a name="validate"></a>validate | `string` | 	Determines the validation for the parameter. Possible values are: `required,optional`.
 <a name="parameterDefault"></a>default | * | Declares the value of the parameter that the server will use if none is provided, for example a "count" to control the number of results per page might default to 100 if not supplied by the client in the request. (Note: "default" has no meaning for required parameters.)  See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-6.2. Unlike JSON Schema this value MUST conform to the defined [`type`](#parameterType) for this parameter.
 <a name="parameterMaximum"></a>maximum | `number` | See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.2.
 <a name="parameterMinimum"></a>minimum | `number` | See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.3.
@@ -536,6 +540,30 @@ type Account struct {
     Name string `json:"name" example:"account name"`
 }
 ```
+
+
+### Function scoped struct declaration
+
+You can declare your request response structs inside a function body. 
+You must have to follow the naming convention `<package-name>.<function-name>.<struct-name> `.
+
+```go
+package main
+
+// @Param request body main.MyHandler.request true "query params" 
+// @Success 200 {object} main.MyHandler.response
+// @Router /test [post]
+func MyHandler() {
+	type request struct {
+		RequestField string
+	}
+	
+	type response struct {
+		ResponseField string
+	}
+}
+```
+
 
 ### Model composition in response
 ```go
