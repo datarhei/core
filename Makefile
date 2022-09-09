@@ -11,6 +11,7 @@ init:
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install github.com/swaggo/swag/cmd/swag@latest
 	go install github.com/99designs/gqlgen@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ## build: Build core (default)
 build:
@@ -39,6 +40,10 @@ vet:
 ## fmt: Format code
 fmt:
 	go fmt ./...
+
+## vulncheck: Check for known vulnerabilities in dependencies
+vulncheck:
+	govulncheck ./...
 
 ## update: Update dependencies
 update:
@@ -91,7 +96,7 @@ release_linux:
 docker:
 	docker build -t core:$(SHORTCOMMIT) .
 
-.PHONY: help init build swagger test vet fmt vendor commit coverage lint release import update
+.PHONY: help init build swagger test vet fmt vulncheck vendor commit coverage lint release import update
 
 ## help: Show all commands
 help: Makefile
