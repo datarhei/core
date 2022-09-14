@@ -53,7 +53,7 @@ github.com/datarhei/gosrt/internal/congestion
 github.com/datarhei/gosrt/internal/crypto
 github.com/datarhei/gosrt/internal/net
 github.com/datarhei/gosrt/internal/packet
-# github.com/datarhei/joy4 v0.0.0-20220914124903-6c0f2974f0ea
+# github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
 ## explicit; go 1.14
 github.com/datarhei/joy4/av
 github.com/datarhei/joy4/av/avutil

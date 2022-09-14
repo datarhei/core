@@ -426,14 +426,8 @@ var CodecTypes = flv.CodecTypes
 
 func (self *Conn) writeBasicConf() (err error) {
 	// > SetChunkSize
-	if self.isserver {
-		if err = self.writeSetChunkSize(self.readMaxChunkSize); err != nil {
-			return
-		}
-	} else {
-		if err = self.writeSetChunkSize(1024 * 1024 * 1); err != nil {
-			return
-		}
+	if err = self.writeSetChunkSize(1024 * 1024 * 1); err != nil {
+		return
 	}
 	// > WindowAckSize
 	if err = self.writeWindowAckSize(1024 * 1024 * 3); err != nil {
@@ -481,10 +475,6 @@ func (self *Conn) readConnect() (err error) {
 	connectparams := self.commandobj
 
 	if err = self.writeBasicConf(); err != nil {
-		return
-	}
-
-	if err = self.flushWrite(); err != nil {
 		return
 	}
 
