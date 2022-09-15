@@ -31,6 +31,7 @@ type Config struct {
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
+	wroteHeader       bool
 	wroteBody         bool
 	minLength         int
 	minLengthExceeded bool
@@ -131,9 +132,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						res.Writer = rw
 						w.Reset(io.Discard)
 					} else if !grw.minLengthExceeded {
-						// Write uncompressed response
+						// If the minimum content length hasn't exceeded, write the uncompressed response
 						res.Writer = rw
-						grw.ResponseWriter.WriteHeader(grw.code)
+						if grw.wroteHeader {
+							grw.ResponseWriter.WriteHeader(grw.code)
+						}
 						grw.buffer.WriteTo(rw)
 						w.Reset(io.Discard)
 					}
@@ -155,6 +158,8 @@ func (w *gzipResponseWriter) WriteHeader(code int) {
 	}
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
 
+	w.wroteHeader = true
+
 	// Delay writing of the header until we know if we'll actually compress the response
 	w.code = code
 }
@@ -174,7 +179,9 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 
 			// The minimum length is exceeded, add Content-Encoding header and write the header
 			w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
-			w.ResponseWriter.WriteHeader(w.code)
+			if w.wroteHeader {
+				w.ResponseWriter.WriteHeader(w.code)
+			}
 
 			return w.Writer.Write(w.buffer.Bytes())
 		} else {
@@ -186,6 +193,17 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *gzipResponseWriter) Flush() {
+	if !w.minLengthExceeded {
+		// Enforce compression
+		w.minLengthExceeded = true
+		w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+		if w.wroteHeader {
+			w.ResponseWriter.WriteHeader(w.code)
+		}
+
+		w.Writer.Write(w.buffer.Bytes())
+	}
+
 	w.Writer.(*gzip.Writer).Flush()
 	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
