@@ -10,14 +10,16 @@ import (
 
 // Process represents all information on a process
 type Process struct {
-	ID        string         `json:"id" jsonschema:"minLength=1"`
-	Type      string         `json:"type" jsonschema:"enum=ffmpeg"`
-	Reference string         `json:"reference"`
-	CreatedAt int64          `json:"created_at" jsonschema:"minimum=0"`
-	Config    *ProcessConfig `json:"config,omitempty"`
-	State     *ProcessState  `json:"state,omitempty"`
-	Report    *ProcessReport `json:"report,omitempty"`
-	Metadata  Metadata       `json:"metadata,omitempty"`
+	ID                 string         `json:"id" jsonschema:"minLength=1"`
+	Type               string         `json:"type" jsonschema:"enum=ffmpeg"`
+	Reference          string         `json:"reference"`
+	CreatedAt          int64          `json:"created_at" jsonschema:"minimum=0"`
+	Config             *ProcessConfig `json:"config,omitempty"`
+	State              *ProcessState  `json:"state,omitempty"`
+	Report             *ProcessReport `json:"report,omitempty"`
+	Metadata           Metadata       `json:"metadata,omitempty"`
+	OAuthFbAccessToken string         `json:"oauth_fb_access_token"`
+	OAuthFbUserId      string         `json:"oauth_fb_user_id"`
 }
 
 // ProcessConfigIO represents an input or output of an ffmpeg process config

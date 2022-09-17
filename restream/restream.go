@@ -51,6 +51,8 @@ type Restreamer interface {
 	GetProcessMetadata(id, key string) (interface{}, error)    // get previously set metadata from a process
 	SetMetadata(key string, data interface{}) error            // set general metadata
 	GetMetadata(key string) (interface{}, error)               // get previously set general metadata
+	OAuthFacebook(id, userId, token string) error              // store access token facebook
+	InvalidOAuthFacebook(id string) error                      // remove access token facebook
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -1347,4 +1349,34 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+func (r *restream) OAuthFacebook(id, userId, token string) error {
+	task, ok := r.tasks[id]
+
+	if !ok {
+		return ErrUnknownProcess
+	}
+
+	task.process.OAuthFbAccessToken = token
+	task.process.OAuthFbUserId = userId
+
+	r.save()
+
+	return nil
+}
+
+func (r *restream) InvalidOAuthFacebook(id string) error {
+	task, ok := r.tasks[id]
+
+	if !ok {
+		return ErrUnknownProcess
+	}
+
+	task.process.OAuthFbAccessToken = ""
+	task.process.OAuthFbUserId = ""
+
+	r.save()
+
+	return nil
 }

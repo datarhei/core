@@ -2,7 +2,7 @@
 .env
 /data/**
 /test/**
-Dockerfile*
+Dockerfile.test
 CHANGELOG.md
 README.md
 *.md

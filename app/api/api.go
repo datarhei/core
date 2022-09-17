@@ -680,21 +680,21 @@ func (a *api) start() error {
 		var certerror bool
 
 		// For each domain, get the certificate
-		for _, host := range cfg.Host.Name {
-			logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
-			logger.Info().Log("Acquiring certificate ...")
+		// for _, host := range cfg.Host.Name {
+		// 	logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
+		// 	logger.Info().Log("Acquiring certificate ...")
 
-			_, err := autocertManager.GetCertificate(&tls.ClientHelloInfo{
-				ServerName: host,
-			})
-			if err != nil {
-				logger.Error().WithField("error", err).Log("Failed to acquire certificate")
-				certerror = true
-				break
-			}
+		// 	_, err := autocertManager.GetCertificate(&tls.ClientHelloInfo{
+		// 		ServerName: host,
+		// 	})
+		// 	if err != nil {
+		// 		logger.Error().WithField("error", err).Log("Failed to acquire certificate")
+		// 		certerror = true
+		// 		break
+		// 	}
 
-			logger.Info().Log("Successfully acquired certificate")
-		}
+		// 	logger.Info().Log("Successfully acquired certificate")
+		// }
 
 		// Shut down the temporary http server
 		tempserver.Close()

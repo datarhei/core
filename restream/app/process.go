@@ -174,20 +174,24 @@ func (config *Config) CreateCommand() []string {
 }
 
 type Process struct {
-	ID        string  `json:"id"`
-	Reference string  `json:"reference"`
-	Config    *Config `json:"config"`
-	CreatedAt int64   `json:"created_at"`
-	Order     string  `json:"order"`
+	ID                 string  `json:"id"`
+	Reference          string  `json:"reference"`
+	Config             *Config `json:"config"`
+	CreatedAt          int64   `json:"created_at"`
+	Order              string  `json:"order"`
+	OAuthFbAccessToken string  `json:"oauth_fb_access_token"`
+	OAuthFbUserId      string  `json:"oauth_fb_user_id"`
 }
 
 func (process *Process) Clone() *Process {
 	clone := &Process{
-		ID:        process.ID,
-		Reference: process.Reference,
-		Config:    process.Config.Clone(),
-		CreatedAt: process.CreatedAt,
-		Order:     process.Order,
+		ID:                 process.ID,
+		Reference:          process.Reference,
+		Config:             process.Config.Clone(),
+		CreatedAt:          process.CreatedAt,
+		Order:              process.Order,
+		OAuthFbAccessToken: process.OAuthFbAccessToken,
+		OAuthFbUserId:      process.OAuthFbUserId,
 	}
 
 	return clone

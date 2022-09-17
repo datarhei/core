@@ -1,4 +1,4 @@
-ARG CORE_IMAGE=datarhei/base:alpine-core-latest
+ARG CORE_IMAGE=datarhei/core-local
 
 ARG FFMPEG_IMAGE=datarhei/base:alpine-ffmpeg-latest
 

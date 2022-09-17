@@ -560,6 +560,12 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/metadata", s.v3handler.restream.GetMetadata)
 		v3.GET("/metadata/:key", s.v3handler.restream.GetMetadata)
 
+		v3.POST("/process/:id/oauth/facebook", s.v3handler.restream.OAuthFacebook)
+		v3.POST("/process/:id/oauth/facebook/logout", s.v3handler.restream.InvalidOAuthFacebook)
+		v3.GET("/process/:id/facebook/auth", s.v3handler.restream.CheckAuthFB)
+		v3.GET("/process/:id/facebook/account", s.v3handler.restream.GetFBAccountInfo)
+		v3.POST("/process/:id/facebook/live", s.v3handler.restream.CreateFbLive)
+
 		if !s.readOnly {
 			v3.POST("/process", s.v3handler.restream.Add)
 			v3.PUT("/process/:id", s.v3handler.restream.Update)
