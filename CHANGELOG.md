@@ -14,6 +14,7 @@
 -   Fix RTMP communication (datarhei/restreamer#385)
 -   Fix injecting commit, branch, and build info
 -   Add cache block list for extensions not to cache
+-   Replace x/crypto/acme/autocert with caddyserver/certmagic
 
 #### Core v16.9.0 > v16.9.1
 
