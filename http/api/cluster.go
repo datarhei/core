@@ -13,4 +13,4 @@ type ClusterNode struct {
 	State      string `json:"state"`
 }
 
-type ClusterNodeFiles []string
+type ClusterNodeFiles map[string][]string

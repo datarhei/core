@@ -2,7 +2,9 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/http/api"
@@ -14,12 +16,14 @@ import (
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
 type ClusterHandler struct {
 	cluster cluster.Cluster
+	prefix  *regexp.Regexp
 }
 
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.
 func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	return &ClusterHandler{
 		cluster: cluster,
+		prefix:  regexp.MustCompile(`^[a-z]+:`),
 	}
 }
 
@@ -85,14 +89,19 @@ func (h *ClusterHandler) AddNode(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id} [delete]
 func (h *ClusterHandler) DeleteNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	if err := h.cluster.RemoveNode(id); err != nil {
-		return api.Err(http.StatusBadRequest, "Failed to remove node", "%s", err)
+		if err == cluster.ErrNodeNotFound {
+			return api.Err(http.StatusNotFound, err.Error(), "%s", id)
+		}
+
+		return api.Err(http.StatusInternalServerError, "Failed to remove node", "%s", err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -146,16 +155,25 @@ func (h *ClusterHandler) GetNodeProxy(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
 
+	files := api.ClusterNodeFiles{}
+
 	state := peer.State()
 
 	sort.Strings(state.Files)
 
-	return c.JSON(http.StatusOK, state.Files)
+	for _, path := range state.Files {
+		prefix := strings.TrimSuffix(h.prefix.FindString(path), ":")
+		path = h.prefix.ReplaceAllString(path, "")
+
+		files[prefix] = append(files[prefix], path)
+	}
+
+	return c.JSON(http.StatusOK, files)
 }
 
 // UpdateNode replaces an existing node
-// @Summary Replace an existing Node
-// @Description Replace an existing Node
+// @Summary Replaces an existing node
+// @Description Replaces an existing node and returns the new node ID
 // @ID cluster-3-update-node
 // @Accept json
 // @Produce json
@@ -176,6 +194,9 @@ func (h *ClusterHandler) UpdateNode(c echo.Context) error {
 	}
 
 	if err := h.cluster.RemoveNode(id); err != nil {
+		if err == cluster.ErrNodeNotFound {
+			return api.Err(http.StatusNotFound, err.Error(), "%s", id)
+		}
 		return api.Err(http.StatusBadRequest, "Failed to remove node", "%s", err)
 	}
 

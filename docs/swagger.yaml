@@ -76,6 +76,12 @@ definitions:
       username:
         type: string
     type: object
+  api.ClusterNodeFiles:
+    additionalProperties:
+      items:
+        type: string
+      type: array
+    type: object
   api.Command:
     properties:
       command:
@@ -1774,7 +1780,7 @@ paths:
       - text/html
       responses:
         "200":
-          description: ""
+          description: OK
       security:
       - ApiKeyAuth: []
       summary: Load GraphQL playground
@@ -1933,8 +1939,12 @@ paths:
           description: OK
           schema:
             type: string
-        "400":
-          description: Bad Request
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -1966,7 +1976,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Replace an existing Node
+      description: Replaces an existing node and returns the new node ID
       operationId: cluster-3-update-node
       parameters:
       - description: Node ID
@@ -1997,7 +2007,7 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Replace an existing Node
+      summary: Replaces an existing node
   /api/v3/cluster/node/{id}/proxy:
     get:
       description: List the files of a node by its ID
@@ -2014,9 +2024,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              type: string
-            type: array
+            $ref: '#/definitions/api.ClusterNodeFiles'
         "404":
           description: Not Found
           schema:

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 )
+
+var ErrNodeNotFound = errors.New("node not found")
 
 type ClusterReader interface {
 	GetURL(path string) (string, error)
@@ -182,7 +185,7 @@ func (c *cluster) RemoveNode(id string) error {
 
 	node, ok := c.nodes[id]
 	if !ok {
-		return nil
+		return ErrNodeNotFound
 	}
 
 	node.stop()
