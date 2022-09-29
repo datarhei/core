@@ -17,8 +17,8 @@ func NewDiskCollector(path string) metric.Collector {
 		path: path,
 	}
 
-	c.totalDescr = metric.NewDesc("disk_total", "", []string{"path"})
-	c.usageDescr = metric.NewDesc("disk_usage", "", []string{"path"})
+	c.totalDescr = metric.NewDesc("disk_total", "Total size of the disk in bytes", []string{"path"})
+	c.usageDescr = metric.NewDesc("disk_usage", "Number of used bytes on the disk", []string{"path"})
 
 	return c
 }

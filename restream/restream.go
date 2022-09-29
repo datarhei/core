@@ -30,28 +30,28 @@ import (
 type Restreamer interface {
 	ID() string                                                // ID of this instance
 	Name() string                                              // Arbitrary name of this instance
-	CreatedAt() time.Time                                      // time of when this instance has been created
-	Start()                                                    // start all processes that have a "start" order
-	Stop()                                                     // stop all running process but keep their "start" order
-	AddProcess(config *app.Config) error                       // add a new process
-	GetProcessIDs(idpattern, refpattern string) []string       // get a list of process IDs based on patterns for ID and reference
-	DeleteProcess(id string) error                             // delete a process
-	UpdateProcess(id string, config *app.Config) error         // update a process
-	StartProcess(id string) error                              // start a process
-	StopProcess(id string) error                               // stop a process
-	RestartProcess(id string) error                            // restart a process
-	ReloadProcess(id string) error                             // reload a process
-	GetProcess(id string) (*app.Process, error)                // get a process
-	GetProcessState(id string) (*app.State, error)             // get the state of a process
-	GetProcessLog(id string) (*app.Log, error)                 // get the logs of a process
-	GetPlayout(id, inputid string) (string, error)             // get the URL of the playout API for a process
-	Probe(id string) app.Probe                                 // probe a process
-	Skills() skills.Skills                                     // get the ffmpeg skills
-	ReloadSkills() error                                       // reload the ffmpeg skills
-	SetProcessMetadata(id, key string, data interface{}) error // set metatdata to a process
-	GetProcessMetadata(id, key string) (interface{}, error)    // get previously set metadata from a process
-	SetMetadata(key string, data interface{}) error            // set general metadata
-	GetMetadata(key string) (interface{}, error)               // get previously set general metadata
+	CreatedAt() time.Time                                      // Time of when this instance has been created
+	Start()                                                    // Start all processes that have a "start" order
+	Stop()                                                     // Stop all running process but keep their "start" order
+	AddProcess(config *app.Config) error                       // Add a new process
+	GetProcessIDs(idpattern, refpattern string) []string       // Get a list of process IDs based on patterns for ID and reference
+	DeleteProcess(id string) error                             // Delete a process
+	UpdateProcess(id string, config *app.Config) error         // Update a process
+	StartProcess(id string) error                              // Start a process
+	StopProcess(id string) error                               // Stop a process
+	RestartProcess(id string) error                            // Restart a process
+	ReloadProcess(id string) error                             // Reload a process
+	GetProcess(id string) (*app.Process, error)                // Get a process
+	GetProcessState(id string) (*app.State, error)             // Get the state of a process
+	GetProcessLog(id string) (*app.Log, error)                 // Get the logs of a process
+	GetPlayout(id, inputid string) (string, error)             // Get the URL of the playout API for a process
+	Probe(id string) app.Probe                                 // Probe a process
+	Skills() skills.Skills                                     // Get the ffmpeg skills
+	ReloadSkills() error                                       // Reload the ffmpeg skills
+	SetProcessMetadata(id, key string, data interface{}) error // Set metatdata to a process
+	GetProcessMetadata(id, key string) (interface{}, error)    // Get previously set metadata from a process
+	SetMetadata(key string, data interface{}) error            // Set general metadata
+	GetMetadata(key string) (interface{}, error)               // Get previously set general metadata
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -128,7 +128,7 @@ func New(config Config) (Restreamer, error) {
 	if config.DiskFS != nil {
 		r.fs.diskfs = rfs.New(rfs.Config{
 			FS:     config.DiskFS,
-			Logger: r.logger.WithComponent("DiskFS"),
+			Logger: r.logger.WithComponent("Cleanup").WithField("type", "diskfs"),
 		})
 	} else {
 		r.fs.diskfs = rfs.New(rfs.Config{
@@ -139,7 +139,7 @@ func New(config Config) (Restreamer, error) {
 	if config.MemFS != nil {
 		r.fs.memfs = rfs.New(rfs.Config{
 			FS:     config.MemFS,
-			Logger: r.logger.WithComponent("MemFS"),
+			Logger: r.logger.WithComponent("Cleanup").WithField("type", "memfs"),
 		})
 	} else {
 		r.fs.memfs = rfs.New(rfs.Config{
@@ -478,7 +478,7 @@ func (r *restream) setCleanup(id string, config *app.Config) {
 					},
 				})
 			} else if strings.HasPrefix(c.Pattern, "diskfs:") {
-				r.fs.memfs.SetCleanup(id, []rfs.Pattern{
+				r.fs.diskfs.SetCleanup(id, []rfs.Pattern{
 					{
 						Pattern:       strings.TrimPrefix(c.Pattern, "diskfs:"),
 						MaxFiles:      c.MaxFiles,
@@ -1304,6 +1304,8 @@ func (r *restream) GetPlayout(id, inputid string) (string, error) {
 	return "127.0.0.1:" + strconv.Itoa(port), nil
 }
 
+var ErrMetadataKeyNotFound = errors.New("unknown key")
+
 func (r *restream) SetProcessMetadata(id, key string, data interface{}) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -1350,11 +1352,11 @@ func (r *restream) GetProcessMetadata(id, key string) (interface{}, error) {
 	}
 
 	data, ok := task.metadata[key]
-	if ok {
-		return data, nil
+	if !ok {
+		return nil, ErrMetadataKeyNotFound
 	}
 
-	return nil, nil
+	return data, nil
 }
 
 func (r *restream) SetMetadata(key string, data interface{}) error {
@@ -1393,9 +1395,9 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	}
 
 	data, ok := r.metadata[key]
-	if ok {
-		return data, nil
+	if !ok {
+		return nil, ErrMetadataKeyNotFound
 	}
 
-	return nil, nil
+	return data, nil
 }

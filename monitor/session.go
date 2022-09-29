@@ -31,17 +31,17 @@ func NewSessionCollector(r session.RegistryReader, collectors []string) metric.C
 		c.collectors = r.Collectors()
 	}
 
-	c.totalDescr = metric.NewDesc("session_total", "", []string{"collector"})
-	c.limitDescr = metric.NewDesc("session_limit", "", []string{"collector"})
-	c.activeDescr = metric.NewDesc("session_active", "", []string{"collector"})
-	c.rxBytesDescr = metric.NewDesc("session_rxbytes", "", []string{"collector"})
-	c.txBytesDescr = metric.NewDesc("session_txbytes", "", []string{"collector"})
+	c.totalDescr = metric.NewDesc("session_total", "Total sessions", []string{"collector"})
+	c.limitDescr = metric.NewDesc("session_limit", "Max. number of concurrent sessions", []string{"collector"})
+	c.activeDescr = metric.NewDesc("session_active", "Number of current sessions", []string{"collector"})
+	c.rxBytesDescr = metric.NewDesc("session_rxbytes", "Number of received bytes", []string{"collector"})
+	c.txBytesDescr = metric.NewDesc("session_txbytes", "Number of transmitted bytes", []string{"collector"})
 
-	c.rxBitrateDescr = metric.NewDesc("session_rxbitrate", "", []string{"collector"})
-	c.txBitrateDescr = metric.NewDesc("session_txbitrate", "", []string{"collector"})
+	c.rxBitrateDescr = metric.NewDesc("session_rxbitrate", "Current receiving bitrate in bit per second", []string{"collector"})
+	c.txBitrateDescr = metric.NewDesc("session_txbitrate", "Current transmitting bitrate in bit per second", []string{"collector"})
 
-	c.maxTxBitrateDescr = metric.NewDesc("session_maxtxbitrate", "", []string{"collector"})
-	c.maxRxBitrateDescr = metric.NewDesc("session_maxrxbitrate", "", []string{"collector"})
+	c.maxRxBitrateDescr = metric.NewDesc("session_maxrxbitrate", "Max. allowed receiving bitrate in bit per second", []string{"collector"})
+	c.maxTxBitrateDescr = metric.NewDesc("session_maxtxbitrate", "Max. allowed transmitting bitrate in bit per second", []string{"collector"})
 
 	return c
 }

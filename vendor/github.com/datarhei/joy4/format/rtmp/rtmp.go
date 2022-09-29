@@ -426,7 +426,7 @@ var CodecTypes = flv.CodecTypes
 
 func (self *Conn) writeBasicConf() (err error) {
 	// > SetChunkSize
-	if err = self.writeSetChunkSize(1024 * 1024 * 128); err != nil {
+	if err = self.writeSetChunkSize(1024 * 1024 * 1); err != nil {
 		return
 	}
 	// > WindowAckSize
@@ -471,6 +471,7 @@ func (self *Conn) readConnect() (err error) {
 	if ok {
 		tcurl, _ = _tcurl.(string)
 	}
+
 	connectparams := self.commandobj
 
 	if err = self.writeBasicConf(); err != nil {
@@ -1180,6 +1181,7 @@ func (self *Conn) fillChunkHeader(b []byte, csid uint32, timestamp int32, msgtyp
 
 	if Debug {
 		fmt.Printf("rtmp: write chunk msgdatalen=%d msgsid=%d\n", msgdatalen, msgsid)
+		fmt.Print(hex.Dump(b[:msgdatalen]))
 	}
 
 	return
@@ -1568,6 +1570,10 @@ func (self *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 		}
 		self.readAckSize = pio.U32BE(self.msgdata)
 		return
+	default:
+		if Debug {
+			fmt.Printf("rtmp: unhandled msg: %d\n", msgtypeid)
+		}
 	}
 
 	self.gotmsg = true

@@ -53,10 +53,10 @@ import (
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
 
-	mwbodysize "github.com/datarhei/core/v16/http/middleware/bodysize"
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
+	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
@@ -149,6 +149,7 @@ type server struct {
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
+		hlsrewrite echo.MiddlewareFunc
 	}
 
 	memfs struct {
@@ -193,6 +194,10 @@ func NewServer(config Config) (Server, error) {
 		filesystem,
 		config.Cache,
 	)
+
+	s.middleware.hlsrewrite = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
+		PathPrefix: config.DiskFS.Base(),
+	})
 
 	s.memfs.enableAuth = config.MemFS.EnableAuth
 	s.memfs.username = config.MemFS.Username
@@ -359,7 +364,6 @@ func NewServer(config Config) (Server, error) {
 			return nil
 		},
 	}))
-	s.router.Use(mwbodysize.New())
 	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
 		Collector: config.Sessions.Collector("http"),
 	}))
@@ -423,9 +427,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) setRoutes() {
 	gzipMiddleware := mwgzip.NewWithConfig(mwgzip.Config{
-		Level:        mwgzip.BestSpeed,
-		MinLength:    1000,
-		ContentTypes: []string{""},
+		Level:     mwgzip.BestSpeed,
+		MinLength: 1000,
+		Skipper:   mwgzip.ContentTypeSkipper(nil),
 	})
 
 	// API router grouo
@@ -458,12 +462,16 @@ func (s *server) setRoutes() {
 		DefaultContentType: "text/html",
 	}))
 	fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-		Level:        mwgzip.BestSpeed,
-		MinLength:    1000,
-		ContentTypes: s.gzip.mimetypes,
+		Level:     mwgzip.BestSpeed,
+		MinLength: 1000,
+		Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
 	}))
 	if s.middleware.cache != nil {
 		fs.Use(s.middleware.cache)
+	}
+	fs.Use(s.middleware.hlsrewrite)
+	if s.middleware.session != nil {
+		fs.Use(s.middleware.session)
 	}
 
 	fs.GET("", s.handler.diskfs.GetFile)
@@ -477,9 +485,9 @@ func (s *server) setRoutes() {
 			DefaultContentType: "application/data",
 		}))
 		memfs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-			Level:        mwgzip.BestSpeed,
-			MinLength:    1000,
-			ContentTypes: s.gzip.mimetypes,
+			Level:     mwgzip.BestSpeed,
+			MinLength: 1000,
+			Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
 		}))
 		if s.middleware.session != nil {
 			memfs.Use(s.middleware.session)
@@ -673,6 +681,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 Log
 	v3.GET("/log", s.v3handler.log.Log)
 
-	// v3 Resources
+	// v3 Metrics
+	v3.GET("/metrics", s.v3handler.resources.Describe)
 	v3.POST("/metrics", s.v3handler.resources.Metrics)
 }

@@ -175,9 +175,10 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 		for _, c := range x.Cleanup {
 			io.Cleanup = append(io.Cleanup, ProcessConfigIOCleanup{
-				Pattern:    c.Pattern,
-				MaxFiles:   c.MaxFiles,
-				MaxFileAge: c.MaxFileAge,
+				Pattern:       c.Pattern,
+				MaxFiles:      c.MaxFiles,
+				MaxFileAge:    c.MaxFileAge,
+				PurgeOnDelete: c.PurgeOnDelete,
 			})
 		}
 
