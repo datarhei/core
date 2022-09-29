@@ -17,6 +17,7 @@
 -   Fix RTMP communication (Blackmagic Web Presenter, thx 235 MEDIA)
 -   Fix RTMP communication (Blackmagic ATEM Mini, datarhei/restreamer#385)
 -   Fix injecting commit, branch, and build info
+-   Fix API metadata endpoints responses
 
 #### Core v16.9.0 > v16.9.1
 
