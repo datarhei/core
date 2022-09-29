@@ -5,16 +5,18 @@
 -   Add HLS session middleware to diskfs
 -   Add /v3/metrics (get) endpoint to list all known metrics
 -   Add logging HTTP request and response body sizes
--   Exclude .m3u8 and .mpd files from disk cache by default
+-   Add process id and reference glob pattern matching
+-   Add cache block list for extensions not to cache
+-   Mod exclude .m3u8 and .mpd files from disk cache by default
+-   Mod replaces x/crypto/acme/autocert with caddyserver/certmagic
+-   Mod exposes ports (Docker desktop)
 -   Fix assigning cleanup rules for diskfs
 -   Fix wrong path for swagger definition
 -   Fix process cleanup on delete, remove empty directories from disk
--   Add process id and reference glob pattern matching
 -   Fix SRT blocking port on restart (upgrade datarhei/gosrt)
--   Fix RTMP communication (datarhei/restreamer#385)
+-   Fix RTMP communication (Blackmagic Web Presenter, thx 235 MEDIA)
+-   Fix RTMP communication (Blackmagic ATEM Mini, datarhei/restreamer#385)
 -   Fix injecting commit, branch, and build info
--   Add cache block list for extensions not to cache
--   Replace x/crypto/acme/autocert with caddyserver/certmagic
 
 #### Core v16.9.0 > v16.9.1
 
