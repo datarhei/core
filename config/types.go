@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"os/exec"
@@ -803,5 +804,41 @@ func (s *absolutePathValue) Validate() error {
 }
 
 func (s *absolutePathValue) IsEmpty() bool {
+	return len(string(*s)) == 0
+}
+
+// email address
+
+type emailValue string
+
+func newEmailValue(p *string, val string) *emailValue {
+	*p = val
+	return (*emailValue)(p)
+}
+
+func (s *emailValue) Set(val string) error {
+	addr, err := mail.ParseAddress(val)
+	if err != nil {
+		return err
+	}
+
+	*s = emailValue(addr.Address)
+	return nil
+}
+
+func (s *emailValue) String() string {
+	return string(*s)
+}
+
+func (s *emailValue) Validate() error {
+	if len(s.String()) == 0 {
+		return nil
+	}
+
+	_, err := mail.ParseAddress(s.String())
+	return err
+}
+
+func (s *emailValue) IsEmpty() bool {
 	return len(string(*s)) == 0
 }

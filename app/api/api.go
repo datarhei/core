@@ -655,8 +655,8 @@ func (a *api) start() error {
 		}
 
 		certmagic.DefaultACME.Agreed = true
-		certmagic.DefaultACME.Email = ""
-		certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
+		certmagic.DefaultACME.Email = cfg.TLS.Email
+		certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
 		certmagic.DefaultACME.DisableHTTPChallenge = false
 		certmagic.DefaultACME.DisableTLSALPNChallenge = true
 		certmagic.DefaultACME.Logger = nil
