@@ -1,5 +1,10 @@
 # Core
 
+### Core v16.10.0 > v16.11.0
+
+-   Fix use of Let's Encrypt production CA
+-   Add email address in TLS config for Let's Encrypt
+
 ### Core v16.9.1 > v16.10.0
 
 -   Add HLS session middleware to diskfs
