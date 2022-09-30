@@ -176,6 +176,7 @@ func (d *Config) init() {
 	d.val(newAddressValue(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
 	d.val(newBoolValue(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.val(newBoolValue(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
+	d.val(newEmailValue(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
 	d.val(newFileValue(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
 	d.val(newFileValue(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
@@ -416,6 +417,13 @@ func (d *Config) Validate(resetLogs bool) {
 
 				cancel()
 			}
+		}
+	}
+
+	// If TLS and Let's Encrypt certificate is enabled, we require a non-empty email address
+	if d.TLS.Enable && d.TLS.Auto {
+		if len(d.TLS.Email) == 0 {
+			d.log("error", d.findVariable("tls.email"), "an email address must be set in order to get an automatic TLS certificate")
 		}
 	}
 
