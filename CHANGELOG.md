@@ -2,8 +2,8 @@
 
 ### Core v16.10.0 > v16.10.1
 
--   Fix use of Let's Encrypt production CA
 -   Add email address in TLS config for Let's Encrypt
+-   Fix use of Let's Encrypt production CA
 
 ### Core v16.9.1 > v16.10.0
 
