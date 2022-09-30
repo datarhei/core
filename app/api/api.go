@@ -454,7 +454,12 @@ func (a *api) start() error {
 			host = "localhost"
 		}
 
-		template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
+		template := "rtmp://" + host + ":" + port
+		if cfg.RTMP.App != "/" {
+			template += cfg.RTMP.App
+		}
+		template += "/{name}"
+
 		if len(cfg.RTMP.Token) != 0 {
 			template += "?token=" + cfg.RTMP.Token
 		}
