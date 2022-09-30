@@ -29,7 +29,7 @@ func (v versionInfo) MinorString() string {
 // Version of the app
 var Version = versionInfo{
 	Major: 16,
-	Minor: 10,
+	Minor: 11,
 	Patch: 0,
 }
 
