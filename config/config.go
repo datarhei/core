@@ -423,7 +423,8 @@ func (d *Config) Validate(resetLogs bool) {
 	// If TLS and Let's Encrypt certificate is enabled, we require a non-empty email address
 	if d.TLS.Enable && d.TLS.Auto {
 		if len(d.TLS.Email) == 0 {
-			d.log("error", d.findVariable("tls.email"), "an email address must be set in order to get an automatic TLS certificate")
+			v := d.findVariable("tls.email")
+			v.value.Set(v.defVal)
 		}
 	}
 
