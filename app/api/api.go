@@ -459,7 +459,12 @@ func (a *api) start() error {
 			host = "localhost"
 		}
 
-		template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
+		template := "rtmp://" + host + ":" + port
+		if cfg.RTMP.App != "/" {
+			template += cfg.RTMP.App
+		}
+		template += "/{name}"
+
 		if len(cfg.RTMP.Token) != 0 {
 			template += "?token=" + cfg.RTMP.Token
 		}
@@ -665,8 +670,8 @@ func (a *api) start() error {
 		}
 
 		certmagic.DefaultACME.Agreed = true
-		certmagic.DefaultACME.Email = ""
-		certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
+		certmagic.DefaultACME.Email = cfg.TLS.Email
+		certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
 		certmagic.DefaultACME.DisableHTTPChallenge = false
 		certmagic.DefaultACME.DisableTLSALPNChallenge = true
 		certmagic.DefaultACME.Logger = nil
