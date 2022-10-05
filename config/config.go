@@ -192,6 +192,7 @@ func (d *Config) init() {
 	d.val(newAddressValue(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
 	d.val(newBoolValue(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.val(newBoolValue(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
+	d.val(newEmailValue(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
 	d.val(newFileValue(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
 	d.val(newFileValue(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
@@ -206,7 +207,7 @@ func (d *Config) init() {
 	d.val(newInt64Value(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
 	d.val(newUint64Value(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
 	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
-	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
+	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
 
 	// Storage (Memory)
 	d.val(newBoolValue(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
@@ -435,6 +436,14 @@ func (d *Config) Validate(resetLogs bool) {
 
 				cancel()
 			}
+		}
+	}
+
+	// If TLS and Let's Encrypt certificate is enabled, we require a non-empty email address
+	if d.TLS.Enable && d.TLS.Auto {
+		if len(d.TLS.Email) == 0 {
+			v := d.findVariable("tls.email")
+			v.value.Set(v.defVal)
 		}
 	}
 

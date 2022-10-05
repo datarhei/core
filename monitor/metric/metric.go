@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 type Pattern interface {
@@ -304,12 +305,23 @@ func NewDesc(name, description string, labels []string) *Description {
 	}
 }
 
+func (d *Description) String() string {
+	return fmt.Sprintf("%s: %s (%s)", d.name, d.description, strings.Join(d.labels, ","))
+}
+
 func (d *Description) Name() string {
 	return d.name
 }
 
 func (d *Description) Description() string {
 	return d.description
+}
+
+func (d *Description) Labels() []string {
+	labels := make([]string, len(d.labels))
+	copy(labels, d.labels)
+
+	return labels
 }
 
 type Collector interface {

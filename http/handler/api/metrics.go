@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
@@ -26,6 +27,34 @@ func NewMetrics(config MetricsConfig) *MetricsHandler {
 	return &MetricsHandler{
 		metrics: config.Metrics,
 	}
+}
+
+// Describe the known metrics
+// @Summary List all known metrics with their description and labels
+// @Description List all known metrics with their description and labels
+// @ID metrics-3-describe
+// @Produce json
+// @Success 200 {array} api.MetricsDescription
+// @Security ApiKeyAuth
+// @Router /api/v3/metrics [get]
+func (r *MetricsHandler) Describe(c echo.Context) error {
+	response := []api.MetricsDescription{}
+
+	descriptors := r.metrics.Describe()
+
+	for _, d := range descriptors {
+		response = append(response, api.MetricsDescription{
+			Name:        d.Name(),
+			Description: d.Description(),
+			Labels:      d.Labels(),
+		})
+	}
+
+	sort.Slice(response, func(i, j int) bool {
+		return response[i].Name < response[j].Name
+	})
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // Query the collected metrics

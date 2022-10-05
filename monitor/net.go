@@ -13,8 +13,8 @@ type netCollector struct {
 func NewNetCollector() metric.Collector {
 	c := &netCollector{}
 
-	c.rxDescr = metric.NewDesc("net_rx", "", []string{"interface"})
-	c.txDescr = metric.NewDesc("net_tx", "", []string{"interface"})
+	c.rxDescr = metric.NewDesc("net_rx", "Number of received bytes", []string{"interface"})
+	c.txDescr = metric.NewDesc("net_tx", "Number of transmitted bytes", []string{"interface"})
 
 	return c
 }

@@ -54,6 +54,7 @@ type Data struct {
 		Address  string `json:"address"`
 		Enable   bool   `json:"enable"`
 		Auto     bool   `json:"auto"`
+		Email    string `json:"email"`
 		CertFile string `json:"cert_file"`
 		KeyFile  string `json:"key_file"`
 	} `json:"tls"`
@@ -175,7 +176,6 @@ func NewV3FromV2(d *dataV2) (*Data, error) {
 	data.DB = d.DB
 	data.Host = d.Host
 	data.API = d.API
-	data.TLS = d.TLS
 	data.RTMP = d.RTMP
 	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
@@ -212,6 +212,13 @@ func NewV3FromV2(d *dataV2) (*Data, error) {
 	data.Router.Routes = copyStringMap(d.Router.Routes)
 
 	// Actual changes
+	data.TLS.Enable = d.TLS.Enable
+	data.TLS.Address = d.TLS.Address
+	data.TLS.Auto = d.TLS.Auto
+	data.TLS.CertFile = d.TLS.CertFile
+	data.TLS.KeyFile = d.TLS.KeyFile
+	data.TLS.Email = "cert@datarhei.com"
+
 	data.Storage.MimeTypes = d.Storage.MimeTypes
 
 	data.Storage.CORS = d.Storage.CORS

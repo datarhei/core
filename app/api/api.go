@@ -37,7 +37,7 @@ import (
 	"github.com/datarhei/core/v16/srt"
 	"github.com/datarhei/core/v16/update"
 
-	"golang.org/x/crypto/acme/autocert"
+	"github.com/caddyserver/certmagic"
 )
 
 // The API interface is the implementation for the restreamer API.
@@ -505,7 +505,12 @@ func (a *api) start() error {
 			host = "localhost"
 		}
 
-		template := "rtmp://" + host + ":" + port + cfg.RTMP.App + "/{name}"
+		template := "rtmp://" + host + ":" + port
+		if cfg.RTMP.App != "/" {
+			template += cfg.RTMP.App
+		}
+		template += "/{name}"
+
 		if len(cfg.RTMP.Token) != 0 {
 			template += "?token=" + cfg.RTMP.Token
 		}
@@ -704,23 +709,51 @@ func (a *api) start() error {
 		a.cache = cache
 	}
 
-	var autocertManager *autocert.Manager
+	var autocertManager *certmagic.Config
 
 	if cfg.TLS.Enable && cfg.TLS.Auto {
 		if len(cfg.Host.Name) == 0 {
 			return fmt.Errorf("at least one host must be provided in host.name or RS_HOST_NAME")
 		}
 
-		autocertManager = &autocert.Manager{
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(cfg.Host.Name...),
-			Cache:      autocert.DirCache(cfg.DB.Dir + "/cert"),
+		certmagic.DefaultACME.Agreed = true
+		certmagic.DefaultACME.Email = cfg.TLS.Email
+		certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
+		certmagic.DefaultACME.DisableHTTPChallenge = false
+		certmagic.DefaultACME.DisableTLSALPNChallenge = true
+		certmagic.DefaultACME.Logger = nil
+
+		certmagic.Default.Storage = &certmagic.FileStorage{
+			Path: cfg.DB.Dir + "/cert",
 		}
+		certmagic.Default.DefaultServerName = cfg.Host.Name[0]
+		certmagic.Default.Logger = nil
+		certmagic.Default.OnEvent = func(event string, data interface{}) {
+			message := ""
+
+			switch data := data.(type) {
+			case string:
+				message = data
+			case fmt.Stringer:
+				message = data.String()
+			}
+
+			if len(message) != 0 {
+				a.log.logger.core.WithComponent("certmagic").Info().WithField("event", event).Log(message)
+			}
+		}
+
+		magic := certmagic.NewDefault()
+		acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
+
+		magic.Issuers = []certmagic.Issuer{acme}
+
+		autocertManager = magic
 
 		// Start temporary http server on configured port
 		tempserver := &gohttp.Server{
 			Addr: cfg.Address,
-			Handler: autocertManager.HTTPHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
+			Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
 				w.WriteHeader(gohttp.StatusNotFound)
 			})),
 			ReadTimeout:    10 * time.Second,
@@ -743,9 +776,12 @@ func (a *api) start() error {
 			logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
 			logger.Info().Log("Acquiring certificate ...")
 
-			_, err := autocertManager.GetCertificate(&tls.ClientHelloInfo{
-				ServerName: host,
-			})
+			ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
+
+			err := autocertManager.ManageSync(ctx, []string{host})
+
+			cancel()
+
 			if err != nil {
 				logger.Error().WithField("error", err).Log("Failed to acquire certificate")
 				certerror = true
@@ -977,7 +1013,8 @@ func (a *api) start() error {
 				GetCertificate: autocertManager.GetCertificate,
 			}
 
-			a.sidecarserver.Handler = autocertManager.HTTPHandler(sidecarserverhandler)
+			acme := autocertManager.Issuers[0].(*certmagic.ACMEIssuer)
+			a.sidecarserver.Handler = acme.HTTPChallengeHandler(sidecarserverhandler)
 		}
 
 		wgStart.Add(1)

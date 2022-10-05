@@ -13,8 +13,8 @@ type memCollector struct {
 func NewMemCollector() metric.Collector {
 	c := &memCollector{}
 
-	c.totalDescr = metric.NewDesc("mem_total", "", nil)
-	c.freeDescr = metric.NewDesc("mem_free", "", nil)
+	c.totalDescr = metric.NewDesc("mem_total", "Total available memory in bytes", nil)
+	c.freeDescr = metric.NewDesc("mem_free", "Free memory in bytes", nil)
 
 	return c
 }

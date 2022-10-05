@@ -111,13 +111,13 @@ type Options struct {
 // Global constants.
 const (
 	libraryName    = "minio-go"
-	libraryVersion = "v7.0.34"
+	libraryVersion = "v7.0.39"
 )
 
 // User Agent should always following the below style.
 // Please open an issue to discuss any new changes here.
 //
-//       MinIO (OS; ARCH) LIB/VER APP/VER
+//	MinIO (OS; ARCH) LIB/VER APP/VER
 const (
 	libraryUserAgentPrefix = "MinIO (" + runtime.GOOS + "; " + runtime.GOARCH + ") "
 	libraryUserAgent       = libraryUserAgentPrefix + libraryName + "/" + libraryVersion
@@ -312,9 +312,9 @@ func (c *Client) SetS3TransferAccelerate(accelerateEndpoint string) {
 // Hash materials provides relevant initialized hash algo writers
 // based on the expected signature type.
 //
-//  - For signature v4 request if the connection is insecure compute only sha256.
-//  - For signature v4 request if the connection is secure compute only md5.
-//  - For anonymous request compute md5.
+//   - For signature v4 request if the connection is insecure compute only sha256.
+//   - For signature v4 request if the connection is secure compute only md5.
+//   - For anonymous request compute md5.
 func (c *Client) hashMaterials(isMd5Requested, isSha256Requested bool) (hashAlgos map[string]md5simd.Hasher, hashSums map[string][]byte) {
 	hashSums = make(map[string][]byte)
 	hashAlgos = make(map[string]md5simd.Hasher)
@@ -595,12 +595,11 @@ func (c *Client) executeMethod(ctx context.Context, method string, metadata requ
 		// Initiate the request.
 		res, err = c.do(req)
 		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil, err
+			if isRequestErrorRetryable(err) {
+				// Retry the request
+				continue
 			}
-
-			// Retry the request
-			continue
+			return nil, err
 		}
 
 		// For any known successful http status, return quickly.

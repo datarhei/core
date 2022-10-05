@@ -16,7 +16,7 @@ func NewUptimeCollector() metric.Collector {
 		t: time.Now(),
 	}
 
-	c.uptimeDescr = metric.NewDesc("uptime_uptime", "", nil)
+	c.uptimeDescr = metric.NewDesc("uptime_uptime", "Current uptime in seconds", nil)
 
 	return c
 }

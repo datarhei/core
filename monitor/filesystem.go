@@ -19,9 +19,9 @@ func NewFilesystemCollector(name string, fs fs.Filesystem) metric.Collector {
 		name: name,
 	}
 
-	c.limitDescr = metric.NewDesc("filesystem_limit", "", []string{"name"})
-	c.usageDescr = metric.NewDesc("filesystem_usage", "", []string{"name"})
-	c.filesDescr = metric.NewDesc("filesystem_files", "", []string{"name"})
+	c.limitDescr = metric.NewDesc("filesystem_limit", "Total size of the filesystem in bytes, negative if unlimited", []string{"name"})
+	c.usageDescr = metric.NewDesc("filesystem_usage", "Number of used bytes on the filesystem", []string{"name"})
+	c.filesDescr = metric.NewDesc("filesystem_files", "Number of files on the filesystem (excluding directories)", []string{"name"})
 
 	return c
 }
