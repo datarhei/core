@@ -1,4 +1,4 @@
-package config
+package v2
 
 import (
 	"fmt"
@@ -6,9 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/datarhei/core/v16/config/copy"
+	v1 "github.com/datarhei/core/v16/config/v1"
+	"github.com/datarhei/core/v16/config/value"
 )
 
-type dataV2 struct {
+type Data struct {
 	CreatedAt       time.Time `json:"created_at"`
 	LoadedAt        time.Time `json:"-"`
 	UpdatedAt       time.Time `json:"-"`
@@ -50,8 +54,8 @@ type dataV2 struct {
 				Secret string `json:"secret"`
 			} `json:"jwt"`
 			Auth0 struct {
-				Enable  bool          `json:"enable"`
-				Tenants []Auth0Tenant `json:"tenants"`
+				Enable  bool                `json:"enable"`
+				Tenants []value.Auth0Tenant `json:"tenants"`
 			} `json:"auth0"`
 		} `json:"auth"`
 	} `json:"api"`
@@ -160,11 +164,15 @@ type dataV2 struct {
 	} `json:"router"`
 }
 
-// Migrate will migrate some settings, depending on the version it finds. Migrations
-// are only going upwards,i.e. from a lower version to a higher version.
-func NewV2FromV1(d *dataV1) (*dataV2, error) {
-	data := &dataV2{}
+func UpgradeV1ToV2(d *v1.Data) (*Data, error) {
+	cfg := New()
 
+	return MergeV1ToV2(&cfg.Data, d)
+}
+
+// Migrate will migrate some settings, depending on the version it finds. Migrations
+// are only going upwards, i.e. from a lower version to a higher version.
+func MergeV1ToV2(data *Data, d *v1.Data) (*Data, error) {
 	data.CreatedAt = d.CreatedAt
 	data.LoadedAt = d.LoadedAt
 	data.UpdatedAt = d.UpdatedAt
@@ -189,30 +197,30 @@ func NewV2FromV1(d *dataV1) (*dataV2, error) {
 	data.Service = d.Service
 	data.Router = d.Router
 
-	data.Log.Topics = copyStringSlice(d.Log.Topics)
+	data.Log.Topics = copy.Slice(d.Log.Topics)
 
-	data.Host.Name = copyStringSlice(d.Host.Name)
+	data.Host.Name = copy.Slice(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copyStringSlice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copyStringSlice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copyStringSlice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copyStringSlice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
 
-	data.API.Auth.Auth0.Tenants = copyTenantSlice(d.API.Auth.Auth0.Tenants)
+	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copyStringSlice(d.Storage.CORS.Origins)
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 
-	data.FFmpeg.Access.Input.Allow = copyStringSlice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copyStringSlice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copyStringSlice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copyStringSlice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copyStringSlice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copyStringSlice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copyStringSlice(d.Router.BlockedPrefixes)
-	data.Router.Routes = copyStringMap(d.Router.Routes)
+	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
 	data.RTMP.Enable = d.RTMP.Enable
@@ -242,6 +250,70 @@ func NewV2FromV1(d *dataV1) (*dataV2, error) {
 	}
 
 	data.Version = 2
+
+	return data, nil
+}
+
+func DowngradeV2toV1(d *Data) (*v1.Data, error) {
+	data := &v1.Data{}
+
+	data.CreatedAt = d.CreatedAt
+	data.LoadedAt = d.LoadedAt
+	data.UpdatedAt = d.UpdatedAt
+
+	data.ID = d.ID
+	data.Name = d.Name
+	data.Address = d.Address
+	data.CheckForUpdates = d.CheckForUpdates
+
+	data.Log = d.Log
+	data.DB = d.DB
+	data.Host = d.Host
+	data.API = d.API
+	data.TLS = d.TLS
+	data.Storage = d.Storage
+	data.SRT = d.SRT
+	data.FFmpeg = d.FFmpeg
+	data.Playout = d.Playout
+	data.Debug = d.Debug
+	data.Metrics = d.Metrics
+	data.Sessions = d.Sessions
+	data.Service = d.Service
+	data.Router = d.Router
+
+	data.Log.Topics = copy.Slice(d.Log.Topics)
+
+	data.Host.Name = copy.Slice(d.Host.Name)
+
+	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
+
+	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
+
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+
+	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+
+	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+
+	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
+
+	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.Routes = copy.StringMap(d.Router.Routes)
+
+	// Actual changes
+	data.RTMP.Enable = d.RTMP.Enable
+	data.RTMP.EnableTLS = d.RTMP.EnableTLS
+	data.RTMP.Address = d.RTMP.Address
+	data.RTMP.App = d.RTMP.App
+	data.RTMP.Token = d.RTMP.Token
+
+	data.Version = 1
 
 	return data, nil
 }

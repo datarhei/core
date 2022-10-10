@@ -1,44 +1,20 @@
-// Package config implements types for handling the configuation for the app.
-package config
+package v1
 
 import (
 	"context"
 	"net"
 	"time"
 
-	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
 	"github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/math/rand"
+
+	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
 )
 
-/*
-type Config interface {
-	// Merge merges the values of the known environment variables into the configuration
-	Merge()
-
-	// Validate validates the current state of the Config for completeness and sanity. Errors are
-	// written to the log. Use resetLogs to indicate to reset the logs prior validation.
-	Validate(resetLogs bool)
-
-	// Messages calls for each log entry the provided callback. The level has the values 'error', 'warn', or 'info'.
-	// The name is the name of the configuration value, e.g. 'api.auth.enable'. The message is the log message.
-	Messages(logger func(level string, v vars.Variable, message string))
-
-	// HasErrors returns whether there are some error messages in the log.
-	HasErrors() bool
-
-	// Overrides returns a list of configuration value names that have been overriden by an environment variable.
-	Overrides() []string
-
-	Get(name string) (string, error)
-	Set(name, val string) error
-}
-*/
-
-const version int64 = 3
+const version int64 = 1
 
 // Make sure that the config.Config interface is satisfied
 //var _ config.Config = &Config{}
@@ -52,11 +28,11 @@ type Config struct {
 
 // New returns a Config which is initialized with its default values
 func New() *Config {
-	config := &Config{}
+	cfg := &Config{}
 
-	config.init()
+	cfg.init()
 
-	return config
+	return cfg
 }
 
 func (d *Config) Get(name string) (string, error) {
@@ -109,8 +85,7 @@ func (d *Config) Clone() *Config {
 	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
 	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
-	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
-	data.Storage.Disk.Cache.Types.Block = copy.Slice(d.Storage.Disk.Cache.Types.Block)
+	data.Storage.Disk.Cache.Types = copy.Slice(d.Storage.Disk.Cache.Types)
 
 	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
@@ -171,7 +146,6 @@ func (d *Config) init() {
 	d.vars.Register(value.NewAddress(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
-	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
@@ -185,8 +159,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
 	d.vars.Register(value.NewInt64(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
 	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
-	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
-	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
+	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types, []string{}, " "), "storage.disk.cache.types", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
 
 	// Storage (Memory)
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
@@ -202,7 +175,6 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.RTMP.Enable, false), "rtmp.enable", "CORE_RTMP_ENABLE", nil, "Enable RTMP server", false, false)
 	d.vars.Register(value.NewBool(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
 	d.vars.Register(value.NewAddress(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
-	d.vars.Register(value.NewAddress(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
 	d.vars.Register(value.NewAbsolutePath(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.vars.Register(value.NewString(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
 
@@ -332,13 +304,6 @@ func (d *Config) Validate(resetLogs bool) {
 		}
 	}
 
-	// If TLS and Let's Encrypt certificate is enabled, we require a non-empty email address
-	if d.TLS.Enable && d.TLS.Auto {
-		if len(d.TLS.Email) == 0 {
-			d.vars.SetDefault("tls.email")
-		}
-	}
-
 	// If TLS for RTMP is enabled, TLS must be enabled
 	if d.RTMP.EnableTLS {
 		if !d.RTMP.Enable {
@@ -347,14 +312,6 @@ func (d *Config) Validate(resetLogs bool) {
 
 		if !d.TLS.Enable {
 			d.vars.Log("error", "rtmp.enable_tls", "RTMPS server can only be enabled if TLS is enabled")
-		}
-
-		if len(d.RTMP.AddressTLS) == 0 {
-			d.vars.Log("error", "rtmp.address_tls", "RTMPS server address must be set")
-		}
-
-		if d.RTMP.Enable && d.RTMP.Address == d.RTMP.AddressTLS {
-			d.vars.Log("error", "rtmp.address", "The RTMP and RTMPS server can't listen on the same address")
 		}
 	}
 
@@ -423,23 +380,18 @@ func (d *Config) Validate(resetLogs bool) {
 	}
 }
 
-// Merge merges the values of the known environment variables into the configuration
 func (d *Config) Merge() {
 	d.vars.Merge()
 }
 
-// Messages calls for each log entry the provided callback. The level has the values 'error', 'warn', or 'info'.
-// The name is the name of the configuration value, e.g. 'api.auth.enable'. The message is the log message.
 func (d *Config) Messages(logger func(level string, v vars.Variable, message string)) {
 	d.vars.Messages(logger)
 }
 
-// HasErrors returns whether there are some error messages in the log.
 func (d *Config) HasErrors() bool {
 	return d.vars.HasErrors()
 }
 
-// Overrides returns a list of configuration value names that have been overriden by an environment variable.
 func (d *Config) Overrides() []string {
 	return d.vars.Overrides()
 }

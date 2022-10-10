@@ -1,17 +1,21 @@
-package config
+package store
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/datarhei/core/v16/config"
+)
 
 type dummyStore struct {
-	current *Config
-	active  *Config
+	current *config.Config
+	active  *config.Config
 }
 
 // NewDummyStore returns a store that returns the default config
-func NewDummyStore() Store {
+func NewDummy() Store {
 	s := &dummyStore{}
 
-	cfg := New()
+	cfg := config.New()
 
 	cfg.DB.Dir = "."
 	cfg.FFmpeg.Binary = "true"
@@ -20,7 +24,7 @@ func NewDummyStore() Store {
 
 	s.current = cfg
 
-	cfg = New()
+	cfg = config.New()
 
 	cfg.DB.Dir = "."
 	cfg.FFmpeg.Binary = "true"
@@ -32,48 +36,34 @@ func NewDummyStore() Store {
 	return s
 }
 
-func (c *dummyStore) Get() *Config {
-	cfg := New()
-
-	cfg.DB.Dir = "."
-	cfg.FFmpeg.Binary = "true"
-	cfg.Storage.Disk.Dir = "."
-	cfg.Storage.MimeTypes = ""
-
-	return cfg
+func (c *dummyStore) Get() *config.Config {
+	return c.current.Clone()
 }
 
-func (c *dummyStore) Set(d *Config) error {
+func (c *dummyStore) Set(d *config.Config) error {
 	d.Validate(true)
 
 	if d.HasErrors() {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	c.current = NewConfigFrom(d)
+	c.current = d.Clone()
 
 	return nil
 }
 
-func (c *dummyStore) GetActive() *Config {
-	cfg := New()
-
-	cfg.DB.Dir = "."
-	cfg.FFmpeg.Binary = "true"
-	cfg.Storage.Disk.Dir = "."
-	cfg.Storage.MimeTypes = ""
-
-	return cfg
+func (c *dummyStore) GetActive() *config.Config {
+	return c.active.Clone()
 }
 
-func (c *dummyStore) SetActive(d *Config) error {
+func (c *dummyStore) SetActive(d *config.Config) error {
 	d.Validate(true)
 
 	if d.HasErrors() {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	c.active = NewConfigFrom(d)
+	c.active = d.Clone()
 
 	return nil
 }

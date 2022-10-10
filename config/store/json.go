@@ -1,4 +1,4 @@
-package config
+package store
 
 import (
 	gojson "encoding/json"
@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/datarhei/core/v16/config"
+	v1 "github.com/datarhei/core/v16/config/v1"
+	v2 "github.com/datarhei/core/v16/config/v2"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/file"
 )
@@ -14,7 +17,7 @@ import (
 type jsonStore struct {
 	path string
 
-	data map[string]*Config
+	data map[string]*config.Config
 
 	reloadFn func()
 }
@@ -23,14 +26,14 @@ type jsonStore struct {
 // back to the path. The returned error will be nil if everything went fine.
 // If the path doesn't exist, a default JSON config file will be written to that path.
 // The returned ConfigStore can be used to retrieve or write the config.
-func NewJSONStore(path string, reloadFn func()) (Store, error) {
+func NewJSON(path string, reloadFn func()) (Store, error) {
 	c := &jsonStore{
 		path:     path,
-		data:     make(map[string]*Config),
+		data:     make(map[string]*config.Config),
 		reloadFn: reloadFn,
 	}
 
-	c.data["base"] = New()
+	c.data["base"] = config.New()
 
 	if err := c.load(c.data["base"]); err != nil {
 		return nil, fmt.Errorf("failed to read JSON from '%s': %w", path, err)
@@ -43,16 +46,16 @@ func NewJSONStore(path string, reloadFn func()) (Store, error) {
 	return c, nil
 }
 
-func (c *jsonStore) Get() *Config {
-	return NewConfigFrom(c.data["base"])
+func (c *jsonStore) Get() *config.Config {
+	return c.data["base"].Clone()
 }
 
-func (c *jsonStore) Set(d *Config) error {
+func (c *jsonStore) Set(d *config.Config) error {
 	if d.HasErrors() {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	data := NewConfigFrom(d)
+	data := d.Clone()
 
 	data.CreatedAt = time.Now()
 
@@ -67,26 +70,26 @@ func (c *jsonStore) Set(d *Config) error {
 	return nil
 }
 
-func (c *jsonStore) GetActive() *Config {
+func (c *jsonStore) GetActive() *config.Config {
 	if x, ok := c.data["merged"]; ok {
-		return NewConfigFrom(x)
+		return x.Clone()
 	}
 
 	if x, ok := c.data["base"]; ok {
-		return NewConfigFrom(x)
+		return x.Clone()
 	}
 
 	return nil
 }
 
-func (c *jsonStore) SetActive(d *Config) error {
+func (c *jsonStore) SetActive(d *config.Config) error {
 	d.Validate(true)
 
 	if d.HasErrors() {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	c.data["merged"] = NewConfigFrom(d)
+	c.data["merged"] = d.Clone()
 
 	return nil
 }
@@ -101,7 +104,7 @@ func (c *jsonStore) Reload() error {
 	return nil
 }
 
-func (c *jsonStore) load(config *Config) error {
+func (c *jsonStore) load(cfg *config.Config) error {
 	if len(c.path) == 0 {
 		return nil
 	}
@@ -115,7 +118,7 @@ func (c *jsonStore) load(config *Config) error {
 		return err
 	}
 
-	dataV3 := &Data{}
+	dataV3 := &config.Data{}
 
 	version := DataVersion{}
 
@@ -124,29 +127,29 @@ func (c *jsonStore) load(config *Config) error {
 	}
 
 	if version.Version == 1 {
-		dataV1 := &dataV1{}
+		dataV1 := &v1.Data{}
 
 		if err = gojson.Unmarshal(jsondata, dataV1); err != nil {
 			return json.FormatError(jsondata, err)
 		}
 
-		dataV2, err := NewV2FromV1(dataV1)
+		dataV2, err := v2.UpgradeV1ToV2(dataV1)
 		if err != nil {
 			return err
 		}
 
-		dataV3, err = NewV3FromV2(dataV2)
+		dataV3, err = config.UpgradeV2ToV3(dataV2)
 		if err != nil {
 			return err
 		}
 	} else if version.Version == 2 {
-		dataV2 := &dataV2{}
+		dataV2 := &v2.Data{}
 
 		if err = gojson.Unmarshal(jsondata, dataV2); err != nil {
 			return json.FormatError(jsondata, err)
 		}
 
-		dataV3, err = NewV3FromV2(dataV2)
+		dataV3, err = config.UpgradeV2ToV3(dataV2)
 		if err != nil {
 			return err
 		}
@@ -156,15 +159,15 @@ func (c *jsonStore) load(config *Config) error {
 		}
 	}
 
-	config.Data = *dataV3
+	cfg.Data = *dataV3
 
-	config.LoadedAt = time.Now()
-	config.UpdatedAt = config.LoadedAt
+	cfg.LoadedAt = time.Now()
+	cfg.UpdatedAt = cfg.LoadedAt
 
 	return nil
 }
 
-func (c *jsonStore) store(data *Config) error {
+func (c *jsonStore) store(data *config.Config) error {
 	data.CreatedAt = time.Now()
 
 	if len(c.path) == 0 {

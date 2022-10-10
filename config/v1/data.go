@@ -1,8 +1,12 @@
-package config
+package v1
 
-import "time"
+import (
+	"time"
 
-type dataV1 struct {
+	"github.com/datarhei/core/v16/config/value"
+)
+
+type Data struct {
 	CreatedAt       time.Time `json:"created_at"`
 	LoadedAt        time.Time `json:"-"`
 	UpdatedAt       time.Time `json:"-"`
@@ -44,8 +48,8 @@ type dataV1 struct {
 				Secret string `json:"secret"`
 			} `json:"jwt"`
 			Auth0 struct {
-				Enable  bool          `json:"enable"`
-				Tenants []Auth0Tenant `json:"tenants"`
+				Enable  bool                `json:"enable"`
+				Tenants []value.Auth0Tenant `json:"tenants"`
 			} `json:"auth0"`
 		} `json:"auth"`
 	} `json:"api"`

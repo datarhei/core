@@ -16,6 +16,8 @@ import (
 
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/config"
+	configstore "github.com/datarhei/core/v16/config/store"
+	configvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
@@ -96,7 +98,7 @@ type api struct {
 
 	config struct {
 		path   string
-		store  config.Store
+		store  configstore.Store
 		config *config.Config
 	}
 
@@ -145,7 +147,7 @@ func (a *api) Reload() error {
 
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
 
-	store, err := config.NewJSONStore(a.config.path, func() {
+	store, err := configstore.NewJSON(a.config.path, func() {
 		a.errorChan <- ErrConfigReload
 	})
 	if err != nil {
@@ -157,7 +159,7 @@ func (a *api) Reload() error {
 	cfg.Merge()
 
 	if len(cfg.Host.Name) == 0 && cfg.Host.Auto {
-		cfg.SetPublicIPs()
+		cfg.Host.Name = net.GetPublicIPs(5 * time.Second)
 	}
 
 	cfg.Validate(false)
@@ -226,7 +228,7 @@ func (a *api) Reload() error {
 	logger.Info().WithFields(logfields).Log("")
 
 	configlogger := logger.WithComponent("Config")
-	cfg.Messages(func(level string, v config.Variable, message string) {
+	cfg.Messages(func(level string, v configvars.Variable, message string) {
 		configlogger = configlogger.WithFields(log.Fields{
 			"variable":    v.Name,
 			"value":       v.Value,

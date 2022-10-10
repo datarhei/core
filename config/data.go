@@ -1,6 +1,12 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/datarhei/core/v16/config/copy"
+	v2 "github.com/datarhei/core/v16/config/v2"
+	"github.com/datarhei/core/v16/config/value"
+)
 
 // Data is the actual configuration data for the app
 type Data struct {
@@ -45,8 +51,8 @@ type Data struct {
 				Secret string `json:"secret"`
 			} `json:"jwt"`
 			Auth0 struct {
-				Enable  bool          `json:"enable"`
-				Tenants []Auth0Tenant `json:"tenants"`
+				Enable  bool                `json:"enable"`
+				Tenants []value.Auth0Tenant `json:"tenants"`
 			} `json:"auth0"`
 		} `json:"auth"`
 	} `json:"api"`
@@ -159,8 +165,90 @@ type Data struct {
 	} `json:"router"`
 }
 
-func NewV3FromV2(d *dataV2) (*Data, error) {
-	data := &Data{}
+func UpgradeV2ToV3(d *v2.Data) (*Data, error) {
+	cfg := New()
+
+	return MergeV2toV3(&cfg.Data, d)
+}
+
+func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
+	data.CreatedAt = d.CreatedAt
+	data.LoadedAt = d.LoadedAt
+	data.UpdatedAt = d.UpdatedAt
+
+	data.ID = d.ID
+	data.Name = d.Name
+	data.Address = d.Address
+	data.CheckForUpdates = d.CheckForUpdates
+
+	data.Log = d.Log
+	data.DB = d.DB
+	data.Host = d.Host
+	data.API = d.API
+	data.RTMP = d.RTMP
+	data.SRT = d.SRT
+	data.FFmpeg = d.FFmpeg
+	data.Playout = d.Playout
+	data.Debug = d.Debug
+	data.Metrics = d.Metrics
+	data.Sessions = d.Sessions
+	data.Service = d.Service
+	data.Router = d.Router
+
+	data.Log.Topics = copy.Slice(d.Log.Topics)
+
+	data.Host.Name = copy.Slice(d.Host.Name)
+
+	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
+
+	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
+
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+
+	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+
+	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+
+	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
+
+	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.Routes = copy.StringMap(d.Router.Routes)
+
+	data.Storage.MimeTypes = d.Storage.MimeTypes
+
+	data.Storage.CORS = d.Storage.CORS
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+
+	data.Storage.Memory = d.Storage.Memory
+
+	// Actual changes
+	data.TLS.Enable = d.TLS.Enable
+	data.TLS.Address = d.TLS.Address
+	data.TLS.Auto = d.TLS.Auto
+	data.TLS.CertFile = d.TLS.CertFile
+	data.TLS.KeyFile = d.TLS.KeyFile
+
+	data.Storage.Disk.Dir = d.Storage.Disk.Dir
+	data.Storage.Disk.Size = d.Storage.Disk.Size
+	data.Storage.Disk.Cache.Enable = d.Storage.Disk.Cache.Enable
+	data.Storage.Disk.Cache.Size = d.Storage.Disk.Cache.Size
+	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
+	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
+	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types)
+
+	data.Version = 3
+
+	return data, nil
+}
+
+func DowngradeV3toV2(d *Data) (*v2.Data, error) {
+	data := &v2.Data{}
 
 	data.CreatedAt = d.CreatedAt
 	data.LoadedAt = d.LoadedAt
@@ -185,30 +273,30 @@ func NewV3FromV2(d *dataV2) (*Data, error) {
 	data.Service = d.Service
 	data.Router = d.Router
 
-	data.Log.Topics = copyStringSlice(d.Log.Topics)
+	data.Log.Topics = copy.Slice(d.Log.Topics)
 
-	data.Host.Name = copyStringSlice(d.Host.Name)
+	data.Host.Name = copy.Slice(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copyStringSlice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copyStringSlice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copyStringSlice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copyStringSlice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
 
-	data.API.Auth.Auth0.Tenants = copyTenantSlice(d.API.Auth.Auth0.Tenants)
+	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copyStringSlice(d.Storage.CORS.Origins)
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 
-	data.FFmpeg.Access.Input.Allow = copyStringSlice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copyStringSlice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copyStringSlice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copyStringSlice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copyStringSlice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copyStringSlice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copyStringSlice(d.Router.BlockedPrefixes)
-	data.Router.Routes = copyStringMap(d.Router.Routes)
+	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
 	data.TLS.Enable = d.TLS.Enable
@@ -216,12 +304,11 @@ func NewV3FromV2(d *dataV2) (*Data, error) {
 	data.TLS.Auto = d.TLS.Auto
 	data.TLS.CertFile = d.TLS.CertFile
 	data.TLS.KeyFile = d.TLS.KeyFile
-	data.TLS.Email = "cert@datarhei.com"
 
 	data.Storage.MimeTypes = d.Storage.MimeTypes
 
 	data.Storage.CORS = d.Storage.CORS
-	data.Storage.CORS.Origins = copyStringSlice(d.Storage.CORS.Origins)
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 
 	data.Storage.Memory = d.Storage.Memory
 
@@ -231,10 +318,9 @@ func NewV3FromV2(d *dataV2) (*Data, error) {
 	data.Storage.Disk.Cache.Size = d.Storage.Disk.Cache.Size
 	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
 	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
-	data.Storage.Disk.Cache.Types.Allow = copyStringSlice(d.Storage.Disk.Cache.Types)
-	data.Storage.Disk.Cache.Types.Block = []string{}
+	data.Storage.Disk.Cache.Types = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
 
-	data.Version = 3
+	data.Version = 2
 
 	return data, nil
 }

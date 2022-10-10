@@ -1,4 +1,4 @@
-package config
+package value
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 func TestIntValue(t *testing.T) {
 	var i int
 
-	ivar := newIntValue(&i, 11)
+	ivar := NewInt(&i, 11)
 
 	assert.Equal(t, "11", ivar.String())
 	assert.Equal(t, nil, ivar.Validate())
@@ -34,16 +34,16 @@ type testdata struct {
 func TestCopyStruct(t *testing.T) {
 	data1 := testdata{}
 
-	newIntValue(&data1.value1, 1)
-	newIntValue(&data1.value2, 2)
+	NewInt(&data1.value1, 1)
+	NewInt(&data1.value2, 2)
 
 	assert.Equal(t, int(1), data1.value1)
 	assert.Equal(t, int(2), data1.value2)
 
 	data2 := testdata{}
 
-	val21 := newIntValue(&data2.value1, 3)
-	val22 := newIntValue(&data2.value2, 4)
+	val21 := NewInt(&data2.value1, 3)
+	val22 := NewInt(&data2.value2, 4)
 
 	assert.Equal(t, int(3), data2.value1)
 	assert.Equal(t, int(4), data2.value2)
