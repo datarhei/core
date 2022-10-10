@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -73,12 +74,18 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 	summary := collector.Summary()
 
 	for _, session := range summary.Active {
-		if session.Reference == process.Reference {
-			data.CurrentSessions++
+		if !strings.HasPrefix(session.Reference, process.Reference) {
+			continue
 		}
+
+		data.CurrentSessions++
 	}
 
-	if s, ok := summary.Summary.References[process.Reference]; ok {
+	for reference, s := range summary.Summary.References {
+		if !strings.HasPrefix(reference, process.Reference) {
+			continue
+		}
+
 		data.TotalSessions = s.TotalSessions
 	}
 
