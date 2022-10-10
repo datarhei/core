@@ -86,7 +86,7 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 			continue
 		}
 
-		data.TotalSessions = s.TotalSessions
+		data.TotalSessions += s.TotalSessions
 	}
 
 	return c.JSON(http.StatusOK, data)
