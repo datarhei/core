@@ -379,13 +379,12 @@ func (p *parser) Parse(line string) uint64 {
 	}
 
 	// Calculate if any of the processed frames staled.
-	// If one number of frames in an output is the same as
-	// before, then pFrames becomes 0.
-	var pFrames uint64 = 0
-
-	pFrames = p.stats.main.diff.frame
+	// If one number of frames in an output is the same as before, then pFrames becomes 0.
+	pFrames := p.stats.main.diff.frame
 
 	if isFFmpegProgress {
+		// Only consider the outputs
+		pFrames = 1
 		for i := range p.stats.output {
 			pFrames *= p.stats.output[i].diff.frame
 		}
