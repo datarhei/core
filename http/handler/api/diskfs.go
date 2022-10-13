@@ -34,6 +34,7 @@ func NewDiskFS(fs fs.Filesystem, cache cache.Cacher) *DiskFSHandler {
 // GetFile returns the file at the given path
 // @Summary Fetch a file from the filesystem
 // @Description Fetch a file from the filesystem. The contents of that file are returned.
+// @Tags v16.7.2
 // @ID diskfs-3-get-file
 // @Produce application/data
 // @Produce json
@@ -86,6 +87,7 @@ func (h *DiskFSHandler) GetFile(c echo.Context) error {
 // PutFile adds or overwrites a file at the given path
 // @Summary Add a file to the filesystem
 // @Description Writes or overwrites a file on the filesystem
+// @Tags v16.7.2
 // @ID diskfs-3-put-file
 // @Accept application/data
 // @Produce text/plain
@@ -125,6 +127,7 @@ func (h *DiskFSHandler) PutFile(c echo.Context) error {
 // DeleteFile removes a file from the filesystem
 // @Summary Remove a file from the filesystem
 // @Description Remove a file from the filesystem
+// @Tags v16.7.2
 // @ID diskfs-3-delete-file
 // @Produce text/plain
 // @Param path path string true "Path to file"
@@ -153,6 +156,7 @@ func (h *DiskFSHandler) DeleteFile(c echo.Context) error {
 // ListFiles lists all files on the filesystem
 // @Summary List all files on the filesystem
 // @Description List all files on the filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.
+// @Tags v16.7.2
 // @ID diskfs-3-list-files
 // @Produce json
 // @Param glob query string false "glob pattern for file names"

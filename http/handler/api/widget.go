@@ -34,6 +34,7 @@ func NewWidget(config WidgetConfig) *WidgetHandler {
 // Get returns minimal public statistics about a process
 // @Summary Fetch minimal statistics about a process
 // @Description Fetch minimal statistics about a process, which is not protected by any auth.
+// @Tags v16.7.2
 // @ID widget-3-get
 // @Produce json
 // @Param id path string true "ID of a process"

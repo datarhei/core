@@ -31,6 +31,7 @@ func NewLog(buffer log.BufferWriter) *LogHandler {
 // Log returns the last log lines of the Restreamer application
 // @Summary Application log
 // @Description Get the last log lines of the Restreamer application
+// @Tags v16.7.2
 // @ID log-3
 // @Param format query string false "Format of the list of log events (*console, raw)"
 // @Produce json

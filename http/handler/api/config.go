@@ -28,6 +28,7 @@ func NewConfig(store cfgstore.Store) *ConfigHandler {
 // Get returns the currently active Restreamer configuration
 // @Summary Retrieve the currently active Restreamer configuration
 // @Description Retrieve the currently active Restreamer configuration
+// @Tags v16.7.2
 // @ID config-3-get
 // @Produce json
 // @Success 200 {object} api.Config
@@ -45,6 +46,7 @@ func (p *ConfigHandler) Get(c echo.Context) error {
 // Set will set the given configuration as new active configuration
 // @Summary Update the current Restreamer configuration
 // @Description Update the current Restreamer configuration by providing a complete or partial configuration. Fields that are not provided will not be changed.
+// @Tags v16.7.2
 // @ID config-3-set
 // @Accept json
 // @Produce json
@@ -156,6 +158,7 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 // Reload will reload the currently active configuration
 // @Summary Reload the currently active configuration
 // @Description Reload the currently active configuration. This will trigger a restart of the Restreamer.
+// @Tags v16.7.2
 // @ID config-3-reload
 // @Produce plain
 // @Success 200 {string} string "OK"

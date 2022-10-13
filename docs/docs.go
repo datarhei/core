@@ -62,7 +62,7 @@ const docTemplate = `{
                 "operationId": "graph-playground",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -220,6 +220,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Retrieve the currently active Restreamer configuration",
                 "operationId": "config-3-get",
                 "responses": {
@@ -243,6 +246,9 @@ const docTemplate = `{
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Update the current Restreamer configuration",
                 "operationId": "config-3-set",
@@ -290,6 +296,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Reload the currently active configuration",
                 "operationId": "config-3-reload",
                 "responses": {
@@ -312,6 +321,9 @@ const docTemplate = `{
                 "description": "List all files on the filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "List all files on the filesystem",
                 "operationId": "diskfs-3-list-files",
@@ -360,6 +372,9 @@ const docTemplate = `{
                     "application/data",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Fetch a file from the filesystem",
                 "operationId": "diskfs-3-get-file",
                 "parameters": [
@@ -405,6 +420,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Add a file to the filesystem",
                 "operationId": "diskfs-3-put-file",
@@ -460,6 +478,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Remove a file from the filesystem",
                 "operationId": "diskfs-3-delete-file",
                 "parameters": [
@@ -497,6 +518,9 @@ const docTemplate = `{
                 "description": "List all files on the memory filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "List all files on the memory filesystem",
                 "operationId": "memfs-3-list-files",
@@ -545,6 +569,9 @@ const docTemplate = `{
                     "application/data",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Fetch a file from the memory filesystem",
                 "operationId": "memfs-3-get-file",
                 "parameters": [
@@ -590,6 +617,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Add a file to the memory filesystem",
                 "operationId": "memfs-3-put-file",
@@ -645,6 +675,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Remove a file from the memory filesystem",
                 "operationId": "memfs-3-delete-file",
                 "parameters": [
@@ -684,6 +717,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Create a link to a file in the memory filesystem",
                 "operationId": "memfs-3-patch",
@@ -732,6 +768,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Application log",
                 "operationId": "log-3",
                 "parameters": [
@@ -765,6 +804,9 @@ const docTemplate = `{
                 "description": "Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Retrieve JSON metadata from a key",
                 "operationId": "metadata-3-get",
@@ -805,6 +847,9 @@ const docTemplate = `{
                 "description": "Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Add JSON metadata under the given key",
                 "operationId": "metadata-3-set",
@@ -849,6 +894,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.10.0"
+                ],
                 "summary": "List all known metrics with their description and labels",
                 "operationId": "metrics-3-describe",
                 "responses": {
@@ -875,6 +923,9 @@ const docTemplate = `{
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Query the collected metrics",
                 "operationId": "metrics-3-metrics",
@@ -915,6 +966,9 @@ const docTemplate = `{
                 "description": "List all known processes. Use the query parameter to filter the listed processes.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "List all known processes",
                 "operationId": "process-3-get-all",
@@ -975,6 +1029,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Add a new process",
                 "operationId": "process-3-add",
                 "parameters": [
@@ -1015,6 +1072,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "List a process by its ID",
                 "operationId": "process-3-get",
                 "parameters": [
@@ -1053,12 +1113,15 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Replace an existing process. This is a shortcut for DELETE+POST.",
+                "description": "Replace an existing process.",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Replace an existing process",
                 "operationId": "process-3-update",
@@ -1111,6 +1174,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Delete a process by its ID",
                 "operationId": "process-3-delete",
                 "parameters": [
@@ -1151,6 +1217,9 @@ const docTemplate = `{
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Issue a command to a process",
                 "operationId": "process-3-command",
@@ -1205,6 +1274,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Get the configuration of a process",
                 "operationId": "process-3-get-config",
                 "parameters": [
@@ -1248,6 +1320,9 @@ const docTemplate = `{
                 "description": "Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Retrieve JSON metadata stored with a process under a key",
                 "operationId": "process-3-get-process-metadata",
@@ -1295,6 +1370,9 @@ const docTemplate = `{
                 "description": "Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Add JSON metadata with a process under the given key",
                 "operationId": "process-3-set-process-metadata",
@@ -1353,6 +1431,9 @@ const docTemplate = `{
                     "text/plain",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Encode the errorframe",
                 "operationId": "process-3-playout-errorframencode",
                 "parameters": [
@@ -1407,6 +1488,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Upload an error frame",
                 "operationId": "process-3-playout-errorframe",
@@ -1480,6 +1564,9 @@ const docTemplate = `{
                     "image/png",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Get the last keyframe",
                 "operationId": "process-3-playout-keyframe",
                 "parameters": [
@@ -1538,6 +1625,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Close the current input stream",
                 "operationId": "process-3-playout-reopen-input",
                 "parameters": [
@@ -1588,6 +1678,9 @@ const docTemplate = `{
                 "description": "Get the current playout status of an input of a process",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Get the current playout status",
                 "operationId": "process-3-playout-status",
@@ -1643,6 +1736,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Switch to a new stream",
                 "operationId": "process-3-playout-stream",
@@ -1700,9 +1796,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Probe an existing process to get a detailed stream information on the inputs",
+                "description": "Probe an existing process to get a detailed stream information on the inputs.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Probe a process",
                 "operationId": "process-3-probe",
@@ -1732,9 +1831,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get the logs and the log history of a process",
+                "description": "Get the logs and the log history of a process.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Get the logs of a process",
                 "operationId": "process-3-get-report",
@@ -1776,9 +1878,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get the state and progress data of a process",
+                "description": "Get the state and progress data of a process.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Get the state of a process",
                 "operationId": "process-3-get-state",
@@ -1820,9 +1925,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all currently publishing RTMP streams",
+                "description": "List all currently publishing RTMP streams.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "List all publishing RTMP streams",
                 "operationId": "rtmp-3-list-channels",
@@ -1846,9 +1954,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get a summary of all active and past sessions of the given collector",
+                "description": "Get a summary of all active and past sessions of the given collector.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Get a summary of all active and past sessions",
                 "operationId": "session-3-summary",
@@ -1877,9 +1988,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get a minimal summary of all active sessions (i.e. number of sessions, bandwidth)",
+                "description": "Get a minimal summary of all active sessions (i.e. number of sessions, bandwidth).",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Get a minimal summary of all active sessions",
                 "operationId": "session-3-current",
@@ -1908,9 +2022,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all detected FFmpeg capabilities",
+                "description": "List all detected FFmpeg capabilities.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "FFmpeg capabilities",
                 "operationId": "skills-3",
@@ -1931,9 +2048,12 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Refresh the available FFmpeg capabilities",
+                "description": "Refresh the available FFmpeg capabilities.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Refresh FFmpeg capabilities",
                 "operationId": "skills-3-reload",
@@ -1958,6 +2078,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.9.0"
+                ],
                 "summary": "List all publishing SRT treams",
                 "operationId": "srt-3-list-channels",
                 "responses": {
@@ -1978,6 +2101,9 @@ const docTemplate = `{
                 "description": "Fetch minimal statistics about a process, which is not protected by any auth.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Fetch minimal statistics about a process",
                 "operationId": "widget-3-get",
@@ -2427,7 +2553,7 @@ const docTemplate = `{
                                         "tenants": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/config.Auth0Tenant"
+                                                "$ref": "#/definitions/value.Auth0Tenant"
                                             }
                                         }
                                     }
@@ -2835,6 +2961,9 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "cert_file": {
+                            "type": "string"
+                        },
+                        "email": {
                             "type": "string"
                         },
                         "enable": {
@@ -4052,7 +4181,7 @@ const docTemplate = `{
                                         "tenants": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/config.Auth0Tenant"
+                                                "$ref": "#/definitions/value.Auth0Tenant"
                                             }
                                         }
                                     }
@@ -4462,6 +4591,9 @@ const docTemplate = `{
                         "cert_file": {
                             "type": "string"
                         },
+                        "email": {
+                            "type": "string"
+                        },
                         "enable": {
                             "type": "boolean"
                         },
@@ -4741,7 +4873,7 @@ const docTemplate = `{
                 }
             }
         },
-        "config.Auth0Tenant": {
+        "value.Auth0Tenant": {
             "type": "object",
             "properties": {
                 "audience": {
