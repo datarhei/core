@@ -96,6 +96,26 @@ func (s *SRTStatistics) Unmarshal(ss *gosrt.Statistics) {
 	s.ByteSndDrop = ss.ByteSndDrop
 	s.ByteRcvDrop = ss.ByteRcvDrop
 	s.ByteRcvUndecrypt = ss.ByteRcvUndecrypt
+
+	s.UsPktSndPeriod = ss.UsPktSndPeriod
+	s.PktFlowWindow = ss.PktFlowWindow
+	s.PktFlightSize = ss.PktFlightSize
+	s.MsRTT = ss.MsRTT
+	s.MbpsBandwidth = ss.MbpsBandwidth
+	s.ByteAvailSndBuf = ss.ByteAvailSndBuf
+	s.ByteAvailRcvBuf = ss.ByteAvailRcvBuf
+	s.MbpsMaxBW = ss.MbpsMaxBW
+	s.ByteMSS = ss.ByteMSS
+	s.PktSndBuf = ss.PktSndBuf
+	s.ByteSndBuf = ss.ByteSndBuf
+	s.MsSndBuf = ss.MsSndBuf
+	s.MsSndTsbPdDelay = ss.MsSndTsbPdDelay
+	s.PktRcvBuf = ss.PktRcvBuf
+	s.ByteRcvBuf = ss.ByteRcvBuf
+	s.MsRcvBuf = ss.MsRcvBuf
+	s.MsRcvTsbPdDelay = ss.MsRcvTsbPdDelay
+	s.PktReorderTolerance = ss.PktReorderTolerance
+	s.PktRcvAvgBelatedTime = ss.PktRcvAvgBelatedTime
 }
 
 type SRTLog struct {
