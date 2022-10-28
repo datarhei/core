@@ -979,7 +979,7 @@ definitions:
       recv_km_pkt:
         description: The total number of received KM (Key Material) control packets
         type: integer
-      recv_loss__bytes:
+      recv_loss_bytes:
         description: Same as pktRcvLoss, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT), bytes for the presently missing (either
           reordered or lost) packets' payloads are estimated based on the average
@@ -1088,7 +1088,7 @@ definitions:
       sent_retrans_pkt:
         description: The total number of retransmitted packets sent by the SRT sender
         type: integer
-      sent_unique__bytes:
+      sent_unique_bytes:
         description: Same as pktSentUnique, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
         type: integer

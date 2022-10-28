@@ -53,15 +53,17 @@ func (c *client) ticker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	stats := &srt.Statistics{}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			stats := c.conn.Stats()
+			c.conn.Stats(stats)
 
-			rxbytes := stats.ByteRecv
-			txbytes := stats.ByteSent
+			rxbytes := stats.Accumulated.ByteRecv
+			txbytes := stats.Accumulated.ByteSent
 
 			c.collector.Ingress(c.id, int64(rxbytes-c.rxbytes))
 			c.collector.Egress(c.id, int64(txbytes-c.txbytes))
@@ -285,8 +287,11 @@ func (s *server) Channels() Channels {
 		socketId := ch.publisher.conn.SocketId()
 		st.Publisher[id] = socketId
 
+		stats := &srt.Statistics{}
+		ch.publisher.conn.Stats(stats)
+
 		st.Connections[socketId] = Connection{
-			Stats: ch.publisher.conn.Stats(),
+			Stats: *stats,
 			Log:   map[string][]Log{},
 		}
 
@@ -294,8 +299,11 @@ func (s *server) Channels() Channels {
 			socketId := c.conn.SocketId()
 			st.Subscriber[id] = append(st.Subscriber[id], socketId)
 
+			stats := &srt.Statistics{}
+			c.conn.Stats(stats)
+
 			st.Connections[socketId] = Connection{
-				Stats: c.conn.Stats(),
+				Stats: *stats,
 				Log:   map[string][]Log{},
 			}
 		}

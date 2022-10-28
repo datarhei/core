@@ -18,6 +18,7 @@ import (
 
 const MAX_SEQUENCENUMBER uint32 = 0b01111111_11111111_11111111_11111111
 const MAX_TIMESTAMP uint32 = 0b11111111_11111111_11111111_11111111
+const MAX_PAYLOAD_SIZE = 1456
 
 // Table 1: SRT Control Packet Types
 const (
@@ -279,7 +280,7 @@ func (p *pkt) Decommission() {
 func (p pkt) String() string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "timestamp=%#08x, destId=%#08x\n", p.header.Timestamp, p.header.DestinationSocketId)
+	fmt.Fprintf(&b, "timestamp=%#08x (%d), destId=%#08x\n", p.header.Timestamp, p.header.Timestamp, p.header.DestinationSocketId)
 
 	if p.header.IsControlPacket {
 		fmt.Fprintf(&b, "control packet:\n")

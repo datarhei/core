@@ -9,7 +9,6 @@ import (
 	"go/build"
 	goparser "go/parser"
 	"go/token"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -733,17 +732,17 @@ func isGeneralAPIComment(comments []string) bool {
 }
 
 func getMarkdownForTag(tagName string, dirPath string) ([]byte, error) {
-	filesInfos, err := ioutil.ReadDir(dirPath)
+	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, fileInfo := range filesInfos {
-		if fileInfo.IsDir() {
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
 			continue
 		}
 
-		fileName := fileInfo.Name()
+		fileName := entry.Name()
 
 		if !strings.Contains(fileName, ".md") {
 			continue
@@ -752,7 +751,7 @@ func getMarkdownForTag(tagName string, dirPath string) ([]byte, error) {
 		if strings.Contains(fileName, tagName) {
 			fullPath := filepath.Join(dirPath, fileName)
 
-			commentInfo, err := ioutil.ReadFile(fullPath)
+			commentInfo, err := os.ReadFile(fullPath)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to read markdown file %s error: %s ", fullPath, err)
 			}
@@ -873,7 +872,7 @@ func convertFromSpecificToPrimitive(typeName string) (string, error) {
 func (parser *Parser) getTypeSchema(typeName string, file *ast.File, ref bool) (*spec.Schema, error) {
 	if override, ok := parser.Overrides[typeName]; ok {
 		parser.debug.Printf("Override detected for %s: using %s instead", typeName, override)
-		typeName = override
+		return parseObjectSchema(parser, override, file)
 	}
 
 	if IsInterfaceLike(typeName) {
@@ -1186,12 +1185,10 @@ func (parser *Parser) parseTypeExpr(file *ast.File, typeExpr ast.Expr, ref bool)
 
 	case *ast.FuncType:
 		return nil, ErrFuncTypeField
-	// ...
-	default:
-		parser.debug.Printf("Type definition of type '%T' is not supported yet. Using 'object' instead.\n", typeExpr)
+		// ...
 	}
 
-	return PrimitiveSchema(OBJECT), nil
+	return parser.parseGenericTypeExpr(file, typeExpr)
 }
 
 func (parser *Parser) parseStruct(file *ast.File, fields *ast.FieldList) (*spec.Schema, error) {
@@ -1334,7 +1331,7 @@ func getFieldType(file *ast.File, field ast.Expr) (string, error) {
 
 		return fullName, nil
 	default:
-		return getGenericFieldType(file, field)
+		return getGenericFieldType(file, field, nil)
 	}
 }
 
@@ -1490,7 +1487,7 @@ func (parser *Parser) getAllGoFileInfoFromDeps(pkg *depth.Pkg) error {
 
 	srcDir := pkg.Raw.Dir
 
-	files, err := ioutil.ReadDir(srcDir) // only parsing files in the dir(don't contain sub dir files)
+	files, err := os.ReadDir(srcDir) // only parsing files in the dir(don't contain sub dir files)
 	if err != nil {
 		return err
 	}

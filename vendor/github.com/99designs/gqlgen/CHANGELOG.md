@@ -5,10 +5,138 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <a name="unreleased"></a>
-## [Unreleased](https://github.com/99designs/gqlgen/compare/v0.17.14...HEAD)
+## [Unreleased](https://github.com/99designs/gqlgen/compare/v0.17.19...HEAD)
 
 <!-- end of if -->
 <!-- end of CommitGroups -->
+<a name="v0.17.19"></a>
+## [v0.17.19](https://github.com/99designs/gqlgen/compare/v0.17.18...v0.17.19) - 2022-09-15
+- <a href="https://github.com/99designs/gqlgen/commit/588c6ac137b8ed7aea1bc7c009ea23cb9dec5caa"><tt>588c6ac1</tt></a> release v0.17.19
+
+- <a href="https://github.com/99designs/gqlgen/commit/c671317056298db8073498c8db02120b6f737032"><tt>c6713170</tt></a> v0.17.18 postrelease bump
+
+ <!-- end of Commits -->
+<!-- end of Else -->
+
+<!-- end of If NoteGroups -->
+<a name="v0.17.18"></a>
+## [v0.17.18](https://github.com/99designs/gqlgen/compare/v0.17.17...v0.17.18) - 2022-09-15
+- <a href="https://github.com/99designs/gqlgen/commit/1d41c808a93446fca8ff867e957ef552e56f6ae3"><tt>1d41c808</tt></a> release v0.17.18
+
+- <a href="https://github.com/99designs/gqlgen/commit/4dbe2e475f15ce77a498c841ea6c9149ef5ceaba"><tt>4dbe2e47</tt></a> update graphiql to 2.0.7 (<a href="https://github.com/99designs/gqlgen/pull/2375">#2375</a>)
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/b7cc094a49e3d348cfc457aa76f1640c86cdcae9"><tt>b7cc094a</tt></a> testfix: make apollo federated tracer test more consistent (<a href="https://github.com/99designs/gqlgen/pull/2374">#2374</a>)</summary>
+
+* Update tracing_test.go
+
+* add missing imports
+
+</details></dd></dl>
+
+- <a href="https://github.com/99designs/gqlgen/commit/d096fb9b08531b0dc389a786b6f44add045ea75e"><tt>d096fb9b</tt></a> Update directives (<a href="https://github.com/99designs/gqlgen/pull/2371">#2371</a>)
+
+- <a href="https://github.com/99designs/gqlgen/commit/1acfea2fbdf3564df16f8023f4e736e90a05b909"><tt>1acfea2f</tt></a> Add v0.17.17 changelog
+
+- <a href="https://github.com/99designs/gqlgen/commit/c273adc8ad45e15940bbb6fe211603670d9f3220"><tt>c273adc8</tt></a> v0.17.17 postrelease bump
+
+ <!-- end of Commits -->
+<!-- end of Else -->
+
+<!-- end of If NoteGroups -->
+<a name="v0.17.17"></a>
+## [v0.17.17](https://github.com/99designs/gqlgen/compare/v0.17.16...v0.17.17) - 2022-09-13
+- <a href="https://github.com/99designs/gqlgen/commit/d50bc5aca10c5a5dd6a1680b2288c35a61327ade"><tt>d50bc5ac</tt></a> release v0.17.17
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/462025b400e9b792a5afbe320cde4cc952f6b547"><tt>462025b4</tt></a> nil check error before type assertion follow-up from <a href="https://github.com/99designs/gqlgen/pull/2341">#2341</a> (<a href="https://github.com/99designs/gqlgen/pull/2368">#2368</a>)</summary>
+
+* Improve errcode.Set safety
+
+</details></dd></dl>
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/59493aff86020d170e58900654d334f5ebc2ceee"><tt>59493aff</tt></a> fix: apollo federation tracer was race prone (<a href="https://github.com/99designs/gqlgen/pull/2366">#2366</a>)</summary>
+
+The tracer was using a global state across different goroutines
+Added req headers to operation context to allow it to be fetched in InterceptOperation
+
+</details></dd></dl>
+
+- <a href="https://github.com/99designs/gqlgen/commit/fc0185567f2dfc37b38f11283efb9cc1db69e96d"><tt>fc018556</tt></a> Update gqlparser to v2.5.1 (<a href="https://github.com/99designs/gqlgen/pull/2363">#2363</a>)
+
+- <a href="https://github.com/99designs/gqlgen/commit/56574a146bd16a13c9055128ec3c80e96a7c4b29"><tt>56574a14</tt></a> feat: make Playground HTML content compatible with UTF-8 charset (<a href="https://github.com/99designs/gqlgen/pull/2355">#2355</a>)
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/182b039d34cb730f432c486ebe763f246937dea4"><tt>182b039d</tt></a> Add `subscriptions.md` recipe to docs (<a href="https://github.com/99designs/gqlgen/pull/2346">#2346</a>)</summary>
+
+* Add `subscriptions.md` recipe to docs
+
+* Fix wrong request type
+
+</details></dd></dl>
+
+- <a href="https://github.com/99designs/gqlgen/commit/b66fff16de0b16edc317398a5574fcff2cb39e66"><tt>b66fff16</tt></a> Add omit_getters config option (<a href="https://github.com/99designs/gqlgen/pull/2348">#2348</a>)
+
+- <a href="https://github.com/99designs/gqlgen/commit/2ba8040f20e32d06dc6d5bfacaadc5619a6e66ee"><tt>2ba8040f</tt></a> Update changelog for v0.17.16
+
+- <a href="https://github.com/99designs/gqlgen/commit/8bef8c8061222071e6c814e45bbc33fcabcb3980"><tt>8bef8c80</tt></a> v0.17.16 postrelease bump
+
+ <!-- end of Commits -->
+<!-- end of Else -->
+
+<!-- end of If NoteGroups -->
+<a name="v0.17.16"></a>
+## [v0.17.16](https://github.com/99designs/gqlgen/compare/v0.17.15...v0.17.16) - 2022-08-26
+- <a href="https://github.com/99designs/gqlgen/commit/9593ceadd6e07c6fd0f0b0e0c55b9f1bf8ade762"><tt>9593cead</tt></a> release v0.17.16
+
+- <a href="https://github.com/99designs/gqlgen/commit/2390af2db920dc632fe47bc778a24c30495b9efd"><tt>2390af2d</tt></a> Update gqlparser to v2.5.0 (<a href="https://github.com/99designs/gqlgen/pull/2341">#2341</a>)
+
+- <a href="https://github.com/99designs/gqlgen/commit/2a87fe0645fd271e4e71d2b7bde34ecf31bf844c"><tt>2a87fe06</tt></a> feat: update Graphiql to version 2 (<a href="https://github.com/99designs/gqlgen/pull/2340">#2340</a>)
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/32e2ccd30e82fc566ca022a65dcc4a67c4b6125a"><tt>32e2ccd3</tt></a> Update yaml to v3 (<a href="https://github.com/99designs/gqlgen/pull/2339">#2339</a>)</summary>
+
+* update yaml to v3
+
+* add missing go entry for yaml on _example
+
+* add missing sum file
+
+</details></dd></dl>
+
+- <a href="https://github.com/99designs/gqlgen/commit/7949117a524be7f8882a61e2d4ade1bedf105107"><tt>7949117a</tt></a> v0.17.15 postrelease bump
+
+ <!-- end of Commits -->
+<!-- end of Else -->
+
+<!-- end of If NoteGroups -->
+<a name="v0.17.15"></a>
+## [v0.17.15](https://github.com/99designs/gqlgen/compare/v0.17.14...v0.17.15) - 2022-08-23
+- <a href="https://github.com/99designs/gqlgen/commit/23cc749256b4e2edc4b11ce9e84c643a7bb3194f"><tt>23cc7492</tt></a> release v0.17.15
+
+- <a href="https://github.com/99designs/gqlgen/commit/577a570cdb6b1b9185f24940690a14cdced37a36"><tt>577a570c</tt></a> Markdown formatting fixes (<a href="https://github.com/99designs/gqlgen/pull/2335">#2335</a>)
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/2b584011fc64a55cbda67f46637a280bf94d9cc1"><tt>2b584011</tt></a> Fix Interface Slice Getter Generation (<a href="https://github.com/99designs/gqlgen/pull/2332">#2332</a>)</summary>
+
+* Make modelgen test fail if generated doesn't build
+Added returning list of interface to modelgen test schema
+
+* Implement slice copying when returning interface slices
+
+* Re-generate to satisfy the linter
+
+</details></dd></dl>
+
+<dl><dd><details><summary><a href="https://github.com/99designs/gqlgen/commit/aee57b4c521e527ebc0538b8edfbe610973abf21"><tt>aee57b4c</tt></a> Correct boolean logic (<a href="https://github.com/99designs/gqlgen/pull/2330">#2330</a>)</summary>
+
+Correcting boolean logic issue
+
+</details></dd></dl>
+
+- <a href="https://github.com/99designs/gqlgen/commit/da0610e11accf3afd34903f03bfc0abd045d07ed"><tt>da0610e1</tt></a> Update changelog for v0.17.14
+
+- <a href="https://github.com/99designs/gqlgen/commit/ddcb524e3321d849505f6937307ef3dcbd3acace"><tt>ddcb524e</tt></a> v0.17.14 postrelease bump
+
+ <!-- end of Commits -->
+<!-- end of Else -->
+
+<!-- end of If NoteGroups -->
 <a name="v0.17.14"></a>
 ## [v0.17.14](https://github.com/99designs/gqlgen/compare/v0.17.13...v0.17.14) - 2022-08-18
 - <a href="https://github.com/99designs/gqlgen/commit/581bf6eb063a0d6a3cec3b6bc7a16ca10e310a97"><tt>581bf6eb</tt></a> release v0.17.14

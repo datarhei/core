@@ -669,20 +669,6 @@ func (a *api) start() error {
 			}
 			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
 			certmagic.Default.Logger = nil
-			certmagic.Default.OnEvent = func(event string, data interface{}) {
-				message := ""
-
-				switch data := data.(type) {
-				case string:
-					message = data
-				case fmt.Stringer:
-					message = data.String()
-				}
-
-				if len(message) != 0 {
-					a.log.logger.core.WithComponent("certmagic").Info().WithField("event", event).Log(message)
-				}
-			}
 
 			magic := certmagic.NewDefault()
 			acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)

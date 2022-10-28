@@ -33,9 +33,9 @@ type SRTStatistics struct {
 
 	ByteSent         uint64 `json:"sent_bytes"`           // Same as pktSent, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
 	ByteRecv         uint64 `json:"recv_bytes"`           // Same as pktRecv, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
-	ByteSentUnique   uint64 `json:"sent_unique__bytes"`   // Same as pktSentUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
+	ByteSentUnique   uint64 `json:"sent_unique_bytes"`    // Same as pktSentUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
 	ByteRecvUnique   uint64 `json:"recv_unique_bytes"`    // Same as pktRecvUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
-	ByteRcvLoss      uint64 `json:"recv_loss__bytes"`     // Same as pktRcvLoss, but expressed in bytes, including payload and all the headers (IP, TCP, SRT), bytes for the presently missing (either reordered or lost) packets' payloads are estimated based on the average packet size
+	ByteRcvLoss      uint64 `json:"recv_loss_bytes"`      // Same as pktRcvLoss, but expressed in bytes, including payload and all the headers (IP, TCP, SRT), bytes for the presently missing (either reordered or lost) packets' payloads are estimated based on the average packet size
 	ByteRetrans      uint64 `json:"sent_retrans_bytes"`   // Same as pktRetrans, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
 	ByteSndDrop      uint64 `json:"send_drop_bytes"`      // Same as pktSndDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
 	ByteRcvDrop      uint64 `json:"recv_drop_bytes"`      // Same as pktRcvDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)
@@ -68,54 +68,54 @@ type SRTStatistics struct {
 func (s *SRTStatistics) Unmarshal(ss *gosrt.Statistics) {
 	s.MsTimeStamp = ss.MsTimeStamp
 
-	s.PktSent = ss.PktSent
-	s.PktRecv = ss.PktRecv
-	s.PktSentUnique = ss.PktSentUnique
-	s.PktRecvUnique = ss.PktRecvUnique
-	s.PktSndLoss = ss.PktSndLoss
-	s.PktRcvLoss = ss.PktRcvLoss
-	s.PktRetrans = ss.PktRetrans
-	s.PktRcvRetrans = ss.PktRcvRetrans
-	s.PktSentACK = ss.PktSentACK
-	s.PktRecvACK = ss.PktRecvACK
-	s.PktSentNAK = ss.PktSentNAK
-	s.PktRecvNAK = ss.PktRecvNAK
-	s.PktSentKM = ss.PktSentKM
-	s.PktRecvKM = ss.PktRecvKM
-	s.UsSndDuration = ss.UsSndDuration
-	s.PktSndDrop = ss.PktSndDrop
-	s.PktRcvDrop = ss.PktRcvDrop
-	s.PktRcvUndecrypt = ss.PktRcvUndecrypt
+	s.PktSent = ss.Accumulated.PktSent
+	s.PktRecv = ss.Accumulated.PktRecv
+	s.PktSentUnique = ss.Accumulated.PktSentUnique
+	s.PktRecvUnique = ss.Accumulated.PktRecvUnique
+	s.PktSndLoss = ss.Accumulated.PktSendLoss
+	s.PktRcvLoss = ss.Accumulated.PktRecvLoss
+	s.PktRetrans = ss.Accumulated.PktRetrans
+	s.PktRcvRetrans = ss.Accumulated.PktRecvRetrans
+	s.PktSentACK = ss.Accumulated.PktSentACK
+	s.PktRecvACK = ss.Accumulated.PktRecvACK
+	s.PktSentNAK = ss.Accumulated.PktSentNAK
+	s.PktRecvNAK = ss.Accumulated.PktRecvNAK
+	s.PktSentKM = ss.Accumulated.PktSentKM
+	s.PktRecvKM = ss.Accumulated.PktRecvKM
+	s.UsSndDuration = ss.Accumulated.UsSndDuration
+	s.PktSndDrop = ss.Accumulated.PktSendDrop
+	s.PktRcvDrop = ss.Accumulated.PktRecvDrop
+	s.PktRcvUndecrypt = ss.Accumulated.PktRecvUndecrypt
 
-	s.ByteSent = ss.ByteSent
-	s.ByteRecv = ss.ByteRecv
-	s.ByteSentUnique = ss.ByteSentUnique
-	s.ByteRecvUnique = ss.ByteRecvUnique
-	s.ByteRcvLoss = ss.ByteRcvLoss
-	s.ByteRetrans = ss.ByteRetrans
-	s.ByteSndDrop = ss.ByteSndDrop
-	s.ByteRcvDrop = ss.ByteRcvDrop
-	s.ByteRcvUndecrypt = ss.ByteRcvUndecrypt
+	s.ByteSent = ss.Accumulated.ByteSent
+	s.ByteRecv = ss.Accumulated.ByteRecv
+	s.ByteSentUnique = ss.Accumulated.ByteSentUnique
+	s.ByteRecvUnique = ss.Accumulated.ByteRecvUnique
+	s.ByteRcvLoss = ss.Accumulated.ByteRecvLoss
+	s.ByteRetrans = ss.Accumulated.ByteRetrans
+	s.ByteSndDrop = ss.Accumulated.ByteSendDrop
+	s.ByteRcvDrop = ss.Accumulated.ByteRecvDrop
+	s.ByteRcvUndecrypt = ss.Accumulated.ByteRecvUndecrypt
 
-	s.UsPktSndPeriod = ss.UsPktSndPeriod
-	s.PktFlowWindow = ss.PktFlowWindow
-	s.PktFlightSize = ss.PktFlightSize
-	s.MsRTT = ss.MsRTT
-	s.MbpsBandwidth = ss.MbpsBandwidth
-	s.ByteAvailSndBuf = ss.ByteAvailSndBuf
-	s.ByteAvailRcvBuf = ss.ByteAvailRcvBuf
-	s.MbpsMaxBW = ss.MbpsMaxBW
-	s.ByteMSS = ss.ByteMSS
-	s.PktSndBuf = ss.PktSndBuf
-	s.ByteSndBuf = ss.ByteSndBuf
-	s.MsSndBuf = ss.MsSndBuf
-	s.MsSndTsbPdDelay = ss.MsSndTsbPdDelay
-	s.PktRcvBuf = ss.PktRcvBuf
-	s.ByteRcvBuf = ss.ByteRcvBuf
-	s.MsRcvBuf = ss.MsRcvBuf
-	s.MsRcvTsbPdDelay = ss.MsRcvTsbPdDelay
-	s.PktReorderTolerance = ss.PktReorderTolerance
-	s.PktRcvAvgBelatedTime = ss.PktRcvAvgBelatedTime
+	s.UsPktSndPeriod = ss.Instantaneous.UsPktSendPeriod
+	s.PktFlowWindow = ss.Instantaneous.PktFlowWindow
+	s.PktFlightSize = ss.Instantaneous.PktFlightSize
+	s.MsRTT = ss.Instantaneous.MsRTT
+	s.MbpsBandwidth = ss.Instantaneous.MbpsLinkCapacity
+	s.ByteAvailSndBuf = ss.Instantaneous.ByteAvailSendBuf
+	s.ByteAvailRcvBuf = ss.Instantaneous.ByteAvailRecvBuf
+	s.MbpsMaxBW = ss.Instantaneous.MbpsMaxBW
+	s.ByteMSS = ss.Instantaneous.ByteMSS
+	s.PktSndBuf = ss.Instantaneous.PktSendBuf
+	s.ByteSndBuf = ss.Instantaneous.ByteSendBuf
+	s.MsSndBuf = ss.Instantaneous.MsSendBuf
+	s.MsSndTsbPdDelay = ss.Instantaneous.MsSendTsbPdDelay
+	s.PktRcvBuf = ss.Instantaneous.PktRecvBuf
+	s.ByteRcvBuf = ss.Instantaneous.ByteRecvBuf
+	s.MsRcvBuf = ss.Instantaneous.MsRecvBuf
+	s.MsRcvTsbPdDelay = ss.Instantaneous.MsRecvTsbPdDelay
+	s.PktReorderTolerance = ss.Instantaneous.PktReorderTolerance
+	s.PktRcvAvgBelatedTime = ss.Instantaneous.PktRecvAvgBelatedTime
 }
 
 type SRTLog struct {
