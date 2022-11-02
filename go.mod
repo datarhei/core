@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/99designs/gqlgen v0.17.20
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/datarhei/gosrt v0.3.1
@@ -18,8 +19,8 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.16
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
-	github.com/prometheus/client_golang v1.13.0
-	github.com/shirou/gopsutil/v3 v3.22.9
+	github.com/prometheus/client_golang v1.13.1
+	github.com/shirou/gopsutil/v3 v3.22.10
 	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/echo-swagger v1.3.5
 	github.com/swaggo/swag v1.8.7

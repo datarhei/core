@@ -17,6 +17,18 @@ func Rename(src, dst string) error {
 	}
 
 	// If renaming the file fails, copy the data
+	Copy(src, dst)
+
+	if err := os.Remove(src); err != nil {
+		os.Remove(dst)
+		return fmt.Errorf("failed to remove source file: %w", err)
+	}
+
+	return nil
+}
+
+// Copy copies a file from src to dst.
+func Copy(src, dst string) error {
 	source, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
@@ -36,11 +48,6 @@ func Rename(src, dst string) error {
 	}
 
 	source.Close()
-
-	if err := os.Remove(src); err != nil {
-		os.Remove(dst)
-		return fmt.Errorf("failed to remove source file: %w", err)
-	}
 
 	return nil
 }

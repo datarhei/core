@@ -80,7 +80,7 @@ func doImport(logger log.Logger, configstore cfgstore.Store) error {
 
 	// Load an existing DB
 	datastore := store.NewJSONStore(store.JSONConfig{
-		Dir: cfg.DB.Dir,
+		Filepath: cfg.DB.Dir + "/db.json",
 	})
 
 	data, err := datastore.Load()

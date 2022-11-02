@@ -364,11 +364,6 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
-	store := store.NewJSONStore(store.JSONConfig{
-		Dir:    cfg.DB.Dir,
-		Logger: a.log.logger.core.WithComponent("ProcessStore"),
-	})
-
 	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
 		Dir:    cfg.Storage.Disk.Dir,
 		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
@@ -482,6 +477,12 @@ func (a *api) start() error {
 		}
 		a.replacer.RegisterTemplate("srt", template)
 	}
+
+	store := store.NewJSONStore(store.JSONConfig{
+		Filepath:  cfg.DB.Dir + "/db.json",
+		FFVersion: a.ffmpeg.Skills().FFmpeg.Version,
+		Logger:    a.log.logger.core.WithComponent("ProcessStore"),
+	})
 
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,

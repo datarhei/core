@@ -75,6 +75,14 @@ import:
 import_linux:
 	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -ldflags="-s -w"
 
+## ffmigrate: Build ffmpeg migration binary
+ffmigrate:
+	cd app/ffmigrate && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../ffmigrate -ldflags="-s -w"
+
+# github workflow workaround
+ffmigrate_linux:
+	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../ffmigrate -ldflags="-s -w"
+
 ## coverage: Generate code coverage analysis
 coverage:
 	go test -race -coverprofile test/cover.out ./...
@@ -96,7 +104,7 @@ release_linux:
 docker:
 	docker build -t core:$(SHORTCOMMIT) .
 
-.PHONY: help init build swagger test vet fmt vulncheck vendor commit coverage lint release import update
+.PHONY: help init build swagger test vet fmt vulncheck vendor commit coverage lint release import ffmigrate update
 
 ## help: Show all commands
 help: Makefile
