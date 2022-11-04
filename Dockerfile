@@ -1,6 +1,6 @@
-ARG GOLANG_IMAGE=golang:1.18.4-alpine3.15
+ARG GOLANG_IMAGE=golang:1.19.3-alpine3.16
 
-ARG BUILD_IMAGE=alpine:3.15
+ARG BUILD_IMAGE=alpine:3.16
 
 FROM $GOLANG_IMAGE as builder
 
