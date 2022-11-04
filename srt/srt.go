@@ -228,8 +228,6 @@ func New(config Config) (Server, error) {
 
 	srtconfig := srt.DefaultConfig()
 
-	srtconfig.KMPreAnnounce = 200
-	srtconfig.KMRefreshRate = 10000
 	srtconfig.Passphrase = config.Passphrase
 	srtconfig.Logger = s.srtlogger
 
