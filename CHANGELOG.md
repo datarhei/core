@@ -1,5 +1,18 @@
 # Core
 
+### Core v16.10.1 > v16.11.0
+
+-   Upgrade to FFmpeg 5.1.2
+-   Add FFmpeg 4.4 to FFmpeg 5.1 migration tool
+-   Add alternative SRT streamid
+-   Fix crash with custom SSL certificates (datarhei/restreamer#425)
+-   Fix proper version handling for config
+-   Fix widged session data
+-   Fix resetting process stats when process stopped
+-   Fix stale FFmpeg process detection for streams with only audio
+-   Fix wrong return status code (#6)
+-   Fix use SRT defaults for key material exchange
+
 ### Core v16.10.0 > v16.10.1
 
 -   Add email address in TLS config for Let's Encrypt
