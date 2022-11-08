@@ -2,15 +2,15 @@
 
 ### Core v16.10.1 > v16.11.0
 
--   Upgrade to FFmpeg 5.1.2
 -   Add FFmpeg 4.4 to FFmpeg 5.1 migration tool
 -   Add alternative SRT streamid
--   Fix crash with custom SSL certificates (datarhei/restreamer#425)
+-   Mod bump FFmpeg to v5.1.2 (datarhei/core:tag bundles)
+-   Fix crash with custom SSL certificates ([restreamer/#425](https://github.com/datarhei/restreamer/issues/425))
 -   Fix proper version handling for config
 -   Fix widged session data
 -   Fix resetting process stats when process stopped
 -   Fix stale FFmpeg process detection for streams with only audio
--   Fix wrong return status code (#6)
+-   Fix wrong return status code ([#6](https://github.com/datarhei/core/issues/6)))
 -   Fix use SRT defaults for key material exchange
 
 ### Core v16.10.0 > v16.10.1
@@ -33,11 +33,11 @@
 -   Fix process cleanup on delete, remove empty directories from disk
 -   Fix SRT blocking port on restart (upgrade datarhei/gosrt)
 -   Fix RTMP communication (Blackmagic Web Presenter, thx 235 MEDIA)
--   Fix RTMP communication (Blackmagic ATEM Mini, datarhei/restreamer#385)
+-   Fix RTMP communication (Blackmagic ATEM Mini, [#385](https://github.com/datarhei/restreamer/issues/385))
 -   Fix injecting commit, branch, and build info
 -   Fix API metadata endpoints responses
 
-#### Core v16.9.0 > v16.9.1
+#### Core v16.9.0 > v16.9.1^
 
 -   Fix v1 import app
 -   Fix race condition
