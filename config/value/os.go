@@ -14,6 +14,7 @@ type MustDir string
 
 func NewMustDir(p *string, val string) *MustDir {
 	*p = val
+
 	return (*MustDir)(p)
 }
 
@@ -55,6 +56,7 @@ type Dir string
 
 func NewDir(p *string, val string) *Dir {
 	*p = val
+
 	return (*Dir)(p)
 }
 
@@ -96,6 +98,7 @@ type Exec string
 
 func NewExec(p *string, val string) *Exec {
 	*p = val
+
 	return (*Exec)(p)
 }
 
@@ -129,6 +132,7 @@ type File string
 
 func NewFile(p *string, val string) *File {
 	*p = val
+
 	return (*File)(p)
 }
 
@@ -170,6 +174,7 @@ type AbsolutePath string
 
 func NewAbsolutePath(p *string, val string) *AbsolutePath {
 	*p = filepath.Clean(val)
+
 	return (*AbsolutePath)(p)
 }
 

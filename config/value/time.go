@@ -8,6 +8,7 @@ type Time time.Time
 
 func NewTime(p *time.Time, val time.Time) *Time {
 	*p = val
+
 	return (*Time)(p)
 }
 

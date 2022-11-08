@@ -18,6 +18,7 @@ type Address string
 
 func NewAddress(p *string, val string) *Address {
 	*p = val
+
 	return (*Address)(p)
 }
 
@@ -66,7 +67,9 @@ func NewCIDRList(p *[]string, val []string, separator string) *CIDRList {
 		p:         p,
 		separator: separator,
 	}
+
 	*p = val
+
 	return v
 }
 
@@ -120,7 +123,9 @@ func NewCORSOrigins(p *[]string, val []string, separator string) *CORSOrigins {
 		p:         p,
 		separator: separator,
 	}
+
 	*p = val
+
 	return v
 }
 
@@ -161,6 +166,7 @@ type Port int
 
 func NewPort(p *int, val int) *Port {
 	*p = val
+
 	return (*Port)(p)
 }
 
@@ -197,6 +203,7 @@ type URL string
 
 func NewURL(p *string, val string) *URL {
 	*p = val
+
 	return (*URL)(p)
 }
 
@@ -238,6 +245,7 @@ type Email string
 
 func NewEmail(p *string, val string) *Email {
 	*p = val
+
 	return (*Email)(p)
 }
 

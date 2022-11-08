@@ -11,6 +11,7 @@ type String string
 
 func NewString(p *string, val string) *String {
 	*p = val
+
 	return (*String)(p)
 }
 
@@ -43,7 +44,9 @@ func NewStringList(p *[]string, val []string, separator string) *StringList {
 		p:         p,
 		separator: separator,
 	}
+
 	*p = val
+
 	return v
 }
 
@@ -149,6 +152,7 @@ type Bool bool
 
 func NewBool(p *bool, val bool) *Bool {
 	*p = val
+
 	return (*Bool)(p)
 }
 
@@ -179,6 +183,7 @@ type Int int
 
 func NewInt(p *int, val int) *Int {
 	*p = val
+
 	return (*Int)(p)
 }
 
@@ -209,6 +214,7 @@ type Int64 int64
 
 func NewInt64(p *int64, val int64) *Int64 {
 	*p = val
+
 	return (*Int64)(p)
 }
 
@@ -239,6 +245,7 @@ type Uint64 uint64
 
 func NewUint64(p *uint64, val uint64) *Uint64 {
 	*p = val
+
 	return (*Uint64)(p)
 }
 

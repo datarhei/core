@@ -118,48 +118,12 @@ func (c *jsonStore) load(cfg *config.Config) error {
 		return err
 	}
 
-	dataV3 := &config.Data{}
-
-	version := DataVersion{}
-
-	if err = gojson.Unmarshal(jsondata, &version); err != nil {
-		return json.FormatError(jsondata, err)
+	data, err := migrate(jsondata)
+	if err != nil {
+		return err
 	}
 
-	if version.Version == 1 {
-		dataV1 := &v1.Data{}
-
-		if err = gojson.Unmarshal(jsondata, dataV1); err != nil {
-			return json.FormatError(jsondata, err)
-		}
-
-		dataV2, err := v2.UpgradeV1ToV2(dataV1)
-		if err != nil {
-			return err
-		}
-
-		dataV3, err = config.UpgradeV2ToV3(dataV2)
-		if err != nil {
-			return err
-		}
-	} else if version.Version == 2 {
-		dataV2 := &v2.Data{}
-
-		if err = gojson.Unmarshal(jsondata, dataV2); err != nil {
-			return json.FormatError(jsondata, err)
-		}
-
-		dataV3, err = config.UpgradeV2ToV3(dataV2)
-		if err != nil {
-			return err
-		}
-	} else if version.Version == 3 {
-		if err = gojson.Unmarshal(jsondata, dataV3); err != nil {
-			return json.FormatError(jsondata, err)
-		}
-	}
-
-	cfg.Data = *dataV3
+	cfg.Data = *data
 
 	cfg.LoadedAt = time.Now()
 	cfg.UpdatedAt = cfg.LoadedAt
@@ -201,4 +165,56 @@ func (c *jsonStore) store(data *config.Config) error {
 	}
 
 	return nil
+}
+
+func migrate(jsondata []byte) (*config.Data, error) {
+	data := &config.Data{}
+	version := DataVersion{}
+
+	if err := gojson.Unmarshal(jsondata, &version); err != nil {
+		return nil, json.FormatError(jsondata, err)
+	}
+
+	if version.Version == 1 {
+		dataV1 := &v1.New().Data
+
+		if err := gojson.Unmarshal(jsondata, dataV1); err != nil {
+			return nil, json.FormatError(jsondata, err)
+		}
+
+		dataV2, err := v2.UpgradeV1ToV2(dataV1)
+		if err != nil {
+			return nil, err
+		}
+
+		dataV3, err := config.UpgradeV2ToV3(dataV2)
+		if err != nil {
+			return nil, err
+		}
+
+		data = dataV3
+	} else if version.Version == 2 {
+		dataV2 := &v2.New().Data
+
+		if err := gojson.Unmarshal(jsondata, dataV2); err != nil {
+			return nil, json.FormatError(jsondata, err)
+		}
+
+		dataV3, err := config.UpgradeV2ToV3(dataV2)
+		if err != nil {
+			return nil, err
+		}
+
+		data = dataV3
+	} else if version.Version == 3 {
+		dataV3 := &config.New().Data
+
+		if err := gojson.Unmarshal(jsondata, dataV3); err != nil {
+			return nil, json.FormatError(jsondata, err)
+		}
+
+		data = dataV3
+	}
+
+	return data, nil
 }

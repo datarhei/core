@@ -28,6 +28,7 @@ func NewTenantList(p *[]Auth0Tenant, val []Auth0Tenant, separator string) *Tenan
 	}
 
 	*p = val
+
 	return v
 }
 
