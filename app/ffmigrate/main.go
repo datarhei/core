@@ -88,22 +88,26 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 		return fmt.Errorf("unsupported FFmpeg version found: %w", err)
 	}
 
+	// Check if there's a DB file
+	dbFilepath := cfg.DB.Dir + "/db.json"
+
+	if _, err = os.Stat(dbFilepath); err != nil {
+		// There's no DB to backup
+		logger.Info().WithField("db", dbFilepath).Log("Database not found. Migration not required")
+		return nil
+	}
+
 	// Check if we already have a backup
 	backupFilepath := cfg.DB.Dir + "/db_ff4.json"
 
-	if _, err := os.Stat(backupFilepath); err == nil {
+	if _, err = os.Stat(backupFilepath); err == nil {
 		// Yes, we have a backup. The migration already happened
 		logger.Info().WithField("backup", backupFilepath).Log("Migration already done")
 		return nil
 	}
 
-	if err != nil && !os.IsNotExist(err) {
-		logger.Error().WithError(err).Log("Checking for backup file failed")
-		return fmt.Errorf("checking for backup file failed: %w", err)
-	}
-
 	// Create a backup
-	if err := file.Copy(cfg.DB.Dir+"/db.json", backupFilepath); err != nil {
+	if err := file.Copy(dbFilepath, backupFilepath); err != nil {
 		logger.Error().WithError(err).Log("Creating backup file failed")
 		return fmt.Errorf("creating backup file failed: %w", err)
 	}
