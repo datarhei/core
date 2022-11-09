@@ -81,7 +81,7 @@ ffmigrate:
 
 # github workflow workaround
 ffmigrate_linux:
-	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../ffmigrate -ldflags="-s -w"
+	cd app/ffmigrate && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../ffmigrate -ldflags="-s -w"
 
 ## coverage: Generate code coverage analysis
 coverage:
