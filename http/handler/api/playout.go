@@ -31,6 +31,7 @@ func NewPlayout(restream restream.Restreamer) *PlayoutHandler {
 // Status return the current playout status
 // @Summary Get the current playout status
 // @Description Get the current playout status of an input of a process
+// @Tags v16.7.2
 // @ID process-3-playout-status
 // @Produce json
 // @Param id path string true "Process ID"
@@ -84,6 +85,7 @@ func (h *PlayoutHandler) Status(c echo.Context) error {
 // Keyframe returns the last keyframe
 // @Summary Get the last keyframe
 // @Description Get the last keyframe of an input of a process. The extension of the name determines the return type.
+// @Tags v16.7.2
 // @ID process-3-playout-keyframe
 // @Produce image/jpeg
 // @Produce image/png
@@ -133,6 +135,7 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 // EncodeErrorframe encodes the errorframe
 // @Summary Encode the errorframe
 // @Description Immediately encode the errorframe (if available and looping)
+// @Tags v16.7.2
 // @ID process-3-playout-errorframencode
 // @Produce text/plain
 // @Produce json
@@ -173,6 +176,7 @@ func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 // SetErrorframe sets an errorframe
 // @Summary Upload an error frame
 // @Description Upload an error frame which will be encoded immediately
+// @Tags v16.7.2
 // @ID process-3-playout-errorframe
 // @Produce text/plain
 // @Produce json
@@ -221,6 +225,7 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 // ReopenInput closes the current input stream
 // @Summary Close the current input stream
 // @Description Close the current input stream such that it will be automatically re-opened
+// @Tags v16.7.2
 // @ID process-3-playout-reopen-input
 // @Produce plain
 // @Param id path string true "Process ID"
@@ -260,6 +265,7 @@ func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 // SetStream replaces the current stream
 // @Summary Switch to a new stream
 // @Description Replace the current stream with the one from the given URL. The switch will only happen if the stream parameters match.
+// @Tags v16.7.2
 // @ID process-3-playout-stream
 // @Produce text/plain
 // @Produce json

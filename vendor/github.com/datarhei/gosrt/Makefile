@@ -5,7 +5,7 @@ all: build
 
 ## test: Run all tests
 test:
-	go test -race -coverprofile=/dev/null -timeout 60s -v ./...
+	go test -race -coverprofile=/dev/null -v ./...
 
 ## vet: Analyze code for potential errors
 vet:

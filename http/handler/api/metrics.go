@@ -32,6 +32,7 @@ func NewMetrics(config MetricsConfig) *MetricsHandler {
 // Describe the known metrics
 // @Summary List all known metrics with their description and labels
 // @Description List all known metrics with their description and labels
+// @Tags v16.10.0
 // @ID metrics-3-describe
 // @Produce json
 // @Success 200 {array} api.MetricsDescription
@@ -60,6 +61,7 @@ func (r *MetricsHandler) Describe(c echo.Context) error {
 // Query the collected metrics
 // @Summary Query the collected metrics
 // @Description Query the collected metrics
+// @Tags v16.7.2
 // @ID metrics-3-metrics
 // @Accept json
 // @Produce json

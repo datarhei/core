@@ -16,6 +16,8 @@ import (
 
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/config"
+	configstore "github.com/datarhei/core/v16/config/store"
+	configvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
@@ -96,7 +98,7 @@ type api struct {
 
 	config struct {
 		path   string
-		store  config.Store
+		store  configstore.Store
 		config *config.Config
 	}
 
@@ -145,7 +147,7 @@ func (a *api) Reload() error {
 
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
 
-	store, err := config.NewJSONStore(a.config.path, func() {
+	store, err := configstore.NewJSON(a.config.path, func() {
 		a.errorChan <- ErrConfigReload
 	})
 	if err != nil {
@@ -157,7 +159,7 @@ func (a *api) Reload() error {
 	cfg.Merge()
 
 	if len(cfg.Host.Name) == 0 && cfg.Host.Auto {
-		cfg.SetPublicIPs()
+		cfg.Host.Name = net.GetPublicIPs(5 * time.Second)
 	}
 
 	cfg.Validate(false)
@@ -226,7 +228,7 @@ func (a *api) Reload() error {
 	logger.Info().WithFields(logfields).Log("")
 
 	configlogger := logger.WithComponent("Config")
-	cfg.Messages(func(level string, v config.Variable, message string) {
+	cfg.Messages(func(level string, v configvars.Variable, message string) {
 		configlogger = configlogger.WithFields(log.Fields{
 			"variable":    v.Name,
 			"value":       v.Value,
@@ -362,11 +364,6 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
-	store := store.NewJSONStore(store.JSONConfig{
-		Dir:    cfg.DB.Dir,
-		Logger: a.log.logger.core.WithComponent("ProcessStore"),
-	})
-
 	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
 		Dir:    cfg.Storage.Disk.Dir,
 		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
@@ -480,6 +477,12 @@ func (a *api) start() error {
 		}
 		a.replacer.RegisterTemplate("srt", template)
 	}
+
+	store := store.NewJSONStore(store.JSONConfig{
+		Filepath:  cfg.DB.Dir + "/db.json",
+		FFVersion: a.ffmpeg.Skills().FFmpeg.Version,
+		Logger:    a.log.logger.core.WithComponent("ProcessStore"),
+	})
 
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
@@ -649,98 +652,88 @@ func (a *api) start() error {
 
 	var autocertManager *certmagic.Config
 
-	if cfg.TLS.Enable && cfg.TLS.Auto {
-		if len(cfg.Host.Name) == 0 {
-			return fmt.Errorf("at least one host must be provided in host.name or RS_HOST_NAME")
-		}
-
-		certmagic.DefaultACME.Agreed = true
-		certmagic.DefaultACME.Email = cfg.TLS.Email
-		certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
-		certmagic.DefaultACME.DisableHTTPChallenge = false
-		certmagic.DefaultACME.DisableTLSALPNChallenge = true
-		certmagic.DefaultACME.Logger = nil
-
-		certmagic.Default.Storage = &certmagic.FileStorage{
-			Path: cfg.DB.Dir + "/cert",
-		}
-		certmagic.Default.DefaultServerName = cfg.Host.Name[0]
-		certmagic.Default.Logger = nil
-		certmagic.Default.OnEvent = func(event string, data interface{}) {
-			message := ""
-
-			switch data := data.(type) {
-			case string:
-				message = data
-			case fmt.Stringer:
-				message = data.String()
+	if cfg.TLS.Enable {
+		if cfg.TLS.Auto {
+			if len(cfg.Host.Name) == 0 {
+				return fmt.Errorf("at least one host must be provided in host.name or RS_HOST_NAME")
 			}
 
-			if len(message) != 0 {
-				a.log.logger.core.WithComponent("certmagic").Info().WithField("event", event).Log(message)
+			certmagic.DefaultACME.Agreed = true
+			certmagic.DefaultACME.Email = cfg.TLS.Email
+			certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
+			certmagic.DefaultACME.DisableHTTPChallenge = false
+			certmagic.DefaultACME.DisableTLSALPNChallenge = true
+			certmagic.DefaultACME.Logger = nil
+
+			certmagic.Default.Storage = &certmagic.FileStorage{
+				Path: cfg.DB.Dir + "/cert",
 			}
-		}
+			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
+			certmagic.Default.Logger = nil
 
-		magic := certmagic.NewDefault()
-		acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
+			magic := certmagic.NewDefault()
+			acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
 
-		magic.Issuers = []certmagic.Issuer{acme}
+			magic.Issuers = []certmagic.Issuer{acme}
 
-		autocertManager = magic
+			autocertManager = magic
 
-		// Start temporary http server on configured port
-		tempserver := &gohttp.Server{
-			Addr: cfg.Address,
-			Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
-				w.WriteHeader(gohttp.StatusNotFound)
-			})),
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20,
-		}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-
-		go func() {
-			tempserver.ListenAndServe()
-			wg.Done()
-		}()
-
-		var certerror bool
-
-		// For each domain, get the certificate
-		for _, host := range cfg.Host.Name {
-			logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
-			logger.Info().Log("Acquiring certificate ...")
-
-			ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
-
-			err := autocertManager.ManageSync(ctx, []string{host})
-
-			cancel()
-
-			if err != nil {
-				logger.Error().WithField("error", err).Log("Failed to acquire certificate")
-				certerror = true
-				break
+			// Start temporary http server on configured port
+			tempserver := &gohttp.Server{
+				Addr: cfg.Address,
+				Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
+					w.WriteHeader(gohttp.StatusNotFound)
+				})),
+				ReadTimeout:    10 * time.Second,
+				WriteTimeout:   10 * time.Second,
+				MaxHeaderBytes: 1 << 20,
 			}
 
-			logger.Info().Log("Successfully acquired certificate")
-		}
+			wg := sync.WaitGroup{}
+			wg.Add(1)
 
-		// Shut down the temporary http server
-		tempserver.Close()
+			go func() {
+				tempserver.ListenAndServe()
+				wg.Done()
+			}()
 
-		wg.Wait()
+			var certerror bool
 
-		if certerror {
-			a.log.logger.core.Warn().Log("Continuing with disabled TLS")
-			autocertManager = nil
-			cfg.TLS.Enable = false
+			// For each domain, get the certificate
+			for _, host := range cfg.Host.Name {
+				logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
+				logger.Info().Log("Acquiring certificate ...")
+
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
+
+				err := autocertManager.ManageSync(ctx, []string{host})
+
+				cancel()
+
+				if err != nil {
+					logger.Error().WithField("error", err).Log("Failed to acquire certificate")
+					certerror = true
+					break
+				}
+
+				logger.Info().Log("Successfully acquired certificate")
+			}
+
+			// Shut down the temporary http server
+			tempserver.Close()
+
+			wg.Wait()
+
+			if certerror {
+				a.log.logger.core.Warn().Log("Continuing with disabled TLS")
+				autocertManager = nil
+				cfg.TLS.Enable = false
+			} else {
+				cfg.TLS.CertFile = ""
+				cfg.TLS.KeyFile = ""
+			}
 		} else {
-			cfg.TLS.CertFile = ""
-			cfg.TLS.KeyFile = ""
+			a.log.logger.core.Info().Log("Enabling TLS with cert and key files")
 		}
 	}
 
@@ -756,14 +749,15 @@ func (a *api) start() error {
 			Collector: a.sessions.Collector("rtmp"),
 		}
 
-		if autocertManager != nil && cfg.RTMP.EnableTLS {
-			config.TLSConfig = &tls.Config{
-				GetCertificate: autocertManager.GetCertificate,
-			}
-
+		if cfg.RTMP.EnableTLS {
 			config.Logger = config.Logger.WithComponent("RTMP/S")
 
 			a.log.logger.rtmps = a.log.logger.core.WithComponent("RTMPS").WithField("address", cfg.RTMP.AddressTLS)
+			if autocertManager != nil {
+				config.TLSConfig = &tls.Config{
+					GetCertificate: autocertManager.GetCertificate,
+				}
+			}
 		}
 
 		rtmpserver, err := rtmp.New(config)

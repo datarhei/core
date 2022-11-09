@@ -3,12 +3,12 @@ package main
 import (
 	"testing"
 
-	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/config/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestImport(t *testing.T) {
-	configstore := config.NewDummyStore()
+	configstore := store.NewDummy()
 
 	cfg := configstore.Get()
 

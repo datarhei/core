@@ -9,6 +9,7 @@ import (
 var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
 <html>
   <head>
+  	<meta charset="utf-8">
   	<title>{{.title}}</title>
 	<style>
 		body {
@@ -75,15 +76,15 @@ var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
 // Handler responsible for setting up the playground
 func Handler(title string, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/html")
+		w.Header().Add("Content-Type", "text/html; charset=UTF-8")
 		err := page.Execute(w, map[string]interface{}{
 			"title":                title,
 			"endpoint":             endpoint,
 			"endpointIsAbsolute":   endpointHasScheme(endpoint),
 			"subscriptionEndpoint": getSubscriptionEndpoint(endpoint),
-			"version":              "2.0.1",
-			"cssSRI":               "sha256-hYUgpHapGug0ucdB5kG0zSipubcQOJcGjclIZke2rl8=",
-			"jsSRI":                "sha256-jMXGO5+Y4OhcHPSR34jpzpzlz4OZTlxcvaDXSWmUMRo=",
+			"version":              "2.0.7",
+			"cssSRI":               "sha256-gQryfbGYeYFxnJYnfPStPYFt0+uv8RP8Dm++eh00G9c=",
+			"jsSRI":                "sha256-qQ6pw7LwTLC+GfzN+cJsYXfVWRKH9O5o7+5H96gTJhQ=",
 			"reactSRI":             "sha256-Ipu/TQ50iCCVZBUsZyNJfxrDk0E2yhaEIz0vqI+kFG8=",
 			"reactDOMSRI":          "sha256-nbMykgB6tsOFJ7OdVmPpdqMFVk4ZsqWocT6issAPUF0=",
 		})

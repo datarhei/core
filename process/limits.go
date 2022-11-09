@@ -104,6 +104,8 @@ func (l *limiter) Stop() {
 
 	l.proc.Stop()
 	l.proc = nil
+
+	l.reset()
 }
 
 func (l *limiter) ticker(ctx context.Context) {

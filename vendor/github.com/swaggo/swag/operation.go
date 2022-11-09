@@ -6,7 +6,6 @@ import (
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -226,7 +225,7 @@ func findInSlice(arr []string, target string) bool {
 }
 
 func (operation *Operation) parseArrayParam(param *spec.Parameter, paramType, refType, objectType string) error {
-	if !IsPrimitiveType(refType) {
+	if !IsPrimitiveType(refType) && !(refType == "file" && paramType == "formData") {
 		return fmt.Errorf("%s is not supported array type for %s", refType, paramType)
 	}
 
@@ -270,7 +269,9 @@ func (operation *Operation) parseArrayParam(param *spec.Parameter, paramType, re
 
 // ParseParamComment parses params return []string of param properties
 // E.g. @Param	queryText		formData	      string	  true		        "The email for login"
-//              [param name]    [paramType] [data type]  [is mandatory?]   [Comment]
+//
+//	[param name]    [paramType] [data type]  [is mandatory?]   [Comment]
+//
 // E.g. @Param   some_id     path    int     true        "Some ID".
 func (operation *Operation) ParseParamComment(commentLine string, astFile *ast.File) error {
 	matches := paramPattern.FindStringSubmatch(commentLine)
@@ -824,6 +825,10 @@ var responsePattern = regexp.MustCompile(`^([\w,]+)\s+([\w{}]+)\s+([\w\-.\\{}=,\
 var combinedPattern = regexp.MustCompile(`^([\w\-./\[\]]+){(.*)}$`)
 
 func (operation *Operation) parseObjectSchema(refType string, astFile *ast.File) (*spec.Schema, error) {
+	return parseObjectSchema(operation.parser, refType, astFile)
+}
+
+func parseObjectSchema(parser *Parser, refType string, astFile *ast.File) (*spec.Schema, error) {
 	switch {
 	case refType == NIL:
 		return nil, nil
@@ -838,7 +843,7 @@ func (operation *Operation) parseObjectSchema(refType string, astFile *ast.File)
 	case IsPrimitiveType(refType):
 		return PrimitiveSchema(refType), nil
 	case strings.HasPrefix(refType, "[]"):
-		schema, err := operation.parseObjectSchema(refType[2:], astFile)
+		schema, err := parseObjectSchema(parser, refType[2:], astFile)
 		if err != nil {
 			return nil, err
 		}
@@ -856,17 +861,17 @@ func (operation *Operation) parseObjectSchema(refType string, astFile *ast.File)
 			return spec.MapProperty(nil), nil
 		}
 
-		schema, err := operation.parseObjectSchema(refType, astFile)
+		schema, err := parseObjectSchema(parser, refType, astFile)
 		if err != nil {
 			return nil, err
 		}
 
 		return spec.MapProperty(schema), nil
 	case strings.Contains(refType, "{"):
-		return operation.parseCombinedObjectSchema(refType, astFile)
+		return parseCombinedObjectSchema(parser, refType, astFile)
 	default:
-		if operation.parser != nil { // checking refType has existing in 'TypeDefinitions'
-			schema, err := operation.parser.getTypeSchema(refType, astFile, true)
+		if parser != nil { // checking refType has existing in 'TypeDefinitions'
+			schema, err := parser.getTypeSchema(refType, astFile, true)
 			if err != nil {
 				return nil, err
 			}
@@ -896,13 +901,13 @@ func parseFields(s string) []string {
 	})
 }
 
-func (operation *Operation) parseCombinedObjectSchema(refType string, astFile *ast.File) (*spec.Schema, error) {
+func parseCombinedObjectSchema(parser *Parser, refType string, astFile *ast.File) (*spec.Schema, error) {
 	matches := combinedPattern.FindStringSubmatch(refType)
 	if len(matches) != 3 {
 		return nil, fmt.Errorf("invalid type: %s", refType)
 	}
 
-	schema, err := operation.parseObjectSchema(matches[1], astFile)
+	schema, err := parseObjectSchema(parser, matches[1], astFile)
 	if err != nil {
 		return nil, err
 	}
@@ -912,7 +917,7 @@ func (operation *Operation) parseCombinedObjectSchema(refType string, astFile *a
 	for _, field := range fields {
 		keyVal := strings.SplitN(field, "=", 2)
 		if len(keyVal) == 2 {
-			schema, err := operation.parseObjectSchema(keyVal[1], astFile)
+			schema, err := parseObjectSchema(parser, keyVal[1], astFile)
 			if err != nil {
 				return nil, err
 			}
@@ -1193,17 +1198,17 @@ func createParameter(paramType, description, paramName, schemaType string, requi
 }
 
 func getCodeExampleForSummary(summaryName string, dirPath string) ([]byte, error) {
-	filesInfos, err := ioutil.ReadDir(dirPath)
+	dirEntries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, fileInfo := range filesInfos {
-		if fileInfo.IsDir() {
+	for _, entry := range dirEntries {
+		if entry.IsDir() {
 			continue
 		}
 
-		fileName := fileInfo.Name()
+		fileName := entry.Name()
 
 		if !strings.Contains(fileName, ".json") {
 			continue
@@ -1212,7 +1217,7 @@ func getCodeExampleForSummary(summaryName string, dirPath string) ([]byte, error
 		if strings.Contains(fileName, summaryName) {
 			fullPath := filepath.Join(dirPath, fileName)
 
-			commentInfo, err := ioutil.ReadFile(fullPath)
+			commentInfo, err := os.ReadFile(fullPath)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to read code example file %s error: %s ", fullPath, err)
 			}

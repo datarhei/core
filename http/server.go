@@ -32,7 +32,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/v16/config"
+	cfgstore "github.com/datarhei/core/v16/config/store"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/graph/resolver"
@@ -87,7 +87,7 @@ type Config struct {
 	RTMP          rtmp.Server
 	SRT           srt.Server
 	JWT           jwt.JWT
-	Config        config.Store
+	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
 	Router        router.Router

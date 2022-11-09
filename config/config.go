@@ -3,60 +3,49 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"os"
 	"time"
 
-	"github.com/datarhei/core/v16/math/rand"
-
 	haikunator "github.com/atrox/haikunatorgo/v2"
+	"github.com/datarhei/core/v16/config/copy"
+	"github.com/datarhei/core/v16/config/value"
+	"github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/math/rand"
 	"github.com/google/uuid"
 )
 
+/*
+type Config interface {
+	// Merge merges the values of the known environment variables into the configuration
+	Merge()
+
+	// Validate validates the current state of the Config for completeness and sanity. Errors are
+	// written to the log. Use resetLogs to indicate to reset the logs prior validation.
+	Validate(resetLogs bool)
+
+	// Messages calls for each log entry the provided callback. The level has the values 'error', 'warn', or 'info'.
+	// The name is the name of the configuration value, e.g. 'api.auth.enable'. The message is the log message.
+	Messages(logger func(level string, v vars.Variable, message string))
+
+	// HasErrors returns whether there are some error messages in the log.
+	HasErrors() bool
+
+	// Overrides returns a list of configuration value names that have been overriden by an environment variable.
+	Overrides() []string
+
+	Get(name string) (string, error)
+	Set(name, val string) error
+}
+*/
+
 const version int64 = 3
 
-type variable struct {
-	value       value    // The actual value
-	defVal      string   // The default value in string representation
-	name        string   // A name for this value
-	envName     string   // The environment variable that corresponds to this value
-	envAltNames []string // Alternative environment variable names
-	description string   // A desriptions for this value
-	required    bool     // Whether a non-empty value is required
-	disguise    bool     // Whether the value should be disguised if printed
-	merged      bool     // Whether this value has been replaced by its corresponding environment variable
-}
-
-type Variable struct {
-	Value       string
-	Name        string
-	EnvName     string
-	Description string
-	Merged      bool
-}
-
-type message struct {
-	message  string   // The log message
-	variable Variable // The config field this message refers to
-	level    string   // The loglevel for this message
-}
-
-type Auth0Tenant struct {
-	Domain   string   `json:"domain"`
-	Audience string   `json:"audience"`
-	ClientID string   `json:"clientid"`
-	Users    []string `json:"users"`
-}
-
-type DataVersion struct {
-	Version int64 `json:"version"`
-}
+// Make sure that the config.Config interface is satisfied
+//var _ config.Config = &Config{}
 
 // Config is a wrapper for Data
 type Config struct {
-	vars []*variable
-	logs []message
+	vars vars.Variables
 
 	Data
 }
@@ -70,8 +59,16 @@ func New() *Config {
 	return config
 }
 
+func (d *Config) Get(name string) (string, error) {
+	return d.vars.Get(name)
+}
+
+func (d *Config) Set(name, val string) error {
+	return d.vars.Set(name, val)
+}
+
 // NewConfigFrom returns a clone of a Config
-func NewConfigFrom(d *Config) *Config {
+func (d *Config) Clone() *Config {
 	data := New()
 
 	data.CreatedAt = d.CreatedAt
@@ -100,286 +97,201 @@ func NewConfigFrom(d *Config) *Config {
 	data.Service = d.Service
 	data.Router = d.Router
 
-	data.Log.Topics = copyStringSlice(d.Log.Topics)
+	data.Log.Topics = copy.Slice(d.Log.Topics)
 
-	data.Host.Name = copyStringSlice(d.Host.Name)
+	data.Host.Name = copy.Slice(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copyStringSlice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copyStringSlice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copyStringSlice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copyStringSlice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
 
-	data.API.Auth.Auth0.Tenants = copyTenantSlice(d.API.Auth.Auth0.Tenants)
+	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copyStringSlice(d.Storage.CORS.Origins)
-	data.Storage.Disk.Cache.Types.Allow = copyStringSlice(d.Storage.Disk.Cache.Types.Allow)
-	data.Storage.Disk.Cache.Types.Block = copyStringSlice(d.Storage.Disk.Cache.Types.Block)
+	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
+	data.Storage.Disk.Cache.Types.Block = copy.Slice(d.Storage.Disk.Cache.Types.Block)
 
-	data.FFmpeg.Access.Input.Allow = copyStringSlice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copyStringSlice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copyStringSlice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copyStringSlice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copyStringSlice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copyStringSlice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copyStringSlice(d.Router.BlockedPrefixes)
-	data.Router.Routes = copyStringMap(d.Router.Routes)
+	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
-	for i, v := range d.vars {
-		data.vars[i].merged = v.merged
-	}
+	data.vars.Transfer(&d.vars)
 
 	return data
 }
 
 func (d *Config) init() {
-	d.val(newInt64Value(&d.Version, version), "version", "", nil, "Configuration file layout version", true, false)
-	d.val(newTimeValue(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
-	d.val(newStringValue(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
-	d.val(newStringValue(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
-	d.val(newAddressValue(&d.Address, ":8080"), "address", "CORE_ADDRESS", nil, "HTTP listening address", false, false)
-	d.val(newBoolValue(&d.CheckForUpdates, true), "update_check", "CORE_UPDATE_CHECK", nil, "Check for updates and send anonymized data", false, false)
+	d.vars.Register(value.NewInt64(&d.Version, version), "version", "", nil, "Configuration file layout version", true, false)
+	d.vars.Register(value.NewTime(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
+	d.vars.Register(value.NewString(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
+	d.vars.Register(value.NewString(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
+	d.vars.Register(value.NewAddress(&d.Address, ":8080"), "address", "CORE_ADDRESS", nil, "HTTP listening address", false, false)
+	d.vars.Register(value.NewBool(&d.CheckForUpdates, true), "update_check", "CORE_UPDATE_CHECK", nil, "Check for updates and send anonymized data", false, false)
 
 	// Log
-	d.val(newStringValue(&d.Log.Level, "info"), "log.level", "CORE_LOG_LEVEL", nil, "Loglevel: silent, error, warn, info, debug", false, false)
-	d.val(newStringListValue(&d.Log.Topics, []string{}, ","), "log.topics", "CORE_LOG_TOPICS", nil, "Show only selected log topics", false, false)
-	d.val(newIntValue(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
+	d.vars.Register(value.NewString(&d.Log.Level, "info"), "log.level", "CORE_LOG_LEVEL", nil, "Loglevel: silent, error, warn, info, debug", false, false)
+	d.vars.Register(value.NewStringList(&d.Log.Topics, []string{}, ","), "log.topics", "CORE_LOG_TOPICS", nil, "Show only selected log topics", false, false)
+	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
 
 	// DB
-	d.val(newMustDirValue(&d.DB.Dir, "./config"), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
+	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config"), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
 
 	// Host
-	d.val(newStringListValue(&d.Host.Name, []string{}, ","), "host.name", "CORE_HOST_NAME", nil, "Comma separated list of public host/domain names or IPs", false, false)
-	d.val(newBoolValue(&d.Host.Auto, true), "host.auto", "CORE_HOST_AUTO", nil, "Enable detection of public IP addresses", false, false)
+	d.vars.Register(value.NewStringList(&d.Host.Name, []string{}, ","), "host.name", "CORE_HOST_NAME", nil, "Comma separated list of public host/domain names or IPs", false, false)
+	d.vars.Register(value.NewBool(&d.Host.Auto, true), "host.auto", "CORE_HOST_AUTO", nil, "Enable detection of public IP addresses", false, false)
 
 	// API
-	d.val(newBoolValue(&d.API.ReadOnly, false), "api.read_only", "CORE_API_READ_ONLY", nil, "Allow only ready only access to the API", false, false)
-	d.val(newCIDRListValue(&d.API.Access.HTTP.Allow, []string{}, ","), "api.access.http.allow", "CORE_API_ACCESS_HTTP_ALLOW", nil, "List of IPs in CIDR notation (HTTP traffic)", false, false)
-	d.val(newCIDRListValue(&d.API.Access.HTTP.Block, []string{}, ","), "api.access.http.block", "CORE_API_ACCESS_HTTP_BLOCK", nil, "List of IPs in CIDR notation (HTTP traffic)", false, false)
-	d.val(newCIDRListValue(&d.API.Access.HTTPS.Allow, []string{}, ","), "api.access.https.allow", "CORE_API_ACCESS_HTTPS_ALLOW", nil, "List of IPs in CIDR notation (HTTPS traffic)", false, false)
-	d.val(newCIDRListValue(&d.API.Access.HTTPS.Block, []string{}, ","), "api.access.https.block", "CORE_API_ACCESS_HTTPS_BLOCK", nil, "List of IPs in CIDR notation (HTTPS traffic)", false, false)
-	d.val(newBoolValue(&d.API.Auth.Enable, false), "api.auth.enable", "CORE_API_AUTH_ENABLE", nil, "Enable authentication for all clients", false, false)
-	d.val(newBoolValue(&d.API.Auth.DisableLocalhost, false), "api.auth.disable_localhost", "CORE_API_AUTH_DISABLE_LOCALHOST", nil, "Disable authentication for clients from localhost", false, false)
-	d.val(newStringValue(&d.API.Auth.Username, ""), "api.auth.username", "CORE_API_AUTH_USERNAME", []string{"RS_USERNAME"}, "Username", false, false)
-	d.val(newStringValue(&d.API.Auth.Password, ""), "api.auth.password", "CORE_API_AUTH_PASSWORD", []string{"RS_PASSWORD"}, "Password", false, true)
+	d.vars.Register(value.NewBool(&d.API.ReadOnly, false), "api.read_only", "CORE_API_READ_ONLY", nil, "Allow only ready only access to the API", false, false)
+	d.vars.Register(value.NewCIDRList(&d.API.Access.HTTP.Allow, []string{}, ","), "api.access.http.allow", "CORE_API_ACCESS_HTTP_ALLOW", nil, "List of IPs in CIDR notation (HTTP traffic)", false, false)
+	d.vars.Register(value.NewCIDRList(&d.API.Access.HTTP.Block, []string{}, ","), "api.access.http.block", "CORE_API_ACCESS_HTTP_BLOCK", nil, "List of IPs in CIDR notation (HTTP traffic)", false, false)
+	d.vars.Register(value.NewCIDRList(&d.API.Access.HTTPS.Allow, []string{}, ","), "api.access.https.allow", "CORE_API_ACCESS_HTTPS_ALLOW", nil, "List of IPs in CIDR notation (HTTPS traffic)", false, false)
+	d.vars.Register(value.NewCIDRList(&d.API.Access.HTTPS.Block, []string{}, ","), "api.access.https.block", "CORE_API_ACCESS_HTTPS_BLOCK", nil, "List of IPs in CIDR notation (HTTPS traffic)", false, false)
+	d.vars.Register(value.NewBool(&d.API.Auth.Enable, false), "api.auth.enable", "CORE_API_AUTH_ENABLE", nil, "Enable authentication for all clients", false, false)
+	d.vars.Register(value.NewBool(&d.API.Auth.DisableLocalhost, false), "api.auth.disable_localhost", "CORE_API_AUTH_DISABLE_LOCALHOST", nil, "Disable authentication for clients from localhost", false, false)
+	d.vars.Register(value.NewString(&d.API.Auth.Username, ""), "api.auth.username", "CORE_API_AUTH_USERNAME", []string{"RS_USERNAME"}, "Username", false, false)
+	d.vars.Register(value.NewString(&d.API.Auth.Password, ""), "api.auth.password", "CORE_API_AUTH_PASSWORD", []string{"RS_PASSWORD"}, "Password", false, true)
 
 	// Auth JWT
-	d.val(newStringValue(&d.API.Auth.JWT.Secret, rand.String(32)), "api.auth.jwt.secret", "CORE_API_AUTH_JWT_SECRET", nil, "JWT secret, leave empty for generating a random value", false, true)
+	d.vars.Register(value.NewString(&d.API.Auth.JWT.Secret, rand.String(32)), "api.auth.jwt.secret", "CORE_API_AUTH_JWT_SECRET", nil, "JWT secret, leave empty for generating a random value", false, true)
 
 	// Auth Auth0
-	d.val(newBoolValue(&d.API.Auth.Auth0.Enable, false), "api.auth.auth0.enable", "CORE_API_AUTH_AUTH0_ENABLE", nil, "Enable Auth0", false, false)
-	d.val(newTenantListValue(&d.API.Auth.Auth0.Tenants, []Auth0Tenant{}, ","), "api.auth.auth0.tenants", "CORE_API_AUTH_AUTH0_TENANTS", nil, "List of Auth0 tenants", false, false)
+	d.vars.Register(value.NewBool(&d.API.Auth.Auth0.Enable, false), "api.auth.auth0.enable", "CORE_API_AUTH_AUTH0_ENABLE", nil, "Enable Auth0", false, false)
+	d.vars.Register(value.NewTenantList(&d.API.Auth.Auth0.Tenants, []value.Auth0Tenant{}, ","), "api.auth.auth0.tenants", "CORE_API_AUTH_AUTH0_TENANTS", nil, "List of Auth0 tenants", false, false)
 
 	// TLS
-	d.val(newAddressValue(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
-	d.val(newBoolValue(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
-	d.val(newBoolValue(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
-	d.val(newEmailValue(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
-	d.val(newFileValue(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
-	d.val(newFileValue(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
+	d.vars.Register(value.NewAddress(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
+	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
+	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
+	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
 	// Storage
-	d.val(newFileValue(&d.Storage.MimeTypes, "./mime.types"), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
+	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types"), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
 
 	// Storage (Disk)
-	d.val(newMustDirValue(&d.Storage.Disk.Dir, "./data"), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
-	d.val(newInt64Value(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAXSIZEMBYTES", nil, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
-	d.val(newBoolValue(&d.Storage.Disk.Cache.Enable, true), "storage.disk.cache.enable", "CORE_STORAGE_DISK_CACHE_ENABLE", nil, "Enable cache for /", false, false)
-	d.val(newUint64Value(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
-	d.val(newInt64Value(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
-	d.val(newUint64Value(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
-	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
-	d.val(newStringListValue(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
+	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data"), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
+	d.vars.Register(value.NewInt64(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAXSIZEMBYTES", nil, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
+	d.vars.Register(value.NewBool(&d.Storage.Disk.Cache.Enable, true), "storage.disk.cache.enable", "CORE_STORAGE_DISK_CACHE_ENABLE", nil, "Enable cache for /", false, false)
+	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
+	d.vars.Register(value.NewInt64(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
+	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
+	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
+	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
 
 	// Storage (Memory)
-	d.val(newBoolValue(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
-	d.val(newStringValue(&d.Storage.Memory.Auth.Username, "admin"), "storage.memory.auth.username", "CORE_STORAGE_MEMORY_AUTH_USERNAME", nil, "Username for Basic-Auth of /memfs", false, false)
-	d.val(newStringValue(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
-	d.val(newInt64Value(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAXSIZEMBYTES", nil, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
-	d.val(newBoolValue(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
+	d.vars.Register(value.NewBool(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
+	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Username, "admin"), "storage.memory.auth.username", "CORE_STORAGE_MEMORY_AUTH_USERNAME", nil, "Username for Basic-Auth of /memfs", false, false)
+	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
+	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAXSIZEMBYTES", nil, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
+	d.vars.Register(value.NewBool(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
 
 	// Storage (CORS)
-	d.val(newCORSOriginsValue(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)
+	d.vars.Register(value.NewCORSOrigins(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)
 
 	// RTMP
-	d.val(newBoolValue(&d.RTMP.Enable, false), "rtmp.enable", "CORE_RTMP_ENABLE", nil, "Enable RTMP server", false, false)
-	d.val(newBoolValue(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
-	d.val(newAddressValue(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
-	d.val(newAddressValue(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
-	d.val(newAbsolutePathValue(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
-	d.val(newStringValue(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
+	d.vars.Register(value.NewBool(&d.RTMP.Enable, false), "rtmp.enable", "CORE_RTMP_ENABLE", nil, "Enable RTMP server", false, false)
+	d.vars.Register(value.NewBool(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
+	d.vars.Register(value.NewAddress(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
+	d.vars.Register(value.NewAddress(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
+	d.vars.Register(value.NewAbsolutePath(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
+	d.vars.Register(value.NewString(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
 
 	// SRT
-	d.val(newBoolValue(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
-	d.val(newAddressValue(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
-	d.val(newStringValue(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
-	d.val(newStringValue(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
-	d.val(newBoolValue(&d.SRT.Log.Enable, false), "srt.log.enable", "CORE_SRT_LOG_ENABLE", nil, "Enable SRT server logging", false, false)
-	d.val(newStringListValue(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
+	d.vars.Register(value.NewBool(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
+	d.vars.Register(value.NewAddress(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
+	d.vars.Register(value.NewString(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
+	d.vars.Register(value.NewString(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
+	d.vars.Register(value.NewBool(&d.SRT.Log.Enable, false), "srt.log.enable", "CORE_SRT_LOG_ENABLE", nil, "Enable SRT server logging", false, false)
+	d.vars.Register(value.NewStringList(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
-	d.val(newExecValue(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
-	d.val(newInt64Value(&d.FFmpeg.MaxProcesses, 0), "ffmpeg.max_processes", "CORE_FFMPEG_MAXPROCESSES", nil, "Max. allowed simultaneously running ffmpeg instances, 0 for unlimited", false, false)
-	d.val(newStringListValue(&d.FFmpeg.Access.Input.Allow, []string{}, " "), "ffmpeg.access.input.allow", "CORE_FFMPEG_ACCESS_INPUT_ALLOW", nil, "List of allowed expression to match against the input addresses", false, false)
-	d.val(newStringListValue(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)
-	d.val(newStringListValue(&d.FFmpeg.Access.Output.Allow, []string{}, " "), "ffmpeg.access.output.allow", "CORE_FFMPEG_ACCESS_OUTPUT_ALLOW", nil, "List of allowed expression to match against the output addresses", false, false)
-	d.val(newStringListValue(&d.FFmpeg.Access.Output.Block, []string{}, " "), "ffmpeg.access.output.block", "CORE_FFMPEG_ACCESS_OUTPUT_BLOCK", nil, "List of blocked expression to match against the output addresses", false, false)
-	d.val(newIntValue(&d.FFmpeg.Log.MaxLines, 50), "ffmpeg.log.max_lines", "CORE_FFMPEG_LOG_MAXLINES", nil, "Number of latest log lines to keep for each process", false, false)
-	d.val(newIntValue(&d.FFmpeg.Log.MaxHistory, 3), "ffmpeg.log.max_history", "CORE_FFMPEG_LOG_MAXHISTORY", nil, "Number of latest logs to keep for each process", false, false)
+	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
+	d.vars.Register(value.NewInt64(&d.FFmpeg.MaxProcesses, 0), "ffmpeg.max_processes", "CORE_FFMPEG_MAXPROCESSES", nil, "Max. allowed simultaneously running ffmpeg instances, 0 for unlimited", false, false)
+	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Allow, []string{}, " "), "ffmpeg.access.input.allow", "CORE_FFMPEG_ACCESS_INPUT_ALLOW", nil, "List of allowed expression to match against the input addresses", false, false)
+	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)
+	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Output.Allow, []string{}, " "), "ffmpeg.access.output.allow", "CORE_FFMPEG_ACCESS_OUTPUT_ALLOW", nil, "List of allowed expression to match against the output addresses", false, false)
+	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Output.Block, []string{}, " "), "ffmpeg.access.output.block", "CORE_FFMPEG_ACCESS_OUTPUT_BLOCK", nil, "List of blocked expression to match against the output addresses", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxLines, 50), "ffmpeg.log.max_lines", "CORE_FFMPEG_LOG_MAXLINES", nil, "Number of latest log lines to keep for each process", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxHistory, 3), "ffmpeg.log.max_history", "CORE_FFMPEG_LOG_MAXHISTORY", nil, "Number of latest logs to keep for each process", false, false)
 
 	// Playout
-	d.val(newBoolValue(&d.Playout.Enable, false), "playout.enable", "CORE_PLAYOUT_ENABLE", nil, "Enable playout proxy where available", false, false)
-	d.val(newPortValue(&d.Playout.MinPort, 0), "playout.min_port", "CORE_PLAYOUT_MINPORT", nil, "Min. playout server port", false, false)
-	d.val(newPortValue(&d.Playout.MaxPort, 0), "playout.max_port", "CORE_PLAYOUT_MAXPORT", nil, "Max. playout server port", false, false)
+	d.vars.Register(value.NewBool(&d.Playout.Enable, false), "playout.enable", "CORE_PLAYOUT_ENABLE", nil, "Enable playout proxy where available", false, false)
+	d.vars.Register(value.NewPort(&d.Playout.MinPort, 0), "playout.min_port", "CORE_PLAYOUT_MINPORT", nil, "Min. playout server port", false, false)
+	d.vars.Register(value.NewPort(&d.Playout.MaxPort, 0), "playout.max_port", "CORE_PLAYOUT_MAXPORT", nil, "Max. playout server port", false, false)
 
 	// Debug
-	d.val(newBoolValue(&d.Debug.Profiling, false), "debug.profiling", "CORE_DEBUG_PROFILING", nil, "Enable profiling endpoint on /profiling", false, false)
-	d.val(newIntValue(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCEGC", nil, "Number of seconds between forcing GC to return memory to the OS", false, false)
+	d.vars.Register(value.NewBool(&d.Debug.Profiling, false), "debug.profiling", "CORE_DEBUG_PROFILING", nil, "Enable profiling endpoint on /profiling", false, false)
+	d.vars.Register(value.NewInt(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCEGC", nil, "Number of seconds between forcing GC to return memory to the OS", false, false)
 
 	// Metrics
-	d.val(newBoolValue(&d.Metrics.Enable, false), "metrics.enable", "CORE_METRICS_ENABLE", nil, "Enable collecting historic metrics data", false, false)
-	d.val(newBoolValue(&d.Metrics.EnablePrometheus, false), "metrics.enable_prometheus", "CORE_METRICS_ENABLE_PROMETHEUS", nil, "Enable prometheus endpoint /metrics", false, false)
-	d.val(newInt64Value(&d.Metrics.Range, 300), "metrics.range_seconds", "CORE_METRICS_RANGE_SECONDS", nil, "Seconds to keep history data", false, false)
-	d.val(newInt64Value(&d.Metrics.Interval, 2), "metrics.interval_seconds", "CORE_METRICS_INTERVAL_SECONDS", nil, "Interval for collecting metrics", false, false)
+	d.vars.Register(value.NewBool(&d.Metrics.Enable, false), "metrics.enable", "CORE_METRICS_ENABLE", nil, "Enable collecting historic metrics data", false, false)
+	d.vars.Register(value.NewBool(&d.Metrics.EnablePrometheus, false), "metrics.enable_prometheus", "CORE_METRICS_ENABLE_PROMETHEUS", nil, "Enable prometheus endpoint /metrics", false, false)
+	d.vars.Register(value.NewInt64(&d.Metrics.Range, 300), "metrics.range_seconds", "CORE_METRICS_RANGE_SECONDS", nil, "Seconds to keep history data", false, false)
+	d.vars.Register(value.NewInt64(&d.Metrics.Interval, 2), "metrics.interval_seconds", "CORE_METRICS_INTERVAL_SECONDS", nil, "Interval for collecting metrics", false, false)
 
 	// Sessions
-	d.val(newBoolValue(&d.Sessions.Enable, true), "sessions.enable", "CORE_SESSIONS_ENABLE", nil, "Enable collecting HLS session stats for /memfs", false, false)
-	d.val(newCIDRListValue(&d.Sessions.IPIgnoreList, []string{"127.0.0.1/32", "::1/128"}, ","), "sessions.ip_ignorelist", "CORE_SESSIONS_IP_IGNORELIST", nil, "List of IP ranges in CIDR notation to ignore", false, false)
-	d.val(newIntValue(&d.Sessions.SessionTimeout, 30), "sessions.session_timeout_sec", "CORE_SESSIONS_SESSION_TIMEOUT_SEC", nil, "Timeout for an idle session", false, false)
-	d.val(newBoolValue(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored as sessions.json in db.dir", false, false)
-	d.val(newIntValue(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history", false, false)
-	d.val(newUint64Value(&d.Sessions.MaxBitrate, 0), "sessions.max_bitrate_mbit", "CORE_SESSIONS_MAXBITRATE_MBIT", nil, "Max. allowed outgoing bitrate in mbit/s, 0 for unlimited", false, false)
-	d.val(newUint64Value(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAXSESSIONS", nil, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)
+	d.vars.Register(value.NewBool(&d.Sessions.Enable, true), "sessions.enable", "CORE_SESSIONS_ENABLE", nil, "Enable collecting HLS session stats for /memfs", false, false)
+	d.vars.Register(value.NewCIDRList(&d.Sessions.IPIgnoreList, []string{"127.0.0.1/32", "::1/128"}, ","), "sessions.ip_ignorelist", "CORE_SESSIONS_IP_IGNORELIST", nil, "List of IP ranges in CIDR notation to ignore", false, false)
+	d.vars.Register(value.NewInt(&d.Sessions.SessionTimeout, 30), "sessions.session_timeout_sec", "CORE_SESSIONS_SESSION_TIMEOUT_SEC", nil, "Timeout for an idle session", false, false)
+	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored as sessions.json in db.dir", false, false)
+	d.vars.Register(value.NewInt(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history", false, false)
+	d.vars.Register(value.NewUint64(&d.Sessions.MaxBitrate, 0), "sessions.max_bitrate_mbit", "CORE_SESSIONS_MAXBITRATE_MBIT", nil, "Max. allowed outgoing bitrate in mbit/s, 0 for unlimited", false, false)
+	d.vars.Register(value.NewUint64(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAXSESSIONS", nil, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)
 
 	// Service
-	d.val(newBoolValue(&d.Service.Enable, false), "service.enable", "CORE_SERVICE_ENABLE", nil, "Enable connecting to the Restreamer Service", false, false)
-	d.val(newStringValue(&d.Service.Token, ""), "service.token", "CORE_SERVICE_TOKEN", nil, "Restreamer Service account token", false, true)
-	d.val(newURLValue(&d.Service.URL, "https://service.datarhei.com"), "service.url", "CORE_SERVICE_URL", nil, "URL of the Restreamer Service", false, false)
+	d.vars.Register(value.NewBool(&d.Service.Enable, false), "service.enable", "CORE_SERVICE_ENABLE", nil, "Enable connecting to the Restreamer Service", false, false)
+	d.vars.Register(value.NewString(&d.Service.Token, ""), "service.token", "CORE_SERVICE_TOKEN", nil, "Restreamer Service account token", false, true)
+	d.vars.Register(value.NewURL(&d.Service.URL, "https://service.datarhei.com"), "service.url", "CORE_SERVICE_URL", nil, "URL of the Restreamer Service", false, false)
 
 	// Router
-	d.val(newStringListValue(&d.Router.BlockedPrefixes, []string{"/api"}, ","), "router.blocked_prefixes", "CORE_ROUTER_BLOCKED_PREFIXES", nil, "List of path prefixes that can't be routed", false, false)
-	d.val(newStringMapStringValue(&d.Router.Routes, nil), "router.routes", "CORE_ROUTER_ROUTES", nil, "List of route mappings", false, false)
-	d.val(newDirValue(&d.Router.UIPath, ""), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
-}
-
-func (d *Config) val(val value, name, envName string, envAltNames []string, description string, required, disguise bool) {
-	d.vars = append(d.vars, &variable{
-		value:       val,
-		defVal:      val.String(),
-		name:        name,
-		envName:     envName,
-		envAltNames: envAltNames,
-		description: description,
-		required:    required,
-		disguise:    disguise,
-	})
-}
-
-func (d *Config) log(level string, v *variable, format string, args ...interface{}) {
-	variable := Variable{
-		Value:       v.value.String(),
-		Name:        v.name,
-		EnvName:     v.envName,
-		Description: v.description,
-		Merged:      v.merged,
-	}
-
-	if v.disguise {
-		variable.Value = "***"
-	}
-
-	l := message{
-		message:  fmt.Sprintf(format, args...),
-		variable: variable,
-		level:    level,
-	}
-
-	d.logs = append(d.logs, l)
-}
-
-// Merge merges the values of the known environment variables into the configuration
-func (d *Config) Merge() {
-	for _, v := range d.vars {
-		if len(v.envName) == 0 {
-			continue
-		}
-
-		var envval string
-		var ok bool
-
-		envval, ok = os.LookupEnv(v.envName)
-		if !ok {
-			foundAltName := false
-
-			for _, envName := range v.envAltNames {
-				envval, ok = os.LookupEnv(envName)
-				if ok {
-					foundAltName = true
-					d.log("warn", v, "deprecated name, please use %s", v.envName)
-					break
-				}
-			}
-
-			if !foundAltName {
-				continue
-			}
-		}
-
-		err := v.value.Set(envval)
-		if err != nil {
-			d.log("error", v, "%s", err.Error())
-		}
-
-		v.merged = true
-	}
+	d.vars.Register(value.NewStringList(&d.Router.BlockedPrefixes, []string{"/api"}, ","), "router.blocked_prefixes", "CORE_ROUTER_BLOCKED_PREFIXES", nil, "List of path prefixes that can't be routed", false, false)
+	d.vars.Register(value.NewStringMapString(&d.Router.Routes, nil), "router.routes", "CORE_ROUTER_ROUTES", nil, "List of route mappings", false, false)
+	d.vars.Register(value.NewDir(&d.Router.UIPath, ""), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are
 // written to the log. Use resetLogs to indicate to reset the logs prior validation.
 func (d *Config) Validate(resetLogs bool) {
 	if resetLogs {
-		d.logs = nil
+		d.vars.ResetLogs()
 	}
 
 	if d.Version != version {
-		d.log("error", d.findVariable("version"), "unknown configuration layout version (found version %d, expecting version %d)", d.Version, version)
+		d.vars.Log("error", "version", "unknown configuration layout version (found version %d, expecting version %d)", d.Version, version)
 
 		return
 	}
 
-	for _, v := range d.vars {
-		d.log("info", v, "%s", "")
-
-		err := v.value.Validate()
-		if err != nil {
-			d.log("error", v, "%s", err.Error())
-		}
-
-		if v.required && v.value.IsEmpty() {
-			d.log("error", v, "a value is required")
-		}
-	}
+	d.vars.Validate()
 
 	// Individual sanity checks
 
 	// If HTTP Auth is enabled, check that the username and password are set
 	if d.API.Auth.Enable {
 		if len(d.API.Auth.Username) == 0 || len(d.API.Auth.Password) == 0 {
-			d.log("error", d.findVariable("api.auth.enable"), "api.auth.username and api.auth.password must be set")
+			d.vars.Log("error", "api.auth.enable", "api.auth.username and api.auth.password must be set")
 		}
 	}
 
 	// If Auth0 is enabled, check that domain, audience, and clientid are set
 	if d.API.Auth.Auth0.Enable {
 		if len(d.API.Auth.Auth0.Tenants) == 0 {
-			d.log("error", d.findVariable("api.auth.auth0.enable"), "at least one tenants must be set")
+			d.vars.Log("error", "api.auth.auth0.enable", "at least one tenants must be set")
 		}
 
 		for i, t := range d.API.Auth.Auth0.Tenants {
 			if len(t.Domain) == 0 || len(t.Audience) == 0 || len(t.ClientID) == 0 {
-				d.log("error", d.findVariable("api.auth.auth0.tenants"), "domain, audience, and clientid must be set (tenant %d)", i)
+				d.vars.Log("error", "api.auth.auth0.tenants", "domain, audience, and clientid must be set (tenant %d)", i)
 			}
 		}
 	}
@@ -387,14 +299,14 @@ func (d *Config) Validate(resetLogs bool) {
 	// If TLS is enabled and Let's Encrypt is disabled, require certfile and keyfile
 	if d.TLS.Enable && !d.TLS.Auto {
 		if len(d.TLS.CertFile) == 0 || len(d.TLS.KeyFile) == 0 {
-			d.log("error", d.findVariable("tls.enable"), "tls.certfile and tls.keyfile must be set")
+			d.vars.Log("error", "tls.enable", "tls.certfile and tls.keyfile must be set")
 		}
 	}
 
 	// If TLS and Let's Encrypt certificate is enabled, we require a public hostname
 	if d.TLS.Enable && d.TLS.Auto {
 		if len(d.Host.Name) == 0 {
-			d.log("error", d.findVariable("host.name"), "a hostname must be set in order to get an automatic TLS certificate")
+			d.vars.Log("error", "host.name", "a hostname must be set in order to get an automatic TLS certificate")
 		} else {
 			r := &net.Resolver{
 				PreferGo:     true,
@@ -404,7 +316,7 @@ func (d *Config) Validate(resetLogs bool) {
 			for _, host := range d.Host.Name {
 				// Don't lookup IP addresses
 				if ip := net.ParseIP(host); ip != nil {
-					d.log("error", d.findVariable("host.name"), "only host names are allowed if automatic TLS is enabled, but found IP address: %s", host)
+					d.vars.Log("error", "host.name", "only host names are allowed if automatic TLS is enabled, but found IP address: %s", host)
 				}
 
 				// Lookup host name with a timeout
@@ -412,7 +324,7 @@ func (d *Config) Validate(resetLogs bool) {
 
 				_, err := r.LookupHost(ctx, host)
 				if err != nil {
-					d.log("error", d.findVariable("host.name"), "the host '%s' can't be resolved and will not work with automatic TLS", host)
+					d.vars.Log("error", "host.name", "the host '%s' can't be resolved and will not work with automatic TLS", host)
 				}
 
 				cancel()
@@ -423,32 +335,31 @@ func (d *Config) Validate(resetLogs bool) {
 	// If TLS and Let's Encrypt certificate is enabled, we require a non-empty email address
 	if d.TLS.Enable && d.TLS.Auto {
 		if len(d.TLS.Email) == 0 {
-			v := d.findVariable("tls.email")
-			v.value.Set(v.defVal)
+			d.vars.SetDefault("tls.email")
 		}
 	}
 
 	// If TLS for RTMP is enabled, TLS must be enabled
 	if d.RTMP.EnableTLS {
 		if !d.RTMP.Enable {
-			d.log("error", d.findVariable("rtmp.enable"), "RTMP server must be enabled if RTMPS server is enabled")
+			d.vars.Log("error", "rtmp.enable", "RTMP server must be enabled if RTMPS server is enabled")
 		}
 
 		if !d.TLS.Enable {
-			d.log("error", d.findVariable("rtmp.enable_tls"), "RTMPS server can only be enabled if TLS is enabled")
+			d.vars.Log("error", "rtmp.enable_tls", "RTMPS server can only be enabled if TLS is enabled")
 		}
 
 		if len(d.RTMP.AddressTLS) == 0 {
-			d.log("error", d.findVariable("rtmp.address_tls"), "RTMPS server address must be set")
+			d.vars.Log("error", "rtmp.address_tls", "RTMPS server address must be set")
 		}
 
 		if d.RTMP.Enable && d.RTMP.Address == d.RTMP.AddressTLS {
-			d.log("error", d.findVariable("rtmp.address"), "The RTMP and RTMPS server can't listen on the same address")
+			d.vars.Log("error", "rtmp.address", "The RTMP and RTMPS server can't listen on the same address")
 		}
 	}
 
 	// If CORE_MEMFS_USERNAME and CORE_MEMFS_PASSWORD are set, automatically active/deactivate Basic-Auth for memfs
-	if d.findVariable("storage.memory.auth.username").merged && d.findVariable("storage.memory.auth.password").merged {
+	if d.vars.IsMerged("storage.memory.auth.username") && d.vars.IsMerged("storage.memory.auth.password") {
 		d.Storage.Memory.Auth.Enable = true
 
 		if len(d.Storage.Memory.Auth.Username) == 0 && len(d.Storage.Memory.Auth.Password) == 0 {
@@ -459,121 +370,76 @@ func (d *Config) Validate(resetLogs bool) {
 	// If Basic-Auth for memfs is enable, check that the username and password are set
 	if d.Storage.Memory.Auth.Enable {
 		if len(d.Storage.Memory.Auth.Username) == 0 || len(d.Storage.Memory.Auth.Password) == 0 {
-			d.log("error", d.findVariable("storage.memory.auth.enable"), "storage.memory.auth.username and storage.memory.auth.password must be set")
+			d.vars.Log("error", "storage.memory.auth.enable", "storage.memory.auth.username and storage.memory.auth.password must be set")
 		}
 	}
 
 	// If playout is enabled, check that the port range is sane
 	if d.Playout.Enable {
 		if d.Playout.MinPort >= d.Playout.MaxPort {
-			d.log("error", d.findVariable("playout.min_port"), "must be bigger than playout.max_port")
+			d.vars.Log("error", "playout.min_port", "must be bigger than playout.max_port")
 		}
 	}
 
 	// If cache is enabled, a valid TTL has to be set to a useful value
 	if d.Storage.Disk.Cache.Enable && d.Storage.Disk.Cache.TTL < 0 {
-		d.log("error", d.findVariable("storage.disk.cache.ttl_seconds"), "must be equal or greater than 0")
+		d.vars.Log("error", "storage.disk.cache.ttl_seconds", "must be equal or greater than 0")
 	}
 
 	// If the stats are enabled, the session timeout has to be set to a useful value
 	if d.Sessions.Enable && d.Sessions.SessionTimeout < 1 {
-		d.log("error", d.findVariable("stats.session_timeout_sec"), "must be equal or greater than 1")
+		d.vars.Log("error", "stats.session_timeout_sec", "must be equal or greater than 1")
 	}
 
 	// If the stats and their persistence are enabled, the persist interval has to be set to a useful value
 	if d.Sessions.Enable && d.Sessions.PersistInterval < 0 {
-		d.log("error", d.findVariable("stats.persist_interval_sec"), "must be at equal or greater than 0")
+		d.vars.Log("error", "stats.persist_interval_sec", "must be at equal or greater than 0")
 	}
 
 	// If the service is enabled, the token and enpoint have to be defined
 	if d.Service.Enable {
 		if len(d.Service.Token) == 0 {
-			d.log("error", d.findVariable("service.token"), "must be non-empty")
+			d.vars.Log("error", "service.token", "must be non-empty")
 		}
 
 		if len(d.Service.URL) == 0 {
-			d.log("error", d.findVariable("service.url"), "must be non-empty")
+			d.vars.Log("error", "service.url", "must be non-empty")
 		}
 	}
 
 	// If historic metrics are enabled, the timerange and interval have to be valid
 	if d.Metrics.Enable {
 		if d.Metrics.Range <= 0 {
-			d.log("error", d.findVariable("metrics.range"), "must be greater 0")
+			d.vars.Log("error", "metrics.range", "must be greater 0")
 		}
 
 		if d.Metrics.Interval <= 0 {
-			d.log("error", d.findVariable("metrics.interval"), "must be greater 0")
+			d.vars.Log("error", "metrics.interval", "must be greater 0")
 		}
 
 		if d.Metrics.Interval > d.Metrics.Range {
-			d.log("error", d.findVariable("metrics.interval"), "must be smaller than the range")
+			d.vars.Log("error", "metrics.interval", "must be smaller than the range")
 		}
 	}
 }
 
-func (d *Config) findVariable(name string) *variable {
-	for _, v := range d.vars {
-		if v.name == name {
-			return v
-		}
-	}
-
-	return nil
+// Merge merges the values of the known environment variables into the configuration
+func (d *Config) Merge() {
+	d.vars.Merge()
 }
 
 // Messages calls for each log entry the provided callback. The level has the values 'error', 'warn', or 'info'.
 // The name is the name of the configuration value, e.g. 'api.auth.enable'. The message is the log message.
-func (d *Config) Messages(logger func(level string, v Variable, message string)) {
-	for _, l := range d.logs {
-		logger(l.level, l.variable, l.message)
-	}
+func (d *Config) Messages(logger func(level string, v vars.Variable, message string)) {
+	d.vars.Messages(logger)
 }
 
 // HasErrors returns whether there are some error messages in the log.
 func (d *Config) HasErrors() bool {
-	for _, l := range d.logs {
-		if l.level == "error" {
-			return true
-		}
-	}
-
-	return false
+	return d.vars.HasErrors()
 }
 
 // Overrides returns a list of configuration value names that have been overriden by an environment variable.
 func (d *Config) Overrides() []string {
-	overrides := []string{}
-
-	for _, v := range d.vars {
-		if v.merged {
-			overrides = append(overrides, v.name)
-		}
-	}
-
-	return overrides
-}
-
-func copyStringSlice(src []string) []string {
-	dst := make([]string, len(src))
-	copy(dst, src)
-
-	return dst
-}
-
-func copyStringMap(src map[string]string) map[string]string {
-	dst := make(map[string]string)
-
-	for k, v := range src {
-		dst[k] = v
-	}
-
-	return dst
-}
-
-func copyTenantSlice(src []Auth0Tenant) []Auth0Tenant {
-	dst := make([]Auth0Tenant, len(src))
-	copy(dst, src)
-
-	return dst
+	return d.vars.Overrides()
 }

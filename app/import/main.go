@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/datarhei/core/v16/config"
+	cfgstore "github.com/datarhei/core/v16/config/store"
+	cfgvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/store"
 
@@ -14,7 +15,7 @@ import (
 func main() {
 	logger := log.New("Import").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithField("version", "v1")
 
-	configstore, err := config.NewJSONStore(os.Getenv("CORE_CONFIGFILE"), nil)
+	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
 		os.Exit(1)
@@ -25,7 +26,7 @@ func main() {
 	}
 }
 
-func doImport(logger log.Logger, configstore config.Store) error {
+func doImport(logger log.Logger, configstore cfgstore.Store) error {
 	if logger == nil {
 		logger = log.New("")
 	}
@@ -41,7 +42,7 @@ func doImport(logger log.Logger, configstore config.Store) error {
 	if cfg.HasErrors() {
 		logger.Error().Log("The configuration contains errors")
 		messages := []string{}
-		cfg.Messages(func(level string, v config.Variable, message string) {
+		cfg.Messages(func(level string, v cfgvars.Variable, message string) {
 			if level == "error" {
 				logger.Error().WithFields(log.Fields{
 					"variable":    v.Name,
@@ -79,7 +80,7 @@ func doImport(logger log.Logger, configstore config.Store) error {
 
 	// Load an existing DB
 	datastore := store.NewJSONStore(store.JSONConfig{
-		Dir: cfg.DB.Dir,
+		Filepath: cfg.DB.Dir + "/db.json",
 	})
 
 	data, err := datastore.Load()

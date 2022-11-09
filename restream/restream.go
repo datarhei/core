@@ -24,6 +24,8 @@ import (
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/store"
+
+	"github.com/Masterminds/semver/v3"
 )
 
 // The Restreamer interface
@@ -267,7 +269,18 @@ func (r *restream) load() error {
 
 	tasks := make(map[string]*task)
 
+	skills := r.ffmpeg.Skills()
+	ffversion := skills.FFmpeg.Version
+	if v, err := semver.NewVersion(ffversion); err == nil {
+		// Remove the patch level for the constraint
+		ffversion = fmt.Sprintf("%d.%d.0", v.Major(), v.Minor())
+	}
+
 	for id, process := range data.Process {
+		if len(process.Config.FFVersion) == 0 {
+			process.Config.FFVersion = "^" + ffversion
+		}
+
 		t := &task{
 			id:        id,
 			reference: process.Reference,
@@ -295,6 +308,23 @@ func (r *restream) load() error {
 	// replaced, we can resolve references and validate the
 	// inputs and outputs.
 	for _, t := range tasks {
+		// Just warn if the ffmpeg version constraint doesn't match the available ffmpeg version
+		if c, err := semver.NewConstraint(t.config.FFVersion); err == nil {
+			if v, err := semver.NewVersion(skills.FFmpeg.Version); err == nil {
+				if !c.Check(v) {
+					r.logger.Warn().WithFields(log.Fields{
+						"id":         t.id,
+						"constraint": t.config.FFVersion,
+						"version":    skills.FFmpeg.Version,
+					}).WithError(fmt.Errorf("available FFmpeg version doesn't fit constraint; you have to update this process to adjust the constraint")).Log("")
+				}
+			} else {
+				r.logger.Warn().WithField("id", t.id).WithError(err).Log("")
+			}
+		} else {
+			r.logger.Warn().WithField("id", t.id).WithError(err).Log("")
+		}
+
 		err := r.resolveAddresses(tasks, t.config)
 		if err != nil {
 			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
@@ -405,6 +435,12 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	if len(id) == 0 {
 		return nil, fmt.Errorf("an empty ID is not allowed")
+	}
+
+	config.FFVersion = "^" + r.ffmpeg.Skills().FFmpeg.Version
+	if v, err := semver.NewVersion(config.FFVersion); err == nil {
+		// Remove the patch level for the constraint
+		config.FFVersion = fmt.Sprintf("^%d.%d.0", v.Major(), v.Minor())
 	}
 
 	process := &app.Process{

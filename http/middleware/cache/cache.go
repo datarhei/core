@@ -57,31 +57,18 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			if req.Method != "GET" {
 				res.Header().Set("X-Cache", "SKIP ONLYGET")
-
-				if err := next(c); err != nil {
-					c.Error(err)
-				}
-
-				return nil
+				return next(c)
 			}
-
-			res.Header().Set("Cache-Control", fmt.Sprintf("max-age=%.0f", config.Cache.TTL().Seconds()))
 
 			key := strings.TrimPrefix(req.URL.Path, config.Prefix)
 
 			if !config.Cache.IsExtensionCacheable(path.Ext(req.URL.Path)) {
 				res.Header().Set("X-Cache", "SKIP EXT")
-
-				if err := next(c); err != nil {
-					c.Error(err)
-				}
-
-				return nil
+				return next(c)
 			}
 
 			if obj, expireIn, _ := config.Cache.Get(key); obj == nil {
 				// cache miss
-
 				writer := res.Writer
 
 				w := &cacheWriter{
@@ -105,6 +92,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 				if res.Status != 200 {
 					res.Header().Set("X-Cache", "SKIP NOTOK")
+					res.Writer.WriteHeader(res.Status)
 					return nil
 				}
 
@@ -112,6 +100,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 				if !config.Cache.IsSizeCacheable(size) {
 					res.Header().Set("X-Cache", "SKIP TOOBIG")
+					res.Writer.WriteHeader(res.Status)
 					return nil
 				}
 
@@ -123,11 +112,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 				if err := config.Cache.Put(key, o, size); err != nil {
 					res.Header().Set("X-Cache", "SKIP TOOBIG")
+					res.Writer.WriteHeader(res.Status)
 					return nil
 				}
 
 				res.Header().Set("Cache-Control", fmt.Sprintf("max-age=%.0f", expireIn.Seconds()))
 				res.Header().Set("X-Cache", "MISS")
+				res.Writer.WriteHeader(res.Status)
 			} else {
 				// cache hit
 				o := obj.(*cacheObject)
@@ -190,7 +181,5 @@ func (w *cacheWriter) WriteHeader(code int) {
 }
 
 func (w *cacheWriter) Write(body []byte) (int, error) {
-	n, err := w.body.Write(body)
-
-	return n, err
+	return w.body.Write(body)
 }

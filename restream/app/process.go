@@ -37,6 +37,7 @@ func (io ConfigIO) Clone() ConfigIO {
 type Config struct {
 	ID             string     `json:"id"`
 	Reference      string     `json:"reference"`
+	FFVersion      string     `json:"ffversion"`
 	Input          []ConfigIO `json:"input"`
 	Output         []ConfigIO `json:"output"`
 	Options        []string   `json:"options"`
@@ -53,6 +54,7 @@ func (config *Config) Clone() *Config {
 	clone := &Config{
 		ID:             config.ID,
 		Reference:      config.Reference,
+		FFVersion:      config.FFVersion,
 		Reconnect:      config.Reconnect,
 		ReconnectDelay: config.ReconnectDelay,
 		Autostart:      config.Autostart,

@@ -25,7 +25,8 @@ func NewSession(registry session.RegistryReader) *SessionHandler {
 
 // Summary returns a summary of all active and past sessions
 // @Summary Get a summary of all active and past sessions
-// @Description Get a summary of all active and past sessions of the given collector
+// @Description Get a summary of all active and past sessions of the given collector.
+// @Tags v16.7.2
 // @ID session-3-summary
 // @Produce json
 // @Security ApiKeyAuth
@@ -49,7 +50,8 @@ func (s *SessionHandler) Summary(c echo.Context) error {
 
 // Active returns a list of active sessions
 // @Summary Get a minimal summary of all active sessions
-// @Description Get a minimal summary of all active sessions (i.e. number of sessions, bandwidth)
+// @Description Get a minimal summary of all active sessions (i.e. number of sessions, bandwidth).
+// @Tags v16.7.2
 // @ID session-3-current
 // @Produce json
 // @Security ApiKeyAuth
