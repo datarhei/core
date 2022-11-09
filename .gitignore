@@ -2,6 +2,7 @@
 .env
 /core*
 /import*
+/ffmigrate*
 /data/**
 /test/**
 .vscode

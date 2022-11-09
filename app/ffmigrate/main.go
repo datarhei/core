@@ -129,6 +129,8 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 
 	reRTSP := regexp.MustCompile(`^rtsps?://`)
 	for id, p := range data.Process {
+		logger.Info().WithField("processid", p.ID).Log("")
+
 		for index, input := range p.Config.Input {
 			if !reRTSP.MatchString(input.Address) {
 				continue
@@ -144,6 +146,7 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 
 			p.Config.Input[index] = input
 		}
+		p.Config.FFVersion = version.String()
 		data.Process[id] = p
 	}
 
