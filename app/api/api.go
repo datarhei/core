@@ -468,9 +468,9 @@ func (a *api) start() error {
 			host = "localhost"
 		}
 
-		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid=#!:m={mode},r={name}"
+		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid={name},mode:{mode}"
 		if len(cfg.SRT.Token) != 0 {
-			template += ",token=" + cfg.SRT.Token
+			template += ",token:" + cfg.SRT.Token
 		}
 		if len(cfg.SRT.Passphrase) != 0 {
 			template += "&passphrase=" + cfg.SRT.Passphrase
