@@ -55,7 +55,7 @@ func New(config Config) (Service, error) {
 	}
 
 	if s.logger == nil {
-		s.logger = log.New("Service")
+		s.logger = log.New("")
 	}
 
 	s.logger = s.logger.WithField("url", config.URL)
@@ -214,7 +214,10 @@ func (s *service) collect() (time.Duration, error) {
 		return 15 * time.Minute, fmt.Errorf("failed to send monitor data to service: %w", err)
 	}
 
-	s.logger.Debug().WithField("next", r.Next).Log("Sent monitor data")
+	s.logger.Debug().WithFields(log.Fields{
+		"next": r.Next,
+		"data": data,
+	}).Log("Sent monitor data")
 
 	if r.Next == 0 {
 		r.Next = 5 * 60
@@ -230,6 +233,8 @@ func (s *service) Start() {
 		go s.tick(ctx, time.Second)
 
 		s.stopOnce = sync.Once{}
+
+		s.logger.Info().Log("Connected")
 	})
 }
 
@@ -237,6 +242,8 @@ func (s *service) Stop() {
 	s.stopOnce.Do(func() {
 		s.stopTicker()
 		s.startOnce = sync.Once{}
+
+		s.logger.Info().Log("Disconnected")
 	})
 }
 
