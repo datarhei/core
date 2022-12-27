@@ -445,8 +445,8 @@ func (a *api) start() error {
 	a.replacer = replace.New()
 
 	{
-		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
-		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
+		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base(), nil)
+		a.replacer.RegisterTemplate("memfs", a.memfs.Base(), nil)
 
 		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
 		if len(host) == 0 {
@@ -463,21 +463,23 @@ func (a *api) start() error {
 			template += "?token=" + cfg.RTMP.Token
 		}
 
-		a.replacer.RegisterTemplate("rtmp", template)
+		a.replacer.RegisterTemplate("rtmp", template, nil)
 
 		host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
 		if len(host) == 0 {
 			host = "localhost"
 		}
 
-		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid={name},mode:{mode}"
+		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name},mode:{mode}"
 		if len(cfg.SRT.Token) != 0 {
 			template += ",token:" + cfg.SRT.Token
 		}
 		if len(cfg.SRT.Passphrase) != 0 {
 			template += "&passphrase=" + cfg.SRT.Passphrase
 		}
-		a.replacer.RegisterTemplate("srt", template)
+		a.replacer.RegisterTemplate("srt", template, map[string]string{
+			"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
+		})
 	}
 
 	store := store.NewJSONStore(store.JSONConfig{
