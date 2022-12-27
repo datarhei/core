@@ -39,6 +39,8 @@ import (
 	"github.com/datarhei/core/v16/update"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/letsdebug/letsdebug"
+	"go.uber.org/zap"
 )
 
 // The API interface is the implementation for the restreamer API.
@@ -655,26 +657,28 @@ func (a *api) start() error {
 	if cfg.TLS.Enable {
 		if cfg.TLS.Auto {
 			if len(cfg.Host.Name) == 0 {
-				return fmt.Errorf("at least one host must be provided in host.name or RS_HOST_NAME")
+				return fmt.Errorf("at least one host must be provided in host.name or CORE_HOST_NAME")
 			}
+
+			certmagic.Default.Storage = &certmagic.FileStorage{
+				Path: cfg.DB.Dir + "/cert",
+			}
+			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
+			certmagic.Default.Logger = zap.NewNop()
 
 			certmagic.DefaultACME.Agreed = true
 			certmagic.DefaultACME.Email = cfg.TLS.Email
 			certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
 			certmagic.DefaultACME.DisableHTTPChallenge = false
 			certmagic.DefaultACME.DisableTLSALPNChallenge = true
-			certmagic.DefaultACME.Logger = nil
-
-			certmagic.Default.Storage = &certmagic.FileStorage{
-				Path: cfg.DB.Dir + "/cert",
-			}
-			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
-			certmagic.Default.Logger = nil
+			certmagic.DefaultACME.Logger = zap.NewNop()
 
 			magic := certmagic.NewDefault()
 			acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
+			acme.Logger = zap.NewNop()
 
 			magic.Issuers = []certmagic.Issuer{acme}
+			magic.Logger = zap.NewNop()
 
 			autocertManager = magic
 
@@ -713,6 +717,19 @@ func (a *api) start() error {
 				if err != nil {
 					logger.Error().WithField("error", err).Log("Failed to acquire certificate")
 					certerror = true
+
+					problems, err := letsdebug.Check(host, letsdebug.HTTP01)
+					if err != nil {
+						logger.Error().WithField("error", err).Log("Failed to debug certificate acquisition")
+					}
+
+					for _, p := range problems {
+						logger.Error().WithFields(log.Fields{
+							"name":   p.Name,
+							"detail": p.Detail,
+						}).Log(p.Explanation)
+					}
+
 					break
 				}
 

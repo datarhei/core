@@ -1,0 +1,23 @@
+language: go
+go:
+  - '1.15.x'
+before_install:
+  - sudo apt-get update
+  - sudo apt-get -y install libunbound-dev make
+  - sudo mkdir -p $GOPATH/bin
+  - export PATH=$PATH:$GOPATH/bin
+install:
+  - make deps
+script:
+  - make letsdebug-server letsdebug-cli
+deploy:
+  provider: releases
+  api_key:
+    secure: f65vxdzq7SoIooXNAPJaHEiCcnG1Q2R7muomm/5qWyRXgaXyBu6Yo0oOGQNcYLbs22PbRCVS8xnN2cSfFV5jeilRKuhpTYq0tforjJbtjL1DEs9ODyLZnXIXH+uacIPwM/ioxFbFVTnSCkZx90+9I+WHY0taqc2AW49RvQKPTzOmWYZ4ATsQxsv5jBLXZIuhhl3cEJayeogT2yToYump3AZN+8o67kP94a/vSbPMTRcKOeLQa+gjxSoHVBfjmpYvGdFTp1iE8bWsJpfo/i2snF6eMdAig4Vy9Ajk/SVEmSzEBWk31JceDrT9n7VNmlDN9Us2PhdjQLR5KD3OCLx6QN/P72iBN1zq9bTRiHaF4TEUq6IyP3cnDQStfTYzE+IIZtl7DQQKY+Dp5mTO3QSq17Kp7Dvw9mNyGsyE7Oo4VmxHuH8XXbuCoyN2ywJ6l2rv/wuBPylIC5iuguJyVK9WnMxt8vOaBWIAPmm8HbviU3FHnHic6s4DPDpLfwpvsqbxSvEYcj+mRYKhMSD3pF2E/a9wFhph+Wj6sbPhiWkI84D4kmwH42h7WmYqaJfTMGyiZiiFdcF4J/M4c66csWbBLza1GIeNGmxPpKLjilIIBDo6gfpKqQYZllt+ZfeLdwIydE8m5NBVw1d6I0ctF9GNWUG8yfHPKHxNwY05kziW5qA=
+  file:
+    - letsdebug-server
+    - letsdebug-cli
+  skip_cleanup: true
+  on:
+    repo: letsdebug/letsdebug
+    tags: true
