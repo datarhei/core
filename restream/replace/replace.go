@@ -9,12 +9,13 @@ import (
 type Replacer interface {
 	// RegisterTemplate registers a template for a specific placeholder. Template
 	// may contain placeholders as well of the form {name}. They will be replaced
-	// by the parameters of the placeholder (see Replace).
-	RegisterTemplate(placeholder, template string)
+	// by the parameters of the placeholder (see Replace). If a parameter is not of
+	// a template is not present, default values can be provided.
+	RegisterTemplate(placeholder, template string, defaults map[string]string)
 
 	// RegisterTemplateFunc does the same as RegisterTemplate, but the template
 	// is returned by the template function.
-	RegisterTemplateFunc(placeholder string, template func() string)
+	RegisterTemplateFunc(placeholder string, template func() string, defaults map[string]string)
 
 	// Replace replaces all occurences of placeholder in str with value. The placeholder is of the
 	// form {placeholder}. It is possible to escape a characters in value with \\ by appending a ^
@@ -28,8 +29,13 @@ type Replacer interface {
 	Replace(str, placeholder, value string) string
 }
 
+type template struct {
+	fn       func() string
+	defaults map[string]string
+}
+
 type replacer struct {
-	templates map[string]func() string
+	templates map[string]template
 
 	re         *regexp.Regexp
 	templateRe *regexp.Regexp
@@ -38,7 +44,7 @@ type replacer struct {
 // New returns a Replacer
 func New() Replacer {
 	r := &replacer{
-		templates:  make(map[string]func() string),
+		templates:  make(map[string]template),
 		re:         regexp.MustCompile(`{([a-z]+)(?:\^(.))?(?:,(.*?))?}`),
 		templateRe: regexp.MustCompile(`{([a-z]+)}`),
 	}
@@ -46,12 +52,18 @@ func New() Replacer {
 	return r
 }
 
-func (r *replacer) RegisterTemplate(placeholder, template string) {
-	r.templates[placeholder] = func() string { return template }
+func (r *replacer) RegisterTemplate(placeholder, tmpl string, defaults map[string]string) {
+	r.templates[placeholder] = template{
+		fn:       func() string { return tmpl },
+		defaults: defaults,
+	}
 }
 
-func (r *replacer) RegisterTemplateFunc(placeholder string, template func() string) {
-	r.templates[placeholder] = template
+func (r *replacer) RegisterTemplateFunc(placeholder string, tmplFn func() string, defaults map[string]string) {
+	r.templates[placeholder] = template{
+		fn:       tmplFn,
+		defaults: defaults,
+	}
 }
 
 func (r *replacer) Replace(str, placeholder, value string) string {
@@ -63,16 +75,20 @@ func (r *replacer) Replace(str, placeholder, value string) string {
 
 		// We need a copy from the value
 		v := value
+		var tmpl template = template{
+			fn: func() string { return v },
+		}
 
 		// Check for a registered template
 		if len(v) == 0 {
-			tmplFunc, ok := r.templates[placeholder]
+			t, ok := r.templates[placeholder]
 			if ok {
-				v = tmplFunc()
+				tmpl = t
 			}
 		}
 
-		v = r.compileTemplate(v, matches[3])
+		v = tmpl.fn()
+		v = r.compileTemplate(v, matches[3], tmpl.defaults)
 
 		if len(matches[2]) != 0 {
 			// If there's a character to escape, we also have to escape the
@@ -97,12 +113,17 @@ func (r *replacer) Replace(str, placeholder, value string) string {
 // placeholder name and will be replaced with the value. The resulting string is "Hello World!".
 // If a placeholder name is not present in the params string, it will not be replaced. The key
 // and values can be escaped as in net/url.QueryEscape.
-func (r *replacer) compileTemplate(str, params string) string {
-	if len(params) == 0 {
+func (r *replacer) compileTemplate(str, params string, defaults map[string]string) string {
+	if len(params) == 0 && len(defaults) == 0 {
 		return str
 	}
 
 	p := make(map[string]string)
+
+	// Copy the defaults
+	for key, value := range defaults {
+		p[key] = value
+	}
 
 	// taken from net/url.ParseQuery
 	for params != "" {
