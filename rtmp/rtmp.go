@@ -381,7 +381,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		}
 
 		// Adjust the timestamp such that the stream starts from 0
-		filters = append(filters, &pktque.FixTime{StartFromZero: true, MakeIncrement: true})
+		filters = append(filters, &pktque.FixTime{StartFromZero: true, MakeIncrement: false})
 
 		demuxer := &pktque.FilterDemuxer{
 			Filter:  filters,
