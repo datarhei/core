@@ -39,7 +39,6 @@ import (
 	"github.com/datarhei/core/v16/update"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/letsdebug/letsdebug"
 	"go.uber.org/zap"
 )
 
@@ -719,19 +718,19 @@ func (a *api) start() error {
 				if err != nil {
 					logger.Error().WithField("error", err).Log("Failed to acquire certificate")
 					certerror = true
+					/*
+						problems, err := letsdebug.Check(host, letsdebug.HTTP01)
+						if err != nil {
+							logger.Error().WithField("error", err).Log("Failed to debug certificate acquisition")
+						}
 
-					problems, err := letsdebug.Check(host, letsdebug.HTTP01)
-					if err != nil {
-						logger.Error().WithField("error", err).Log("Failed to debug certificate acquisition")
-					}
-
-					for _, p := range problems {
-						logger.Error().WithFields(log.Fields{
-							"name":   p.Name,
-							"detail": p.Detail,
-						}).Log(p.Explanation)
-					}
-
+						for _, p := range problems {
+							logger.Error().WithFields(log.Fields{
+								"name":   p.Name,
+								"detail": p.Detail,
+							}).Log(p.Explanation)
+						}
+					*/
 					break
 				}
 

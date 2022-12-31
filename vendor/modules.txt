@@ -85,9 +85,6 @@ github.com/datarhei/joy4/utils/bits/pio
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/eggsampler/acme/v3 v3.1.1
-## explicit; go 1.11
-github.com/eggsampler/acme/v3
 # github.com/go-ole/go-ole v1.2.6
 ## explicit; go 1.12
 github.com/go-ole/go-ole
@@ -174,14 +171,6 @@ github.com/labstack/gommon/random
 # github.com/leodido/go-urn v1.2.1
 ## explicit; go 1.13
 github.com/leodido/go-urn
-# github.com/letsdebug/letsdebug v1.6.1
-## explicit; go 1.15
-github.com/letsdebug/letsdebug
-# github.com/lib/pq v1.8.0
-## explicit; go 1.13
-github.com/lib/pq
-github.com/lib/pq/oid
-github.com/lib/pq/scram
 # github.com/libdns/libdns v0.2.1
 ## explicit; go 1.14
 github.com/libdns/libdns
@@ -212,9 +201,6 @@ github.com/mholt/acmez/acme
 # github.com/miekg/dns v1.1.50
 ## explicit; go 1.14
 github.com/miekg/dns
-# github.com/miekg/unbound v0.0.0-20180419064740-e2b53b2dbcba
-## explicit
-github.com/miekg/unbound
 # github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
@@ -293,10 +279,6 @@ github.com/vektah/gqlparser/v2/lexer
 github.com/vektah/gqlparser/v2/parser
 github.com/vektah/gqlparser/v2/validator
 github.com/vektah/gqlparser/v2/validator/rules
-# github.com/weppos/publicsuffix-go v0.13.0
-## explicit
-github.com/weppos/publicsuffix-go/net/publicsuffix
-github.com/weppos/publicsuffix-go/publicsuffix
 # github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb
 ## explicit
 github.com/xeipuuv/gojsonpointer

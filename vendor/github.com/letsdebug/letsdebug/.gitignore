@@ -1,6 +1,0 @@
-vendor/
-.idea/
-acme-account.json
-web/*_gen.go
-letsdebug-server
-letsdebug-cli

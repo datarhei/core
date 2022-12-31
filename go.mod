@@ -16,7 +16,6 @@ require (
 	github.com/invopop/jsonschema v0.4.0
 	github.com/joho/godotenv v1.4.0
 	github.com/labstack/echo/v4 v4.9.1
-	github.com/letsdebug/letsdebug v1.6.1
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.16
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
@@ -39,7 +38,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/eggsampler/acme/v3 v3.1.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
@@ -56,7 +54,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.1.2 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
-	github.com/lib/pq v1.8.0 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20220913051719-115f729f3c8c // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -64,7 +61,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mholt/acmez v1.0.4 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
-	github.com/miekg/unbound v0.0.0-20180419064740-e2b53b2dbcba // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20220216144756-c35f1ee13d7c // indirect
@@ -78,7 +74,6 @@ require (
 	github.com/urfave/cli/v2 v2.8.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/weppos/publicsuffix-go v0.13.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
