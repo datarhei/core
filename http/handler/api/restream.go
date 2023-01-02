@@ -51,7 +51,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
 	}
 
-	if len(process.Input) == 0 && len(process.Output) == 0 {
+	if len(process.Input) == 0 || len(process.Output) == 0 {
 		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
 	}
 
