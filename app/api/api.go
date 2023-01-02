@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	golog "log"
+	"math"
 	gonet "net"
 	gohttp "net/http"
 	"net/url"
@@ -1117,6 +1118,12 @@ func (a *api) start() error {
 				}
 			}
 		}(ctx)
+	}
+
+	if cfg.Debug.MemoryLimit > 0 {
+		debug.SetMemoryLimit(cfg.Debug.MemoryLimit * 1024 * 1024)
+	} else {
+		debug.SetMemoryLimit(math.MaxInt64)
 	}
 
 	// Start the restream processes

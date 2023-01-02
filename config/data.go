@@ -135,8 +135,9 @@ type Data struct {
 		MaxPort int  `json:"max_port"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling bool `json:"profiling"`
-		ForceGC   int  `json:"force_gc"`
+		Profiling   bool  `json:"profiling"`
+		ForceGC     int   `json:"force_gc"`
+		MemoryLimit int64 `json:"memory_limit_mbytes"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
@@ -189,7 +190,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
-	data.Debug = d.Debug
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
 	data.Service = d.Service
@@ -228,6 +228,10 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Memory = d.Storage.Memory
 
 	// Actual changes
+	data.Debug.Profiling = d.Debug.Profiling
+	data.Debug.ForceGC = d.Debug.ForceGC
+	data.Debug.MemoryLimit = 0
+
 	data.TLS.Enable = d.TLS.Enable
 	data.TLS.Address = d.TLS.Address
 	data.TLS.Auto = d.TLS.Auto
@@ -267,7 +271,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
-	data.Debug = d.Debug
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
 	data.Service = d.Service
@@ -299,6 +302,9 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
+	data.Debug.Profiling = d.Debug.Profiling
+	data.Debug.ForceGC = d.Debug.ForceGC
+
 	data.TLS.Enable = d.TLS.Enable
 	data.TLS.Address = d.TLS.Address
 	data.TLS.Auto = d.TLS.Auto
