@@ -189,6 +189,14 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		Autostart: true,
 	}
 
+	current, err := h.restream.GetProcess(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+	}
+
+	// Prefill the config with the current values
+	process.Unmarshal(current.Config)
+
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
