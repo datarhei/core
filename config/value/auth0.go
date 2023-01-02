@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -14,6 +15,28 @@ type Auth0Tenant struct {
 	Audience string   `json:"audience"`
 	ClientID string   `json:"clientid"`
 	Users    []string `json:"users"`
+}
+
+func (a *Auth0Tenant) String() string {
+	u := url.URL{
+		Scheme: "auth0",
+		Host:   a.Domain,
+	}
+
+	if len(a.ClientID) != 0 {
+		u.User = url.User(a.ClientID)
+	}
+
+	q := url.Values{}
+	q.Set("aud", a.Audience)
+
+	for _, user := range a.Users {
+		q.Add("user", user)
+	}
+
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }
 
 type TenantList struct {
@@ -32,18 +55,34 @@ func NewTenantList(p *[]Auth0Tenant, val []Auth0Tenant, separator string) *Tenan
 	return v
 }
 
+// Set allows to set a tenant list in two formats:
+// - a separator separated list of bas64 encoded Auth0Tenant JSON objects
+// - a separator separated list of Auth0Tenant in URL representation: auth0://[clientid]@[domain]?aud=[audience]&user=...&user=...
 func (s *TenantList) Set(val string) error {
 	list := []Auth0Tenant{}
 
 	for i, elm := range strings.Split(val, s.separator) {
-		data, err := base64.StdEncoding.DecodeString(elm)
-		if err != nil {
-			return fmt.Errorf("invalid base64 encoding of tenant %d: %w", i, err)
-		}
-
 		t := Auth0Tenant{}
-		if err := json.Unmarshal(data, &t); err != nil {
-			return fmt.Errorf("invalid JSON in tenant %d: %w", i, err)
+
+		if strings.HasPrefix(elm, "auth0://") {
+			data, err := url.Parse(elm)
+			if err != nil {
+				return fmt.Errorf("invalid url encoding of tenant %d: %w", i, err)
+			}
+
+			t.Domain = data.Host
+			t.ClientID = data.User.Username()
+			t.Audience = data.Query().Get("aud")
+			t.Users = data.Query()["user"]
+		} else {
+			data, err := base64.StdEncoding.DecodeString(elm)
+			if err != nil {
+				return fmt.Errorf("invalid base64 encoding of tenant %d: %w", i, err)
+			}
+
+			if err := json.Unmarshal(data, &t); err != nil {
+				return fmt.Errorf("invalid JSON in tenant %d: %w", i, err)
+			}
 		}
 
 		list = append(list, t)
@@ -62,10 +101,10 @@ func (s *TenantList) String() string {
 	list := []string{}
 
 	for _, t := range *s.p {
-		list = append(list, fmt.Sprintf("%s (%d users)", t.Domain, len(t.Users)))
+		list = append(list, t.String())
 	}
 
-	return strings.Join(list, ",")
+	return strings.Join(list, s.separator)
 }
 
 func (s *TenantList) Validate() error {
