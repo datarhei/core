@@ -15,7 +15,9 @@ import (
 func main() {
 	logger := log.New("Import").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithField("version", "v1")
 
-	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
+	configfile := cfgstore.Location(os.Getenv("CORE_CONFIGFILE"))
+
+	configstore, err := cfgstore.NewJSON(configfile, nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
 		os.Exit(1)
