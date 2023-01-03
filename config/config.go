@@ -141,6 +141,8 @@ func (d *Config) init() {
 	d.vars.Register(value.NewString(&d.Log.Level, "info"), "log.level", "CORE_LOG_LEVEL", nil, "Loglevel: silent, error, warn, info, debug", false, false)
 	d.vars.Register(value.NewStringList(&d.Log.Topics, []string{}, ","), "log.topics", "CORE_LOG_TOPICS", nil, "Show only selected log topics", false, false)
 	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
+	d.vars.Register(value.NewString(&d.Log.Target.Output, "stderr"), "log.target.output", "CORE_LOG_TARGET_OUTPUT", nil, "Where to write the logs to: stdout, stderr, file", false, false)
+	d.vars.Register(value.NewString(&d.Log.Target.Path, ""), "log.target.path", "CORE_LOG_TARGET_PATH", nil, "Path to log file if output is 'file'", false, false)
 
 	// DB
 	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config"), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)

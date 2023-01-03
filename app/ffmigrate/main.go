@@ -17,7 +17,12 @@ import (
 )
 
 func main() {
-	logger := log.New("Migration").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithFields(log.Fields{
+	logger := log.New("Migration").WithOutput(
+		log.NewLevelWriter(
+			log.NewConsoleWriter(os.Stderr, true),
+			log.Linfo,
+		),
+	).WithFields(log.Fields{
 		"from": "ffmpeg4",
 		"to":   "ffmpeg5",
 	})

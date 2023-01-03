@@ -22,7 +22,7 @@ func NewLog(buffer log.BufferWriter) *LogHandler {
 	}
 
 	if l.buffer == nil {
-		l.buffer = log.NewBufferWriter(log.Lsilent, 1)
+		l.buffer = log.NewBufferWriter(1)
 	}
 
 	return l

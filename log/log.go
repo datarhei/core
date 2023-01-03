@@ -14,28 +14,29 @@ import (
 type Level uint
 
 const (
-	Lsilent Level = 0
-	Lerror  Level = 1
-	Lwarn   Level = 2
-	Linfo   Level = 3
-	Ldebug  Level = 4
+	Lsilent Level = 0b0000
+	Lerror  Level = 0b0001
+	Lwarn   Level = 0b0010
+	Linfo   Level = 0b0100
+	Ldebug  Level = 0b1000
 )
 
 // String returns a string representing the log level.
 func (level Level) String() string {
-	names := []string{
-		"SILENT",
-		"ERROR",
-		"WARN",
-		"INFO",
-		"DEBUG",
-	}
-
-	if level > Ldebug {
+	switch level {
+	case Lsilent:
+		return "SILENT"
+	case Lerror:
+		return "ERROR"
+	case Lwarn:
+		return "WARN"
+	case Linfo:
+		return "INFO"
+	case Ldebug:
+		return "DEBUG"
+	default:
 		return `¯\_(ツ)_/¯`
 	}
-
-	return names[level]
 }
 
 func (level *Level) MarshalJSON() ([]byte, error) {
@@ -97,6 +98,9 @@ type Logger interface {
 	// Write implements the io.Writer interface such that it can be used in e.g. the
 	// the log/Logger facility. Messages will be printed with debug level.
 	Write(p []byte) (int, error)
+
+	// Close closes the underlying writer.
+	Close()
 }
 
 // logger is an implementation of the Logger interface.
@@ -182,6 +186,10 @@ func (l *logger) Error() Logger {
 
 func (l *logger) Write(p []byte) (int, error) {
 	return newEvent(l).Write(p)
+}
+
+func (l *logger) Close() {
+	l.output.Close()
 }
 
 type Event struct {
@@ -352,12 +360,6 @@ func (l *Event) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-type Eventx struct {
-	Time      time.Time   `json:"ts"`
-	Level     Level       `json:"level"`
-	Component string      `json:"component"`
-	Reference string      `json:"ref"`
-	Message   string      `json:"message"`
-	Caller    string      `json:"caller"`
-	Detail    interface{} `json:"detail"`
+func (l *Event) Close() {
+	l.logger.Close()
 }

@@ -22,6 +22,10 @@ type Data struct {
 		Level    string   `json:"level" enums:"debug,info,warn,error,silent" jsonschema:"enum=debug,enum=info,enum=warn,enum=error,enum=silent"`
 		Topics   []string `json:"topics"`
 		MaxLines int      `json:"max_lines"`
+		Target   struct {
+			Output string `json:"name"`
+			Path   string `json:"path"`
+		} `json:"target"` // discard, stderr, stdout, file:/path/to/file.log
 	} `json:"log"`
 	DB struct {
 		Dir string `json:"dir"`
@@ -182,7 +186,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Address = d.Address
 	data.CheckForUpdates = d.CheckForUpdates
 
-	data.Log = d.Log
 	data.DB = d.DB
 	data.Host = d.Host
 	data.API = d.API
@@ -194,8 +197,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
-
-	data.Log.Topics = copy.Slice(d.Log.Topics)
 
 	data.Host.Name = copy.Slice(d.Host.Name)
 
@@ -228,6 +229,12 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Memory = d.Storage.Memory
 
 	// Actual changes
+	data.Log.Level = d.Log.Level
+	data.Log.Topics = copy.Slice(d.Log.Topics)
+	data.Log.MaxLines = d.Log.MaxLines
+	data.Log.Target.Output = "stderr"
+	data.Log.Target.Path = ""
+
 	data.Debug.Profiling = d.Debug.Profiling
 	data.Debug.ForceGC = d.Debug.ForceGC
 	data.Debug.MemoryLimit = 0
@@ -263,7 +270,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Address = d.Address
 	data.CheckForUpdates = d.CheckForUpdates
 
-	data.Log = d.Log
 	data.DB = d.DB
 	data.Host = d.Host
 	data.API = d.API
@@ -275,8 +281,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
-
-	data.Log.Topics = copy.Slice(d.Log.Topics)
 
 	data.Host.Name = copy.Slice(d.Host.Name)
 
@@ -302,6 +306,10 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
+	data.Log.Level = d.Log.Level
+	data.Log.Topics = copy.Slice(d.Log.Topics)
+	data.Log.MaxLines = d.Log.MaxLines
+
 	data.Debug.Profiling = d.Debug.Profiling
 	data.Debug.ForceGC = d.Debug.ForceGC
 

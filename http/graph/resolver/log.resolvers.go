@@ -12,7 +12,7 @@ import (
 
 func (r *queryResolver) Log(ctx context.Context) ([]string, error) {
 	if r.LogBuffer == nil {
-		r.LogBuffer = log.NewBufferWriter(log.Lsilent, 1)
+		r.LogBuffer = log.NewBufferWriter(1)
 	}
 
 	events := r.LogBuffer.Events()

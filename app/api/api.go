@@ -10,6 +10,7 @@ import (
 	gonet "net"
 	gohttp "net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime/debug"
 	"sync"
@@ -147,7 +148,12 @@ func (a *api) Reload() error {
 		a.errorChan = make(chan error, 1)
 	}
 
-	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
+	logger := log.New("Core").WithOutput(
+		log.NewLevelWriter(
+			log.NewConsoleWriter(a.log.writer, true),
+			log.Lwarn,
+		),
+	)
 
 	store, err := configstore.NewJSON(a.config.path, func() {
 		a.errorChan <- ErrConfigReload
@@ -183,31 +189,54 @@ func (a *api) Reload() error {
 		break
 	}
 
-	buffer := log.NewBufferWriter(loglevel, cfg.Log.MaxLines)
+	buffer := log.NewBufferWriter(cfg.Log.MaxLines)
+	var writer log.Writer
 
-	logger = logger.WithOutput(log.NewLevelRewriter(
-		log.NewMultiWriter(
-			log.NewTopicWriter(
-				log.NewConsoleWriter(a.log.writer, loglevel, true),
-				cfg.Log.Topics,
-			),
-			buffer,
-		),
-		[]log.LevelRewriteRule{
-			// FFmpeg annoyance, move all warnings about unathorized access to memfs from ffmpeg to debug level
-			// ts=2022-04-28T07:24:27Z level=WARN component="HTTP" address=":8080" client="::1" latency_ms=0 method="PUT" path="/memfs/00a10a69-416a-4cd5-9d4f-6d88ed3dd7f5_0917.ts" proto="HTTP/1.1" size_bytes=65 status=401 status_text="Unauthorized" user_agent="Lavf/58.76.100"
-			{
-				Level:     log.Ldebug,
-				Component: "HTTP",
-				Match: map[string]string{
-					"client":      "^(::1|127.0.0.1)$",
-					"method":      "^(PUT|POST|DELETE)$",
-					"status_text": "^Unauthorized$",
-					"user_agent":  "^Lavf/",
+	if cfg.Log.Target.Output == "stdout" {
+		writer = log.NewConsoleWriter(
+			os.Stdout,
+			true,
+		)
+	} else if cfg.Log.Target.Output == "file" {
+		writer = log.NewFileWriter(
+			cfg.Log.Target.Path,
+			log.NewJSONFormatter(),
+		)
+	} else {
+		writer = log.NewConsoleWriter(
+			os.Stderr,
+			true,
+		)
+	}
+
+	logger = logger.WithOutput(
+		log.NewLevelWriter(
+			log.NewLevelRewriter(
+				log.NewMultiWriter(
+					log.NewTopicWriter(
+						writer,
+						cfg.Log.Topics,
+					),
+					buffer,
+				),
+				[]log.LevelRewriteRule{
+					// FFmpeg annoyance, move all warnings about unathorized access to memfs from ffmpeg to debug level
+					// ts=2022-04-28T07:24:27Z level=WARN component="HTTP" address=":8080" client="::1" latency_ms=0 method="PUT" path="/memfs/00a10a69-416a-4cd5-9d4f-6d88ed3dd7f5_0917.ts" proto="HTTP/1.1" size_bytes=65 status=401 status_text="Unauthorized" user_agent="Lavf/58.76.100"
+					{
+						Level:     log.Ldebug,
+						Component: "HTTP",
+						Match: map[string]string{
+							"client":      "^(::1|127.0.0.1)$",
+							"method":      "^(PUT|POST|DELETE)$",
+							"status_text": "^Unauthorized$",
+							"user_agent":  "^Lavf/",
+						},
+					},
 				},
-			},
-		},
-	))
+			),
+			loglevel,
+		),
+	)
 
 	logfields := log.Fields{
 		"application": app.Name,
@@ -1297,4 +1326,6 @@ func (a *api) Destroy() {
 		a.memfs.DeleteAll()
 		a.memfs = nil
 	}
+
+	a.log.logger.core.Close()
 }

@@ -13,7 +13,12 @@ import (
 )
 
 func main() {
-	logger := log.New("Import").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithField("version", "v1")
+	logger := log.New("Import").WithOutput(
+		log.NewLevelWriter(
+			log.NewConsoleWriter(os.Stderr, true),
+			log.Linfo,
+		),
+	).WithField("version", "v1")
 
 	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
 	if err != nil {

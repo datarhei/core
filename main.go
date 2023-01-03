@@ -12,7 +12,15 @@ import (
 )
 
 func main() {
-	logger := log.New("Core").WithOutput(log.NewConsoleWriter(os.Stderr, log.Lwarn, true))
+	logger := log.New("Core").WithOutput(
+		log.NewLevelWriter(
+			log.NewConsoleWriter(
+				os.Stderr,
+				true,
+			),
+			log.Lwarn,
+		),
+	)
 
 	configfile := findConfigfile()
 
@@ -53,6 +61,8 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
+
+	logger.Close()
 
 	// Stop the app
 	app.Destroy()

@@ -5,25 +5,25 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoglevelNames(t *testing.T) {
-	assert.Equal(t, "DEBUG", Ldebug.String())
-	assert.Equal(t, "ERROR", Lerror.String())
-	assert.Equal(t, "WARN", Lwarn.String())
-	assert.Equal(t, "INFO", Linfo.String())
-	assert.Equal(t, `SILENT`, Lsilent.String())
+	require.Equal(t, "DEBUG", Ldebug.String())
+	require.Equal(t, "ERROR", Lerror.String())
+	require.Equal(t, "WARN", Lwarn.String())
+	require.Equal(t, "INFO", Linfo.String())
+	require.Equal(t, `SILENT`, Lsilent.String())
 }
 
 func TestLogColorToNotTTY(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	w := NewConsoleWriter(writer, Linfo, true).(*syncWriter)
+	w := NewLevelWriter(NewConsoleWriter(writer, true), Linfo).(*levelWriter).writer.(*syncWriter)
 	formatter := w.writer.(*consoleWriter).formatter.(*consoleFormatter)
 
-	assert.NotEqual(t, true, formatter.color, "Color should not be used on a buffer logger")
+	require.NotEqual(t, true, formatter.color, "Color should not be used on a buffer logger")
 }
 
 func TestLogContext(t *testing.T) {
@@ -31,7 +31,7 @@ func TestLogContext(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("component").WithOutput(NewConsoleWriter(writer, Ldebug, false))
+	logger := New("component").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Ldebug))
 
 	logger.Debug().Log("debug")
 	logger.Info().Log("info")
@@ -53,19 +53,19 @@ func TestLogContext(t *testing.T) {
 	lenWithoutCtx := buffer.Len()
 	buffer.Reset()
 
-	assert.Greater(t, lenWithCtx, lenWithoutCtx, "Log line length without context is not shorter than with context")
+	require.Greater(t, lenWithCtx, lenWithoutCtx, "Log line length without context is not shorter than with context")
 }
 
 func TestLogClone(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Linfo, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Linfo))
 
 	logger.Info().Log("info")
 	writer.Flush()
 
-	assert.Contains(t, buffer.String(), `component="test"`)
+	require.Contains(t, buffer.String(), `component="test"`)
 
 	buffer.Reset()
 
@@ -74,33 +74,33 @@ func TestLogClone(t *testing.T) {
 	logger2.Info().Log("info")
 	writer.Flush()
 
-	assert.Contains(t, buffer.String(), `component="tset"`)
+	require.Contains(t, buffer.String(), `component="tset"`)
 }
 
 func TestLogSilent(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Lsilent, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Lsilent))
 
 	logger.Debug().Log("debug")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Info().Log("info")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Warn().Log("warn")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Error().Log("error")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 }
 
@@ -108,26 +108,26 @@ func TestLogDebug(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Ldebug, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Ldebug))
 
 	logger.Debug().Log("debug")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Info().Log("info")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Warn().Log("warn")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Error().Log("error")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 }
 
@@ -135,26 +135,26 @@ func TestLogInfo(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Linfo, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Linfo))
 
 	logger.Debug().Log("debug")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Info().Log("info")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Warn().Log("warn")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Error().Log("error")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 }
 
@@ -162,26 +162,26 @@ func TestLogWarn(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Lwarn, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Lwarn))
 
 	logger.Debug().Log("debug")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Info().Log("info")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Warn().Log("warn")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 
 	logger.Error().Log("error")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 }
 
@@ -189,25 +189,25 @@ func TestLogError(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := bufio.NewWriter(&buffer)
 
-	logger := New("test").WithOutput(NewConsoleWriter(writer, Lerror, false))
+	logger := New("test").WithOutput(NewLevelWriter(NewConsoleWriter(writer, false), Lerror))
 
 	logger.Debug().Log("debug")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Info().Log("info")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Warn().Log("warn")
 	writer.Flush()
-	assert.Equal(t, 0, buffer.Len(), "Buffer should be empty")
+	require.Equal(t, 0, buffer.Len(), "Buffer should be empty")
 	buffer.Reset()
 
 	logger.Error().Log("error")
 	writer.Flush()
-	assert.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
+	require.NotEqual(t, 0, buffer.Len(), "Buffer should not be empty")
 	buffer.Reset()
 }
