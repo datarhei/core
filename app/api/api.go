@@ -229,6 +229,8 @@ func (a *api) Reload() error {
 
 	logger.Info().WithFields(logfields).Log("")
 
+	logger.Info().WithField("path", a.config.path).Log("Read config file")
+
 	configlogger := logger.WithComponent("Config")
 	cfg.Messages(func(level string, v configvars.Variable, message string) {
 		configlogger = configlogger.WithFields(log.Fields{

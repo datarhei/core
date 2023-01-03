@@ -118,6 +118,10 @@ func (c *jsonStore) load(cfg *config.Config) error {
 		return err
 	}
 
+	if len(jsondata) == 0 {
+		return nil
+	}
+
 	data, err := migrate(jsondata)
 	if err != nil {
 		return err
