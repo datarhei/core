@@ -27,7 +27,9 @@ func main() {
 		"to":   "ffmpeg5",
 	})
 
-	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
+	configfile := cfgstore.Location(os.Getenv("CORE_CONFIGFILE"))
+
+	configstore, err := cfgstore.NewJSON(configfile, nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
 		os.Exit(1)
