@@ -70,6 +70,27 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 		return fmt.Errorf("the configuration contains errors: %v", messages)
 	}
 
+	var writer log.Writer
+
+	if cfg.Log.Target.Output == "stdout" {
+		writer = log.NewConsoleWriter(
+			os.Stdout,
+			true,
+		)
+	} else if cfg.Log.Target.Output == "file" {
+		writer = log.NewFileWriter(
+			cfg.Log.Target.Path,
+			log.NewJSONFormatter(),
+		)
+	} else {
+		writer = log.NewConsoleWriter(
+			os.Stderr,
+			true,
+		)
+	}
+
+	logger = logger.WithOutput(writer)
+
 	ff, err := ffmpeg.New(ffmpeg.Config{
 		Binary: cfg.FFmpeg.Binary,
 	})

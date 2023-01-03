@@ -38,8 +38,6 @@ func doImport(logger log.Logger, configstore cfgstore.Store) error {
 		logger = log.New("")
 	}
 
-	logger.Info().Log("Database import")
-
 	cfg := configstore.Get()
 
 	// Merging the persisted config with the environment variables
@@ -64,6 +62,27 @@ func doImport(logger log.Logger, configstore cfgstore.Store) error {
 
 		return fmt.Errorf("the configuration contains errors: %v", messages)
 	}
+
+	var writer log.Writer
+
+	if cfg.Log.Target.Output == "stdout" {
+		writer = log.NewConsoleWriter(
+			os.Stdout,
+			true,
+		)
+	} else if cfg.Log.Target.Output == "file" {
+		writer = log.NewFileWriter(
+			cfg.Log.Target.Path,
+			log.NewJSONFormatter(),
+		)
+	} else {
+		writer = log.NewConsoleWriter(
+			os.Stderr,
+			true,
+		)
+	}
+
+	logger = logger.WithOutput(writer)
 
 	logger.Info().Log("Checking for database ...")
 
