@@ -68,21 +68,6 @@ definitions:
     required:
     - command
     type: object
-  api.Config:
-    properties:
-      config:
-        $ref: '#/definitions/api.ConfigData'
-      created_at:
-        type: string
-      loaded_at:
-        type: string
-      overrides:
-        items:
-          type: string
-        type: array
-      updated_at:
-        type: string
-    type: object
   api.ConfigData:
     properties:
       address:
@@ -152,6 +137,8 @@ definitions:
       debug:
         properties:
           force_gc:
+            type: integer
+          memory_limit_mbytes:
             type: integer
           profiling:
             type: boolean
@@ -823,7 +810,8 @@ definitions:
       address:
         type: string
       avstream:
-        $ref: '#/definitions/api.AVstream'
+        allOf:
+        - $ref: '#/definitions/api.AVstream'
         description: avstream
       bitrate_kbit:
         description: kbit/s
@@ -1278,6 +1266,8 @@ definitions:
         properties:
           force_gc:
             type: integer
+          memory_limit_mbytes:
+            type: integer
           profiling:
             type: boolean
         type: object
@@ -1695,6 +1685,21 @@ definitions:
       uptime:
         type: integer
     type: object
+  github_com_datarhei_core_v16_http_api.Config:
+    properties:
+      config:
+        $ref: '#/definitions/api.ConfigData'
+      created_at:
+        type: string
+      loaded_at:
+        type: string
+      overrides:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
   value.Auth0Tenant:
     properties:
       audience:
@@ -1876,7 +1881,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.Config'
+            $ref: '#/definitions/github_com_datarhei_core_v16_http_api.Config'
       security:
       - ApiKeyAuth: []
       summary: Retrieve the currently active Restreamer configuration
