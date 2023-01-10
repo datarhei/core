@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
+	github.com/casbin/casbin/v2 v2.60.0
 	github.com/datarhei/gosrt v0.3.1
 	github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
 	github.com/go-playground/validator/v10 v10.11.1
@@ -31,6 +32,7 @@ require (
 )
 
 require (
+	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
