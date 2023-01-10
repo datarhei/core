@@ -1,0 +1,17 @@
+p, admin, igelcamp, api:/process/**, GET|POST|PUT|DELETE
+p, admin, igelcamp, processid:*, GET|POST|PUT|DELETE
+p, admin, igelcamp, rtmp:*, PUBLISH|PLAY
+p, admin, igelcamp, srt:*, PUBLISH|PLAY
+p, admin, igelcamp, fs:/igelcamp/**, GET|POST|PUT|DELETE
+p, admin, igelcamp, fs:/memfs/igelcamp/**, GET|POST|PUT|DELETE
+p, user, igelcamp, api:/process/**, GET
+p, user, igelcamp, processid:*, GET
+p, user, igelcamp, rtmp:*, PLAY
+p, user, igelcamp, srt:*, PLAY
+p, user, igelcamp, fs:/igelcamp/**, GET
+p, user, igelcamp, fs:/memfs/igelcamp/**, GET
+p, anonymous, $none, fs:/*, GET
+
+g, alice, admin, igelcamp
+g, alice, anonymous, $none
+g, bob, user, igelcamp
