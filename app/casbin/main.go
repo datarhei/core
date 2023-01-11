@@ -17,14 +17,15 @@ func main() {
 	var object string
 	var action string
 
-	flag.StringVar(&subject, "subject", "", "subject of this request")
+	flag.StringVar(&subject, "subject", "$anon", "subject of this request")
 	flag.StringVar(&domain, "domain", "$none", "domain of this request")
 	flag.StringVar(&object, "object", "", "object of this request")
 	flag.StringVar(&action, "action", "", "action of this request")
 
 	flag.Parse()
 
-	e, err := casbin.NewEnforcer("./model.conf", "./policy.csv")
+	policy := NewAdapter("./policy.json")
+	e, err := casbin.NewEnforcer("./model.conf", policy)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 		os.Exit(1)
@@ -32,6 +33,24 @@ func main() {
 
 	e.AddFunction("ResourceMatch", ResourceMatchFunc)
 	e.AddFunction("ActionMatch", ActionMatchFunc)
+
+	if err := addGroup(e, "foobar"); err != nil {
+		fmt.Printf("error: %s\n", err)
+		os.Exit(1)
+	}
+
+	if err := addGroupUser(e, "foobar", "franz", "admin"); err != nil {
+		fmt.Printf("error: %s\n", err)
+		os.Exit(1)
+	}
+
+	if err := addGroupUser(e, "foobar", "$anon", "anonymous"); err != nil {
+		fmt.Printf("error: %s\n", err)
+		os.Exit(1)
+	}
+
+	e.RemovePolicy("bob", "igelcamp", "processid:*", "COMMAND")
+	e.AddPolicy("bob", "igelcamp", "processid:bob-*", "COMMAND")
 
 	ok, err := e.Enforce(subject, domain, object, action)
 	if err != nil {
@@ -137,4 +156,37 @@ func getPrefix(s string) (string, string) {
 	}
 
 	return splits[0], splits[1]
+}
+
+func addGroup(e *casbin.Enforcer, name string) error {
+	rules := [][]string{}
+
+	rules = append(rules, []string{"role:admin", name, "api:/process/**", "GET|POST|PUT|DELETE"})
+	rules = append(rules, []string{"role:admin", name, "processid:*", "CONFIG|PROGRESS|REPORT|METADATA|COMMAND"})
+	rules = append(rules, []string{"role:admin", name, "rtmp:" + name + "/*", "PUBLISH|PLAY"})
+	rules = append(rules, []string{"role:admin", name, "srt:" + name + "/*", "PUBLISH|PLAY"})
+	rules = append(rules, []string{"role:admin", name, "fs:/" + name + "/**", "GET|POST|PUT|DELETE"})
+	rules = append(rules, []string{"role:admin", name, "fs:/memfs/" + name + "/**", "GET|POST|PUT|DELETE"})
+
+	rules = append(rules, []string{"role:user", name, "api:/process/**", "GET"})
+	rules = append(rules, []string{"role:user", name, "processid:*", "PROGRESS"})
+	rules = append(rules, []string{"role:user", name, "rtmp:" + name + "/*", "PLAY"})
+	rules = append(rules, []string{"role:user", name, "srt:" + name + "/*", "PLAY"})
+	rules = append(rules, []string{"role:user", name, "fs:/" + name + "/**", "GET"})
+	rules = append(rules, []string{"role:user", name, "fs:/memfs/" + name + "/**", "GET"})
+
+	rules = append(rules, []string{"role:anonymous", name, "rtmp:" + name + "/*", "PLAY"})
+	rules = append(rules, []string{"role:anonymous", name, "srt:" + name + "/*", "PLAY"})
+	rules = append(rules, []string{"role:anonymous", name, "fs:/" + name + "/**", "GET"})
+	rules = append(rules, []string{"role:anonymous", name, "fs:/memfs/" + name + "/**", "GET"})
+
+	_, err := e.AddPolicies(rules)
+
+	return err
+}
+
+func addGroupUser(e *casbin.Enforcer, group, username, role string) error {
+	_, err := e.AddGroupingPolicy(username, "role:"+role, group)
+
+	return err
 }
