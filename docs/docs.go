@@ -229,7 +229,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.Config"
+                            "$ref": "#/definitions/github_com_datarhei_core_v16_http_api.Config"
                         }
                     }
                 }
@@ -2470,29 +2470,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.Config": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "$ref": "#/definitions/api.ConfigData"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "loaded_at": {
-                    "type": "string"
-                },
-                "overrides": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "api.ConfigData": {
             "type": "object",
             "properties": {
@@ -2600,6 +2577,9 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "force_gc": {
+                            "type": "integer"
+                        },
+                        "memory_limit_mbytes": {
                             "type": "integer"
                         },
                         "profiling": {
@@ -3623,7 +3603,11 @@ const docTemplate = `{
                 },
                 "avstream": {
                     "description": "avstream",
-                    "$ref": "#/definitions/api.AVstream"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/api.AVstream"
+                        }
+                    ]
                 },
                 "bitrate_kbit": {
                     "description": "kbit/s",
@@ -4228,6 +4212,9 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "force_gc": {
+                            "type": "integer"
+                        },
+                        "memory_limit_mbytes": {
                             "type": "integer"
                         },
                         "profiling": {
@@ -4870,6 +4857,29 @@ const docTemplate = `{
                 },
                 "uptime": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_datarhei_core_v16_http_api.Config": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/api.ConfigData"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "loaded_at": {
+                    "type": "string"
+                },
+                "overrides": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
