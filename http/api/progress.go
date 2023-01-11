@@ -13,29 +13,29 @@ type ProgressIO struct {
 	Address string `json:"address" jsonschema:"minLength=1"`
 
 	// General
-	Index   uint64      `json:"index"`
-	Stream  uint64      `json:"stream"`
+	Index   uint64      `json:"index" format:"uint64"`
+	Stream  uint64      `json:"stream" format:"uint64"`
 	Format  string      `json:"format"`
 	Type    string      `json:"type"`
 	Codec   string      `json:"codec"`
 	Coder   string      `json:"coder"`
-	Frame   uint64      `json:"frame"`
+	Frame   uint64      `json:"frame" format:"uint64"`
 	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Packet  uint64      `json:"packet"`
+	Packet  uint64      `json:"packet" format:"uint64"`
 	PPS     json.Number `json:"pps" swaggertype:"number" jsonschema:"type=number"`
-	Size    uint64      `json:"size_kb"`                                                    // kbytes
+	Size    uint64      `json:"size_kb" format:"uint64"`                                    // kbytes
 	Bitrate json.Number `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 
 	// Video
 	Pixfmt    string      `json:"pix_fmt,omitempty"`
 	Quantizer json.Number `json:"q,omitempty" swaggertype:"number" jsonschema:"type=number"`
-	Width     uint64      `json:"width,omitempty"`
-	Height    uint64      `json:"height,omitempty"`
+	Width     uint64      `json:"width,omitempty" format:"uint64"`
+	Height    uint64      `json:"height,omitempty" format:"uint64"`
 
 	// Audio
-	Sampling uint64 `json:"sampling_hz,omitempty"`
+	Sampling uint64 `json:"sampling_hz,omitempty" format:"uint64"`
 	Layout   string `json:"layout,omitempty"`
-	Channels uint64 `json:"channels,omitempty"`
+	Channels uint64 `json:"channels,omitempty" format:"uint64"`
 
 	// avstream
 	AVstream *AVstream `json:"avstream"`
@@ -79,16 +79,16 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 type Progress struct {
 	Input     []ProgressIO `json:"inputs"`
 	Output    []ProgressIO `json:"outputs"`
-	Frame     uint64       `json:"frame"`
-	Packet    uint64       `json:"packet"`
+	Frame     uint64       `json:"frame" format:"uint64"`
+	Packet    uint64       `json:"packet" format:"uint64"`
 	FPS       json.Number  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 	Quantizer json.Number  `json:"q" swaggertype:"number" jsonschema:"type=number"`
-	Size      uint64       `json:"size_kb"` // kbytes
+	Size      uint64       `json:"size_kb" format:"uint64"` // kbytes
 	Time      json.Number  `json:"time" swaggertype:"number" jsonschema:"type=number"`
 	Bitrate   json.Number  `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 	Speed     json.Number  `json:"speed" swaggertype:"number" jsonschema:"type=number"`
-	Drop      uint64       `json:"drop"`
-	Dup       uint64       `json:"dup"`
+	Drop      uint64       `json:"drop" format:"uint64"`
+	Dup       uint64       `json:"dup" format:"uint64"`
 }
 
 // Unmarshal converts a restreamer Progress to a Progress in API representation

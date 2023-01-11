@@ -8,7 +8,7 @@ import (
 
 // Error represents an error response of the API
 type Error struct {
-	Code    int      `json:"code" jsonschema:"required"`
+	Code    int      `json:"code" jsonschema:"required" format:"int"`
 	Message string   `json:"message" jsonschema:""`
 	Details []string `json:"details" jsonschema:""`
 }
