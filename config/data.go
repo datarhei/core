@@ -67,12 +67,12 @@ type Data struct {
 	Storage struct {
 		Disk struct {
 			Dir   string `json:"dir"`
-			Size  int64  `json:"max_size_mbytes"`
+			Size  int64  `json:"max_size_mbytes" format:"int64"`
 			Cache struct {
 				Enable   bool   `json:"enable"`
-				Size     uint64 `json:"max_size_mbytes"`
+				Size     uint64 `json:"max_size_mbytes" format:"int64"`
 				TTL      int64  `json:"ttl_seconds"`
-				FileSize uint64 `json:"max_file_size_mbytes"`
+				FileSize uint64 `json:"max_file_size_mbytes" format:"int64"`
 				Types    struct {
 					Allow []string `json:"allow"`
 					Block []string `json:"block"`
@@ -85,7 +85,7 @@ type Data struct {
 				Username string `json:"username"`
 				Password string `json:"password"`
 			} `json:"auth"`
-			Size  int64 `json:"max_size_mbytes"`
+			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
 		CORS struct {
@@ -113,7 +113,7 @@ type Data struct {
 	} `json:"srt"`
 	FFmpeg struct {
 		Binary       string `json:"binary"`
-		MaxProcesses int64  `json:"max_processes"`
+		MaxProcesses int64  `json:"max_processes" format:"int64"`
 		Access       struct {
 			Input struct {
 				Allow []string `json:"allow"`
@@ -137,13 +137,13 @@ type Data struct {
 	Debug struct {
 		Profiling   bool  `json:"profiling"`
 		ForceGC     int   `json:"force_gc"`
-		MemoryLimit int64 `json:"memory_limit_mbytes"`
+		MemoryLimit int64 `json:"memory_limit_mbytes" format:"int64"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
 		EnablePrometheus bool  `json:"enable_prometheus"`
-		Range            int64 `json:"range_sec"`    // seconds
-		Interval         int64 `json:"interval_sec"` // seconds
+		Range            int64 `json:"range_sec" format:"int64"`    // seconds
+		Interval         int64 `json:"interval_sec" format:"int64"` // seconds
 	} `json:"metrics"`
 	Sessions struct {
 		Enable          bool     `json:"enable"`
@@ -151,8 +151,8 @@ type Data struct {
 		SessionTimeout  int      `json:"session_timeout_sec"`
 		Persist         bool     `json:"persist"`
 		PersistInterval int      `json:"persist_interval_sec"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit"`
-		MaxSessions     uint64   `json:"max_sessions"`
+		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"int64"`
+		MaxSessions     uint64   `json:"max_sessions" format:"int64"`
 	} `json:"sessions"`
 	Service struct {
 		Enable bool   `json:"enable"`

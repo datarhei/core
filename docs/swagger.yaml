@@ -139,6 +139,7 @@ definitions:
           force_gc:
             type: integer
           memory_limit_mbytes:
+            format: int64
             type: integer
           profiling:
             type: boolean
@@ -180,6 +181,7 @@ definitions:
                 type: integer
             type: object
           max_processes:
+            format: int64
             type: integer
         type: object
       host:
@@ -218,9 +220,11 @@ definitions:
             type: boolean
           interval_sec:
             description: seconds
+            format: int64
             type: integer
           range_sec:
             description: seconds
+            format: int64
             type: integer
         type: object
       name:
@@ -280,8 +284,10 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
+            format: int64
             type: integer
           max_sessions:
+            format: int64
             type: integer
           persist:
             type: boolean
@@ -326,8 +332,10 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
+                    format: int64
                     type: integer
                   max_size_mbytes:
+                    format: int64
                     type: integer
                   ttl_seconds:
                     type: integer
@@ -346,6 +354,7 @@ definitions:
               dir:
                 type: string
               max_size_mbytes:
+                format: int64
                 type: integer
             type: object
           memory:
@@ -360,6 +369,7 @@ definitions:
                     type: string
                 type: object
               max_size_mbytes:
+                format: int64
                 type: integer
               purge:
                 type: boolean
@@ -1267,6 +1277,7 @@ definitions:
           force_gc:
             type: integer
           memory_limit_mbytes:
+            format: int64
             type: integer
           profiling:
             type: boolean
@@ -1308,6 +1319,7 @@ definitions:
                 type: integer
             type: object
           max_processes:
+            format: int64
             type: integer
         type: object
       host:
@@ -1346,9 +1358,11 @@ definitions:
             type: boolean
           interval_sec:
             description: seconds
+            format: int64
             type: integer
           range_sec:
             description: seconds
+            format: int64
             type: integer
         type: object
       name:
@@ -1408,8 +1422,10 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
+            format: int64
             type: integer
           max_sessions:
+            format: int64
             type: integer
           persist:
             type: boolean
@@ -1454,8 +1470,10 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
+                    format: int64
                     type: integer
                   max_size_mbytes:
+                    format: int64
                     type: integer
                   ttl_seconds:
                     type: integer
@@ -1474,6 +1492,7 @@ definitions:
               dir:
                 type: string
               max_size_mbytes:
+                format: int64
                 type: integer
             type: object
           memory:
@@ -1488,6 +1507,7 @@ definitions:
                     type: string
                 type: object
               max_size_mbytes:
+                format: int64
                 type: integer
               purge:
                 type: boolean

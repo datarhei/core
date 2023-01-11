@@ -2580,7 +2580,8 @@ const docTemplate = `{
                             "type": "integer"
                         },
                         "memory_limit_mbytes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "profiling": {
                             "type": "boolean"
@@ -2644,7 +2645,8 @@ const docTemplate = `{
                             }
                         },
                         "max_processes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -2700,11 +2702,13 @@ const docTemplate = `{
                         },
                         "interval_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "range_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -2795,10 +2799,12 @@ const docTemplate = `{
                             }
                         },
                         "max_bitrate_mbit": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "max_sessions": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "persist": {
                             "type": "boolean"
@@ -2866,10 +2872,12 @@ const docTemplate = `{
                                             "type": "boolean"
                                         },
                                         "max_file_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "max_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "ttl_seconds": {
                                             "type": "integer"
@@ -2897,7 +2905,8 @@ const docTemplate = `{
                                     "type": "string"
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 }
                             }
                         },
@@ -2919,7 +2928,8 @@ const docTemplate = `{
                                     }
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 },
                                 "purge": {
                                     "type": "boolean"
@@ -4215,7 +4225,8 @@ const docTemplate = `{
                             "type": "integer"
                         },
                         "memory_limit_mbytes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "profiling": {
                             "type": "boolean"
@@ -4279,7 +4290,8 @@ const docTemplate = `{
                             }
                         },
                         "max_processes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -4335,11 +4347,13 @@ const docTemplate = `{
                         },
                         "interval_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "range_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -4430,10 +4444,12 @@ const docTemplate = `{
                             }
                         },
                         "max_bitrate_mbit": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "max_sessions": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "persist": {
                             "type": "boolean"
@@ -4501,10 +4517,12 @@ const docTemplate = `{
                                             "type": "boolean"
                                         },
                                         "max_file_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "max_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "ttl_seconds": {
                                             "type": "integer"
@@ -4532,7 +4550,8 @@ const docTemplate = `{
                                     "type": "string"
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 }
                             }
                         },
@@ -4554,7 +4573,8 @@ const docTemplate = `{
                                     }
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 },
                                 "purge": {
                                     "type": "boolean"
