@@ -8,9 +8,9 @@ import (
 
 // SessionStats are the accumulated numbers for the session summary
 type SessionStats struct {
-	TotalSessions uint64 `json:"sessions"`
-	TotalRxBytes  uint64 `json:"traffic_rx_mb"`
-	TotalTxBytes  uint64 `json:"traffic_tx_mb"`
+	TotalSessions uint64 `json:"sessions" format:"uint64"`
+	TotalRxBytes  uint64 `json:"traffic_rx_mb" format:"uint64"`
+	TotalTxBytes  uint64 `json:"traffic_tx_mb" format:"uint64"`
 }
 
 // SessionPeers is for the grouping by peers in the summary
@@ -24,12 +24,12 @@ type SessionPeers struct {
 type Session struct {
 	ID        string      `json:"id"`
 	Reference string      `json:"reference"`
-	CreatedAt int64       `json:"created_at"`
+	CreatedAt int64       `json:"created_at" format:"int64"`
 	Location  string      `json:"local"`
 	Peer      string      `json:"remote"`
 	Extra     string      `json:"extra"`
-	RxBytes   uint64      `json:"bytes_rx"`
-	TxBytes   uint64      `json:"bytes_tx"`
+	RxBytes   uint64      `json:"bytes_rx" format:"uint64"`
+	TxBytes   uint64      `json:"bytes_tx" format:"uint64"`
 	RxBitrate json.Number `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 	TxBitrate json.Number `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 }
@@ -50,10 +50,10 @@ func (s *Session) Unmarshal(sess session.Session) {
 // SessionSummaryActive represents the currently active sessions
 type SessionSummaryActive struct {
 	SessionList  []Session   `json:"list"`
-	Sessions     uint64      `json:"sessions"`
+	Sessions     uint64      `json:"sessions" format:"uint64"`
 	RxBitrate    json.Number `json:"bandwidth_rx_mbit" swaggertype:"number" jsonschema:"type=number"` // mbit/s
 	TxBitrate    json.Number `json:"bandwidth_tx_mbit" swaggertype:"number" jsonschema:"type=number"` // mbit/s
-	MaxSessions  uint64      `json:"max_sessions"`
+	MaxSessions  uint64      `json:"max_sessions" format:"uint64"`
 	MaxRxBitrate json.Number `json:"max_bandwidth_rx_mbit" swaggertype:"number" jsonschema:"type=number"` // mbit/s
 	MaxTxBitrate json.Number `json:"max_bandwidth_tx_mbit" swaggertype:"number" jsonschema:"type=number"` // mbit/s
 }

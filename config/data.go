@@ -13,7 +13,7 @@ type Data struct {
 	CreatedAt       time.Time `json:"created_at"`
 	LoadedAt        time.Time `json:"-"`
 	UpdatedAt       time.Time `json:"-"`
-	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3"`
+	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3" format:"int64"`
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	Address         string    `json:"address"`
@@ -21,7 +21,7 @@ type Data struct {
 	Log             struct {
 		Level    string   `json:"level" enums:"debug,info,warn,error,silent" jsonschema:"enum=debug,enum=info,enum=warn,enum=error,enum=silent"`
 		Topics   []string `json:"topics"`
-		MaxLines int      `json:"max_lines"`
+		MaxLines int      `json:"max_lines" format:"int"`
 	} `json:"log"`
 	DB struct {
 		Dir string `json:"dir"`
@@ -70,9 +70,9 @@ type Data struct {
 			Size  int64  `json:"max_size_mbytes" format:"int64"`
 			Cache struct {
 				Enable   bool   `json:"enable"`
-				Size     uint64 `json:"max_size_mbytes" format:"int64"`
-				TTL      int64  `json:"ttl_seconds"`
-				FileSize uint64 `json:"max_file_size_mbytes" format:"int64"`
+				Size     uint64 `json:"max_size_mbytes" format:"uint64"`
+				TTL      int64  `json:"ttl_seconds" format:"int64"`
+				FileSize uint64 `json:"max_file_size_mbytes" format:"uint64"`
 				Types    struct {
 					Allow []string `json:"allow"`
 					Block []string `json:"block"`
@@ -125,18 +125,18 @@ type Data struct {
 			} `json:"output"`
 		} `json:"access"`
 		Log struct {
-			MaxLines   int `json:"max_lines"`
-			MaxHistory int `json:"max_history"`
+			MaxLines   int `json:"max_lines" format:"int"`
+			MaxHistory int `json:"max_history" format:"int"`
 		} `json:"log"`
 	} `json:"ffmpeg"`
 	Playout struct {
 		Enable  bool `json:"enable"`
-		MinPort int  `json:"min_port"`
-		MaxPort int  `json:"max_port"`
+		MinPort int  `json:"min_port" format:"int"`
+		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
 		Profiling   bool  `json:"profiling"`
-		ForceGC     int   `json:"force_gc"`
+		ForceGC     int   `json:"force_gc" format:"int"`
 		MemoryLimit int64 `json:"memory_limit_mbytes" format:"int64"`
 	} `json:"debug"`
 	Metrics struct {
@@ -148,11 +148,11 @@ type Data struct {
 	Sessions struct {
 		Enable          bool     `json:"enable"`
 		IPIgnoreList    []string `json:"ip_ignorelist"`
-		SessionTimeout  int      `json:"session_timeout_sec"`
+		SessionTimeout  int      `json:"session_timeout_sec" format:"int"`
 		Persist         bool     `json:"persist"`
-		PersistInterval int      `json:"persist_interval_sec"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"int64"`
-		MaxSessions     uint64   `json:"max_sessions" format:"int64"`
+		PersistInterval int      `json:"persist_interval_sec" format:"int"`
+		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"uint64"`
+		MaxSessions     uint64   `json:"max_sessions" format:"uint64"`
 	} `json:"sessions"`
 	Service struct {
 		Enable bool   `json:"enable"`

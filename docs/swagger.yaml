@@ -3,14 +3,18 @@ definitions:
   api.AVstream:
     properties:
       aqueue:
+        format: uint64
         type: integer
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       duplicating:
         type: boolean
       enc:
+        format: uint64
         type: integer
       gop:
         type: string
@@ -21,11 +25,13 @@ definitions:
       output:
         $ref: '#/definitions/api.AVstreamIO'
       queue:
+        format: uint64
         type: integer
     type: object
   api.AVstreamIO:
     properties:
       packet:
+        format: uint64
         type: integer
       size_kb:
         type: integer
@@ -137,6 +143,7 @@ definitions:
       debug:
         properties:
           force_gc:
+            format: int
             type: integer
           memory_limit_mbytes:
             format: int64
@@ -176,8 +183,10 @@ definitions:
           log:
             properties:
               max_history:
+                format: int
                 type: integer
               max_lines:
+                format: int
                 type: integer
             type: object
           max_processes:
@@ -206,6 +215,7 @@ definitions:
             - silent
             type: string
           max_lines:
+            format: int
             type: integer
           topics:
             items:
@@ -234,8 +244,10 @@ definitions:
           enable:
             type: boolean
           max_port:
+            format: int
             type: integer
           min_port:
+            format: int
             type: integer
         type: object
       router:
@@ -284,16 +296,18 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
-            format: int64
+            format: uint64
             type: integer
           max_sessions:
-            format: int64
+            format: uint64
             type: integer
           persist:
             type: boolean
           persist_interval_sec:
+            format: int
             type: integer
           session_timeout_sec:
+            format: int
             type: integer
         type: object
       srt:
@@ -332,12 +346,13 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
-                    format: int64
+                    format: uint64
                     type: integer
                   max_size_mbytes:
-                    format: int64
+                    format: uint64
                     type: integer
                   ttl_seconds:
+                    format: int64
                     type: integer
                   types:
                     properties:
@@ -395,6 +410,7 @@ definitions:
       update_check:
         type: boolean
       version:
+        format: int64
         type: integer
     type: object
   api.ConfigError:
@@ -406,6 +422,7 @@ definitions:
   api.Error:
     properties:
       code:
+        format: int
         type: integer
       details:
         items:
@@ -417,10 +434,12 @@ definitions:
   api.FileInfo:
     properties:
       last_modified:
+        format: int64
         type: integer
       name:
         type: string
       size_bytes:
+        format: int64
         type: integer
     type: object
   api.GraphQuery:
@@ -475,12 +494,14 @@ definitions:
   api.MetricsQuery:
     properties:
       interval_sec:
+        format: int64
         type: integer
       metrics:
         items:
           $ref: '#/definitions/api.MetricsQueryMetric'
         type: array
       timerange_sec:
+        format: int64
         type: integer
     type: object
   api.MetricsQueryMetric:
@@ -495,12 +516,14 @@ definitions:
   api.MetricsResponse:
     properties:
       interval_sec:
+        format: int64
         type: integer
       metrics:
         items:
           $ref: '#/definitions/api.MetricsResponseMetric'
         type: array
       timerange_sec:
+        format: int64
         type: integer
     type: object
   api.MetricsResponseMetric:
@@ -526,15 +549,19 @@ definitions:
   api.PlayoutStatus:
     properties:
       aqueue:
+        format: uint64
         type: integer
       debug: {}
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       duplicating:
         type: boolean
       enc:
+        format: uint64
         type: integer
       gop:
         type: string
@@ -547,8 +574,10 @@ definitions:
       output:
         $ref: '#/definitions/api.PlayoutStatusIO'
       queue:
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       swap:
         $ref: '#/definitions/api.PlayoutStatusSwap'
@@ -558,8 +587,10 @@ definitions:
   api.PlayoutStatusIO:
     properties:
       packet:
+        format: uint64
         type: integer
       size_kb:
+        format: uint64
         type: integer
       state:
         enum:
@@ -567,6 +598,7 @@ definitions:
         - idle
         type: string
       time:
+        format: uint64
         type: integer
     type: object
   api.PlayoutStatusSwap:
@@ -596,6 +628,7 @@ definitions:
       bitrate_kbps:
         type: number
       channels:
+        format: uint64
         type: integer
       codec:
         type: string
@@ -609,8 +642,10 @@ definitions:
         description: video
         type: number
       height:
+        format: uint64
         type: integer
       index:
+        format: uint64
         type: integer
       language:
         type: string
@@ -620,8 +655,10 @@ definitions:
         type: string
       sampling_hz:
         description: audio
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       type:
         type: string
@@ -629,6 +666,7 @@ definitions:
         description: common
         type: string
       width:
+        format: uint64
         type: integer
     type: object
   api.Process:
@@ -636,6 +674,7 @@ definitions:
       config:
         $ref: '#/definitions/api.ProcessConfig'
       created_at:
+        format: int64
         type: integer
       id:
         type: string
@@ -672,10 +711,12 @@ definitions:
       reconnect:
         type: boolean
       reconnect_delay_seconds:
+        format: uint64
         type: integer
       reference:
         type: string
       stale_timeout_seconds:
+        format: uint64
         type: integer
       type:
         enum:
@@ -706,8 +747,10 @@ definitions:
   api.ProcessConfigIOCleanup:
     properties:
       max_file_age_seconds:
+        format: uint
         type: integer
       max_files:
+        format: uint
         type: integer
       pattern:
         type: string
@@ -721,13 +764,16 @@ definitions:
       cpu_usage:
         type: number
       memory_mbytes:
+        format: uint64
         type: integer
       waitfor_seconds:
+        format: uint64
         type: integer
     type: object
   api.ProcessReport:
     properties:
       created_at:
+        format: int64
         type: integer
       history:
         items:
@@ -747,6 +793,7 @@ definitions:
   api.ProcessReportHistoryEntry:
     properties:
       created_at:
+        format: int64
         type: integer
       log:
         items:
@@ -772,14 +819,17 @@ definitions:
       last_logline:
         type: string
       memory_bytes:
+        format: uint64
         type: integer
       order:
         type: string
       progress:
         $ref: '#/definitions/api.Progress'
       reconnect_seconds:
+        format: int64
         type: integer
       runtime_seconds:
+        format: int64
         type: integer
     type: object
   api.Progress:
@@ -788,12 +838,15 @@ definitions:
         description: kbit/s
         type: number
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       fps:
         type: number
       frame:
+        format: uint64
         type: integer
       inputs:
         items:
@@ -804,11 +857,13 @@ definitions:
           $ref: '#/definitions/api.ProgressIO'
         type: array
       packet:
+        format: uint64
         type: integer
       q:
         type: number
       size_kb:
         description: kbytes
+        format: uint64
         type: integer
       speed:
         type: number
@@ -827,6 +882,7 @@ definitions:
         description: kbit/s
         type: number
       channels:
+        format: uint64
         type: integer
       codec:
         type: string
@@ -837,17 +893,21 @@ definitions:
       fps:
         type: number
       frame:
+        format: uint64
         type: integer
       height:
+        format: uint64
         type: integer
       id:
         type: string
       index:
         description: General
+        format: uint64
         type: integer
       layout:
         type: string
       packet:
+        format: uint64
         type: integer
       pix_fmt:
         description: Video
@@ -858,15 +918,19 @@ definitions:
         type: number
       sampling_hz:
         description: Audio
+        format: uint64
         type: integer
       size_kb:
         description: kbytes
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       type:
         type: string
       width:
+        format: uint64
         type: integer
     type: object
   api.RTMPChannel:
@@ -915,34 +979,41 @@ definitions:
           type: string
         type: array
       ts:
+        format: int64
         type: integer
     type: object
   api.SRTStatistics:
     properties:
       avail_recv_buf_bytes:
         description: The available space in the receiver's buffer, in bytes
+        format: uint64
         type: integer
       avail_send_buf_bytes:
         description: The available space in the sender's buffer, in bytes
+        format: uint64
         type: integer
       bandwidth_mbit:
         description: Estimated bandwidth of the network link, in Mbps
         type: number
       flight_size_pkt:
         description: The number of packets in flight
+        format: uint64
         type: integer
       flow_window_pkt:
         description: The maximum number of packets that can be "in flight"
+        format: uint64
         type: integer
       max_bandwidth_mbit:
         description: Transmission bandwidth limit, in Mbps
         type: number
       mss_bytes:
         description: Maximum Segment Size (MSS), in bytes
+        format: uint64
         type: integer
       pkt_recv_avg_belated_time_ms:
         description: Accumulated difference between the current time and the time-to-play
           of a packet that is received late
+        format: uint64
         type: integer
       pkt_send_period_us:
         description: Current minimum time interval between which consecutive packets
@@ -950,79 +1021,98 @@ definitions:
         type: number
       recv_ack_pkt:
         description: The total number of received ACK (Acknowledgement) control packets
+        format: uint64
         type: integer
       recv_buf_bytes:
         description: Instantaneous (current) value of pktRcvBuf, expressed in bytes,
           including payload and all headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_buf_ms:
         description: The timespan (msec) of acknowledged packets in the receiver's
           buffer
+        format: uint64
         type: integer
       recv_buf_pkt:
         description: The number of acknowledged packets in receiver's buffer
+        format: uint64
         type: integer
       recv_bytes:
         description: Same as pktRecv, but expressed in bytes, including payload and
           all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_drop_bytes:
         description: Same as pktRcvDrop, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_drop_pkt:
         description: The total number of dropped by the SRT receiver and, as a result,
           not delivered to the upstream application DATA packets
+        format: uint64
         type: integer
       recv_km_pkt:
         description: The total number of received KM (Key Material) control packets
+        format: uint64
         type: integer
       recv_loss_bytes:
         description: Same as pktRcvLoss, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT), bytes for the presently missing (either
           reordered or lost) packets' payloads are estimated based on the average
           packet size
+        format: uint64
         type: integer
       recv_loss_pkt:
         description: The total number of SRT DATA packets detected as presently missing
           (either reordered or lost) at the receiver side
+        format: uint64
         type: integer
       recv_nak_pkt:
         description: The total number of received NAK (Negative Acknowledgement) control
           packets
+        format: uint64
         type: integer
       recv_pkt:
         description: The total number of received DATA packets, including retransmitted
           packets
+        format: uint64
         type: integer
       recv_retran_pkts:
         description: The total number of retransmitted packets registered at the receiver
           side
+        format: uint64
         type: integer
       recv_tsbpd_delay_ms:
         description: Timestamp-based Packet Delivery Delay value set on the socket
           via SRTO_RCVLATENCY or SRTO_LATENCY
+        format: uint64
         type: integer
       recv_undecrypt_bytes:
         description: Same as pktRcvUndecrypt, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_undecrypt_pkt:
         description: The total number of packets that failed to be decrypted at the
           receiver side
+        format: uint64
         type: integer
       recv_unique_bytes:
         description: Same as pktRecvUnique, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_unique_pkt:
         description: The total number of unique original, retransmitted or recovered
           by the packet filter DATA packets received in time, decrypted without errors
           and, as a result, scheduled for delivery to the upstream application by
           the SRT receiver.
+        format: uint64
         type: integer
       reorder_tolerance_pkt:
         description: Instant value of the packet reorder tolerance
+        format: uint64
         type: integer
       rtt_ms:
         description: Smoothed round-trip time (SRTT), an exponentially-weighted moving
@@ -1031,71 +1121,89 @@ definitions:
       send_buf_bytes:
         description: Instantaneous (current) value of pktSndBuf, but expressed in
           bytes, including payload and all headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       send_buf_ms:
         description: The timespan (msec) of packets in the sender's buffer (unacknowledged
           packets)
+        format: uint64
         type: integer
       send_buf_pkt:
         description: The number of packets in the sender's buffer that are already
           scheduled for sending or even possibly sent, but not yet acknowledged
+        format: uint64
         type: integer
       send_drop_bytes:
         description: Same as pktSndDrop, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       send_drop_pkt:
         description: The total number of dropped by the SRT sender DATA packets that
           have no chance to be delivered in time
+        format: uint64
         type: integer
       send_duration_us:
         description: The total accumulated time in microseconds, during which the
           SRT sender has some data to transmit, including packets that have been sent,
           but not yet acknowledged
+        format: uint64
         type: integer
       send_km_pkt:
         description: The total number of sent KM (Key Material) control packets
+        format: uint64
         type: integer
       send_loss_pkt:
         description: The total number of data packets considered or reported as lost
           at the sender side. Does not correspond to the packets detected as lost
           at the receiver side.
+        format: uint64
         type: integer
       send_tsbpd_delay_ms:
         description: Timestamp-based Packet Delivery Delay value of the peer
+        format: uint64
         type: integer
       sent_ack_pkt:
         description: The total number of sent ACK (Acknowledgement) control packets
+        format: uint64
         type: integer
       sent_bytes:
         description: Same as pktSent, but expressed in bytes, including payload and
           all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_nak_pkt:
         description: The total number of sent NAK (Negative Acknowledgement) control
           packets
+        format: uint64
         type: integer
       sent_pkt:
         description: The total number of sent DATA packets, including retransmitted
           packets
+        format: uint64
         type: integer
       sent_retrans_bytes:
         description: Same as pktRetrans, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_retrans_pkt:
         description: The total number of retransmitted packets sent by the SRT sender
+        format: uint64
         type: integer
       sent_unique_bytes:
         description: Same as pktSentUnique, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_unique_pkt:
         description: The total number of unique DATA packets sent by the SRT sender
+        format: uint64
         type: integer
       timestamp_ms:
         description: The time elapsed, in milliseconds, since the SRT socket has been
           created
+        format: uint64
         type: integer
     type: object
   api.Session:
@@ -1107,10 +1215,13 @@ definitions:
         description: kbit/s
         type: number
       bytes_rx:
+        format: uint64
         type: integer
       bytes_tx:
+        format: uint64
         type: integer
       created_at:
+        format: int64
         type: integer
       extra:
         type: string
@@ -1130,19 +1241,25 @@ definitions:
           $ref: '#/definitions/api.SessionStats'
         type: object
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionStats:
     properties:
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionSummary:
@@ -1171,8 +1288,10 @@ definitions:
         description: mbit/s
         type: number
       max_sessions:
+        format: uint64
         type: integer
       sessions:
+        format: uint64
         type: integer
     type: object
   api.SessionSummarySummary:
@@ -1190,10 +1309,13 @@ definitions:
           $ref: '#/definitions/api.SessionPeers'
         type: object
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionsActive:
@@ -1275,6 +1397,7 @@ definitions:
       debug:
         properties:
           force_gc:
+            format: int
             type: integer
           memory_limit_mbytes:
             format: int64
@@ -1314,8 +1437,10 @@ definitions:
           log:
             properties:
               max_history:
+                format: int
                 type: integer
               max_lines:
+                format: int
                 type: integer
             type: object
           max_processes:
@@ -1344,6 +1469,7 @@ definitions:
             - silent
             type: string
           max_lines:
+            format: int
             type: integer
           topics:
             items:
@@ -1372,8 +1498,10 @@ definitions:
           enable:
             type: boolean
           max_port:
+            format: int
             type: integer
           min_port:
+            format: int
             type: integer
         type: object
       router:
@@ -1422,16 +1550,18 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
-            format: int64
+            format: uint64
             type: integer
           max_sessions:
-            format: int64
+            format: uint64
             type: integer
           persist:
             type: boolean
           persist_interval_sec:
+            format: int
             type: integer
           session_timeout_sec:
+            format: int
             type: integer
         type: object
       srt:
@@ -1470,12 +1600,13 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
-                    format: int64
+                    format: uint64
                     type: integer
                   max_size_mbytes:
-                    format: int64
+                    format: uint64
                     type: integer
                   ttl_seconds:
+                    format: int64
                     type: integer
                   types:
                     properties:
@@ -1533,6 +1664,7 @@ definitions:
       update_check:
         type: boolean
       version:
+        format: int64
         type: integer
     type: object
   api.Skills:
@@ -1699,8 +1831,10 @@ definitions:
   api.WidgetProcess:
     properties:
       current_sessions:
+        format: uint64
         type: integer
       total_sessions:
+        format: uint64
         type: integer
       uptime:
         type: integer

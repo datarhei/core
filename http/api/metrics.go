@@ -19,8 +19,8 @@ type MetricsQueryMetric struct {
 }
 
 type MetricsQuery struct {
-	Timerange int64                `json:"timerange_sec"`
-	Interval  int64                `json:"interval_sec"`
+	Timerange int64                `json:"timerange_sec" format:"int64"`
+	Interval  int64                `json:"interval_sec" format:"int64"`
 	Metrics   []MetricsQueryMetric `json:"metrics"`
 }
 
@@ -51,8 +51,8 @@ func (v MetricsResponseValue) MarshalJSON() ([]byte, error) {
 }
 
 type MetricsResponse struct {
-	Timerange int64                   `json:"timerange_sec"`
-	Interval  int64                   `json:"interval_sec"`
+	Timerange int64                   `json:"timerange_sec" format:"int64"`
+	Interval  int64                   `json:"interval_sec" format:"int64"`
 	Metrics   []MetricsResponseMetric `json:"metrics"`
 }
 

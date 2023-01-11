@@ -4,9 +4,9 @@ import "github.com/datarhei/core/v16/playout"
 
 type PlayoutStatusIO struct {
 	State  string `json:"state" enums:"running,idle" jsonschema:"enum=running,enum=idle"`
-	Packet uint64 `json:"packet"`
-	Time   uint64 `json:"time"`
-	Size   uint64 `json:"size_kb"`
+	Packet uint64 `json:"packet" format:"uint64"`
+	Time   uint64 `json:"time" format:"uint64"`
+	Size   uint64 `json:"size_kb" format:"uint64"`
 }
 
 func (i *PlayoutStatusIO) Unmarshal(io playout.StatusIO) {
@@ -33,12 +33,12 @@ func (s *PlayoutStatusSwap) Unmarshal(swap playout.StatusSwap) {
 type PlayoutStatus struct {
 	ID          string            `json:"id"`
 	Address     string            `json:"url"`
-	Stream      uint64            `json:"stream"`
-	Queue       uint64            `json:"queue"`
-	AQueue      uint64            `json:"aqueue"`
-	Dup         uint64            `json:"dup"`
-	Drop        uint64            `json:"drop"`
-	Enc         uint64            `json:"enc"`
+	Stream      uint64            `json:"stream" format:"uint64"`
+	Queue       uint64            `json:"queue" format:"uint64"`
+	AQueue      uint64            `json:"aqueue" format:"uint64"`
+	Dup         uint64            `json:"dup" format:"uint64"`
+	Drop        uint64            `json:"drop" format:"uint64"`
+	Enc         uint64            `json:"enc" format:"uint64"`
 	Looping     bool              `json:"looping"`
 	Duplicating bool              `json:"duplicating"`
 	GOP         string            `json:"gop"`
