@@ -478,7 +478,7 @@ func (a *adapter) GetAllGroupNames() []string {
 type Group struct {
 	Name      string            `json:"name"`
 	Roles     map[string][]Role `json:"roles"`
-	UserRoles []MapUserRole     `json:"users"`
+	UserRoles []MapUserRole     `json:"userroles"`
 	Policies  []Policy          `json:"policies"`
 }
 
