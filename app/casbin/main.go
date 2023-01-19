@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/datarhei/core/v16/glob"
-
 	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v2/model"
+	"github.com/gobwas/glob"
 )
 
 func main() {
@@ -24,8 +24,16 @@ func main() {
 
 	flag.Parse()
 
-	policy := NewAdapter("./policy.json")
-	e, err := casbin.NewEnforcer("./model.conf", policy)
+	m := model.NewModel()
+	m.AddDef("r", "r", "sub, dom, obj, act")
+	m.AddDef("p", "p", "sub, dom, obj, act")
+	m.AddDef("g", "g", "_, _, _")
+	m.AddDef("e", "e", "some(where (p.eft == allow))")
+	m.AddDef("m", "m", `g(r.sub, p.sub, r.dom) && r.dom == p.dom && ResourceMatch(r.obj, r.dom, p.obj) && ActionMatch(r.act, p.act) || r.sub == "$superuser"`)
+
+	a := NewAdapter("./policy.json")
+
+	e, err := casbin.NewEnforcer(m, a)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 		os.Exit(1)
@@ -34,32 +42,33 @@ func main() {
 	e.AddFunction("ResourceMatch", ResourceMatchFunc)
 	e.AddFunction("ActionMatch", ActionMatchFunc)
 
-	if err := addGroup(e, "foobar"); err != nil {
-		fmt.Printf("error: %s\n", err)
-		os.Exit(1)
-	}
+	/*
+		if err := addGroup(e, "foobar"); err != nil {
+			fmt.Printf("error: %s\n", err)
+			os.Exit(1)
+		}
 
-	if err := addGroupUser(e, "foobar", "franz", "admin"); err != nil {
-		fmt.Printf("error: %s\n", err)
-		os.Exit(1)
-	}
+		if err := addGroupUser(e, "foobar", "franz", "admin"); err != nil {
+			fmt.Printf("error: %s\n", err)
+			os.Exit(1)
+		}
 
-	if err := addGroupUser(e, "foobar", "$anon", "anonymous"); err != nil {
-		fmt.Printf("error: %s\n", err)
-		os.Exit(1)
-	}
+		if err := addGroupUser(e, "foobar", "$anon", "anonymous"); err != nil {
+			fmt.Printf("error: %s\n", err)
+			os.Exit(1)
+		}
 
-	e.RemovePolicy("bob", "igelcamp", "processid:*", "COMMAND")
-	e.AddPolicy("bob", "igelcamp", "processid:bob-*", "COMMAND")
-
-	ok, err := e.Enforce(subject, domain, object, action)
+		e.RemovePolicy("bob", "igelcamp", "processid:*", "COMMAND")
+		e.AddPolicy("bob", "igelcamp", "processid:bob-*", "COMMAND")
+	*/
+	ok, reason, err := e.EnforceEx(subject, domain, object, action)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
 		os.Exit(1)
 	}
 
 	if ok {
-		fmt.Printf("OK\n")
+		fmt.Printf("OK: %v\n", reason)
 	} else {
 		fmt.Printf("not OK\n")
 	}
@@ -82,27 +91,32 @@ func ResourceMatch(request, domain, policy string) bool {
 	var err error
 
 	if reqPrefix == "processid" {
-		match, err = glob.Match(polResource, reqResource)
+		match, err = Match(polResource, reqResource)
 		if err != nil {
 			return false
 		}
 	} else if reqPrefix == "api" {
-		match, err = glob.Match(polResource, reqResource, rune('/'))
+		match, err = Match(polResource, reqResource, rune('/'))
 		if err != nil {
 			return false
 		}
 	} else if reqPrefix == "fs" {
-		match, err = glob.Match(polResource, reqResource, rune('/'))
+		match, err = Match(polResource, reqResource, rune('/'))
 		if err != nil {
 			return false
 		}
 	} else if reqPrefix == "rtmp" {
-		match, err = glob.Match(polResource, reqResource)
+		match, err = Match(polResource, reqResource)
 		if err != nil {
 			return false
 		}
 	} else if reqPrefix == "srt" {
-		match, err = glob.Match(polResource, reqResource)
+		match, err = Match(polResource, reqResource)
+		if err != nil {
+			return false
+		}
+	} else {
+		match, err = Match(polResource, reqResource)
 		if err != nil {
 			return false
 		}
@@ -156,6 +170,15 @@ func getPrefix(s string) (string, string) {
 	}
 
 	return splits[0], splits[1]
+}
+
+func Match(pattern, name string, separators ...rune) (bool, error) {
+	g, err := glob.Compile(pattern, separators...)
+	if err != nil {
+		return false, err
+	}
+
+	return g.Match(name), nil
 }
 
 func addGroup(e *casbin.Enforcer, name string) error {

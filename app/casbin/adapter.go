@@ -10,7 +10,6 @@ import (
 
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
-	"github.com/datarhei/core/v16/io/file"
 )
 
 // Adapter is the file adapter for Casbin.
@@ -45,6 +44,11 @@ func (a *adapter) LoadPolicy(model model.Model) error {
 }
 
 func (a *adapter) loadPolicyFile(model model.Model) error {
+	if _, err := os.Stat(a.filePath); os.IsNotExist(err) {
+		a.groups = []Group{}
+		return nil
+	}
+
 	data, err := os.ReadFile(a.filePath)
 	if err != nil {
 		return err
@@ -153,7 +157,7 @@ func (a *adapter) savePolicyFile() error {
 		return err
 	}
 
-	if err := file.Rename(tmpfile.Name(), a.filePath); err != nil {
+	if err := os.Rename(tmpfile.Name(), a.filePath); err != nil {
 		return err
 	}
 
@@ -496,47 +500,3 @@ type Policy struct {
 	Username string `json:"username"`
 	Role
 }
-
-/*
-group = {
-    name: "igelcamp",
-    roles: {
-        "admin": [
-            ["api:/process/**", "GET|POST|PUT|DELETE"],
-            ["processid:*", "CONFIG|PROGRESS|REPORT|METADATA|COMMAND"],
-            ["rtmp:igelcamp/*", "PUBLISH|PLAY"],
-            ["srt:igelcamp/*", "PUBLISH|PLAY"],
-            ["fs:/igelcamp/**", "GET|POST|PUT|DELETE"],
-            ["fs:/memfs/igelcamp/**", "GET|POST|PUT|DELETE"],
-        ],
-        "user": [
-            ["api:/process/**", "GET"],
-            ["processid:*", "PROGRESS"],
-            ["rtmp:igelcamp/*", "PLAY"],
-            ["srt:igelcamp/*", "PLAY"],
-            ["fs:/igelcamp/**", "GET"],
-            ["fs:/memfs/igelcamp/**", "GET"],
-        ],
-    },
-    users: [
-        {"username": "alice", "role": "admin"],
-        ["bob", "user"],
-    ],
-    policies: [
-        ["bob", "processid:*", "COMMAND"]
-    ],
-}
-
-group = {
-    name: "$none",
-    roles: {
-        "anonymous": [
-            {"fs:/*", "GET"}
-        ]
-    },
-    users: [
-        {"alice", "anonymous"},
-        {"bob", "anonymous"},
-    ]
-}
-*/
