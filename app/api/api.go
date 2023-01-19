@@ -257,6 +257,8 @@ func (a *api) Reload() error {
 		return fmt.Errorf("not all variables are set or valid")
 	}
 
+	cfg.LoadedAt = time.Now()
+
 	store.SetActive(cfg)
 
 	a.config.store = store

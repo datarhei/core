@@ -3,6 +3,7 @@ package api
 import (
 	"io"
 	"net/http"
+	"time"
 
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	cfgvars "github.com/datarhei/core/v16/config/vars"
@@ -71,6 +72,10 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 	}
 
 	cfg := p.store.Get()
+	cfgActive := p.store.GetActive()
+
+	// Copy the timestamp of when this config has been used
+	cfg.LoadedAt = cfgActive.LoadedAt
 
 	// For each version, set the current config as default config value. This will
 	// allow to set a partial config without destroying the other values.
@@ -118,6 +123,9 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 	} else {
 		return api.Err(http.StatusBadRequest, "Invalid config version", "version %d", version.Version)
 	}
+
+	cfg.CreatedAt = time.Now()
+	cfg.UpdatedAt = cfg.CreatedAt
 
 	// Now we make a copy from the config and merge it with the environment
 	// variables. If this configuration is valid, we will store the un-merged

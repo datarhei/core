@@ -10,9 +10,9 @@ import (
 
 // Data is the actual configuration data for the app
 type Data struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LoadedAt        time.Time `json:"-"`
-	UpdatedAt       time.Time `json:"-"`
+	CreatedAt       time.Time `json:"created_at"` // When this config has been persisted
+	LoadedAt        time.Time `json:"-"`          // When this config has been actually used
+	UpdatedAt       time.Time `json:"-"`          // Irrelevant
 	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3" format:"int64"`
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`

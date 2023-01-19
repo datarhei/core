@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/datarhei/core/v16/config"
 	v1 "github.com/datarhei/core/v16/config/v1"
@@ -57,13 +56,9 @@ func (c *jsonStore) Set(d *config.Config) error {
 
 	data := d.Clone()
 
-	data.CreatedAt = time.Now()
-
 	if err := c.store(data); err != nil {
 		return fmt.Errorf("failed to write JSON to '%s': %w", c.path, err)
 	}
-
-	data.UpdatedAt = time.Now()
 
 	c.data["base"] = data
 
@@ -89,7 +84,9 @@ func (c *jsonStore) SetActive(d *config.Config) error {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	c.data["merged"] = d.Clone()
+	data := d.Clone()
+
+	c.data["merged"] = data
 
 	return nil
 }
@@ -129,15 +126,12 @@ func (c *jsonStore) load(cfg *config.Config) error {
 
 	cfg.Data = *data
 
-	cfg.LoadedAt = time.Now()
-	cfg.UpdatedAt = cfg.LoadedAt
+	cfg.UpdatedAt = cfg.CreatedAt
 
 	return nil
 }
 
 func (c *jsonStore) store(data *config.Config) error {
-	data.CreatedAt = time.Now()
-
 	if len(c.path) == 0 {
 		return nil
 	}
