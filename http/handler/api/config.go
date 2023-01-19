@@ -157,15 +157,15 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 
 // Reload will reload the currently active configuration
 // @Summary Reload the currently active configuration
-// @Description Reload the currently active configuration. This will trigger a restart of the Restreamer.
+// @Description Reload the currently active configuration. This will trigger a restart of the Core.
 // @Tags v16.7.2
 // @ID config-3-reload
-// @Produce plain
-// @Success 200 {string} string "OK"
+// @Produce json
+// @Success 200 {string} string
 // @Security ApiKeyAuth
 // @Router /api/v3/config/reload [get]
 func (p *ConfigHandler) Reload(c echo.Context) error {
 	p.store.Reload()
 
-	return c.String(http.StatusOK, "OK")
+	return c.JSON(http.StatusOK, "OK")
 }

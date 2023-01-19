@@ -292,9 +292,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Reload the currently active configuration. This will trigger a restart of the Restreamer.",
+                "description": "Reload the currently active configuration. This will trigger a restart of the Core.",
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "v16.7.2"

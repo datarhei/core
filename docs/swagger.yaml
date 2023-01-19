@@ -2077,10 +2077,10 @@ paths:
   /api/v3/config/reload:
     get:
       description: Reload the currently active configuration. This will trigger a
-        restart of the Restreamer.
+        restart of the Core.
       operationId: config-3-reload
       produces:
-      - text/plain
+      - application/json
       responses:
         "200":
           description: OK
