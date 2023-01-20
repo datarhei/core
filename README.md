@@ -1,6 +1,6 @@
 # Core
 
-The cloud-native audio/video processing API.
+![dsdsds](https://github.com/datarhei/misc/blob/main/img/media-core.png?raw=true)
 
 [![License: Apache2](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)](<[https://opensource.org/licenses/MI](https://www.apache.org/licenses/LICENSE-2.0)>)
 [![CodeQL](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/datarhei/core/actions/workflows/codeql-analysis.yml)
@@ -50,6 +50,13 @@ The objectives of development are:
 * Swagger documentation
 * Metrics incl. Prometheus support (also detects POSIX and cgroups resources)
 * Docker images for fast setup of development environments up to the integration of cloud resources
+
+## Docker images
+
+- datarhei/core:latest (AMD64, ARM64, ARMv7)
+- datarhei/core:cuda-latest (Nvidia CUDA 11.7.1, AMD64)
+- datarhei/core:rpi-latest (Raspberry Pi / OMX/V4L2-M2M, AMD64/ARMv7)
+- datarhei/core:vaapi-latest (Intel VAAPI, AMD64)
 
 ## Quick start
 
