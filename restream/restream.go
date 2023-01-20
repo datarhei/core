@@ -290,7 +290,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		t.config.ResolvePlaceholders(r.replace)
+		resolvePlaceholders(t.config, r.replace)
 
 		tasks[id] = t
 	}
@@ -463,7 +463,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	t.config.ResolvePlaceholders(r.replace)
+	resolvePlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -1089,7 +1089,7 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.config = t.process.Config.Clone()
 
-	t.config.ResolvePlaceholders(r.replace)
+	resolvePlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -1436,4 +1436,95 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	}
 
 	return data, nil
+}
+
+// resolvePlaceholders replaces all placeholders in the config. The config
+// will be modified in place.
+func resolvePlaceholders(config *app.Config, r replace.Replacer) {
+	vars := map[string]string{
+		"processid": config.ID,
+		"reference": config.Reference,
+	}
+
+	for i, option := range config.Options {
+		// Replace any known placeholders
+		option = r.Replace(option, "diskfs", "", vars, config, "global")
+		option = r.Replace(option, "fs:*", "", vars, config, "global")
+
+		config.Options[i] = option
+	}
+
+	// Resolving the given inputs
+	for i, input := range config.Input {
+		vars["inputid"] = input.ID
+
+		// Replace any known placeholders
+		input.ID = r.Replace(input.ID, "processid", config.ID, nil, nil, "input")
+		input.ID = r.Replace(input.ID, "reference", config.Reference, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "inputid", input.ID, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "processid", config.ID, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "reference", config.Reference, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "diskfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "memfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "fs:*", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "rtmp", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "srt", "", vars, config, "input")
+
+		for j, option := range input.Options {
+			// Replace any known placeholders
+			option = r.Replace(option, "inputid", input.ID, nil, nil, "input")
+			option = r.Replace(option, "processid", config.ID, nil, nil, "input")
+			option = r.Replace(option, "reference", config.Reference, nil, nil, "input")
+			option = r.Replace(option, "diskfs", "", vars, config, "input")
+			option = r.Replace(option, "memfs", "", vars, config, "input")
+			option = r.Replace(option, "fs:*", "", vars, config, "input")
+
+			input.Options[j] = option
+		}
+
+		delete(vars, "inputid")
+
+		config.Input[i] = input
+	}
+
+	// Resolving the given outputs
+	for i, output := range config.Output {
+		vars["outputid"] = output.ID
+
+		// Replace any known placeholders
+		output.ID = r.Replace(output.ID, "processid", config.ID, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "outputid", output.ID, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "processid", config.ID, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "reference", config.Reference, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "diskfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "memfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "fs:*", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "rtmp", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "srt", "", vars, config, "output")
+
+		for j, option := range output.Options {
+			// Replace any known placeholders
+			option = r.Replace(option, "outputid", output.ID, nil, nil, "output")
+			option = r.Replace(option, "processid", config.ID, nil, nil, "output")
+			option = r.Replace(option, "reference", config.Reference, nil, nil, "output")
+			option = r.Replace(option, "diskfs", "", vars, config, "output")
+			option = r.Replace(option, "memfs", "", vars, config, "output")
+			option = r.Replace(option, "fs:*", "", vars, config, "output")
+
+			output.Options[j] = option
+		}
+
+		for j, cleanup := range output.Cleanup {
+			// Replace any known placeholders
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID, nil, nil, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID, nil, nil, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference, nil, nil, "output")
+
+			output.Cleanup[j] = cleanup
+		}
+
+		delete(vars, "outputid")
+
+		config.Output[i] = output
+	}
 }

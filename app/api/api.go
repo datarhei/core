@@ -31,6 +31,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
 	"github.com/datarhei/core/v16/restream"
+	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/store"
 	"github.com/datarhei/core/v16/rtmp"
@@ -449,39 +450,62 @@ func (a *api) start() error {
 	a.replacer = replace.New()
 
 	{
-		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base(), nil)
-		a.replacer.RegisterTemplate("memfs", a.memfs.Base(), nil)
+		a.replacer.RegisterTemplateFunc("diskfs", func(config *restreamapp.Config, section string) string {
+			return a.diskfs.Base()
+		}, nil)
 
-		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
-		if len(host) == 0 {
-			host = "localhost"
-		}
+		a.replacer.RegisterTemplateFunc("fs:disk", func(config *restreamapp.Config, section string) string {
+			return a.diskfs.Base()
+		}, nil)
 
-		template := "rtmp://" + host + ":" + port
-		if cfg.RTMP.App != "/" {
-			template += cfg.RTMP.App
-		}
-		template += "/{name}"
+		a.replacer.RegisterTemplateFunc("memfs", func(config *restreamapp.Config, section string) string {
+			return a.memfs.Base()
+		}, nil)
 
-		if len(cfg.RTMP.Token) != 0 {
-			template += "?token=" + cfg.RTMP.Token
-		}
+		a.replacer.RegisterTemplateFunc("fs:mem", func(config *restreamapp.Config, section string) string {
+			return a.memfs.Base()
+		}, nil)
 
-		a.replacer.RegisterTemplate("rtmp", template, nil)
+		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {
+			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
 
-		host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
-		if len(host) == 0 {
-			host = "localhost"
-		}
+			template := "rtmp://" + host + ":" + port
+			if cfg.RTMP.App != "/" {
+				template += cfg.RTMP.App
+			}
+			template += "/{name}"
 
-		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name},mode:{mode}"
-		if len(cfg.SRT.Token) != 0 {
-			template += ",token:" + cfg.SRT.Token
-		}
-		if len(cfg.SRT.Passphrase) != 0 {
-			template += "&passphrase=" + cfg.SRT.Passphrase
-		}
-		a.replacer.RegisterTemplate("srt", template, map[string]string{
+			if len(cfg.RTMP.Token) != 0 {
+				template += "?token=" + cfg.RTMP.Token
+			}
+
+			return template
+		}, nil)
+
+		a.replacer.RegisterTemplateFunc("srt", func(config *restreamapp.Config, section string) string {
+			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
+
+			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name}"
+			if section == "output" {
+				template += ",mode:publish"
+			} else {
+				template += ",mode:request"
+			}
+			if len(cfg.SRT.Token) != 0 {
+				template += ",token:" + cfg.SRT.Token
+			}
+			if len(cfg.SRT.Passphrase) != 0 {
+				template += "&passphrase=" + cfg.SRT.Passphrase
+			}
+
+			return template
+		}, map[string]string{
 			"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
 		})
 	}
