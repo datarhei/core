@@ -1456,11 +1456,12 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 
 	// Resolving the given inputs
 	for i, input := range config.Input {
-		vars["inputid"] = input.ID
-
 		// Replace any known placeholders
 		input.ID = r.Replace(input.ID, "processid", config.ID, nil, nil, "input")
 		input.ID = r.Replace(input.ID, "reference", config.Reference, nil, nil, "input")
+
+		vars["inputid"] = input.ID
+
 		input.Address = r.Replace(input.Address, "inputid", input.ID, nil, nil, "input")
 		input.Address = r.Replace(input.Address, "processid", config.ID, nil, nil, "input")
 		input.Address = r.Replace(input.Address, "reference", config.Reference, nil, nil, "input")
@@ -1489,10 +1490,12 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 
 	// Resolving the given outputs
 	for i, output := range config.Output {
-		vars["outputid"] = output.ID
-
 		// Replace any known placeholders
 		output.ID = r.Replace(output.ID, "processid", config.ID, nil, nil, "output")
+		output.ID = r.Replace(output.ID, "reference", config.Reference, nil, nil, "output")
+
+		vars["outputid"] = output.ID
+
 		output.Address = r.Replace(output.Address, "outputid", output.ID, nil, nil, "output")
 		output.Address = r.Replace(output.Address, "processid", config.ID, nil, nil, "output")
 		output.Address = r.Replace(output.Address, "reference", config.Reference, nil, nil, "output")

@@ -69,7 +69,7 @@ func (r *replacer) RegisterTemplateFunc(placeholder string, templateFn TemplateF
 	}
 }
 
-func (r *replacer) Replace(str, placeholder, value string, vars map[string]string, config *app.Config, kind string) string {
+func (r *replacer) Replace(str, placeholder, value string, vars map[string]string, config *app.Config, section string) string {
 	str = r.re.ReplaceAllStringFunc(str, func(match string) string {
 		matches := r.re.FindStringSubmatch(match)
 
@@ -93,7 +93,7 @@ func (r *replacer) Replace(str, placeholder, value string, vars map[string]strin
 			}
 		}
 
-		v = tmpl.fn(config, kind)
+		v = tmpl.fn(config, section)
 		v = r.compileTemplate(v, matches[3], vars, tmpl.defaults)
 
 		if len(matches[2]) != 0 {
