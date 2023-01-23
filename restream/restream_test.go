@@ -394,6 +394,19 @@ func TestReloadProcess(t *testing.T) {
 	rs.StopProcess(process.ID)
 }
 
+func TestProbeProcess(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+
+	rs.AddProcess(process)
+
+	probe := rs.ProbeWithTimeout(process.ID, 5*time.Second)
+
+	require.Equal(t, 3, len(probe.Streams))
+}
+
 func TestProcessMetadata(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)
