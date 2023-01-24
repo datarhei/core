@@ -12,7 +12,7 @@ type Pattern interface {
 	Name() string
 
 	// Match returns whether a map of labels with its label values
-	// match this pattern.
+	// match this pattern. All labels have to be present and need to match.
 	Match(labels map[string]string) bool
 
 	// IsValid returns whether the pattern is valid.
@@ -26,7 +26,7 @@ type pattern struct {
 }
 
 // NewPattern creates a new pattern with the given prefix and group name. There
-// has to be an even number of parameter, which is ("label", "labelvalue", "label",
+// has to be an even number of labels, which is ("label", "labelvalue", "label",
 // "labelvalue" ...). The label value will be interpreted as regular expression.
 func NewPattern(name string, labels ...string) Pattern {
 	p := &pattern{
@@ -38,7 +38,6 @@ func NewPattern(name string, labels ...string) Pattern {
 		for i := 0; i < len(labels); i += 2 {
 			exp, err := regexp.Compile(labels[i+1])
 			if err != nil {
-				fmt.Printf("error: %s\n", err)
 				continue
 			}
 
@@ -84,19 +83,35 @@ func (p *pattern) IsValid() bool {
 	return p.valid
 }
 
+// Metrics is a collection of values
 type Metrics interface {
+	// Value returns the first value that matches the name and the labels. The labels
+	// are used to create a pattern and therefore must obey to the rules of NewPattern.
 	Value(name string, labels ...string) Value
+
+	// Values returns all values that matches the name and the labels. The labels
+	// are used to create a pattern and therefore must obey to the rules of NewPattern.
 	Values(name string, labels ...string) []Value
+
+	// Labels return a list of all values for a label.
 	Labels(name string, label string) []string
+
+	// All returns all values currently stored in the collection.
 	All() []Value
+
+	// Add adds a value to the collection.
 	Add(v Value)
+
+	// String return a string representation of all collected values.
 	String() string
 }
 
+// metrics is an implementation of the Metrics interface.
 type metrics struct {
 	values []Value
 }
 
+// NewMetrics returns a new metrics instance.
 func NewMetrics() *metrics {
 	return &metrics{}
 }
@@ -231,8 +246,15 @@ func (v *value) Hash() string {
 func (v *value) String() string {
 	s := fmt.Sprintf("%s: %f {", v.name, v.value)
 
-	for k, v := range v.labels {
-		s += k + "=" + v + " "
+	keys := []string{}
+	for k := range v.labels {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		s += k + "=" + v.labels[k] + " "
 	}
 
 	s += "}"
