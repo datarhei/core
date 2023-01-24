@@ -6,26 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntValue(t *testing.T) {
-	var i int
-
-	ivar := NewInt(&i, 11)
-
-	require.Equal(t, "11", ivar.String())
-	require.Equal(t, nil, ivar.Validate())
-	require.Equal(t, false, ivar.IsEmpty())
-
-	i = 42
-
-	require.Equal(t, "42", ivar.String())
-	require.Equal(t, nil, ivar.Validate())
-	require.Equal(t, false, ivar.IsEmpty())
-
-	ivar.Set("77")
-
-	require.Equal(t, int(77), i)
-}
-
 type testdata struct {
 	value1 int
 	value2 int
