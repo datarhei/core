@@ -15,6 +15,9 @@ import (
 // DiskConfig is the config required to create a new disk
 // filesystem.
 type DiskConfig struct {
+	// Namee is the name of the filesystem
+	Name string
+
 	// Dir is the path to the directory to observe
 	Dir string
 
@@ -109,7 +112,8 @@ func (f *diskFile) Read(p []byte) (int, error) {
 
 // diskFilesystem implements the Filesystem interface
 type diskFilesystem struct {
-	dir string
+	name string
+	dir  string
 
 	// Max. size of the filesystem in bytes as
 	// given by the config
@@ -127,19 +131,29 @@ type diskFilesystem struct {
 // that implements the Filesystem interface
 func NewDiskFilesystem(config DiskConfig) (Filesystem, error) {
 	fs := &diskFilesystem{
+		name:    config.Name,
 		maxSize: config.Size,
 		logger:  config.Logger,
 	}
 
 	if fs.logger == nil {
-		fs.logger = log.New("DiskFS")
+		fs.logger = log.New("")
 	}
+
+	fs.logger = fs.logger.WithFields(log.Fields{
+		"name": fs.name,
+		"type": "disk",
+	})
 
 	if err := fs.Rebase(config.Dir); err != nil {
 		return nil, err
 	}
 
 	return fs, nil
+}
+
+func (fs *diskFilesystem) Name() string {
+	return fs.name
 }
 
 func (fs *diskFilesystem) Base() string {
@@ -170,6 +184,10 @@ func (fs *diskFilesystem) Rebase(base string) error {
 	fs.dir = base
 
 	return nil
+}
+
+func (fs *diskFilesystem) Type() string {
+	return "diskfs"
 }
 
 func (fs *diskFilesystem) Size() (int64, int64) {

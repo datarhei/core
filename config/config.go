@@ -6,11 +6,12 @@ import (
 	"net"
 	"time"
 
-	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
 	"github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/math/rand"
+
+	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
 )
 
@@ -111,6 +112,7 @@ func (d *Config) Clone() *Config {
 	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
 	data.Storage.Disk.Cache.Types.Block = copy.Slice(d.Storage.Disk.Cache.Types.Block)
+	data.Storage.S3 = copy.Slice(d.Storage.S3)
 
 	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
@@ -194,6 +196,9 @@ func (d *Config) init() {
 	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
 	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAXSIZEMBYTES", nil, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
+
+	// Storage (S3)
+	d.vars.Register(value.NewS3StorageListValue(&d.Storage.S3, []value.S3Storage{}, "|"), "storage.s3", "CORE_STORAGE_S3", nil, "List of S3 storage URLS", false, false)
 
 	// Storage (CORS)
 	d.vars.Register(value.NewCORSOrigins(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)

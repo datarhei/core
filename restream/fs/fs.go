@@ -62,6 +62,11 @@ func New(config Config) Filesystem {
 		rfs.logger = log.New("")
 	}
 
+	rfs.logger = rfs.logger.WithFields(log.Fields{
+		"name": config.FS.Name(),
+		"type": config.FS.Type(),
+	})
+
 	rfs.cleanupPatterns = make(map[string][]Pattern)
 
 	// already drain the stop

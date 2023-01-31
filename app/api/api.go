@@ -22,6 +22,7 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
+	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/io/fs"
@@ -69,6 +70,7 @@ type api struct {
 	ffmpeg        ffmpeg.FFmpeg
 	diskfs        fs.Filesystem
 	memfs         fs.Filesystem
+	s3fs          map[string]fs.Filesystem
 	rtmpserver    rtmp.Server
 	srtserver     srt.Server
 	metrics       monitor.HistoryMonitor
@@ -118,6 +120,7 @@ var ErrConfigReload = fmt.Errorf("configuration reload")
 func New(configpath string, logwriter io.Writer) (API, error) {
 	a := &api{
 		state: "idle",
+		s3fs:  map[string]fs.Filesystem{},
 	}
 
 	a.config.path = configpath
@@ -372,12 +375,13 @@ func (a *api) start() error {
 	}
 
 	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
+		Name:   "disk",
 		Dir:    cfg.Storage.Disk.Dir,
 		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
-		Logger: a.log.logger.core.WithComponent("DiskFS"),
+		Logger: a.log.logger.core.WithComponent("FS"),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("disk filesystem: %w", err)
 	}
 
 	a.diskfs = diskfs
@@ -400,10 +404,11 @@ func (a *api) start() error {
 
 	if a.memfs == nil {
 		memfs := fs.NewMemFilesystem(fs.MemConfig{
+			Name:   "mem",
 			Base:   baseMemFS.String(),
 			Size:   cfg.Storage.Memory.Size * 1024 * 1024,
 			Purge:  cfg.Storage.Memory.Purge,
-			Logger: a.log.logger.core.WithComponent("MemFS"),
+			Logger: a.log.logger.core.WithComponent("FS"),
 		})
 
 		a.memfs = memfs
@@ -412,23 +417,62 @@ func (a *api) start() error {
 		a.memfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
 	}
 
+	for _, s3 := range cfg.Storage.S3 {
+		baseS3FS := url.URL{
+			Scheme: "http",
+			Path:   s3.Mountpoint,
+		}
+
+		host, port, _ := gonet.SplitHostPort(cfg.Address)
+		if len(host) == 0 {
+			baseS3FS.Host = "localhost:" + port
+		} else {
+			baseS3FS.Host = cfg.Address
+		}
+
+		if s3.Auth.Enable {
+			baseS3FS.User = url.UserPassword(s3.Auth.Username, s3.Auth.Password)
+		}
+
+		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
+			Name:            s3.Name,
+			Base:            baseS3FS.String(),
+			Endpoint:        s3.Endpoint,
+			AccessKeyID:     s3.AccessKeyID,
+			SecretAccessKey: s3.SecretAccessKey,
+			Region:          s3.Region,
+			Bucket:          s3.Bucket,
+			UseSSL:          s3.UseSSL,
+			Logger:          a.log.logger.core.WithComponent("FS"),
+		})
+		if err != nil {
+			return fmt.Errorf("s3 filesystem (%s): %w", s3.Name, err)
+		}
+
+		if _, ok := a.s3fs[s3.Name]; ok {
+			return fmt.Errorf("the name '%s' for a filesystem is already in use", s3.Name)
+		}
+
+		a.s3fs[s3.Name] = s3fs
+	}
+
 	var portrange net.Portranger
 
 	if cfg.Playout.Enable {
 		portrange, err = net.NewPortrange(cfg.Playout.MinPort, cfg.Playout.MaxPort)
 		if err != nil {
-			return err
+			return fmt.Errorf("playout port range: %w", err)
 		}
 	}
 
 	validatorIn, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Input.Allow, cfg.FFmpeg.Access.Input.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("input address validator: %w", err)
 	}
 
 	validatorOut, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Output.Allow, cfg.FFmpeg.Access.Output.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("output address validator: %w", err)
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
@@ -442,7 +486,7 @@ func (a *api) start() error {
 		Collector:        a.sessions.Collector("ffmpeg"),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create ffmpeg: %w", err)
 	}
 
 	a.ffmpeg = ffmpeg
@@ -510,6 +554,15 @@ func (a *api) start() error {
 		})
 	}
 
+	filesystems := []fs.Filesystem{
+		a.diskfs,
+		a.memfs,
+	}
+
+	for _, fs := range a.s3fs {
+		filesystems = append(filesystems, fs)
+	}
+
 	store := store.NewJSONStore(store.JSONConfig{
 		Filepath:  cfg.DB.Dir + "/db.json",
 		FFVersion: a.ffmpeg.Skills().FFmpeg.Version,
@@ -520,8 +573,7 @@ func (a *api) start() error {
 		ID:           cfg.ID,
 		Name:         cfg.Name,
 		Store:        store,
-		DiskFS:       a.diskfs,
-		MemFS:        a.memfs,
+		Filesystems:  filesystems,
 		Replace:      a.replacer,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
@@ -592,6 +644,9 @@ func (a *api) start() error {
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Base()))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
+	for name, fs := range a.s3fs {
+		metrics.Register(monitor.NewFilesystemCollector(name, fs))
+	}
 	metrics.Register(monitor.NewRestreamCollector(a.restream))
 	metrics.Register(monitor.NewFFmpegCollector(a.ffmpeg))
 	metrics.Register(monitor.NewSessionCollector(a.sessions, []string{}))
@@ -666,7 +721,7 @@ func (a *api) start() error {
 	}
 
 	if cfg.Storage.Disk.Cache.Enable {
-		diskCache, err := cache.NewLRUCache(cache.LRUConfig{
+		cache, err := cache.NewLRUCache(cache.LRUConfig{
 			TTL:             time.Duration(cfg.Storage.Disk.Cache.TTL) * time.Second,
 			MaxSize:         cfg.Storage.Disk.Cache.Size * 1024 * 1024,
 			MaxFileSize:     cfg.Storage.Disk.Cache.FileSize * 1024 * 1024,
@@ -676,10 +731,10 @@ func (a *api) start() error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("unable to create disk cache: %w", err)
+			return fmt.Errorf("unable to create cache: %w", err)
 		}
 
-		a.cache = diskCache
+		a.cache = cache
 	}
 
 	var autocertManager *certmagic.Config
@@ -867,22 +922,61 @@ func (a *api) start() error {
 
 	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
 
-	mainserverhandler, err := http.NewServer(http.Config{
+	httpfilesystems := []httpfs.FS{
+		{
+			Name:               a.diskfs.Name(),
+			Mountpoint:         "",
+			AllowWrite:         false,
+			EnableAuth:         false,
+			Username:           "",
+			Password:           "",
+			DefaultFile:        "index.html",
+			DefaultContentType: "text/html",
+			Gzip:               true,
+			Filesystem:         a.diskfs,
+			Cache:              a.cache,
+		},
+		{
+			Name:               a.memfs.Name(),
+			Mountpoint:         "/memfs",
+			AllowWrite:         true,
+			EnableAuth:         cfg.Storage.Memory.Auth.Enable,
+			Username:           cfg.Storage.Memory.Auth.Username,
+			Password:           cfg.Storage.Memory.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.memfs,
+			Cache:              nil,
+		},
+	}
+
+	for _, s3 := range cfg.Storage.S3 {
+		httpfilesystems = append(httpfilesystems, httpfs.FS{
+			Name:               s3.Name,
+			Mountpoint:         s3.Mountpoint,
+			AllowWrite:         true,
+			EnableAuth:         s3.Auth.Enable,
+			Username:           s3.Auth.Username,
+			Password:           s3.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.s3fs[s3.Name],
+			Cache:              a.cache,
+		})
+	}
+
+	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
 		Restream:      a.restream,
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypes,
-		DiskFS:        a.diskfs,
-		MemFS: http.MemFSConfig{
-			EnableAuth: cfg.Storage.Memory.Auth.Enable,
-			Username:   cfg.Storage.Memory.Auth.Username,
-			Password:   cfg.Storage.Memory.Auth.Password,
-			Filesystem: a.memfs,
-		},
-		IPLimiter: iplimiter,
-		Profiling: cfg.Debug.Profiling,
+		Filesystems:   httpfilesystems,
+		IPLimiter:     iplimiter,
+		Profiling:     cfg.Debug.Profiling,
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},
@@ -890,11 +984,12 @@ func (a *api) start() error {
 		SRT:      a.srtserver,
 		JWT:      a.httpjwt,
 		Config:   a.config.store,
-		Cache:    a.cache,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
-	})
+	}
+
+	mainserverhandler, err := http.NewServer(serverConfig)
 
 	if err != nil {
 		return fmt.Errorf("unable to create server: %w", err)
@@ -929,34 +1024,10 @@ func (a *api) start() error {
 
 		a.log.logger.sidecar = a.log.logger.core.WithComponent("HTTP").WithField("address", cfg.Address)
 
-		sidecarserverhandler, err := http.NewServer(http.Config{
-			Logger:        a.log.logger.sidecar,
-			LogBuffer:     a.log.buffer,
-			Restream:      a.restream,
-			Metrics:       a.metrics,
-			Prometheus:    a.prom,
-			MimeTypesFile: cfg.Storage.MimeTypes,
-			DiskFS:        a.diskfs,
-			MemFS: http.MemFSConfig{
-				EnableAuth: cfg.Storage.Memory.Auth.Enable,
-				Username:   cfg.Storage.Memory.Auth.Username,
-				Password:   cfg.Storage.Memory.Auth.Password,
-				Filesystem: a.memfs,
-			},
-			IPLimiter: iplimiter,
-			Profiling: cfg.Debug.Profiling,
-			Cors: http.CorsConfig{
-				Origins: cfg.Storage.CORS.Origins,
-			},
-			RTMP:     a.rtmpserver,
-			SRT:      a.srtserver,
-			JWT:      a.httpjwt,
-			Config:   a.config.store,
-			Cache:    a.cache,
-			Sessions: a.sessions,
-			Router:   router,
-			ReadOnly: cfg.API.ReadOnly,
-		})
+		serverConfig.Logger = a.log.logger.sidecar
+		serverConfig.IPLimiter = iplimiter
+
+		sidecarserverhandler, err := http.NewServer(serverConfig)
 
 		if err != nil {
 			return fmt.Errorf("unable to create sidecar HTTP server: %w", err)

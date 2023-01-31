@@ -88,6 +88,7 @@ type Data struct {
 			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
+		S3   []value.S3Storage `json:"s3"`
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
@@ -245,6 +246,8 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
 	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
 	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types)
+
+	data.Storage.S3 = []value.S3Storage{}
 
 	data.Version = 3
 
