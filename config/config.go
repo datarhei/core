@@ -380,6 +380,21 @@ func (d *Config) Validate(resetLogs bool) {
 		}
 	}
 
+	if len(d.Storage.S3) != 0 {
+		names := map[string]struct{}{
+			"disk": {},
+			"mem":  {},
+		}
+
+		for _, s3 := range d.Storage.S3 {
+			if _, ok := names[s3.Name]; ok {
+				d.vars.Log("error", "storage.s3", "the name %s is already in use or reserved", s3.Name)
+			}
+
+			names[s3.Name] = struct{}{}
+		}
+	}
+
 	// If playout is enabled, check that the port range is sane
 	if d.Playout.Enable {
 		if d.Playout.MinPort >= d.Playout.MaxPort {
