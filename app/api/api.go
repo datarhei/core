@@ -510,6 +510,10 @@ func (a *api) start() error {
 			return a.memfs.Base()
 		}, nil)
 
+		for name, s3 := range a.s3fs {
+			a.replacer.RegisterTemplate("fs:"+name, s3.Base(), nil)
+		}
+
 		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {
 			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
 			if len(host) == 0 {
