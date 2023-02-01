@@ -124,7 +124,14 @@ func New(config Config) (Restreamer, error) {
 	}
 
 	if r.store == nil {
-		r.store = store.NewDummyStore(store.DummyConfig{})
+		dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+		s, err := store.NewJSON(store.JSONConfig{
+			Filesystem: dummyfs,
+		})
+		if err != nil {
+			return nil, err
+		}
+		r.store = s
 	}
 
 	for _, fs := range config.Filesystems {
@@ -136,7 +143,7 @@ func New(config Config) (Restreamer, error) {
 		r.fs.list = append(r.fs.list, fs)
 
 		// Add the diskfs filesystems also to a separate array. We need it later for input and output validation
-		if fs.Type() == "diskfs" {
+		if fs.Type() == "disk" {
 			r.fs.diskfs = append(r.fs.diskfs, fs)
 		}
 	}
@@ -183,7 +190,7 @@ func (r *restream) Start() {
 		for _, fs := range r.fs.list {
 			fs.Start()
 
-			if fs.Type() == "diskfs" {
+			if fs.Type() == "disk" {
 				go r.observe(ctx, fs, 10*time.Second)
 			}
 		}
@@ -635,7 +642,7 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 		if len(r.fs.diskfs) != 0 {
 			maxFails := 0
 			for _, fs := range r.fs.diskfs {
-				io.Address, err = r.validateInputAddress(io.Address, fs.Base())
+				io.Address, err = r.validateInputAddress(io.Address, fs.Metadata("base"))
 				if err != nil {
 					maxFails++
 				}
@@ -682,7 +689,7 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			maxFails := 0
 			for _, fs := range r.fs.diskfs {
 				isFile := false
-				io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Base())
+				io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Metadata("base"))
 				if err != nil {
 					maxFails++
 				}

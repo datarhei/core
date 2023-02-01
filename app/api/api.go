@@ -34,7 +34,7 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
-	"github.com/datarhei/core/v16/restream/store"
+	restreamstore "github.com/datarhei/core/v16/restream/store"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
@@ -153,7 +153,8 @@ func (a *api) Reload() error {
 
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
 
-	store, err := configstore.NewJSON(a.config.path, func() {
+	rootfs, _ := fs.NewDiskFilesystem(fs.DiskConfig{})
+	store, err := configstore.NewJSON(rootfs, a.config.path, func() {
 		a.errorChan <- ErrConfigReload
 	})
 	if err != nil {
@@ -295,7 +296,13 @@ func (a *api) start() error {
 		}
 
 		if cfg.Sessions.Persist {
-			sessionConfig.PersistDir = filepath.Join(cfg.DB.Dir, "sessions")
+			fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+				Root: filepath.Join(cfg.DB.Dir, "sessions"),
+			})
+			if err != nil {
+				return fmt.Errorf("unable to create filesystem for persisting sessions: %w", err)
+			}
+			sessionConfig.PersistFS = fs
 		}
 
 		sessions, err := session.New(sessionConfig)
@@ -374,11 +381,9 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
-	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
-		Name:   "disk",
-		Dir:    cfg.Storage.Disk.Dir,
-		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
-		Logger: a.log.logger.core.WithComponent("FS"),
+	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+		Root:   cfg.Storage.Disk.Dir,
+		Logger: a.log.logger.core.WithComponent("DiskFS"),
 	})
 	if err != nil {
 		return fmt.Errorf("disk filesystem: %w", err)
@@ -403,21 +408,27 @@ func (a *api) start() error {
 	}
 
 	if a.memfs == nil {
-		memfs := fs.NewMemFilesystem(fs.MemConfig{
-			Name:   "mem",
-			Base:   baseMemFS.String(),
-			Size:   cfg.Storage.Memory.Size * 1024 * 1024,
-			Purge:  cfg.Storage.Memory.Purge,
-			Logger: a.log.logger.core.WithComponent("FS"),
+		memfs, _ := fs.NewMemFilesystem(fs.MemConfig{
+			Logger: a.log.logger.core.WithComponent("MemFS"),
 		})
 
-		a.memfs = memfs
+		memfs.SetMetadata("base", baseMemFS.String())
+
+		sizedfs, _ := fs.NewSizedFilesystem(memfs, cfg.Storage.Memory.Size*1024*1024, cfg.Storage.Memory.Purge)
+
+		a.memfs = sizedfs
 	} else {
-		a.memfs.Rebase(baseMemFS.String())
-		a.memfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
+		a.memfs.SetMetadata("base", baseMemFS.String())
+		if sizedfs, ok := a.memfs.(fs.SizedFilesystem); ok {
+			sizedfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
+		}
 	}
 
 	for _, s3 := range cfg.Storage.S3 {
+		if _, ok := a.s3fs[s3.Name]; ok {
+			return fmt.Errorf("the name '%s' for a s3 filesystem is already in use", s3.Name)
+		}
+
 		baseS3FS := url.URL{
 			Scheme: "http",
 			Path:   s3.Mountpoint,
@@ -436,7 +447,6 @@ func (a *api) start() error {
 
 		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
 			Name:            s3.Name,
-			Base:            baseS3FS.String(),
 			Endpoint:        s3.Endpoint,
 			AccessKeyID:     s3.AccessKeyID,
 			SecretAccessKey: s3.SecretAccessKey,
@@ -449,9 +459,7 @@ func (a *api) start() error {
 			return fmt.Errorf("s3 filesystem (%s): %w", s3.Name, err)
 		}
 
-		if _, ok := a.s3fs[s3.Name]; ok {
-			return fmt.Errorf("the name '%s' for a filesystem is already in use", s3.Name)
-		}
+		s3fs.SetMetadata("base", baseS3FS.String())
 
 		a.s3fs[s3.Name] = s3fs
 	}
@@ -495,23 +503,23 @@ func (a *api) start() error {
 
 	{
 		a.replacer.RegisterTemplateFunc("diskfs", func(config *restreamapp.Config, section string) string {
-			return a.diskfs.Base()
+			return a.diskfs.Metadata("base")
 		}, nil)
 
 		a.replacer.RegisterTemplateFunc("fs:disk", func(config *restreamapp.Config, section string) string {
-			return a.diskfs.Base()
+			return a.diskfs.Metadata("base")
 		}, nil)
 
 		a.replacer.RegisterTemplateFunc("memfs", func(config *restreamapp.Config, section string) string {
-			return a.memfs.Base()
+			return a.memfs.Metadata("base")
 		}, nil)
 
 		a.replacer.RegisterTemplateFunc("fs:mem", func(config *restreamapp.Config, section string) string {
-			return a.memfs.Base()
+			return a.memfs.Metadata("base")
 		}, nil)
 
 		for name, s3 := range a.s3fs {
-			a.replacer.RegisterTemplate("fs:"+name, s3.Base(), nil)
+			a.replacer.RegisterTemplate("fs:"+name, s3.Metadata("base"), nil)
 		}
 
 		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {
@@ -567,11 +575,24 @@ func (a *api) start() error {
 		filesystems = append(filesystems, fs)
 	}
 
-	store := store.NewJSONStore(store.JSONConfig{
-		Filepath:  cfg.DB.Dir + "/db.json",
-		FFVersion: a.ffmpeg.Skills().FFmpeg.Version,
-		Logger:    a.log.logger.core.WithComponent("ProcessStore"),
-	})
+	var store restreamstore.Store = nil
+
+	{
+		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+			Root: cfg.DB.Dir,
+		})
+		if err != nil {
+			return err
+		}
+		store, err = restreamstore.NewJSON(restreamstore.JSONConfig{
+			Filesystem: fs,
+			Filepath:   "/db.json",
+			Logger:     a.log.logger.core.WithComponent("ProcessStore"),
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
@@ -645,8 +666,8 @@ func (a *api) start() error {
 	metrics.Register(monitor.NewCPUCollector())
 	metrics.Register(monitor.NewMemCollector())
 	metrics.Register(monitor.NewNetCollector())
-	metrics.Register(monitor.NewDiskCollector(a.diskfs.Base()))
-	metrics.Register(monitor.NewFilesystemCollector("diskfs", diskfs))
+	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base")))
+	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
 	for name, fs := range a.s3fs {
 		metrics.Register(monitor.NewFilesystemCollector(name, fs))
@@ -1395,7 +1416,7 @@ func (a *api) Destroy() {
 
 	// Free the MemFS
 	if a.memfs != nil {
-		a.memfs.DeleteAll()
+		a.memfs.RemoveAll()
 		a.memfs = nil
 	}
 }

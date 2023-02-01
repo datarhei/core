@@ -17,6 +17,7 @@ import (
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/store"
 
@@ -32,7 +33,17 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
 	}
 
-	store := store.NewDummyStore(store.DummyConfig{})
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
+	}
+
+	store, err := store.NewJSON(store.JSONConfig{
+		Filesystem: memfs,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
 		Binary: binary,

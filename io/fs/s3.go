@@ -1,9 +1,15 @@
 package fs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/glob"
@@ -15,7 +21,6 @@ import (
 type S3Config struct {
 	// Namee is the name of the filesystem
 	Name            string
-	Base            string
 	Endpoint        string
 	AccessKeyID     string
 	SecretAccessKey string
@@ -26,9 +31,11 @@ type S3Config struct {
 	Logger log.Logger
 }
 
-type s3fs struct {
+type s3Filesystem struct {
+	metadata map[string]string
+	metaLock sync.RWMutex
+
 	name string
-	base string
 
 	endpoint        string
 	accessKeyID     string
@@ -42,10 +49,12 @@ type s3fs struct {
 	logger log.Logger
 }
 
+var fakeDirEntry = "..."
+
 func NewS3Filesystem(config S3Config) (Filesystem, error) {
-	fs := &s3fs{
+	fs := &s3Filesystem{
+		metadata:        make(map[string]string),
 		name:            config.Name,
-		base:            config.Base,
 		endpoint:        config.Endpoint,
 		accessKeyID:     config.AccessKeyID,
 		secretAccessKey: config.SecretAccessKey,
@@ -106,28 +115,32 @@ func NewS3Filesystem(config S3Config) (Filesystem, error) {
 	return fs, nil
 }
 
-func (fs *s3fs) Name() string {
+func (fs *s3Filesystem) Name() string {
 	return fs.name
 }
 
-func (fs *s3fs) Base() string {
-	return fs.base
+func (fs *s3Filesystem) Type() string {
+	return "s3"
 }
 
-func (fs *s3fs) Rebase(base string) error {
-	fs.base = base
+func (fs *s3Filesystem) Metadata(key string) string {
+	fs.metaLock.RLock()
+	defer fs.metaLock.RUnlock()
 
-	return nil
+	return fs.metadata[key]
 }
 
-func (fs *s3fs) Type() string {
-	return "s3fs"
+func (fs *s3Filesystem) SetMetadata(key, data string) {
+	fs.metaLock.Lock()
+	defer fs.metaLock.Unlock()
+
+	fs.metadata[key] = data
 }
 
-func (fs *s3fs) Size() (int64, int64) {
+func (fs *s3Filesystem) Size() (int64, int64) {
 	size := int64(0)
 
-	files := fs.List("")
+	files := fs.List("/", "")
 
 	for _, file := range files {
 		size += file.Size()
@@ -136,14 +149,18 @@ func (fs *s3fs) Size() (int64, int64) {
 	return size, -1
 }
 
-func (fs *s3fs) Resize(size int64) {}
-
-func (fs *s3fs) Files() int64 {
+func (fs *s3Filesystem) Files() int64 {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-		Recursive: true,
+		WithVersions: false,
+		WithMetadata: false,
+		Prefix:       "",
+		Recursive:    true,
+		MaxKeys:      0,
+		StartAfter:   "",
+		UseV1:        false,
 	})
 
 	nfiles := int64(0)
@@ -152,19 +169,77 @@ func (fs *s3fs) Files() int64 {
 		if object.Err != nil {
 			fs.logger.WithError(object.Err).Log("Listing object failed")
 		}
+
+		if strings.HasSuffix("/"+object.Key, "/"+fakeDirEntry) {
+			// Skip fake entries (see MkdirAll)
+			continue
+		}
+
 		nfiles++
 	}
 
 	return nfiles
 }
 
-func (fs *s3fs) Symlink(oldname, newname string) error {
+func (fs *s3Filesystem) Symlink(oldname, newname string) error {
 	return fmt.Errorf("not implemented")
 }
 
-func (fs *s3fs) Open(path string) File {
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
+func (fs *s3Filesystem) Stat(path string) (FileInfo, error) {
+	path = fs.cleanPath(path)
+
+	if len(path) == 0 {
+		return &s3FileInfo{
+			name:         "/",
+			size:         0,
+			dir:          true,
+			lastModified: time.Now(),
+		}, nil
+	}
+
+	ctx := context.Background()
+
+	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
+	if err != nil {
+		if fs.isDir(path) {
+			return &s3FileInfo{
+				name:         "/" + path,
+				size:         0,
+				dir:          true,
+				lastModified: time.Now(),
+			}, nil
+		}
+
+		fs.logger.Debug().WithField("key", path).WithError(err).Log("Not found")
+		return nil, err
+	}
+
+	defer object.Close()
+
+	stat, err := object.Stat()
+	if err != nil {
+		if fs.isDir(path) {
+			return &s3FileInfo{
+				name:         "/" + path,
+				size:         0,
+				dir:          true,
+				lastModified: time.Now(),
+			}, nil
+		}
+
+		fs.logger.Debug().WithField("key", path).WithError(err).Log("Stat failed")
+		return nil, err
+	}
+
+	return &s3FileInfo{
+		name:         "/" + stat.Key,
+		size:         stat.Size,
+		lastModified: stat.LastModified,
+	}, nil
+}
+
+func (fs *s3Filesystem) Open(path string) File {
+	path = fs.cleanPath(path)
 	ctx := context.Background()
 
 	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
@@ -181,7 +256,7 @@ func (fs *s3fs) Open(path string) File {
 
 	file := &s3File{
 		data:         object,
-		name:         stat.Key,
+		name:         "/" + stat.Key,
 		size:         stat.Size,
 		lastModified: stat.LastModified,
 	}
@@ -191,7 +266,26 @@ func (fs *s3fs) Open(path string) File {
 	return file
 }
 
-func (fs *s3fs) Store(path string, r io.Reader) (int64, bool, error) {
+func (fs *s3Filesystem) ReadFile(path string) ([]byte, error) {
+	path = fs.cleanPath(path)
+	file := fs.Open(path)
+	if file == nil {
+		return nil, os.ErrNotExist
+	}
+
+	defer file.Close()
+
+	buf := &bytes.Buffer{}
+
+	_, err := buf.ReadFrom(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (fs *s3Filesystem) write(path string, r io.Reader) (int64, bool, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -234,10 +328,84 @@ func (fs *s3fs) Store(path string, r io.Reader) (int64, bool, error) {
 		"overwrite": overwrite,
 	}).Log("Stored")
 
-	return info.Size, overwrite, nil
+	return info.Size, !overwrite, nil
 }
 
-func (fs *s3fs) Delete(path string) int64 {
+func (fs *s3Filesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
+	path = fs.cleanPath(path)
+	return fs.write(path, r)
+}
+
+func (fs *s3Filesystem) WriteFile(path string, data []byte) (int64, bool, error) {
+	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+}
+
+func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
+	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+}
+
+func (fs *s3Filesystem) Rename(src, dst string) error {
+	src = fs.cleanPath(src)
+	dst = fs.cleanPath(dst)
+
+	err := fs.Copy(src, dst)
+	if err != nil {
+		return err
+	}
+
+	res := fs.Remove(src)
+	if res == -1 {
+		return fmt.Errorf("failed to remove source file: %s", src)
+	}
+
+	return nil
+}
+
+func (fs *s3Filesystem) Copy(src, dst string) error {
+	src = fs.cleanPath(src)
+	dst = fs.cleanPath(dst)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, err := fs.client.CopyObject(ctx, minio.CopyDestOptions{
+		Bucket: fs.bucket,
+		Object: dst,
+	}, minio.CopySrcOptions{
+		Bucket: fs.bucket,
+		Object: src,
+	})
+
+	return err
+}
+
+func (fs *s3Filesystem) MkdirAll(path string, perm os.FileMode) error {
+	if path == "/" {
+		return nil
+	}
+
+	info, err := fs.Stat(path)
+	if err == nil {
+		if !info.IsDir() {
+			return os.ErrExist
+		}
+
+		return nil
+	}
+
+	path = filepath.Join(path, fakeDirEntry)
+
+	_, _, err = fs.write(path, strings.NewReader(""))
+	if err != nil {
+		return fmt.Errorf("can't create directory")
+	}
+
+	return nil
+}
+
+func (fs *s3Filesystem) Remove(path string) int64 {
+	path = fs.cleanPath(path)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -260,7 +428,7 @@ func (fs *s3fs) Delete(path string) int64 {
 	return stat.Size
 }
 
-func (fs *s3fs) DeleteAll() int64 {
+func (fs *s3Filesystem) RemoveAll() int64 {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -295,14 +463,16 @@ func (fs *s3fs) DeleteAll() int64 {
 	return totalSize
 }
 
-func (fs *s3fs) List(pattern string) []FileInfo {
+func (fs *s3Filesystem) List(path, pattern string) []FileInfo {
+	path = fs.cleanPath(path)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
 		WithVersions: false,
 		WithMetadata: false,
-		Prefix:       "",
+		Prefix:       path,
 		Recursive:    true,
 		MaxKeys:      0,
 		StartAfter:   "",
@@ -317,14 +487,20 @@ func (fs *s3fs) List(pattern string) []FileInfo {
 			continue
 		}
 
+		key := "/" + object.Key
+		if strings.HasSuffix(key, "/"+fakeDirEntry) {
+			// filter out fake directory entries (see MkdirAll)
+			continue
+		}
+
 		if len(pattern) != 0 {
-			if ok, _ := glob.Match(pattern, object.Key, '/'); !ok {
+			if ok, _ := glob.Match(pattern, key, '/'); !ok {
 				continue
 			}
 		}
 
 		f := &s3FileInfo{
-			name:         object.Key,
+			name:         key,
 			size:         object.Size,
 			lastModified: object.LastModified,
 		}
@@ -335,9 +511,56 @@ func (fs *s3fs) List(pattern string) []FileInfo {
 	return files
 }
 
+func (fs *s3Filesystem) isDir(path string) bool {
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+
+	if path == "/" {
+		return true
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
+		WithVersions: false,
+		WithMetadata: false,
+		Prefix:       path,
+		Recursive:    true,
+		MaxKeys:      1,
+		StartAfter:   "",
+		UseV1:        false,
+	})
+
+	files := uint64(0)
+
+	for object := range ch {
+		if object.Err != nil {
+			fs.logger.WithError(object.Err).Log("Listing object failed")
+			continue
+		}
+
+		files++
+	}
+
+	return files > 0
+}
+
+func (fs *s3Filesystem) cleanPath(path string) string {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join("/", path)
+	}
+
+	path = strings.TrimSuffix(path, "/"+fakeDirEntry)
+
+	return filepath.Join("/", filepath.Clean(path))[1:]
+}
+
 type s3FileInfo struct {
 	name         string
 	size         int64
+	dir          bool
 	lastModified time.Time
 }
 
@@ -349,6 +572,10 @@ func (f *s3FileInfo) Size() int64 {
 	return f.size
 }
 
+func (f *s3FileInfo) Mode() os.FileMode {
+	return fs.FileMode(fs.ModePerm)
+}
+
 func (f *s3FileInfo) ModTime() time.Time {
 	return f.lastModified
 }
@@ -358,7 +585,7 @@ func (f *s3FileInfo) IsLink() (string, bool) {
 }
 
 func (f *s3FileInfo) IsDir() bool {
-	return false
+	return f.dir
 }
 
 type s3File struct {

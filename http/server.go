@@ -198,7 +198,7 @@ func NewServer(config Config) (Server, error) {
 
 		if fs.Filesystem.Type() == "disk" {
 			s.middleware.hlsrewrite = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
-				PathPrefix: fs.Filesystem.Base(),
+				PathPrefix: fs.Filesystem.Metadata("base"),
 			})
 		}
 	}

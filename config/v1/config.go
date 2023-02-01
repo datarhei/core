@@ -8,6 +8,7 @@ import (
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
 	"github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/math/rand"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
@@ -21,14 +22,21 @@ const version int64 = 1
 
 // Config is a wrapper for Data
 type Config struct {
+	fs   fs.Filesystem
 	vars vars.Variables
 
 	Data
 }
 
 // New returns a Config which is initialized with its default values
-func New() *Config {
-	cfg := &Config{}
+func New(f fs.Filesystem) *Config {
+	cfg := &Config{
+		fs: f,
+	}
+
+	if cfg.fs == nil {
+		cfg.fs, _ = fs.NewMemFilesystem(fs.MemConfig{})
+	}
 
 	cfg.init()
 
@@ -45,7 +53,7 @@ func (d *Config) Set(name, val string) error {
 
 // NewConfigFrom returns a clone of a Config
 func (d *Config) Clone() *Config {
-	data := New()
+	data := New(d.fs)
 
 	data.CreatedAt = d.CreatedAt
 	data.LoadedAt = d.LoadedAt
@@ -118,7 +126,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
 
 	// DB
-	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config"), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
+	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config", d.fs), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
 
 	// Host
 	d.vars.Register(value.NewStringList(&d.Host.Name, []string{}, ","), "host.name", "CORE_HOST_NAME", nil, "Comma separated list of public host/domain names or IPs", false, false)
@@ -146,14 +154,14 @@ func (d *Config) init() {
 	d.vars.Register(value.NewAddress(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
 	// Storage
-	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types"), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
+	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
 
 	// Storage (Disk)
-	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data"), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
+	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data", d.fs), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
 	d.vars.Register(value.NewInt64(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAXSIZEMBYTES", nil, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Disk.Cache.Enable, true), "storage.disk.cache.enable", "CORE_STORAGE_DISK_CACHE_ENABLE", nil, "Enable cache for /", false, false)
 	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
@@ -228,7 +236,7 @@ func (d *Config) init() {
 	// Router
 	d.vars.Register(value.NewStringList(&d.Router.BlockedPrefixes, []string{"/api"}, ","), "router.blocked_prefixes", "CORE_ROUTER_BLOCKED_PREFIXES", nil, "List of path prefixes that can't be routed", false, false)
 	d.vars.Register(value.NewStringMapString(&d.Router.Routes, nil), "router.routes", "CORE_ROUTER_ROUTES", nil, "List of route mappings", false, false)
-	d.vars.Register(value.NewDir(&d.Router.UIPath, ""), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
+	d.vars.Register(value.NewDir(&d.Router.UIPath, "", d.fs), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are

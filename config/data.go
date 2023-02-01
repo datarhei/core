@@ -6,6 +6,7 @@ import (
 	"github.com/datarhei/core/v16/config/copy"
 	v2 "github.com/datarhei/core/v16/config/v2"
 	"github.com/datarhei/core/v16/config/value"
+	"github.com/datarhei/core/v16/io/fs"
 )
 
 // Data is the actual configuration data for the app
@@ -167,8 +168,8 @@ type Data struct {
 	} `json:"router"`
 }
 
-func UpgradeV2ToV3(d *v2.Data) (*Data, error) {
-	cfg := New()
+func UpgradeV2ToV3(d *v2.Data, fs fs.Filesystem) (*Data, error) {
+	cfg := New(fs)
 
 	return MergeV2toV3(&cfg.Data, d)
 }

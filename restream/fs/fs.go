@@ -135,7 +135,7 @@ func (rfs *filesystem) cleanup() {
 
 	for _, patterns := range rfs.cleanupPatterns {
 		for _, pattern := range patterns {
-			filesAndDirs := rfs.Filesystem.List(pattern.Pattern)
+			filesAndDirs := rfs.Filesystem.List("/", pattern.Pattern)
 
 			files := []fs.FileInfo{}
 			for _, f := range filesAndDirs {
@@ -151,7 +151,7 @@ func (rfs *filesystem) cleanup() {
 			if pattern.MaxFiles > 0 && uint(len(files)) > pattern.MaxFiles {
 				for i := uint(0); i < uint(len(files))-pattern.MaxFiles; i++ {
 					rfs.logger.Debug().WithField("path", files[i].Name()).Log("Remove file because MaxFiles is exceeded")
-					rfs.Filesystem.Delete(files[i].Name())
+					rfs.Filesystem.Remove(files[i].Name())
 				}
 			}
 
@@ -161,7 +161,7 @@ func (rfs *filesystem) cleanup() {
 				for _, f := range files {
 					if f.ModTime().Before(bestBefore) {
 						rfs.logger.Debug().WithField("path", f.Name()).Log("Remove file because MaxFileAge is exceeded")
-						rfs.Filesystem.Delete(f.Name())
+						rfs.Filesystem.Remove(f.Name())
 					}
 				}
 			}
@@ -175,11 +175,11 @@ func (rfs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
 			continue
 		}
 
-		files := rfs.Filesystem.List(pattern.Pattern)
+		files := rfs.Filesystem.List("/", pattern.Pattern)
 		sort.Slice(files, func(i, j int) bool { return len(files[i].Name()) > len(files[j].Name()) })
 		for _, f := range files {
 			rfs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
-			rfs.Filesystem.Delete(f.Name())
+			rfs.Filesystem.Remove(f.Name())
 			nfiles++
 		}
 	}

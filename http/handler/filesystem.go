@@ -82,7 +82,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	req := c.Request()
 
-	_, created, err := h.fs.Filesystem.Store(path, req.Body)
+	_, created, err := h.fs.Filesystem.WriteFileReader(path, req.Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "%s", err)
 	}
@@ -105,7 +105,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	c.Response().Header().Del(echo.HeaderContentType)
 
-	size := h.fs.Filesystem.Delete(path)
+	size := h.fs.Filesystem.Remove(path)
 
 	if size < 0 {
 		return api.Err(http.StatusNotFound, "File not found", path)
@@ -123,7 +123,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	files := h.fs.Filesystem.List(pattern)
+	files := h.fs.Filesystem.List("/", pattern)
 
 	var sortFunc func(i, j int) bool
 

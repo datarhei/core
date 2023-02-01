@@ -2,20 +2,18 @@ package session
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sync"
 
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 )
 
 // Config is the configuration for creating a new registry
 type Config struct {
-	// PersistDir is a path to the directory where the session
-	// history will be persisted. If it is an empty value, the
+	// PersistFS is a filesystem in whose root the session history will be persisted. If it is nil, the
 	// history will not be persisted.
-	PersistDir string
+	PersistFS fs.Filesystem
 
 	// Logger is an instance of a logger. If it is nil, no logs
 	// will be written.
@@ -52,9 +50,9 @@ type Registry interface {
 }
 
 type registry struct {
-	collector  map[string]*collector
-	persistDir string
-	logger     log.Logger
+	collector map[string]*collector
+	persistFS fs.Filesystem
+	logger    log.Logger
 
 	lock sync.Mutex
 }
@@ -63,19 +61,13 @@ type registry struct {
 // is non-nil if the PersistDir from the config can't be created.
 func New(conf Config) (Registry, error) {
 	r := &registry{
-		collector:  make(map[string]*collector),
-		persistDir: conf.PersistDir,
-		logger:     conf.Logger,
+		collector: make(map[string]*collector),
+		persistFS: conf.PersistFS,
+		logger:    conf.Logger,
 	}
 
 	if r.logger == nil {
 		r.logger = log.New("Session")
-	}
-
-	if len(r.persistDir) != 0 {
-		if err := os.MkdirAll(r.persistDir, 0700); err != nil {
-			return nil, err
-		}
 	}
 
 	return r, nil
@@ -99,12 +91,7 @@ func (r *registry) Register(id string, conf CollectorConfig) (Collector, error) 
 		return nil, fmt.Errorf("a collector with the ID '%s' already exists", id)
 	}
 
-	persistPath := ""
-	if len(r.persistDir) != 0 {
-		persistPath = filepath.Join(r.persistDir, id+".json")
-	}
-
-	m, err := newCollector(id, persistPath, r.logger, conf)
+	m, err := newCollector(id, r.persistFS, r.logger, conf)
 	if err != nil {
 		return nil, err
 	}
