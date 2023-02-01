@@ -285,7 +285,7 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	}
 
 	s := &cpuTimesStat{
-		total:  times[0].Total(),
+		total:  cpuTotal(&times[0]),
 		system: times[0].System,
 		user:   times[0].User,
 		idle:   times[0].Idle,
@@ -495,4 +495,9 @@ func (u *util) readFile(path string) ([]string, error) {
 	}
 
 	return lines, nil
+}
+
+func cpuTotal(c *cpu.TimesStat) float64 {
+	return c.User + c.System + c.Idle + c.Nice + c.Iowait + c.Irq +
+		c.Softirq + c.Steal + c.Guest + c.GuestNice
 }
