@@ -103,7 +103,6 @@ type Logger interface {
 type logger struct {
 	output    Writer
 	component string
-	topics    map[string]struct{}
 }
 
 // New returns an implementation of the Logger interface.
@@ -119,14 +118,6 @@ func (l *logger) clone() *logger {
 	clone := &logger{
 		output:    l.output,
 		component: l.component,
-	}
-
-	if len(l.topics) != 0 {
-		clone.topics = make(map[string]struct{})
-
-		for topic := range l.topics {
-			clone.topics[topic] = struct{}{}
-		}
 	}
 
 	return clone

@@ -10,11 +10,7 @@ import (
 )
 
 func TestMaxFiles(t *testing.T) {
-	memfs := fs.NewMemFilesystem(fs.MemConfig{
-		Base:  "/",
-		Size:  1024,
-		Purge: false,
-	})
+	memfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
 
 	cleanfs := New(Config{
 		FS: memfs,
@@ -30,15 +26,15 @@ func TestMaxFiles(t *testing.T) {
 		},
 	})
 
-	cleanfs.Store("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.Store("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.Store("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 3
 	}, 3*time.Second, time.Second)
 
-	cleanfs.Store("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 3 {
@@ -47,7 +43,7 @@ func TestMaxFiles(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/*.ts") {
+		for _, f := range cleanfs.List("/", "/*.ts") {
 			names = append(names, f.Name())
 		}
 
@@ -60,11 +56,7 @@ func TestMaxFiles(t *testing.T) {
 }
 
 func TestMaxAge(t *testing.T) {
-	memfs := fs.NewMemFilesystem(fs.MemConfig{
-		Base:  "/",
-		Size:  1024,
-		Purge: false,
-	})
+	memfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
 
 	cleanfs := New(Config{
 		FS: memfs,
@@ -80,15 +72,15 @@ func TestMaxAge(t *testing.T) {
 		},
 	})
 
-	cleanfs.Store("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.Store("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.Store("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 0
 	}, 5*time.Second, time.Second)
 
-	cleanfs.Store("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 1 {
@@ -97,7 +89,7 @@ func TestMaxAge(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/*.ts") {
+		for _, f := range cleanfs.List("/", "/*.ts") {
 			names = append(names, f.Name())
 		}
 
@@ -110,11 +102,7 @@ func TestMaxAge(t *testing.T) {
 }
 
 func TestUnsetCleanup(t *testing.T) {
-	memfs := fs.NewMemFilesystem(fs.MemConfig{
-		Base:  "/",
-		Size:  1024,
-		Purge: false,
-	})
+	memfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
 
 	cleanfs := New(Config{
 		FS: memfs,
@@ -130,15 +118,15 @@ func TestUnsetCleanup(t *testing.T) {
 		},
 	})
 
-	cleanfs.Store("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.Store("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.Store("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 3
 	}, 3*time.Second, time.Second)
 
-	cleanfs.Store("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 3 {
@@ -147,7 +135,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/*.ts") {
+		for _, f := range cleanfs.List("/", "/*.ts") {
 			names = append(names, f.Name())
 		}
 
@@ -158,7 +146,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 	cleanfs.UnsetCleanup("foobar")
 
-	cleanfs.Store("/chunk_4.ts", strings.NewReader("chunk_4"))
+	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"))
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 4 {
@@ -167,7 +155,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/*.ts") {
+		for _, f := range cleanfs.List("/", "/*.ts") {
 			names = append(names, f.Name())
 		}
 

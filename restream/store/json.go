@@ -4,24 +4,23 @@ import (
 	gojson "encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"sync"
 
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 )
 
 type JSONConfig struct {
-	Filepath  string
-	FFVersion string
-	Logger    log.Logger
+	Filesystem fs.Filesystem
+	Filepath   string // Full path to the database file
+	Logger     log.Logger
 }
 
 type jsonStore struct {
-	filepath  string
-	ffversion string
-	logger    log.Logger
+	fs       fs.Filesystem
+	filepath string
+	logger   log.Logger
 
 	// Mutex to serialize access to the backend
 	lock sync.RWMutex
@@ -29,18 +28,26 @@ type jsonStore struct {
 
 var version uint64 = 4
 
-func NewJSONStore(config JSONConfig) Store {
+func NewJSON(config JSONConfig) (Store, error) {
 	s := &jsonStore{
-		filepath:  config.Filepath,
-		ffversion: config.FFVersion,
-		logger:    config.Logger,
+		fs:       config.Filesystem,
+		filepath: config.Filepath,
+		logger:   config.Logger,
+	}
+
+	if len(s.filepath) == 0 {
+		s.filepath = "/db.json"
+	}
+
+	if s.fs == nil {
+		return nil, fmt.Errorf("no valid filesystem provided")
 	}
 
 	if s.logger == nil {
 		s.logger = log.New("")
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *jsonStore) Load() (StoreData, error) {
@@ -79,25 +86,8 @@ func (s *jsonStore) store(filepath string, data StoreData) error {
 		return err
 	}
 
-	dir := path.Dir(filepath)
-	name := path.Base(filepath)
-
-	tmpfile, err := os.CreateTemp(dir, name)
+	_, _, err = s.fs.WriteFileSafe(filepath, jsondata)
 	if err != nil {
-		return err
-	}
-
-	defer os.Remove(tmpfile.Name())
-
-	if _, err := tmpfile.Write(jsondata); err != nil {
-		return err
-	}
-
-	if err := tmpfile.Close(); err != nil {
-		return err
-	}
-
-	if err := file.Rename(tmpfile.Name(), filepath); err != nil {
 		return err
 	}
 
@@ -113,7 +103,7 @@ type storeVersion struct {
 func (s *jsonStore) load(filepath string, version uint64) (StoreData, error) {
 	r := NewStoreData()
 
-	_, err := os.Stat(filepath)
+	_, err := s.fs.Stat(filepath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return r, nil
@@ -122,7 +112,7 @@ func (s *jsonStore) load(filepath string, version uint64) (StoreData, error) {
 		return r, err
 	}
 
-	jsondata, err := os.ReadFile(filepath)
+	jsondata, err := s.fs.ReadFile(filepath)
 	if err != nil {
 		return r, err
 	}

@@ -98,7 +98,7 @@ func (p *process) cpuTimes() (*cpuTimesStat, error) {
 	}
 
 	s := &cpuTimesStat{
-		total:  times.Total(),
+		total:  cpuTotal(times),
 		system: times.System,
 		user:   times.User,
 	}

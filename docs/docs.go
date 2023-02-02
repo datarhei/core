@@ -292,9 +292,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Reload the currently active configuration. This will trigger a restart of the Restreamer.",
+                "description": "Reload the currently active configuration. This will trigger a restart of the Core.",
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "v16.7.2"
@@ -311,23 +311,53 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/disk": {
+        "/api/v3/fs": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all files on the filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "description": "Listall registered filesystems",
                 "produces": [
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
+                "summary": "List all registered filesystems",
+                "operationId": "filesystem-3-list",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.FilesystemInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/fs/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
                 ],
-                "summary": "List all files on the filesystem",
-                "operationId": "diskfs-3-list-files",
+                "description": "List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "List all files on a filesystem",
+                "operationId": "filesystem-3-list-files",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "glob pattern for file names",
@@ -360,24 +390,28 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/disk/{path}": {
+        "/api/v3/fs/{name}/{path}": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Fetch a file from the filesystem. The contents of that file are returned.",
+                "description": "Fetch a file from a filesystem",
                 "produces": [
                     "application/data",
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Fetch a file from the filesystem",
-                "operationId": "diskfs-3-get-file",
+                "summary": "Fetch a file from a filesystem",
+                "operationId": "filesystem-3-get-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -413,7 +447,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Writes or overwrites a file on the filesystem",
+                "description": "Writes or overwrites a file on a filesystem",
                 "consumes": [
                     "application/data"
                 ],
@@ -421,12 +455,16 @@ const docTemplate = `{
                     "text/plain",
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Add a file to the filesystem",
-                "operationId": "diskfs-3-put-file",
+                "summary": "Add a file to a filesystem",
+                "operationId": "filesystem-3-put-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -474,16 +512,20 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Remove a file from the filesystem",
+                "description": "Remove a file from a filesystem",
                 "produces": [
                     "text/plain"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Remove a file from the filesystem",
-                "operationId": "diskfs-3-delete-file",
+                "summary": "Remove a file from a filesystem",
+                "operationId": "filesystem-3-delete-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -501,255 +543,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/fs/mem": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "List all files on the memory filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "List all files on the memory filesystem",
-                "operationId": "memfs-3-list-files",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "glob pattern for file names",
-                        "name": "glob",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "none, name, size, lastmod",
-                        "name": "sort",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "asc, desc",
-                        "name": "order",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.FileInfo"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/fs/mem/{path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Fetch a file from the memory filesystem",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Fetch a file from the memory filesystem",
-                "operationId": "memfs-3-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Writes or overwrites a file on the memory filesystem",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Add a file to the memory filesystem",
-                "operationId": "memfs-3-put-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "File data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "507": {
-                        "description": "Insufficient Storage",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Remove a file from the memory filesystem",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Remove a file from the memory filesystem",
-                "operationId": "memfs-3-delete-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Create a link to a file in the memory filesystem. The file linked to has to exist.",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Create a link to a file in the memory filesystem",
-                "operationId": "memfs-3-patch",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Path to the file to link to",
-                        "name": "url",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2132,140 +1925,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/memfs/{path}": {
-            "get": {
-                "description": "Fetch a file from the memory filesystem",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "summary": "Fetch a file from the memory filesystem",
-                "operationId": "memfs-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Writes or overwrites a file on the memory filesystem",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "summary": "Add a file to the memory filesystem",
-                "operationId": "memfs-put-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "File data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "507": {
-                        "description": "Insufficient Storage",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Remove a file from the memory filesystem",
-                "produces": [
-                    "text/plain"
-                ],
-                "summary": "Remove a file from the memory filesystem",
-                "operationId": "memfs-delete-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
         "/metrics": {
             "get": {
                 "description": "Prometheus metrics",
@@ -2321,46 +1980,6 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/{path}": {
-            "get": {
-                "description": "Fetch a file from the filesystem. If the file is a directory, a index.html is returned, if it exists.",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "summary": "Fetch a file from the filesystem",
-                "operationId": "diskfs-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -2569,6 +2188,7 @@ const docTemplate = `{
                     }
                 },
                 "created_at": {
+                    "description": "When this config has been persisted",
                     "type": "string"
                 },
                 "db": {
@@ -2953,6 +2573,12 @@ const docTemplate = `{
                         },
                         "mimetypes_file": {
                             "type": "string"
+                        },
+                        "s3": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/value.S3Storage"
+                            }
                         }
                     }
                 },
@@ -3028,6 +2654,20 @@ const docTemplate = `{
                 "size_bytes": {
                     "type": "integer",
                     "format": "int64"
+                }
+            }
+        },
+        "api.FilesystemInfo": {
+            "type": "object",
+            "properties": {
+                "mount": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -4330,6 +3970,7 @@ const docTemplate = `{
                     }
                 },
                 "created_at": {
+                    "description": "When this config has been persisted",
                     "type": "string"
                 },
                 "db": {
@@ -4714,6 +4355,12 @@ const docTemplate = `{
                         },
                         "mimetypes_file": {
                             "type": "string"
+                        },
+                        "s3": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/value.S3Storage"
+                            }
                         }
                     }
                 },
@@ -5054,6 +4701,49 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "value.S3Storage": {
+            "type": "object",
+            "properties": {
+                "access_key_id": {
+                    "type": "string"
+                },
+                "auth": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "password": {
+                            "type": "string"
+                        },
+                        "username": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "bucket": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "mountpoint": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "secret_access_key": {
+                    "type": "string"
+                },
+                "use_ssl": {
+                    "type": "boolean"
                 }
             }
         }

@@ -30,30 +30,31 @@ import (
 
 // The Restreamer interface
 type Restreamer interface {
-	ID() string                                                // ID of this instance
-	Name() string                                              // Arbitrary name of this instance
-	CreatedAt() time.Time                                      // Time of when this instance has been created
-	Start()                                                    // Start all processes that have a "start" order
-	Stop()                                                     // Stop all running process but keep their "start" order
-	AddProcess(config *app.Config) error                       // Add a new process
-	GetProcessIDs(idpattern, refpattern string) []string       // Get a list of process IDs based on patterns for ID and reference
-	DeleteProcess(id string) error                             // Delete a process
-	UpdateProcess(id string, config *app.Config) error         // Update a process
-	StartProcess(id string) error                              // Start a process
-	StopProcess(id string) error                               // Stop a process
-	RestartProcess(id string) error                            // Restart a process
-	ReloadProcess(id string) error                             // Reload a process
-	GetProcess(id string) (*app.Process, error)                // Get a process
-	GetProcessState(id string) (*app.State, error)             // Get the state of a process
-	GetProcessLog(id string) (*app.Log, error)                 // Get the logs of a process
-	GetPlayout(id, inputid string) (string, error)             // Get the URL of the playout API for a process
-	Probe(id string) app.Probe                                 // Probe a process
-	Skills() skills.Skills                                     // Get the ffmpeg skills
-	ReloadSkills() error                                       // Reload the ffmpeg skills
-	SetProcessMetadata(id, key string, data interface{}) error // Set metatdata to a process
-	GetProcessMetadata(id, key string) (interface{}, error)    // Get previously set metadata from a process
-	SetMetadata(key string, data interface{}) error            // Set general metadata
-	GetMetadata(key string) (interface{}, error)               // Get previously set general metadata
+	ID() string                                                  // ID of this instance
+	Name() string                                                // Arbitrary name of this instance
+	CreatedAt() time.Time                                        // Time of when this instance has been created
+	Start()                                                      // Start all processes that have a "start" order
+	Stop()                                                       // Stop all running process but keep their "start" order
+	AddProcess(config *app.Config) error                         // Add a new process
+	GetProcessIDs(idpattern, refpattern string) []string         // Get a list of process IDs based on patterns for ID and reference
+	DeleteProcess(id string) error                               // Delete a process
+	UpdateProcess(id string, config *app.Config) error           // Update a process
+	StartProcess(id string) error                                // Start a process
+	StopProcess(id string) error                                 // Stop a process
+	RestartProcess(id string) error                              // Restart a process
+	ReloadProcess(id string) error                               // Reload a process
+	GetProcess(id string) (*app.Process, error)                  // Get a process
+	GetProcessState(id string) (*app.State, error)               // Get the state of a process
+	GetProcessLog(id string) (*app.Log, error)                   // Get the logs of a process
+	GetPlayout(id, inputid string) (string, error)               // Get the URL of the playout API for a process
+	Probe(id string) app.Probe                                   // Probe a process
+	ProbeWithTimeout(id string, timeout time.Duration) app.Probe // Probe a process with specific timeout
+	Skills() skills.Skills                                       // Get the ffmpeg skills
+	ReloadSkills() error                                         // Reload the ffmpeg skills
+	SetProcessMetadata(id, key string, data interface{}) error   // Set metatdata to a process
+	GetProcessMetadata(id, key string) (interface{}, error)      // Get previously set metadata from a process
+	SetMetadata(key string, data interface{}) error              // Set general metadata
+	GetMetadata(key string) (interface{}, error)                 // Get previously set general metadata
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -61,8 +62,7 @@ type Config struct {
 	ID           string
 	Name         string
 	Store        store.Store
-	DiskFS       fs.Filesystem
-	MemFS        fs.Filesystem
+	Filesystems  []fs.Filesystem
 	Replace      replace.Replacer
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
@@ -93,8 +93,8 @@ type restream struct {
 	maxProc   int64
 	nProc     int64
 	fs        struct {
-		diskfs       rfs.Filesystem
-		memfs        rfs.Filesystem
+		list         []rfs.Filesystem
+		diskfs       []rfs.Filesystem
 		stopObserver context.CancelFunc
 	}
 	replace  replace.Replacer
@@ -124,29 +124,28 @@ func New(config Config) (Restreamer, error) {
 	}
 
 	if r.store == nil {
-		r.store = store.NewDummyStore(store.DummyConfig{})
+		dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+		s, err := store.NewJSON(store.JSONConfig{
+			Filesystem: dummyfs,
+		})
+		if err != nil {
+			return nil, err
+		}
+		r.store = s
 	}
 
-	if config.DiskFS != nil {
-		r.fs.diskfs = rfs.New(rfs.Config{
-			FS:     config.DiskFS,
-			Logger: r.logger.WithComponent("Cleanup").WithField("type", "diskfs"),
+	for _, fs := range config.Filesystems {
+		fs := rfs.New(rfs.Config{
+			FS:     fs,
+			Logger: r.logger.WithComponent("Cleanup"),
 		})
-	} else {
-		r.fs.diskfs = rfs.New(rfs.Config{
-			FS: fs.NewDummyFilesystem(),
-		})
-	}
 
-	if config.MemFS != nil {
-		r.fs.memfs = rfs.New(rfs.Config{
-			FS:     config.MemFS,
-			Logger: r.logger.WithComponent("Cleanup").WithField("type", "memfs"),
-		})
-	} else {
-		r.fs.memfs = rfs.New(rfs.Config{
-			FS: fs.NewDummyFilesystem(),
-		})
+		r.fs.list = append(r.fs.list, fs)
+
+		// Add the diskfs filesystems also to a separate array. We need it later for input and output validation
+		if fs.Type() == "disk" {
+			r.fs.diskfs = append(r.fs.diskfs, fs)
+		}
 	}
 
 	if r.replace == nil {
@@ -185,12 +184,16 @@ func (r *restream) Start() {
 			r.setCleanup(id, t.config)
 		}
 
-		r.fs.diskfs.Start()
-		r.fs.memfs.Start()
-
 		ctx, cancel := context.WithCancel(context.Background())
 		r.fs.stopObserver = cancel
-		go r.observe(ctx, 10*time.Second)
+
+		for _, fs := range r.fs.list {
+			fs.Start()
+
+			if fs.Type() == "disk" {
+				go r.observe(ctx, fs, 10*time.Second)
+			}
+		}
 
 		r.stopOnce = sync.Once{}
 	})
@@ -214,14 +217,16 @@ func (r *restream) Stop() {
 
 		r.fs.stopObserver()
 
-		r.fs.diskfs.Stop()
-		r.fs.memfs.Stop()
+		// Stop the cleanup jobs
+		for _, fs := range r.fs.list {
+			fs.Stop()
+		}
 
 		r.startOnce = sync.Once{}
 	})
 }
 
-func (r *restream) observe(ctx context.Context, interval time.Duration) {
+func (r *restream) observe(ctx context.Context, fs fs.Filesystem, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -230,14 +235,14 @@ func (r *restream) observe(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			size, limit := r.fs.diskfs.Size()
+			size, limit := fs.Size()
 			isFull := false
 			if limit > 0 && size >= limit {
 				isFull = true
 			}
 
 			if isFull {
-				// Stop all tasks that write to disk
+				// Stop all tasks that write to this filesystem
 				r.lock.Lock()
 				for id, t := range r.tasks {
 					if !t.valid {
@@ -252,7 +257,7 @@ func (r *restream) observe(ctx context.Context, interval time.Duration) {
 						continue
 					}
 
-					r.logger.Warn().Log("Shutting down because disk is full")
+					r.logger.Warn().Log("Shutting down because filesystem is full")
 					r.stopProcess(id)
 				}
 				r.lock.Unlock()
@@ -290,7 +295,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		t.config.ResolvePlaceholders(r.replace)
+		resolvePlaceholders(t.config, r.replace)
 
 		tasks[id] = t
 	}
@@ -463,7 +468,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	t.config.ResolvePlaceholders(r.replace)
+	resolvePlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -502,34 +507,50 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 }
 
 func (r *restream) setCleanup(id string, config *app.Config) {
+	rePrefix := regexp.MustCompile(`^([a-z]+):`)
+
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {
-			if strings.HasPrefix(c.Pattern, "memfs:") {
-				r.fs.memfs.SetCleanup(id, []rfs.Pattern{
-					{
-						Pattern:       strings.TrimPrefix(c.Pattern, "memfs:"),
-						MaxFiles:      c.MaxFiles,
-						MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
-						PurgeOnDelete: c.PurgeOnDelete,
-					},
+			matches := rePrefix.FindStringSubmatch(c.Pattern)
+			if matches == nil {
+				continue
+			}
+
+			name := matches[1]
+
+			// Support legacy names
+			if name == "diskfs" {
+				name = "disk"
+			} else if name == "memfs" {
+				name = "mem"
+			}
+
+			for _, fs := range r.fs.list {
+				if fs.Name() != name {
+					continue
+				}
+
+				pattern := rfs.Pattern{
+					Pattern:       rePrefix.ReplaceAllString(c.Pattern, ""),
+					MaxFiles:      c.MaxFiles,
+					MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
+					PurgeOnDelete: c.PurgeOnDelete,
+				}
+
+				fs.SetCleanup(id, []rfs.Pattern{
+					pattern,
 				})
-			} else if strings.HasPrefix(c.Pattern, "diskfs:") {
-				r.fs.diskfs.SetCleanup(id, []rfs.Pattern{
-					{
-						Pattern:       strings.TrimPrefix(c.Pattern, "diskfs:"),
-						MaxFiles:      c.MaxFiles,
-						MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
-						PurgeOnDelete: c.PurgeOnDelete,
-					},
-				})
+
+				break
 			}
 		}
 	}
 }
 
 func (r *restream) unsetCleanup(id string) {
-	r.fs.diskfs.UnsetCleanup(id)
-	r.fs.memfs.UnsetCleanup(id)
+	for _, fs := range r.fs.list {
+		fs.UnsetCleanup(id)
+	}
 }
 
 func (r *restream) setPlayoutPorts(t *task) error {
@@ -618,9 +639,23 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		io.Address, err = r.validateInputAddress(io.Address, r.fs.diskfs.Base())
-		if err != nil {
-			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+		if len(r.fs.diskfs) != 0 {
+			maxFails := 0
+			for _, fs := range r.fs.diskfs {
+				io.Address, err = r.validateInputAddress(io.Address, fs.Metadata("base"))
+				if err != nil {
+					maxFails++
+				}
+			}
+
+			if maxFails == len(r.fs.diskfs) {
+				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+			}
+		} else {
+			io.Address, err = r.validateInputAddress(io.Address, "/")
+			if err != nil {
+				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+			}
 		}
 	}
 
@@ -650,15 +685,33 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		isFile := false
+		if len(r.fs.diskfs) != 0 {
+			maxFails := 0
+			for _, fs := range r.fs.diskfs {
+				isFile := false
+				io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Metadata("base"))
+				if err != nil {
+					maxFails++
+				}
 
-		io.Address, isFile, err = r.validateOutputAddress(io.Address, r.fs.diskfs.Base())
-		if err != nil {
-			return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
-		}
+				if isFile {
+					hasFiles = true
+				}
+			}
 
-		if isFile {
-			hasFiles = true
+			if maxFails == len(r.fs.diskfs) {
+				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+			}
+		} else {
+			isFile := false
+			io.Address, isFile, err = r.validateOutputAddress(io.Address, "/")
+			if err != nil {
+				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+			}
+
+			if isFile {
+				hasFiles = true
+			}
 		}
 	}
 
@@ -1089,7 +1142,7 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.config = t.process.Config.Clone()
 
-	t.config.ResolvePlaceholders(r.replace)
+	resolvePlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
@@ -1251,6 +1304,10 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 }
 
 func (r *restream) Probe(id string) app.Probe {
+	return r.ProbeWithTimeout(id, 20*time.Second)
+}
+
+func (r *restream) ProbeWithTimeout(id string, timeout time.Duration) app.Probe {
 	r.lock.RLock()
 
 	appprobe := app.Probe{}
@@ -1288,7 +1345,7 @@ func (r *restream) Probe(id string) app.Probe {
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 		Reconnect:      false,
 		ReconnectDelay: 0,
-		StaleTimeout:   20 * time.Second,
+		StaleTimeout:   timeout,
 		Command:        command,
 		Parser:         prober,
 		Logger:         task.logger,
@@ -1436,4 +1493,98 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	}
 
 	return data, nil
+}
+
+// resolvePlaceholders replaces all placeholders in the config. The config
+// will be modified in place.
+func resolvePlaceholders(config *app.Config, r replace.Replacer) {
+	vars := map[string]string{
+		"processid": config.ID,
+		"reference": config.Reference,
+	}
+
+	for i, option := range config.Options {
+		// Replace any known placeholders
+		option = r.Replace(option, "diskfs", "", vars, config, "global")
+		option = r.Replace(option, "fs:*", "", vars, config, "global")
+
+		config.Options[i] = option
+	}
+
+	// Resolving the given inputs
+	for i, input := range config.Input {
+		// Replace any known placeholders
+		input.ID = r.Replace(input.ID, "processid", config.ID, nil, nil, "input")
+		input.ID = r.Replace(input.ID, "reference", config.Reference, nil, nil, "input")
+
+		vars["inputid"] = input.ID
+
+		input.Address = r.Replace(input.Address, "inputid", input.ID, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "processid", config.ID, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "reference", config.Reference, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "diskfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "memfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "fs:*", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "rtmp", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "srt", "", vars, config, "input")
+
+		for j, option := range input.Options {
+			// Replace any known placeholders
+			option = r.Replace(option, "inputid", input.ID, nil, nil, "input")
+			option = r.Replace(option, "processid", config.ID, nil, nil, "input")
+			option = r.Replace(option, "reference", config.Reference, nil, nil, "input")
+			option = r.Replace(option, "diskfs", "", vars, config, "input")
+			option = r.Replace(option, "memfs", "", vars, config, "input")
+			option = r.Replace(option, "fs:*", "", vars, config, "input")
+
+			input.Options[j] = option
+		}
+
+		delete(vars, "inputid")
+
+		config.Input[i] = input
+	}
+
+	// Resolving the given outputs
+	for i, output := range config.Output {
+		// Replace any known placeholders
+		output.ID = r.Replace(output.ID, "processid", config.ID, nil, nil, "output")
+		output.ID = r.Replace(output.ID, "reference", config.Reference, nil, nil, "output")
+
+		vars["outputid"] = output.ID
+
+		output.Address = r.Replace(output.Address, "outputid", output.ID, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "processid", config.ID, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "reference", config.Reference, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "diskfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "memfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "fs:*", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "rtmp", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "srt", "", vars, config, "output")
+
+		for j, option := range output.Options {
+			// Replace any known placeholders
+			option = r.Replace(option, "outputid", output.ID, nil, nil, "output")
+			option = r.Replace(option, "processid", config.ID, nil, nil, "output")
+			option = r.Replace(option, "reference", config.Reference, nil, nil, "output")
+			option = r.Replace(option, "diskfs", "", vars, config, "output")
+			option = r.Replace(option, "memfs", "", vars, config, "output")
+			option = r.Replace(option, "fs:*", "", vars, config, "output")
+
+			output.Options[j] = option
+		}
+
+		for j, cleanup := range output.Cleanup {
+			// Replace any known placeholders
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID, nil, nil, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID, nil, nil, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference, nil, nil, "output")
+
+			output.Cleanup[j] = cleanup
+		}
+
+		delete(vars, "outputid")
+
+		config.Output[i] = output
+	}
 }

@@ -6,13 +6,14 @@ import (
 	"github.com/datarhei/core/v16/config/copy"
 	v2 "github.com/datarhei/core/v16/config/v2"
 	"github.com/datarhei/core/v16/config/value"
+	"github.com/datarhei/core/v16/io/fs"
 )
 
 // Data is the actual configuration data for the app
 type Data struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LoadedAt        time.Time `json:"-"`
-	UpdatedAt       time.Time `json:"-"`
+	CreatedAt       time.Time `json:"created_at"` // When this config has been persisted
+	LoadedAt        time.Time `json:"-"`          // When this config has been actually used
+	UpdatedAt       time.Time `json:"-"`          // Irrelevant
 	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3" format:"int64"`
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
@@ -88,6 +89,7 @@ type Data struct {
 			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
+		S3   []value.S3Storage `json:"s3"`
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
@@ -166,8 +168,8 @@ type Data struct {
 	} `json:"router"`
 }
 
-func UpgradeV2ToV3(d *v2.Data) (*Data, error) {
-	cfg := New()
+func UpgradeV2ToV3(d *v2.Data, fs fs.Filesystem) (*Data, error) {
+	cfg := New(fs)
 
 	return MergeV2toV3(&cfg.Data, d)
 }
@@ -245,6 +247,8 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
 	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
 	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types)
+
+	data.Storage.S3 = []value.S3Storage{}
 
 	data.Version = 3
 

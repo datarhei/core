@@ -134,6 +134,7 @@ definitions:
             type: boolean
         type: object
       created_at:
+        description: When this config has been persisted
         type: string
       db:
         properties:
@@ -391,6 +392,10 @@ definitions:
             type: object
           mimetypes_file:
             type: string
+          s3:
+            items:
+              $ref: '#/definitions/value.S3Storage'
+            type: array
         type: object
       tls:
         properties:
@@ -441,6 +446,15 @@ definitions:
       size_bytes:
         format: int64
         type: integer
+    type: object
+  api.FilesystemInfo:
+    properties:
+      mount:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
     type: object
   api.GraphQuery:
     properties:
@@ -1388,6 +1402,7 @@ definitions:
             type: boolean
         type: object
       created_at:
+        description: When this config has been persisted
         type: string
       db:
         properties:
@@ -1645,6 +1660,10 @@ definitions:
             type: object
           mimetypes_file:
             type: string
+          s3:
+            items:
+              $ref: '#/definitions/value.S3Storage'
+            type: array
         type: object
       tls:
         properties:
@@ -1867,6 +1886,34 @@ definitions:
           type: string
         type: array
     type: object
+  value.S3Storage:
+    properties:
+      access_key_id:
+        type: string
+      auth:
+        properties:
+          enable:
+            type: boolean
+          password:
+            type: string
+          username:
+            type: string
+        type: object
+      bucket:
+        type: string
+      endpoint:
+        type: string
+      mountpoint:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      secret_access_key:
+        type: string
+      use_ssl:
+        type: boolean
+    type: object
 info:
   contact:
     email: hello@datarhei.com
@@ -1879,34 +1926,6 @@ info:
   title: datarhei Core API
   version: "3.0"
 paths:
-  /{path}:
-    get:
-      description: Fetch a file from the filesystem. If the file is a directory, a
-        index.html is returned, if it exists.
-      operationId: diskfs-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      summary: Fetch a file from the filesystem
   /api:
     get:
       description: API version and build infos in case auth is valid or not required.
@@ -2077,10 +2096,10 @@ paths:
   /api/v3/config/reload:
     get:
       description: Reload the currently active configuration. This will trigger a
-        restart of the Restreamer.
+        restart of the Core.
       operationId: config-3-reload
       produces:
-      - text/plain
+      - application/json
       responses:
         "200":
           description: OK
@@ -2091,12 +2110,33 @@ paths:
       summary: Reload the currently active configuration
       tags:
       - v16.7.2
-  /api/v3/fs/disk:
+  /api/v3/fs:
     get:
-      description: List all files on the filesystem. The listing can be ordered by
-        name, size, or date of last modification in ascending or descending order.
-      operationId: diskfs-3-list-files
+      description: Listall registered filesystems
+      operationId: filesystem-3-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.FilesystemInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all registered filesystems
+  /api/v3/fs/{name}:
+    get:
+      description: List all files on a filesystem. The listing can be ordered by name,
+        size, or date of last modification in ascending or descending order.
+      operationId: filesystem-3-list-files
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: name
+        required: true
+        type: string
       - description: glob pattern for file names
         in: query
         name: glob
@@ -2120,14 +2160,17 @@ paths:
             type: array
       security:
       - ApiKeyAuth: []
-      summary: List all files on the filesystem
-      tags:
-      - v16.7.2
-  /api/v3/fs/disk/{path}:
+      summary: List all files on a filesystem
+  /api/v3/fs/{name}/{path}:
     delete:
-      description: Remove a file from the filesystem
-      operationId: diskfs-3-delete-file
+      description: Remove a file from a filesystem
+      operationId: filesystem-3-delete-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: name
+        required: true
+        type: string
       - description: Path to file
         in: path
         name: path
@@ -2146,14 +2189,16 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Remove a file from the filesystem
-      tags:
-      - v16.7.2
+      summary: Remove a file from a filesystem
     get:
-      description: Fetch a file from the filesystem. The contents of that file are
-        returned.
-      operationId: diskfs-3-get-file
+      description: Fetch a file from a filesystem
+      operationId: filesystem-3-get-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: name
+        required: true
+        type: string
       - description: Path to file
         in: path
         name: path
@@ -2177,15 +2222,18 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Fetch a file from the filesystem
-      tags:
-      - v16.7.2
+      summary: Fetch a file from a filesystem
     put:
       consumes:
       - application/data
-      description: Writes or overwrites a file on the filesystem
-      operationId: diskfs-3-put-file
+      description: Writes or overwrites a file on a filesystem
+      operationId: filesystem-3-put-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: name
+        required: true
+        type: string
       - description: Path to file
         in: path
         name: path
@@ -2217,172 +2265,7 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Add a file to the filesystem
-      tags:
-      - v16.7.2
-  /api/v3/fs/mem:
-    get:
-      description: List all files on the memory filesystem. The listing can be ordered
-        by name, size, or date of last modification in ascending or descending order.
-      operationId: memfs-3-list-files
-      parameters:
-      - description: glob pattern for file names
-        in: query
-        name: glob
-        type: string
-      - description: none, name, size, lastmod
-        in: query
-        name: sort
-        type: string
-      - description: asc, desc
-        in: query
-        name: order
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/api.FileInfo'
-            type: array
-      security:
-      - ApiKeyAuth: []
-      summary: List all files on the memory filesystem
-      tags:
-      - v16.7.2
-  /api/v3/fs/mem/{path}:
-    delete:
-      description: Remove a file from the memory filesystem
-      operationId: memfs-3-delete-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Remove a file from the memory filesystem
-      tags:
-      - v16.7.2
-    get:
-      description: Fetch a file from the memory filesystem
-      operationId: memfs-3-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Fetch a file from the memory filesystem
-      tags:
-      - v16.7.2
-    patch:
-      consumes:
-      - application/data
-      description: Create a link to a file in the memory filesystem. The file linked
-        to has to exist.
-      operationId: memfs-3-patch
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Path to the file to link to
-        in: body
-        name: url
-        required: true
-        schema:
-          type: string
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Create a link to a file in the memory filesystem
-      tags:
-      - v16.7.2
-    put:
-      consumes:
-      - application/data
-      description: Writes or overwrites a file on the memory filesystem
-      operationId: memfs-3-put-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: File data
-        in: body
-        name: data
-        required: true
-        schema:
-          items:
-            type: integer
-          type: array
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "507":
-          description: Insufficient Storage
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Add a file to the memory filesystem
-      tags:
-      - v16.7.2
+      summary: Add a file to a filesystem
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application
@@ -3292,94 +3175,6 @@ paths:
       summary: Fetch minimal statistics about a process
       tags:
       - v16.7.2
-  /memfs/{path}:
-    delete:
-      description: Remove a file from the memory filesystem
-      operationId: memfs-delete-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - BasicAuth: []
-      summary: Remove a file from the memory filesystem
-    get:
-      description: Fetch a file from the memory filesystem
-      operationId: memfs-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      summary: Fetch a file from the memory filesystem
-    put:
-      consumes:
-      - application/data
-      description: Writes or overwrites a file on the memory filesystem
-      operationId: memfs-put-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: File data
-        in: body
-        name: data
-        required: true
-        schema:
-          items:
-            type: integer
-          type: array
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "507":
-          description: Insufficient Storage
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - BasicAuth: []
-      summary: Add a file to the memory filesystem
   /metrics:
     get:
       description: Prometheus metrics
