@@ -6,7 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/http/jwt/jwks"
+	"github.com/datarhei/core/v16/iam"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
@@ -24,14 +24,12 @@ type Validator interface {
 }
 
 type localValidator struct {
-	username string
-	password string
+	iam iam.IAM
 }
 
-func NewLocalValidator(username, password string) (Validator, error) {
+func NewLocalValidator(iam iam.IAM) (Validator, error) {
 	v := &localValidator{
-		username: username,
-		password: password,
+		iam: iam,
 	}
 
 	return v, nil
@@ -48,46 +46,34 @@ func (v *localValidator) Validate(c echo.Context) (bool, string, error) {
 		return false, "", nil
 	}
 
-	if login.Username != v.username || login.Password != v.password {
+	identity := v.iam.GetIdentity(login.Username)
+	if identity == nil {
 		return true, "", fmt.Errorf("invalid username or password")
 	}
 
-	return true, v.username, nil
+	if !identity.VerifyAPIPassword(login.Password) {
+		return true, "", fmt.Errorf("invalid username or password")
+	}
+
+	return true, login.Username, nil
 }
 
 func (v *localValidator) Cancel() {}
 
 type auth0Validator struct {
-	domain   string
-	issuer   string
-	audience string
-	clientID string
-	users    []string
-	certs    jwks.JWKS
+	iam iam.IAM
 }
 
-func NewAuth0Validator(domain, audience, clientID string, users []string) (Validator, error) {
+func NewAuth0Validator(iam iam.IAM) (Validator, error) {
 	v := &auth0Validator{
-		domain:   domain,
-		issuer:   "https://" + domain + "/",
-		audience: audience,
-		clientID: clientID,
-		users:    users,
+		iam: iam,
 	}
-
-	url := v.issuer + ".well-known/jwks.json"
-	certs, err := jwks.NewFromURL(url, jwks.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	v.certs = certs
 
 	return v, nil
 }
 
 func (v auth0Validator) String() string {
-	return fmt.Sprintf("auth0 domain=%s audience=%s clientid=%s", v.domain, v.audience, v.clientID)
+	return fmt.Sprintf("auth0 domain=%s audience=%s clientid=%s", "", "", "")
 }
 
 func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
@@ -116,26 +102,6 @@ func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
 		return false, "", nil
 	}
 
-	var issuer string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if iss, ok := claims["iss"]; ok {
-			issuer = iss.(string)
-		}
-	}
-
-	if issuer != v.issuer {
-		return false, "", nil
-	}
-
-	token, err = jwtgo.Parse(auth, v.keyFunc)
-	if err != nil {
-		return true, "", err
-	}
-
-	if !token.Valid {
-		return true, "", fmt.Errorf("invalid token")
-	}
-
 	var subject string
 	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
 		if sub, ok := claims["sub"]; ok {
@@ -143,72 +109,16 @@ func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
 		}
 	}
 
+	identity := v.iam.GetIdentityByAuth0(subject)
+	if identity == nil {
+		return true, "", fmt.Errorf("invalid token")
+	}
+
+	if !identity.VerifyAPIAuth0(auth) {
+		return true, "", fmt.Errorf("invalid token")
+	}
+
 	return true, subject, nil
 }
 
-func (v *auth0Validator) keyFunc(token *jwtgo.Token) (interface{}, error) {
-	// Verify 'aud' claim
-	checkAud := token.Claims.(jwtgo.MapClaims).VerifyAudience(v.audience, false)
-	if !checkAud {
-		return nil, fmt.Errorf("invalid audience")
-	}
-
-	// Verify 'iss' claim
-	checkIss := token.Claims.(jwtgo.MapClaims).VerifyIssuer(v.issuer, false)
-	if !checkIss {
-		return nil, fmt.Errorf("invalid issuer")
-	}
-
-	// Verify 'sub' claim
-	if _, ok := token.Claims.(jwtgo.MapClaims)["sub"]; !ok {
-		return nil, fmt.Errorf("sub claim is required")
-	}
-
-	sub := token.Claims.(jwtgo.MapClaims)["sub"].(string)
-	found := false
-	for _, u := range v.users {
-		if sub == u {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return nil, fmt.Errorf("user not allowed")
-	}
-
-	// find the key
-	if _, ok := token.Header["kid"]; !ok {
-		return nil, fmt.Errorf("kid not found")
-	}
-
-	kid := token.Header["kid"].(string)
-
-	key, err := v.certs.Key(kid)
-	if err != nil {
-		return nil, fmt.Errorf("no cert for kid found: %w", err)
-	}
-
-	// find algorithm
-	if _, ok := token.Header["alg"]; !ok {
-		return nil, fmt.Errorf("kid not found")
-	}
-
-	alg := token.Header["alg"].(string)
-
-	if key.Alg() != alg {
-		return nil, fmt.Errorf("signing method doesn't match")
-	}
-
-	// get the public key
-	publicKey, err := key.PublicKey()
-	if err != nil {
-		return nil, fmt.Errorf("invalid public key: %w", err)
-	}
-
-	return publicKey, nil
-}
-
-func (v *auth0Validator) Cancel() {
-	v.certs.Cancel()
-}
+func (v *auth0Validator) Cancel() {}

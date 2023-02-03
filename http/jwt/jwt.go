@@ -92,7 +92,19 @@ func New(config Config) (JWT, error) {
 		AuthScheme:              "Bearer",
 		Claims:                  jwtgo.MapClaims{},
 		ErrorHandlerWithContext: j.ErrorHandler,
-		ParseTokenFunc:          j.parseToken("access"),
+		SuccessHandler: func(c echo.Context) {
+			token := c.Get("user").(*jwtgo.Token)
+
+			var subject string
+			if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
+				if sub, ok := claims["sub"]; ok {
+					subject = sub.(string)
+				}
+			}
+
+			c.Set("user", subject)
+		},
+		ParseTokenFunc: j.parseToken("access"),
 	}
 
 	j.refreshConfig = middleware.JWTConfig{

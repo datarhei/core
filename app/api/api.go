@@ -25,6 +25,7 @@ import (
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/math/rand"
@@ -83,6 +84,7 @@ type api struct {
 	httpjwt       jwt.JWT
 	update        update.Checker
 	replacer      replace.Replacer
+	iam           iam.IAM
 
 	errorChan chan error
 
@@ -380,6 +382,13 @@ func (a *api) start() error {
 		sessions, _ := session.New(session.Config{})
 		a.sessions = sessions
 	}
+
+	iam, err := iam.NewIAM()
+	if err != nil {
+		return fmt.Errorf("iam: %w", err)
+	}
+
+	a.iam = iam
 
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 		Root:   cfg.Storage.Disk.Dir,
@@ -874,6 +883,7 @@ func (a *api) start() error {
 			Token:     cfg.RTMP.Token,
 			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
+			IAM:       a.iam,
 		}
 
 		if cfg.RTMP.EnableTLS {
@@ -902,6 +912,7 @@ func (a *api) start() error {
 			Token:      cfg.SRT.Token,
 			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
 			Collector:  a.sessions.Collector("srt"),
+			IAM:        a.iam,
 		}
 
 		if cfg.SRT.Log.Enable {
@@ -1012,6 +1023,7 @@ func (a *api) start() error {
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
+		IAM:      a.iam,
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

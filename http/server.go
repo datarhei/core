@@ -43,6 +43,7 @@ import (
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
@@ -92,6 +93,7 @@ type Config struct {
 	Sessions      session.RegistryReader
 	Router        router.Router
 	ReadOnly      bool
+	IAM           iam.IAM
 }
 
 type CorsConfig struct {

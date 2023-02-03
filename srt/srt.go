@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 	srt "github.com/datarhei/gosrt"
@@ -164,6 +165,8 @@ type Config struct {
 	Collector session.Collector
 
 	SRTLogTopics []string
+
+	IAM iam.IAM
 }
 
 // Server represents a SRT server

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 
@@ -195,6 +196,8 @@ type Config struct {
 	// ListenAndServe, so it's not possible to modify the configuration
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
+
+	IAM iam.IAM
 }
 
 // Server represents a RTMP server
