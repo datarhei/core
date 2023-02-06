@@ -46,8 +46,8 @@ func (v *localValidator) Validate(c echo.Context) (bool, string, error) {
 		return false, "", nil
 	}
 
-	identity := v.iam.GetIdentity(login.Username)
-	if identity == nil {
+	identity, err := v.iam.GetIdentity(login.Username)
+	if err != nil {
 		return true, "", fmt.Errorf("invalid username or password")
 	}
 
@@ -55,7 +55,7 @@ func (v *localValidator) Validate(c echo.Context) (bool, string, error) {
 		return true, "", fmt.Errorf("invalid username or password")
 	}
 
-	return true, login.Username, nil
+	return true, identity.Name(), nil
 }
 
 func (v *localValidator) Cancel() {}
@@ -109,8 +109,8 @@ func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
 		}
 	}
 
-	identity := v.iam.GetIdentityByAuth0(subject)
-	if identity == nil {
+	identity, err := v.iam.GetIdentityByAuth0(subject)
+	if err != nil {
 		return true, "", fmt.Errorf("invalid token")
 	}
 
@@ -118,7 +118,7 @@ func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
 		return true, "", fmt.Errorf("invalid token")
 	}
 
-	return true, subject, nil
+	return true, identity.Name(), nil
 }
 
 func (v *auth0Validator) Cancel() {}

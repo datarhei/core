@@ -1,11 +1,14 @@
 package iam
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"sync"
 
-	"github.com/datarhei/core/v16/http/jwt/jwks"
+	"github.com/datarhei/core/v16/iam/jwks"
+	"github.com/datarhei/core/v16/io/fs"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
 )
@@ -16,28 +19,35 @@ import (
 // the whole jwks will be part of this package
 
 type User struct {
-	Name      string `json:"name"`
-	Superuser bool   `json:"superuser"`
-	Auth      struct {
-		API struct {
-			Userpass struct {
-				Enable   bool   `json:"enable"`
-				Password string `json:"password"`
-			} `json:"userpass"`
-			Auth0 struct {
-				Enable bool        `json:"enable"`
-				User   string      `json:"user"`
-				Tenant Auth0Tenant `json:"tenant"`
-			} `json:"auth0"`
-		} `json:"api"`
-		Services struct {
-			Basic struct {
-				Enable   bool   `json:"enable"`
-				Password string `json:"password"`
-			} `json:"basic"`
-			Token string `json:"token"`
-		} `json:"services"`
-	} `json:"auth"`
+	Name      string   `json:"name"`
+	Superuser bool     `json:"superuser"`
+	Auth      UserAuth `json:"auth"`
+}
+
+type UserAuth struct {
+	API      UserAuthAPI      `json:"api"`
+	Services UserAuthServices `json:"services"`
+}
+
+type UserAuthAPI struct {
+	Userpass UserAuthPassword `json:"userpass"`
+	Auth0    UserAuthAPIAuth0 `json:"auth0"`
+}
+
+type UserAuthAPIAuth0 struct {
+	Enable bool        `json:"enable"`
+	User   string      `json:"user"`
+	Tenant Auth0Tenant `json:"tenant"`
+}
+
+type UserAuthServices struct {
+	Basic UserAuthPassword `json:"basic"`
+	Token string           `json:"token"`
+}
+
+type UserAuthPassword struct {
+	Enable   bool   `json:"enable"`
+	Password string `json:"password"`
 }
 
 func (u *User) validate() error {
@@ -81,6 +91,10 @@ type identity struct {
 	valid bool
 
 	lock sync.RWMutex
+}
+
+func (i *identity) Name() string {
+	return i.user.Name
 }
 
 func (i *identity) VerifyAPIPassword(password string) bool {
@@ -238,6 +252,8 @@ func (i *identity) IsSuperuser() bool {
 }
 
 type IdentityVerifier interface {
+	Name() string
+
 	VerifyAPIPassword(password string) bool
 	VerifyAPIAuth0(jwt string) bool
 
@@ -252,11 +268,12 @@ type IdentityManager interface {
 	Remove(name string) error
 	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
+	GetVerifierByAuth0(name string) (IdentityVerifier, error)
 	Rename(oldname, newname string) error
 	Update(name string, identity User) error
 
-	Load(path string) error
-	Save(path string) error
+	Save() error
+	Close()
 }
 
 type Auth0Tenant struct {
@@ -297,32 +314,72 @@ func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
 	return t, nil
 }
 
+func (a *auth0Tenant) Cancel() {
+	a.certs.Cancel()
+}
+
 type identityManager struct {
 	identities map[string]*identity
 	tenants    map[string]*auth0Tenant
 
 	auth0UserIdentityMap map[string]string
 
+	fs       fs.Filesystem
+	filePath string
+
 	lock sync.RWMutex
 }
 
-func NewIdentityManager() (IdentityManager, error) {
-	return &identityManager{
+func NewIdentityManager(fs fs.Filesystem, superuser User) (IdentityManager, error) {
+	im := &identityManager{
 		identities:           map[string]*identity{},
 		tenants:              map[string]*auth0Tenant{},
 		auth0UserIdentityMap: map[string]string{},
-	}, nil
+		fs:                   fs,
+		filePath:             "./users.json",
+	}
+
+	err := im.load(im.filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(im.identities) == 0 {
+		superuser.Superuser = true
+		im.Create(superuser)
+
+		im.save(im.filePath)
+	}
+
+	return im, nil
 }
 
-func (i *identityManager) Create(u User) error {
+func (im *identityManager) Close() {
+	im.lock.Lock()
+	defer im.lock.Unlock()
+
+	im.fs = nil
+	im.auth0UserIdentityMap = map[string]string{}
+	im.identities = map[string]*identity{}
+
+	for _, t := range im.tenants {
+		t.Cancel()
+	}
+
+	im.tenants = map[string]*auth0Tenant{}
+
+	return
+}
+
+func (im *identityManager) Create(u User) error {
 	if err := u.validate(); err != nil {
 		return err
 	}
 
-	i.lock.Lock()
-	defer i.lock.Unlock()
+	im.lock.Lock()
+	defer im.lock.Unlock()
 
-	_, ok := i.identities[u.Name]
+	_, ok := im.identities[u.Name]
 	if ok {
 		return fmt.Errorf("identity already exists")
 	}
@@ -330,42 +387,42 @@ func (i *identityManager) Create(u User) error {
 	identity := u.marshalIdentity()
 
 	if identity.user.Auth.API.Auth0.Enable {
-		if _, ok := i.auth0UserIdentityMap[identity.user.Auth.API.Auth0.User]; ok {
+		if _, ok := im.auth0UserIdentityMap[identity.user.Auth.API.Auth0.User]; ok {
 			return fmt.Errorf("the Auth0 user has already an identity")
 		}
 
 		auth0Key := identity.user.Auth.API.Auth0.Tenant.key()
 
-		if _, ok := i.tenants[auth0Key]; !ok {
+		if _, ok := im.tenants[auth0Key]; !ok {
 			tenant, err := newAuth0Tenant(identity.user.Auth.API.Auth0.Tenant)
 			if err != nil {
 				return err
 			}
 
-			i.tenants[auth0Key] = tenant
+			im.tenants[auth0Key] = tenant
 		}
 
 	}
 
-	i.identities[identity.user.Name] = identity
+	im.identities[identity.user.Name] = identity
 
 	return nil
 }
 
-func (i *identityManager) Update(name string, identity User) error {
+func (im *identityManager) Update(name string, identity User) error {
 	return nil
 }
 
-func (i *identityManager) Remove(name string) error {
-	i.lock.Lock()
-	defer i.lock.Unlock()
+func (im *identityManager) Remove(name string) error {
+	im.lock.Lock()
+	defer im.lock.Unlock()
 
-	user, ok := i.identities[name]
+	user, ok := im.identities[name]
 	if !ok {
 		return nil
 	}
 
-	delete(i.identities, name)
+	delete(im.identities, name)
 
 	user.lock.Lock()
 	user.valid = false
@@ -374,11 +431,8 @@ func (i *identityManager) Remove(name string) error {
 	return nil
 }
 
-func (i *identityManager) getIdentity(name string) (*identity, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
-
-	identity, ok := i.identities[name]
+func (im *identityManager) getIdentity(name string) (*identity, error) {
+	identity, ok := im.identities[name]
 	if !ok {
 		return nil, fmt.Errorf("not found")
 	}
@@ -386,55 +440,117 @@ func (i *identityManager) getIdentity(name string) (*identity, error) {
 	return identity, nil
 }
 
-func (i *identityManager) Get(name string) (User, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
+func (im *identityManager) Get(name string) (User, error) {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
 
-	identity, ok := i.identities[name]
-	if !ok {
+	identity, err := im.getIdentity(name)
+	if err != nil {
 		return User{}, fmt.Errorf("not found")
 	}
 
 	return identity.user, nil
 }
 
-func (i *identityManager) GetVerifier(name string) (IdentityVerifier, error) {
-	i.lock.RLock()
-	defer i.lock.RUnlock()
+func (im *identityManager) GetVerifier(name string) (IdentityVerifier, error) {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
 
-	identity, ok := i.identities[name]
+	return im.getIdentity(name)
+}
+
+func (im *identityManager) GetVerifierByAuth0(name string) (IdentityVerifier, error) {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
+	name, ok := im.auth0UserIdentityMap[name]
 	if !ok {
 		return nil, fmt.Errorf("not found")
 	}
 
-	return identity, nil
+	return im.getIdentity(name)
 }
 
-func (i *identityManager) Rename(oldname, newname string) error {
-	i.lock.Lock()
-	defer i.lock.Unlock()
+func (im *identityManager) Rename(oldname, newname string) error {
+	im.lock.Lock()
+	defer im.lock.Unlock()
 
-	identity, ok := i.identities[oldname]
+	identity, ok := im.identities[oldname]
 	if !ok {
 		return nil
 	}
 
-	if _, ok := i.identities[newname]; ok {
+	if _, ok := im.identities[newname]; ok {
 		return fmt.Errorf("the new name already exists")
 	}
 
-	delete(i.identities, oldname)
+	delete(im.identities, oldname)
 
 	identity.user.Name = newname
-	i.identities[newname] = identity
+	im.identities[newname] = identity
 
 	return nil
 }
 
-func (i *identityManager) Load(path string) error {
-	return fmt.Errorf("not implemented")
+func (im *identityManager) load(filePath string) error {
+	if im.fs == nil {
+		return fmt.Errorf("no filesystem provided")
+	}
+
+	if _, err := im.fs.Stat(filePath); os.IsNotExist(err) {
+		return nil
+	}
+
+	data, err := im.fs.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	users := []User{}
+
+	err = json.Unmarshal(data, &users)
+	if err != nil {
+		return err
+	}
+
+	for _, u := range users {
+		err = im.Create(u)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (i *identityManager) Save(path string) error {
-	return fmt.Errorf("not implemented")
+func (im *identityManager) Save() error {
+	return im.save(im.filePath)
+}
+
+func (im *identityManager) save(filePath string) error {
+	if im.fs == nil {
+		return fmt.Errorf("no filesystem provided")
+	}
+
+	if filePath == "" {
+		return fmt.Errorf("invalid file path, file path cannot be empty")
+	}
+
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
+	users := []User{}
+
+	for _, u := range im.identities {
+		users = append(users, u.user)
+	}
+
+	jsondata, err := json.MarshalIndent(users, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	_, _, err = im.fs.WriteFileSafe(filePath, jsondata)
+
+	return err
 }

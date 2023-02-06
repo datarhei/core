@@ -383,12 +383,50 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
-	iam, err := iam.NewIAM()
-	if err != nil {
-		return fmt.Errorf("iam: %w", err)
-	}
+	{
+		superuser := iam.User{
+			Name:      cfg.API.Auth.Username,
+			Superuser: true,
+			Auth: iam.UserAuth{
+				API: iam.UserAuthAPI{
+					Userpass: iam.UserAuthPassword{
+						Enable:   cfg.API.Auth.Enable,
+						Password: cfg.API.Auth.Password,
+					},
+					Auth0: iam.UserAuthAPIAuth0{
+						Enable: cfg.API.Auth.Auth0.Enable,
+						User:   cfg.API.Auth.Auth0.Tenants[0].Users[0],
+						Tenant: iam.Auth0Tenant{
+							Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
+							Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
+							ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
+						},
+					},
+				},
+				Services: iam.UserAuthServices{
+					Basic: iam.UserAuthPassword{
+						Enable:   cfg.Storage.Memory.Auth.Enable,
+						Password: cfg.Storage.Memory.Auth.Password,
+					},
+					Token: cfg.RTMP.Token,
+				},
+			},
+		}
 
-	a.iam = iam
+		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+			Root: filepath.Join(cfg.DB.Dir, "iam"),
+		})
+		if err != nil {
+			return err
+		}
+
+		iam, err := iam.NewIAM(fs, superuser)
+		if err != nil {
+			return fmt.Errorf("iam: %w", err)
+		}
+
+		a.iam = iam
+	}
 
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 		Root:   cfg.Storage.Disk.Dir,
@@ -639,7 +677,7 @@ func (a *api) start() error {
 			return fmt.Errorf("unable to create JWT provider: %w", err)
 		}
 
-		if validator, err := jwt.NewLocalValidator(cfg.API.Auth.Username, cfg.API.Auth.Password); err == nil {
+		if validator, err := jwt.NewLocalValidator(a.iam); err == nil {
 			if err := httpjwt.AddValidator(app.Name, validator); err != nil {
 				return fmt.Errorf("unable to add local JWT validator: %w", err)
 			}
@@ -649,7 +687,7 @@ func (a *api) start() error {
 
 		if cfg.API.Auth.Auth0.Enable {
 			for _, t := range cfg.API.Auth.Auth0.Tenants {
-				if validator, err := jwt.NewAuth0Validator(t.Domain, t.Audience, t.ClientID, t.Users); err == nil {
+				if validator, err := jwt.NewAuth0Validator(a.iam); err == nil {
 					if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
 						return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
 					}
@@ -1301,6 +1339,10 @@ func (a *api) stop() {
 	if a.state == "idle" {
 		logger.Info().Log("Complete")
 		return
+	}
+
+	if a.iam != nil {
+		a.iam.Close()
 	}
 
 	// Stop JWT authentication
