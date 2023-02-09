@@ -6,9 +6,11 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/datarhei/core/v16/iam/jwks"
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/google/uuid"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
 )
@@ -86,7 +88,8 @@ func (u *User) marshalIdentity() *identity {
 type identity struct {
 	user User
 
-	tenant *auth0Tenant
+	tenant     *auth0Tenant
+	jwtKeyFunc func(*jwtgo.Token) (interface{}, error)
 
 	valid bool
 
@@ -97,37 +100,37 @@ func (i *identity) Name() string {
 	return i.user.Name
 }
 
-func (i *identity) VerifyAPIPassword(password string) bool {
+func (i *identity) VerifyAPIPassword(password string) (bool, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	if !i.isValid() {
-		return false
+		return false, fmt.Errorf("invalid identity")
 	}
 
 	if !i.user.Auth.API.Userpass.Enable {
-		return false
+		return false, fmt.Errorf("authentication method disabled")
 	}
 
-	return i.user.Auth.API.Userpass.Password == password
+	return i.user.Auth.API.Userpass.Password == password, nil
 }
 
-func (i *identity) VerifyAPIAuth0(jwt string) bool {
+func (i *identity) VerifyAPIAuth0(jwt string) (bool, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	if !i.isValid() {
-		return false
+		return false, fmt.Errorf("invalid identity")
 	}
 
 	if !i.user.Auth.API.Auth0.Enable {
-		return false
+		return false, fmt.Errorf("authentication method disabled")
 	}
 
 	p := &jwtgo.Parser{}
 	token, _, err := p.ParseUnverified(jwt, jwtgo.MapClaims{})
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	var subject string
@@ -138,7 +141,7 @@ func (i *identity) VerifyAPIAuth0(jwt string) bool {
 	}
 
 	if subject != i.user.Auth.API.Auth0.User {
-		return false
+		return false, fmt.Errorf("wrong subject")
 	}
 
 	var issuer string
@@ -149,19 +152,19 @@ func (i *identity) VerifyAPIAuth0(jwt string) bool {
 	}
 
 	if issuer != i.tenant.issuer {
-		return false
+		return false, fmt.Errorf("wrong issuer")
 	}
 
 	token, err = jwtgo.Parse(jwt, i.auth0KeyFunc)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if !token.Valid {
-		return false
+		return false, fmt.Errorf("invalid token")
 	}
 
-	return true
+	return true, nil
 }
 
 func (i *identity) auth0KeyFunc(token *jwtgo.Token) (interface{}, error) {
@@ -214,30 +217,64 @@ func (i *identity) auth0KeyFunc(token *jwtgo.Token) (interface{}, error) {
 	return publicKey, nil
 }
 
-func (i *identity) VerifyServiceBasicAuth(password string) bool {
+func (i *identity) VerifyJWT(jwt string) (bool, error) {
+	p := &jwtgo.Parser{}
+	token, _, err := p.ParseUnverified(jwt, jwtgo.MapClaims{})
+	if err != nil {
+		return false, err
+	}
+
+	var issuer string
+	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
+		if sub, ok := claims["iss"]; ok {
+			issuer = sub.(string)
+		}
+	}
+
+	if issuer != "datarhei-core" {
+		return false, fmt.Errorf("wrong issuer")
+	}
+
+	if token.Method.Alg() != "HS256" {
+		return false, fmt.Errorf("invalid hashing algorithm")
+	}
+
+	token, err = jwtgo.Parse(jwt, i.jwtKeyFunc)
+	if err != nil {
+		return false, err
+	}
+
+	if !token.Valid {
+		return false, fmt.Errorf("invalid token")
+	}
+
+	return true, nil
+}
+
+func (i *identity) VerifyServiceBasicAuth(password string) (bool, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	if !i.isValid() {
-		return false
+		return false, fmt.Errorf("invalid identity")
 	}
 
 	if !i.user.Auth.Services.Basic.Enable {
-		return false
+		return false, fmt.Errorf("authentication method disabled")
 	}
 
-	return i.user.Auth.Services.Basic.Password == password
+	return i.user.Auth.Services.Basic.Password == password, nil
 }
 
-func (i *identity) VerifyServiceToken(token string) bool {
+func (i *identity) VerifyServiceToken(token string) (bool, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	if !i.isValid() {
-		return false
+		return false, fmt.Errorf("invalid identity")
 	}
 
-	return i.user.Auth.Services.Token == token
+	return i.user.Auth.Services.Token == token, nil
 }
 
 func (i *identity) isValid() bool {
@@ -254,11 +291,13 @@ func (i *identity) IsSuperuser() bool {
 type IdentityVerifier interface {
 	Name() string
 
-	VerifyAPIPassword(password string) bool
-	VerifyAPIAuth0(jwt string) bool
+	VerifyJWT(jwt string) (bool, error)
 
-	VerifyServiceBasicAuth(password string) bool
-	VerifyServiceToken(token string) bool
+	VerifyAPIPassword(password string) (bool, error)
+	VerifyAPIAuth0(jwt string) (bool, error)
+
+	VerifyServiceBasicAuth(password string) (bool, error)
+	VerifyServiceToken(token string) (bool, error)
 
 	IsSuperuser() bool
 }
@@ -269,56 +308,20 @@ type IdentityManager interface {
 	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
 	GetVerifierByAuth0(name string) (IdentityVerifier, error)
+	GetDefaultVerifier() (IdentityVerifier, error)
 	Rename(oldname, newname string) error
 	Update(name string, identity User) error
+
+	Validators() []string
+	CreateJWT(name string) (string, string, error)
 
 	Save() error
 	Close()
 }
 
-type Auth0Tenant struct {
-	Domain   string
-	Audience string
-	ClientID string
-}
-
-func (t *Auth0Tenant) key() string {
-	return t.Domain + t.Audience
-}
-
-type auth0Tenant struct {
-	domain    string
-	issuer    string
-	audience  string
-	clientIDs []string
-	certs     jwks.JWKS
-}
-
-func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
-	t := &auth0Tenant{
-		domain:    tenant.Domain,
-		issuer:    "https://" + tenant.Domain + "/",
-		audience:  tenant.Audience,
-		clientIDs: []string{tenant.ClientID},
-		certs:     nil,
-	}
-
-	url := t.issuer + "/.well-known/jwks.json"
-	certs, err := jwks.NewFromURL(url, jwks.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	t.certs = certs
-
-	return t, nil
-}
-
-func (a *auth0Tenant) Cancel() {
-	a.certs.Cancel()
-}
-
 type identityManager struct {
+	root *identity
+
 	identities map[string]*identity
 	tenants    map[string]*auth0Tenant
 
@@ -327,16 +330,25 @@ type identityManager struct {
 	fs       fs.Filesystem
 	filePath string
 
+	jwtSecret []byte
+
 	lock sync.RWMutex
 }
 
-func NewIdentityManager(fs fs.Filesystem, superuser User) (IdentityManager, error) {
+type IdentityConfig struct {
+	FS        fs.Filesystem
+	Superuser User
+	JWTSecret string
+}
+
+func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 	im := &identityManager{
 		identities:           map[string]*identity{},
 		tenants:              map[string]*auth0Tenant{},
 		auth0UserIdentityMap: map[string]string{},
-		fs:                   fs,
+		fs:                   config.FS,
 		filePath:             "./users.json",
+		jwtSecret:            []byte(config.JWTSecret),
 	}
 
 	err := im.load(im.filePath)
@@ -344,12 +356,13 @@ func NewIdentityManager(fs fs.Filesystem, superuser User) (IdentityManager, erro
 		return nil, err
 	}
 
-	if len(im.identities) == 0 {
-		superuser.Superuser = true
-		im.Create(superuser)
-
-		im.save(im.filePath)
+	config.Superuser.Superuser = true
+	identity, err := im.create(config.Superuser)
+	if err != nil {
+		return nil, err
 	}
+
+	im.root = identity
 
 	return im, nil
 }
@@ -361,6 +374,7 @@ func (im *identityManager) Close() {
 	im.fs = nil
 	im.auth0UserIdentityMap = map[string]string{}
 	im.identities = map[string]*identity{}
+	im.root = nil
 
 	for _, t := range im.tenants {
 		t.Cancel()
@@ -384,11 +398,22 @@ func (im *identityManager) Create(u User) error {
 		return fmt.Errorf("identity already exists")
 	}
 
+	identity, err := im.create(u)
+	if err != nil {
+		return err
+	}
+
+	im.identities[identity.user.Name] = identity
+
+	return nil
+}
+
+func (im *identityManager) create(u User) (*identity, error) {
 	identity := u.marshalIdentity()
 
 	if identity.user.Auth.API.Auth0.Enable {
 		if _, ok := im.auth0UserIdentityMap[identity.user.Auth.API.Auth0.User]; ok {
-			return fmt.Errorf("the Auth0 user has already an identity")
+			return nil, fmt.Errorf("the Auth0 user has already an identity")
 		}
 
 		auth0Key := identity.user.Auth.API.Auth0.Tenant.key()
@@ -396,17 +421,17 @@ func (im *identityManager) Create(u User) error {
 		if _, ok := im.tenants[auth0Key]; !ok {
 			tenant, err := newAuth0Tenant(identity.user.Auth.API.Auth0.Tenant)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			im.tenants[auth0Key] = tenant
+			identity.tenant = tenant
 		}
-
 	}
 
-	im.identities[identity.user.Name] = identity
+	identity.valid = true
 
-	return nil
+	return identity, nil
 }
 
 func (im *identityManager) Update(name string, identity User) error {
@@ -432,10 +457,20 @@ func (im *identityManager) Remove(name string) error {
 }
 
 func (im *identityManager) getIdentity(name string) (*identity, error) {
-	identity, ok := im.identities[name]
-	if !ok {
+	var identity *identity = nil
+
+	if im.root.user.Name == name {
+		identity = im.root
+	} else {
+		identity, _ = im.identities[name]
+
+	}
+
+	if identity == nil {
 		return nil, fmt.Errorf("not found")
 	}
+
+	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
 
 	return identity, nil
 }
@@ -469,6 +504,10 @@ func (im *identityManager) GetVerifierByAuth0(name string) (IdentityVerifier, er
 	}
 
 	return im.getIdentity(name)
+}
+
+func (im *identityManager) GetDefaultVerifier() (IdentityVerifier, error) {
+	return im.root, nil
 }
 
 func (im *identityManager) Rename(oldname, newname string) error {
@@ -553,4 +592,103 @@ func (im *identityManager) save(filePath string) error {
 	_, _, err = im.fs.WriteFileSafe(filePath, jsondata)
 
 	return err
+}
+
+func (im *identityManager) Validators() []string {
+	validators := []string{"localjwt"}
+
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
+	for _, t := range im.tenants {
+		for _, clientid := range t.clientIDs {
+			validators = append(validators, fmt.Sprintf("auth0 domain=%s audience=%s clientid=%s", t.domain, t.audience, clientid))
+		}
+	}
+
+	return validators
+}
+
+func (im *identityManager) CreateJWT(name string) (string, string, error) {
+	now := time.Now()
+	accessExpires := now.Add(time.Minute * 10)
+	refreshExpires := now.Add(time.Hour * 24)
+
+	// Create access token
+	accessToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
+		"iss":    "datarhei-core",
+		"sub":    name,
+		"usefor": "access",
+		"iat":    now.Unix(),
+		"exp":    accessExpires.Unix(),
+		"exi":    uint64(accessExpires.Sub(now).Seconds()),
+		"jti":    uuid.New().String(),
+	})
+
+	// Generate encoded access token
+	at, err := accessToken.SignedString(im.jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Create refresh token
+	refreshToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
+		"iss":    "datarhei-core",
+		"sub":    name,
+		"usefor": "refresh",
+		"iat":    now.Unix(),
+		"exp":    refreshExpires.Unix(),
+		"exi":    uint64(refreshExpires.Sub(now).Seconds()),
+		"jti":    uuid.New().String(),
+	})
+
+	// Generate encoded refresh token
+	rt, err := refreshToken.SignedString(im.jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	return at, rt, nil
+}
+
+type Auth0Tenant struct {
+	Domain   string
+	Audience string
+	ClientID string
+}
+
+func (t *Auth0Tenant) key() string {
+	return t.Domain + t.Audience
+}
+
+type auth0Tenant struct {
+	domain    string
+	issuer    string
+	audience  string
+	clientIDs []string
+	certs     jwks.JWKS
+}
+
+func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
+	t := &auth0Tenant{
+		domain:    tenant.Domain,
+		issuer:    "https://" + tenant.Domain + "/",
+		audience:  tenant.Audience,
+		clientIDs: []string{tenant.ClientID},
+		certs:     nil,
+	}
+
+	url := t.issuer + "/.well-known/jwks.json"
+	certs, err := jwks.NewFromURL(url, jwks.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	t.certs = certs
+
+	return t, nil
+}
+
+func (a *auth0Tenant) Cancel() {
+	a.certs.Cancel()
 }

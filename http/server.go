@@ -40,7 +40,6 @@ import (
 	"github.com/datarhei/core/v16/http/graph/resolver"
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
-	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/iam"
@@ -57,6 +56,7 @@ import (
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
 	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
+	mwiam "github.com/datarhei/core/v16/http/middleware/iam"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
@@ -87,7 +87,6 @@ type Config struct {
 	Cors          CorsConfig
 	RTMP          rtmp.Server
 	SRT           srt.Server
-	JWT           jwt.JWT
 	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
@@ -113,7 +112,7 @@ type server struct {
 		profiling  *handler.ProfilingHandler
 		ping       *handler.PingHandler
 		graph      *api.GraphHandler
-		jwt        jwt.JWT
+		jwt        *api.JWTHandler
 	}
 
 	v3handler struct {
@@ -137,6 +136,7 @@ type server struct {
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
 		hlsrewrite echo.MiddlewareFunc
+		iam        echo.MiddlewareFunc
 	}
 
 	gzip struct {
@@ -210,20 +210,20 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	if config.Logger == nil {
-		s.logger = log.New("HTTP")
+		s.logger = log.New("")
 	}
 
-	if config.JWT == nil {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			[]string{},
-		)
-	} else {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			config.JWT.Validators(),
-		)
-	}
+	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
+		IAM:    config.IAM,
+		Logger: s.logger.WithComponent("IAM"),
+	})
+
+	s.handler.about = api.NewAbout(
+		config.Restream,
+		config.IAM.Validators(),
+	)
+
+	s.handler.jwt = api.NewJWT(config.IAM)
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
@@ -273,12 +273,6 @@ func NewServer(config Config) (Server, error) {
 		s.v3handler.config = api.NewConfig(
 			config.Config,
 		)
-	}
-
-	if config.JWT != nil {
-		s.handler.jwt = config.JWT
-		s.middleware.accessJWT = config.JWT.AccessMiddleware()
-		s.middleware.refreshJWT = config.JWT.RefreshMiddleware()
 	}
 
 	if config.Sessions == nil {
@@ -354,6 +348,8 @@ func NewServer(config Config) (Server, error) {
 		s.router.Use(s.middleware.cors)
 	}
 
+	s.router.Use(s.middleware.iam)
+
 	// Add static routes
 	if path, target := config.Router.StaticRoute(); len(target) != 0 {
 		group := s.router.Group(path)
@@ -416,14 +412,9 @@ func (s *server) setRoutes() {
 		api.Use(s.middleware.iplimit)
 	}
 
-	if s.middleware.accessJWT != nil {
-		// Enable JWT auth
-		api.Use(s.middleware.accessJWT)
-
-		// The login endpoint should not be blocked by auth
-		s.router.POST("/api/login", s.handler.jwt.LoginHandler)
-		s.router.GET("/api/login/refresh", s.handler.jwt.RefreshHandler, s.middleware.refreshJWT)
-	}
+	// The login endpoint should not be blocked by auth
+	s.router.POST("/api/login", s.handler.jwt.Login)
+	s.router.GET("/api/login/refresh", s.handler.jwt.Refresh)
 
 	api.GET("", s.handler.about.About)
 
@@ -467,23 +458,9 @@ func (s *server) setRoutes() {
 		fs.HEAD("", filesystem.handler.GetFile)
 
 		if filesystem.AllowWrite {
-			if filesystem.EnableAuth {
-				authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-					if username == filesystem.Username && password == filesystem.Password {
-						return true, nil
-					}
-
-					return false, nil
-				})
-
-				fs.POST("", filesystem.handler.PutFile, authmw)
-				fs.PUT("", filesystem.handler.PutFile, authmw)
-				fs.DELETE("", filesystem.handler.DeleteFile, authmw)
-			} else {
-				fs.POST("", filesystem.handler.PutFile)
-				fs.PUT("", filesystem.handler.PutFile)
-				fs.DELETE("", filesystem.handler.DeleteFile)
-			}
+			fs.POST("", filesystem.handler.PutFile)
+			fs.PUT("", filesystem.handler.PutFile)
+			fs.DELETE("", filesystem.handler.DeleteFile)
 		}
 	}
 
@@ -521,10 +498,6 @@ func (s *server) setRoutes() {
 
 	// APIv3 router group
 	v3 := api.Group("/v3")
-
-	if s.handler.jwt != nil {
-		v3.Use(s.middleware.accessJWT)
-	}
 
 	v3.Use(gzipMiddleware)
 

@@ -23,7 +23,7 @@ type adapter struct {
 }
 
 func newAdapter(fs fs.Filesystem, filePath string) persist.Adapter {
-	return &adapter{filePath: filePath}
+	return &adapter{filePath: filePath, fs: fs}
 }
 
 // Adapter
@@ -110,6 +110,8 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 func (a *adapter) importPolicy(model model.Model, rule []string) error {
 	copiedRule := make([]string, len(rule))
 	copy(copiedRule, rule)
+
+	fmt.Printf("%+v\n", copiedRule)
 
 	ok, err := model.HasPolicyEx(copiedRule[0], copiedRule[0], copiedRule[1:])
 	if err != nil {

@@ -231,6 +231,8 @@ type server struct {
 	// access to the map.
 	channels map[string]*channel
 	lock     sync.RWMutex
+
+	iam iam.IAM
 }
 
 // New creates a new RTMP server according to the given config
@@ -248,6 +250,7 @@ func New(config Config) (Server, error) {
 		token:     config.Token,
 		logger:    config.Logger,
 		collector: config.Collector,
+		iam:       config.IAM,
 	}
 
 	if s.collector == nil {
@@ -360,23 +363,31 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	defer conn.Close()
 
-	playPath := conn.URL.Path
+	playPath, token := getToken(conn.URL)
 
-	// Check the token in the URL if one is required
-	if len(s.token) != 0 {
-		path, token := getToken(conn.URL)
+	identity, err := s.findIdentityFromStreamKey(token)
+	if err != nil {
+		s.logger.Debug().WithError(err).Log("no valid identity found")
+		s.log("PLAY", "FORBIDDEN", playPath, "invalid streamkey ("+token+")", client)
+		return
+	}
 
-		if len(token) == 0 {
-			s.log("PLAY", "FORBIDDEN", path, "no streamkey provided", client)
-			return
-		}
+	domain := s.findDomainFromPlaypath(playPath)
+	resource := "rtmp:" + playPath
 
-		if s.token != token {
-			s.log("PLAY", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
-			return
-		}
+	l := s.logger.Debug().WithFields(log.Fields{
+		"name":     identity.Name(),
+		"domain":   domain,
+		"resource": resource,
+		"action":   "PLAY",
+	})
 
-		playPath = path
+	if ok, rule := s.iam.Enforce(identity.Name(), domain, resource, "PLAY"); !ok {
+		l.Log("access denied")
+		s.log("PLAY", "FORBIDDEN", playPath, "invalid streamkey ("+token+")", client)
+		return
+	} else {
+		l.Log(rule)
 	}
 
 	/*
@@ -446,28 +457,37 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 
 	defer conn.Close()
 
-	playPath := conn.URL.Path
-
-	if len(s.token) != 0 {
-		path, token := getToken(conn.URL)
-
-		if len(token) == 0 {
-			s.log("PLAY", "FORBIDDEN", path, "no streamkey provided", client)
-			return
-		}
-
-		if s.token != token {
-			s.log("PLAY", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
-			return
-		}
-
-		playPath = path
-	}
+	playPath, token := getToken(conn.URL)
 
 	// Check the app patch
 	if !strings.HasPrefix(playPath, s.app) {
 		s.log("PUBLISH", "FORBIDDEN", conn.URL.Path, "invalid app", client)
 		return
+	}
+
+	identity, err := s.findIdentityFromStreamKey(token)
+	if err != nil {
+		s.logger.Debug().WithError(err).Log("no valid identity found")
+		s.log("PUBLISH", "FORBIDDEN", playPath, "invalid streamkey ("+token+")", client)
+		return
+	}
+
+	domain := s.findDomainFromPlaypath(playPath)
+	resource := "rtmp:" + playPath
+
+	l := s.logger.Debug().WithFields(log.Fields{
+		"name":     identity.Name(),
+		"domain":   domain,
+		"resource": resource,
+		"action":   "PUBLISH",
+	})
+
+	if ok, rule := s.iam.Enforce(identity.Name(), domain, "rtmp:"+playPath, "PUBLISH"); !ok {
+		l.Log("access denied")
+		s.log("PUBLISH", "FORBIDDEN", playPath, "invalid streamkey ("+token+")", client)
+		return
+	} else {
+		l.Log(rule)
 	}
 
 	// Check the stream if it contains any valid/known streams
@@ -529,4 +549,43 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 	ch.Close()
 
 	s.log("PUBLISH", "STOP", playPath, "", client)
+}
+
+func (s *server) findIdentityFromStreamKey(key string) (iam.IdentityVerifier, error) {
+	var identity iam.IdentityVerifier
+	var err error
+
+	elements := strings.Split(key, ":")
+	if len(elements) == 1 {
+		identity, err = s.iam.GetDefaultIdentity()
+	} else {
+		identity, err = s.iam.GetIdentity(elements[0])
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	if ok, err := identity.VerifyServiceToken(elements[1]); !ok {
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	return identity, nil
+}
+
+func (s *server) findDomainFromPlaypath(path string) string {
+	path = strings.TrimPrefix(path, filepath.Join(s.app, "/"))
+
+	elements := strings.Split(path, "/")
+	if len(elements) == 1 {
+		return ""
+	}
+
+	domain := elements[0]
+
+	if s.iam.IsDomain(domain) {
+		return domain
+	}
+
+	return ""
 }

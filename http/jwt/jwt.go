@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/iam"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
@@ -21,19 +23,13 @@ type Config struct {
 	Realm         string
 	Secret        string
 	SkipLocalhost bool
+	IAM           iam.IAM
 }
 
 // JWT provides access to a JWT provider
 type JWT interface {
-	AddValidator(iss string, issuer Validator) error
-
-	ClearValidators()
-
-	Validators() []string
-
 	// Middleware returns an echo middleware
-	AccessMiddleware() echo.MiddlewareFunc
-	RefreshMiddleware() echo.MiddlewareFunc
+	Middleware() echo.MiddlewareFunc
 
 	// LoginHandler is an echo route handler for retrieving a JWT
 	LoginHandler(c echo.Context) error
@@ -43,19 +39,14 @@ type JWT interface {
 }
 
 type jwt struct {
-	realm             string
-	skipLocalhost     bool
-	secret            []byte
-	accessValidFor    time.Duration
-	accessConfig      middleware.JWTConfig
-	accessMiddleware  echo.MiddlewareFunc
-	refreshValidFor   time.Duration
-	refreshConfig     middleware.JWTConfig
-	refreshMiddleware echo.MiddlewareFunc
-	// Validators is a map of all recognized issuers to their specific validators. The key is the value of
-	// the "iss" field in the claims. Somewhat required because otherwise the token cannot be verified.
-	validators map[string]Validator
-	lock       sync.RWMutex
+	realm           string
+	skipLocalhost   bool
+	secret          []byte
+	accessValidFor  time.Duration
+	refreshValidFor time.Duration
+	config          middleware.JWTConfig
+	middleware      echo.MiddlewareFunc
+	iam             iam.IAM
 }
 
 // New returns a new JWT provider
@@ -84,7 +75,7 @@ func New(config Config) (JWT, error) {
 		return false
 	}
 
-	j.accessConfig = middleware.JWTConfig{
+	j.config = middleware.JWTConfig{
 		Skipper:                 skipperFunc,
 		SigningMethod:           middleware.AlgorithmHS256,
 		ContextKey:              "user",
@@ -103,104 +94,53 @@ func New(config Config) (JWT, error) {
 			}
 
 			c.Set("user", subject)
-		},
-		ParseTokenFunc: j.parseToken("access"),
-	}
 
-	j.refreshConfig = middleware.JWTConfig{
-		Skipper:                 skipperFunc,
-		SigningMethod:           middleware.AlgorithmHS256,
-		ContextKey:              "user",
-		TokenLookup:             "header:" + echo.HeaderAuthorization,
-		AuthScheme:              "Bearer",
-		Claims:                  jwtgo.MapClaims{},
-		ErrorHandlerWithContext: j.ErrorHandler,
-		ParseTokenFunc:          j.parseToken("refresh"),
+			var usefor string
+			if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
+				if sub, ok := claims["usefor"]; ok {
+					usefor = sub.(string)
+				}
+			}
+
+			c.Set("usefor", usefor)
+		},
+		ParseTokenFunc: j.parseToken,
 	}
 
 	return j, nil
 }
 
-func (j *jwt) parseToken(use string) func(auth string, c echo.Context) (interface{}, error) {
+func (j *jwt) parseToken(auth string, c echo.Context) (interface{}, error) {
 	keyFunc := func(*jwtgo.Token) (interface{}, error) { return j.secret, nil }
 
-	return func(auth string, c echo.Context) (interface{}, error) {
-		var token *jwtgo.Token
-		var err error
+	var token *jwtgo.Token
+	var err error
 
-		token, err = jwtgo.Parse(auth, keyFunc)
-		if err != nil {
-			return nil, err
-		}
-
-		if !token.Valid {
-			return nil, errors.New("invalid token")
-		}
-
-		if _, ok := token.Claims.(jwtgo.MapClaims)["usefor"]; !ok {
-			return nil, fmt.Errorf("usefor claim is required")
-		}
-
-		claimuse := token.Claims.(jwtgo.MapClaims)["usefor"].(string)
-
-		if claimuse != use {
-			return nil, fmt.Errorf("invalid token claim")
-		}
-
-		return token, nil
-	}
-}
-
-func (j *jwt) Validators() []string {
-	j.lock.RLock()
-	defer j.lock.RUnlock()
-
-	values := []string{}
-
-	for _, v := range j.validators {
-		values = append(values, v.String())
+	token, err = jwtgo.Parse(auth, keyFunc)
+	if err != nil {
+		return nil, err
 	}
 
-	return values
-}
-
-func (j *jwt) AddValidator(iss string, issuer Validator) error {
-	j.lock.Lock()
-	defer j.lock.Unlock()
-
-	if j.validators == nil {
-		j.validators = make(map[string]Validator)
+	if !token.Valid {
+		return nil, errors.New("invalid token")
 	}
 
-	if _, ok := j.validators[iss]; ok {
-		return fmt.Errorf("a validator for %s is already registered", iss)
+	if _, ok := token.Claims.(jwtgo.MapClaims)["sub"]; !ok {
+		return nil, fmt.Errorf("sub claim is required")
 	}
 
-	j.validators[iss] = issuer
-
-	return nil
-}
-
-func (j *jwt) ClearValidators() {
-	j.lock.Lock()
-	defer j.lock.Unlock()
-
-	if j.validators == nil {
-		return
+	if _, ok := token.Claims.(jwtgo.MapClaims)["usefor"]; !ok {
+		return nil, fmt.Errorf("usefor claim is required")
 	}
 
-	for _, v := range j.validators {
-		v.Cancel()
-	}
-
-	j.validators = nil
+	return token, nil
 }
 
 func (j *jwt) ErrorHandler(err error, c echo.Context) error {
 	if c.Request().URL.Path == "/api" {
 		return c.JSON(http.StatusOK, api.MinimalAbout{
 			App:   app.Name,
-			Auths: j.Validators(),
+			Auths: []string{},
 			Version: api.VersionMinimal{
 				Number: app.Version.MajorString(),
 			},
@@ -210,20 +150,12 @@ func (j *jwt) ErrorHandler(err error, c echo.Context) error {
 	return api.Err(http.StatusUnauthorized, "Missing or invalid JWT token")
 }
 
-func (j *jwt) AccessMiddleware() echo.MiddlewareFunc {
-	if j.accessMiddleware == nil {
-		j.accessMiddleware = middleware.JWTWithConfig(j.accessConfig)
+func (j *jwt) Middleware() echo.MiddlewareFunc {
+	if j.middleware == nil {
+		j.middleware = middleware.JWTWithConfig(j.config)
 	}
 
-	return j.accessMiddleware
-}
-
-func (j *jwt) RefreshMiddleware() echo.MiddlewareFunc {
-	if j.refreshMiddleware == nil {
-		j.refreshMiddleware = middleware.JWTWithConfig(j.refreshConfig)
-	}
-
-	return j.refreshMiddleware
+	return j.middleware
 }
 
 // LoginHandler returns an access token and a refresh token
@@ -239,18 +171,7 @@ func (j *jwt) RefreshMiddleware() echo.MiddlewareFunc {
 // @Security Auth0KeyAuth
 // @Router /api/login [post]
 func (j *jwt) LoginHandler(c echo.Context) error {
-	var ok bool
-	var subject string
-	var err error
-
-	j.lock.RLock()
-	for _, validator := range j.validators {
-		ok, subject, err = validator.Validate(c)
-		if ok {
-			break
-		}
-	}
-	j.lock.RUnlock()
+	ok, subject, err := j.validateLogin(c)
 
 	if ok {
 		if err != nil {
@@ -273,6 +194,79 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 	})
 }
 
+func (j *jwt) validateLogin(c echo.Context) (bool, string, error) {
+	ok, subject, err := j.validateUserpassLogin(c)
+	if ok {
+		return ok, subject, err
+	}
+
+	return j.validateAuth0Login(c)
+}
+
+func (j *jwt) validateUserpassLogin(c echo.Context) (bool, string, error) {
+	var login api.Login
+
+	if err := util.ShouldBindJSON(c, &login); err != nil {
+		return false, "", nil
+	}
+
+	identity, err := j.iam.GetIdentity(login.Username)
+	if err != nil {
+		return true, "", fmt.Errorf("invalid username or password")
+	}
+
+	if !identity.VerifyAPIPassword(login.Password) {
+		return true, "", fmt.Errorf("invalid username or password")
+	}
+
+	return true, identity.Name(), nil
+}
+
+func (j *jwt) validateAuth0Login(c echo.Context) (bool, string, error) {
+	// Look for an Auth header
+	values := c.Request().Header.Values("Authorization")
+	prefix := "Bearer "
+
+	auth := ""
+	for _, value := range values {
+		if !strings.HasPrefix(value, prefix) {
+			continue
+		}
+
+		auth = value[len(prefix):]
+
+		break
+	}
+
+	if len(auth) == 0 {
+		return false, "", nil
+	}
+
+	p := &jwtgo.Parser{}
+	token, _, err := p.ParseUnverified(auth, jwtgo.MapClaims{})
+	if err != nil {
+		return false, "", nil
+	}
+
+	var subject string
+	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
+		if sub, ok := claims["sub"]; ok {
+			subject = sub.(string)
+		}
+	}
+
+	identity, err := j.iam.GetIdentityByAuth0(subject)
+	if err != nil {
+		return true, "", fmt.Errorf("invalid token")
+	}
+
+	if !identity.VerifyAPIAuth0(auth) {
+		return true, "", fmt.Errorf("invalid token")
+	}
+
+	return true, identity.Name(), nil
+}
+
 // RefreshHandler returns a new refresh token
 // @Summary Retrieve a new access token
 // @Description Retrieve a new access token by providing the refresh token
@@ -283,12 +277,19 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 // @Security ApiRefreshKeyAuth
 // @Router /api/login/refresh [get]
 func (j *jwt) RefreshHandler(c echo.Context) error {
-	token, ok := c.Get("user").(*jwtgo.Token)
+	subject, ok := c.Get("user").(string)
 	if !ok {
 		return api.Err(http.StatusForbidden, "Invalid token")
 	}
 
-	subject := token.Claims.(jwtgo.MapClaims)["sub"].(string)
+	usefor, ok := c.Get("usefor").(string)
+	if !ok {
+		return api.Err(http.StatusForbidden, "Invalid token")
+	}
+
+	if usefor != "refresh" {
+		return api.Err(http.StatusForbidden, "Invalid token")
+	}
 
 	at, _, err := j.createToken(subject)
 	if err != nil {

@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"strings"
+
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/casbin/casbin/v2"
@@ -8,7 +10,7 @@ import (
 )
 
 type AccessEnforcer interface {
-	Enforce(name, domain, resource, action string) bool
+	Enforce(name, domain, resource, action string) (bool, string)
 }
 
 type AccessManager interface {
@@ -51,8 +53,8 @@ func NewAccessManager(fs fs.Filesystem) (AccessManager, error) {
 }
 
 func (am *access) AddPolicy() {}
-func (am *access) Enforce(name, domain, resource, action string) bool {
-	ok, _, _ := am.enforcer.EnforceEx(name, domain, resource, action)
+func (am *access) Enforce(name, domain, resource, action string) (bool, string) {
+	ok, rule, _ := am.enforcer.EnforceEx(name, domain, resource, action)
 
-	return ok
+	return ok, strings.Join(rule, ", ")
 }

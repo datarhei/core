@@ -35,6 +35,18 @@ func NewAbout(restream restream.Restreamer, auths []string) *AboutHandler {
 // @Security ApiKeyAuth
 // @Router /api [get]
 func (p *AboutHandler) About(c echo.Context) error {
+	user, _ := c.Get("user").(string)
+
+	if user == "$anon" {
+		return c.JSON(http.StatusOK, api.MinimalAbout{
+			App:   app.Name,
+			Auths: p.auths,
+			Version: api.VersionMinimal{
+				Number: app.Version.MajorString(),
+			},
+		})
+	}
+
 	createdAt := p.restream.CreatedAt()
 
 	about := api.About{

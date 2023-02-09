@@ -23,7 +23,6 @@ import (
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
-	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
@@ -81,7 +80,6 @@ type api struct {
 	cache         cache.Cacher
 	mainserver    *gohttp.Server
 	sidecarserver *gohttp.Server
-	httpjwt       jwt.JWT
 	update        update.Checker
 	replacer      replace.Replacer
 	iam           iam.IAM
@@ -395,12 +393,6 @@ func (a *api) start() error {
 					},
 					Auth0: iam.UserAuthAPIAuth0{
 						Enable: cfg.API.Auth.Auth0.Enable,
-						User:   cfg.API.Auth.Auth0.Tenants[0].Users[0],
-						Tenant: iam.Auth0Tenant{
-							Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
-							Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
-							ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
-						},
 					},
 				},
 				Services: iam.UserAuthServices{
@@ -413,6 +405,15 @@ func (a *api) start() error {
 			},
 		}
 
+		if cfg.API.Auth.Auth0.Enable {
+			superuser.Auth.API.Auth0.User = cfg.API.Auth.Auth0.Tenants[0].Users[0]
+			superuser.Auth.API.Auth0.Tenant = iam.Auth0Tenant{
+				Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
+				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
+				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
+			}
+		}
+
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 			Root: filepath.Join(cfg.DB.Dir, "iam"),
 		})
@@ -420,7 +421,18 @@ func (a *api) start() error {
 			return err
 		}
 
-		iam, err := iam.NewIAM(fs, superuser)
+		secret := rand.String(32)
+		if len(cfg.API.Auth.JWT.Secret) != 0 {
+			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
+		}
+
+		fmt.Printf("superuser: %+v\n", superuser)
+
+		iam, err := iam.NewIAM(iam.Config{
+			FS:        fs,
+			Superuser: superuser,
+			JWTSecret: secret,
+		})
 		if err != nil {
 			return fmt.Errorf("iam: %w", err)
 		}
@@ -657,49 +669,49 @@ func (a *api) start() error {
 	}
 
 	a.restream = restream
+	/*
+		var httpjwt jwt.JWT
 
-	var httpjwt jwt.JWT
-
-	if cfg.API.Auth.Enable {
-		secret := rand.String(32)
-		if len(cfg.API.Auth.JWT.Secret) != 0 {
-			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
-		}
-
-		var err error
-		httpjwt, err = jwt.New(jwt.Config{
-			Realm:         app.Name,
-			Secret:        secret,
-			SkipLocalhost: cfg.API.Auth.DisableLocalhost,
-		})
-
-		if err != nil {
-			return fmt.Errorf("unable to create JWT provider: %w", err)
-		}
-
-		if validator, err := jwt.NewLocalValidator(a.iam); err == nil {
-			if err := httpjwt.AddValidator(app.Name, validator); err != nil {
-				return fmt.Errorf("unable to add local JWT validator: %w", err)
+		if cfg.API.Auth.Enable {
+			secret := rand.String(32)
+			if len(cfg.API.Auth.JWT.Secret) != 0 {
+				secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
 			}
-		} else {
-			return fmt.Errorf("unable to create local JWT validator: %w", err)
-		}
 
-		if cfg.API.Auth.Auth0.Enable {
-			for _, t := range cfg.API.Auth.Auth0.Tenants {
-				if validator, err := jwt.NewAuth0Validator(a.iam); err == nil {
-					if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
-						return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
+			var err error
+			httpjwt, err = jwt.New(jwt.Config{
+				Realm:         app.Name,
+				Secret:        secret,
+				SkipLocalhost: cfg.API.Auth.DisableLocalhost,
+			})
+
+			if err != nil {
+				return fmt.Errorf("unable to create JWT provider: %w", err)
+			}
+
+			if validator, err := jwt.NewLocalValidator(a.iam); err == nil {
+				if err := httpjwt.AddValidator(app.Name, validator); err != nil {
+					return fmt.Errorf("unable to add local JWT validator: %w", err)
+				}
+			} else {
+				return fmt.Errorf("unable to create local JWT validator: %w", err)
+			}
+
+			if cfg.API.Auth.Auth0.Enable {
+				for _, t := range cfg.API.Auth.Auth0.Tenants {
+					if validator, err := jwt.NewAuth0Validator(a.iam); err == nil {
+						if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
+							return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
+						}
+					} else {
+						return fmt.Errorf("unable to create Auth0 JWT validator: %w", err)
 					}
-				} else {
-					return fmt.Errorf("unable to create Auth0 JWT validator: %w", err)
 				}
 			}
 		}
-	}
 
-	a.httpjwt = httpjwt
-
+		a.httpjwt = httpjwt
+	*/
 	metrics, err := monitor.NewHistory(monitor.HistoryConfig{
 		Enable:    cfg.Metrics.Enable,
 		Timerange: time.Duration(cfg.Metrics.Range) * time.Second,
@@ -1056,7 +1068,6 @@ func (a *api) start() error {
 		},
 		RTMP:     a.rtmpserver,
 		SRT:      a.srtserver,
-		JWT:      a.httpjwt,
 		Config:   a.config.store,
 		Sessions: a.sessions,
 		Router:   router,
@@ -1343,11 +1354,6 @@ func (a *api) stop() {
 
 	if a.iam != nil {
 		a.iam.Close()
-	}
-
-	// Stop JWT authentication
-	if a.httpjwt != nil {
-		a.httpjwt.ClearValidators()
 	}
 
 	if a.update != nil {
