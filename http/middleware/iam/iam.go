@@ -1,3 +1,34 @@
+// Package iam implements an identity and access management middleware
+//
+// Four information are required in order to decide to grant access.
+// - identity
+// - domain
+// - resource
+// - action
+//
+// The identity of the requester can be obtained by different means:
+// - JWT
+// - Username and password in the body as JSON
+// - Auth0 access token
+// - Basic auth
+//
+// The path prefix /api/login is treated specially in order to accomodate
+// different ways of identification (UserPass, Auth0). All other /api paths
+// only allow JWT as authentication method.
+//
+// If the identity can't be detected, the identity of "$anon" is given, representing
+// an anonmyous user. If the request originates from localhost, the identity will
+// be $localhost, representing an anonymous user from localhost.
+//
+// The domain is provided as query parameter "group" for all API requests or the
+// first path element after a mountpoint for filesystem requests.
+//
+// If the domain can't be detected, the domain "$none" will be used.
+//
+// The resource is the path of the request. For API requests it's prepended with
+// the "api:" prefix. For all other requests it's prepended with the "fs:" prefix.
+//
+// The action is the requests HTTP method (e.g. GET, POST, ...).
 package iam
 
 import (
@@ -22,12 +53,14 @@ import (
 type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
+	Mounts  []string
 	IAM     iam.IAM
 	Logger  log.Logger
 }
 
 var DefaultConfig = Config{
 	Skipper: middleware.DefaultSkipper,
+	Mounts:  []string{},
 	IAM:     nil,
 	Logger:  nil,
 }
@@ -49,7 +82,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 	mw := iammiddleware{
 		iam:    config.IAM,
-		mounts: []string{"/", "/memfs"},
+		mounts: config.Mounts,
 		logger: config.Logger,
 	}
 
@@ -61,6 +94,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 		return false
 	})
+
+	mw.logger.Debug().WithField("mounts", mw.mounts).Log("")
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -122,7 +157,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			} else {
 				identity, err = mw.findIdentityFromBasicAuth(c)
 				if err != nil {
-					return api.Err(http.StatusForbidden, "Bad request", "%s", err)
+					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
 				}
 
 				domain = mw.findDomainFromFilesystem(resource)
@@ -130,7 +165,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			}
 
 			username := "$anon"
-			if identity != nil {
+			if identity == nil {
+				ip := c.RealIP()
+
+				if ip == "127.0.0.1" || ip == "::1" {
+					username = "$localhost"
+				}
+			} else {
 				username = identity.Name()
 			}
 
@@ -146,18 +187,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			action := c.Request().Method
 
-			l := mw.logger.Debug().WithFields(log.Fields{
-				"subject":  username,
-				"domain":   domain,
-				"resource": resource,
-				"action":   action,
-			})
-
-			if ok, rule := config.IAM.Enforce(username, domain, resource, action); !ok {
-				l.Log("access denied")
+			if ok, _ := config.IAM.Enforce(username, domain, resource, action); !ok {
 				return api.Err(http.StatusForbidden, "Forbidden", "access denied")
-			} else {
-				l.Log(rule)
 			}
 
 			return next(c)
@@ -203,7 +234,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
-	if ok, err := identity.VerifyAPIPassword(password); !ok {
+	if ok, err := identity.VerifyServiceBasicAuth(password); !ok {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
@@ -373,7 +404,7 @@ func (m *iammiddleware) findDomainFromFilesystem(path string) string {
 	// Remove it from the path and split it into components: foobar file.txt
 	// Check if foobar a known domain. If yes, return it. If not, return empty domain.
 	for _, mount := range m.mounts {
-		prefix := filepath.Join(mount, "/")
+		prefix := filepath.Clean(mount) + "/"
 		if strings.HasPrefix(path, prefix) {
 			elements := strings.Split(strings.TrimPrefix(path, prefix), "/")
 			if m.iam.IsDomain(elements[0]) {

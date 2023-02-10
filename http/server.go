@@ -213,8 +213,15 @@ func NewServer(config Config) (Server, error) {
 		s.logger = log.New("")
 	}
 
+	mounts := []string{}
+
+	for _, fs := range s.filesystems {
+		mounts = append(mounts, fs.FS.Mountpoint)
+	}
+
 	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
 		IAM:    config.IAM,
+		Mounts: mounts,
 		Logger: s.logger.WithComponent("IAM"),
 	})
 

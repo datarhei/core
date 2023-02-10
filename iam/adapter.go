@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
 
 	"github.com/casbin/casbin/v2/model"
-	"github.com/casbin/casbin/v2/persist"
 )
 
 // Adapter is the file adapter for Casbin.
@@ -18,12 +18,17 @@ import (
 type adapter struct {
 	fs       fs.Filesystem
 	filePath string
+	logger   log.Logger
 	groups   []Group
 	lock     sync.Mutex
 }
 
-func newAdapter(fs fs.Filesystem, filePath string) persist.Adapter {
-	return &adapter{filePath: filePath, fs: fs}
+func newAdapter(fs fs.Filesystem, filePath string, logger log.Logger) *adapter {
+	return &adapter{
+		fs:       fs,
+		filePath: filePath,
+		logger:   logger,
+	}
 }
 
 // Adapter
@@ -34,13 +39,6 @@ func (a *adapter) LoadPolicy(model model.Model) error {
 	if a.filePath == "" {
 		return fmt.Errorf("invalid file path, file path cannot be empty")
 	}
-
-	/*
-		logger := &log.DefaultLogger{}
-		logger.EnableLog(true)
-
-		model.SetLogger(logger)
-	*/
 
 	return a.loadPolicyFile(model)
 }
@@ -111,7 +109,12 @@ func (a *adapter) importPolicy(model model.Model, rule []string) error {
 	copiedRule := make([]string, len(rule))
 	copy(copiedRule, rule)
 
-	fmt.Printf("%+v\n", copiedRule)
+	a.logger.Debug().WithFields(log.Fields{
+		"username": copiedRule[1],
+		"domain":   copiedRule[2],
+		"resource": copiedRule[3],
+		"actions":  copiedRule[4],
+	}).Log("imported policy")
 
 	ok, err := model.HasPolicyEx(copiedRule[0], copiedRule[0], copiedRule[1:])
 	if err != nil {
@@ -199,10 +202,23 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 		domain = rule[1]
 		resource = rule[2]
 		actions = rule[3]
+
+		a.logger.Debug().WithFields(log.Fields{
+			"username": username,
+			"domain":   domain,
+			"resource": resource,
+			"actions":  actions,
+		}).Log("adding policy")
 	} else if ptype == "g" {
 		username = rule[0]
 		role = rule[1]
 		domain = rule[2]
+
+		a.logger.Debug().WithFields(log.Fields{
+			"username": username,
+			"role":     role,
+			"domain":   domain,
+		}).Log("adding role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}
@@ -378,10 +394,23 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		domain = rule[1]
 		resource = rule[2]
 		actions = rule[3]
+
+		a.logger.Debug().WithFields(log.Fields{
+			"username": username,
+			"domain":   domain,
+			"resource": resource,
+			"actions":  actions,
+		}).Log("removing policy")
 	} else if ptype == "g" {
 		username = rule[0]
 		role = rule[1]
 		domain = rule[2]
+
+		a.logger.Debug().WithFields(log.Fields{
+			"username": username,
+			"role":     role,
+			"domain":   domain,
+		}).Log("adding role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}
@@ -449,19 +478,6 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 // Adapter
 func (a *adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int, fieldValues ...string) error {
 	return fmt.Errorf("not implemented")
-}
-
-func (a *adapter) GetAllGroupNames() []string {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	groups := []string{}
-
-	for _, group := range a.groups {
-		groups = append(groups, group.Name)
-	}
-
-	return groups
 }
 
 type Group struct {

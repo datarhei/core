@@ -67,7 +67,7 @@ func (r *sizedFilesystem) Resize(size int64) error {
 
 func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader) (int64, bool, error) {
 	currentSize, maxSize := r.Size()
-	if maxSize < 0 {
+	if maxSize <= 0 {
 		return r.Filesystem.WriteFileReader(path, rd)
 	}
 

@@ -43,8 +43,8 @@ type File interface {
 }
 
 type ReadFilesystem interface {
-	// Size returns the consumed size and capacity of the filesystem in bytes. The
-	// capacity is negative if the filesystem can consume as much space as it wants.
+	// Size returns the consumed size and capacity of the filesystem in bytes. If the
+	// capacity is 0 or smaller if the filesystem can consume as much space as it wants.
 	Size() (int64, int64)
 
 	// Files returns the current number of files in the filesystem.

@@ -400,7 +400,10 @@ func (a *api) start() error {
 						Enable:   cfg.Storage.Memory.Auth.Enable,
 						Password: cfg.Storage.Memory.Auth.Password,
 					},
-					Token: cfg.RTMP.Token,
+					Token: []string{
+						cfg.RTMP.Token,
+						cfg.SRT.Token,
+					},
 				},
 			},
 		}
@@ -426,15 +429,40 @@ func (a *api) start() error {
 			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
 		}
 
-		fmt.Printf("superuser: %+v\n", superuser)
-
 		iam, err := iam.NewIAM(iam.Config{
 			FS:        fs,
 			Superuser: superuser,
+			JWTRealm:  "datarhei-core",
 			JWTSecret: secret,
+			Logger:    a.log.logger.core.WithComponent("IAM"),
 		})
 		if err != nil {
 			return fmt.Errorf("iam: %w", err)
+		}
+
+		iam.RemovePolicy("$anon", "$none", "", "")
+		iam.RemovePolicy("$localhost", "$none", "", "")
+
+		iam.AddPolicy("$anon", "$none", "fs:/**", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$anon", "$none", "api:/api", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", "GET|HEAD|OPTIONS")
+
+		iam.AddPolicy("$localhost", "$none", "fs:/**", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$localhost", "$none", "api:/api", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", "GET|HEAD|OPTIONS")
+
+		if !cfg.API.Auth.Enable {
+			iam.AddPolicy("$anon", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+			iam.AddPolicy("$localhost", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+		}
+
+		if cfg.API.Auth.DisableLocalhost {
+			iam.AddPolicy("$localhost", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+		}
+
+		if !cfg.Storage.Memory.Auth.Enable {
+			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+			iam.AddPolicy("$localhost", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
 		}
 
 		a.iam = iam

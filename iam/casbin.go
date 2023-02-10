@@ -1,7 +1,6 @@
 package iam
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -14,12 +13,12 @@ func resourceMatch(request, domain, policy string) bool {
 	if reqPrefix != polPrefix {
 		return false
 	}
-
-	fmt.Printf("prefix: %s\n", reqPrefix)
-	fmt.Printf("requested resource: %s\n", reqResource)
-	fmt.Printf("requested domain: %s\n", domain)
-	fmt.Printf("policy resource: %s\n", polResource)
-
+	/*
+		fmt.Printf("prefix: %s\n", reqPrefix)
+		fmt.Printf("requested resource: %s\n", reqResource)
+		fmt.Printf("requested domain: %s\n", domain)
+		fmt.Printf("policy resource: %s\n", polResource)
+	*/
 	var match bool
 	var err error
 
@@ -55,7 +54,7 @@ func resourceMatch(request, domain, policy string) bool {
 		}
 	}
 
-	fmt.Printf("match: %v\n", match)
+	//fmt.Printf("match: %v\n", match)
 
 	return match
 }

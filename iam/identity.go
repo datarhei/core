@@ -10,6 +10,7 @@ import (
 
 	"github.com/datarhei/core/v16/iam/jwks"
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
 	"github.com/google/uuid"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
@@ -44,7 +45,7 @@ type UserAuthAPIAuth0 struct {
 
 type UserAuthServices struct {
 	Basic UserAuthPassword `json:"basic"`
-	Token string           `json:"token"`
+	Token []string         `json:"token"`
 }
 
 type UserAuthPassword struct {
@@ -88,7 +89,9 @@ func (u *User) marshalIdentity() *identity {
 type identity struct {
 	user User
 
-	tenant     *auth0Tenant
+	tenant *auth0Tenant
+
+	jwtRealm   string
 	jwtKeyFunc func(*jwtgo.Token) (interface{}, error)
 
 	valid bool
@@ -231,7 +234,7 @@ func (i *identity) VerifyJWT(jwt string) (bool, error) {
 		}
 	}
 
-	if issuer != "datarhei-core" {
+	if issuer != i.jwtRealm {
 		return false, fmt.Errorf("wrong issuer")
 	}
 
@@ -274,7 +277,13 @@ func (i *identity) VerifyServiceToken(token string) (bool, error) {
 		return false, fmt.Errorf("invalid identity")
 	}
 
-	return i.user.Auth.Services.Token == token, nil
+	for _, t := range i.user.Auth.Services.Token {
+		if t == token {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (i *identity) isValid() bool {
@@ -329,7 +338,9 @@ type identityManager struct {
 
 	fs       fs.Filesystem
 	filePath string
+	logger   log.Logger
 
+	jwtRealm  string
 	jwtSecret []byte
 
 	lock sync.RWMutex
@@ -338,7 +349,9 @@ type identityManager struct {
 type IdentityConfig struct {
 	FS        fs.Filesystem
 	Superuser User
+	JWTRealm  string
 	JWTSecret string
+	Logger    log.Logger
 }
 
 func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
@@ -348,7 +361,13 @@ func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 		auth0UserIdentityMap: map[string]string{},
 		fs:                   config.FS,
 		filePath:             "./users.json",
+		jwtRealm:             config.JWTRealm,
 		jwtSecret:            []byte(config.JWTSecret),
+		logger:               config.Logger,
+	}
+
+	if im.logger == nil {
+		im.logger = log.New("")
 	}
 
 	err := im.load(im.filePath)
@@ -470,6 +489,7 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 		return nil, fmt.Errorf("not found")
 	}
 
+	identity.jwtRealm = im.jwtRealm
 	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
 
 	return identity, nil
@@ -616,7 +636,7 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 
 	// Create access token
 	accessToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
-		"iss":    "datarhei-core",
+		"iss":    im.jwtRealm,
 		"sub":    name,
 		"usefor": "access",
 		"iat":    now.Unix(),
@@ -633,7 +653,7 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 
 	// Create refresh token
 	refreshToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
-		"iss":    "datarhei-core",
+		"iss":    im.jwtRealm,
 		"sub":    name,
 		"usefor": "refresh",
 		"iat":    now.Unix(),

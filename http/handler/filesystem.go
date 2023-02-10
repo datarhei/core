@@ -84,7 +84,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	_, created, err := h.fs.Filesystem.WriteFileReader(path, req.Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "%s", err)
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 	}
 
 	if h.fs.Cache != nil {
