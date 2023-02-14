@@ -155,7 +155,8 @@ type server struct {
 type filesystem struct {
 	fs.FS
 
-	handler *handler.FSHandler
+	handler    *handler.FSHandler
+	middleware echo.MiddlewareFunc
 }
 
 func NewServer(config Config) (Server, error) {
@@ -196,13 +197,13 @@ func NewServer(config Config) (Server, error) {
 			handler: handler.NewFS(fs),
 		}
 
-		s.filesystems[filesystem.Name] = filesystem
-
 		if fs.Filesystem.Type() == "disk" {
-			s.middleware.hlsrewrite = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
+			filesystem.middleware = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
 				PathPrefix: fs.Filesystem.Metadata("base"),
 			})
 		}
+
+		s.filesystems[filesystem.Name] = filesystem
 	}
 
 	if _, ok := corsPrefixes["/"]; !ok {
@@ -459,6 +460,14 @@ func (s *server) setRoutes() {
 				Cache: filesystem.Cache,
 			})
 			fs.Use(mwcache)
+		}
+
+		if filesystem.middleware != nil {
+			fs.Use(filesystem.middleware)
+		}
+
+		if s.middleware.session != nil {
+			fs.Use(s.middleware.session)
 		}
 
 		fs.GET("", filesystem.handler.GetFile)

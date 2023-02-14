@@ -22,7 +22,7 @@ type PurgeFilesystem interface {
 type sizedFilesystem struct {
 	Filesystem
 
-	// Siez is the capacity of the filesystem in bytes
+	// Size is the capacity of the filesystem in bytes
 	maxSize int64
 
 	// Set true to automatically delete the oldest files until there's
@@ -106,7 +106,7 @@ func (r *sizedFilesystem) WriteFile(path string, data []byte) (int64, bool, erro
 
 func (r *sizedFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
 	currentSize, maxSize := r.Size()
-	if maxSize < 0 {
+	if maxSize <= 0 {
 		return r.Filesystem.WriteFile(path, data)
 	}
 

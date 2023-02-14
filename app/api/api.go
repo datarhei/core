@@ -476,6 +476,12 @@ func (a *api) start() error {
 		return fmt.Errorf("disk filesystem: %w", err)
 	}
 
+	if diskfsRoot, err := filepath.Abs(cfg.Storage.Disk.Dir); err != nil {
+		return err
+	} else {
+		diskfs.SetMetadata("base", diskfsRoot)
+	}
+
 	a.diskfs = diskfs
 
 	baseMemFS := url.URL{
