@@ -370,6 +370,10 @@ func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 		im.logger = log.New("")
 	}
 
+	if im.fs == nil {
+		return nil, fmt.Errorf("no filesystem provided")
+	}
+
 	err := im.load(im.filePath)
 	if err != nil {
 		return nil, err
@@ -552,10 +556,6 @@ func (im *identityManager) Rename(oldname, newname string) error {
 }
 
 func (im *identityManager) load(filePath string) error {
-	if im.fs == nil {
-		return fmt.Errorf("no filesystem provided")
-	}
-
 	if _, err := im.fs.Stat(filePath); os.IsNotExist(err) {
 		return nil
 	}
@@ -587,10 +587,6 @@ func (im *identityManager) Save() error {
 }
 
 func (im *identityManager) save(filePath string) error {
-	if im.fs == nil {
-		return fmt.Errorf("no filesystem provided")
-	}
-
 	if filePath == "" {
 		return fmt.Errorf("invalid file path, file path cannot be empty")
 	}

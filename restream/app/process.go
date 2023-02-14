@@ -36,6 +36,8 @@ func (io ConfigIO) Clone() ConfigIO {
 type Config struct {
 	ID             string     `json:"id"`
 	Reference      string     `json:"reference"`
+	Owner          string     `json:"owner"`
+	Group          string     `json:"group"`
 	FFVersion      string     `json:"ffversion"`
 	Input          []ConfigIO `json:"input"`
 	Output         []ConfigIO `json:"output"`
@@ -103,6 +105,8 @@ func (config *Config) CreateCommand() []string {
 
 type Process struct {
 	ID        string  `json:"id"`
+	Owner     string  `json:"owner"`
+	Group     string  `json:"group"`
 	Reference string  `json:"reference"`
 	Config    *Config `json:"config"`
 	CreatedAt int64   `json:"created_at"`

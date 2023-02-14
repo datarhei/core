@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -30,9 +32,27 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
+	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, err
+	}
+
+	iam, err := iam.NewIAM(iam.Config{
+		FS: dummyfs,
+		Superuser: iam.User{
+			Name: "foobar",
+		},
+		JWTRealm:  "",
+		JWTSecret: "",
+		Logger:    nil,
+	})
+
+	iam.AddPolicy("$anon", "$none", "process:*", "CREATE|GET|DELETE|UPDATE|COMMAND|PROBE|METADATA|PLAYOUT")
+
 	rs, err := New(Config{
 		FFmpeg:  ffmpeg,
 		Replace: replacer,
+		IAM:     iam,
 	})
 	if err != nil {
 		return nil, err
@@ -85,16 +105,16 @@ func TestAddProcess(t *testing.T) {
 	process := getDummyProcess()
 	require.NotNil(t, process)
 
-	_, err = rs.GetProcess(process.ID)
-	require.NotEqual(t, nil, err, "Unset process found (%s)", process.ID)
+	_, err = rs.GetProcess(process.ID, "", "")
+	require.Equal(t, ErrUnknownProcess, err)
 
 	err = rs.AddProcess(process)
 	require.Equal(t, nil, err, "Failed to add process (%s)", err)
 
-	_, err = rs.GetProcess(process.ID)
+	_, err = rs.GetProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "Set process not found (%s)", process.ID)
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "stop", state.Order, "Process should be stopped")
 }
 
@@ -107,10 +127,10 @@ func TestAutostartProcess(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	rs.StopProcess(process.ID)
+	rs.StopProcess(process.ID, "", "")
 }
 
 func TestAddInvalidProcess(t *testing.T) {
@@ -190,10 +210,10 @@ func TestRemoveProcess(t *testing.T) {
 	err = rs.AddProcess(process)
 	require.Equal(t, nil, err, "Failed to add process (%s)", err)
 
-	err = rs.DeleteProcess(process.ID)
+	err = rs.DeleteProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "Set process not found (%s)", process.ID)
 
-	_, err = rs.GetProcess(process.ID)
+	_, err = rs.GetProcess(process.ID, "", "")
 	require.NotEqual(t, nil, err, "Unset process found (%s)", process.ID)
 }
 
@@ -219,17 +239,17 @@ func TestUpdateProcess(t *testing.T) {
 	require.NotNil(t, process3)
 	process3.ID = "process2"
 
-	err = rs.UpdateProcess("process1", process3)
+	err = rs.UpdateProcess("process1", "", "", process3)
 	require.Error(t, err)
 
 	process3.ID = "process3"
-	err = rs.UpdateProcess("process1", process3)
+	err = rs.UpdateProcess("process1", "", "", process3)
 	require.NoError(t, err)
 
-	_, err = rs.GetProcess(process1.ID)
+	_, err = rs.GetProcess(process1.ID, "", "")
 	require.Error(t, err)
 
-	_, err = rs.GetProcess(process3.ID)
+	_, err = rs.GetProcess(process3.ID, "", "")
 	require.NoError(t, err)
 }
 
@@ -255,34 +275,34 @@ func TestGetProcess(t *testing.T) {
 	rs.AddProcess(process3)
 	rs.AddProcess(process4)
 
-	_, err = rs.GetProcess(process1.ID)
+	_, err = rs.GetProcess(process1.ID, "", "")
 	require.Equal(t, nil, err)
 
-	list := rs.GetProcessIDs("", "")
+	list := rs.GetProcessIDs("", "", "", "")
 	require.Len(t, list, 4)
 	require.ElementsMatch(t, []string{"foo_aaa_1", "bar_bbb_2", "foo_ccc_3", "bar_ddd_4"}, list)
 
-	list = rs.GetProcessIDs("foo_*", "")
+	list = rs.GetProcessIDs("foo_*", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []string{"foo_aaa_1", "foo_ccc_3"}, list)
 
-	list = rs.GetProcessIDs("bar_*", "")
+	list = rs.GetProcessIDs("bar_*", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []string{"bar_bbb_2", "bar_ddd_4"}, list)
 
-	list = rs.GetProcessIDs("*_bbb_*", "")
+	list = rs.GetProcessIDs("*_bbb_*", "", "", "")
 	require.Len(t, list, 1)
 	require.ElementsMatch(t, []string{"bar_bbb_2"}, list)
 
-	list = rs.GetProcessIDs("", "foo_*")
+	list = rs.GetProcessIDs("", "foo_*", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []string{"foo_aaa_1", "foo_ccc_3"}, list)
 
-	list = rs.GetProcessIDs("", "bar_*")
+	list = rs.GetProcessIDs("", "bar_*", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []string{"bar_bbb_2", "bar_ddd_4"}, list)
 
-	list = rs.GetProcessIDs("", "*_bbb_*")
+	list = rs.GetProcessIDs("", "*_bbb_*", "", "")
 	require.Len(t, list, 1)
 	require.ElementsMatch(t, []string{"bar_bbb_2"}, list)
 }
@@ -295,22 +315,22 @@ func TestStartProcess(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	err = rs.StartProcess("foobar")
+	err = rs.StartProcess("foobar", "", "")
 	require.NotEqual(t, nil, err, "shouldn't be able to start non-existing process")
 
-	err = rs.StartProcess(process.ID)
+	err = rs.StartProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to start existing process")
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	err = rs.StartProcess(process.ID)
+	err = rs.StartProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to start already running process")
 
-	state, _ = rs.GetProcessState(process.ID)
+	state, _ = rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	rs.StopProcess(process.ID)
+	rs.StopProcess(process.ID, "", "")
 }
 
 func TestStopProcess(t *testing.T) {
@@ -320,21 +340,21 @@ func TestStopProcess(t *testing.T) {
 	process := getDummyProcess()
 
 	rs.AddProcess(process)
-	rs.StartProcess(process.ID)
+	rs.StartProcess(process.ID, "", "")
 
-	err = rs.StopProcess("foobar")
+	err = rs.StopProcess("foobar", "", "")
 	require.NotEqual(t, nil, err, "shouldn't be able to stop non-existing process")
 
-	err = rs.StopProcess(process.ID)
+	err = rs.StopProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to stop existing running process")
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "stop", state.Order, "Process should be stopped")
 
-	err = rs.StopProcess(process.ID)
+	err = rs.StopProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to stop already stopped process")
 
-	state, _ = rs.GetProcessState(process.ID)
+	state, _ = rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "stop", state.Order, "Process should be stopped")
 }
 
@@ -346,21 +366,21 @@ func TestRestartProcess(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	err = rs.RestartProcess("foobar")
+	err = rs.RestartProcess("foobar", "", "")
 	require.NotEqual(t, nil, err, "shouldn't be able to restart non-existing process")
 
-	err = rs.RestartProcess(process.ID)
+	err = rs.RestartProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to restart existing stopped process")
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "stop", state.Order, "Process should be stopped")
 
-	rs.StartProcess(process.ID)
+	rs.StartProcess(process.ID, "", "")
 
-	state, _ = rs.GetProcessState(process.ID)
+	state, _ = rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	rs.StopProcess(process.ID)
+	rs.StopProcess(process.ID, "", "")
 }
 
 func TestReloadProcess(t *testing.T) {
@@ -371,27 +391,27 @@ func TestReloadProcess(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	err = rs.ReloadProcess("foobar")
+	err = rs.ReloadProcess("foobar", "", "")
 	require.NotEqual(t, nil, err, "shouldn't be able to reload non-existing process")
 
-	err = rs.ReloadProcess(process.ID)
+	err = rs.ReloadProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to reload existing stopped process")
 
-	state, _ := rs.GetProcessState(process.ID)
+	state, _ := rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "stop", state.Order, "Process should be stopped")
 
-	rs.StartProcess(process.ID)
+	rs.StartProcess(process.ID, "", "")
 
-	state, _ = rs.GetProcessState(process.ID)
+	state, _ = rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	err = rs.ReloadProcess(process.ID)
+	err = rs.ReloadProcess(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to reload existing process")
 
-	state, _ = rs.GetProcessState(process.ID)
+	state, _ = rs.GetProcessState(process.ID, "", "")
 	require.Equal(t, "start", state.Order, "Process should be started")
 
-	rs.StopProcess(process.ID)
+	rs.StopProcess(process.ID, "", "")
 }
 
 func TestProbeProcess(t *testing.T) {
@@ -402,7 +422,7 @@ func TestProbeProcess(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	probe := rs.ProbeWithTimeout(process.ID, 5*time.Second)
+	probe := rs.ProbeWithTimeout(process.ID, "", "", 5*time.Second)
 
 	require.Equal(t, 3, len(probe.Streams))
 }
@@ -415,12 +435,15 @@ func TestProcessMetadata(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	data, _ := rs.GetProcessMetadata(process.ID, "foobar")
+	data, err := rs.GetProcessMetadata(process.ID, "", "", "foobar")
+	require.Error(t, ErrMetadataKeyNotFound)
 	require.Equal(t, nil, data, "nothing should be stored under the key")
 
-	rs.SetProcessMetadata(process.ID, "foobar", process)
+	err = rs.SetProcessMetadata(process.ID, "", "", "foobar", process)
+	require.NoError(t, err)
 
-	data, _ = rs.GetProcessMetadata(process.ID, "foobar")
+	data, err = rs.GetProcessMetadata(process.ID, "", "", "foobar")
+	require.NoError(t, err)
 	require.NotEqual(t, nil, data, "there should be something stored under the key")
 
 	p := data.(*app.Config)
@@ -436,26 +459,26 @@ func TestLog(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetProcessLog("foobar")
+	_, err = rs.GetProcessLog("foobar", "", "")
 	require.NotEqual(t, nil, err, "shouldn't be able to get log from non-existing process")
 
-	log, err := rs.GetProcessLog(process.ID)
+	log, err := rs.GetProcessLog(process.ID, "", "")
 	require.Equal(t, nil, err, "should be able to get log from existing process")
 	require.Equal(t, 0, len(log.Prelude))
 	require.Equal(t, 0, len(log.Log))
 
-	rs.StartProcess(process.ID)
+	rs.StartProcess(process.ID, "", "")
 
 	time.Sleep(3 * time.Second)
 
-	log, _ = rs.GetProcessLog(process.ID)
+	log, _ = rs.GetProcessLog(process.ID, "", "")
 
 	require.NotEqual(t, 0, len(log.Prelude))
 	require.NotEqual(t, 0, len(log.Log))
 
-	rs.StopProcess(process.ID)
+	rs.StopProcess(process.ID, "", "")
 
-	log, _ = rs.GetProcessLog(process.ID)
+	log, _ = rs.GetProcessLog(process.ID, "", "")
 
 	require.NotEqual(t, 0, len(log.Prelude))
 	require.NotEqual(t, 0, len(log.Log))
@@ -471,13 +494,13 @@ func TestPlayoutNoRange(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetPlayout("foobar", process.Input[0].ID)
-	require.NotEqual(t, nil, err, "playout of non-existing process should error")
+	_, err = rs.GetPlayout("foobar", "", "", process.Input[0].ID)
+	require.Equal(t, ErrUnknownProcess, err)
 
-	_, err = rs.GetPlayout(process.ID, "foobar")
+	_, err = rs.GetPlayout(process.ID, "", "", "foobar")
 	require.NotEqual(t, nil, err, "playout of non-existing input should error")
 
-	addr, _ := rs.GetPlayout(process.ID, process.Input[0].ID)
+	addr, _ := rs.GetPlayout(process.ID, "", "", process.Input[0].ID)
 	require.Equal(t, 0, len(addr), "the playout address should be empty if no port range is given")
 }
 
@@ -494,13 +517,13 @@ func TestPlayoutRange(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetPlayout("foobar", process.Input[0].ID)
-	require.NotEqual(t, nil, err, "playout of non-existing process should error")
+	_, err = rs.GetPlayout("foobar", "", "", process.Input[0].ID)
+	require.Equal(t, ErrUnknownProcess, err)
 
-	_, err = rs.GetPlayout(process.ID, "foobar")
+	_, err = rs.GetPlayout(process.ID, "", "", "foobar")
 	require.NotEqual(t, nil, err, "playout of non-existing input should error")
 
-	addr, _ := rs.GetPlayout(process.ID, process.Input[0].ID)
+	addr, _ := rs.GetPlayout(process.ID, "", "", process.Input[0].ID)
 	require.NotEqual(t, 0, len(addr), "the playout address should not be empty if a port range is given")
 	require.Equal(t, "127.0.0.1:3000", addr, "the playout address should be 127.0.0.1:3000")
 }
@@ -512,10 +535,9 @@ func TestAddressReference(t *testing.T) {
 	process1 := getDummyProcess()
 	process2 := getDummyProcess()
 
-	process2.ID = "process2"
-
 	rs.AddProcess(process1)
 
+	process2.ID = "process2"
 	process2.Input[0].Address = "#process:foobar=out"
 
 	err = rs.AddProcess(process2)

@@ -76,3 +76,12 @@ func DefaultQuery(c echo.Context, name, defValue string) string {
 
 	return param
 }
+
+func DefaultContext(c echo.Context, name, defValue string) string {
+	value, ok := c.Get(name).(string)
+	if !ok {
+		return defValue
+	}
+
+	return value
+}

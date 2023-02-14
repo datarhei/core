@@ -57,15 +57,15 @@ func (c *restreamCollector) Collect() metric.Metrics {
 		"starting":  0,
 	}
 
-	ids := c.r.GetProcessIDs("", "")
+	ids := c.r.GetProcessIDs("", "", "$superuser", "$none")
 
 	for _, id := range ids {
-		state, _ := c.r.GetProcessState(id)
+		state, _ := c.r.GetProcessState(id, "$superuser", "$none")
 		if state == nil {
 			continue
 		}
 
-		proc, _ := c.r.GetProcess(id)
+		proc, _ := c.r.GetProcess(id, "$superuser", "$none")
 		if proc == nil {
 			continue
 		}
