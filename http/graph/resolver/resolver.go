@@ -22,23 +22,23 @@ type Resolver struct {
 	LogBuffer log.BufferWriter
 }
 
-func (r *queryResolver) getProcess(id string) (*models.Process, error) {
-	process, err := r.Restream.GetProcess(id)
+func (r *queryResolver) getProcess(id, user, group string) (*models.Process, error) {
+	process, err := r.Restream.GetProcess(id, user, group)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := r.Restream.GetProcessState(id)
+	state, err := r.Restream.GetProcessState(id, user, group)
 	if err != nil {
 		return nil, err
 	}
 
-	report, err := r.Restream.GetProcessLog(id)
+	report, err := r.Restream.GetProcessLog(id, user, group)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := r.Restream.GetProcessMetadata(id, "")
+	m, err := r.Restream.GetProcessMetadata(id, user, group, "")
 	if err != nil {
 		return nil, err
 	}

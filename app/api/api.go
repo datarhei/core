@@ -34,6 +34,7 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/rewrite"
 	restreamstore "github.com/datarhei/core/v16/restream/store"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
@@ -440,6 +441,9 @@ func (a *api) start() error {
 			return fmt.Errorf("iam: %w", err)
 		}
 
+		// Create default policies for anonymous users in order to mimic
+		// the behaviour before IAM
+
 		iam.RemovePolicy("$anon", "$none", "", "")
 		iam.RemovePolicy("$localhost", "$none", "", "")
 
@@ -463,6 +467,14 @@ func (a *api) start() error {
 		if !cfg.Storage.Memory.Auth.Enable {
 			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
 			iam.AddPolicy("$localhost", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+		}
+
+		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+			iam.AddPolicy("$anon", "$none", "rtmp:/**", "PUBLISH|PLAY")
+		}
+
+		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+			iam.AddPolicy("$anon", "$none", "srt:**", "PUBLISH|PLAY")
 		}
 
 		a.iam = iam
@@ -592,6 +604,35 @@ func (a *api) start() error {
 
 	a.ffmpeg = ffmpeg
 
+	var rw rewrite.Rewriter
+
+	{
+		baseAddress := func(address string) string {
+			var base string
+			host, port, _ := gonet.SplitHostPort(address)
+			if len(host) == 0 {
+				base = "localhost:" + port
+			} else {
+				base = address
+			}
+
+			return base
+		}
+
+		httpBase := baseAddress(cfg.Address)
+		rtmpBase := baseAddress(cfg.RTMP.Address) + cfg.RTMP.App
+		srtBase := baseAddress(cfg.SRT.Address)
+
+		rw, err = rewrite.New(rewrite.Config{
+			HTTPBase: "http://" + httpBase,
+			RTMPBase: "rtmp://" + rtmpBase,
+			SRTBase:  "srt://" + srtBase,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create url rewriter: %w", err)
+		}
+	}
+
 	a.replacer = replace.New()
 
 	{
@@ -627,8 +668,8 @@ func (a *api) start() error {
 			}
 			template += "/{name}"
 
-			if len(cfg.RTMP.Token) != 0 {
-				template += "?token=" + cfg.RTMP.Token
+			if identity, _ := a.iam.GetIdentity(config.Owner); identity != nil {
+				template += "/" + identity.GetServiceToken()
 			}
 
 			return template
@@ -643,14 +684,14 @@ func (a *api) start() error {
 			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name}"
 			if section == "output" {
 				template += ",mode:publish"
-			} else {
-				template += ",mode:request"
 			}
-			if len(cfg.SRT.Token) != 0 {
-				template += ",token:" + cfg.SRT.Token
+
+			if identity, _ := a.iam.GetIdentity(config.Owner); identity != nil {
+				template += ",token:" + identity.GetServiceToken()
 			}
+
 			if len(cfg.SRT.Passphrase) != 0 {
-				template += "&passphrase=" + cfg.SRT.Passphrase
+				template += "&passphrase=" + url.QueryEscape(cfg.SRT.Passphrase)
 			}
 
 			return template
@@ -693,8 +734,10 @@ func (a *api) start() error {
 		Store:        store,
 		Filesystems:  filesystems,
 		Replace:      a.replacer,
+		Rewrite:      rw,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
+		IAM:          a.iam,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 
@@ -703,49 +746,7 @@ func (a *api) start() error {
 	}
 
 	a.restream = restream
-	/*
-		var httpjwt jwt.JWT
 
-		if cfg.API.Auth.Enable {
-			secret := rand.String(32)
-			if len(cfg.API.Auth.JWT.Secret) != 0 {
-				secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
-			}
-
-			var err error
-			httpjwt, err = jwt.New(jwt.Config{
-				Realm:         app.Name,
-				Secret:        secret,
-				SkipLocalhost: cfg.API.Auth.DisableLocalhost,
-			})
-
-			if err != nil {
-				return fmt.Errorf("unable to create JWT provider: %w", err)
-			}
-
-			if validator, err := jwt.NewLocalValidator(a.iam); err == nil {
-				if err := httpjwt.AddValidator(app.Name, validator); err != nil {
-					return fmt.Errorf("unable to add local JWT validator: %w", err)
-				}
-			} else {
-				return fmt.Errorf("unable to create local JWT validator: %w", err)
-			}
-
-			if cfg.API.Auth.Auth0.Enable {
-				for _, t := range cfg.API.Auth.Auth0.Tenants {
-					if validator, err := jwt.NewAuth0Validator(a.iam); err == nil {
-						if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
-							return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
-						}
-					} else {
-						return fmt.Errorf("unable to create Auth0 JWT validator: %w", err)
-					}
-				}
-			}
-		}
-
-		a.httpjwt = httpjwt
-	*/
 	metrics, err := monitor.NewHistory(monitor.HistoryConfig{
 		Enable:    cfg.Metrics.Enable,
 		Timerange: time.Duration(cfg.Metrics.Range) * time.Second,

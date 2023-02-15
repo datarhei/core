@@ -13,8 +13,11 @@ import (
 	"github.com/datarhei/core/v16/playout"
 )
 
-func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, input string) (*models.RawAVstream, error) {
-	addr, err := r.Restream.GetPlayout(id, input)
+// PlayoutStatus is the resolver for the playoutStatus field.
+func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, group *string, input string) (*models.RawAVstream, error) {
+	user, _ := ctx.Value("user").(string)
+
+	addr, err := r.Restream.GetPlayout(id, user, *group, input)
 	if err != nil {
 		return nil, fmt.Errorf("unknown process or input: %w", err)
 	}

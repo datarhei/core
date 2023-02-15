@@ -16,7 +16,7 @@ type StoreData struct {
 
 func NewStoreData() StoreData {
 	c := StoreData{
-		Version: 4,
+		Version: version,
 	}
 
 	c.Process = make(map[string]*app.Process)

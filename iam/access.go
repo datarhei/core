@@ -108,20 +108,7 @@ func (am *access) HasGroup(name string) bool {
 }
 
 func (am *access) Enforce(name, domain, resource, action string) (bool, string) {
-	l := am.logger.Debug().WithFields(log.Fields{
-		"subject":  name,
-		"domain":   domain,
-		"resource": resource,
-		"action":   action,
-	})
-
 	ok, rule, _ := am.enforcer.EnforceEx(name, domain, resource, action)
-
-	if !ok {
-		l.Log("no match")
-	} else {
-		l.WithField("rule", strings.Join(rule, ", ")).Log("match")
-	}
 
 	return ok, strings.Join(rule, ", ")
 }

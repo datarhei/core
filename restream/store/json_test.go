@@ -76,11 +76,11 @@ func TestNotExists(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	fs := getFS(t)
-	fs.Remove("./fixtures/v4_store.json")
+	fs.Remove("./fixtures/v5_store.json")
 
 	store, err := NewJSON(JSONConfig{
 		Filesystem: fs,
-		Filepath:   "./fixtures/v4_store.json",
+		Filepath:   "./fixtures/v5_store.json",
 	})
 	require.NoError(t, err)
 
@@ -90,13 +90,14 @@ func TestStore(t *testing.T) {
 
 	data.Metadata.System["somedata"] = "foobar"
 
-	store.Store(data)
+	err = store.Store(data)
+	require.NoError(t, err)
 
 	data2, err := store.Load()
 	require.NoError(t, err)
 	require.Equal(t, data, data2)
 
-	fs.Remove("./fixtures/v4_store.json")
+	fs.Remove("./fixtures/v5_store.json")
 }
 
 func TestInvalidVersion(t *testing.T) {

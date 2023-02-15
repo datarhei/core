@@ -9,13 +9,15 @@ import (
 	"github.com/datarhei/core/v16/http/graph/models"
 )
 
-func (r *queryResolver) Processes(ctx context.Context) ([]*models.Process, error) {
-	ids := r.Restream.GetProcessIDs("", "")
+// Processes is the resolver for the processes field.
+func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpattern *string, group *string) ([]*models.Process, error) {
+	user, _ := ctx.Value("user").(string)
+	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, user, *group)
 
 	procs := []*models.Process{}
 
 	for _, id := range ids {
-		p, err := r.getProcess(id)
+		p, err := r.getProcess(id, user, *group)
 		if err != nil {
 			return nil, err
 		}
@@ -26,12 +28,18 @@ func (r *queryResolver) Processes(ctx context.Context) ([]*models.Process, error
 	return procs, nil
 }
 
-func (r *queryResolver) Process(ctx context.Context, id string) (*models.Process, error) {
-	return r.getProcess(id)
+// Process is the resolver for the process field.
+func (r *queryResolver) Process(ctx context.Context, id string, group *string) (*models.Process, error) {
+	user, _ := ctx.Value("user").(string)
+
+	return r.getProcess(id, user, *group)
 }
 
-func (r *queryResolver) Probe(ctx context.Context, id string) (*models.Probe, error) {
-	probe := r.Restream.Probe(id)
+// Probe is the resolver for the probe field.
+func (r *queryResolver) Probe(ctx context.Context, id string, group *string) (*models.Probe, error) {
+	user, _ := ctx.Value("user").(string)
+
+	probe := r.Restream.Probe(id, user, *group)
 
 	p := &models.Probe{}
 	p.UnmarshalRestream(probe)

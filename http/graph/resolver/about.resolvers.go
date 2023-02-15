@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/http/graph/scalars"
 )
 
+// About is the resolver for the about field.
 func (r *queryResolver) About(ctx context.Context) (*models.About, error) {
 	createdAt := r.Restream.CreatedAt()
 

@@ -17,6 +17,7 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
@@ -502,6 +503,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData,
 	}
 
 	r := store.NewStoreData()
+	r.Version = 4
 
 	jsondata, err := fs.ReadFile(path)
 	if err != nil {
@@ -1428,17 +1430,30 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
+	iam, _ := iam.NewIAM(iam.Config{
+		FS: dummyfs,
+		Superuser: iam.User{
+			Name: "foobar",
+		},
+		JWTRealm:  "",
+		JWTSecret: "",
+		Logger:    nil,
+	})
+
+	iam.AddPolicy("$anon", "$none", "process:*", "CREATE|GET|DELETE|PROBE")
+
 	rs, err := restream.New(restream.Config{
 		FFmpeg: ffmpeg,
 		Store:  store,
+		IAM:    iam,
 	})
 	if err != nil {
 		return app.Probe{}
 	}
 
 	rs.AddProcess(&config)
-	probe := rs.Probe(config.ID)
-	rs.DeleteProcess(config.ID)
+	probe := rs.Probe(config.ID, "", "")
+	rs.DeleteProcess(config.ID, "", "")
 
 	return probe
 }

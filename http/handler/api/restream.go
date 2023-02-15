@@ -37,6 +37,8 @@ func NewRestream(restream restream.Restreamer) *RestreamHandler {
 // @Security ApiKeyAuth
 // @Router /api/v3/process [post]
 func (h *RestreamHandler) Add(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
+
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
 		Type:      "ffmpeg",
@@ -56,6 +58,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	config := process.Marshal()
+	config.Owner = user
 
 	if err := h.restream.AddProcess(config); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
@@ -210,6 +213,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 	}
 
 	config := process.Marshal()
+	config.Owner = user
 
 	if err := h.restream.UpdateProcess(id, user, group, config); err != nil {
 		if err == restream.ErrUnknownProcess {

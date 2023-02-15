@@ -43,17 +43,18 @@ func NewWidget(config WidgetConfig) *WidgetHandler {
 // @Router /api/v3/widget/process/{id} [get]
 func (w *WidgetHandler) Get(c echo.Context) error {
 	id := util.PathParam(c, "id")
+	group := util.DefaultQuery(c, "group", "")
 
 	if w.restream == nil {
 		return api.Err(http.StatusNotFound, "Unknown process ID")
 	}
 
-	process, err := w.restream.GetProcess(id)
+	process, err := w.restream.GetProcess(id, "", group)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
 	}
 
-	state, err := w.restream.GetProcessState(id)
+	state, err := w.restream.GetProcessState(id, "", group)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
 	}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/datarhei/core/v16/http/graph/graph"
@@ -18,7 +19,7 @@ type GraphHandler struct {
 	playgroundHandler http.HandlerFunc
 }
 
-// NewRestream return a new Restream type. You have to provide a valid Restreamer instance.
+// NewGraph return a new GraphHandler type. You have to provide a valid Restreamer instance.
 func NewGraph(resolver resolver.Resolver, path string) *GraphHandler {
 	g := &GraphHandler{
 		resolver: resolver,
@@ -43,7 +44,12 @@ func NewGraph(resolver resolver.Resolver, path string) *GraphHandler {
 // @Security ApiKeyAuth
 // @Router /api/graph/query [post]
 func (g *GraphHandler) Query(c echo.Context) error {
-	g.queryHandler.ServeHTTP(c.Response(), c.Request())
+	user, _ := c.Get("user").(string)
+
+	r := c.Request()
+	ctx := context.WithValue(r.Context(), "user", user)
+
+	g.queryHandler.ServeHTTP(c.Response(), r.WithContext(ctx))
 
 	return nil
 }

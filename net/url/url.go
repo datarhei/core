@@ -18,8 +18,6 @@ func Validate(address string) error {
 // Parse parses an URL into its components. Returns a net/url.URL or
 // an error if the URL couldn't be parsed.
 func Parse(address string) (*url.URL, error) {
-	address = reScheme.ReplaceAllString(address, "//")
-
 	u, err := url.Parse(address)
 
 	return u, err

@@ -24,6 +24,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/rewrite"
 	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/Masterminds/semver/v3"
@@ -67,6 +68,7 @@ type Config struct {
 	Store        store.Store
 	Filesystems  []fs.Filesystem
 	Replace      replace.Replacer
+	Rewrite      rewrite.Rewriter
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
 	Logger       log.Logger
@@ -112,6 +114,7 @@ type restream struct {
 		stopObserver context.CancelFunc
 	}
 	replace  replace.Replacer
+	rewrite  rewrite.Rewriter
 	tasks    map[string]*task
 	logger   log.Logger
 	metadata map[string]interface{}
@@ -132,6 +135,7 @@ func New(config Config) (Restreamer, error) {
 		createdAt: time.Now(),
 		store:     config.Store,
 		replace:   config.Replace,
+		rewrite:   config.Rewrite,
 		logger:    config.Logger,
 		iam:       config.IAM,
 	}
@@ -418,16 +422,21 @@ func (r *restream) save() {
 
 func (r *restream) enforce(name, group, processid, action string) bool {
 	if len(name) == 0 {
-		name = "$anon"
+		// This is for backwards compatibility. Existing processes don't have an owner.
+		// All processes that will be added later will have an owner ($anon, ...).
+		identity, err := r.iam.GetDefaultIdentity()
+		if err != nil {
+			name = "$anon"
+		} else {
+			name = identity.Name()
+		}
 	}
 
 	if len(group) == 0 {
 		group = "$none"
 	}
 
-	ok, _ := r.iam.Enforce(name, group, "process:"+processid, action)
-
-	return ok
+	return r.iam.Enforce(name, group, "process:"+processid, action)
 }
 
 func (r *restream) ID() string {
@@ -878,37 +887,138 @@ func (r *restream) resolveAddresses(tasks map[string]*task, config *app.Config) 
 }
 
 func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (string, error) {
-	re := regexp.MustCompile(`^#(.+):output=(.+)`)
-
-	if len(address) == 0 {
-		return address, fmt.Errorf("empty address")
+	matches, err := parseAddressReference(address)
+	if err != nil {
+		return address, err
 	}
 
-	if address[0] != '#' {
+	// Address is not a reference
+	if _, ok := matches["address"]; ok {
 		return address, nil
 	}
 
-	matches := re.FindStringSubmatch(address)
-	if matches == nil {
-		return address, fmt.Errorf("invalid format (%s)", address)
+	if matches["id"] == id {
+		return address, fmt.Errorf("self-reference is not allowed (%s)", address)
 	}
 
-	if matches[1] == id {
-		return address, fmt.Errorf("self-reference not possible (%s)", address)
-	}
+	var t *task = nil
 
-	task, ok := tasks[matches[1]]
-	if !ok {
-		return address, fmt.Errorf("unknown process '%s' (%s)", matches[1], address)
-	}
-
-	for _, x := range task.config.Output {
-		if x.ID == matches[2] {
-			return x.Address, nil
+	for _, tsk := range tasks {
+		if tsk.id == matches["id"] && tsk.group == matches["group"] {
+			t = tsk
+			break
 		}
 	}
 
-	return address, fmt.Errorf("the process '%s' has no outputs with the ID '%s' (%s)", matches[1], matches[2], address)
+	if t == nil {
+		return address, fmt.Errorf("unknown process '%s' in group '%s' (%s)", matches["id"], matches["group"], address)
+	}
+
+	identity, _ := r.iam.GetIdentity(t.config.Owner)
+
+	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
+
+	for _, x := range t.config.Output {
+		if x.ID != matches["output"] {
+			continue
+		}
+
+		// Check for non-tee output
+		if !strings.Contains(x.Address, "|") && !strings.HasPrefix(x.Address, "[") {
+			return r.rewrite.RewriteAddress(x.Address, identity, rewrite.READ), nil
+		}
+
+		// Split tee output in its individual addresses
+
+		addresses := strings.Split(x.Address, "|")
+		if len(addresses) == 0 {
+			return x.Address, nil
+		}
+
+		// Remove tee options
+		for i, a := range addresses {
+			addresses[i] = teeOptions.ReplaceAllString(a, "")
+		}
+
+		if len(matches["source"]) == 0 {
+			return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+		}
+
+		for _, a := range addresses {
+			u, err := url.Parse(a)
+			if err != nil {
+				// Ignore invalid addresses
+				continue
+			}
+
+			if matches["source"] == "hls" {
+				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.Path, ".m3u8") {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			} else if matches["source"] == "rtmp" {
+				if u.Scheme == "rtmp" {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			} else if matches["source"] == "srt" {
+				if u.Scheme == "srt" {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			}
+		}
+
+		// If none of the sources matched, return the first address
+		return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+	}
+
+	return address, fmt.Errorf("the process '%s' in group '%s' has no outputs with the ID '%s' (%s)", matches["id"], matches["group"], matches["output"], address)
+}
+
+func parseAddressReference(address string) (map[string]string, error) {
+	if len(address) == 0 {
+		return nil, fmt.Errorf("empty address")
+	}
+
+	if address[0] != '#' {
+		return map[string]string{
+			"address": address,
+		}, nil
+	}
+
+	re := regexp.MustCompile(`:(output|group|source)=(.+)`)
+
+	results := map[string]string{}
+
+	idEnd := -1
+	value := address
+	key := ""
+
+	for {
+		matches := re.FindStringSubmatchIndex(value)
+		if matches == nil {
+			break
+		}
+
+		if idEnd < 0 {
+			idEnd = matches[2] - 1
+		}
+
+		if len(key) != 0 {
+			results[key] = value[:matches[2]-1]
+		}
+
+		key = value[matches[2]:matches[3]]
+		value = value[matches[4]:matches[5]]
+
+		results[key] = value
+	}
+
+	if idEnd < 0 {
+		return nil, fmt.Errorf("invalid format (%s)", address)
+	}
+
+	results["id"] = address[1:idEnd]
+
+	return results, nil
 }
 
 func (r *restream) UpdateProcess(id, user, group string, config *app.Config) error {
@@ -1661,6 +1771,7 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 	vars := map[string]string{
 		"processid": config.ID,
+		"owner":     config.Owner,
 		"reference": config.Reference,
 		"group":     config.Group,
 	}

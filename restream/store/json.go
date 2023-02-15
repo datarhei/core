@@ -26,7 +26,10 @@ type jsonStore struct {
 	lock sync.RWMutex
 }
 
-var version uint64 = 4
+// version 4 -> 5:
+// process groups have been added. the indices for the maps are only the process IDs in version 4.
+// version 5 adds the group name as suffix to the process ID with a "~".
+var version uint64 = 5
 
 func NewJSON(config JSONConfig) (Store, error) {
 	s := &jsonStore{
@@ -123,12 +126,29 @@ func (s *jsonStore) load(filepath string, version uint64) (StoreData, error) {
 		return r, json.FormatError(jsondata, err)
 	}
 
-	if db.Version != version {
-		return r, fmt.Errorf("unsupported version of the DB file (want: %d, have: %d)", version, db.Version)
-	}
+	if db.Version == 4 {
+		rold := NewStoreData()
+		if err = gojson.Unmarshal(jsondata, &rold); err != nil {
+			return r, json.FormatError(jsondata, err)
+		}
 
-	if err = gojson.Unmarshal(jsondata, &r); err != nil {
-		return r, json.FormatError(jsondata, err)
+		for id, p := range rold.Process {
+			r.Process[id+"~"] = p
+		}
+
+		for key, p := range rold.Metadata.System {
+			r.Metadata.System[key] = p
+		}
+
+		for id, p := range rold.Metadata.Process {
+			r.Metadata.Process[id+"~"] = p
+		}
+	} else if db.Version == version {
+		if err = gojson.Unmarshal(jsondata, &r); err != nil {
+			return r, json.FormatError(jsondata, err)
+		}
+	} else {
+		return r, fmt.Errorf("unsupported version of the DB file (want: %d, have: %d)", version, db.Version)
 	}
 
 	s.logger.WithField("file", filepath).Debug().Log("Read data")

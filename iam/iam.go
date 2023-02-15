@@ -6,7 +6,7 @@ import (
 )
 
 type IAM interface {
-	Enforce(user, domain, resource, action string) (bool, string)
+	Enforce(user, domain, resource, action string) bool
 	IsDomain(domain string) bool
 
 	AddPolicy(username, domain, resource, actions string) bool
@@ -26,6 +26,8 @@ type IAM interface {
 type iam struct {
 	im IdentityManager
 	am AccessManager
+
+	logger log.Logger
 }
 
 type Config struct {
@@ -56,10 +58,17 @@ func NewIAM(config Config) (IAM, error) {
 		return nil, err
 	}
 
-	return &iam{
-		im: im,
-		am: am,
-	}, nil
+	iam := &iam{
+		im:     im,
+		am:     am,
+		logger: config.Logger,
+	}
+
+	if iam.logger == nil {
+		iam.logger = log.New("")
+	}
+
+	return iam, nil
 }
 
 func (i *iam) Close() {
@@ -67,12 +76,38 @@ func (i *iam) Close() {
 	i.im = nil
 
 	i.am = nil
-
-	return
 }
 
-func (i *iam) Enforce(user, domain, resource, action string) (bool, string) {
-	return i.am.Enforce(user, domain, resource, action)
+func (i *iam) Enforce(user, domain, resource, action string) bool {
+	superuser := false
+
+	if identity, err := i.im.GetVerifier(user); err == nil {
+		if identity.IsSuperuser() {
+			superuser = true
+		}
+	}
+
+	l := i.logger.Debug().WithFields(log.Fields{
+		"subject":   user,
+		"domain":    domain,
+		"resource":  resource,
+		"action":    action,
+		"superuser": superuser,
+	})
+
+	if superuser {
+		user = "$superuser"
+	}
+
+	ok, rule := i.am.Enforce(user, domain, resource, action)
+
+	if !ok {
+		l.Log("no match")
+	} else {
+		l.WithField("rule", rule).Log("match")
+	}
+
+	return ok
 }
 
 func (i *iam) GetIdentity(name string) (IdentityVerifier, error) {

@@ -177,17 +177,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			c.Set("user", username)
 
-			if identity != nil && identity.IsSuperuser() {
-				username = "$superuser"
-			}
-
 			if len(domain) == 0 {
 				domain = "$none"
 			}
 
 			action := c.Request().Method
 
-			if ok, _ := config.IAM.Enforce(username, domain, resource, action); !ok {
+			if !config.IAM.Enforce(username, domain, resource, action) {
 				return api.Err(http.StatusForbidden, "Forbidden", "access denied")
 			}
 

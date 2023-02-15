@@ -1,5 +1,5 @@
 extend type Query {
-	playoutStatus(id: ID!, input: ID!): RawAVstream
+	playoutStatus(id: ID!, group: String, input: ID!): RawAVstream
 }
 
 type RawAVstreamIO {

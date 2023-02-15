@@ -9,10 +9,12 @@ import (
 	"github.com/datarhei/core/v16/http/graph/graph"
 )
 
+// Ping is the resolver for the ping field.
 func (r *mutationResolver) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }
 
+// Ping is the resolver for the ping field.
 func (r *queryResolver) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }

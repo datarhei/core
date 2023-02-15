@@ -86,6 +86,23 @@ func (u *User) marshalIdentity() *identity {
 	return i
 }
 
+type IdentityVerifier interface {
+	Name() string
+
+	VerifyJWT(jwt string) (bool, error)
+
+	VerifyAPIPassword(password string) (bool, error)
+	VerifyAPIAuth0(jwt string) (bool, error)
+
+	VerifyServiceBasicAuth(password string) (bool, error)
+	VerifyServiceToken(token string) (bool, error)
+
+	GetServiceBasicAuth() string
+	GetServiceToken() string
+
+	IsSuperuser() bool
+}
+
 type identity struct {
 	user User
 
@@ -269,6 +286,21 @@ func (i *identity) VerifyServiceBasicAuth(password string) (bool, error) {
 	return i.user.Auth.Services.Basic.Password == password, nil
 }
 
+func (i *identity) GetServiceBasicAuth() string {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	if !i.isValid() {
+		return ""
+	}
+
+	if !i.user.Auth.Services.Basic.Enable {
+		return ""
+	}
+
+	return i.user.Auth.Services.Basic.Password
+}
+
 func (i *identity) VerifyServiceToken(token string) (bool, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -286,6 +318,21 @@ func (i *identity) VerifyServiceToken(token string) (bool, error) {
 	return false, nil
 }
 
+func (i *identity) GetServiceToken() string {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	if !i.isValid() {
+		return ""
+	}
+
+	if len(i.user.Auth.Services.Token) == 0 {
+		return ""
+	}
+
+	return i.Name() + ":" + i.user.Auth.Services.Token[0]
+}
+
 func (i *identity) isValid() bool {
 	return i.valid
 }
@@ -297,24 +344,9 @@ func (i *identity) IsSuperuser() bool {
 	return i.user.Superuser
 }
 
-type IdentityVerifier interface {
-	Name() string
-
-	VerifyJWT(jwt string) (bool, error)
-
-	VerifyAPIPassword(password string) (bool, error)
-	VerifyAPIAuth0(jwt string) (bool, error)
-
-	VerifyServiceBasicAuth(password string) (bool, error)
-	VerifyServiceToken(token string) (bool, error)
-
-	IsSuperuser() bool
-}
-
 type IdentityManager interface {
 	Create(identity User) error
 	Remove(name string) error
-	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
 	GetVerifierByAuth0(name string) (IdentityVerifier, error)
 	GetDefaultVerifier() (IdentityVerifier, error)
@@ -404,8 +436,6 @@ func (im *identityManager) Close() {
 	}
 
 	im.tenants = map[string]*auth0Tenant{}
-
-	return
 }
 
 func (im *identityManager) Create(u User) error {
@@ -485,7 +515,7 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 	if im.root.user.Name == name {
 		identity = im.root
 	} else {
-		identity, _ = im.identities[name]
+		identity = im.identities[name]
 
 	}
 
@@ -497,18 +527,6 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
 
 	return identity, nil
-}
-
-func (im *identityManager) Get(name string) (User, error) {
-	im.lock.RLock()
-	defer im.lock.RUnlock()
-
-	identity, err := im.getIdentity(name)
-	if err != nil {
-		return User{}, fmt.Errorf("not found")
-	}
-
-	return identity.user, nil
 }
 
 func (im *identityManager) GetVerifier(name string) (IdentityVerifier, error) {

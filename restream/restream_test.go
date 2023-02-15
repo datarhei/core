@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/rewrite"
 
 	"github.com/stretchr/testify/require"
 )
@@ -49,9 +50,15 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 
 	iam.AddPolicy("$anon", "$none", "process:*", "CREATE|GET|DELETE|UPDATE|COMMAND|PROBE|METADATA|PLAYOUT")
 
+	rewriter, err := rewrite.New(rewrite.Config{})
+	if err != nil {
+		return nil, err
+	}
+
 	rs, err := New(Config{
 		FFmpeg:  ffmpeg,
 		Replace: replacer,
+		Rewrite: rewriter,
 		IAM:     iam,
 	})
 	if err != nil {
@@ -528,6 +535,39 @@ func TestPlayoutRange(t *testing.T) {
 	require.Equal(t, "127.0.0.1:3000", addr, "the playout address should be 127.0.0.1:3000")
 }
 
+func TestParseAddressReference(t *testing.T) {
+	matches, err := parseAddressReference("foobar")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", matches["address"])
+
+	_, err = parseAddressReference("#foobar")
+	require.Error(t, err)
+
+	_, err = parseAddressReference("#foobar:nothing=foo")
+	require.Error(t, err)
+
+	matches, err = parseAddressReference("#foobar:output=foo")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", matches["id"])
+	require.Equal(t, "foo", matches["output"])
+
+	matches, err = parseAddressReference("#foobar:group=foo")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", matches["id"])
+	require.Equal(t, "foo", matches["group"])
+
+	matches, err = parseAddressReference("#foobar:nothing=foo:output=bar")
+	require.NoError(t, err)
+	require.Equal(t, "foobar:nothing=foo", matches["id"])
+	require.Equal(t, "bar", matches["output"])
+
+	matches, err = parseAddressReference("#foobar:output=foo:group=bar")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", matches["id"])
+	require.Equal(t, "foo", matches["output"])
+	require.Equal(t, "bar", matches["group"])
+}
+
 func TestAddressReference(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)
@@ -557,6 +597,44 @@ func TestAddressReference(t *testing.T) {
 
 	err = rs.AddProcess(process2)
 	require.Equal(t, nil, err, "should resolve reference")
+}
+
+func TestTeeAddressReference(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process1 := getDummyProcess()
+	process2 := getDummyProcess()
+	process3 := getDummyProcess()
+	process4 := getDummyProcess()
+
+	process1.Output[0].Address = "[f=hls]http://example.com/live.m3u8|[f=flv]rtmp://example.com/live.stream?token=123"
+	process2.ID = "process2"
+	process3.ID = "process3"
+	process4.ID = "process4"
+
+	rs.AddProcess(process1)
+
+	process2.Input[0].Address = "#process:output=out"
+
+	err = rs.AddProcess(process2)
+	require.Equal(t, nil, err, "should resolve reference")
+
+	process3.Input[0].Address = "#process:output=out:source=hls"
+
+	err = rs.AddProcess(process3)
+	require.Equal(t, nil, err, "should resolve reference")
+
+	process4.Input[0].Address = "#process:output=out:source=rtmp"
+
+	err = rs.AddProcess(process4)
+	require.Equal(t, nil, err, "should resolve reference")
+
+	r := rs.(*restream)
+
+	require.Equal(t, "http://example.com/live.m3u8", r.tasks["process2~"].config.Input[0].Address)
+	require.Equal(t, "http://example.com/live.m3u8", r.tasks["process3~"].config.Input[0].Address)
+	require.Equal(t, "rtmp://example.com/live.stream?token=123", r.tasks["process4~"].config.Input[0].Address)
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -863,5 +941,8 @@ func TestReplacer(t *testing.T) {
 		StaleTimeout:   0,
 	}
 
-	require.Equal(t, process, rs.tasks["314159265359"].config)
+	task, ok := rs.tasks["314159265359~"]
+	require.True(t, ok)
+
+	require.Equal(t, process, task.config)
 }

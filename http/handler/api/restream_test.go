@@ -8,9 +8,9 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
 )
 
 type Response struct {

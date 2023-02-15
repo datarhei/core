@@ -44,8 +44,10 @@ func NewPlayout(restream restream.Restreamer) *PlayoutHandler {
 func (h *PlayoutHandler) Status(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -102,8 +104,10 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	name := util.PathWildcardParam(c)
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -149,8 +153,10 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -193,8 +199,10 @@ func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -238,8 +246,10 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -281,8 +291,10 @@ func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 func (h *PlayoutHandler) SetStream(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	group := util.DefaultQuery(c, "group", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	addr, err := h.restream.GetPlayout(id, user, group, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
