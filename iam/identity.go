@@ -374,7 +374,7 @@ func (i *identity) IsSuperuser() bool {
 type IdentityManager interface {
 	Create(identity User) error
 	Update(name string, identity User) error
-	Remove(name string) error
+	Delete(name string) error
 
 	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
@@ -555,7 +555,7 @@ func (im *identityManager) Update(name string, u User) error {
 		}
 	}
 
-	err := im.remove(name)
+	err := im.delete(name)
 	if err != nil {
 		return err
 	}
@@ -580,14 +580,14 @@ func (im *identityManager) Update(name string, u User) error {
 	return nil
 }
 
-func (im *identityManager) Remove(name string) error {
+func (im *identityManager) Delete(name string) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	return im.remove(name)
+	return im.delete(name)
 }
 
-func (im *identityManager) remove(name string) error {
+func (im *identityManager) delete(name string) error {
 	if im.root.user.Name == name {
 		return fmt.Errorf("this identity can't be removed")
 	}

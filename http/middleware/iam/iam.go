@@ -403,7 +403,7 @@ func (m *iammiddleware) findDomainFromFilesystem(path string) string {
 		prefix := filepath.Clean(mount) + "/"
 		if strings.HasPrefix(path, prefix) {
 			elements := strings.Split(strings.TrimPrefix(path, prefix), "/")
-			if m.iam.IsDomain(elements[0]) {
+			if m.iam.HasDomain(elements[0]) {
 				return elements[0]
 			}
 		}

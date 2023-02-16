@@ -21,6 +21,7 @@ type AccessManager interface {
 
 	AddPolicy(username, domain, resource, actions string) bool
 	RemovePolicy(username, domain, resource, actions string) bool
+	ListPolicies(username, domain, resource, actions string) [][]string
 }
 
 type access struct {
@@ -90,6 +91,10 @@ func (am *access) RemovePolicy(username, domain, resource, actions string) bool 
 	am.enforcer.RemovePolicies(policies)
 
 	return true
+}
+
+func (am *access) ListPolicies(username, domain, resource, actions string) [][]string {
+	return am.enforcer.GetFilteredPolicy(0, username, domain, resource, actions)
 }
 
 func (am *access) HasGroup(name string) bool {

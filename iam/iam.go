@@ -7,12 +7,19 @@ import (
 
 type IAM interface {
 	Enforce(user, domain, resource, action string) bool
-	IsDomain(domain string) bool
+	HasDomain(domain string) bool
 
 	AddPolicy(username, domain, resource, actions string) bool
 	RemovePolicy(username, domain, resource, actions string) bool
 
+	ListPolicies(username, domain, resource, actions string) [][]string
+
 	Validators() []string
+
+	CreateIdentity(u User) error
+	UpdateIdentity(name string, u User) error
+	DeleteIdentity(name string) error
+	ListIdentities() []User
 
 	GetIdentity(name string) (IdentityVerifier, error)
 	GetIdentityByAuth0(name string) (IdentityVerifier, error)
@@ -110,6 +117,22 @@ func (i *iam) Enforce(user, domain, resource, action string) bool {
 	return ok
 }
 
+func (i *iam) CreateIdentity(u User) error {
+	return i.im.Create(u)
+}
+
+func (i *iam) UpdateIdentity(name string, u User) error {
+	return i.im.Update(name, u)
+}
+
+func (i *iam) DeleteIdentity(name string) error {
+	return i.im.Delete(name)
+}
+
+func (i *iam) ListIdentities() []User {
+	return nil
+}
+
 func (i *iam) GetIdentity(name string) (IdentityVerifier, error) {
 	return i.im.GetVerifier(name)
 }
@@ -126,7 +149,7 @@ func (i *iam) CreateJWT(name string) (string, string, error) {
 	return i.im.CreateJWT(name)
 }
 
-func (i *iam) IsDomain(domain string) bool {
+func (i *iam) HasDomain(domain string) bool {
 	return i.am.HasGroup(domain)
 }
 
@@ -140,4 +163,8 @@ func (i *iam) AddPolicy(username, domain, resource, actions string) bool {
 
 func (i *iam) RemovePolicy(username, domain, resource, actions string) bool {
 	return i.am.RemovePolicy(username, domain, resource, actions)
+}
+
+func (i *iam) ListPolicies(username, domain, resource, actions string) [][]string {
+	return i.am.ListPolicies(username, domain, resource, actions)
 }

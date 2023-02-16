@@ -575,10 +575,10 @@ func TestRemoveUser(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, im)
 
-	err = im.Remove("fooboz")
+	err = im.Delete("fooboz")
 	require.Error(t, err)
 
-	err = im.Remove("foobar")
+	err = im.Delete("foobar")
 	require.Error(t, err)
 
 	err = im.Create(User{
@@ -630,7 +630,7 @@ func TestRemoveUser(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, err)
 
-	err = im.Remove("foobaz")
+	err = im.Delete("foobaz")
 	require.NoError(t, err)
 
 	ok, err = identity.VerifyAPIPassword("apisecret")
@@ -728,7 +728,7 @@ func TestRemoveUserAuth0(t *testing.T) {
 		"auth0 domain=datarhei-demo.eu.auth0.com audience=https://datarhei-demo.eu.auth0.com/api/v2/ clientid=987654",
 	}, im.Validators())
 
-	err = im.Remove("foobaz")
+	err = im.Delete("foobaz")
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(manager.tenants))
@@ -739,7 +739,7 @@ func TestRemoveUserAuth0(t *testing.T) {
 		"auth0 domain=datarhei-demo.eu.auth0.com audience=https://datarhei-demo.eu.auth0.com/api/v2/ clientid=987654",
 	}, im.Validators())
 
-	err = im.Remove("fooboz")
+	err = im.Delete("fooboz")
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(manager.tenants))
@@ -793,7 +793,7 @@ func TestAutosave(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, []byte("[]"), data)
 
-	err = im.Remove("fooboz")
+	err = im.Delete("fooboz")
 	require.NoError(t, err)
 
 	data, err = dummyfs.ReadFile("./users.json")

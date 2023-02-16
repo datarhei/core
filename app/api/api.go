@@ -456,17 +456,20 @@ func (a *api) start() error {
 		iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", "GET|HEAD|OPTIONS")
 
 		if !cfg.API.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
-			iam.AddPolicy("$localhost", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+			iam.AddPolicy("$anon", "$none", "api:/api/**", "ANY")
+			iam.AddPolicy("$anon", "$none", "process:*", "ANY")
+			iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
+			iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
 		}
 
 		if cfg.API.Auth.DisableLocalhost {
-			iam.AddPolicy("$localhost", "$none", "api:/api/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+			iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
+			iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
 		}
 
 		if !cfg.Storage.Memory.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
-			iam.AddPolicy("$localhost", "$none", "fs:/memfs/**", "GET|HEAD|OPTIONS|POST|PUT|DELETE")
+			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", "ANY")
+			iam.AddPolicy("$localhost", "$none", "fs:/memfs/**", "ANY")
 		}
 
 		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {

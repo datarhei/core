@@ -433,7 +433,7 @@ func (s *server) findDomainFromPlaypath(path string) string {
 
 	domain := elements[0]
 
-	if s.iam.IsDomain(domain) {
+	if s.iam.HasDomain(domain) {
 		return domain
 	}
 
