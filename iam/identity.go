@@ -86,6 +86,15 @@ func (u *User) marshalIdentity() *identity {
 	return i
 }
 
+func (u *User) clone() User {
+	user := *u
+
+	user.Auth.Services.Token = make([]string, len(u.Auth.Services.Token))
+	copy(user.Auth.Services.Token, u.Auth.Services.Token)
+
+	return user
+}
+
 type IdentityVerifier interface {
 	Name() string
 
@@ -238,10 +247,28 @@ func (i *identity) auth0KeyFunc(token *jwtgo.Token) (interface{}, error) {
 }
 
 func (i *identity) VerifyJWT(jwt string) (bool, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	if !i.isValid() {
+		return false, fmt.Errorf("invalid identity")
+	}
+
 	p := &jwtgo.Parser{}
 	token, _, err := p.ParseUnverified(jwt, jwtgo.MapClaims{})
 	if err != nil {
 		return false, err
+	}
+
+	var subject string
+	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
+		if sub, ok := claims["sub"]; ok {
+			subject = sub.(string)
+		}
+	}
+
+	if subject != i.user.Name {
+		return false, fmt.Errorf("wrong subject")
 	}
 
 	var issuer string
@@ -346,17 +373,19 @@ func (i *identity) IsSuperuser() bool {
 
 type IdentityManager interface {
 	Create(identity User) error
+	Update(name string, identity User) error
 	Remove(name string) error
+
+	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
 	GetVerifierByAuth0(name string) (IdentityVerifier, error)
 	GetDefaultVerifier() (IdentityVerifier, error)
-	Rename(oldname, newname string) error
-	Update(name string, identity User) error
 
 	Validators() []string
 	CreateJWT(name string) (string, string, error)
 
 	Save() error
+	Autosave(bool)
 	Close()
 }
 
@@ -370,6 +399,7 @@ type identityManager struct {
 
 	fs       fs.Filesystem
 	filePath string
+	autosave bool
 	logger   log.Logger
 
 	jwtRealm  string
@@ -446,6 +476,10 @@ func (im *identityManager) Create(u User) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
+	if im.root != nil && im.root.user.Name == u.Name {
+		return fmt.Errorf("identity already exists")
+	}
+
 	_, ok := im.identities[u.Name]
 	if ok {
 		return fmt.Errorf("identity already exists")
@@ -458,10 +492,15 @@ func (im *identityManager) Create(u User) error {
 
 	im.identities[identity.user.Name] = identity
 
+	if im.autosave {
+		im.save(im.filePath)
+	}
+
 	return nil
 }
 
 func (im *identityManager) create(u User) (*identity, error) {
+	u = u.clone()
 	identity := u.marshalIdentity()
 
 	if identity.user.Auth.API.Auth0.Enable {
@@ -471,7 +510,7 @@ func (im *identityManager) create(u User) (*identity, error) {
 
 		auth0Key := identity.user.Auth.API.Auth0.Tenant.key()
 
-		if _, ok := im.tenants[auth0Key]; !ok {
+		if tenant, ok := im.tenants[auth0Key]; !ok {
 			tenant, err := newAuth0Tenant(identity.user.Auth.API.Auth0.Tenant)
 			if err != nil {
 				return nil, err
@@ -479,7 +518,12 @@ func (im *identityManager) create(u User) (*identity, error) {
 
 			im.tenants[auth0Key] = tenant
 			identity.tenant = tenant
+		} else {
+			tenant.AddClientID(identity.user.Auth.API.Auth0.Tenant.ClientID)
+			identity.tenant = tenant
 		}
+
+		im.auth0UserIdentityMap[identity.user.Auth.API.Auth0.User] = u.Name
 	}
 
 	identity.valid = true
@@ -487,7 +531,52 @@ func (im *identityManager) create(u User) (*identity, error) {
 	return identity, nil
 }
 
-func (im *identityManager) Update(name string, identity User) error {
+func (im *identityManager) Update(name string, u User) error {
+	if err := u.validate(); err != nil {
+		return err
+	}
+
+	im.lock.Lock()
+	defer im.lock.Unlock()
+
+	if im.root.user.Name == name {
+		return fmt.Errorf("this identity can't be updated")
+	}
+
+	oldidentity, ok := im.identities[name]
+	if !ok {
+		return fmt.Errorf("not found")
+	}
+
+	if name != u.Name {
+		_, err := im.getIdentity(u.Name)
+		if err == nil {
+			return fmt.Errorf("identity already exist")
+		}
+	}
+
+	err := im.remove(name)
+	if err != nil {
+		return err
+	}
+
+	identity, err := im.create(u)
+	if err != nil {
+		if identity, err := im.create(oldidentity.user); err != nil {
+			return err
+		} else {
+			im.identities[identity.user.Name] = identity
+		}
+
+		return err
+	}
+
+	im.identities[identity.user.Name] = identity
+
+	if im.autosave {
+		im.save(im.filePath)
+	}
+
 	return nil
 }
 
@@ -495,16 +584,75 @@ func (im *identityManager) Remove(name string) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	user, ok := im.identities[name]
+	return im.remove(name)
+}
+
+func (im *identityManager) remove(name string) error {
+	if im.root.user.Name == name {
+		return fmt.Errorf("this identity can't be removed")
+	}
+
+	identity, ok := im.identities[name]
 	if !ok {
-		return nil
+		return fmt.Errorf("not found")
 	}
 
 	delete(im.identities, name)
 
-	user.lock.Lock()
-	user.valid = false
-	user.lock.Unlock()
+	identity.lock.Lock()
+	identity.valid = false
+	identity.lock.Unlock()
+
+	if !identity.user.Auth.API.Auth0.Enable {
+		if im.autosave {
+			im.save(im.filePath)
+		}
+
+		return nil
+	}
+
+	delete(im.auth0UserIdentityMap, identity.user.Auth.API.Auth0.User)
+
+	// find out if the tenant is still used somewhere else
+	found := false
+	for _, i := range im.identities {
+		if i.tenant == identity.tenant {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		identity.tenant.Cancel()
+		delete(im.tenants, identity.user.Auth.API.Auth0.Tenant.key())
+
+		if im.autosave {
+			im.save(im.filePath)
+		}
+
+		return nil
+	}
+
+	// find out if the tenant's clientid is still used somewhere else
+	found = false
+	for _, i := range im.identities {
+		if !i.user.Auth.API.Auth0.Enable {
+			continue
+		}
+
+		if i.user.Auth.API.Auth0.Tenant.ClientID == identity.user.Auth.API.Auth0.Tenant.ClientID {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		identity.tenant.RemoveClientID(identity.user.Auth.API.Auth0.Tenant.ClientID)
+	}
+
+	if im.autosave {
+		im.save(im.filePath)
+	}
 
 	return nil
 }
@@ -516,7 +664,6 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 		identity = im.root
 	} else {
 		identity = im.identities[name]
-
 	}
 
 	if identity == nil {
@@ -527,6 +674,20 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
 
 	return identity, nil
+}
+
+func (im *identityManager) Get(name string) (User, error) {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
+	identity, err := im.getIdentity(name)
+	if err != nil {
+		return User{}, err
+	}
+
+	user := identity.user.clone()
+
+	return user, nil
 }
 
 func (im *identityManager) GetVerifier(name string) (IdentityVerifier, error) {
@@ -550,27 +711,6 @@ func (im *identityManager) GetVerifierByAuth0(name string) (IdentityVerifier, er
 
 func (im *identityManager) GetDefaultVerifier() (IdentityVerifier, error) {
 	return im.root, nil
-}
-
-func (im *identityManager) Rename(oldname, newname string) error {
-	im.lock.Lock()
-	defer im.lock.Unlock()
-
-	identity, ok := im.identities[oldname]
-	if !ok {
-		return nil
-	}
-
-	if _, ok := im.identities[newname]; ok {
-		return fmt.Errorf("the new name already exists")
-	}
-
-	delete(im.identities, oldname)
-
-	identity.user.Name = newname
-	im.identities[newname] = identity
-
-	return nil
 }
 
 func (im *identityManager) load(filePath string) error {
@@ -601,6 +741,9 @@ func (im *identityManager) load(filePath string) error {
 }
 
 func (im *identityManager) Save() error {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
 	return im.save(im.filePath)
 }
 
@@ -608,9 +751,6 @@ func (im *identityManager) save(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("invalid file path, file path cannot be empty")
 	}
-
-	im.lock.RLock()
-	defer im.lock.RUnlock()
 
 	users := []User{}
 
@@ -626,6 +766,13 @@ func (im *identityManager) save(filePath string) error {
 	_, _, err = im.fs.WriteFileSafe(filePath, jsondata)
 
 	return err
+}
+
+func (im *identityManager) Autosave(auto bool) {
+	im.lock.Lock()
+	defer im.lock.Unlock()
+
+	im.autosave = auto
 }
 
 func (im *identityManager) Validators() []string {
@@ -644,6 +791,14 @@ func (im *identityManager) Validators() []string {
 }
 
 func (im *identityManager) CreateJWT(name string) (string, string, error) {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
+
+	identity, err := im.getIdentity(name)
+	if err != nil {
+		return "", "", err
+	}
+
 	now := time.Now()
 	accessExpires := now.Add(time.Minute * 10)
 	refreshExpires := now.Add(time.Hour * 24)
@@ -651,7 +806,7 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 	// Create access token
 	accessToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
 		"iss":    im.jwtRealm,
-		"sub":    name,
+		"sub":    identity.Name(),
 		"usefor": "access",
 		"iat":    now.Unix(),
 		"exp":    accessExpires.Unix(),
@@ -668,7 +823,7 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 	// Create refresh token
 	refreshToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
 		"iss":    im.jwtRealm,
-		"sub":    name,
+		"sub":    identity.Name(),
 		"usefor": "refresh",
 		"iat":    now.Unix(),
 		"exp":    refreshExpires.Unix(),
@@ -701,6 +856,8 @@ type auth0Tenant struct {
 	audience  string
 	clientIDs []string
 	certs     jwks.JWKS
+
+	lock sync.Mutex
 }
 
 func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
@@ -712,7 +869,7 @@ func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
 		certs:     nil,
 	}
 
-	url := t.issuer + "/.well-known/jwks.json"
+	url := t.issuer + ".well-known/jwks.json"
 	certs, err := jwks.NewFromURL(url, jwks.Config{})
 	if err != nil {
 		return nil, err
@@ -725,4 +882,40 @@ func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
 
 func (a *auth0Tenant) Cancel() {
 	a.certs.Cancel()
+}
+
+func (a *auth0Tenant) AddClientID(clientid string) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	found := false
+	for _, id := range a.clientIDs {
+		if id == clientid {
+			found = true
+			break
+		}
+	}
+
+	if found {
+		return
+	}
+
+	a.clientIDs = append(a.clientIDs, clientid)
+}
+
+func (a *auth0Tenant) RemoveClientID(clientid string) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	clientids := []string{}
+
+	for _, id := range a.clientIDs {
+		if id == clientid {
+			continue
+		}
+
+		clientids = append(clientids, id)
+	}
+
+	a.clientIDs = clientids
 }
