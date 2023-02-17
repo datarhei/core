@@ -459,11 +459,11 @@ func (a *api) start() error {
 			iam.AddPolicy("$anon", "$none", "process:*", "ANY")
 			iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
 			iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
-		}
-
-		if cfg.API.Auth.DisableLocalhost {
-			iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
-			iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
+		} else {
+			if cfg.API.Auth.DisableLocalhost {
+				iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
+				iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
+			}
 		}
 
 		if !cfg.Storage.Memory.Auth.Enable {
@@ -471,11 +471,11 @@ func (a *api) start() error {
 		}
 
 		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "rtmp:/**", "PUBLISH|PLAY")
+			iam.AddPolicy("$anon", "$none", "rtmp:/**", "ANY")
 		}
 
 		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "srt:**", "PUBLISH|PLAY")
+			iam.AddPolicy("$anon", "$none", "srt:**", "ANY")
 		}
 
 		a.iam = iam
@@ -669,7 +669,15 @@ func (a *api) start() error {
 			}
 			template += "/{name}"
 
-			if identity, _ := a.iam.GetIdentity(config.Owner); identity != nil {
+			var identity iam.IdentityVerifier = nil
+
+			if len(config.Owner) == 0 {
+				identity, _ = a.iam.GetDefaultIdentity()
+			} else {
+				identity, _ = a.iam.GetIdentity(config.Owner)
+			}
+
+			if identity != nil {
 				template += "/" + identity.GetServiceToken()
 			}
 
@@ -687,7 +695,15 @@ func (a *api) start() error {
 				template += ",mode:publish"
 			}
 
-			if identity, _ := a.iam.GetIdentity(config.Owner); identity != nil {
+			var identity iam.IdentityVerifier = nil
+
+			if len(config.Owner) == 0 {
+				identity, _ = a.iam.GetDefaultIdentity()
+			} else {
+				identity, _ = a.iam.GetIdentity(config.Owner)
+			}
+
+			if identity != nil {
 				template += ",token:" + identity.GetServiceToken()
 			}
 
@@ -1102,13 +1118,14 @@ func (a *api) start() error {
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},
-		RTMP:     a.rtmpserver,
-		SRT:      a.srtserver,
-		Config:   a.config.store,
-		Sessions: a.sessions,
-		Router:   router,
-		ReadOnly: cfg.API.ReadOnly,
-		IAM:      a.iam,
+		RTMP:                a.rtmpserver,
+		SRT:                 a.srtserver,
+		Config:              a.config.store,
+		Sessions:            a.sessions,
+		Router:              router,
+		ReadOnly:            cfg.API.ReadOnly,
+		IAM:                 a.iam,
+		IAMDisableLocalhost: cfg.API.Auth.DisableLocalhost,
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

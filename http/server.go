@@ -75,24 +75,25 @@ import (
 var ListenAndServe = http.ListenAndServe
 
 type Config struct {
-	Logger        log.Logger
-	LogBuffer     log.BufferWriter
-	Restream      restream.Restreamer
-	Metrics       monitor.HistoryReader
-	Prometheus    prometheus.Reader
-	MimeTypesFile string
-	Filesystems   []fs.FS
-	IPLimiter     net.IPLimiter
-	Profiling     bool
-	Cors          CorsConfig
-	RTMP          rtmp.Server
-	SRT           srt.Server
-	Config        cfgstore.Store
-	Cache         cache.Cacher
-	Sessions      session.RegistryReader
-	Router        router.Router
-	ReadOnly      bool
-	IAM           iam.IAM
+	Logger              log.Logger
+	LogBuffer           log.BufferWriter
+	Restream            restream.Restreamer
+	Metrics             monitor.HistoryReader
+	Prometheus          prometheus.Reader
+	MimeTypesFile       string
+	Filesystems         []fs.FS
+	IPLimiter           net.IPLimiter
+	Profiling           bool
+	Cors                CorsConfig
+	RTMP                rtmp.Server
+	SRT                 srt.Server
+	Config              cfgstore.Store
+	Cache               cache.Cacher
+	Sessions            session.RegistryReader
+	Router              router.Router
+	ReadOnly            bool
+	IAM                 iam.IAM
+	IAMDisableLocalhost bool
 }
 
 type CorsConfig struct {
@@ -221,14 +222,15 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
-		IAM:    config.IAM,
-		Mounts: mounts,
-		Logger: s.logger.WithComponent("IAM"),
+		IAM:              config.IAM,
+		Mounts:           mounts,
+		DisableLocalhost: config.IAMDisableLocalhost,
+		Logger:           s.logger.WithComponent("IAM"),
 	})
 
 	s.handler.about = api.NewAbout(
 		config.Restream,
-		config.IAM.Validators(),
+		func() []string { return config.IAM.Validators() },
 	)
 
 	s.handler.jwt = api.NewJWT(config.IAM)

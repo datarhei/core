@@ -71,6 +71,23 @@ func TestIdentity(t *testing.T) {
 	require.False(t, identity.IsSuperuser())
 	identity.user.Superuser = true
 	require.True(t, identity.IsSuperuser())
+
+	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	im, err := NewIdentityManager(IdentityConfig{
+		FS:        dummyfs,
+		Superuser: User{Name: "foobar"},
+		JWTRealm:  "test-realm",
+		JWTSecret: "abc123",
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, im)
+
+	id, err := im.GetVerifier("unknown")
+	require.Error(t, err)
+	require.Nil(t, id)
 }
 
 func TestDefaultIdentity(t *testing.T) {

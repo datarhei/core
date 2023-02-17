@@ -33,6 +33,7 @@ package iam
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -52,17 +53,19 @@ import (
 
 type Config struct {
 	// Skipper defines a function to skip middleware.
-	Skipper middleware.Skipper
-	Mounts  []string
-	IAM     iam.IAM
-	Logger  log.Logger
+	Skipper          middleware.Skipper
+	Mounts           []string
+	IAM              iam.IAM
+	DisableLocalhost bool
+	Logger           log.Logger
 }
 
 var DefaultConfig = Config{
-	Skipper: middleware.DefaultSkipper,
-	Mounts:  []string{},
-	IAM:     nil,
-	Logger:  nil,
+	Skipper:          middleware.DefaultSkipper,
+	Mounts:           []string{},
+	IAM:              nil,
+	DisableLocalhost: false,
+	Logger:           nil,
 }
 
 type iammiddleware struct {
@@ -95,6 +98,9 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+
+			c.Set("disablelocalhost", config.DisableLocalhost)
+
 			if config.Skipper(c) {
 				c.Set("user", "$anon")
 				return next(c)
@@ -159,6 +165,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			} else {
 				identity, err = mw.findIdentityFromBasicAuth(c)
 				if err != nil {
+					if err == ErrUnauthorized {
+						c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm=datarhei-core")
+						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+					}
+
 					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
 				}
 
@@ -187,12 +198,30 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 }
 
+var ErrUnauthorized = errors.New("unauthorized")
+
 func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityVerifier, error) {
 	basic := "basic"
 	auth := c.Request().Header.Get(echo.HeaderAuthorization)
 	l := len(basic)
 
 	if len(auth) == 0 {
+		method := c.Request().Method
+		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+			return nil, nil
+		}
+
+		path := c.Request().URL.Path
+		for _, m := range m.mounts {
+			if m == "/" {
+				continue
+			}
+
+			if strings.HasPrefix(path, m+"/") {
+				return nil, ErrUnauthorized
+			}
+		}
+
 		return nil, nil
 	}
 
