@@ -88,11 +88,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 	// Sort the mounts from longest to shortest
 	sort.Slice(mw.mounts, func(i, j int) bool {
-		if len(mw.mounts[i]) > len(mw.mounts[j]) {
-			return true
-		}
-
-		return false
+		return len(mw.mounts[i]) > len(mw.mounts[j])
 	})
 
 	mw.logger.Debug().WithField("mounts", mw.mounts).Log("")

@@ -47,6 +47,9 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		JWTSecret: "",
 		Logger:    nil,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	iam.AddPolicy("$anon", "$none", "process:*", "CREATE|GET|DELETE|UPDATE|COMMAND|PROBE|METADATA|PLAYOUT")
 
@@ -443,7 +446,7 @@ func TestProcessMetadata(t *testing.T) {
 	rs.AddProcess(process)
 
 	data, err := rs.GetProcessMetadata(process.ID, "", "", "foobar")
-	require.Error(t, ErrMetadataKeyNotFound)
+	require.Equal(t, ErrMetadataKeyNotFound, err)
 	require.Equal(t, nil, data, "nothing should be stored under the key")
 
 	err = rs.SetProcessMetadata(process.ID, "", "", "foobar", process)

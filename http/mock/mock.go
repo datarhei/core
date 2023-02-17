@@ -62,6 +62,9 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		JWTSecret: "",
 		Logger:    nil,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	iam.AddPolicy("$anon", "$none", "api:/**", "ANY")
 	iam.AddPolicy("$anon", "$none", "fs:/**", "ANY")
