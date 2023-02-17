@@ -111,6 +111,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			var identity iam.IdentityVerifier = nil
 			var err error
 
+			username := "$anon"
 			resource := c.Request().URL.Path
 			var domain string
 
@@ -152,6 +153,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					}
 				}
 
+				ip := c.RealIP()
+				if ip == "127.0.0.1" || ip == "::1" {
+					username = "$localhost"
+				}
+
 				domain = c.QueryParam("group")
 				resource = "api:" + resource
 			} else {
@@ -164,14 +170,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				resource = "fs:" + resource
 			}
 
-			username := "$anon"
-			if identity == nil {
-				ip := c.RealIP()
-
-				if ip == "127.0.0.1" || ip == "::1" {
-					username = "$localhost"
-				}
-			} else {
+			if identity != nil {
 				username = identity.Name()
 			}
 
