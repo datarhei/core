@@ -1,5 +1,18 @@
 # Core
 
+### Core v16.11.0 > v16.12.0
+
+-   Add S3 storage support
+-   Add support for variables in placeholde parameter
+-   Add support for RTMP token as stream key as last element in path
+-   Add support for soft memory limit with debug.memory_limit_mbytes in config
+-   Add support for partial process config updates
+-   Add support for alternative syntax for auth0 tenants as environment variable
+-   Fix config timestamps created_at and loaded_at
+-   Fix /config/reload return type
+-   Fix modifying DTS in RTMP packets ([restreamer/#487](https://github.com/datarhei/restreamer/issues/487), [restreamer/#367](https://github.com/datarhei/restreamer/issues/367))
+-   Fix default internal SRT latency to 20ms
+
 ### Core v16.10.1 > v16.11.0
 
 -   Add FFmpeg 4.4 to FFmpeg 5.1 migration tool
