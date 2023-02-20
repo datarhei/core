@@ -480,6 +480,20 @@ func (a *adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 	return fmt.Errorf("not implemented")
 }
 
+func (a *adapter) getAllGroups() []string {
+	names := []string{}
+
+	for _, group := range a.groups {
+		if group.Name[0] == '$' {
+			continue
+		}
+
+		names = append(names, group.Name)
+	}
+
+	return names
+}
+
 type Group struct {
 	Name      string            `json:"name"`
 	Roles     map[string][]Role `json:"roles"`

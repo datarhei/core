@@ -83,6 +83,14 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.Skipper = DefaultConfig.Skipper
 	}
 
+	if len(config.Mounts) == 0 {
+		config.Mounts = append(config.Mounts, "/")
+	}
+
+	if config.Logger == nil {
+		config.Logger = log.New("")
+	}
+
 	mw := iammiddleware{
 		iam:    config.IAM,
 		mounts: config.Mounts,
@@ -168,6 +176,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					if err == ErrUnauthorized {
 						c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm=datarhei-core")
 						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+					} else if err == ErrBadRequest {
+						return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 					}
 
 					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
@@ -199,6 +209,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 }
 
 var ErrUnauthorized = errors.New("unauthorized")
+var ErrBadRequest = errors.New("bad request")
 
 func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityVerifier, error) {
 	basic := "basic"
@@ -206,20 +217,14 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 	l := len(basic)
 
 	if len(auth) == 0 {
-		method := c.Request().Method
-		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-			return nil, nil
+		path := c.Request().URL.Path
+		domain := m.findDomainFromFilesystem(path)
+		if len(domain) == 0 {
+			domain = "$none"
 		}
 
-		path := c.Request().URL.Path
-		for _, m := range m.mounts {
-			if m == "/" {
-				continue
-			}
-
-			if strings.HasPrefix(path, m+"/") {
-				return nil, ErrUnauthorized
-			}
+		if !m.iam.Enforce("$anon", domain, "fs:"+path, c.Request().Method) {
+			return nil, ErrUnauthorized
 		}
 
 		return nil, nil
@@ -233,7 +238,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 		// instead should be treated as invalid client input
 		b, err := base64.StdEncoding.DecodeString(auth[l+1:])
 		if err != nil {
-			return nil, err
+			return nil, ErrBadRequest
 		}
 
 		cred := string(b)
@@ -251,7 +256,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("identity not found")
-		return nil, fmt.Errorf("invalid username or password")
+		return nil, ErrUnauthorized
 	}
 
 	if ok, err := identity.VerifyServiceBasicAuth(password); !ok {
@@ -259,7 +264,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("wrong password")
-		return nil, fmt.Errorf("invalid username or password")
+		return nil, ErrUnauthorized
 	}
 
 	return identity, nil
@@ -424,7 +429,11 @@ func (m *iammiddleware) findDomainFromFilesystem(path string) string {
 	// Remove it from the path and split it into components: foobar file.txt
 	// Check if foobar a known domain. If yes, return it. If not, return empty domain.
 	for _, mount := range m.mounts {
-		prefix := filepath.Clean(mount) + "/"
+		prefix := filepath.Clean(mount)
+		if prefix != "/" {
+			prefix += "/"
+		}
+
 		if strings.HasPrefix(path, prefix) {
 			elements := strings.Split(strings.TrimPrefix(path, prefix), "/")
 			if m.iam.HasDomain(elements[0]) {

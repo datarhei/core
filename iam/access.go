@@ -98,10 +98,8 @@ func (am *access) ListPolicies(username, domain, resource, actions string) [][]s
 }
 
 func (am *access) HasGroup(name string) bool {
-	groups, err := am.enforcer.GetAllDomains()
-	if err != nil {
-		return false
-	}
+	groups := am.adapter.getAllGroups()
+	fmt.Printf("groups: %+v\n", groups)
 
 	for _, g := range groups {
 		if g == name {
