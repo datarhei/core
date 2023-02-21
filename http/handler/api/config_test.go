@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/datarhei/core/v16/config"
@@ -19,6 +20,12 @@ func getDummyConfigRouter(t *testing.T) (*echo.Echo, store.Store) {
 	router := mock.DummyEcho()
 
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
 	require.NoError(t, err)
 
 	config, err := store.NewJSON(memfs, "/config.json", nil)
@@ -43,10 +50,13 @@ func TestConfigGet(t *testing.T) {
 func TestConfigSetConflict(t *testing.T) {
 	router, _ := getDummyConfigRouter(t)
 
+	cfg := config.New(nil)
+	cfg.Storage.MimeTypes = "/path/to/mime.types"
+
 	var data bytes.Buffer
 
 	encoder := json.NewEncoder(&data)
-	encoder.Encode(config.New(nil))
+	encoder.Encode(cfg)
 
 	mock.Request(t, http.StatusConflict, router, "PUT", "/", &data)
 }
@@ -63,10 +73,8 @@ func TestConfigSet(t *testing.T) {
 
 	// Setting a new v3 config
 	cfg := config.New(nil)
-	cfg.FFmpeg.Binary = "true"
 	cfg.DB.Dir = "."
 	cfg.Storage.Disk.Dir = "."
-	cfg.Storage.MimeTypes = ""
 	cfg.Storage.Disk.Cache.Types.Allow = []string{".aaa"}
 	cfg.Storage.Disk.Cache.Types.Block = []string{".zzz"}
 	cfg.Host.Name = []string{"foobar.com"}
@@ -84,10 +92,8 @@ func TestConfigSet(t *testing.T) {
 
 	// Setting a complete v1 config
 	cfgv1 := v1.New(nil)
-	cfgv1.FFmpeg.Binary = "true"
 	cfgv1.DB.Dir = "."
 	cfgv1.Storage.Disk.Dir = "."
-	cfgv1.Storage.MimeTypes = ""
 	cfgv1.Storage.Disk.Cache.Types = []string{".bbb"}
 	cfgv1.Host.Name = []string{"foobar.com"}
 

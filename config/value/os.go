@@ -2,7 +2,6 @@ package value
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -115,27 +114,35 @@ func (u *Dir) IsEmpty() bool {
 
 // executable
 
-type Exec string
+type Exec struct {
+	p  *string
+	fs fs.Filesystem
+}
 
-func NewExec(p *string, val string) *Exec {
+func NewExec(p *string, val string, fs fs.Filesystem) *Exec {
+	v := &Exec{
+		p:  p,
+		fs: fs,
+	}
+
 	*p = val
 
-	return (*Exec)(p)
+	return v
 }
 
 func (u *Exec) Set(val string) error {
-	*u = Exec(val)
+	*u.p = val
 	return nil
 }
 
 func (u *Exec) String() string {
-	return string(*u)
+	return *u.p
 }
 
 func (u *Exec) Validate() error {
-	val := string(*u)
+	val := *u.p
 
-	_, err := exec.LookPath(val)
+	_, err := u.fs.LookPath(val)
 	if err != nil {
 		return fmt.Errorf("%s not found or is not executable", val)
 	}
@@ -144,7 +151,7 @@ func (u *Exec) Validate() error {
 }
 
 func (u *Exec) IsEmpty() bool {
-	return len(string(*u)) == 0
+	return len(*u.p) == 0
 }
 
 // regular file

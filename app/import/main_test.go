@@ -15,6 +15,7 @@ func TestImport(t *testing.T) {
 	require.NoError(t, err)
 
 	memfs.WriteFileReader("/mime.types", strings.NewReader("foobar"))
+	memfs.WriteFileReader("/bin/ffmpeg", strings.NewReader("foobar"))
 
 	configstore, err := store.NewJSON(memfs, "/config.json", nil)
 	require.NoError(t, err)
