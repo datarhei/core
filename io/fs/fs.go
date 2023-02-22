@@ -66,6 +66,12 @@ type ReadFilesystem interface {
 
 	// List lists all files that are currently on the filesystem.
 	List(path, pattern string) []FileInfo
+
+	// LookPath searches for an executable named file in the directories named by the PATH environment
+	// variable. If file contains a slash, it is tried directly and the PATH is not consulted. Otherwise,
+	// on success, the result is an absolute path. On non-disk filesystems. Only the mere existence
+	// of that file is verfied.
+	LookPath(file string) (string, error)
 }
 
 type WriteFilesystem interface {

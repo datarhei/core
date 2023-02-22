@@ -192,6 +192,7 @@ type process struct {
 		onStart       func()
 		onExit        func()
 		onStateChange func(from, to string)
+		lock          sync.Mutex
 	}
 	limits Limiter
 }
@@ -588,6 +589,7 @@ func (p *process) stop(wait bool) error {
 	if wait {
 		wg.Add(1)
 
+		p.callbacks.lock.Lock()
 		if p.callbacks.onExit == nil {
 			p.callbacks.onExit = func() {
 				wg.Done()
@@ -601,6 +603,7 @@ func (p *process) stop(wait bool) error {
 				p.callbacks.onExit = cb
 			}
 		}
+		p.callbacks.lock.Unlock()
 	}
 
 	var err error
@@ -829,10 +832,12 @@ func (p *process) waiter() {
 	// Reset the parser stats
 	p.parser.ResetStats()
 
-	// Call the onStop callback
+	// Call the onExit callback
+	p.callbacks.lock.Lock()
 	if p.callbacks.onExit != nil {
 		go p.callbacks.onExit()
 	}
+	p.callbacks.lock.Unlock()
 
 	p.order.lock.Lock()
 	defer p.order.lock.Unlock()

@@ -553,6 +553,51 @@ func (fs *diskFilesystem) List(path, pattern string) []FileInfo {
 	return files
 }
 
+func (fs *diskFilesystem) LookPath(file string) (string, error) {
+	if strings.Contains(file, "/") {
+		file = fs.cleanPath(file)
+		err := fs.findExecutable(file)
+		if err == nil {
+			return file, nil
+		}
+		return "", os.ErrNotExist
+	}
+	path := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			// Unix shell semantics: path element "" means "."
+			dir = "."
+		}
+		path := filepath.Join(dir, file)
+		path = fs.cleanPath(path)
+		if err := fs.findExecutable(path); err == nil {
+			if !filepath.IsAbs(path) {
+				return path, os.ErrNotExist
+			}
+			return path, nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
+func (fs *diskFilesystem) findExecutable(file string) error {
+	d, err := fs.Stat(file)
+	if err != nil {
+		return err
+	}
+
+	m := d.Mode()
+	if m.IsDir() {
+		return fmt.Errorf("is a directory")
+	}
+
+	if m&0111 != 0 {
+		return nil
+	}
+
+	return os.ErrPermission
+}
+
 func (fs *diskFilesystem) walk(path string, walkfn func(path string, info os.FileInfo)) {
 	filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

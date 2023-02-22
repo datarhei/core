@@ -57,10 +57,15 @@ func TestConfigCopy(t *testing.T) {
 }
 
 func TestValidateDefault(t *testing.T) {
-	fs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+	fs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
 	size, fresh, err := fs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
 	require.Equal(t, int64(5), size)
 	require.Equal(t, true, fresh)
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
 	require.NoError(t, err)
 
 	cfg := New(fs)

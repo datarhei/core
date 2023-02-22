@@ -228,7 +228,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
-	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
+	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg", d.fs), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
 	d.vars.Register(value.NewInt64(&d.FFmpeg.MaxProcesses, 0), "ffmpeg.max_processes", "CORE_FFMPEG_MAXPROCESSES", nil, "Max. allowed simultaneously running ffmpeg instances, 0 for unlimited", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Allow, []string{}, " "), "ffmpeg.access.input.allow", "CORE_FFMPEG_ACCESS_INPUT_ALLOW", nil, "List of allowed expression to match against the input addresses", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)

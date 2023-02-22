@@ -697,6 +697,39 @@ func (fs *memFilesystem) List(path, pattern string) []FileInfo {
 	return files
 }
 
+func (fs *memFilesystem) LookPath(file string) (string, error) {
+	if strings.Contains(file, "/") {
+		file = fs.cleanPath(file)
+		info, err := fs.Stat(file)
+		if err == nil {
+			if !info.Mode().IsRegular() {
+				return file, os.ErrNotExist
+			}
+			return file, nil
+		}
+		return "", os.ErrNotExist
+	}
+	path := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			// Unix shell semantics: path element "" means "."
+			dir = "."
+		}
+		path := filepath.Join(dir, file)
+		path = fs.cleanPath(path)
+		if info, err := fs.Stat(path); err == nil {
+			if !filepath.IsAbs(path) {
+				return path, os.ErrNotExist
+			}
+			if !info.Mode().IsRegular() {
+				return path, os.ErrNotExist
+			}
+			return path, nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
 func (fs *memFilesystem) cleanPath(path string) string {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join("/", path)
