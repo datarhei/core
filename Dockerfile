@@ -1,4 +1,4 @@
-ARG GOLANG_IMAGE=golang:1.19.3-alpine3.16
+ARG GOLANG_IMAGE=golang:1.20-alpine3.16
 
 ARG BUILD_IMAGE=alpine:3.16
 
