@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegisterSession(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Hour,
 		SessionTimeout:  time.Hour,
 	})
@@ -31,7 +31,7 @@ func TestRegisterSession(t *testing.T) {
 }
 
 func TestInactiveSession(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Second,
 		SessionTimeout:  time.Hour,
 	})
@@ -52,7 +52,7 @@ func TestInactiveSession(t *testing.T) {
 }
 
 func TestActivateSession(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Second,
 		SessionTimeout:  time.Second,
 	})
@@ -73,7 +73,7 @@ func TestActivateSession(t *testing.T) {
 }
 
 func TestIngress(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Second,
 		SessionTimeout:  time.Hour,
 	})
@@ -92,7 +92,7 @@ func TestIngress(t *testing.T) {
 }
 
 func TestEgress(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Second,
 		SessionTimeout:  time.Hour,
 	})
@@ -111,7 +111,7 @@ func TestEgress(t *testing.T) {
 }
 
 func TestNbSessions(t *testing.T) {
-	c, err := newCollector("", "", nil, CollectorConfig{
+	c, err := newCollector("", nil, nil, CollectorConfig{
 		InactiveTimeout: time.Hour,
 		SessionTimeout:  time.Hour,
 	})

@@ -3,6 +3,7 @@ package api
 import (
 	"io"
 	"net/http"
+	"time"
 
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	cfgvars "github.com/datarhei/core/v16/config/vars"
@@ -71,6 +72,10 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 	}
 
 	cfg := p.store.Get()
+	cfgActive := p.store.GetActive()
+
+	// Copy the timestamp of when this config has been used
+	cfg.LoadedAt = cfgActive.LoadedAt
 
 	// For each version, set the current config as default config value. This will
 	// allow to set a partial config without destroying the other values.
@@ -119,6 +124,9 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid config version", "version %d", version.Version)
 	}
 
+	cfg.CreatedAt = time.Now()
+	cfg.UpdatedAt = cfg.CreatedAt
+
 	// Now we make a copy from the config and merge it with the environment
 	// variables. If this configuration is valid, we will store the un-merged
 	// one to disk.
@@ -157,15 +165,15 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 
 // Reload will reload the currently active configuration
 // @Summary Reload the currently active configuration
-// @Description Reload the currently active configuration. This will trigger a restart of the Restreamer.
+// @Description Reload the currently active configuration. This will trigger a restart of the Core.
 // @Tags v16.7.2
 // @ID config-3-reload
-// @Produce plain
-// @Success 200 {string} string "OK"
+// @Produce json
+// @Success 200 {string} string
 // @Security ApiKeyAuth
 // @Router /api/v3/config/reload [get]
 func (p *ConfigHandler) Reload(c echo.Context) error {
 	p.store.Reload()
 
-	return c.String(http.StatusOK, "OK")
+	return c.JSON(http.StatusOK, "OK")
 }

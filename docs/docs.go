@@ -229,7 +229,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.Config"
+                            "$ref": "#/definitions/github_com_datarhei_core_v16_http_api.Config"
                         }
                     }
                 }
@@ -292,9 +292,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Reload the currently active configuration. This will trigger a restart of the Restreamer.",
+                "description": "Reload the currently active configuration. This will trigger a restart of the Core.",
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "v16.7.2"
@@ -311,23 +311,53 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/disk": {
+        "/api/v3/fs": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List all files on the filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "description": "Listall registered filesystems",
                 "produces": [
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
+                "summary": "List all registered filesystems",
+                "operationId": "filesystem-3-list",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.FilesystemInfo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/fs/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
                 ],
-                "summary": "List all files on the filesystem",
-                "operationId": "diskfs-3-list-files",
+                "description": "List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "List all files on a filesystem",
+                "operationId": "filesystem-3-list-files",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "glob pattern for file names",
@@ -360,24 +390,28 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/disk/{path}": {
+        "/api/v3/fs/{name}/{path}": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Fetch a file from the filesystem. The contents of that file are returned.",
+                "description": "Fetch a file from a filesystem",
                 "produces": [
                     "application/data",
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Fetch a file from the filesystem",
-                "operationId": "diskfs-3-get-file",
+                "summary": "Fetch a file from a filesystem",
+                "operationId": "filesystem-3-get-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -413,7 +447,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Writes or overwrites a file on the filesystem",
+                "description": "Writes or overwrites a file on a filesystem",
                 "consumes": [
                     "application/data"
                 ],
@@ -421,12 +455,16 @@ const docTemplate = `{
                     "text/plain",
                     "application/json"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Add a file to the filesystem",
-                "operationId": "diskfs-3-put-file",
+                "summary": "Add a file to a filesystem",
+                "operationId": "filesystem-3-put-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -474,16 +512,20 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Remove a file from the filesystem",
+                "description": "Remove a file from a filesystem",
                 "produces": [
                     "text/plain"
                 ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Remove a file from the filesystem",
-                "operationId": "diskfs-3-delete-file",
+                "summary": "Remove a file from a filesystem",
+                "operationId": "filesystem-3-delete-file",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "type": "string",
                         "description": "Path to file",
@@ -501,255 +543,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/fs/mem": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "List all files on the memory filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "List all files on the memory filesystem",
-                "operationId": "memfs-3-list-files",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "glob pattern for file names",
-                        "name": "glob",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "none, name, size, lastmod",
-                        "name": "sort",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "asc, desc",
-                        "name": "order",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.FileInfo"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/fs/mem/{path}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Fetch a file from the memory filesystem",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Fetch a file from the memory filesystem",
-                "operationId": "memfs-3-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Writes or overwrites a file on the memory filesystem",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Add a file to the memory filesystem",
-                "operationId": "memfs-3-put-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "File data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "507": {
-                        "description": "Insufficient Storage",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Remove a file from the memory filesystem",
-                "produces": [
-                    "text/plain"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Remove a file from the memory filesystem",
-                "operationId": "memfs-3-delete-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Create a link to a file in the memory filesystem. The file linked to has to exist.",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.7.2"
-                ],
-                "summary": "Create a link to a file in the memory filesystem",
-                "operationId": "memfs-3-patch",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Path to the file to link to",
-                        "name": "url",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2132,140 +1925,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/memfs/{path}": {
-            "get": {
-                "description": "Fetch a file from the memory filesystem",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "summary": "Fetch a file from the memory filesystem",
-                "operationId": "memfs-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Writes or overwrites a file on the memory filesystem",
-                "consumes": [
-                    "application/data"
-                ],
-                "produces": [
-                    "text/plain",
-                    "application/json"
-                ],
-                "summary": "Add a file to the memory filesystem",
-                "operationId": "memfs-put-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "File data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "507": {
-                        "description": "Insufficient Storage",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "Remove a file from the memory filesystem",
-                "produces": [
-                    "text/plain"
-                ],
-                "summary": "Remove a file from the memory filesystem",
-                "operationId": "memfs-delete-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
         "/metrics": {
             "get": {
                 "description": "Prometheus metrics",
@@ -2325,46 +1984,6 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/{path}": {
-            "get": {
-                "description": "Fetch a file from the filesystem. If the file is a directory, a index.html is returned, if it exists.",
-                "produces": [
-                    "application/data",
-                    "application/json"
-                ],
-                "summary": "Fetch a file from the filesystem",
-                "operationId": "diskfs-get-file",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Path to file",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "301": {
-                        "description": "Moved Permanently",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -2372,19 +1991,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "aqueue": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "drop": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "dup": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "duplicating": {
                     "type": "boolean"
                 },
                 "enc": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "gop": {
                     "type": "string"
@@ -2399,7 +2022,8 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
                 "queue": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -2407,7 +2031,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "packet": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "size_kb": {
                     "type": "integer"
@@ -2467,29 +2092,6 @@ const docTemplate = `{
                         "restart",
                         "reload"
                     ]
-                }
-            }
-        },
-        "api.Config": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "$ref": "#/definitions/api.ConfigData"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "loaded_at": {
-                    "type": "string"
-                },
-                "overrides": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
@@ -2586,6 +2188,7 @@ const docTemplate = `{
                     }
                 },
                 "created_at": {
+                    "description": "When this config has been persisted",
                     "type": "string"
                 },
                 "db": {
@@ -2600,7 +2203,12 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "force_gc": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "memory_limit_mbytes": {
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "profiling": {
                             "type": "boolean"
@@ -2656,15 +2264,18 @@ const docTemplate = `{
                             "type": "object",
                             "properties": {
                                 "max_history": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int"
                                 },
                                 "max_lines": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int"
                                 }
                             }
                         },
                         "max_processes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -2699,7 +2310,8 @@ const docTemplate = `{
                             ]
                         },
                         "max_lines": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "topics": {
                             "type": "array",
@@ -2720,11 +2332,13 @@ const docTemplate = `{
                         },
                         "interval_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "range_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -2738,10 +2352,12 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "max_port": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "min_port": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         }
                     }
                 },
@@ -2815,19 +2431,23 @@ const docTemplate = `{
                             }
                         },
                         "max_bitrate_mbit": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "uint64"
                         },
                         "max_sessions": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "uint64"
                         },
                         "persist": {
                             "type": "boolean"
                         },
                         "persist_interval_sec": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "session_timeout_sec": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         }
                     }
                 },
@@ -2886,13 +2506,16 @@ const docTemplate = `{
                                             "type": "boolean"
                                         },
                                         "max_file_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "uint64"
                                         },
                                         "max_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "uint64"
                                         },
                                         "ttl_seconds": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "types": {
                                             "type": "object",
@@ -2917,7 +2540,8 @@ const docTemplate = `{
                                     "type": "string"
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 }
                             }
                         },
@@ -2939,7 +2563,8 @@ const docTemplate = `{
                                     }
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 },
                                 "purge": {
                                     "type": "boolean"
@@ -2948,6 +2573,12 @@ const docTemplate = `{
                         },
                         "mimetypes_file": {
                             "type": "string"
+                        },
+                        "s3": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/value.S3Storage"
+                            }
                         }
                     }
                 },
@@ -2978,7 +2609,8 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "version": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -2995,7 +2627,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "code": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int"
                 },
                 "details": {
                     "type": "array",
@@ -3012,13 +2645,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "last_modified": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "name": {
                     "type": "string"
                 },
                 "size_bytes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "api.FilesystemInfo": {
+            "type": "object",
+            "properties": {
+                "mount": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -3100,7 +2749,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "interval_sec": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "metrics": {
                     "type": "array",
@@ -3109,7 +2759,8 @@ const docTemplate = `{
                     }
                 },
                 "timerange_sec": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3131,7 +2782,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "interval_sec": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "metrics": {
                     "type": "array",
@@ -3140,7 +2792,8 @@ const docTemplate = `{
                     }
                 },
                 "timerange_sec": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3179,20 +2832,24 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "aqueue": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "debug": {},
                 "drop": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "dup": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "duplicating": {
                     "type": "boolean"
                 },
                 "enc": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "gop": {
                     "type": "string"
@@ -3210,10 +2867,12 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.PlayoutStatusIO"
                 },
                 "queue": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "stream": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "swap": {
                     "$ref": "#/definitions/api.PlayoutStatusSwap"
@@ -3227,10 +2886,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "packet": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "size_kb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "state": {
                     "type": "string",
@@ -3240,7 +2901,8 @@ const docTemplate = `{
                     ]
                 },
                 "time": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -3285,7 +2947,8 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "channels": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "codec": {
                     "type": "string"
@@ -3304,10 +2967,12 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "height": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "index": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "language": {
                     "type": "string"
@@ -3320,10 +2985,12 @@ const docTemplate = `{
                 },
                 "sampling_hz": {
                     "description": "audio",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "stream": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "type": {
                     "type": "string"
@@ -3333,7 +3000,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "width": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -3344,7 +3012,8 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.ProcessConfig"
                 },
                 "created_at": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "id": {
                     "type": "string"
@@ -3402,13 +3071,15 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "reconnect_delay_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "reference": {
                     "type": "string"
                 },
                 "stale_timeout_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "type": {
                     "type": "string",
@@ -3452,10 +3123,12 @@ const docTemplate = `{
             ],
             "properties": {
                 "max_file_age_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint"
                 },
                 "max_files": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint"
                 },
                 "pattern": {
                     "type": "string"
@@ -3472,10 +3145,12 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "memory_mbytes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "waitfor_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -3483,7 +3158,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "history": {
                     "type": "array",
@@ -3512,7 +3188,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "log": {
                     "type": "array",
@@ -3550,7 +3227,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "memory_bytes": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "order": {
                     "type": "string"
@@ -3559,10 +3237,12 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.Progress"
                 },
                 "reconnect_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "runtime_seconds": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3574,16 +3254,19 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "drop": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "dup": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "fps": {
                     "type": "number"
                 },
                 "frame": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "inputs": {
                     "type": "array",
@@ -3598,14 +3281,16 @@ const docTemplate = `{
                     }
                 },
                 "packet": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "q": {
                     "type": "number"
                 },
                 "size_kb": {
                     "description": "kbytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "speed": {
                     "type": "number"
@@ -3623,14 +3308,19 @@ const docTemplate = `{
                 },
                 "avstream": {
                     "description": "avstream",
-                    "$ref": "#/definitions/api.AVstream"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/api.AVstream"
+                        }
+                    ]
                 },
                 "bitrate_kbit": {
                     "description": "kbit/s",
                     "type": "number"
                 },
                 "channels": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "codec": {
                     "type": "string"
@@ -3645,23 +3335,27 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "frame": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "height": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "id": {
                     "type": "string"
                 },
                 "index": {
                     "description": "General",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "layout": {
                     "type": "string"
                 },
                 "packet": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "pix_fmt": {
                     "description": "Video",
@@ -3675,20 +3369,24 @@ const docTemplate = `{
                 },
                 "sampling_hz": {
                     "description": "Audio",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "size_kb": {
                     "description": "kbytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "stream": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "type": {
                     "type": "string"
                 },
                 "width": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -3762,7 +3460,8 @@ const docTemplate = `{
                     }
                 },
                 "ts": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3771,11 +3470,13 @@ const docTemplate = `{
             "properties": {
                 "avail_recv_buf_bytes": {
                     "description": "The available space in the receiver's buffer, in bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "avail_send_buf_bytes": {
                     "description": "The available space in the sender's buffer, in bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "bandwidth_mbit": {
                     "description": "Estimated bandwidth of the network link, in Mbps",
@@ -3783,11 +3484,13 @@ const docTemplate = `{
                 },
                 "flight_size_pkt": {
                     "description": "The number of packets in flight",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "flow_window_pkt": {
                     "description": "The maximum number of packets that can be \"in flight\"",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "max_bandwidth_mbit": {
                     "description": "Transmission bandwidth limit, in Mbps",
@@ -3795,11 +3498,13 @@ const docTemplate = `{
                 },
                 "mss_bytes": {
                     "description": "Maximum Segment Size (MSS), in bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "pkt_recv_avg_belated_time_ms": {
                     "description": "Accumulated difference between the current time and the time-to-play of a packet that is received late",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "pkt_send_period_us": {
                     "description": "Current minimum time interval between which consecutive packets are sent, in microseconds",
@@ -3807,79 +3512,98 @@ const docTemplate = `{
                 },
                 "recv_ack_pkt": {
                     "description": "The total number of received ACK (Acknowledgement) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_buf_bytes": {
                     "description": "Instantaneous (current) value of pktRcvBuf, expressed in bytes, including payload and all headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_buf_ms": {
                     "description": "The timespan (msec) of acknowledged packets in the receiver's buffer",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_buf_pkt": {
                     "description": "The number of acknowledged packets in receiver's buffer",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_bytes": {
                     "description": "Same as pktRecv, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_drop_bytes": {
                     "description": "Same as pktRcvDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_drop_pkt": {
                     "description": "The total number of dropped by the SRT receiver and, as a result, not delivered to the upstream application DATA packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_km_pkt": {
                     "description": "The total number of received KM (Key Material) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_loss_bytes": {
                     "description": "Same as pktRcvLoss, but expressed in bytes, including payload and all the headers (IP, TCP, SRT), bytes for the presently missing (either reordered or lost) packets' payloads are estimated based on the average packet size",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_loss_pkt": {
                     "description": "The total number of SRT DATA packets detected as presently missing (either reordered or lost) at the receiver side",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_nak_pkt": {
                     "description": "The total number of received NAK (Negative Acknowledgement) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_pkt": {
                     "description": "The total number of received DATA packets, including retransmitted packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_retran_pkts": {
                     "description": "The total number of retransmitted packets registered at the receiver side",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_tsbpd_delay_ms": {
                     "description": "Timestamp-based Packet Delivery Delay value set on the socket via SRTO_RCVLATENCY or SRTO_LATENCY",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_undecrypt_bytes": {
                     "description": "Same as pktRcvUndecrypt, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_undecrypt_pkt": {
                     "description": "The total number of packets that failed to be decrypted at the receiver side",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_unique_bytes": {
                     "description": "Same as pktRecvUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "recv_unique_pkt": {
                     "description": "The total number of unique original, retransmitted or recovered by the packet filter DATA packets received in time, decrypted without errors and, as a result, scheduled for delivery to the upstream application by the SRT receiver.",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "reorder_tolerance_pkt": {
                     "description": "Instant value of the packet reorder tolerance",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "rtt_ms": {
                     "description": "Smoothed round-trip time (SRTT), an exponentially-weighted moving average (EWMA) of an endpoint's RTT samples, in milliseconds",
@@ -3887,75 +3611,93 @@ const docTemplate = `{
                 },
                 "send_buf_bytes": {
                     "description": "Instantaneous (current) value of pktSndBuf, but expressed in bytes, including payload and all headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_buf_ms": {
                     "description": "The timespan (msec) of packets in the sender's buffer (unacknowledged packets)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_buf_pkt": {
                     "description": "The number of packets in the sender's buffer that are already scheduled for sending or even possibly sent, but not yet acknowledged",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_drop_bytes": {
                     "description": "Same as pktSndDrop, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_drop_pkt": {
                     "description": "The total number of dropped by the SRT sender DATA packets that have no chance to be delivered in time",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_duration_us": {
                     "description": "The total accumulated time in microseconds, during which the SRT sender has some data to transmit, including packets that have been sent, but not yet acknowledged",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_km_pkt": {
                     "description": "The total number of sent KM (Key Material) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_loss_pkt": {
                     "description": "The total number of data packets considered or reported as lost at the sender side. Does not correspond to the packets detected as lost at the receiver side.",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "send_tsbpd_delay_ms": {
                     "description": "Timestamp-based Packet Delivery Delay value of the peer",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_ack_pkt": {
                     "description": "The total number of sent ACK (Acknowledgement) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_bytes": {
                     "description": "Same as pktSent, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_nak_pkt": {
                     "description": "The total number of sent NAK (Negative Acknowledgement) control packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_pkt": {
                     "description": "The total number of sent DATA packets, including retransmitted packets",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_retrans_bytes": {
                     "description": "Same as pktRetrans, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_retrans_pkt": {
                     "description": "The total number of retransmitted packets sent by the SRT sender",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_unique_bytes": {
                     "description": "Same as pktSentUnique, but expressed in bytes, including payload and all the headers (IP, TCP, SRT)",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sent_unique_pkt": {
                     "description": "The total number of unique DATA packets sent by the SRT sender",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "timestamp_ms": {
                     "description": "The time elapsed, in milliseconds, since the SRT socket has been created",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -3971,13 +3713,16 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "bytes_rx": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "bytes_tx": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "created_at": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "extra": {
                     "type": "string"
@@ -4006,13 +3751,16 @@ const docTemplate = `{
                     }
                 },
                 "sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_rx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_tx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -4020,13 +3768,16 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_rx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_tx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -4067,10 +3818,12 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "max_sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -4096,13 +3849,16 @@ const docTemplate = `{
                     }
                 },
                 "sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_rx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "traffic_tx_mb": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -4214,6 +3970,7 @@ const docTemplate = `{
                     }
                 },
                 "created_at": {
+                    "description": "When this config has been persisted",
                     "type": "string"
                 },
                 "db": {
@@ -4228,7 +3985,12 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "force_gc": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "memory_limit_mbytes": {
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "profiling": {
                             "type": "boolean"
@@ -4284,15 +4046,18 @@ const docTemplate = `{
                             "type": "object",
                             "properties": {
                                 "max_history": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int"
                                 },
                                 "max_lines": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int"
                                 }
                             }
                         },
                         "max_processes": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -4327,7 +4092,8 @@ const docTemplate = `{
                             ]
                         },
                         "max_lines": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "topics": {
                             "type": "array",
@@ -4348,11 +4114,13 @@ const docTemplate = `{
                         },
                         "interval_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "range_sec": {
                             "description": "seconds",
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -4366,10 +4134,12 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "max_port": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "min_port": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         }
                     }
                 },
@@ -4443,19 +4213,23 @@ const docTemplate = `{
                             }
                         },
                         "max_bitrate_mbit": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "uint64"
                         },
                         "max_sessions": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "uint64"
                         },
                         "persist": {
                             "type": "boolean"
                         },
                         "persist_interval_sec": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         },
                         "session_timeout_sec": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int"
                         }
                     }
                 },
@@ -4514,13 +4288,16 @@ const docTemplate = `{
                                             "type": "boolean"
                                         },
                                         "max_file_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "uint64"
                                         },
                                         "max_size_mbytes": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "uint64"
                                         },
                                         "ttl_seconds": {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "format": "int64"
                                         },
                                         "types": {
                                             "type": "object",
@@ -4545,7 +4322,8 @@ const docTemplate = `{
                                     "type": "string"
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 }
                             }
                         },
@@ -4567,7 +4345,8 @@ const docTemplate = `{
                                     }
                                 },
                                 "max_size_mbytes": {
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "format": "int64"
                                 },
                                 "purge": {
                                     "type": "boolean"
@@ -4576,6 +4355,12 @@ const docTemplate = `{
                         },
                         "mimetypes_file": {
                             "type": "string"
+                        },
+                        "s3": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/value.S3Storage"
+                            }
                         }
                     }
                 },
@@ -4606,7 +4391,8 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "version": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -4863,13 +4649,38 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "current_sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "total_sessions": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "uptime": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_datarhei_core_v16_http_api.Config": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/api.ConfigData"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "loaded_at": {
+                    "type": "string"
+                },
+                "overrides": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -4890,6 +4701,49 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "value.S3Storage": {
+            "type": "object",
+            "properties": {
+                "access_key_id": {
+                    "type": "string"
+                },
+                "auth": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "password": {
+                            "type": "string"
+                        },
+                        "username": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "bucket": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "mountpoint": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "secret_access_key": {
+                    "type": "string"
+                },
+                "use_ssl": {
+                    "type": "boolean"
                 }
             }
         }

@@ -2,39 +2,51 @@ package value
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/datarhei/core/v16/io/fs"
 )
 
 // must directory
 
-type MustDir string
+type MustDir struct {
+	p  *string
+	fs fs.Filesystem
+}
 
-func NewMustDir(p *string, val string) *MustDir {
+func NewMustDir(p *string, val string, fs fs.Filesystem) *MustDir {
+	v := &MustDir{
+		p:  p,
+		fs: fs,
+	}
+
 	*p = val
 
-	return (*MustDir)(p)
+	return v
 }
 
 func (u *MustDir) Set(val string) error {
-	*u = MustDir(val)
+	*u.p = val
 	return nil
 }
 
 func (u *MustDir) String() string {
-	return string(*u)
+	return *u.p
 }
 
 func (u *MustDir) Validate() error {
-	val := string(*u)
+	val := *u.p
 
 	if len(strings.TrimSpace(val)) == 0 {
 		return fmt.Errorf("path name must not be empty")
 	}
 
-	finfo, err := os.Stat(val)
+	if err := u.fs.MkdirAll(val, 0750); err != nil {
+		return fmt.Errorf("%s can't be created (%w)", val, err)
+	}
+
+	finfo, err := u.fs.Stat(val)
 	if err != nil {
 		return fmt.Errorf("%s does not exist", val)
 	}
@@ -47,36 +59,44 @@ func (u *MustDir) Validate() error {
 }
 
 func (u *MustDir) IsEmpty() bool {
-	return len(string(*u)) == 0
+	return len(*u.p) == 0
 }
 
 // directory
 
-type Dir string
+type Dir struct {
+	p  *string
+	fs fs.Filesystem
+}
 
-func NewDir(p *string, val string) *Dir {
+func NewDir(p *string, val string, fs fs.Filesystem) *Dir {
+	v := &Dir{
+		p:  p,
+		fs: fs,
+	}
+
 	*p = val
 
-	return (*Dir)(p)
+	return v
 }
 
 func (u *Dir) Set(val string) error {
-	*u = Dir(val)
+	*u.p = val
 	return nil
 }
 
 func (u *Dir) String() string {
-	return string(*u)
+	return *u.p
 }
 
 func (u *Dir) Validate() error {
-	val := string(*u)
+	val := *u.p
 
 	if len(strings.TrimSpace(val)) == 0 {
 		return nil
 	}
 
-	finfo, err := os.Stat(val)
+	finfo, err := u.fs.Stat(val)
 	if err != nil {
 		return fmt.Errorf("%s does not exist", val)
 	}
@@ -89,32 +109,40 @@ func (u *Dir) Validate() error {
 }
 
 func (u *Dir) IsEmpty() bool {
-	return len(string(*u)) == 0
+	return len(*u.p) == 0
 }
 
 // executable
 
-type Exec string
+type Exec struct {
+	p  *string
+	fs fs.Filesystem
+}
 
-func NewExec(p *string, val string) *Exec {
+func NewExec(p *string, val string, fs fs.Filesystem) *Exec {
+	v := &Exec{
+		p:  p,
+		fs: fs,
+	}
+
 	*p = val
 
-	return (*Exec)(p)
+	return v
 }
 
 func (u *Exec) Set(val string) error {
-	*u = Exec(val)
+	*u.p = val
 	return nil
 }
 
 func (u *Exec) String() string {
-	return string(*u)
+	return *u.p
 }
 
 func (u *Exec) Validate() error {
-	val := string(*u)
+	val := *u.p
 
-	_, err := exec.LookPath(val)
+	_, err := u.fs.LookPath(val)
 	if err != nil {
 		return fmt.Errorf("%s not found or is not executable", val)
 	}
@@ -123,36 +151,44 @@ func (u *Exec) Validate() error {
 }
 
 func (u *Exec) IsEmpty() bool {
-	return len(string(*u)) == 0
+	return len(*u.p) == 0
 }
 
 // regular file
 
-type File string
+type File struct {
+	p  *string
+	fs fs.Filesystem
+}
 
-func NewFile(p *string, val string) *File {
+func NewFile(p *string, val string, fs fs.Filesystem) *File {
+	v := &File{
+		p:  p,
+		fs: fs,
+	}
+
 	*p = val
 
-	return (*File)(p)
+	return v
 }
 
 func (u *File) Set(val string) error {
-	*u = File(val)
+	*u.p = val
 	return nil
 }
 
 func (u *File) String() string {
-	return string(*u)
+	return *u.p
 }
 
 func (u *File) Validate() error {
-	val := string(*u)
+	val := *u.p
 
 	if len(val) == 0 {
 		return nil
 	}
 
-	finfo, err := os.Stat(val)
+	finfo, err := u.fs.Stat(val)
 	if err != nil {
 		return fmt.Errorf("%s does not exist", val)
 	}
@@ -165,7 +201,7 @@ func (u *File) Validate() error {
 }
 
 func (u *File) IsEmpty() bool {
-	return len(string(*u)) == 0
+	return len(*u.p) == 0
 }
 
 // absolute path

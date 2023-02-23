@@ -11,8 +11,8 @@ type ProbeIO struct {
 	// common
 	Address  string      `json:"url"`
 	Format   string      `json:"format"`
-	Index    uint64      `json:"index"`
-	Stream   uint64      `json:"stream"`
+	Index    uint64      `json:"index" format:"uint64"`
+	Stream   uint64      `json:"stream" format:"uint64"`
 	Language string      `json:"language"`
 	Type     string      `json:"type"`
 	Codec    string      `json:"codec"`
@@ -23,13 +23,13 @@ type ProbeIO struct {
 	// video
 	FPS    json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 	Pixfmt string      `json:"pix_fmt"`
-	Width  uint64      `json:"width"`
-	Height uint64      `json:"height"`
+	Width  uint64      `json:"width" format:"uint64"`
+	Height uint64      `json:"height" format:"uint64"`
 
 	// audio
-	Sampling uint64 `json:"sampling_hz"`
+	Sampling uint64 `json:"sampling_hz" format:"uint64"`
 	Layout   string `json:"layout"`
-	Channels uint64 `json:"channels"`
+	Channels uint64 `json:"channels" format:"uint64"`
 }
 
 func (i *ProbeIO) Unmarshal(io *app.ProbeIO) {

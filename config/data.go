@@ -6,14 +6,15 @@ import (
 	"github.com/datarhei/core/v16/config/copy"
 	v2 "github.com/datarhei/core/v16/config/v2"
 	"github.com/datarhei/core/v16/config/value"
+	"github.com/datarhei/core/v16/io/fs"
 )
 
 // Data is the actual configuration data for the app
 type Data struct {
-	CreatedAt       time.Time `json:"created_at"`
-	LoadedAt        time.Time `json:"-"`
-	UpdatedAt       time.Time `json:"-"`
-	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3"`
+	CreatedAt       time.Time `json:"created_at"` // When this config has been persisted
+	LoadedAt        time.Time `json:"-"`          // When this config has been actually used
+	UpdatedAt       time.Time `json:"-"`          // Irrelevant
+	Version         int64     `json:"version" jsonschema:"minimum=3,maximum=3" format:"int64"`
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	Address         string    `json:"address"`
@@ -21,7 +22,7 @@ type Data struct {
 	Log             struct {
 		Level    string   `json:"level" enums:"debug,info,warn,error,silent" jsonschema:"enum=debug,enum=info,enum=warn,enum=error,enum=silent"`
 		Topics   []string `json:"topics"`
-		MaxLines int      `json:"max_lines"`
+		MaxLines int      `json:"max_lines" format:"int"`
 	} `json:"log"`
 	DB struct {
 		Dir string `json:"dir"`
@@ -67,12 +68,12 @@ type Data struct {
 	Storage struct {
 		Disk struct {
 			Dir   string `json:"dir"`
-			Size  int64  `json:"max_size_mbytes"`
+			Size  int64  `json:"max_size_mbytes" format:"int64"`
 			Cache struct {
 				Enable   bool   `json:"enable"`
-				Size     uint64 `json:"max_size_mbytes"`
-				TTL      int64  `json:"ttl_seconds"`
-				FileSize uint64 `json:"max_file_size_mbytes"`
+				Size     uint64 `json:"max_size_mbytes" format:"uint64"`
+				TTL      int64  `json:"ttl_seconds" format:"int64"`
+				FileSize uint64 `json:"max_file_size_mbytes" format:"uint64"`
 				Types    struct {
 					Allow []string `json:"allow"`
 					Block []string `json:"block"`
@@ -85,9 +86,10 @@ type Data struct {
 				Username string `json:"username"`
 				Password string `json:"password"`
 			} `json:"auth"`
-			Size  int64 `json:"max_size_mbytes"`
+			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
+		S3   []value.S3Storage `json:"s3"`
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
@@ -113,7 +115,7 @@ type Data struct {
 	} `json:"srt"`
 	FFmpeg struct {
 		Binary       string `json:"binary"`
-		MaxProcesses int64  `json:"max_processes"`
+		MaxProcesses int64  `json:"max_processes" format:"int64"`
 		Access       struct {
 			Input struct {
 				Allow []string `json:"allow"`
@@ -125,33 +127,34 @@ type Data struct {
 			} `json:"output"`
 		} `json:"access"`
 		Log struct {
-			MaxLines   int `json:"max_lines"`
-			MaxHistory int `json:"max_history"`
+			MaxLines   int `json:"max_lines" format:"int"`
+			MaxHistory int `json:"max_history" format:"int"`
 		} `json:"log"`
 	} `json:"ffmpeg"`
 	Playout struct {
 		Enable  bool `json:"enable"`
-		MinPort int  `json:"min_port"`
-		MaxPort int  `json:"max_port"`
+		MinPort int  `json:"min_port" format:"int"`
+		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling bool `json:"profiling"`
-		ForceGC   int  `json:"force_gc"`
+		Profiling   bool  `json:"profiling"`
+		ForceGC     int   `json:"force_gc" format:"int"`
+		MemoryLimit int64 `json:"memory_limit_mbytes" format:"int64"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
 		EnablePrometheus bool  `json:"enable_prometheus"`
-		Range            int64 `json:"range_sec"`    // seconds
-		Interval         int64 `json:"interval_sec"` // seconds
+		Range            int64 `json:"range_sec" format:"int64"`    // seconds
+		Interval         int64 `json:"interval_sec" format:"int64"` // seconds
 	} `json:"metrics"`
 	Sessions struct {
 		Enable          bool     `json:"enable"`
 		IPIgnoreList    []string `json:"ip_ignorelist"`
-		SessionTimeout  int      `json:"session_timeout_sec"`
+		SessionTimeout  int      `json:"session_timeout_sec" format:"int"`
 		Persist         bool     `json:"persist"`
-		PersistInterval int      `json:"persist_interval_sec"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit"`
-		MaxSessions     uint64   `json:"max_sessions"`
+		PersistInterval int      `json:"persist_interval_sec" format:"int"`
+		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"uint64"`
+		MaxSessions     uint64   `json:"max_sessions" format:"uint64"`
 	} `json:"sessions"`
 	Service struct {
 		Enable bool   `json:"enable"`
@@ -165,8 +168,8 @@ type Data struct {
 	} `json:"router"`
 }
 
-func UpgradeV2ToV3(d *v2.Data) (*Data, error) {
-	cfg := New()
+func UpgradeV2ToV3(d *v2.Data, fs fs.Filesystem) (*Data, error) {
+	cfg := New(fs)
 
 	return MergeV2toV3(&cfg.Data, d)
 }
@@ -189,7 +192,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
-	data.Debug = d.Debug
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
 	data.Service = d.Service
@@ -228,6 +230,10 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Memory = d.Storage.Memory
 
 	// Actual changes
+	data.Debug.Profiling = d.Debug.Profiling
+	data.Debug.ForceGC = d.Debug.ForceGC
+	data.Debug.MemoryLimit = 0
+
 	data.TLS.Enable = d.TLS.Enable
 	data.TLS.Address = d.TLS.Address
 	data.TLS.Auto = d.TLS.Auto
@@ -241,6 +247,8 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
 	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
 	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types)
+
+	data.Storage.S3 = []value.S3Storage{}
 
 	data.Version = 3
 
@@ -267,7 +275,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.SRT = d.SRT
 	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
-	data.Debug = d.Debug
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
 	data.Service = d.Service
@@ -299,6 +306,9 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
+	data.Debug.Profiling = d.Debug.Profiling
+	data.Debug.ForceGC = d.Debug.ForceGC
+
 	data.TLS.Enable = d.TLS.Enable
 	data.TLS.Address = d.TLS.Address
 	data.TLS.Auto = d.TLS.Auto

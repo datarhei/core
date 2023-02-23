@@ -1,6 +1,7 @@
 package value
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -127,11 +128,20 @@ func (s *StringMapString) String() string {
 		return "(empty)"
 	}
 
+	sms := *s.p
+
+	keys := []string{}
+	for k := range sms {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
 	mappings := make([]string, len(*s.p))
 
 	i := 0
-	for k, v := range *s.p {
-		mappings[i] = k + ":" + v
+	for _, k := range keys {
+		mappings[i] = k + ":" + sms[k]
 		i++
 	}
 

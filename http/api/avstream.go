@@ -6,7 +6,7 @@ import (
 
 type AVstreamIO struct {
 	State  string `json:"state" enums:"running,idle" jsonschema:"enum=running,enum=idle"`
-	Packet uint64 `json:"packet"`
+	Packet uint64 `json:"packet" format:"uint64"`
 	Time   uint64 `json:"time"`
 	Size   uint64 `json:"size_kb"`
 }
@@ -25,11 +25,11 @@ func (i *AVstreamIO) Unmarshal(io *app.AVstreamIO) {
 type AVstream struct {
 	Input       AVstreamIO `json:"input"`
 	Output      AVstreamIO `json:"output"`
-	Aqueue      uint64     `json:"aqueue"`
-	Queue       uint64     `json:"queue"`
-	Dup         uint64     `json:"dup"`
-	Drop        uint64     `json:"drop"`
-	Enc         uint64     `json:"enc"`
+	Aqueue      uint64     `json:"aqueue" format:"uint64"`
+	Queue       uint64     `json:"queue" format:"uint64"`
+	Dup         uint64     `json:"dup" format:"uint64"`
+	Drop        uint64     `json:"drop" format:"uint64"`
+	Enc         uint64     `json:"enc" format:"uint64"`
 	Looping     bool       `json:"looping"`
 	Duplicating bool       `json:"duplicating"`
 	GOP         string     `json:"gop"`

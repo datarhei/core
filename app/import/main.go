@@ -6,6 +6,7 @@ import (
 
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	cfgvars "github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/store"
 
@@ -15,18 +16,26 @@ import (
 func main() {
 	logger := log.New("Import").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithField("version", "v1")
 
-	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
+	configfile := cfgstore.Location(os.Getenv("CORE_CONFIGFILE"))
+
+	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{})
+	if err != nil {
+		logger.Error().WithError(err).Log("Access disk filesystem failed")
+		os.Exit(1)
+	}
+
+	configstore, err := cfgstore.NewJSON(diskfs, configfile, nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
 		os.Exit(1)
 	}
 
-	if err := doImport(logger, configstore); err != nil {
+	if err := doImport(logger, diskfs, configstore); err != nil {
 		os.Exit(1)
 	}
 }
 
-func doImport(logger log.Logger, configstore cfgstore.Store) error {
+func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) error {
 	if logger == nil {
 		logger = log.New("")
 	}
@@ -65,23 +74,27 @@ func doImport(logger log.Logger, configstore cfgstore.Store) error {
 
 	logger = logger.WithField("database", v1filename)
 
-	if _, err := os.Stat(v1filename); err != nil {
+	if _, err := fs.Stat(v1filename); err != nil {
 		if os.IsNotExist(err) {
 			logger.Info().Log("Database doesn't exist and nothing will be imported")
 			return nil
 		}
 
 		logger.Error().WithError(err).Log("Checking for v1 database")
-
 		return fmt.Errorf("checking for v1 database: %w", err)
 	}
 
 	logger.Info().Log("Found database")
 
 	// Load an existing DB
-	datastore := store.NewJSONStore(store.JSONConfig{
-		Filepath: cfg.DB.Dir + "/db.json",
+	datastore, err := store.NewJSON(store.JSONConfig{
+		Filesystem: fs,
+		Filepath:   cfg.DB.Dir + "/db.json",
 	})
+	if err != nil {
+		logger.Error().WithError(err).Log("Creating datastore for new database failed")
+		return fmt.Errorf("creating datastore for new database failed: %w", err)
+	}
 
 	data, err := datastore.Load()
 	if err != nil {
@@ -103,7 +116,7 @@ func doImport(logger log.Logger, configstore cfgstore.Store) error {
 	importConfig.binary = cfg.FFmpeg.Binary
 
 	// Rewrite the old database to the new database
-	r, err := importV1(v1filename, importConfig)
+	r, err := importV1(fs, v1filename, importConfig)
 	if err != nil {
 		logger.Error().WithError(err).Log("Importing database failed")
 		return fmt.Errorf("importing database failed: %w", err)

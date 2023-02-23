@@ -1,13 +1,18 @@
 package config
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestConfigCopy(t *testing.T) {
-	config1 := New()
+	fs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+	config1 := New(fs)
 
 	config1.Version = 42
 	config1.DB.Dir = "foo"
@@ -49,4 +54,31 @@ func TestConfigCopy(t *testing.T) {
 
 	require.Equal(t, []string{"bar.com"}, config1.Host.Name)
 	require.Equal(t, []string{"foo.com"}, config2.Host.Name)
+}
+
+func TestValidateDefault(t *testing.T) {
+	fs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	size, fresh, err := fs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
+	require.Equal(t, int64(5), size)
+	require.Equal(t, true, fresh)
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	cfg := New(fs)
+
+	cfg.Validate(true)
+
+	errors := []string{}
+	cfg.Messages(func(level string, v vars.Variable, message string) {
+		if level == "error" {
+			errors = append(errors, message)
+		}
+	})
+
+	require.Equal(t, 0, len(cfg.Overrides()))
+	require.Equal(t, false, cfg.HasErrors(), errors)
 }

@@ -16,47 +16,47 @@ The datarhei Core is a process management solution for FFmpeg that offers a rang
 
 The objectives of development are:
 
-* Unhindered use of FFmpeg processes
-* Portability of FFmpeg, including management across development and production environments
-* Scalability of FFmpeg-based applications through the ability to offload processes to additional instances
-* Streamlining of media product development by focusing on features and design.
+-   Unhindered use of FFmpeg processes
+-   Portability of FFmpeg, including management across development and production environments
+-   Scalability of FFmpeg-based applications through the ability to offload processes to additional instances
+-   Streamlining of media product development by focusing on features and design.
 
 ## What issues have been resolved thus far?
 
 ### Process management
 
-* Run multiple processes via API
-* Unrestricted FFmpeg commands in process configuration.
-* Error detection and recovery (e.g., FFmpeg stalls, dumps)
-* Referencing for process chaining (pipelines)
-* Placeholders for storage, RTMP, and SRT usage (automatic credentials management and URL resolution)
-* Logs (access to current stdout/stderr)
-* Log history (configurable log history, e.g., for error analysis)
-* Resource limitation (max. CPU and MEMORY usage per process)
-* Statistics (like FFmpeg progress per input and output, CPU and MEMORY, state, uptime)
-* Input verification (like FFprobe)
-* Metadata (option to store additional information like a title)
+-   Run multiple processes via API
+-   Unrestricted FFmpeg commands in process configuration.
+-   Error detection and recovery (e.g., FFmpeg stalls, dumps)
+-   Referencing for process chaining (pipelines)
+-   Placeholders for storage, RTMP, and SRT usage (automatic credentials management and URL resolution)
+-   Logs (access to current stdout/stderr)
+-   Log history (configurable log history, e.g., for error analysis)
+-   Resource limitation (max. CPU and MEMORY usage per process)
+-   Statistics (like FFmpeg progress per input and output, CPU and MEMORY, state, uptime)
+-   Input verification (like FFprobe)
+-   Metadata (option to store additional information like a title)
 
 ### Media delivery
 
-* Configurable file systems (in-memory, disk-mount, S3)
-* HTTP/S, RTMP/S, and SRT services, including Let's Encrypt
-* Bandwidth and session limiting for HLS/MPEG DASH sessions (protects restreams from congestion)
-* Viewer session API and logging
+-   Configurable file systems (in-memory, disk-mount, S3)
+-   HTTP/S, RTMP/S, and SRT services, including Let's Encrypt
+-   Bandwidth and session limiting for HLS/MPEG DASH sessions (protects restreams from congestion)
+-   Viewer session API and logging
 
 ### Misc
 
-* HTTP REST and GraphQL API
-* Swagger documentation
-* Metrics incl. Prometheus support (also detects POSIX and cgroups resources)
-* Docker images for fast setup of development environments up to the integration of cloud resources
+-   HTTP REST and GraphQL API
+-   Swagger documentation
+-   Metrics incl. Prometheus support (also detects POSIX and cgroups resources)
+-   Docker images for fast setup of development environments up to the integration of cloud resources
 
 ## Docker images
 
-- datarhei/core:latest (AMD64, ARM64, ARMv7)
-- datarhei/core:cuda-latest (Nvidia CUDA 11.7.1, AMD64)
-- datarhei/core:rpi-latest (Raspberry Pi / OMX/V4L2-M2M, AMD64/ARMv7)
-- datarhei/core:vaapi-latest (Intel VAAPI, AMD64)
+-   datarhei/core:latest (AMD64, ARM64, ARMv7)
+-   datarhei/core:cuda-latest (Nvidia CUDA 11.7.1, AMD64)
+-   datarhei/core:rpi-latest (Raspberry Pi / OMX/V4L2-M2M, AMD64/ARMv7)
+-   datarhei/core:vaapi-latest (Intel VAAPI, AMD64)
 
 ## Quick start
 
@@ -80,12 +80,12 @@ docker run --name core -d \
 
 ## Documentation
 
-Documentation is available on [docs.datarhei.com/core](https://docs.datarhei.com/core). 
+Documentation is available on [docs.datarhei.com/core](https://docs.datarhei.com/core).
 
-- [Quick start](https://docs.datarhei.com/core/guides/beginner)
-- [Installation](https://docs.datarhei.com/core/installation)
-- [Configuration](https://docs.datarhei.com/core/configuration)
-- [Coding](https://docs.datarhei.com/core/development/coding)
+-   [Quick start](https://docs.datarhei.com/core/guides/beginner)
+-   [Installation](https://docs.datarhei.com/core/installation)
+-   [Configuration](https://docs.datarhei.com/core/configuration)
+-   [Coding](https://docs.datarhei.com/core/development/coding)
 
 ## License
 

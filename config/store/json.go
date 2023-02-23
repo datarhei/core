@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/datarhei/core/v16/config"
 	v1 "github.com/datarhei/core/v16/config/v1"
 	v2 "github.com/datarhei/core/v16/config/v2"
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/io/fs"
 )
 
 type jsonStore struct {
+	fs   fs.Filesystem
 	path string
 
 	data map[string]*config.Config
@@ -22,18 +22,32 @@ type jsonStore struct {
 	reloadFn func()
 }
 
-// NewJSONStore will read a JSON config file from the given path. After successfully reading it in, it will be written
-// back to the path. The returned error will be nil if everything went fine.
-// If the path doesn't exist, a default JSON config file will be written to that path.
-// The returned ConfigStore can be used to retrieve or write the config.
-func NewJSON(path string, reloadFn func()) (Store, error) {
+// NewJSONStore will read the JSON config file from the given path. After successfully reading it in, it will be written
+// back to the path. The returned error will be nil if everything went fine. If the path doesn't exist, a default JSON
+// config file will be written to that path. The returned ConfigStore can be used to retrieve or write the config.
+func NewJSON(f fs.Filesystem, path string, reloadFn func()) (Store, error) {
 	c := &jsonStore{
-		path:     path,
+		fs:       f,
 		data:     make(map[string]*config.Config),
 		reloadFn: reloadFn,
 	}
 
-	c.data["base"] = config.New()
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine absolute path of '%s': %w", path, err)
+	}
+
+	c.path = path
+
+	if len(c.path) == 0 {
+		c.path = "/config.json"
+	}
+
+	if c.fs == nil {
+		return nil, fmt.Errorf("no valid filesystem provided")
+	}
+
+	c.data["base"] = config.New(f)
 
 	if err := c.load(c.data["base"]); err != nil {
 		return nil, fmt.Errorf("failed to read JSON from '%s': %w", path, err)
@@ -57,13 +71,9 @@ func (c *jsonStore) Set(d *config.Config) error {
 
 	data := d.Clone()
 
-	data.CreatedAt = time.Now()
-
 	if err := c.store(data); err != nil {
 		return fmt.Errorf("failed to write JSON to '%s': %w", c.path, err)
 	}
-
-	data.UpdatedAt = time.Now()
 
 	c.data["base"] = data
 
@@ -89,7 +99,9 @@ func (c *jsonStore) SetActive(d *config.Config) error {
 		return fmt.Errorf("configuration data has errors after validation")
 	}
 
-	c.data["merged"] = d.Clone()
+	data := d.Clone()
+
+	c.data["merged"] = data
 
 	return nil
 }
@@ -109,13 +121,17 @@ func (c *jsonStore) load(cfg *config.Config) error {
 		return nil
 	}
 
-	if _, err := os.Stat(c.path); os.IsNotExist(err) {
+	if _, err := c.fs.Stat(c.path); os.IsNotExist(err) {
 		return nil
 	}
 
-	jsondata, err := os.ReadFile(c.path)
+	jsondata, err := c.fs.ReadFile(c.path)
 	if err != nil {
 		return err
+	}
+
+	if len(jsondata) == 0 {
+		return nil
 	}
 
 	data, err := migrate(jsondata)
@@ -125,15 +141,12 @@ func (c *jsonStore) load(cfg *config.Config) error {
 
 	cfg.Data = *data
 
-	cfg.LoadedAt = time.Now()
-	cfg.UpdatedAt = cfg.LoadedAt
+	cfg.UpdatedAt = cfg.CreatedAt
 
 	return nil
 }
 
 func (c *jsonStore) store(data *config.Config) error {
-	data.CreatedAt = time.Now()
-
 	if len(c.path) == 0 {
 		return nil
 	}
@@ -143,28 +156,9 @@ func (c *jsonStore) store(data *config.Config) error {
 		return err
 	}
 
-	dir, filename := filepath.Split(c.path)
+	_, _, err = c.fs.WriteFileSafe(c.path, jsondata)
 
-	tmpfile, err := os.CreateTemp(dir, filename)
-	if err != nil {
-		return err
-	}
-
-	defer os.Remove(tmpfile.Name())
-
-	if _, err := tmpfile.Write(jsondata); err != nil {
-		return err
-	}
-
-	if err := tmpfile.Close(); err != nil {
-		return err
-	}
-
-	if err := file.Rename(tmpfile.Name(), c.path); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func migrate(jsondata []byte) (*config.Data, error) {
@@ -176,38 +170,38 @@ func migrate(jsondata []byte) (*config.Data, error) {
 	}
 
 	if version.Version == 1 {
-		dataV1 := &v1.New().Data
+		dataV1 := &v1.New(nil).Data
 
 		if err := gojson.Unmarshal(jsondata, dataV1); err != nil {
 			return nil, json.FormatError(jsondata, err)
 		}
 
-		dataV2, err := v2.UpgradeV1ToV2(dataV1)
+		dataV2, err := v2.UpgradeV1ToV2(dataV1, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		dataV3, err := config.UpgradeV2ToV3(dataV2)
+		dataV3, err := config.UpgradeV2ToV3(dataV2, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		data = dataV3
 	} else if version.Version == 2 {
-		dataV2 := &v2.New().Data
+		dataV2 := &v2.New(nil).Data
 
 		if err := gojson.Unmarshal(jsondata, dataV2); err != nil {
 			return nil, json.FormatError(jsondata, err)
 		}
 
-		dataV3, err := config.UpgradeV2ToV3(dataV2)
+		dataV3, err := config.UpgradeV2ToV3(dataV2, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		data = dataV3
 	} else if version.Version == 3 {
-		dataV3 := &config.New().Data
+		dataV3 := &config.New(nil).Data
 
 		if err := gojson.Unmarshal(jsondata, dataV3); err != nil {
 			return nil, json.FormatError(jsondata, err)

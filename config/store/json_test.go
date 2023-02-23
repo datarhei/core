@@ -18,7 +18,7 @@ func TestMigrationV1ToV3(t *testing.T) {
 	jsondatav3, err := os.ReadFile("./fixtures/config_v1_v3.json")
 	require.NoError(t, err)
 
-	datav3 := config.New()
+	datav3 := config.New(nil)
 	json.Unmarshal(jsondatav3, datav3)
 
 	data, err := migrate(jsondatav1)
@@ -37,7 +37,7 @@ func TestMigrationV2ToV3(t *testing.T) {
 	jsondatav3, err := os.ReadFile("./fixtures/config_v2_v3.json")
 	require.NoError(t, err)
 
-	datav3 := config.New()
+	datav3 := config.New(nil)
 	json.Unmarshal(jsondatav3, datav3)
 
 	data, err := migrate(jsondatav2)

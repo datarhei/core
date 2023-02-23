@@ -6,11 +6,13 @@ import (
 	"net"
 	"time"
 
-	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
 	"github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/math/rand"
+
+	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
 )
 
@@ -45,14 +47,21 @@ const version int64 = 3
 
 // Config is a wrapper for Data
 type Config struct {
+	fs   fs.Filesystem
 	vars vars.Variables
 
 	Data
 }
 
 // New returns a Config which is initialized with its default values
-func New() *Config {
-	config := &Config{}
+func New(f fs.Filesystem) *Config {
+	config := &Config{
+		fs: f,
+	}
+
+	if config.fs == nil {
+		config.fs, _ = fs.NewMemFilesystem(fs.MemConfig{})
+	}
 
 	config.init()
 
@@ -69,7 +78,7 @@ func (d *Config) Set(name, val string) error {
 
 // NewConfigFrom returns a clone of a Config
 func (d *Config) Clone() *Config {
-	data := New()
+	data := New(d.fs)
 
 	data.CreatedAt = d.CreatedAt
 	data.LoadedAt = d.LoadedAt
@@ -111,6 +120,7 @@ func (d *Config) Clone() *Config {
 	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
 	data.Storage.Disk.Cache.Types.Block = copy.Slice(d.Storage.Disk.Cache.Types.Block)
+	data.Storage.S3 = copy.Slice(d.Storage.S3)
 
 	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
@@ -143,7 +153,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
 
 	// DB
-	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config"), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
+	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config", d.fs), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
 
 	// Host
 	d.vars.Register(value.NewStringList(&d.Host.Name, []string{}, ","), "host.name", "CORE_HOST_NAME", nil, "Comma separated list of public host/domain names or IPs", false, false)
@@ -172,14 +182,14 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
 	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.CertFile, ""), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.KeyFile, ""), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
 
 	// Storage
-	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types"), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
+	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
 
 	// Storage (Disk)
-	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data"), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
+	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data", d.fs), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
 	d.vars.Register(value.NewInt64(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAXSIZEMBYTES", nil, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Disk.Cache.Enable, true), "storage.disk.cache.enable", "CORE_STORAGE_DISK_CACHE_ENABLE", nil, "Enable cache for /", false, false)
 	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
@@ -194,6 +204,9 @@ func (d *Config) init() {
 	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
 	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAXSIZEMBYTES", nil, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
+
+	// Storage (S3)
+	d.vars.Register(value.NewS3StorageListValue(&d.Storage.S3, []value.S3Storage{}, "|"), "storage.s3", "CORE_STORAGE_S3", nil, "List of S3 storage URLS", false, false)
 
 	// Storage (CORS)
 	d.vars.Register(value.NewCORSOrigins(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)
@@ -215,7 +228,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
-	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
+	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg", d.fs), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
 	d.vars.Register(value.NewInt64(&d.FFmpeg.MaxProcesses, 0), "ffmpeg.max_processes", "CORE_FFMPEG_MAXPROCESSES", nil, "Max. allowed simultaneously running ffmpeg instances, 0 for unlimited", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Allow, []string{}, " "), "ffmpeg.access.input.allow", "CORE_FFMPEG_ACCESS_INPUT_ALLOW", nil, "List of allowed expression to match against the input addresses", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)
@@ -232,6 +245,7 @@ func (d *Config) init() {
 	// Debug
 	d.vars.Register(value.NewBool(&d.Debug.Profiling, false), "debug.profiling", "CORE_DEBUG_PROFILING", nil, "Enable profiling endpoint on /profiling", false, false)
 	d.vars.Register(value.NewInt(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCEGC", nil, "Number of seconds between forcing GC to return memory to the OS", false, false)
+	d.vars.Register(value.NewInt64(&d.Debug.MemoryLimit, 0), "debug.memory_limit_mbytes", "CORE_DEBUG_MEMORY_LIMIT_MBYTES", nil, "Impose a soft memory limit for the core, in megabytes", false, false)
 
 	// Metrics
 	d.vars.Register(value.NewBool(&d.Metrics.Enable, false), "metrics.enable", "CORE_METRICS_ENABLE", nil, "Enable collecting historic metrics data", false, false)
@@ -256,7 +270,7 @@ func (d *Config) init() {
 	// Router
 	d.vars.Register(value.NewStringList(&d.Router.BlockedPrefixes, []string{"/api"}, ","), "router.blocked_prefixes", "CORE_ROUTER_BLOCKED_PREFIXES", nil, "List of path prefixes that can't be routed", false, false)
 	d.vars.Register(value.NewStringMapString(&d.Router.Routes, nil), "router.routes", "CORE_ROUTER_ROUTES", nil, "List of route mappings", false, false)
-	d.vars.Register(value.NewDir(&d.Router.UIPath, ""), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
+	d.vars.Register(value.NewDir(&d.Router.UIPath, "", d.fs), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are
@@ -371,6 +385,21 @@ func (d *Config) Validate(resetLogs bool) {
 	if d.Storage.Memory.Auth.Enable {
 		if len(d.Storage.Memory.Auth.Username) == 0 || len(d.Storage.Memory.Auth.Password) == 0 {
 			d.vars.Log("error", "storage.memory.auth.enable", "storage.memory.auth.username and storage.memory.auth.password must be set")
+		}
+	}
+
+	if len(d.Storage.S3) != 0 {
+		names := map[string]struct{}{
+			"disk": {},
+			"mem":  {},
+		}
+
+		for _, s3 := range d.Storage.S3 {
+			if _, ok := names[s3.Name]; ok {
+				d.vars.Log("error", "storage.s3", "the name %s is already in use or reserved", s3.Name)
+			}
+
+			names[s3.Name] = struct{}{}
 		}
 	}
 

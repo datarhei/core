@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/datarhei/core/v16/log"
 )
 
 type API interface {
@@ -19,6 +21,7 @@ type Config struct {
 	URL    string
 	Token  string
 	Client *http.Client
+	Logger log.Logger
 }
 
 type api struct {
@@ -29,6 +32,8 @@ type api struct {
 	accessTokenType string
 
 	client *http.Client
+
+	logger log.Logger
 }
 
 func New(config Config) (API, error) {
@@ -36,6 +41,11 @@ func New(config Config) (API, error) {
 		url:    config.URL,
 		token:  config.Token,
 		client: config.Client,
+		logger: config.Logger,
+	}
+
+	if a.logger == nil {
+		a.logger = log.New("")
 	}
 
 	if !strings.HasSuffix(a.url, "/") {
@@ -95,7 +105,7 @@ func (c *copyReader) Read(p []byte) (int, error) {
 
 	if err == io.EOF {
 		c.reader = c.copy
-		c.copy = new(bytes.Buffer)
+		c.copy = &bytes.Buffer{}
 	}
 
 	return i, err

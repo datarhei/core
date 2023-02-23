@@ -9,6 +9,7 @@ import (
 	cfgvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/store"
 
@@ -22,7 +23,11 @@ func main() {
 		"to":   "ffmpeg5",
 	})
 
-	configstore, err := cfgstore.NewJSON(os.Getenv("CORE_CONFIGFILE"), nil)
+	configfile := cfgstore.Location(os.Getenv("CORE_CONFIGFILE"))
+
+	diskfs, _ := fs.NewDiskFilesystem(fs.DiskConfig{})
+
+	configstore, err := cfgstore.NewJSON(diskfs, configfile, nil)
 	if err != nil {
 		logger.Error().WithError(err).Log("Loading configuration failed")
 		os.Exit(1)
@@ -115,9 +120,12 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 	logger.Info().WithField("backup", backupFilepath).Log("Backup created")
 
 	// Load the existing DB
-	datastore := store.NewJSONStore(store.JSONConfig{
+	datastore, err := store.NewJSON(store.JSONConfig{
 		Filepath: cfg.DB.Dir + "/db.json",
 	})
+	if err != nil {
+		return err
+	}
 
 	data, err := datastore.Load()
 	if err != nil {
