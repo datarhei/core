@@ -24,21 +24,58 @@ func TestReplace(t *testing.T) {
 
 	r := New()
 
+	r.RegisterReplaceFunc(
+		"foobar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return ";:.,-_$\\£!^"
+		},
+		nil,
+	)
+
 	for _, e := range samples {
-		replaced := r.Replace(e[0], "foobar", foobar, nil, nil, "")
+		replaced := r.Replace(e[0], "foobar", "", nil, nil, "")
 		require.Equal(t, e[1], replaced, e[0])
 	}
 
+	r.RegisterReplaceFunc(
+		"foobar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return ""
+		},
+		nil,
+	)
+
 	replaced := r.Replace("{foobar}", "foobar", "", nil, nil, "")
+	require.Equal(t, "", replaced)
+
+	replaced = r.Replace("{foobar}", "barfoo", "", nil, nil, "")
+	require.Equal(t, "{foobar}", replaced)
+
+	replaced = r.Replace("{barfoo}", "barfoo", "barfoo", nil, nil, "")
+	require.Equal(t, "barfoo", replaced)
+
+	replaced = r.Replace("{barfoo}", "barfoo", "", nil, nil, "")
 	require.Equal(t, "", replaced)
 }
 
-func TestReplaceTemplate(t *testing.T) {
+func TestReplacerFunc(t *testing.T) {
 	r := New()
-	r.RegisterTemplate("foo:bar", "Hello {who}! {what}?", nil)
+	r.RegisterReplaceFunc(
+		"foo:bar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello " + params["who"] + "! " + params["what"] + "?"
+		},
+		map[string]string{
+			"who":  "defaultWho",
+			"what": "defaultWhat",
+		},
+	)
 
-	replaced := r.Replace("{foo:bar,who=World}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello World! {what}?", replaced)
+	replaced := r.Replace("{foo:bar}", "foo:bar", "", nil, nil, "")
+	require.Equal(t, "Hello defaultWho! defaultWhat?", replaced)
+
+	replaced = r.Replace("{foo:bar,who=World}", "foo:bar", "", nil, nil, "")
+	require.Equal(t, "Hello World! defaultWhat?", replaced)
 
 	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "", nil, nil, "")
 	require.Equal(t, "Hello World! E=mc^2?", replaced)
@@ -47,97 +84,56 @@ func TestReplaceTemplate(t *testing.T) {
 	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
 }
 
-func TestReplaceTemplateFunc(t *testing.T) {
+func TestReplacerFuncWithVars(t *testing.T) {
 	r := New()
-	r.RegisterTemplateFunc("foo:bar", func(config *app.Config, kind string) string { return "Hello {who}! {what}?" }, nil)
-
-	replaced := r.Replace("{foo:bar,who=World}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello World! {what}?", replaced)
-
-	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello World! E=mc^2?", replaced)
-
-	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
-}
-
-func TestReplaceTemplateDefaults(t *testing.T) {
-	r := New()
-	r.RegisterTemplate("foobar", "Hello {who}! {what}?", map[string]string{
-		"who":  "someone",
-		"what": "something",
-	})
-
-	replaced := r.Replace("{foobar}", "foobar", "", nil, nil, "")
-	require.Equal(t, "Hello someone! something?", replaced)
-
-	replaced = r.Replace("{foobar,who=World}", "foobar", "", nil, nil, "")
-	require.Equal(t, "Hello World! something?", replaced)
-}
-
-func TestReplaceCompileTemplate(t *testing.T) {
-	samples := [][3]string{
-		{"Hello {who}!", "who=World", "Hello World!"},
-		{"Hello {who}! {what}?", "who=World", "Hello World! {what}?"},
-		{"Hello {who}! {what}?", "who=World,what=Yeah", "Hello World! Yeah?"},
-		{"Hello {who}! {what}?", "who=World,what=", "Hello World! ?"},
-		{"Hello {who}!", "who=E%3dmc^2", "Hello E=mc^2!"},
-	}
-
-	r := New().(*replacer)
-
-	for _, e := range samples {
-		replaced := r.compileTemplate(e[0], e[1], nil, nil)
-		require.Equal(t, e[2], replaced, e[0])
-	}
-}
-
-func TestReplaceCompileTemplateDefaults(t *testing.T) {
-	samples := [][3]string{
-		{"Hello {who}!", "", "Hello someone!"},
-		{"Hello {who}!", "who=World", "Hello World!"},
-		{"Hello {who}! {what}?", "who=World", "Hello World! something?"},
-		{"Hello {who}! {what}?", "who=World,what=Yeah", "Hello World! Yeah?"},
-		{"Hello {who}! {what}?", "who=World,what=", "Hello World! ?"},
-	}
-
-	r := New().(*replacer)
-
-	for _, e := range samples {
-		replaced := r.compileTemplate(e[0], e[1], nil, map[string]string{
-			"who":  "someone",
-			"what": "something",
-		})
-		require.Equal(t, e[2], replaced, e[0])
-	}
-}
-
-func TestReplaceCompileTemplateWithVars(t *testing.T) {
-	samples := [][3]string{
-		{"Hello {who}!", "who=$processid", "Hello 123456789!"},
-		{"Hello {who}! {what}?", "who=$location", "Hello World! {what}?"},
-		{"Hello {who}! {what}?", "who=$location,what=Yeah", "Hello World! Yeah?"},
-		{"Hello {who}! {what}?", "who=$location,what=$processid", "Hello World! 123456789?"},
-		{"Hello {who}!", "who=$processidxxx", "Hello 123456789xxx!"},
-	}
+	r.RegisterReplaceFunc(
+		"foo:bar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello " + params["who"] + "! " + params["what"] + "?"
+		},
+		map[string]string{
+			"who":  "$processid_$location",
+			"what": "$location",
+		},
+	)
 
 	vars := map[string]string{
 		"processid": "123456789",
 		"location":  "World",
 	}
 
-	r := New().(*replacer)
+	replaced := r.Replace("{foo:bar}", "foo:bar", "", vars, nil, "")
+	require.Equal(t, "Hello 123456789_World! World?", replaced)
 
-	for _, e := range samples {
-		replaced := r.compileTemplate(e[0], e[1], vars, nil)
-		require.Equal(t, e[2], replaced, e[0])
-	}
+	replaced = r.Replace("{foo:bar,who=World}", "foo:bar", "", vars, nil, "")
+	require.Equal(t, "Hello World! World?", replaced)
+
+	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "", vars, nil, "")
+	require.Equal(t, "Hello World! E=mc^2?", replaced)
+
+	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "", vars, nil, "")
+	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
+
+	replaced = r.Replace("{foo:bar,who=$location,what=$processid}", "foo:bar", "", vars, nil, "")
+	require.Equal(t, "Hello World! 123456789?", replaced)
 }
 
 func TestReplaceGlob(t *testing.T) {
 	r := New()
-	r.RegisterTemplate("foo:bar", "Hello foobar", nil)
-	r.RegisterTemplate("foo:baz", "Hello foobaz", nil)
+	r.RegisterReplaceFunc(
+		"foo:bar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello foobar"
+		},
+		nil,
+	)
+	r.RegisterReplaceFunc(
+		"foo:baz",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello foobaz"
+		},
+		nil,
+	)
 
 	replaced := r.Replace("{foo:baz}, {foo:bar}", "foo:*", "", nil, nil, "")
 	require.Equal(t, "Hello foobaz, Hello foobar", replaced)

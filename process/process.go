@@ -46,18 +46,19 @@ type Process interface {
 
 // Config is the configuration of a process
 type Config struct {
-	Binary         string                // Path to the ffmpeg binary
-	Args           []string              // List of arguments for the binary
-	Reconnect      bool                  // Whether to restart the process if it exited
-	ReconnectDelay time.Duration         // Duration to wait before restarting the process
-	StaleTimeout   time.Duration         // Kill the process after this duration if it doesn't produce any output
-	LimitCPU       float64               // Kill the process if the CPU usage in percent is above this value
-	LimitMemory    uint64                // Kill the process if the memory consumption in bytes is above this value
-	LimitDuration  time.Duration         // Kill the process if the limits are exceeded for this duration
-	Parser         Parser                // A parser for the output of the process
-	OnStart        func()                // A callback which is called after the process started
-	OnExit         func()                // A callback which is called after the process exited
-	OnStateChange  func(from, to string) // A callback which is called after a state changed
+	Binary         string                       // Path to the ffmpeg binary
+	Args           []string                     // List of arguments for the binary
+	Reconnect      bool                         // Whether to restart the process if it exited
+	ReconnectDelay time.Duration                // Duration to wait before restarting the process
+	StaleTimeout   time.Duration                // Kill the process after this duration if it doesn't produce any output
+	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value
+	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value
+	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration
+	Parser         Parser                       // A parser for the output of the process
+	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args
+	OnStart        func()                       // A callback which is called after the process started
+	OnExit         func()                       // A callback which is called after the process exited
+	OnStateChange  func(from, to string)        // A callback which is called after a state changed
 	Logger         log.Logger
 }
 
@@ -189,6 +190,7 @@ type process struct {
 	logger        log.Logger
 	debuglogger   log.Logger
 	callbacks     struct {
+		onArgs        func(args []string) []string
 		onStart       func()
 		onExit        func()
 		onStateChange func(from, to string)
@@ -239,6 +241,7 @@ func New(config Config) (Process, error) {
 	p.stale.last = time.Now()
 	p.stale.timeout = config.StaleTimeout
 
+	p.callbacks.onArgs = config.OnArgs
 	p.callbacks.onStart = config.OnStart
 	p.callbacks.onExit = config.OnExit
 	p.callbacks.onStateChange = config.OnStateChange
@@ -465,7 +468,15 @@ func (p *process) start() error {
 
 	p.setState(stateStarting)
 
-	p.cmd = exec.Command(p.binary, p.args...)
+	args := p.args
+	if p.callbacks.onArgs != nil {
+		args = make([]string, len(p.args))
+		copy(args, p.args)
+
+		args = p.callbacks.onArgs(args)
+	}
+
+	p.cmd = exec.Command(p.binary, args...)
 	p.cmd.Env = []string{}
 
 	p.stdout, err = p.cmd.StderrPipe()

@@ -180,6 +180,10 @@ github.com/labstack/gommon/random
 # github.com/leodido/go-urn v1.2.1
 ## explicit; go 1.13
 github.com/leodido/go-urn
+# github.com/lestrrat-go/strftime v1.0.6
+## explicit; go 1.13
+github.com/lestrrat-go/strftime
+github.com/lestrrat-go/strftime/internal/errors
 # github.com/libdns/libdns v0.2.1
 ## explicit; go 1.14
 github.com/libdns/libdns
@@ -240,6 +244,7 @@ github.com/modern-go/concurrent
 github.com/modern-go/reflect2
 # github.com/pkg/errors v0.9.1
 ## explicit
+github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 ## explicit
 github.com/pmezard/go-difflib/difflib

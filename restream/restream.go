@@ -295,7 +295,7 @@ func (r *restream) load() error {
 		}
 
 		// Replace all placeholders in the config
-		resolvePlaceholders(t.config, r.replace)
+		resolveStaticPlaceholders(t.config, r.replace)
 
 		tasks[id] = t
 	}
@@ -336,7 +336,12 @@ func (r *restream) load() error {
 			continue
 		}
 
-		t.usesDisk, err = r.validateConfig(t.config)
+		// Validate config with all placeholders replaced. However, we need to take care
+		// that the config with the task keeps its dynamic placeholders for process starts.
+		config := t.config.Clone()
+		resolveDynamicPlaceholder(config, r.replace)
+
+		t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
 		if err != nil {
 			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
 			continue
@@ -355,9 +360,10 @@ func (r *restream) load() error {
 			Reconnect:      t.config.Reconnect,
 			ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 			StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-			Command:        t.command,
+			Args:           t.command,
 			Parser:         t.parser,
 			Logger:         t.logger,
+			OnArgs:         r.onArgs(t.config.Clone()),
 		})
 		if err != nil {
 			return err
@@ -468,16 +474,23 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		logger:    r.logger.WithField("id", process.ID),
 	}
 
-	resolvePlaceholders(t.config, r.replace)
+	resolveStaticPlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
 		return nil, err
 	}
 
-	t.usesDisk, err = r.validateConfig(t.config)
-	if err != nil {
-		return nil, err
+	{
+		// Validate config with all placeholders replaced. However, we need to take care
+		// that the config with the task keeps its dynamic placeholders for process starts.
+		config := t.config.Clone()
+		resolveDynamicPlaceholder(config, r.replace)
+
+		t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = r.setPlayoutPorts(t)
@@ -492,18 +505,35 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-		Command:        t.command,
+		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
+		OnArgs:         r.onArgs(t.config.Clone()),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	t.ffmpeg = ffmpeg
+
 	t.valid = true
 
 	return t, nil
+}
+
+func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
+	return func(args []string) []string {
+		config := cfg.Clone()
+
+		resolveDynamicPlaceholder(config, r.replace)
+
+		_, err := validateConfig(config, r.fs.diskfs, r.ffmpeg)
+		if err != nil {
+			return []string{}
+		}
+
+		return config.CreateCommand()
+	}
 }
 
 func (r *restream) setCleanup(id string, config *app.Config) {
@@ -611,7 +641,7 @@ func (r *restream) unsetPlayoutPorts(t *task) {
 	t.playout = nil
 }
 
-func (r *restream) validateConfig(config *app.Config) (bool, error) {
+func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmpeg) (bool, error) {
 	if len(config.Input) == 0 {
 		return false, fmt.Errorf("at least one input must be defined for the process '%s'", config.ID)
 	}
@@ -639,20 +669,20 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		if len(r.fs.diskfs) != 0 {
+		if len(fss) != 0 {
 			maxFails := 0
-			for _, fs := range r.fs.diskfs {
-				io.Address, err = r.validateInputAddress(io.Address, fs.Metadata("base"))
+			for _, fs := range fss {
+				io.Address, err = validateInputAddress(io.Address, fs.Metadata("base"), ffmpeg)
 				if err != nil {
 					maxFails++
 				}
 			}
 
-			if maxFails == len(r.fs.diskfs) {
+			if maxFails == len(fss) {
 				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
 			}
 		} else {
-			io.Address, err = r.validateInputAddress(io.Address, "/")
+			io.Address, err = validateInputAddress(io.Address, "/", ffmpeg)
 			if err != nil {
 				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
 			}
@@ -685,11 +715,11 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		if len(r.fs.diskfs) != 0 {
+		if len(fss) != 0 {
 			maxFails := 0
-			for _, fs := range r.fs.diskfs {
+			for _, fs := range fss {
 				isFile := false
-				io.Address, isFile, err = r.validateOutputAddress(io.Address, fs.Metadata("base"))
+				io.Address, isFile, err = validateOutputAddress(io.Address, fs.Metadata("base"), ffmpeg)
 				if err != nil {
 					maxFails++
 				}
@@ -699,12 +729,12 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 				}
 			}
 
-			if maxFails == len(r.fs.diskfs) {
+			if maxFails == len(fss) {
 				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
 			}
 		} else {
 			isFile := false
-			io.Address, isFile, err = r.validateOutputAddress(io.Address, "/")
+			io.Address, isFile, err = validateOutputAddress(io.Address, "/", ffmpeg)
 			if err != nil {
 				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
 			}
@@ -718,21 +748,21 @@ func (r *restream) validateConfig(config *app.Config) (bool, error) {
 	return hasFiles, nil
 }
 
-func (r *restream) validateInputAddress(address, basedir string) (string, error) {
+func validateInputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string, error) {
 	if ok := url.HasScheme(address); ok {
 		if err := url.Validate(address); err != nil {
 			return address, err
 		}
 	}
 
-	if !r.ffmpeg.ValidateInputAddress(address) {
+	if !ffmpeg.ValidateInputAddress(address) {
 		return address, fmt.Errorf("address is not allowed")
 	}
 
 	return address, nil
 }
 
-func (r *restream) validateOutputAddress(address, basedir string) (string, bool, error) {
+func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string, bool, error) {
 	// If the address contains a "|" or it starts with a "[", then assume that it
 	// is an address for the tee muxer.
 	if strings.Contains(address, "|") || strings.HasPrefix(address, "[") {
@@ -746,7 +776,7 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 			options := teeOptions.FindString(a)
 			a = teeOptions.ReplaceAllString(a, "")
 
-			va, file, err := r.validateOutputAddress(a, basedir)
+			va, file, err := validateOutputAddress(a, basedir, ffmpeg)
 			if err != nil {
 				return address, false, err
 			}
@@ -768,7 +798,7 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 			return address, false, err
 		}
 
-		if !r.ffmpeg.ValidateOutputAddress(address) {
+		if !ffmpeg.ValidateOutputAddress(address) {
 			return address, false, fmt.Errorf("address is not allowed")
 		}
 
@@ -779,13 +809,14 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 		return "pipe:", false, nil
 	}
 
-	address, err := filepath.Abs(address)
-	if err != nil {
-		return address, false, fmt.Errorf("not a valid path (%w)", err)
+	address = filepath.Clean(address)
+
+	if !filepath.IsAbs(address) {
+		address = filepath.Join(basedir, address)
 	}
 
 	if strings.HasPrefix(address, "/dev/") {
-		if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+		if !ffmpeg.ValidateOutputAddress("file:" + address) {
 			return address, false, fmt.Errorf("address is not allowed")
 		}
 
@@ -796,7 +827,7 @@ func (r *restream) validateOutputAddress(address, basedir string) (string, bool,
 		return address, false, fmt.Errorf("%s is not inside of %s", address, basedir)
 	}
 
-	if !r.ffmpeg.ValidateOutputAddress("file:" + address) {
+	if !ffmpeg.ValidateOutputAddress("file:" + address) {
 		return address, false, fmt.Errorf("address is not allowed")
 	}
 
@@ -1034,10 +1065,12 @@ func (r *restream) startProcess(id string) error {
 		return fmt.Errorf("invalid process definition")
 	}
 
-	status := task.ffmpeg.Status()
+	if task.ffmpeg != nil {
+		status := task.ffmpeg.Status()
 
-	if task.process.Order == "start" && status.Order == "start" {
-		return nil
+		if task.process.Order == "start" && status.Order == "start" {
+			return nil
+		}
 	}
 
 	if r.maxProc > 0 && r.nProc >= r.maxProc {
@@ -1113,7 +1146,9 @@ func (r *restream) restartProcess(id string) error {
 		return nil
 	}
 
-	task.ffmpeg.Kill(true)
+	if task.ffmpeg != nil {
+		task.ffmpeg.Kill(true)
+	}
 
 	return nil
 }
@@ -1142,14 +1177,19 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.config = t.process.Config.Clone()
 
-	resolvePlaceholders(t.config, r.replace)
+	resolveStaticPlaceholders(t.config, r.replace)
 
 	err := r.resolveAddresses(r.tasks, t.config)
 	if err != nil {
 		return err
 	}
 
-	t.usesDisk, err = r.validateConfig(t.config)
+	// Validate config with all placeholders replaced. However, we need to take care
+	// that the config with the task keeps its dynamic placeholders for process starts.
+	config := t.config.Clone()
+	resolveDynamicPlaceholder(config, r.replace)
+
+	t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
 	if err != nil {
 		return err
 	}
@@ -1173,9 +1213,10 @@ func (r *restream) reloadProcess(id string) error {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-		Command:        t.command,
+		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
+		OnArgs:         r.onArgs(t.config.Clone()),
 	})
 	if err != nil {
 		return err
@@ -1346,7 +1387,7 @@ func (r *restream) ProbeWithTimeout(id string, timeout time.Duration) app.Probe 
 		Reconnect:      false,
 		ReconnectDelay: 0,
 		StaleTimeout:   timeout,
-		Command:        command,
+		Args:           command,
 		Parser:         prober,
 		Logger:         task.logger,
 		OnExit: func() {
@@ -1495,9 +1536,8 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	return data, nil
 }
 
-// resolvePlaceholders replaces all placeholders in the config. The config
-// will be modified in place.
-func resolvePlaceholders(config *app.Config, r replace.Replacer) {
+// resolveStaticPlaceholders replaces all placeholders in the config. The config will be modified in place.
+func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 	vars := map[string]string{
 		"processid": config.ID,
 		"reference": config.Reference,
@@ -1514,14 +1554,14 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 	// Resolving the given inputs
 	for i, input := range config.Input {
 		// Replace any known placeholders
-		input.ID = r.Replace(input.ID, "processid", config.ID, nil, nil, "input")
-		input.ID = r.Replace(input.ID, "reference", config.Reference, nil, nil, "input")
+		input.ID = r.Replace(input.ID, "processid", config.ID, vars, config, "input")
+		input.ID = r.Replace(input.ID, "reference", config.Reference, vars, config, "input")
 
 		vars["inputid"] = input.ID
 
-		input.Address = r.Replace(input.Address, "inputid", input.ID, nil, nil, "input")
-		input.Address = r.Replace(input.Address, "processid", config.ID, nil, nil, "input")
-		input.Address = r.Replace(input.Address, "reference", config.Reference, nil, nil, "input")
+		input.Address = r.Replace(input.Address, "inputid", input.ID, vars, config, "input")
+		input.Address = r.Replace(input.Address, "processid", config.ID, vars, config, "input")
+		input.Address = r.Replace(input.Address, "reference", config.Reference, vars, config, "input")
 		input.Address = r.Replace(input.Address, "diskfs", "", vars, config, "input")
 		input.Address = r.Replace(input.Address, "memfs", "", vars, config, "input")
 		input.Address = r.Replace(input.Address, "fs:*", "", vars, config, "input")
@@ -1530,9 +1570,9 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 
 		for j, option := range input.Options {
 			// Replace any known placeholders
-			option = r.Replace(option, "inputid", input.ID, nil, nil, "input")
-			option = r.Replace(option, "processid", config.ID, nil, nil, "input")
-			option = r.Replace(option, "reference", config.Reference, nil, nil, "input")
+			option = r.Replace(option, "inputid", input.ID, vars, config, "input")
+			option = r.Replace(option, "processid", config.ID, vars, config, "input")
+			option = r.Replace(option, "reference", config.Reference, vars, config, "input")
 			option = r.Replace(option, "diskfs", "", vars, config, "input")
 			option = r.Replace(option, "memfs", "", vars, config, "input")
 			option = r.Replace(option, "fs:*", "", vars, config, "input")
@@ -1548,14 +1588,14 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 	// Resolving the given outputs
 	for i, output := range config.Output {
 		// Replace any known placeholders
-		output.ID = r.Replace(output.ID, "processid", config.ID, nil, nil, "output")
-		output.ID = r.Replace(output.ID, "reference", config.Reference, nil, nil, "output")
+		output.ID = r.Replace(output.ID, "processid", config.ID, vars, config, "output")
+		output.ID = r.Replace(output.ID, "reference", config.Reference, vars, config, "output")
 
 		vars["outputid"] = output.ID
 
-		output.Address = r.Replace(output.Address, "outputid", output.ID, nil, nil, "output")
-		output.Address = r.Replace(output.Address, "processid", config.ID, nil, nil, "output")
-		output.Address = r.Replace(output.Address, "reference", config.Reference, nil, nil, "output")
+		output.Address = r.Replace(output.Address, "outputid", output.ID, vars, config, "output")
+		output.Address = r.Replace(output.Address, "processid", config.ID, vars, config, "output")
+		output.Address = r.Replace(output.Address, "reference", config.Reference, vars, config, "output")
 		output.Address = r.Replace(output.Address, "diskfs", "", vars, config, "output")
 		output.Address = r.Replace(output.Address, "memfs", "", vars, config, "output")
 		output.Address = r.Replace(output.Address, "fs:*", "", vars, config, "output")
@@ -1564,9 +1604,9 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 
 		for j, option := range output.Options {
 			// Replace any known placeholders
-			option = r.Replace(option, "outputid", output.ID, nil, nil, "output")
-			option = r.Replace(option, "processid", config.ID, nil, nil, "output")
-			option = r.Replace(option, "reference", config.Reference, nil, nil, "output")
+			option = r.Replace(option, "outputid", output.ID, vars, config, "output")
+			option = r.Replace(option, "processid", config.ID, vars, config, "output")
+			option = r.Replace(option, "reference", config.Reference, vars, config, "output")
 			option = r.Replace(option, "diskfs", "", vars, config, "output")
 			option = r.Replace(option, "memfs", "", vars, config, "output")
 			option = r.Replace(option, "fs:*", "", vars, config, "output")
@@ -1576,14 +1616,58 @@ func resolvePlaceholders(config *app.Config, r replace.Replacer) {
 
 		for j, cleanup := range output.Cleanup {
 			// Replace any known placeholders
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID, nil, nil, "output")
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID, nil, nil, "output")
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference, nil, nil, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID, vars, config, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID, vars, config, "output")
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference, vars, config, "output")
 
 			output.Cleanup[j] = cleanup
 		}
 
 		delete(vars, "outputid")
+
+		config.Output[i] = output
+	}
+}
+
+// resolveDynamicPlaceholder replaces placeholders in the config that should be replaced at process start.
+// The config will be modified in place.
+func resolveDynamicPlaceholder(config *app.Config, r replace.Replacer) {
+	vars := map[string]string{
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	for i, option := range config.Options {
+		option = r.Replace(option, "date", "", vars, config, "global")
+
+		config.Options[i] = option
+	}
+
+	for i, input := range config.Input {
+		input.Address = r.Replace(input.Address, "date", "", vars, config, "input")
+
+		for j, option := range input.Options {
+			option = r.Replace(option, "date", "", vars, config, "input")
+
+			input.Options[j] = option
+		}
+
+		config.Input[i] = input
+	}
+
+	for i, output := range config.Output {
+		output.Address = r.Replace(output.Address, "date", "", vars, config, "output")
+
+		for j, option := range output.Options {
+			option = r.Replace(option, "date", "", vars, config, "output")
+
+			output.Options[j] = option
+		}
+
+		for j, cleanup := range output.Cleanup {
+			cleanup.Pattern = r.Replace(cleanup.Pattern, "date", "", vars, config, "output")
+
+			output.Cleanup[j] = cleanup
+		}
 
 		config.Output[i] = output
 	}

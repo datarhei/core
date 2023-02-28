@@ -16,6 +16,7 @@ require (
 	github.com/invopop/jsonschema v0.4.0
 	github.com/joho/godotenv v1.4.0
 	github.com/labstack/echo/v4 v4.9.1
+	github.com/lestrrat-go/strftime v1.0.6
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.17
 	github.com/minio/minio-go/v7 v7.0.47

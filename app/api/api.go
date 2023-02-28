@@ -42,6 +42,7 @@ import (
 	"github.com/datarhei/core/v16/update"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/lestrrat-go/strftime"
 	"go.uber.org/zap"
 )
 
@@ -508,27 +509,46 @@ func (a *api) start() error {
 	a.replacer = replace.New()
 
 	{
-		a.replacer.RegisterTemplateFunc("diskfs", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("date", func(params map[string]string, config *restreamapp.Config, section string) string {
+			t, err := time.Parse(time.RFC3339, params["timestamp"])
+			if err != nil {
+				return ""
+			}
+
+			s, err := strftime.Format(params["format"], t)
+			if err != nil {
+				return ""
+			}
+
+			return s
+		}, map[string]string{
+			"format":    "%Y-%m-%d_%H-%M-%S",
+			"timestamp": "$timestamp",
+		})
+
+		a.replacer.RegisterReplaceFunc("diskfs", func(params map[string]string, config *restreamapp.Config, section string) string {
 			return a.diskfs.Metadata("base")
 		}, nil)
 
-		a.replacer.RegisterTemplateFunc("fs:disk", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("fs:disk", func(params map[string]string, config *restreamapp.Config, section string) string {
 			return a.diskfs.Metadata("base")
 		}, nil)
 
-		a.replacer.RegisterTemplateFunc("memfs", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("memfs", func(params map[string]string, config *restreamapp.Config, section string) string {
 			return a.memfs.Metadata("base")
 		}, nil)
 
-		a.replacer.RegisterTemplateFunc("fs:mem", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("fs:mem", func(params map[string]string, config *restreamapp.Config, section string) string {
 			return a.memfs.Metadata("base")
 		}, nil)
 
 		for name, s3 := range a.s3fs {
-			a.replacer.RegisterTemplate("fs:"+name, s3.Metadata("base"), nil)
+			a.replacer.RegisterReplaceFunc("fs:"+name, func(params map[string]string, config *restreamapp.Config, section string) string {
+				return s3.Metadata("base")
+			}, nil)
 		}
 
-		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("rtmp", func(params map[string]string, bla *restreamapp.Config, section string) string {
 			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
 			if len(host) == 0 {
 				host = "localhost"
@@ -538,22 +558,24 @@ func (a *api) start() error {
 			if cfg.RTMP.App != "/" {
 				template += cfg.RTMP.App
 			}
-			template += "/{name}"
+			template += "/" + params["name"]
 
 			if len(cfg.RTMP.Token) != 0 {
 				template += "?token=" + cfg.RTMP.Token
 			}
 
 			return template
-		}, nil)
+		}, map[string]string{
+			"name": "",
+		})
 
-		a.replacer.RegisterTemplateFunc("srt", func(config *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("srt", func(params map[string]string, bla *restreamapp.Config, section string) string {
 			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
 			if len(host) == 0 {
 				host = "localhost"
 			}
 
-			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name}"
+			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency=" + params["latency"] + "&streamid=" + params["name"]
 			if section == "output" {
 				template += ",mode:publish"
 			} else {
@@ -568,6 +590,7 @@ func (a *api) start() error {
 
 			return template
 		}, map[string]string{
+			"name":    "",
 			"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
 		})
 	}

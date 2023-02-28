@@ -10,6 +10,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/lestrrat-go/strftime"
 
 	"github.com/stretchr/testify/require"
 )
@@ -500,7 +501,8 @@ func TestPlayoutRange(t *testing.T) {
 	_, err = rs.GetPlayout(process.ID, "foobar")
 	require.NotEqual(t, nil, err, "playout of non-existing input should error")
 
-	addr, _ := rs.GetPlayout(process.ID, process.Input[0].ID)
+	addr, err := rs.GetPlayout(process.ID, process.Input[0].ID)
+	require.NoError(t, err)
 	require.NotEqual(t, 0, len(addr), "the playout address should not be empty if a port range is given")
 	require.Equal(t, "127.0.0.1:3000", addr, "the playout address should be 127.0.0.1:3000")
 }
@@ -545,36 +547,36 @@ func TestConfigValidation(t *testing.T) {
 
 	config := getDummyProcess()
 
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.NoError(t, err)
 
 	config.Input = []app.ConfigIO{}
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config = getDummyProcess()
 	config.Input[0].ID = ""
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config = getDummyProcess()
 	config.Input[0].Address = ""
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config = getDummyProcess()
 	config.Output = []app.ConfigIO{}
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config = getDummyProcess()
 	config.Output[0].ID = ""
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config = getDummyProcess()
 	config.Output[0].Address = ""
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 }
 
@@ -592,21 +594,21 @@ func TestConfigValidationFFmpeg(t *testing.T) {
 
 	config := getDummyProcess()
 
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.Error(t, err)
 
 	config.Input[0].Address = "http://stream.example.com/master.m3u8"
 	config.Output[0].Address = "http://stream.example.com/master2.m3u8"
 
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.NoError(t, err)
 
 	config.Output[0].Address = "[f=flv]http://stream.example.com/master2.m3u8"
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.NoError(t, err)
 
 	config.Output[0].Address = "[f=hls]http://stream.example.com/master2.m3u8|[f=flv]rtmp://stream.example.com/stream"
-	_, err = rs.validateConfig(config)
+	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
 	require.NoError(t, err)
 }
 
@@ -639,10 +641,10 @@ func TestOutputAddressValidation(t *testing.T) {
 	}
 
 	for path, r := range paths {
-		path, _, err := rs.validateOutputAddress(path, "/core/data")
+		path, _, err := validateOutputAddress(path, "/core/data", rs.ffmpeg)
 
 		if r.err {
-			require.Error(t, err)
+			require.Error(t, err, path)
 		} else {
 			require.NoError(t, err)
 		}
@@ -673,28 +675,45 @@ func TestMetadata(t *testing.T) {
 func TestReplacer(t *testing.T) {
 	replacer := replace.New()
 
-	replacer.RegisterTemplateFunc("diskfs", func(config *app.Config, section string) string {
+	replacer.RegisterReplaceFunc("date", func(params map[string]string, config *app.Config, section string) string {
+		t, err := time.Parse(time.RFC3339, params["timestamp"])
+		if err != nil {
+			return ""
+		}
+
+		s, err := strftime.Format(params["format"], t)
+		if err != nil {
+			return ""
+		}
+
+		return s
+	}, map[string]string{
+		"format":    "%Y-%m-%d_%H-%M-%S",
+		"timestamp": "2019-10-12T07:20:50.52Z",
+	})
+
+	replacer.RegisterReplaceFunc("diskfs", func(params map[string]string, config *app.Config, section string) string {
 		return "/mnt/diskfs"
 	}, nil)
 
-	replacer.RegisterTemplateFunc("fs:disk", func(config *app.Config, section string) string {
+	replacer.RegisterReplaceFunc("fs:disk", func(params map[string]string, config *app.Config, section string) string {
 		return "/mnt/diskfs"
 	}, nil)
 
-	replacer.RegisterTemplateFunc("memfs", func(config *app.Config, section string) string {
+	replacer.RegisterReplaceFunc("memfs", func(params map[string]string, config *app.Config, section string) string {
 		return "http://localhost/mnt/memfs"
 	}, nil)
 
-	replacer.RegisterTemplateFunc("fs:mem", func(config *app.Config, section string) string {
+	replacer.RegisterReplaceFunc("fs:mem", func(params map[string]string, config *app.Config, section string) string {
 		return "http://localhost/mnt/memfs"
 	}, nil)
 
-	replacer.RegisterTemplateFunc("rtmp", func(config *app.Config, section string) string {
-		return "rtmp://localhost/app/{name}?token=foobar"
+	replacer.RegisterReplaceFunc("rtmp", func(params map[string]string, config *app.Config, section string) string {
+		return "rtmp://localhost/app/" + params["name"] + "?token=foobar"
 	}, nil)
 
-	replacer.RegisterTemplateFunc("srt", func(config *app.Config, section string) string {
-		template := "srt://localhost:6000?mode=caller&transtype=live&latency={latency}&streamid={name}"
+	replacer.RegisterReplaceFunc("srt", func(params map[string]string, config *app.Config, section string) string {
+		template := "srt://localhost:6000?mode=caller&transtype=live&latency=" + params["latency"] + "&streamid=" + params["name"]
 		if section == "output" {
 			template += ",mode:publish"
 		} else {
@@ -704,6 +723,216 @@ func TestReplacer(t *testing.T) {
 
 		return template
 	}, map[string]string{
+		"name":    "",
+		"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
+	})
+
+	process := &app.Config{
+		ID:        "314159265359",
+		Reference: "refref",
+		FFVersion: "^4.0.2",
+		Input: []app.ConfigIO{
+			{
+				ID:      "in_{processid}_{reference}",
+				Address: "input:{inputid}_process:{processid}_reference:{reference}_diskfs:{diskfs}/disk.txt_memfs:{memfs}/mem.txt_fsdisk:{fs:disk}/fsdisk.txt_fsmem:{fs:mem}/fsmem.txt_rtmp:{rtmp,name=pmtr}_srt:{srt,name=trs}_rtmp:{rtmp,name=$inputid}",
+				Options: []string{
+					"-f",
+					"lavfi",
+					"-re",
+					"input:{inputid}",
+					"process:{processid}",
+					"reference:{reference}",
+					"diskfs:{diskfs}/disk.txt",
+					"memfs:{memfs}/mem.txt",
+					"fsdisk:{fs:disk}/fsdisk_{date}.txt",
+					"fsmem:{fs:mem}/$inputid.txt",
+				},
+			},
+		},
+		Output: []app.ConfigIO{
+			{
+				ID:      "out_{processid}_{reference}",
+				Address: "output:{outputid}_process:{processid}_reference:{reference}_diskfs:{diskfs}/disk.txt_memfs:{memfs}/mem.txt_fsdisk:{fs:disk}/fsdisk.txt_fsmem:{fs:mem}/fsmem.txt_rtmp:{rtmp,name=$processid}_srt:{srt,name=$reference,latency=42}_rtmp:{rtmp,name=$outputid}",
+				Options: []string{
+					"-codec",
+					"copy",
+					"-f",
+					"null",
+					"output:{outputid}",
+					"process:{processid}",
+					"reference:{reference}",
+					"diskfs:{diskfs}/disk.txt",
+					"memfs:{memfs}/mem.txt",
+					"fsdisk:{fs:disk}/fsdisk.txt",
+					"fsmem:{fs:mem}/$outputid.txt",
+				},
+				Cleanup: []app.ConfigIOCleanup{
+					{
+						Pattern:       "pattern_{outputid}_{processid}_{reference}_{rtmp,name=$outputid}",
+						MaxFiles:      0,
+						MaxFileAge:    0,
+						PurgeOnDelete: false,
+					},
+				},
+			},
+		},
+		Options: []string{
+			"-loglevel",
+			"info",
+			"{diskfs}/foobar_on_disk.txt",
+			"{memfs}/foobar_in_mem.txt",
+			"{fs:disk}/foobar_on_disk_aswell.txt",
+			"{fs:mem}/foobar_in_mem_aswell.txt",
+		},
+		Reconnect:      true,
+		ReconnectDelay: 10,
+		Autostart:      false,
+		StaleTimeout:   0,
+	}
+
+	resolveStaticPlaceholders(process, replacer)
+
+	wantprocess := &app.Config{
+		ID:        "314159265359",
+		Reference: "refref",
+		FFVersion: "^4.0.2",
+		Input: []app.ConfigIO{
+			{
+				ID:      "in_314159265359_refref",
+				Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar",
+				Options: []string{
+					"-f",
+					"lavfi",
+					"-re",
+					"input:in_314159265359_refref",
+					"process:314159265359",
+					"reference:refref",
+					"diskfs:/mnt/diskfs/disk.txt",
+					"memfs:http://localhost/mnt/memfs/mem.txt",
+					"fsdisk:/mnt/diskfs/fsdisk_{date}.txt",
+					"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+				},
+			},
+		},
+		Output: []app.ConfigIO{
+			{
+				ID:      "out_314159265359_refref",
+				Address: "output:out_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/314159265359?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=42&streamid=refref,mode:publish,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/out_314159265359_refref?token=foobar",
+				Options: []string{
+					"-codec",
+					"copy",
+					"-f",
+					"null",
+					"output:out_314159265359_refref",
+					"process:314159265359",
+					"reference:refref",
+					"diskfs:/mnt/diskfs/disk.txt",
+					"memfs:http://localhost/mnt/memfs/mem.txt",
+					"fsdisk:/mnt/diskfs/fsdisk.txt",
+					"fsmem:http://localhost/mnt/memfs/$outputid.txt",
+				},
+				Cleanup: []app.ConfigIOCleanup{
+					{
+						Pattern:       "pattern_out_314159265359_refref_314159265359_refref_{rtmp,name=$outputid}",
+						MaxFiles:      0,
+						MaxFileAge:    0,
+						PurgeOnDelete: false,
+					},
+				},
+			},
+		},
+		Options: []string{
+			"-loglevel",
+			"info",
+			"/mnt/diskfs/foobar_on_disk.txt",
+			"{memfs}/foobar_in_mem.txt",
+			"/mnt/diskfs/foobar_on_disk_aswell.txt",
+			"http://localhost/mnt/memfs/foobar_in_mem_aswell.txt",
+		},
+		Reconnect:      true,
+		ReconnectDelay: 10,
+		Autostart:      false,
+		StaleTimeout:   0,
+	}
+
+	require.Equal(t, wantprocess, process)
+
+	resolveDynamicPlaceholder(process, replacer)
+
+	wantprocess.Input = []app.ConfigIO{
+		{
+			ID:      "in_314159265359_refref",
+			Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar",
+			Options: []string{
+				"-f",
+				"lavfi",
+				"-re",
+				"input:in_314159265359_refref",
+				"process:314159265359",
+				"reference:refref",
+				"diskfs:/mnt/diskfs/disk.txt",
+				"memfs:http://localhost/mnt/memfs/mem.txt",
+				"fsdisk:/mnt/diskfs/fsdisk_2019-10-12_07-20-50.txt",
+				"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+			},
+		},
+	}
+
+	require.Equal(t, wantprocess, process)
+}
+
+func TestProcessReplacer(t *testing.T) {
+	replacer := replace.New()
+
+	replacer.RegisterReplaceFunc("date", func(params map[string]string, config *app.Config, section string) string {
+		t, err := time.Parse(time.RFC3339, params["timestamp"])
+		if err != nil {
+			return ""
+		}
+
+		s, err := strftime.Format(params["format"], t)
+		if err != nil {
+			return ""
+		}
+
+		return s
+	}, map[string]string{
+		"format":    "%Y-%m-%d_%H-%M-%S",
+		"timestamp": "2019-10-12T07:20:50.52Z",
+	})
+
+	replacer.RegisterReplaceFunc("diskfs", func(params map[string]string, config *app.Config, section string) string {
+		return "/mnt/diskfs"
+	}, nil)
+
+	replacer.RegisterReplaceFunc("fs:disk", func(params map[string]string, config *app.Config, section string) string {
+		return "/mnt/diskfs"
+	}, nil)
+
+	replacer.RegisterReplaceFunc("memfs", func(params map[string]string, config *app.Config, section string) string {
+		return "http://localhost/mnt/memfs"
+	}, nil)
+
+	replacer.RegisterReplaceFunc("fs:mem", func(params map[string]string, config *app.Config, section string) string {
+		return "http://localhost/mnt/memfs"
+	}, nil)
+
+	replacer.RegisterReplaceFunc("rtmp", func(params map[string]string, config *app.Config, section string) string {
+		return "rtmp://localhost/app/" + params["name"] + "?token=foobar"
+	}, nil)
+
+	replacer.RegisterReplaceFunc("srt", func(params map[string]string, config *app.Config, section string) string {
+		template := "srt://localhost:6000?mode=caller&transtype=live&latency=" + params["latency"] + "&streamid=" + params["name"]
+		if section == "output" {
+			template += ",mode:publish"
+		} else {
+			template += ",mode:request"
+		}
+		template += ",token:abcfoobar&passphrase=secret"
+
+		return template
+	}, map[string]string{
+		"name":    "",
 		"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
 	})
 
@@ -726,7 +955,7 @@ func TestReplacer(t *testing.T) {
 					"reference:{reference}",
 					"diskfs:{diskfs}/disk.txt",
 					"memfs:{memfs}/mem.txt",
-					"fsdisk:{fs:disk}/fsdisk.txt",
+					"fsdisk:{fs:disk}/fsdisk_{date}.txt",
 					"fsmem:{fs:mem}/$inputid.txt",
 				},
 			},
@@ -794,7 +1023,7 @@ func TestReplacer(t *testing.T) {
 					"reference:refref",
 					"diskfs:/mnt/diskfs/disk.txt",
 					"memfs:http://localhost/mnt/memfs/mem.txt",
-					"fsdisk:/mnt/diskfs/fsdisk.txt",
+					"fsdisk:/mnt/diskfs/fsdisk_{date}.txt",
 					"fsmem:http://localhost/mnt/memfs/$inputid.txt",
 				},
 				Cleanup: []app.ConfigIOCleanup{},
