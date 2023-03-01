@@ -53,8 +53,9 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 	}
 
 	rs, err := restream.New(restream.Config{
-		Store:  store,
-		FFmpeg: ffmpeg,
+		Store:       store,
+		FFmpeg:      ffmpeg,
+		Filesystems: []fs.Filesystem{memfs},
 	})
 	if err != nil {
 		return nil, err

@@ -94,7 +94,6 @@ type restream struct {
 	nProc     int64
 	fs        struct {
 		list         []rfs.Filesystem
-		diskfs       []rfs.Filesystem
 		stopObserver context.CancelFunc
 	}
 	replace  replace.Replacer
@@ -134,6 +133,10 @@ func New(config Config) (Restreamer, error) {
 		r.store = s
 	}
 
+	if len(config.Filesystems) == 0 {
+		return nil, fmt.Errorf("at least one filesystem must be provided")
+	}
+
 	for _, fs := range config.Filesystems {
 		fs := rfs.New(rfs.Config{
 			FS:     fs,
@@ -141,11 +144,6 @@ func New(config Config) (Restreamer, error) {
 		})
 
 		r.fs.list = append(r.fs.list, fs)
-
-		// Add the diskfs filesystems also to a separate array. We need it later for input and output validation
-		if fs.Type() == "disk" {
-			r.fs.diskfs = append(r.fs.diskfs, fs)
-		}
 	}
 
 	if r.replace == nil {
@@ -341,7 +339,7 @@ func (r *restream) load() error {
 		config := t.config.Clone()
 		resolveDynamicPlaceholder(config, r.replace)
 
-		t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
+		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
 			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
 			continue
@@ -487,7 +485,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		config := t.config.Clone()
 		resolveDynamicPlaceholder(config, r.replace)
 
-		t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
+		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
 			return nil, err
 		}
@@ -527,7 +525,7 @@ func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
 
 		resolveDynamicPlaceholder(config, r.replace)
 
-		_, err := validateConfig(config, r.fs.diskfs, r.ffmpeg)
+		_, err := validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
 			return []string{}
 		}
@@ -641,6 +639,9 @@ func (r *restream) unsetPlayoutPorts(t *task) {
 	t.playout = nil
 }
 
+// validateConfig verifies a process config, whether the accessed files (read and write) can be accessed
+// based on the provided filesystems and the ffmpeg validators. Returns an error if somethingis wrong,
+// otherwise nil and whether there is a disk filesystem involved.
 func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmpeg) (bool, error) {
 	if len(config.Input) == 0 {
 		return false, fmt.Errorf("at least one input must be defined for the process '%s'", config.ID)
@@ -669,23 +670,21 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		if len(fss) != 0 {
-			maxFails := 0
-			for _, fs := range fss {
-				io.Address, err = validateInputAddress(io.Address, fs.Metadata("base"), ffmpeg)
-				if err != nil {
-					maxFails++
-				}
+		maxFails := 0
+		for _, fs := range fss {
+			basedir := "/"
+			if fs.Type() == "disk" {
+				basedir = fs.Metadata("base")
 			}
 
-			if maxFails == len(fss) {
-				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
-			}
-		} else {
-			io.Address, err = validateInputAddress(io.Address, "/", ffmpeg)
+			io.Address, err = validateInputAddress(io.Address, basedir, ffmpeg)
 			if err != nil {
-				return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
+				maxFails++
 			}
+		}
+
+		if maxFails == len(fss) {
+			return false, fmt.Errorf("the address for input '#%s:%s' (%s) is invalid: %w", config.ID, io.ID, io.Address, err)
 		}
 	}
 
@@ -715,34 +714,33 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
 		}
 
-		if len(fss) != 0 {
-			maxFails := 0
-			for _, fs := range fss {
-				isFile := false
-				io.Address, isFile, err = validateOutputAddress(io.Address, fs.Metadata("base"), ffmpeg)
-				if err != nil {
-					maxFails++
-				}
-
-				if isFile {
-					hasFiles = true
-				}
+		maxFails := 0
+		for _, fs := range fss {
+			basedir := "/"
+			if fs.Type() == "disk" {
+				basedir = fs.Metadata("base")
 			}
 
-			if maxFails == len(fss) {
-				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
-			}
-		} else {
 			isFile := false
-			io.Address, isFile, err = validateOutputAddress(io.Address, "/", ffmpeg)
+			io.Address, isFile, err = validateOutputAddress(io.Address, basedir, ffmpeg)
 			if err != nil {
-				return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+				maxFails++
 			}
 
 			if isFile {
-				hasFiles = true
+				if fs.Type() == "disk" {
+					hasFiles = true
+				}
+
+				dir := filepath.Dir(strings.TrimPrefix(io.Address, "file:"+basedir))
+				fs.MkdirAll(dir, 0744)
 			}
 		}
+
+		if maxFails == len(fss) {
+			return false, fmt.Errorf("the address for output '#%s:%s' is invalid: %w", config.ID, io.ID, err)
+		}
+
 	}
 
 	return hasFiles, nil
@@ -1189,7 +1187,7 @@ func (r *restream) reloadProcess(id string) error {
 	config := t.config.Clone()
 	resolveDynamicPlaceholder(config, r.replace)
 
-	t.usesDisk, err = validateConfig(config, r.fs.diskfs, r.ffmpeg)
+	t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 	if err != nil {
 		return err
 	}

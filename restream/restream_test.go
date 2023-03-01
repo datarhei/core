@@ -2,13 +2,16 @@ package restream
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
+	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/lestrrat-go/strftime"
 
@@ -31,9 +34,15 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, err
+	}
+
 	rs, err := New(Config{
-		FFmpeg:  ffmpeg,
-		Replace: replacer,
+		FFmpeg:      ffmpeg,
+		Replace:     replacer,
+		Filesystems: []fs.Filesystem{memfs},
 	})
 	if err != nil {
 		return nil, err
@@ -547,37 +556,80 @@ func TestConfigValidation(t *testing.T) {
 
 	config := getDummyProcess()
 
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err := validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.NoError(t, err)
+	require.False(t, hasfiles)
 
 	config.Input = []app.ConfigIO{}
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
 
 	config = getDummyProcess()
 	config.Input[0].ID = ""
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
 
 	config = getDummyProcess()
 	config.Input[0].Address = ""
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
 
 	config = getDummyProcess()
 	config.Output = []app.ConfigIO{}
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
 
 	config = getDummyProcess()
 	config.Output[0].ID = ""
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
 
 	config = getDummyProcess()
 	config.Output[0].Address = ""
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	hasfiles, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
+	require.False(t, hasfiles)
+}
+
+func TestConfigValidationWithMkdir(t *testing.T) {
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
+
+	config := getDummyProcess()
+	config.Output[0].Address = "/path/to/a/file/image.jpg"
+	hasfiles, err := validateConfig(config, rs.fs.list, rs.ffmpeg)
+	require.NoError(t, err)
+	require.False(t, hasfiles)
+
+	info, err := rs.fs.list[0].Stat("/path/to/a/file")
+	require.NoError(t, err)
+	require.True(t, info.IsDir())
+
+	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+		Root: "./testing",
+	})
+	require.NoError(t, err)
+
+	diskrfs := rfs.New(rfs.Config{
+		FS: diskfs,
+	})
+
+	hasfiles, err = validateConfig(config, []rfs.Filesystem{diskrfs}, rs.ffmpeg)
+	require.NoError(t, err)
+	require.True(t, hasfiles)
+
+	info, err = diskfs.Stat("/path/to/a/file")
+	require.NoError(t, err)
+	require.True(t, info.IsDir())
+
+	os.RemoveAll("./testing")
 }
 
 func TestConfigValidationFFmpeg(t *testing.T) {
@@ -594,21 +646,21 @@ func TestConfigValidationFFmpeg(t *testing.T) {
 
 	config := getDummyProcess()
 
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	_, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.Error(t, err)
 
 	config.Input[0].Address = "http://stream.example.com/master.m3u8"
 	config.Output[0].Address = "http://stream.example.com/master2.m3u8"
 
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	_, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.NoError(t, err)
 
 	config.Output[0].Address = "[f=flv]http://stream.example.com/master2.m3u8"
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	_, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.NoError(t, err)
 
 	config.Output[0].Address = "[f=hls]http://stream.example.com/master2.m3u8|[f=flv]rtmp://stream.example.com/stream"
-	_, err = validateConfig(config, rs.fs.diskfs, rs.ffmpeg)
+	_, err = validateConfig(config, rs.fs.list, rs.ffmpeg)
 	require.NoError(t, err)
 }
 
