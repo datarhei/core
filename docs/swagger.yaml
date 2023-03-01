@@ -2999,6 +2999,32 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.ProcessReport'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the logs of a process
+      tags:
+      - v16.7.2
+  /api/v3/process/{id}/report/{at}:
+    get:
+      description: Get the logs and the log history of a process.
+      operationId: process-3-get-report-at
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessReport'
         "400":
           description: Bad Request
           schema:
@@ -3011,7 +3037,7 @@ paths:
       - ApiKeyAuth: []
       summary: Get the logs of a process
       tags:
-      - v16.7.2
+      - v16.?.?
   /api/v3/process/{id}/state:
     get:
       description: Get the state and progress data of a process.

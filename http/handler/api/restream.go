@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/datarhei/core/v16/http/api"
@@ -320,7 +321,6 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Success 200 {object} api.ProcessReport
 // @Failure 404 {object} api.Error
-// @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
 func (h *RestreamHandler) GetReport(c echo.Context) error {
@@ -335,6 +335,42 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 	report.Unmarshal(l)
 
 	return c.JSON(http.StatusOK, report)
+}
+
+// GetReport return the current log and the log history of a process
+// @Summary Get the logs of a process
+// @Description Get the logs and the log history of a process.
+// @Tags v16.?.?
+// @ID process-3-get-report-at
+// @Produce json
+// @Param id path string true "Process ID"
+// @Success 200 {object} api.ProcessReport
+// @Failure 404 {object} api.Error
+// @Failure 400 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/process/{id}/report/{at} [get]
+func (h *RestreamHandler) GetReportAt(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	at, err := strconv.ParseInt(util.PathParam(c, "at"), 10, 64)
+	if err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid process report date", "%s", err)
+	}
+
+	l, err := h.restream.GetProcessLog(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+	}
+
+	report := api.ProcessReport{}
+	report.Unmarshal(l)
+
+	for _, r := range report.History {
+		if r.CreatedAt == at {
+			return c.JSON(http.StatusOK, r)
+		}
+	}
+
+	return api.Err(http.StatusNotFound, "Unknown process report date")
 }
 
 // Probe probes a process

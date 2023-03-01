@@ -555,6 +555,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/process/:id/config", s.v3handler.restream.GetConfig)
 		v3.GET("/process/:id/state", s.v3handler.restream.GetState)
 		v3.GET("/process/:id/report", s.v3handler.restream.GetReport)
+		v3.GET("/process/:id/report/:at", s.v3handler.restream.GetReportAt)
 		v3.GET("/process/:id/probe", s.v3handler.restream.Probe)
 
 		v3.GET("/process/:id/metadata", s.v3handler.restream.GetProcessMetadata)
