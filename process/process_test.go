@@ -171,7 +171,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
-		OnExit: func() {
+		OnExit: func(state string) {
 			time.Sleep(2 * time.Second)
 		},
 	})

@@ -809,6 +809,8 @@ definitions:
       created_at:
         format: int64
         type: integer
+      exit_state:
+        type: string
       log:
         items:
           items:
@@ -819,6 +821,8 @@ definitions:
         items:
           type: string
         type: array
+      progress:
+        $ref: '#/definitions/api.Progress'
     type: object
   api.ProcessState:
     properties:

@@ -8,13 +8,12 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg/prelude"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Parser interface {
 	process.Parser
 
-	Probe() app.Probe
+	Probe() Probe
 }
 
 type Config struct {
@@ -40,8 +39,8 @@ func New(config Config) Parser {
 	return p
 }
 
-func (p *prober) Probe() app.Probe {
-	probe := app.Probe{}
+func (p *prober) Probe() Probe {
+	probe := Probe{}
 
 	for _, io := range p.inputs {
 		probe.Streams = append(probe.Streams, io.export())
@@ -111,6 +110,8 @@ func (p *prober) parseDefault() {
 		p.inputs[i].Layout = input.Layout
 	}
 }
+
+func (p *prober) Stop(state string) {}
 
 func (p *prober) Log() []process.Line {
 	return p.data

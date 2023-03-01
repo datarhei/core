@@ -12,6 +12,10 @@ type Parser interface {
 	// or previous line, ...)
 	Parse(line string) uint64
 
+	// Stop tells the parser that the process stopped and provides
+	// its exit state.
+	Stop(state string)
+
 	// Reset resets any collected statistics or temporary data.
 	// This is called before the process starts and after the
 	// process stopped. The stats are meant to be collected
@@ -43,10 +47,8 @@ func NewNullParser() Parser {
 
 var _ Parser = &nullParser{}
 
-func (p *nullParser) Parse(line string) uint64 { return 1 }
-
-func (p *nullParser) Log() []Line { return []Line{} }
-
-func (p *nullParser) ResetStats() {}
-
-func (p *nullParser) ResetLog() {}
+func (p *nullParser) Parse(string) uint64 { return 1 }
+func (p *nullParser) Stop(string)         {}
+func (p *nullParser) ResetStats()         {}
+func (p *nullParser) ResetLog()           {}
+func (p *nullParser) Log() []Line         { return []Line{} }

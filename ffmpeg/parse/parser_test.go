@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/restream/app"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ func TestParserProgress(t *testing.T) {
 	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
 	d, _ := time.ParseDuration("3m58s440ms")
-	wantP := app.Progress{
+	wantP := Progress{
 		Frame:     5968,
 		FPS:       25,
 		Quantizer: 19.4,

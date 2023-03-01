@@ -1,9 +1,5 @@
 package probe
 
-import (
-	"github.com/datarhei/core/v16/restream/app"
-)
-
 type probeIO struct {
 	// common
 	Address  string  `json:"url"`
@@ -29,8 +25,8 @@ type probeIO struct {
 	Channels uint64 `json:"channels"`
 }
 
-func (io *probeIO) export() app.ProbeIO {
-	return app.ProbeIO{
+func (io *probeIO) export() ProbeIO {
+	return ProbeIO{
 		Address:  io.Address,
 		Format:   io.Format,
 		Index:    io.Index,
@@ -49,4 +45,35 @@ func (io *probeIO) export() app.ProbeIO {
 		Layout:   io.Layout,
 		Channels: io.Channels,
 	}
+}
+
+type ProbeIO struct {
+	Address string
+
+	// General
+	Index    uint64
+	Stream   uint64
+	Language string
+	Format   string
+	Type     string
+	Codec    string
+	Coder    string
+	Bitrate  float64 // kbit/s
+	Duration float64
+
+	// Video
+	Pixfmt string
+	Width  uint64
+	Height uint64
+	FPS    float64
+
+	// Audio
+	Sampling uint64
+	Layout   string
+	Channels uint64
+}
+
+type Probe struct {
+	Streams []ProbeIO
+	Log     []string
 }

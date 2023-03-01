@@ -14,7 +14,6 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net/url"
 	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/session"
 )
 
@@ -23,7 +22,7 @@ type Parser interface {
 	process.Parser
 
 	// Progress returns the current progress information of the process
-	Progress() app.Progress
+	Progress() Progress
 
 	// Prelude returns an array of the lines before the progress information started
 	Prelude() []string
@@ -32,7 +31,7 @@ type Parser interface {
 	Report() Report
 
 	// ReportHistory returns an array of previews logs
-	ReportHistory() []Report
+	ReportHistory() []ReportHistoryEntry
 }
 
 // Config is the config for the Parser implementation
@@ -116,7 +115,7 @@ func New(config Config) Parser {
 	}
 
 	if p.logger == nil {
-		p.logger = log.New("Parser")
+		p.logger = log.New("")
 	}
 
 	if p.logLines <= 0 {
@@ -503,7 +502,12 @@ func (p *parser) parseAVstreamProgress(line string) error {
 	return nil
 }
 
-func (p *parser) Progress() app.Progress {
+func (p *parser) Stop(state string) {
+	// The process stopped. The right moment to store the current state to the log history
+	p.storeReportHistory(state)
+}
+
+func (p *parser) Progress() Progress {
 	p.lock.progress.RLock()
 	defer p.lock.progress.RUnlock()
 
@@ -685,8 +689,6 @@ func (p *parser) ResetStats() {
 }
 
 func (p *parser) ResetLog() {
-	p.storeLogHistory()
-
 	p.lock.prelude.Lock()
 	p.prelude.data = []string{}
 	p.prelude.tail = ring.New(p.prelude.tailLines)
@@ -700,25 +702,41 @@ func (p *parser) ResetLog() {
 	p.lock.log.Unlock()
 }
 
-// Report represents a log report, including the prelude and the last log lines
-// of the process.
+// Report represents a log report, including the prelude and the last log lines of the process.
 type Report struct {
 	CreatedAt time.Time
 	Prelude   []string
 	Log       []process.Line
 }
 
-func (p *parser) storeLogHistory() {
+// ReportHistoryEntry represents an historical log report, including the exit status of the
+// process and the last progress data.
+type ReportHistoryEntry struct {
+	Report
+
+	ExitState string
+	Progress  Progress
+}
+
+func (p *parser) storeReportHistory(state string) {
 	if p.logHistory == nil {
 		return
 	}
 
-	h := p.Report()
+	report := p.Report()
 
-	if len(h.Prelude) != 0 {
-		p.logHistory.Value = h
-		p.logHistory = p.logHistory.Next()
+	if len(report.Prelude) == 0 {
+		return
 	}
+
+	h := ReportHistoryEntry{
+		Report:    report,
+		ExitState: state,
+		Progress:  p.Progress(),
+	}
+
+	p.logHistory.Value = h
+	p.logHistory = p.logHistory.Next()
 }
 
 func (p *parser) Report() Report {
@@ -734,15 +752,15 @@ func (p *parser) Report() Report {
 	return h
 }
 
-func (p *parser) ReportHistory() []Report {
-	var history = []Report{}
+func (p *parser) ReportHistory() []ReportHistoryEntry {
+	var history = []ReportHistoryEntry{}
 
 	p.logHistory.Do(func(l interface{}) {
 		if l == nil {
 			return
 		}
 
-		history = append(history, l.(Report))
+		history = append(history, l.(ReportHistoryEntry))
 	})
 
 	return history

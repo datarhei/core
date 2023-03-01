@@ -186,16 +186,23 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	}
 }
 
-// ProcessReportHistoryEntry represents the logs of a run of a restream process
-type ProcessReportHistoryEntry struct {
+// ProcessReportEntry represents the logs of a run of a restream process
+type ProcessReportEntry struct {
 	CreatedAt int64       `json:"created_at" format:"int64"`
 	Prelude   []string    `json:"prelude"`
 	Log       [][2]string `json:"log"`
 }
 
+type ProcessReportHistoryEntry struct {
+	ProcessReportEntry
+
+	ExitState string   `json:"exit_state"`
+	Progress  Progress `json:"progress"`
+}
+
 // ProcessReport represents the current log and the logs of previous runs of a restream process
 type ProcessReport struct {
-	ProcessReportHistoryEntry
+	ProcessReportEntry
 	History []ProcessReportHistoryEntry `json:"history"`
 }
 
@@ -217,14 +224,19 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 
 	for _, h := range l.History {
 		he := ProcessReportHistoryEntry{
-			CreatedAt: h.CreatedAt.Unix(),
-			Prelude:   h.Prelude,
-			Log:       make([][2]string, len(h.Log)),
+			ProcessReportEntry: ProcessReportEntry{
+				CreatedAt: h.CreatedAt.Unix(),
+				Prelude:   h.Prelude,
+				Log:       make([][2]string, len(h.Log)),
+			},
+			ExitState: h.ExitState,
 		}
 
+		he.Progress.Unmarshal(&h.Progress)
+
 		for i, line := range h.Log {
-			he.Log[i][0] = strconv.FormatInt(line.Timestamp.Unix(), 10)
-			he.Log[i][1] = line.Data
+			he.ProcessReportEntry.Log[i][0] = strconv.FormatInt(line.Timestamp.Unix(), 10)
+			he.ProcessReportEntry.Log[i][1] = line.Data
 		}
 
 		report.History = append(report.History, he)

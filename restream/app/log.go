@@ -4,18 +4,25 @@ import (
 	"time"
 )
 
-type LogEntry struct {
+type LogLine struct {
 	Timestamp time.Time
 	Data      string
 }
 
-type LogHistoryEntry struct {
+type LogEntry struct {
 	CreatedAt time.Time
 	Prelude   []string
-	Log       []LogEntry
+	Log       []LogLine
+}
+
+type LogHistoryEntry struct {
+	LogEntry
+
+	ExitState string
+	Progress  Progress
 }
 
 type Log struct {
-	LogHistoryEntry
+	LogEntry
 	History []LogHistoryEntry
 }

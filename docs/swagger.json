@@ -3183,6 +3183,9 @@
                     "type": "integer",
                     "format": "int64"
                 },
+                "exit_state": {
+                    "type": "string"
+                },
                 "log": {
                     "type": "array",
                     "items": {
@@ -3197,6 +3200,9 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "progress": {
+                    "$ref": "#/definitions/api.Progress"
                 }
             }
         },

@@ -57,7 +57,7 @@ type Config struct {
 	Parser         Parser                       // A parser for the output of the process
 	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args
 	OnStart        func()                       // A callback which is called after the process started
-	OnExit         func()                       // A callback which is called after the process exited
+	OnExit         func(state string)           // A callback which is called after the process exited with the exit state
 	OnStateChange  func(from, to string)        // A callback which is called after a state changed
 	Logger         log.Logger
 }
@@ -192,7 +192,7 @@ type process struct {
 	callbacks     struct {
 		onArgs        func(args []string) []string
 		onStart       func()
-		onExit        func()
+		onExit        func(state string)
 		onStateChange func(from, to string)
 		lock          sync.Mutex
 	}
@@ -602,14 +602,14 @@ func (p *process) stop(wait bool) error {
 
 		p.callbacks.lock.Lock()
 		if p.callbacks.onExit == nil {
-			p.callbacks.onExit = func() {
+			p.callbacks.onExit = func(string) {
 				wg.Done()
 				p.callbacks.onExit = nil
 			}
 		} else {
 			cb := p.callbacks.onExit
-			p.callbacks.onExit = func() {
-				cb()
+			p.callbacks.onExit = func(state string) {
+				cb(state)
 				wg.Done()
 				p.callbacks.onExit = cb
 			}
@@ -770,6 +770,10 @@ func (p *process) waiter() {
 		p.stop(false)
 	}
 
+	// The process exited normally, i.e. the return code is zero and no signal
+	// has been raised
+	state := stateFinished
+
 	if err := p.cmd.Wait(); err != nil {
 		// The process exited abnormally, i.e. the return code is non-zero or a signal
 		// has been raised.
@@ -791,33 +795,31 @@ func (p *process) waiter() {
 					// If ffmpeg has been killed with a SIGINT, SIGTERM, etc., then it exited normally,
 					// i.e. closing all stream properly such that all written data is sane.
 					p.logger.Info().Log("Finished")
-					p.setState(stateFinished)
+					state = stateFinished
 				} else {
 					// The process exited by itself with a non-zero return code
 					p.logger.Info().Log("Failed")
-					p.setState(stateFailed)
+					state = stateFailed
 				}
 			} else if status.Signaled() {
 				// If ffmpeg has been killed the hard way, something went wrong and
 				// it can be assumed that any written data is not sane.
 				p.logger.Info().Log("Killed")
-				p.setState(stateKilled)
+				state = stateKilled
 			} else {
 				// The process exited because of something else (e.g. coredump, ...)
 				p.logger.Info().Log("Killed")
-				p.setState(stateKilled)
+				state = stateKilled
 			}
 		} else {
 			// Some other error regarding I/O triggered during Wait()
 			p.logger.Info().Log("Killed")
 			p.logger.WithError(err).Debug().Log("Killed")
-			p.setState(stateKilled)
+			state = stateKilled
 		}
-	} else {
-		// The process exited normally, i.e. the return code is zero and no signal
-		// has been raised
-		p.setState(stateFinished)
 	}
+
+	p.setState(state)
 
 	p.logger.Info().Log("Stopped")
 	p.debuglogger.WithField("log", p.parser.Log()).Debug().Log("Stopped")
@@ -840,13 +842,16 @@ func (p *process) waiter() {
 	}
 	p.stale.lock.Unlock()
 
+	// Send exit state to the parser
+	p.parser.Stop(state.String())
+
 	// Reset the parser stats
 	p.parser.ResetStats()
 
 	// Call the onExit callback
 	p.callbacks.lock.Lock()
 	if p.callbacks.onExit != nil {
-		go p.callbacks.onExit()
+		go p.callbacks.onExit(state.String())
 	}
 	p.callbacks.lock.Unlock()
 

@@ -36,7 +36,7 @@ type ProcessConfig struct {
 	Parser         process.Parser
 	Logger         log.Logger
 	OnArgs         func([]string) []string
-	OnExit         func()
+	OnExit         func(state string)
 	OnStart        func()
 	OnStateChange  func(from, to string)
 }

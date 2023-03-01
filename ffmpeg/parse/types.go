@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
-
-	"github.com/datarhei/core/v16/restream/app"
 )
 
 // Duration represents a time.Duration
@@ -49,8 +47,8 @@ type ffmpegAVstreamIO struct {
 	Size   uint64 `json:"size_kb"`
 }
 
-func (avio *ffmpegAVstreamIO) export() app.AVstreamIO {
-	return app.AVstreamIO{
+func (avio *ffmpegAVstreamIO) export() AVstreamIO {
+	return AVstreamIO{
 		State:  avio.State,
 		Packet: avio.Packet,
 		Time:   avio.Time,
@@ -74,8 +72,8 @@ type ffmpegAVstream struct {
 	GOP         string           `json:"gop"`
 }
 
-func (av *ffmpegAVstream) export() *app.AVstream {
-	return &app.AVstream{
+func (av *ffmpegAVstream) export() *AVstream {
+	return &AVstream{
 		Aqueue:      av.Aqueue,
 		Queue:       av.Queue,
 		Drop:        av.Drop,
@@ -104,7 +102,7 @@ type ffmpegProgressIO struct {
 	Quantizer float64 `json:"q"`
 }
 
-func (io *ffmpegProgressIO) exportTo(progress *app.ProgressIO) {
+func (io *ffmpegProgressIO) exportTo(progress *ProgressIO) {
 	progress.Index = io.Index
 	progress.Stream = io.Stream
 	progress.Frame = io.Frame
@@ -132,7 +130,7 @@ type ffmpegProgress struct {
 	Dup       uint64             `json:"dup"`
 }
 
-func (p *ffmpegProgress) exportTo(progress *app.Progress) {
+func (p *ffmpegProgress) exportTo(progress *Progress) {
 	progress.Frame = p.Frame
 	progress.Packet = p.Packet
 	progress.FPS = p.FPS
@@ -184,8 +182,8 @@ type ffmpegProcessIO struct {
 	Channels uint64 `json:"channels"`
 }
 
-func (io *ffmpegProcessIO) export() app.ProgressIO {
-	return app.ProgressIO{
+func (io *ffmpegProcessIO) export() ProgressIO {
+	return ProgressIO{
 		Address:  io.Address,
 		Format:   io.Format,
 		Index:    io.Index,
@@ -207,8 +205,8 @@ type ffmpegProcess struct {
 	output []ffmpegProcessIO
 }
 
-func (p *ffmpegProcess) export() app.Progress {
-	progress := app.Progress{}
+func (p *ffmpegProcess) export() Progress {
+	progress := Progress{}
 
 	for _, io := range p.input {
 		aio := io.export()
@@ -223,4 +221,72 @@ func (p *ffmpegProcess) export() app.Progress {
 	}
 
 	return progress
+}
+
+type ProgressIO struct {
+	Address string
+
+	// General
+	Index   uint64
+	Stream  uint64
+	Format  string
+	Type    string
+	Codec   string
+	Coder   string
+	Frame   uint64
+	FPS     float64
+	Packet  uint64
+	PPS     float64
+	Size    uint64  // bytes
+	Bitrate float64 // bit/s
+
+	// Video
+	Pixfmt    string
+	Quantizer float64
+	Width     uint64
+	Height    uint64
+
+	// Audio
+	Sampling uint64
+	Layout   string
+	Channels uint64
+
+	// avstream
+	AVstream *AVstream
+}
+
+type Progress struct {
+	Input     []ProgressIO
+	Output    []ProgressIO
+	Frame     uint64
+	Packet    uint64
+	FPS       float64
+	PPS       float64
+	Quantizer float64
+	Size      uint64 // bytes
+	Time      float64
+	Bitrate   float64 // bit/s
+	Speed     float64
+	Drop      uint64
+	Dup       uint64
+}
+
+type AVstreamIO struct {
+	State  string
+	Packet uint64
+	Time   uint64
+	Size   uint64
+}
+
+type AVstream struct {
+	Input       AVstreamIO
+	Output      AVstreamIO
+	Aqueue      uint64
+	Queue       uint64
+	Dup         uint64
+	Drop        uint64
+	Enc         uint64
+	Looping     bool
+	Duplicating bool
+	GOP         string
 }
