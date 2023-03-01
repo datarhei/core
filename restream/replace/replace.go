@@ -12,24 +12,16 @@ import (
 type ReplaceFunc func(params map[string]string, config *app.Config, section string) string
 
 type Replacer interface {
-	// RegisterTemplate registers a template for a specific placeholder. Template
-	// may contain placeholders as well of the form {name}. They will be replaced
-	// by the parameters of the placeholder (see Replace). If a parameter is not of
-	// a template is not present, default values can be provided.
-
-	// RegisterTemplateFunc does the same as RegisterTemplate, but the template
-	// is returned by the template function.
-
+	// RegisterReplaceFunc registers a function for replacing for a specific placeholder.
+	// If a parameter is not of a placeholder is not present, default values can be provided.
 	RegisterReplaceFunc(placeholder string, replacer ReplaceFunc, defaults map[string]string)
 
 	// Replace replaces all occurences of placeholder in str with value. The placeholder is of the
 	// form {placeholder}. It is possible to escape a characters in value with \\ by appending a ^
 	// and the character to escape to the placeholder name, e.g. {placeholder^:} to escape ":".
 	// A placeholder may also have parameters of the form {placeholder,key1=value1,key2=value2}.
-	// If the value has placeholders itself (see RegisterTemplate), they will be replaced by
-	// the value of the corresponding key in the parameters.
-	// If the value is an empty string, the registered templates will be searched for that
-	// placeholder. If no template is found, the placeholder will be replaced by the empty string.
+	// If the value is an empty string, the registered replacer functions will be searched for that
+	// placeholder. If no function is found, the placeholder will be replaced by the empty string.
 	// A placeholder name may consist on of the letters a-z and ':'. The placeholder may contain
 	// a glob pattern to find the appropriate template.
 	Replace(str, placeholder, value string, vars map[string]string, config *app.Config, section string) string
@@ -109,6 +101,11 @@ func (r *replacer) Replace(str, placeholder, value string, vars map[string]strin
 	return str
 }
 
+// parseParametes parses the parameters of a placeholder. The params string is a comma-separated
+// string of key=value pairs. The key and values can be escaped as in net/url.QueryEscape.
+// The provided defaults will be used as basis. Any parsed key/value from the params might overwrite
+// the default value. Any variables in the values will be replaced by their value from the
+// vars parameter.
 func (r *replacer) parseParametes(params string, vars map[string]string, defaults map[string]string) map[string]string {
 	p := make(map[string]string)
 
@@ -153,11 +150,3 @@ func (r *replacer) parseParametes(params string, vars map[string]string, default
 
 	return p
 }
-
-// compileTemplate fills in the placeholder in the template with the values from the params
-// string. The placeholders in the template are delimited by {} and their name may only
-// contain the letters a-z. The params string is a comma-separated string of key=value pairs.
-// Example: the template is "Hello {who}!", the params string is "who=World". The key is the
-// placeholder name and will be replaced with the value. The resulting string is "Hello World!".
-// If a placeholder name is not present in the params string, it will not be replaced. The key
-// and values can be escaped as in net/url.QueryEscape.

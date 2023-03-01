@@ -440,6 +440,7 @@ func (r *restream) AddProcess(config *app.Config) error {
 	return nil
 }
 
+// createTask creates a new task based on a process config.
 func (r *restream) createTask(config *app.Config) (*task, error) {
 	id := strings.TrimSpace(config.ID)
 
@@ -520,6 +521,9 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	return t, nil
 }
 
+// onArgs is a callback that gets called by a process before it will be started.
+// It evalutes the dynamic placeholders in a process config and returns the
+// resulting command line to the process.
 func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
 	return func(args []string) []string {
 		config := cfg.Clone()
@@ -747,6 +751,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 	return hasFiles, nil
 }
 
+// validateInputAddress checks whether the given input address is valid and is allowed to be used.
 func validateInputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string, error) {
 	if ok := url.HasScheme(address); ok {
 		if err := url.Validate(address); err != nil {
@@ -761,6 +766,7 @@ func validateInputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string
 	return address, nil
 }
 
+// validateOutputAddress checks whether the given output address is valid and is allowed to be used.
 func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string, bool, error) {
 	// If the address contains a "|" or it starts with a "[", then assume that it
 	// is an address for the tee muxer.
@@ -833,6 +839,7 @@ func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (strin
 	return "file:" + address, true, nil
 }
 
+// resolveAddresses replaces the addresse reference from each input in a config with the actual address.
 func (r *restream) resolveAddresses(tasks map[string]*task, config *app.Config) error {
 	for i, input := range config.Input {
 		// Resolve any references
@@ -849,6 +856,7 @@ func (r *restream) resolveAddresses(tasks map[string]*task, config *app.Config) 
 	return nil
 }
 
+// resolveAddress replaces the address reference with the actual address.
 func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (string, error) {
 	re := regexp.MustCompile(`^#(.+):output=(.+)`)
 
@@ -1294,6 +1302,7 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	return state, nil
 }
 
+// convertProgressFromParser converts a ffmpeg/parse.Progress type into a restream/app.Progress type.
 func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress) {
 	progress.Frame = pprogress.Frame
 	progress.Packet = pprogress.Packet
@@ -1510,6 +1519,7 @@ func (r *restream) ProbeWithTimeout(id string, timeout time.Duration) app.Probe 
 	return appprobe
 }
 
+// convertProbeFromProber converts a ffmpeg/probe.Probe type into an restream/app.Probe type.
 func convertProbeFromProber(appprobe *app.Probe, pprobe probe.Probe) {
 	appprobe.Log = make([]string, len(pprobe.Log))
 	copy(appprobe.Log, pprobe.Log)
