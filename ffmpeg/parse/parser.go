@@ -32,6 +32,9 @@ type Parser interface {
 
 	// ReportHistory returns an array of previews logs
 	ReportHistory() []ReportHistoryEntry
+
+	// LastLogline returns the last parsed log line
+	LastLogline() string
 }
 
 // Config is the config for the Parser implementation
@@ -70,6 +73,8 @@ type parser struct {
 
 	logHistory       *ring.Ring
 	logHistoryLength int
+
+	lastLogline string
 
 	progress struct {
 		ffmpeg   ffmpegProgress
@@ -622,6 +627,8 @@ func (p *parser) addLog(line string) {
 	p.lock.log.Lock()
 	defer p.lock.log.Unlock()
 
+	p.lastLogline = line
+
 	p.log.Value = process.Line{
 		Timestamp: time.Now(),
 		Data:      line,
@@ -644,6 +651,13 @@ func (p *parser) Log() []process.Line {
 	})
 
 	return log
+}
+
+func (p *parser) LastLogline() string {
+	p.lock.log.RLock()
+	defer p.lock.log.RUnlock()
+
+	return p.lastLogline
 }
 
 func (p *parser) ResetStats() {

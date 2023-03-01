@@ -64,26 +64,14 @@ type Config struct {
 
 // Status represents the current status of a process
 type Status struct {
-	// State is the current state of the process. See stateType for the known states.
-	State string
-
-	// States is the cumulative history of states the process had.
-	States States
-
-	// Order is the wanted condition of process, either "start" or "stop"
-	Order string
-
-	// Duration is the time since the last change of the state
-	Duration time.Duration
-
-	// Time is the time of the last change of the state
-	Time time.Time
-
-	// Used CPU in percent
-	CPU float64
-
-	// Used memory in bytes
-	Memory uint64
+	State       string        // State is the current state of the process. See stateType for the known states.
+	States      States        // States is the cumulative history of states the process had.
+	Order       string        // Order is the wanted condition of process, either "start" or "stop"
+	Duration    time.Duration // Duration is the time since the last change of the state
+	Time        time.Time     // Time is the time of the last change of the state
+	CPU         float64       // Used CPU in percent
+	Memory      uint64        // Used memory in bytes
+	CommandArgs []string      // Currently running command arguments
 }
 
 // States
@@ -205,11 +193,13 @@ var _ Process = &process{}
 func New(config Config) (Process, error) {
 	p := &process{
 		binary: config.Binary,
-		args:   config.Args,
 		cmd:    nil,
 		parser: config.Parser,
 		logger: config.Logger,
 	}
+
+	p.args = make([]string, len(config.Args))
+	copy(p.args, config.Args)
 
 	// This is a loose check on purpose. If the e.g. the binary
 	// doesn't exist or it is not executable, it will be
@@ -413,6 +403,9 @@ func (p *process) Status() Status {
 		CPU:      cpu,
 		Memory:   memory,
 	}
+
+	s.CommandArgs = make([]string, len(p.args))
+	copy(s.CommandArgs, p.args)
 
 	return s
 }

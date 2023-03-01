@@ -1264,8 +1264,8 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	state.CPU = status.CPU
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
 	state.Reconnect = -1
-	state.Command = make([]string, len(task.command))
-	copy(state.Command, task.command)
+	state.Command = status.CommandArgs
+	state.LastLog = task.parser.LastLogline()
 
 	if state.Order == "start" && !task.ffmpeg.IsRunning() && task.config.Reconnect {
 		state.Reconnect = float64(task.config.ReconnectDelay) - state.Duration
@@ -1291,12 +1291,6 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 		}
 
 		state.Progress.Output[i].ID = task.process.Config.Output[p.Index].ID
-	}
-
-	report := task.parser.Report()
-
-	if len(report.Log) != 0 {
-		state.LastLog = report.Log[len(report.Log)-1].Data
 	}
 
 	return state, nil
