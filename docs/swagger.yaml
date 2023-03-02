@@ -824,6 +824,18 @@ definitions:
       progress:
         $ref: '#/definitions/api.Progress'
     type: object
+  api.ProcessReportSearchResult:
+    properties:
+      created_at:
+        format: int64
+        type: integer
+      exit_state:
+        type: string
+      id:
+        type: string
+      reference:
+        type: string
+    type: object
   api.ProcessState:
     properties:
       command:
@@ -3010,7 +3022,7 @@ paths:
       - v16.7.2
   /api/v3/process/{id}/report/{at}:
     get:
-      description: Get the logs and the log history of a process.
+      description: Get the log history entry of a process at a certain time.
       operationId: process-3-get-report-at
       parameters:
       - description: Process ID
@@ -3018,13 +3030,18 @@ paths:
         name: id
         required: true
         type: string
+      - description: Unix timestamp
+        in: path
+        name: at
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.ProcessReport'
+            $ref: '#/definitions/api.ProcessReportHistoryEntry'
         "400":
           description: Bad Request
           schema:
@@ -3035,7 +3052,7 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Get the logs of a process
+      summary: Get the log history entry of a process
       tags:
       - v16.?.?
   /api/v3/process/{id}/state:
@@ -3068,6 +3085,54 @@ paths:
       summary: Get the state of a process
       tags:
       - v16.7.2
+  /api/v3/report/process:
+    get:
+      description: Search log history of all processes by providing patterns for process
+        IDs and references, a state and a time range. All are optional.
+      operationId: process-3-search-report-history
+      parameters:
+      - description: Glob pattern for process IDs. If empty all IDs will be returned.
+          Intersected with results from refpattern.
+        in: query
+        name: idpattern
+        type: string
+      - description: Glob pattern for process references. If empty all IDs will be
+          returned. Intersected with results from idpattern.
+        in: query
+        name: refpattern
+        type: string
+      - description: State of a process, leave empty for any
+        in: query
+        name: state
+        type: string
+      - description: Search range of when the report has been created, older than
+          this value. Unix timestamp, leave empty for any
+        in: query
+        name: from
+        type: integer
+      - description: Search range of when the report has been created, younger than
+          this value. Unix timestamp, leave empty for any
+        in: query
+        name: to
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ProcessReportSearchResult'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Search log history of all processes
+      tags:
+      - v16.?.?
   /api/v3/rtmp:
     get:
       description: List all currently publishing RTMP streams.

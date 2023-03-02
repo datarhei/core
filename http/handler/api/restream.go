@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -337,14 +338,15 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 	return c.JSON(http.StatusOK, report)
 }
 
-// GetReport return the current log and the log history of a process
-// @Summary Get the logs of a process
-// @Description Get the logs and the log history of a process.
+// GetReportAt return the loh history entry of a process
+// @Summary Get the log history entry of a process
+// @Description Get the log history entry of a process at a certain time.
 // @Tags v16.?.?
 // @ID process-3-get-report-at
 // @Produce json
 // @Param id path string true "Process ID"
-// @Success 200 {object} api.ProcessReport
+// @Param at path integer true "Unix timestamp"
+// @Success 200 {object} api.ProcessReportHistoryEntry
 // @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
@@ -371,6 +373,61 @@ func (h *RestreamHandler) GetReportAt(c echo.Context) error {
 	}
 
 	return api.Err(http.StatusNotFound, "Unknown process report date")
+}
+
+// SearchReportHistory returns a list of matching report references
+// @Summary Search log history of all processes
+// @Description Search log history of all processes by providing patterns for process IDs and references, a state and a time range. All are optional.
+// @Tags v16.?.?
+// @ID process-3-search-report-history
+// @Produce json
+// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern."
+// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern."
+// @Param state query string false "State of a process, leave empty for any"
+// @Param from query int64 false "Search range of when the report has been created, older than this value. Unix timestamp, leave empty for any"
+// @Param to query int64 false "Search range of when the report has been created, younger than this value. Unix timestamp, leave empty for any"
+// @Success 200 {array} api.ProcessReportSearchResult
+// @Failure 400 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/report/process [get]
+func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
+	idpattern := util.DefaultQuery(c, "idpattern", "")
+	refpattern := util.DefaultQuery(c, "refpattern", "")
+	state := util.DefaultQuery(c, "state", "")
+	fromUnix := util.DefaultQuery(c, "from", "")
+	toUnix := util.DefaultQuery(c, "to", "")
+
+	var from, to *time.Time = nil, nil
+
+	if len(fromUnix) != 0 {
+		if x, err := strconv.ParseInt(fromUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid search range", "%s", err)
+		} else {
+			t := time.Unix(x, 0)
+			from = &t
+		}
+	}
+
+	if len(toUnix) != 0 {
+		if x, err := strconv.ParseInt(toUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid search range", "%s", err)
+		} else {
+			t := time.Unix(x, 0)
+			to = &t
+		}
+	}
+
+	result := h.restream.SearchProcessLogHistory(idpattern, refpattern, state, from, to)
+
+	response := make([]api.ProcessReportSearchResult, len(result))
+	for i, b := range result {
+		response[i].ProcessID = b.ProcessID
+		response[i].Reference = b.Reference
+		response[i].ExitState = b.ExitState
+		response[i].CreatedAt = b.CreatedAt.Unix()
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // Probe probes a process

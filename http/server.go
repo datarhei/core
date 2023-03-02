@@ -587,6 +587,9 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 				v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.playout.SetStream)
 			}
 		}
+
+		// v3 Report
+		v3.GET("/report/process", s.v3handler.restream.SearchReportHistory)
 	}
 
 	// v3 Filesystems

@@ -26,3 +26,10 @@ type Log struct {
 	LogEntry
 	History []LogHistoryEntry
 }
+
+type LogHistorySearchResult struct {
+	ProcessID string
+	Reference string
+	ExitState string
+	CreatedAt time.Time
+}

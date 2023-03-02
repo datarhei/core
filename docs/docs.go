@@ -1664,14 +1664,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get the logs and the log history of a process.",
+                "description": "Get the log history entry of a process at a certain time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Get the logs of a process",
+                "summary": "Get the log history entry of a process",
                 "operationId": "process-3-get-report-at",
                 "parameters": [
                     {
@@ -1680,13 +1680,20 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Unix timestamp",
+                        "name": "at",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.ProcessReport"
+                            "$ref": "#/definitions/api.ProcessReportHistoryEntry"
                         }
                     },
                     "400": {
@@ -1744,6 +1751,73 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/report/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Search log history of all processes by providing patterns for process IDs and references, a state and a time range. All are optional.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Search log history of all processes",
+                "operationId": "process-3-search-report-history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern.",
+                        "name": "idpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern.",
+                        "name": "refpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "State of a process, leave empty for any",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Search range of when the report has been created, older than this value. Unix timestamp, leave empty for any",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Search range of when the report has been created, younger than this value. Unix timestamp, leave empty for any",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ProcessReportSearchResult"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -3251,6 +3325,24 @@ const docTemplate = `{
                 },
                 "progress": {
                     "$ref": "#/definitions/api.Progress"
+                }
+            }
+        },
+        "api.ProcessReportSearchResult": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "exit_state": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
                 }
             }
         },

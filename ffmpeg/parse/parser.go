@@ -33,6 +33,10 @@ type Parser interface {
 	// ReportHistory returns an array of previews logs
 	ReportHistory() []ReportHistoryEntry
 
+	// SearchReportHistory returns a list of CreatedAt dates of reports that match the
+	// provided state and time range.
+	SearchReportHistory(state string, from, to *time.Time) []ReportHistorySearchResult
+
 	// LastLogline returns the last parsed log line
 	LastLogline() string
 }
@@ -730,6 +734,46 @@ type ReportHistoryEntry struct {
 
 	ExitState string
 	Progress  Progress
+}
+
+type ReportHistorySearchResult struct {
+	CreatedAt time.Time
+	ExitState string
+}
+
+func (p *parser) SearchReportHistory(state string, from, to *time.Time) []ReportHistorySearchResult {
+	result := []ReportHistorySearchResult{}
+
+	p.logHistory.Do(func(l interface{}) {
+		if l == nil {
+			return
+		}
+
+		e := l.(ReportHistoryEntry)
+
+		if len(state) != 0 && state != e.ExitState {
+			return
+		}
+
+		if from != nil {
+			if e.CreatedAt.Before(*from) {
+				return
+			}
+		}
+
+		if to != nil {
+			if e.CreatedAt.After(*to) {
+				return
+			}
+		}
+
+		result = append(result, ReportHistorySearchResult{
+			CreatedAt: e.CreatedAt,
+			ExitState: e.ExitState,
+		})
+	})
+
+	return result
 }
 
 func (p *parser) storeReportHistory(state string) {
