@@ -38,7 +38,7 @@ type ProgressIO struct {
 	Channels uint64 `json:"channels,omitempty" format:"uint64"`
 
 	// avstream
-	AVstream *AVstream `json:"avstream"`
+	AVstream *AVstream `json:"avstream" jsonschema:"anyof_type=null;object"`
 }
 
 // Unmarshal converts a restreamer ProgressIO to a ProgressIO in API representation

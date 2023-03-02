@@ -46,7 +46,9 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary: binary,
+		Binary:           binary,
+		MaxLogLines:      100,
+		LogHistoryLength: 3,
 	})
 	if err != nil {
 		return nil, err
@@ -78,6 +80,7 @@ func DummyEcho() *echo.Echo {
 type Response struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Raw     []byte
 	Data    interface{}
 }
 
@@ -91,7 +94,7 @@ func Request(t *testing.T, httpstatus int, router *echo.Echo, method, path strin
 
 	response := CheckResponse(t, w.Result())
 
-	require.Equal(t, httpstatus, w.Code, response.Data)
+	require.Equal(t, httpstatus, w.Code, string(response.Raw))
 
 	return response
 }
@@ -103,6 +106,8 @@ func CheckResponse(t *testing.T, res *http.Response) *Response {
 
 	body, err := io.ReadAll(res.Body)
 	require.Equal(t, nil, err)
+
+	response.Raw = body
 
 	if strings.Contains(res.Header.Get("Content-Type"), "application/json") {
 		err := json.Unmarshal(body, &response.Data)
@@ -121,7 +126,8 @@ func CheckResponse(t *testing.T, res *http.Response) *Response {
 }
 
 func Validate(t *testing.T, datatype, data interface{}) bool {
-	schema, _ := jsonschema.Reflect(datatype).MarshalJSON()
+	schema, err := jsonschema.Reflect(datatype).MarshalJSON()
+	require.NoError(t, err)
 
 	schemaLoader := gojsonschema.NewStringLoader(string(schema))
 	documentLoader := gojsonschema.NewGoLoader(data)

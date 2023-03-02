@@ -1435,6 +1435,22 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 
 		convertProgressFromParser(&e.Progress, h.Progress)
 
+		for i, p := range e.Progress.Input {
+			if int(p.Index) >= len(task.process.Config.Input) {
+				continue
+			}
+
+			e.Progress.Input[i].ID = task.process.Config.Input[p.Index].ID
+		}
+
+		for i, p := range e.Progress.Output {
+			if int(p.Index) >= len(task.process.Config.Output) {
+				continue
+			}
+
+			e.Progress.Output[i].ID = task.process.Config.Output[p.Index].ID
+		}
+
 		e.LogEntry.Log = make([]app.LogLine, len(h.Log))
 		for i, line := range h.Log {
 			e.LogEntry.Log[i] = app.LogLine{
@@ -1689,6 +1705,10 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	defer r.lock.RUnlock()
 
 	if len(key) == 0 {
+		if len(r.metadata) == 0 {
+			return nil, nil
+		}
+
 		return r.metadata, nil
 	}
 

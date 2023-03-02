@@ -524,10 +524,7 @@ func (p *parser) Progress() Progress {
 
 	p.progress.ffmpeg.exportTo(&progress)
 
-	fmt.Printf("%+v\n", p.progress.avstream)
-
 	for i, io := range progress.Input {
-		fmt.Printf("checking for %s\n", io.Address)
 		av, ok := p.progress.avstream[io.Address]
 		if !ok {
 			continue
