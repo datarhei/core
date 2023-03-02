@@ -165,3 +165,37 @@ Press [q] to stop, [?] for help`
 	require.Equal(t, uint64(48000), i.Sampling)
 	require.Equal(t, "stereo", i.Layout)
 }
+
+func TestJSON(t *testing.T) {
+	prober := New(Config{}).(*prober)
+
+	prober.Parse("foobar")
+	prober.Parse(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`)
+
+	prober.ResetStats()
+
+	probe := prober.Probe()
+
+	require.Equal(t, "foobar", probe.Log[0])
+	require.Equal(t, []ProbeIO{
+		{
+			Address:  "https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
+			Index:    0,
+			Stream:   0,
+			Language: "und",
+			Format:   "playout",
+			Type:     "video",
+			Codec:    "h264",
+			Coder:    "h264",
+			Bitrate:  0,
+			Duration: 0,
+			Pixfmt:   "yuvj420p",
+			Width:    1280,
+			Height:   720,
+			FPS:      20.666666,
+			Sampling: 0,
+			Layout:   "",
+			Channels: 0,
+		},
+	}, probe.Streams)
+}

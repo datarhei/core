@@ -33,7 +33,7 @@ func New(config Config) Parser {
 	}
 
 	if p.logger == nil {
-		p.logger = log.New("Parser")
+		p.logger = log.New("")
 	}
 
 	return p
