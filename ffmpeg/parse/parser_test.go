@@ -39,6 +39,20 @@ func TestParserProgress(t *testing.T) {
 	require.Equal(t, wantP.Speed, p.Speed)
 	require.Equal(t, wantP.Drop, p.Drop)
 	require.Equal(t, wantP.Dup, p.Dup)
+
+	parser.ResetStats()
+
+	wantP = Progress{}
+
+	p = parser.Progress()
+
+	require.Equal(t, wantP.Frame, p.Frame)
+	require.Equal(t, wantP.Quantizer, p.Quantizer)
+	require.Equal(t, wantP.Size, p.Size)
+	require.Equal(t, wantP.Time, p.Time)
+	require.Equal(t, wantP.Speed, p.Speed)
+	require.Equal(t, wantP.Drop, p.Drop)
+	require.Equal(t, wantP.Dup, p.Dup)
 }
 
 func TestParserPrelude(t *testing.T) {
@@ -113,6 +127,149 @@ func TestParserLog(t *testing.T) {
 	log = parser.Log()
 
 	require.Equal(t, 1, len(log))
+}
+
+func TestParserLasLogLine(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse("foo")
+
+	line := parser.LastLogline()
+	require.Equal(t, "foo", line)
+
+	parser.prelude.done = true
+	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+	// progress lines are not logged
+	line = parser.LastLogline()
+	require.Equal(t, "foo", line)
+
+	parser.Parse("bar")
+	line = parser.LastLogline()
+	require.Equal(t, "bar", line)
+}
+
+func TestParserLogHistory(t *testing.T) {
+	parser := New(Config{
+		LogLines:   20,
+		LogHistory: 5,
+	}).(*parser)
+
+	parser.Parse("bla")
+
+	parser.prelude.done = true
+	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+	history := parser.ReportHistory()
+	require.Equal(t, 0, len(history))
+
+	parser.Stop("finished")
+
+	history = parser.ReportHistory()
+	require.Equal(t, 1, len(history))
+
+	require.Equal(t, "finished", history[0].ExitState)
+	require.Equal(t, "bla", history[0].Log[0].Data)
+	require.Equal(t, "bla", history[0].Prelude[0])
+
+	d, _ := time.ParseDuration("3m58s440ms")
+	require.Equal(t, Progress{
+		Frame:     5968,
+		FPS:       0, // is calculated with averager
+		Quantizer: 19.4,
+		Size:      453632,
+		Time:      d.Seconds(),
+		Bitrate:   0, // is calculated with averager
+		Speed:     0.999,
+		Drop:      3522,
+		Dup:       87463,
+	}, history[0].Progress)
+}
+
+func TestParserLogHistorySearch(t *testing.T) {
+	parser := New(Config{
+		LogLines:   20,
+		LogHistory: 5,
+	}).(*parser)
+
+	parser.Parse("foo")
+
+	parser.prelude.done = true
+	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+	parser.Stop("finished")
+
+	parser.ResetStats()
+
+	time.Sleep(2 * time.Second)
+
+	parser.ResetLog()
+
+	parser.Parse("bar")
+
+	parser.prelude.done = true
+	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+	parser.Stop("finished")
+
+	parser.ResetStats()
+
+	time.Sleep(2 * time.Second)
+
+	parser.ResetLog()
+
+	parser.Parse("foobar")
+
+	parser.prelude.done = true
+	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+	parser.Stop("failed")
+
+	res := parser.SearchReportHistory("", nil, nil)
+	require.Equal(t, 3, len(res))
+
+	times := []time.Time{
+		time.Unix(res[0].CreatedAt.Unix(), 0),
+		time.Unix(res[1].CreatedAt.Unix(), 0),
+		time.Unix(res[2].CreatedAt.Unix(), 0),
+	}
+
+	res = parser.SearchReportHistory("finished", nil, nil)
+	require.Equal(t, 2, len(res))
+
+	res = parser.SearchReportHistory("failed", nil, nil)
+	require.Equal(t, 1, len(res))
+
+	res = parser.SearchReportHistory("", &times[0], nil)
+	require.Equal(t, 3, len(res))
+
+	res = parser.SearchReportHistory("", &times[1], nil)
+	require.Equal(t, 2, len(res))
+
+	res = parser.SearchReportHistory("", &times[2], nil)
+	require.Equal(t, 1, len(res))
+
+	to := times[2].Add(1 * time.Second)
+
+	res = parser.SearchReportHistory("", nil, &to)
+	require.Equal(t, 3, len(res))
+
+	res = parser.SearchReportHistory("", nil, &times[2])
+	require.Equal(t, 2, len(res))
+
+	res = parser.SearchReportHistory("", nil, &times[1])
+	require.Equal(t, 1, len(res))
+
+	res = parser.SearchReportHistory("", nil, &times[0])
+	require.Equal(t, 0, len(res))
+
+	res = parser.SearchReportHistory("", &times[1], &times[2])
+	require.Equal(t, 1, len(res))
+
+	res = parser.SearchReportHistory("finished", &times[2], &to)
+	require.Equal(t, 0, len(res))
 }
 
 func TestParserReset(t *testing.T) {
@@ -519,4 +676,125 @@ ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb
 
 	require.Equal(t, 1, len(parser.process.input), "expected 1 input")
 	require.Equal(t, 2, len(parser.process.output), "expected 2 outputs")
+}
+
+func TestParserProgressPlayout(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse(`ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`)
+	parser.Parse(`ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`)
+	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"packet":11,"size_kb":226}],"outputs":[{"index":0,"stream":0,"frame":7,"packet":0,"q":0.0,"size_kb":0},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`)
+	parser.Parse(`avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":0,"dup":0,"drop":0,"enc":0,"looping":false,"duplicating":false,"gop":"none","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`)
+
+	progress := parser.Progress()
+
+	require.Equal(t, Progress{
+		Input: []ProgressIO{
+			{
+				Address:   "playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
+				Index:     0,
+				Stream:    0,
+				Format:    "playout",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "h264",
+				Frame:     7,
+				FPS:       0,
+				Packet:    11,
+				PPS:       0,
+				Size:      231424,
+				Bitrate:   0,
+				Pixfmt:    "yuvj420p",
+				Quantizer: 0,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream: &AVstream{
+					Input: AVstreamIO{
+						State:  "running",
+						Packet: 148,
+						Time:   5,
+						Size:   1529,
+					},
+					Output: AVstreamIO{
+						State:  "running",
+						Packet: 8,
+						Time:   1,
+						Size:   128,
+					},
+					Aqueue:      0,
+					Queue:       140,
+					Dup:         0,
+					Drop:        0,
+					Enc:         0,
+					Looping:     false,
+					Duplicating: false,
+					GOP:         "none",
+				},
+			},
+		},
+		Output: []ProgressIO{
+			{
+				Address:   "/dev/null",
+				Index:     0,
+				Stream:    0,
+				Format:    "flv",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "libx264",
+				Frame:     7,
+				FPS:       0,
+				Packet:    0,
+				PPS:       0,
+				Size:      0,
+				Bitrate:   0,
+				Pixfmt:    "yuvj420p",
+				Quantizer: 0,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream:  nil,
+			},
+			{
+				Address:   "/dev/null",
+				Index:     1,
+				Stream:    0,
+				Format:    "mp4",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "copy",
+				Frame:     11,
+				FPS:       0,
+				Packet:    11,
+				PPS:       0,
+				Size:      231424,
+				Bitrate:   0,
+				Pixfmt:    "yuvj420p",
+				Quantizer: -1,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream:  nil,
+			},
+		},
+		Frame:     7,
+		Packet:    0,
+		FPS:       0,
+		PPS:       0,
+		Quantizer: 0,
+		Size:      231424,
+		Time:      0.56,
+		Bitrate:   0,
+		Speed:     0.4,
+		Drop:      0,
+		Dup:       0,
+	}, progress)
 }
