@@ -14,13 +14,13 @@ import (
 
 // The FSHandler type provides handlers for manipulating a filesystem
 type FSHandler struct {
-	fs fs.FS
+	FS fs.FS
 }
 
 // NewFS return a new FSHandler type. You have to provide a filesystem to act on.
 func NewFS(fs fs.FS) *FSHandler {
 	return &FSHandler{
-		fs: fs,
+		FS: fs,
 	}
 }
 
@@ -30,20 +30,20 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	mimeType := c.Response().Header().Get(echo.HeaderContentType)
 	c.Response().Header().Del(echo.HeaderContentType)
 
-	file := h.fs.Filesystem.Open(path)
+	file := h.FS.Filesystem.Open(path)
 	if file == nil {
 		return api.Err(http.StatusNotFound, "File not found", path)
 	}
 
 	stat, _ := file.Stat()
 
-	if len(h.fs.DefaultFile) != 0 {
+	if len(h.FS.DefaultFile) != 0 {
 		if stat.IsDir() {
-			path = filepath.Join(path, h.fs.DefaultFile)
+			path = filepath.Join(path, h.FS.DefaultFile)
 
 			file.Close()
 
-			file = h.fs.Filesystem.Open(path)
+			file = h.FS.Filesystem.Open(path)
 			if file == nil {
 				return api.Err(http.StatusNotFound, "File not found", path)
 			}
@@ -82,13 +82,13 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	req := c.Request()
 
-	_, created, err := h.fs.Filesystem.WriteFileReader(path, req.Body)
+	_, created, err := h.FS.Filesystem.WriteFileReader(path, req.Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 	}
 
-	if h.fs.Cache != nil {
-		h.fs.Cache.Delete(path)
+	if h.FS.Cache != nil {
+		h.FS.Cache.Delete(path)
 	}
 
 	c.Response().Header().Set("Content-Location", req.URL.RequestURI())
@@ -105,14 +105,14 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	c.Response().Header().Del(echo.HeaderContentType)
 
-	size := h.fs.Filesystem.Remove(path)
+	size := h.FS.Filesystem.Remove(path)
 
 	if size < 0 {
 		return api.Err(http.StatusNotFound, "File not found", path)
 	}
 
-	if h.fs.Cache != nil {
-		h.fs.Cache.Delete(path)
+	if h.FS.Cache != nil {
+		h.FS.Cache.Delete(path)
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)
@@ -123,7 +123,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	files := h.fs.Filesystem.List("/", pattern)
+	files := h.FS.Filesystem.List("/", pattern)
 
 	var sortFunc func(i, j int) bool
 

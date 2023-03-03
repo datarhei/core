@@ -456,6 +456,20 @@ definitions:
       type:
         type: string
     type: object
+  api.FilesystemOperation:
+    properties:
+      from:
+        type: string
+      operation:
+        enum:
+        - copy
+        - move
+        type: string
+      to:
+        type: string
+    required:
+    - operation
+    type: object
   api.GraphQuery:
     properties:
       query:
@@ -2142,6 +2156,40 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all registered filesystems
+      tags:
+      - v16.12.0
+    put:
+      consumes:
+      - application/json
+      description: Execute file operations (copy or move) between registered filesystems
+      operationId: filesystem-3-file-operation
+      parameters:
+      - description: Filesystem operation
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.FilesystemOperation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: File operations between filesystems
+      tags:
+      - v16.?.?
   /api/v3/fs/{name}:
     get:
       description: List all files on a filesystem. The listing can be ordered by name,
@@ -2177,6 +2225,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all files on a filesystem
+      tags:
+      - v16.7.2
   /api/v3/fs/{name}/{path}:
     delete:
       description: Remove a file from a filesystem
@@ -2206,6 +2256,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Remove a file from a filesystem
+      tags:
+      - v16.7.2
     get:
       description: Fetch a file from a filesystem
       operationId: filesystem-3-get-file
@@ -2239,6 +2291,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem
+      tags:
+      - v16.7.2
     put:
       consumes:
       - application/data
@@ -2282,6 +2336,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem
+      tags:
+      - v16.7.2
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application

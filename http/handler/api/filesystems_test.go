@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,36 +17,25 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func getDummyFilesystemsHandler(filesystem httpfs.FS) (*FSHandler, error) {
-	handler := NewFS(map[string]FSConfig{
-		filesystem.Name: {
-			Type:       filesystem.Filesystem.Type(),
-			Mountpoint: filesystem.Mountpoint,
-			Handler:    handler.NewFS(filesystem),
-		},
-	})
+func getDummyFilesystemsHandler(filesystems []httpfs.FS) (*FSHandler, error) {
+	config := map[string]FSConfig{}
+
+	for _, fs := range filesystems {
+		config[fs.Name] = FSConfig{
+			Type:       fs.Filesystem.Type(),
+			Mountpoint: fs.Mountpoint,
+			Handler:    handler.NewFS(fs),
+		}
+	}
+	handler := NewFS(config)
 
 	return handler, nil
 }
 
-func getDummyFilesystemsRouter(filesystem fs.Filesystem) (*echo.Echo, error) {
+func getDummyFilesystemsRouter(filesystems []httpfs.FS) (*echo.Echo, error) {
 	router := mock.DummyEcho()
 
-	fs := httpfs.FS{
-		Name:               "foo",
-		Mountpoint:         "/",
-		AllowWrite:         true,
-		EnableAuth:         false,
-		Username:           "",
-		Password:           "",
-		DefaultFile:        "",
-		DefaultContentType: "text/html",
-		Gzip:               false,
-		Filesystem:         filesystem,
-		Cache:              nil,
-	}
-
-	handler, err := getDummyFilesystemsHandler(fs)
+	handler, err := getDummyFilesystemsHandler(filesystems)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +45,7 @@ func getDummyFilesystemsRouter(filesystem fs.Filesystem) (*echo.Echo, error) {
 	router.DELETE("/:name/*", handler.DeleteFile)
 	router.GET("/:name", handler.ListFiles)
 	router.GET("/", handler.List)
+	router.PUT("/", handler.FileOperation)
 
 	return router, nil
 }
@@ -63,7 +54,16 @@ func TestFilesystems(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	router, err := getDummyFilesystemsRouter(memfs)
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/",
+			AllowWrite: true,
+			Filesystem: memfs,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
 	require.NoError(t, err)
 
 	response := mock.Request(t, http.StatusOK, router, "GET", "/", nil)
@@ -138,4 +138,126 @@ func TestFilesystems(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(l))
+}
+
+func TestFileOperation(t *testing.T) {
+	memfs1, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	memfs2, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/foo",
+			AllowWrite: true,
+			Filesystem: memfs1,
+		},
+		{
+			Name:       "bar",
+			Mountpoint: "/bar",
+			AllowWrite: true,
+			Filesystem: memfs2,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusNotFound, router, "GET", "/foo/file", nil)
+	mock.Request(t, http.StatusNotFound, router, "GET", "/bar/file", nil)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+	require.NotNil(t, data)
+
+	mock.Request(t, http.StatusCreated, router, "PUT", "/foo/file", data)
+	mock.Request(t, http.StatusOK, router, "GET", "/foo/file", nil)
+	mock.Request(t, http.StatusNotFound, router, "GET", "/bar/file", nil)
+
+	op := api.FilesystemOperation{}
+
+	jsondata, err := json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+		From:      "foo/elif",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+		From:      "foo/elif",
+		To:        "/bar",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusNotFound, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+		From:      "foo/file",
+		To:        "/bar",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+		From:      "foo/file",
+		To:        "/bar/file",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusOK, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	mock.Request(t, http.StatusOK, router, "GET", "/foo/file", nil)
+	response := mock.Request(t, http.StatusOK, router, "GET", "/bar/file", nil)
+
+	filedata, err := io.ReadAll(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	require.Equal(t, filedata, response.Raw)
+
+	op = api.FilesystemOperation{
+		Operation: "move",
+		From:      "foo/file",
+		To:        "/bar/file",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusOK, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	mock.Request(t, http.StatusNotFound, router, "GET", "/foo/file", nil)
+	response = mock.Request(t, http.StatusOK, router, "GET", "/bar/file", nil)
+
+	filedata, err = io.ReadAll(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	require.Equal(t, filedata, response.Raw)
 }

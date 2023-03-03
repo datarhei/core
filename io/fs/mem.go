@@ -342,6 +342,10 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
+	if fs.isDir(path) {
+		return -1, false, fmt.Errorf("path not writeable")
+	}
+
 	newFile := &memFile{
 		memFileInfo: memFileInfo{
 			name:    path,
@@ -360,6 +364,8 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 			"filesize_bytes": size,
 			"error":          err,
 		}).Warn().Log("Incomplete file")
+
+		return -1, false, fmt.Errorf("incomplete file")
 	}
 
 	newFile.size = size

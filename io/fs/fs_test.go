@@ -87,6 +87,7 @@ func TestFilesystem(t *testing.T) {
 		"writeFile":       testWriteFile,
 		"writeFileSafe":   testWriteFileSafe,
 		"writeFileReader": testWriteFileReader,
+		"writeFileDir":    testWriteFileDir,
 		"delete":          testDelete,
 		"files":           testFiles,
 		"replace":         testReplace,
@@ -196,6 +197,11 @@ func testWriteFileReader(t *testing.T, fs Filesystem) {
 	cur = fs.Files()
 
 	require.Equal(t, int64(1), cur)
+}
+
+func testWriteFileDir(t *testing.T, fs Filesystem) {
+	_, _, err := fs.WriteFile("/", []byte("xxxxx"))
+	require.Error(t, err)
 }
 
 func testOpen(t *testing.T, fs Filesystem) {

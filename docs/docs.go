@@ -321,6 +321,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.12.0"
+                ],
                 "summary": "List all registered filesystems",
                 "operationId": "filesystem-3-list",
                 "responses": {
@@ -331,6 +334,56 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/api.FilesystemInfo"
                             }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Execute file operations (copy or move) between registered filesystems",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "File operations between filesystems",
+                "operationId": "filesystem-3-file-operation",
+                "parameters": [
+                    {
+                        "description": "Filesystem operation",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.FilesystemOperation"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -346,6 +399,9 @@ const docTemplate = `{
                 "description": "List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "List all files on a filesystem",
                 "operationId": "filesystem-3-list-files",
@@ -401,6 +457,9 @@ const docTemplate = `{
                     "application/data",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Fetch a file from a filesystem",
                 "operationId": "filesystem-3-get-file",
                 "parameters": [
@@ -453,6 +512,9 @@ const docTemplate = `{
                 "produces": [
                     "text/plain",
                     "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Add a file to a filesystem",
                 "operationId": "filesystem-3-put-file",
@@ -514,6 +576,9 @@ const docTemplate = `{
                 "description": "Remove a file from a filesystem",
                 "produces": [
                     "text/plain"
+                ],
+                "tags": [
+                    "v16.7.2"
                 ],
                 "summary": "Remove a file from a filesystem",
                 "operationId": "filesystem-3-delete-file",
@@ -2781,6 +2846,27 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.FilesystemOperation": {
+            "type": "object",
+            "required": [
+                "operation"
+            ],
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "operation": {
+                    "type": "string",
+                    "enum": [
+                        "copy",
+                        "move"
+                    ]
+                },
+                "to": {
                     "type": "string"
                 }
             }

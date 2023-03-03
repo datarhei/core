@@ -605,6 +605,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	handler := api.NewFS(fshandlers)
 
 	v3.GET("/fs", handler.List)
+	v3.PUT("/fs", handler.FileOperation)
 
 	v3.GET("/fs/:name", handler.ListFiles)
 	v3.GET("/fs/:name/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{

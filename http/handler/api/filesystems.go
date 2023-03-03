@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler"
@@ -32,6 +34,7 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 // @Summary Fetch a file from a filesystem
 // @Description Fetch a file from a filesystem
 // @ID filesystem-3-get-file
+// @Tags v16.7.2
 // @Produce application/data
 // @Produce json
 // @Param name path string true "Name of the filesystem"
@@ -56,6 +59,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 // @Summary Add a file to a filesystem
 // @Description Writes or overwrites a file on a filesystem
 // @ID filesystem-3-put-file
+// @Tags v16.7.2
 // @Accept application/data
 // @Produce text/plain
 // @Produce json
@@ -82,6 +86,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 // @Summary Remove a file from a filesystem
 // @Description Remove a file from a filesystem
 // @ID filesystem-3-delete-file
+// @Tags v16.7.2
 // @Produce text/plain
 // @Param name path string true "Name of the filesystem"
 // @Param path path string true "Path to file"
@@ -104,6 +109,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 // @Summary List all files on a filesystem
 // @Description List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.
 // @ID filesystem-3-list-files
+// @Tags v16.7.2
 // @Produce json
 // @Param name path string true "Name of the filesystem"
 // @Param glob query string false "glob pattern for file names"
@@ -127,6 +133,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 // @Summary List all registered filesystems
 // @Description Listall registered filesystems
 // @ID filesystem-3-list
+// @Tags v16.12.0
 // @Produce json
 // @Success 200 {array} api.FilesystemInfo
 // @Security ApiKeyAuth
@@ -143,4 +150,74 @@ func (h *FSHandler) List(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fss)
+}
+
+// FileOperation executes file operations between filesystems
+// @Summary File operations between filesystems
+// @Description Execute file operations (copy or move) between registered filesystems
+// @ID filesystem-3-file-operation
+// @Tags v16.?.?
+// @Accept json
+// @Produce json
+// @Param config body api.FilesystemOperation true "Filesystem operation"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/fs [put]
+func (h *FSHandler) FileOperation(c echo.Context) error {
+	operation := api.FilesystemOperation{}
+
+	if err := util.ShouldBindJSON(c, &operation); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	if operation.Operation != "copy" && operation.Operation != "move" {
+		return api.Err(http.StatusBadRequest, "Invalid operation", "%s", operation.Operation)
+	}
+
+	from := strings.Split(filepath.Join("/", operation.From), "/")
+	if len(from) < 2 {
+		return api.Err(http.StatusBadRequest, "Invalid source path", "%s", operation.From)
+	}
+	fromFSName := from[1]
+	fromPath := strings.Join(from[2:], "/")
+	fromFS, ok := h.filesystems[fromFSName]
+	if !ok {
+		return api.Err(http.StatusBadRequest, "Source filesystem not found", "%s", fromFSName)
+	}
+
+	if operation.From == operation.To {
+		return c.JSON(http.StatusOK, "OK")
+	}
+
+	to := strings.Split(filepath.Join("/", operation.To), "/")
+	if len(to) < 2 {
+		return api.Err(http.StatusBadRequest, "Invalid target path", "%s", operation.To)
+	}
+	toFSName := to[1]
+	toPath := strings.Join(to[2:], "/")
+	toFS, ok := h.filesystems[toFSName]
+	if !ok {
+		return api.Err(http.StatusBadRequest, "Target filesystem not found", "%s", toFSName)
+	}
+
+	fromFile := fromFS.Handler.FS.Filesystem.Open(fromPath)
+	if fromFile == nil {
+		return api.Err(http.StatusNotFound, "File not found", "%s:%s", fromFSName, fromPath)
+	}
+
+	defer fromFile.Close()
+
+	_, _, err := toFS.Handler.FS.Filesystem.WriteFileReader(toPath, fromFile)
+	if err != nil {
+		toFS.Handler.FS.Filesystem.Remove(toPath)
+		return api.Err(http.StatusBadRequest, "Writing target file failed", "%s", err)
+	}
+
+	if operation.Operation == "move" {
+		fromFS.Handler.FS.Filesystem.Remove(fromPath)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
