@@ -2,8 +2,7 @@ package api
 
 import (
 	"net/http"
-	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler"
@@ -176,12 +175,15 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid operation", "%s", operation.Operation)
 	}
 
-	from := strings.Split(filepath.Join("/", operation.From), "/")
-	if len(from) < 2 {
-		return api.Err(http.StatusBadRequest, "Invalid source path", "%s", operation.From)
+	rePrefix := regexp.MustCompile(`^(.+):`)
+
+	matches := rePrefix.FindStringSubmatch(operation.From)
+	if matches == nil {
+		return api.Err(http.StatusBadRequest, "Missing source filesystem prefix")
 	}
-	fromFSName := from[1]
-	fromPath := strings.Join(from[2:], "/")
+
+	fromFSName := matches[1]
+	fromPath := rePrefix.ReplaceAllString(operation.From, "")
 	fromFS, ok := h.filesystems[fromFSName]
 	if !ok {
 		return api.Err(http.StatusBadRequest, "Source filesystem not found", "%s", fromFSName)
@@ -191,12 +193,13 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 		return c.JSON(http.StatusOK, "OK")
 	}
 
-	to := strings.Split(filepath.Join("/", operation.To), "/")
-	if len(to) < 2 {
-		return api.Err(http.StatusBadRequest, "Invalid target path", "%s", operation.To)
+	matches = rePrefix.FindStringSubmatch(operation.To)
+	if matches == nil {
+		return api.Err(http.StatusBadRequest, "Missing target filesystem prefix")
 	}
-	toFSName := to[1]
-	toPath := strings.Join(to[2:], "/")
+
+	toFSName := matches[1]
+	toPath := rePrefix.ReplaceAllString(operation.To, "")
 	toFS, ok := h.filesystems[toFSName]
 	if !ok {
 		return api.Err(http.StatusBadRequest, "Target filesystem not found", "%s", toFSName)

@@ -541,7 +541,7 @@ func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
 }
 
 func (r *restream) setCleanup(id string, config *app.Config) {
-	rePrefix := regexp.MustCompile(`^([a-z]+):`)
+	rePrefix := regexp.MustCompile(`^(.+):`)
 
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {

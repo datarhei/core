@@ -3,6 +3,7 @@ package value
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"golang.org/x/net/publicsuffix"
@@ -12,19 +13,21 @@ import (
 // https://access_key_id:secret_access_id@region.endpoint/bucket?name=aaa&mount=/abc&username=xxx&password=yyy
 
 type S3Storage struct {
-	Name       string `json:"name"`
-	Mountpoint string `json:"mountpoint"`
-	Auth       struct {
-		Enable   bool   `json:"enable"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-	} `json:"auth"`
-	Endpoint        string `json:"endpoint"`
-	AccessKeyID     string `json:"access_key_id"`
-	SecretAccessKey string `json:"secret_access_key"`
-	Bucket          string `json:"bucket"`
-	Region          string `json:"region"`
-	UseSSL          bool   `json:"use_ssl"`
+	Name            string        `json:"name"`
+	Mountpoint      string        `json:"mountpoint"`
+	Auth            S3StorageAuth `json:"auth"`
+	Endpoint        string        `json:"endpoint"`
+	AccessKeyID     string        `json:"access_key_id"`
+	SecretAccessKey string        `json:"secret_access_key"`
+	Bucket          string        `json:"bucket"`
+	Region          string        `json:"region"`
+	UseSSL          bool          `json:"use_ssl"`
+}
+
+type S3StorageAuth struct {
+	Enable   bool   `json:"enable"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func (t *S3Storage) String() string {
@@ -50,7 +53,7 @@ func (t *S3Storage) String() string {
 
 	v := url.Values{}
 	v.Set("name", t.Name)
-	v.Set("mountpoint", t.Mountpoint)
+	v.Set("mount", t.Mountpoint)
 
 	if t.Auth.Enable {
 		if len(t.Auth.Username) != 0 {
@@ -70,12 +73,14 @@ func (t *S3Storage) String() string {
 type s3StorageListValue struct {
 	p         *[]S3Storage
 	separator string
+	reName    *regexp.Regexp
 }
 
 func NewS3StorageListValue(p *[]S3Storage, val []S3Storage, separator string) *s3StorageListValue {
 	v := &s3StorageListValue{
 		p:         p,
 		separator: separator,
+		reName:    regexp.MustCompile(`^[A-Za-z0-9_-]+$`),
 	}
 
 	*p = val
@@ -93,9 +98,12 @@ func (s *s3StorageListValue) Set(val string) error {
 
 		t := S3Storage{
 			Name:        u.Query().Get("name"),
-			Mountpoint:  u.Query().Get("mountpoint"),
+			Mountpoint:  u.Query().Get("mount"),
 			AccessKeyID: u.User.Username(),
 		}
+
+		password, _ := u.User.Password()
+		t.SecretAccessKey = password
 
 		hostname := u.Hostname()
 		port := u.Port()
@@ -129,7 +137,7 @@ func (s *s3StorageListValue) Set(val string) error {
 		if u.Query().Has("username") || u.Query().Has("password") {
 			t.Auth.Enable = true
 			t.Auth.Username = u.Query().Get("username")
-			t.Auth.Username = u.Query().Get("password")
+			t.Auth.Password = u.Query().Get("password")
 		}
 
 		list = append(list, t)
@@ -158,6 +166,10 @@ func (s *s3StorageListValue) Validate() error {
 	for i, t := range *s.p {
 		if len(t.Name) == 0 {
 			return fmt.Errorf("the name for s3 storage %d is missing", i)
+		}
+
+		if !s.reName.MatchString(t.Name) {
+			return fmt.Errorf("the name for s3 storage must match the pattern %s", s.reName.String())
 		}
 
 		if len(t.Mountpoint) == 0 {

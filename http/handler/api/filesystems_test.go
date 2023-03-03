@@ -193,7 +193,7 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo/elif",
+		From:      "foo:/elif",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -203,18 +203,7 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo/elif",
-		To:        "/bar",
-	}
-
-	jsondata, err = json.Marshal(op)
-	require.NoError(t, err)
-
-	mock.Request(t, http.StatusNotFound, router, "PUT", "/", bytes.NewReader(jsondata))
-
-	op = api.FilesystemOperation{
-		Operation: "copy",
-		From:      "foo/file",
+		From:      "foo:/elif",
 		To:        "/bar",
 	}
 
@@ -225,8 +214,19 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo/file",
-		To:        "/bar/file",
+		From:      "foo:/file",
+		To:        "/bar",
+	}
+
+	jsondata, err = json.Marshal(op)
+	require.NoError(t, err)
+
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", bytes.NewReader(jsondata))
+
+	op = api.FilesystemOperation{
+		Operation: "copy",
+		From:      "foo:file",
+		To:        "bar:/file",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -244,8 +244,8 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "move",
-		From:      "foo/file",
-		To:        "/bar/file",
+		From:      "foo:file",
+		To:        "bar:/file",
 	}
 
 	jsondata, err = json.Marshal(op)
