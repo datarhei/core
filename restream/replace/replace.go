@@ -1,7 +1,6 @@
 package replace
 
 import (
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -125,21 +124,14 @@ func (r *replacer) parseParametes(params string, vars map[string]string, default
 	// taken from net/url.ParseQuery
 	for params != "" {
 		var key string
-		key, params, _ = strings.Cut(params, ",")
+		key, params, _ = cut([]rune(params), ',')
 		if key == "" {
 			continue
 		}
 
-		key, value, _ := strings.Cut(key, "=")
-		key, err := url.QueryUnescape(key)
-		if err != nil {
-			continue
-		}
+		key, value, _ := cut([]rune(key), '=')
 
-		value, err = url.QueryUnescape(value)
-		if err != nil {
-			continue
-		}
+		value = unescape([]rune(value))
 
 		for name, v := range vars {
 			value = strings.ReplaceAll(value, "$"+name, v)
@@ -149,4 +141,50 @@ func (r *replacer) parseParametes(params string, vars map[string]string, default
 	}
 
 	return p
+}
+
+func cut(s []rune, sep rune) (before, after string, found bool) {
+	if i := index(s, sep); i >= 0 {
+		return string(s[:i]), string(s[i+1:]), true
+	}
+
+	return string(s), "", false
+}
+
+func index(s []rune, sep rune) int {
+	ignoreSep := false
+	for i, c := range s {
+		if c == rune('\\') {
+			ignoreSep = true
+			continue
+		}
+
+		if c == sep && !ignoreSep {
+			return i
+		}
+
+		ignoreSep = false
+	}
+
+	return -1
+}
+
+func unescape(e []rune) string {
+	r := make([]rune, len(e))
+
+	ignore := false
+	i := 0
+	for _, c := range e {
+		if c == rune('\\') && !ignore {
+			ignore = true
+			continue
+		}
+
+		ignore = false
+
+		r[i] = c
+		i++
+	}
+
+	return string(r[:i])
 }

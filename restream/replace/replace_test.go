@@ -138,3 +138,20 @@ func TestReplaceGlob(t *testing.T) {
 	replaced := r.Replace("{foo:baz}, {foo:bar}", "foo:*", "", nil, nil, "")
 	require.Equal(t, "Hello foobaz, Hello foobar", replaced)
 }
+
+func TestParseParams(t *testing.T) {
+	r := New().(*replacer)
+
+	tests := [][2]string{
+		{"", "def"},
+		{"foobar=hello", "hello"},
+		{"foobar=%Y%m%d_%H%M%S", "%Y%m%d_%H%M%S"},
+		{"foobar=foo\\,bar", "foo,bar"},
+		{"barfoo=xxx,foobar=something", "something"},
+	}
+
+	for _, test := range tests {
+		params := r.parseParametes(test[0], nil, map[string]string{"foobar": "def"})
+		require.Equal(t, test[1], params["foobar"])
+	}
+}
