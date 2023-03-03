@@ -77,10 +77,10 @@ func TestReplacerFunc(t *testing.T) {
 	replaced = r.Replace("{foo:bar,who=World}", "foo:bar", "", nil, nil, "")
 	require.Equal(t, "Hello World! defaultWhat?", replaced)
 
-	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "", nil, nil, "")
+	replaced = r.Replace("{foo:bar,who=World,what=E=mc^2}", "foo:bar", "", nil, nil, "")
 	require.Equal(t, "Hello World! E=mc^2?", replaced)
 
-	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "", nil, nil, "")
+	replaced = r.Replace("{foo:bar^:,who=World,what=E=mc:2}", "foo:bar", "", nil, nil, "")
 	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
 }
 
@@ -108,10 +108,10 @@ func TestReplacerFuncWithVars(t *testing.T) {
 	replaced = r.Replace("{foo:bar,who=World}", "foo:bar", "", vars, nil, "")
 	require.Equal(t, "Hello World! World?", replaced)
 
-	replaced = r.Replace("{foo:bar,who=World,what=E%3dmc^2}", "foo:bar", "", vars, nil, "")
+	replaced = r.Replace("{foo:bar,who=World,what=E=mc^2}", "foo:bar", "", vars, nil, "")
 	require.Equal(t, "Hello World! E=mc^2?", replaced)
 
-	replaced = r.Replace("{foo:bar^:,who=World,what=E%3dmc:2}", "foo:bar", "", vars, nil, "")
+	replaced = r.Replace("{foo:bar^:,who=World,what=E=mc:2}", "foo:bar", "", vars, nil, "")
 	require.Equal(t, "Hello World! E=mc\\\\:2?", replaced)
 
 	replaced = r.Replace("{foo:bar,who=$location,what=$processid}", "foo:bar", "", vars, nil, "")
