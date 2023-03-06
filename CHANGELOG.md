@@ -1,5 +1,17 @@
 # Core
 
+### Core v16.11.0 > v16.?.?
+
+-   Add PUT /api/v3/fs endpoint for file operations
+-   Add GET /api/v3/process/:id/report/:at endpoint for retrieving a specific report history entry
+-   Add last progress report to report history
+-   Add exit status to report history
+-   Add support for date placeholder in process config
+-   Add support for creating directories for output files to be written on disk
+-   Add GET /api/v3/report/process endpoint
+-   Fix S3 storage credential parsing from ENV
+-   Fix placeholder parameter parsing
+
 ### Core v16.11.0 > v16.12.0
 
 -   Add S3 storage support
