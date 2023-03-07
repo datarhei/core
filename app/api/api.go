@@ -444,38 +444,38 @@ func (a *api) start() error {
 		// Create default policies for anonymous users in order to mimic
 		// the behaviour before IAM
 
-		iam.RemovePolicy("$anon", "$none", "", "")
-		iam.RemovePolicy("$localhost", "$none", "", "")
+		iam.RemovePolicy("$anon", "$none", "", nil)
+		iam.RemovePolicy("$localhost", "$none", "", nil)
 
-		iam.AddPolicy("$anon", "$none", "fs:/**", "GET|HEAD|OPTIONS")
-		iam.AddPolicy("$anon", "$none", "api:/api", "GET|HEAD|OPTIONS")
-		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$anon", "$none", "fs:/**", []string{"GET", "HEAD", "OPTIONS"})
+		iam.AddPolicy("$anon", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
+		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
 
-		iam.AddPolicy("$localhost", "$none", "api:/api", "GET|HEAD|OPTIONS")
-		iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", "GET|HEAD|OPTIONS")
+		iam.AddPolicy("$localhost", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
+		iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
 
 		if !cfg.API.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "api:/api/**", "ANY")
-			iam.AddPolicy("$anon", "$none", "process:*", "ANY")
-			iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
-			iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
+			iam.AddPolicy("$anon", "$none", "api:/api/**", []string{"ANY"})
+			iam.AddPolicy("$anon", "$none", "process:*", []string{"ANY"})
+			iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
+			iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
 		} else {
 			if cfg.API.Auth.DisableLocalhost {
-				iam.AddPolicy("$localhost", "$none", "api:/api/**", "ANY")
-				iam.AddPolicy("$localhost", "$none", "process:*", "ANY")
+				iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
+				iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
 			}
 		}
 
 		if !cfg.Storage.Memory.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", "ANY")
+			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", []string{"ANY"})
 		}
 
 		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "rtmp:/**", "ANY")
+			iam.AddPolicy("$anon", "$none", "rtmp:/**", []string{"ANY"})
 		}
 
 		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "srt:**", "ANY")
+			iam.AddPolicy("$anon", "$none", "srt:**", []string{"ANY"})
 		}
 
 		a.iam = iam
@@ -672,9 +672,9 @@ func (a *api) start() error {
 			var identity iam.IdentityVerifier = nil
 
 			if len(config.Owner) == 0 {
-				identity, _ = a.iam.GetDefaultIdentity()
+				identity, _ = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetIdentity(config.Owner)
+				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
 
 			if identity != nil {
@@ -698,9 +698,9 @@ func (a *api) start() error {
 			var identity iam.IdentityVerifier = nil
 
 			if len(config.Owner) == 0 {
-				identity, _ = a.iam.GetDefaultIdentity()
+				identity, _ = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetIdentity(config.Owner)
+				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
 
 			if identity != nil {

@@ -250,7 +250,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 		}
 	}
 
-	identity, err := m.iam.GetIdentity(username)
+	identity, err := m.iam.GetVerifier(username)
 	if err != nil {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,
@@ -314,7 +314,7 @@ func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iam.IdentityVerifie
 		}
 	}
 
-	identity, err := m.iam.GetIdentity(subject)
+	identity, err := m.iam.GetVerifier(subject)
 	if err != nil {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,
@@ -343,7 +343,7 @@ func (m *iammiddleware) findIdentityFromUserpass(c echo.Context) (iam.IdentityVe
 		return nil, nil
 	}
 
-	identity, err := m.iam.GetIdentity(login.Username)
+	identity, err := m.iam.GetVerifier(login.Username)
 	if err != nil {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,
@@ -400,7 +400,7 @@ func (m *iammiddleware) findIdentityFromAuth0(c echo.Context) (iam.IdentityVerif
 		}
 	}
 
-	identity, err := m.iam.GetIdentityByAuth0(subject)
+	identity, err := m.iam.GetVerfierFromAuth0(subject)
 	if err != nil {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,

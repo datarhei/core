@@ -3,7 +3,6 @@ package rtmp
 import (
 	"context"
 	"net"
-	"net/url"
 	"sync"
 	"time"
 
@@ -94,11 +93,11 @@ type channel struct {
 	isProxy bool
 }
 
-func newChannel(conn connection, u *url.URL, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
+func newChannel(conn connection, playpath, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
 	ch := &channel{
-		path:       u.Path,
+		path:       playpath,
 		reference:  reference,
-		publisher:  newClient(conn, u.Path, collector),
+		publisher:  newClient(conn, playpath, collector),
 		subscriber: make(map[string]*client),
 		collector:  collector,
 		streams:    streams,

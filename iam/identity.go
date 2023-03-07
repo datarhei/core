@@ -378,7 +378,7 @@ type IdentityManager interface {
 
 	Get(name string) (User, error)
 	GetVerifier(name string) (IdentityVerifier, error)
-	GetVerifierByAuth0(name string) (IdentityVerifier, error)
+	GetVerifierFromAuth0(name string) (IdentityVerifier, error)
 	GetDefaultVerifier() (IdentityVerifier, error)
 
 	Validators() []string
@@ -697,7 +697,7 @@ func (im *identityManager) GetVerifier(name string) (IdentityVerifier, error) {
 	return im.getIdentity(name)
 }
 
-func (im *identityManager) GetVerifierByAuth0(name string) (IdentityVerifier, error) {
+func (im *identityManager) GetVerifierFromAuth0(name string) (IdentityVerifier, error) {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
@@ -841,9 +841,9 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 }
 
 type Auth0Tenant struct {
-	Domain   string
-	Audience string
-	ClientID string
+	Domain   string `json:"domain"`
+	Audience string `json:"audience"`
+	ClientID string `json:"client_id"`
 }
 
 func (t *Auth0Tenant) key() string {

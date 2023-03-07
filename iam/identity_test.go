@@ -353,11 +353,11 @@ func TestCreateUserAuth0(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	identity, err := im.GetVerifierByAuth0("foobaz")
+	identity, err := im.GetVerifierFromAuth0("foobaz")
 	require.Error(t, err)
 	require.Nil(t, identity)
 
-	identity, err = im.GetVerifierByAuth0("auth0|123456")
+	identity, err = im.GetVerifierFromAuth0("auth0|123456")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 
@@ -553,7 +553,7 @@ func TestUpdateUserAuth0(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	identity, err := im.GetVerifierByAuth0("auth0|123456")
+	identity, err := im.GetVerifierFromAuth0("auth0|123456")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 
@@ -569,7 +569,7 @@ func TestUpdateUserAuth0(t *testing.T) {
 	err = im.Update("foobaz", user)
 	require.NoError(t, err)
 
-	identity, err = im.GetVerifierByAuth0("auth0|123456")
+	identity, err = im.GetVerifierFromAuth0("auth0|123456")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 

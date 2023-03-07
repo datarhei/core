@@ -126,6 +126,7 @@ type server struct {
 		session   *api.SessionHandler
 		widget    *api.WidgetHandler
 		resources *api.MetricsHandler
+		iam       *api.IAMHandler
 	}
 
 	middleware struct {
@@ -234,6 +235,8 @@ func NewServer(config Config) (Server, error) {
 	)
 
 	s.handler.jwt = api.NewJWT(config.IAM)
+
+	s.v3handler.iam = api.NewIAM(config.IAM)
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
@@ -526,6 +529,14 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.widget != nil {
 		// The widget endpoint should not be blocked by auth
 		s.router.GET("/api/v3/widget/process/:id", s.v3handler.widget.Get)
+	}
+
+	// v3 IAM
+	if s.v3handler.iam != nil {
+		v3.POST("/iam/user", s.v3handler.iam.AddUser)
+		v3.GET("/iam/user/:name", s.v3handler.iam.GetUser)
+		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateUser)
+		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveUser)
 	}
 
 	// v3 Restreamer

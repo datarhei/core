@@ -9,21 +9,23 @@ type IAM interface {
 	Enforce(user, domain, resource, action string) bool
 	HasDomain(domain string) bool
 
-	AddPolicy(username, domain, resource, actions string) bool
-	RemovePolicy(username, domain, resource, actions string) bool
+	AddPolicy(username, domain, resource string, actions []string) bool
+	RemovePolicy(username, domain, resource string, actions []string) bool
 
-	ListPolicies(username, domain, resource, actions string) [][]string
+	ListPolicies(username, domain, resource string, actions []string) []Policy
 
 	Validators() []string
 
 	CreateIdentity(u User) error
+	GetIdentity(name string) (User, error)
 	UpdateIdentity(name string, u User) error
 	DeleteIdentity(name string) error
 	ListIdentities() []User
+	SaveIdentities() error
 
-	GetIdentity(name string) (IdentityVerifier, error)
-	GetIdentityByAuth0(name string) (IdentityVerifier, error)
-	GetDefaultIdentity() (IdentityVerifier, error)
+	GetVerifier(name string) (IdentityVerifier, error)
+	GetVerfierFromAuth0(name string) (IdentityVerifier, error)
+	GetDefaultVerifier() (IdentityVerifier, error)
 
 	CreateJWT(name string) (string, string, error)
 
@@ -85,17 +87,25 @@ func (i *iam) Close() {
 	i.am = nil
 }
 
-func (i *iam) Enforce(user, domain, resource, action string) bool {
+func (i *iam) Enforce(name, domain, resource, action string) bool {
+	if len(name) == 0 {
+		name = "$anon"
+	}
+
+	if len(domain) == 0 {
+		domain = "$none"
+	}
+
 	superuser := false
 
-	if identity, err := i.im.GetVerifier(user); err == nil {
+	if identity, err := i.im.GetVerifier(name); err == nil {
 		if identity.IsSuperuser() {
 			superuser = true
 		}
 	}
 
 	l := i.logger.Debug().WithFields(log.Fields{
-		"subject":   user,
+		"subject":   name,
 		"domain":    domain,
 		"resource":  resource,
 		"action":    action,
@@ -103,10 +113,10 @@ func (i *iam) Enforce(user, domain, resource, action string) bool {
 	})
 
 	if superuser {
-		user = "$superuser"
+		name = "$superuser"
 	}
 
-	ok, rule := i.am.Enforce(user, domain, resource, action)
+	ok, rule := i.am.Enforce(name, domain, resource, action)
 
 	if !ok {
 		l.Log("no match")
@@ -121,6 +131,10 @@ func (i *iam) CreateIdentity(u User) error {
 	return i.im.Create(u)
 }
 
+func (i *iam) GetIdentity(name string) (User, error) {
+	return i.im.Get(name)
+}
+
 func (i *iam) UpdateIdentity(name string, u User) error {
 	return i.im.Update(name, u)
 }
@@ -133,15 +147,19 @@ func (i *iam) ListIdentities() []User {
 	return nil
 }
 
-func (i *iam) GetIdentity(name string) (IdentityVerifier, error) {
+func (i *iam) SaveIdentities() error {
+	return i.im.Save()
+}
+
+func (i *iam) GetVerifier(name string) (IdentityVerifier, error) {
 	return i.im.GetVerifier(name)
 }
 
-func (i *iam) GetIdentityByAuth0(name string) (IdentityVerifier, error) {
-	return i.im.GetVerifierByAuth0(name)
+func (i *iam) GetVerfierFromAuth0(name string) (IdentityVerifier, error) {
+	return i.im.GetVerifierFromAuth0(name)
 }
 
-func (i *iam) GetDefaultIdentity() (IdentityVerifier, error) {
+func (i *iam) GetDefaultVerifier() (IdentityVerifier, error) {
 	return i.im.GetDefaultVerifier()
 }
 
@@ -157,14 +175,22 @@ func (i *iam) Validators() []string {
 	return i.im.Validators()
 }
 
-func (i *iam) AddPolicy(username, domain, resource, actions string) bool {
-	return i.am.AddPolicy(username, domain, resource, actions)
+func (i *iam) AddPolicy(name, domain, resource string, actions []string) bool {
+	if len(name) == 0 {
+		name = "$anon"
+	}
+
+	if len(domain) == 0 {
+		domain = "$none"
+	}
+
+	return i.am.AddPolicy(name, domain, resource, actions)
 }
 
-func (i *iam) RemovePolicy(username, domain, resource, actions string) bool {
-	return i.am.RemovePolicy(username, domain, resource, actions)
+func (i *iam) RemovePolicy(name, domain, resource string, actions []string) bool {
+	return i.am.RemovePolicy(name, domain, resource, actions)
 }
 
-func (i *iam) ListPolicies(username, domain, resource, actions string) [][]string {
-	return i.am.ListPolicies(username, domain, resource, actions)
+func (i *iam) ListPolicies(name, domain, resource string, actions []string) []Policy {
+	return i.am.ListPolicies(name, domain, resource, actions)
 }

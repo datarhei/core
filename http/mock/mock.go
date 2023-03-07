@@ -66,8 +66,8 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, err
 	}
 
-	iam.AddPolicy("$anon", "$none", "api:/**", "ANY")
-	iam.AddPolicy("$anon", "$none", "fs:/**", "ANY")
+	iam.AddPolicy("$anon", "$none", "api:/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
 
 	rs, err := restream.New(restream.Config{
 		Store:  store,

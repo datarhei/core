@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 
@@ -23,22 +24,32 @@ type adapter struct {
 	lock     sync.Mutex
 }
 
-func newAdapter(fs fs.Filesystem, filePath string, logger log.Logger) *adapter {
-	return &adapter{
+func newAdapter(fs fs.Filesystem, filePath string, logger log.Logger) (*adapter, error) {
+	a := &adapter{
 		fs:       fs,
 		filePath: filePath,
 		logger:   logger,
 	}
+
+	if a.fs == nil {
+		return nil, fmt.Errorf("a filesystem has to be provided")
+	}
+
+	if len(a.filePath) == 0 {
+		return nil, fmt.Errorf("invalid file path, file path cannot be empty")
+	}
+
+	if a.logger == nil {
+		a.logger = log.New("")
+	}
+
+	return a, nil
 }
 
 // Adapter
 func (a *adapter) LoadPolicy(model model.Model) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-
-	if a.filePath == "" {
-		return fmt.Errorf("invalid file path, file path cannot be empty")
-	}
 
 	return a.loadPolicyFile(model)
 }
@@ -69,7 +80,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 			rule[1] = "role:" + name
 			for _, role := range roles {
 				rule[3] = role.Resource
-				rule[4] = role.Actions
+				rule[4] = formatActions(role.Actions)
 
 				if err := a.importPolicy(model, rule[0:5]); err != nil {
 					return err
@@ -80,7 +91,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		for _, policy := range group.Policies {
 			rule[1] = policy.Username
 			rule[3] = policy.Resource
-			rule[4] = policy.Actions
+			rule[4] = formatActions(policy.Actions)
 
 			if err := a.importPolicy(model, rule[0:5]); err != nil {
 				return err
@@ -138,10 +149,6 @@ func (a *adapter) SavePolicy(model model.Model) error {
 }
 
 func (a *adapter) savePolicyFile() error {
-	if a.filePath == "" {
-		return fmt.Errorf("invalid file path, file path cannot be empty")
-	}
-
 	jsondata, err := json.MarshalIndent(a.groups, "", "    ")
 	if err != nil {
 		return err
@@ -201,7 +208,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = rule[3]
+		actions = formatActions(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
 			"username": username,
@@ -227,16 +234,20 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 	for i := range a.groups {
 		if a.groups[i].Name == domain {
 			group = &a.groups[i]
+			break
 		}
 	}
 
 	if group == nil {
 		g := Group{
-			Name: domain,
+			Name:      domain,
+			Roles:     map[string][]Role{},
+			UserRoles: []MapUserRole{},
+			Policies:  []GroupPolicy{},
 		}
 
 		a.groups = append(a.groups, g)
-		group = &g
+		group = &a.groups[len(a.groups)-1]
 	}
 
 	if ptype == "p" {
@@ -251,8 +262,8 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 				Actions:  actions,
 			})
 		} else {
-			group.Policies = append(group.Policies, Policy{
-				Username: rule[0],
+			group.Policies = append(group.Policies, GroupPolicy{
+				Username: username,
 				Role: Role{
 					Resource: resource,
 					Actions:  actions,
@@ -284,7 +295,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = rule[3]
+		actions = formatActions(rule[3])
 	} else if ptype == "g" {
 		username = rule[0]
 		role = rule[1]
@@ -294,9 +305,9 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 	}
 
 	var group *Group = nil
-	for _, g := range a.groups {
-		if g.Name == domain {
-			group = &g
+	for i := range a.groups {
+		if a.groups[i].Name == domain {
+			group = &a.groups[i]
 			break
 		}
 	}
@@ -321,13 +332,13 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 			}
 
 			for _, role := range roles {
-				if role.Resource == resource && role.Actions == actions {
+				if role.Resource == resource && formatActions(role.Actions) == actions {
 					return true, nil
 				}
 			}
 		} else {
 			for _, p := range group.Policies {
-				if p.Username == username && p.Resource == resource && p.Actions == actions {
+				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
 					return true, nil
 				}
 			}
@@ -393,7 +404,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = rule[3]
+		actions = formatActions(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
 			"username": username,
@@ -419,6 +430,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 	for i := range a.groups {
 		if a.groups[i].Name == domain {
 			group = &a.groups[i]
+			break
 		}
 	}
 
@@ -435,7 +447,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			newRoles := []Role{}
 
 			for _, role := range roles {
-				if role.Resource == resource && role.Actions == actions {
+				if role.Resource == resource && formatActions(role.Actions) == actions {
 					continue
 				}
 
@@ -444,10 +456,10 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 
 			group.Roles[username] = newRoles
 		} else {
-			policies := []Policy{}
+			policies := []GroupPolicy{}
 
 			for _, p := range group.Policies {
-				if p.Username == username && p.Resource == resource && p.Actions == actions {
+				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
 					continue
 				}
 
@@ -470,6 +482,21 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		}
 
 		group.UserRoles = users
+	}
+
+	// Remove the group if there are no rules and policies
+	if len(group.Roles) == 0 && len(group.UserRoles) == 0 && len(group.Policies) == 0 {
+		groups := []Group{}
+
+		for _, g := range a.groups {
+			if g.Name == group.Name {
+				continue
+			}
+
+			groups = append(groups, g)
+		}
+
+		a.groups = groups
 	}
 
 	return nil
@@ -498,7 +525,7 @@ type Group struct {
 	Name      string            `json:"name"`
 	Roles     map[string][]Role `json:"roles"`
 	UserRoles []MapUserRole     `json:"userroles"`
-	Policies  []Policy          `json:"policies"`
+	Policies  []GroupPolicy     `json:"policies"`
 }
 
 type Role struct {
@@ -511,7 +538,15 @@ type MapUserRole struct {
 	Role     string `json:"role"`
 }
 
-type Policy struct {
+type GroupPolicy struct {
 	Username string `json:"username"`
 	Role
+}
+
+func formatActions(actions string) string {
+	a := strings.Split(actions, "|")
+
+	sort.Strings(a)
+
+	return strings.Join(a, "|")
 }

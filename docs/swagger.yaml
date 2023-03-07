@@ -469,30 +469,80 @@ definitions:
         items: {}
         type: array
     type: object
-  api.JWT:
+  api.IAMAuth0Tenant:
     properties:
-      access_token:
+      audience:
         type: string
-      refresh_token:
+      client_id:
+        type: string
+      domain:
         type: string
     type: object
-  api.JWTRefresh:
+  api.IAMPolicy:
     properties:
-      access_token:
+      actions:
+        items:
+          type: string
+        type: array
+      group:
         type: string
+      resource:
+        type: string
+    type: object
+  api.IAMUser:
+    properties:
+      auth:
+        $ref: '#/definitions/api.IAMUserAuth'
+      name:
+        type: string
+      policies:
+        items:
+          $ref: '#/definitions/api.IAMPolicy'
+        type: array
+      superuser:
+        type: boolean
+    type: object
+  api.IAMUserAuth:
+    properties:
+      api:
+        $ref: '#/definitions/api.IAMUserAuthAPI'
+      services:
+        $ref: '#/definitions/api.IAMUserAuthServices'
+    type: object
+  api.IAMUserAuthAPI:
+    properties:
+      auth0:
+        $ref: '#/definitions/api.IAMUserAuthAPIAuth0'
+      userpass:
+        $ref: '#/definitions/api.IAMUserAuthPassword'
+    type: object
+  api.IAMUserAuthAPIAuth0:
+    properties:
+      enable:
+        type: boolean
+      tenant:
+        $ref: '#/definitions/api.IAMAuth0Tenant'
+      user:
+        type: string
+    type: object
+  api.IAMUserAuthPassword:
+    properties:
+      enable:
+        type: boolean
+      password:
+        type: string
+    type: object
+  api.IAMUserAuthServices:
+    properties:
+      basic:
+        $ref: '#/definitions/api.IAMUserAuthPassword'
+      token:
+        items:
+          type: string
+        type: array
     type: object
   api.LogEvent:
     additionalProperties: true
-    type: object
-  api.Login:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
     type: object
   api.MetricsDescription:
     properties:
@@ -706,6 +756,8 @@ definitions:
     properties:
       autostart:
         type: boolean
+      group:
+        type: string
       id:
         type: string
       input:
@@ -1980,58 +2032,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Query the GraphAPI
-  /api/login:
-    post:
-      description: Retrieve valid JWT access and refresh tokens to use for accessing
-        the API. Login either by username/password or Auth0 token
-      operationId: jwt-login
-      parameters:
-      - description: Login data
-        in: body
-        name: data
-        required: true
-        schema:
-          $ref: '#/definitions/api.Login'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.JWT'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.Error'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - Auth0KeyAuth: []
-      summary: Retrieve an access and a refresh token
-  /api/login/refresh:
-    get:
-      description: Retrieve a new access token by providing the refresh token
-      operationId: jwt-refresh
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.JWTRefresh'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiRefreshKeyAuth: []
-      summary: Retrieve a new access token
   /api/swagger:
     get:
       description: Swagger UI for this API
@@ -2266,6 +2266,135 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem
+  /api/v3/iam/user:
+    post:
+      consumes:
+      - application/json
+      description: Add a new user
+      operationId: iam-3-add-user
+      parameters:
+      - description: User definition
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new user
+      tags:
+      - v16.?.?
+  /api/v3/iam/user/{name}:
+    delete:
+      description: Delete an user by its name
+      operationId: iam-3-delete-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an user by its name
+      tags:
+      - v16.?.?
+    get:
+      description: List aa user by its name
+      operationId: iam-3-get-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List an user by its name
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing user.
+      operationId: iam-3-update-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: User definition
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an existing user
+      tags:
+      - v16.?.?
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application

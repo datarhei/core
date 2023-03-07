@@ -1440,7 +1440,7 @@ func probeInput(binary string, config app.Config) app.Probe {
 		Logger:    nil,
 	})
 
-	iam.AddPolicy("$anon", "$none", "process:*", "CREATE|GET|DELETE|PROBE")
+	iam.AddPolicy("$anon", "$none", "process:*", []string{"CREATE", "GET", "DELETE", "PROBE"})
 
 	rs, err := restream.New(restream.Config{
 		FFmpeg: ffmpeg,

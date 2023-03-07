@@ -424,7 +424,7 @@ func (r *restream) enforce(name, group, processid, action string) bool {
 	if len(name) == 0 {
 		// This is for backwards compatibility. Existing processes don't have an owner.
 		// All processes that will be added later will have an owner ($anon, ...).
-		identity, err := r.iam.GetDefaultIdentity()
+		identity, err := r.iam.GetDefaultVerifier()
 		if err != nil {
 			name = "$anon"
 		} else {
@@ -914,7 +914,7 @@ func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (s
 		return address, fmt.Errorf("unknown process '%s' in group '%s' (%s)", matches["id"], matches["group"], address)
 	}
 
-	identity, _ := r.iam.GetIdentity(t.config.Owner)
+	identity, _ := r.iam.GetVerifier(t.config.Owner)
 
 	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
 
