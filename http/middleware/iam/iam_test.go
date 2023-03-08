@@ -147,7 +147,7 @@ func TestFindDomainFromFilesystem(t *testing.T) {
 
 	mw := &iammiddleware{
 		iam:    iam,
-		mounts: []string{"/memfs", "/"},
+		mounts: []string{"/", "/memfs"},
 	}
 
 	domain := mw.findDomainFromFilesystem("/")

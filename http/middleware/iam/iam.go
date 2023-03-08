@@ -17,8 +17,9 @@
 // only allow JWT as authentication method.
 //
 // If the identity can't be detected, the identity of "$anon" is given, representing
-// an anonmyous user. If the request originates from localhost, the identity will
-// be $localhost, representing an anonymous user from localhost.
+// an anonmyous user. If the request originates from localhost and DisableLocalhost
+// is configured, the identity will be $localhost, representing an anonymous user from
+// localhost.
 //
 // The domain is provided as query parameter "group" for all API requests or the
 // first path element after a mountpoint for filesystem requests.
@@ -53,20 +54,24 @@ import (
 
 type Config struct {
 	// Skipper defines a function to skip middleware.
-	Skipper          middleware.Skipper
-	Mounts           []string
-	IAM              iam.IAM
-	DisableLocalhost bool
-	Logger           log.Logger
+	Skipper              middleware.Skipper
+	Mounts               []string
+	IAM                  iam.IAM
+	DisableLocalhost     bool
+	WaitAfterFailedLogin bool
+	Logger               log.Logger
 }
 
 var DefaultConfig = Config{
-	Skipper:          middleware.DefaultSkipper,
-	Mounts:           []string{},
-	IAM:              nil,
-	DisableLocalhost: false,
-	Logger:           nil,
+	Skipper:              middleware.DefaultSkipper,
+	Mounts:               []string{},
+	IAM:                  nil,
+	DisableLocalhost:     false,
+	WaitAfterFailedLogin: false,
+	Logger:               nil,
 }
+
+var realm = "datarhei-core"
 
 type iammiddleware struct {
 	iam    iam.IAM
@@ -106,9 +111,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-
-			c.Set("disablelocalhost", config.DisableLocalhost)
-
 			if config.Skipper(c) {
 				c.Set("user", "$anon")
 				return next(c)
@@ -129,14 +131,18 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				if resource == "/api/login" {
 					identity, err = mw.findIdentityFromUserpass(c)
 					if err != nil {
-						time.Sleep(5 * time.Second)
+						if config.WaitAfterFailedLogin {
+							time.Sleep(5 * time.Second)
+						}
 						return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
 					}
 
 					if identity == nil {
 						identity, err = mw.findIdentityFromAuth0(c)
 						if err != nil {
-							time.Sleep(5 * time.Second)
+							if config.WaitAfterFailedLogin {
+								time.Sleep(5 * time.Second)
+							}
 							return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
 						}
 					}
@@ -150,22 +156,28 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						if resource == "/api/login/refresh" {
 							usefor, _ := c.Get("usefor").(string)
 							if usefor != "refresh" {
-								time.Sleep(5 * time.Second)
+								if config.WaitAfterFailedLogin {
+									time.Sleep(5 * time.Second)
+								}
 								return api.Err(http.StatusForbidden, "Forbidden", "invalid token")
 							}
 						} else {
 							usefor, _ := c.Get("usefor").(string)
 							if usefor != "access" {
-								time.Sleep(5 * time.Second)
+								if config.WaitAfterFailedLogin {
+									time.Sleep(5 * time.Second)
+								}
 								return api.Err(http.StatusForbidden, "Forbidden", "invalid token")
 							}
 						}
 					}
 				}
 
-				ip := c.RealIP()
-				if ip == "127.0.0.1" || ip == "::1" {
-					username = "$localhost"
+				if config.DisableLocalhost {
+					ip := c.RealIP()
+					if ip == "127.0.0.1" || ip == "::1" {
+						username = "$localhost"
+					}
 				}
 
 				domain = c.QueryParam("group")
@@ -173,14 +185,23 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			} else {
 				identity, err = mw.findIdentityFromBasicAuth(c)
 				if err != nil {
-					if err == ErrUnauthorized {
-						c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm=datarhei-core")
+					if err == ErrAuthRequired {
+						c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
 						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
-					} else if err == ErrBadRequest {
-						return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
-					}
+					} else {
+						if config.WaitAfterFailedLogin {
+							time.Sleep(5 * time.Second)
+						}
 
-					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+						if err == ErrBadRequest {
+							return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+						} else if err == ErrUnauthorized {
+							c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
+							return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+						} else {
+							return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+						}
+					}
 				}
 
 				domain = mw.findDomainFromFilesystem(resource)
@@ -208,6 +229,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 }
 
+var ErrAuthRequired = errors.New("unauthorized")
 var ErrUnauthorized = errors.New("unauthorized")
 var ErrBadRequest = errors.New("bad request")
 
@@ -224,7 +246,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 		}
 
 		if !m.iam.Enforce("$anon", domain, "fs:"+path, c.Request().Method) {
-			return nil, ErrUnauthorized
+			return nil, ErrAuthRequired
 		}
 
 		return nil, nil

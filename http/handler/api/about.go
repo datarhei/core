@@ -36,9 +36,8 @@ func NewAbout(restream restream.Restreamer, auths func() []string) *AboutHandler
 // @Router /api [get]
 func (p *AboutHandler) About(c echo.Context) error {
 	user, _ := c.Get("user").(string)
-	disablelocalhost, _ := c.Get("disablelocalhost").(bool)
 
-	if user == "$anon" || (user == "$localhost" && !disablelocalhost) {
+	if user == "$anon" {
 		return c.JSON(http.StatusOK, api.MinimalAbout{
 			App:   app.Name,
 			Auths: p.auths(),

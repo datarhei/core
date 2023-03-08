@@ -223,10 +223,11 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
-		IAM:              config.IAM,
-		Mounts:           mounts,
-		DisableLocalhost: config.IAMDisableLocalhost,
-		Logger:           s.logger.WithComponent("IAM"),
+		IAM:                  config.IAM,
+		Mounts:               mounts,
+		DisableLocalhost:     config.IAMDisableLocalhost,
+		WaitAfterFailedLogin: true,
+		Logger:               s.logger.WithComponent("IAM"),
 	})
 
 	s.handler.about = api.NewAbout(

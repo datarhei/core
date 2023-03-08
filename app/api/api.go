@@ -441,8 +441,7 @@ func (a *api) start() error {
 			return fmt.Errorf("iam: %w", err)
 		}
 
-		// Create default policies for anonymous users in order to mimic
-		// the behaviour before IAM
+		// Create default policies for anonymous users in order to mimic the behaviour before IAM
 
 		iam.RemovePolicy("$anon", "$none", "", nil)
 		iam.RemovePolicy("$localhost", "$none", "", nil)
@@ -451,16 +450,14 @@ func (a *api) start() error {
 		iam.AddPolicy("$anon", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
 		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
 
-		iam.AddPolicy("$localhost", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
-		iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
-
 		if !cfg.API.Auth.Enable {
 			iam.AddPolicy("$anon", "$none", "api:/api/**", []string{"ANY"})
 			iam.AddPolicy("$anon", "$none", "process:*", []string{"ANY"})
-			iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
-			iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
 		} else {
 			if cfg.API.Auth.DisableLocalhost {
+				iam.AddPolicy("$localhost", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
+				iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
+
 				iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
 				iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
 			}
@@ -1125,7 +1122,7 @@ func (a *api) start() error {
 		Router:              router,
 		ReadOnly:            cfg.API.ReadOnly,
 		IAM:                 a.iam,
-		IAMDisableLocalhost: cfg.API.Auth.DisableLocalhost,
+		IAMDisableLocalhost: cfg.API.Auth.Enable && cfg.API.Auth.DisableLocalhost,
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)
