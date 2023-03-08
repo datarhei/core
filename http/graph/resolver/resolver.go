@@ -86,3 +86,5 @@ func (r *queryResolver) playoutRequest(method, addr, path, contentType string, d
 
 	return data, nil
 }
+
+type GraphKey string

@@ -11,7 +11,7 @@ import (
 
 // Processes is the resolver for the processes field.
 func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpattern *string, group *string) ([]*models.Process, error) {
-	user, _ := ctx.Value("user").(string)
+	user, _ := ctx.Value(GraphKey("user")).(string)
 	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, user, *group)
 
 	procs := []*models.Process{}
@@ -30,14 +30,14 @@ func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpat
 
 // Process is the resolver for the process field.
 func (r *queryResolver) Process(ctx context.Context, id string, group *string) (*models.Process, error) {
-	user, _ := ctx.Value("user").(string)
+	user, _ := ctx.Value(GraphKey("user")).(string)
 
 	return r.getProcess(id, user, *group)
 }
 
 // Probe is the resolver for the probe field.
 func (r *queryResolver) Probe(ctx context.Context, id string, group *string) (*models.Probe, error) {
-	user, _ := ctx.Value("user").(string)
+	user, _ := ctx.Value(GraphKey("user")).(string)
 
 	probe := r.Restream.Probe(id, user, *group)
 

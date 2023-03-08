@@ -47,7 +47,7 @@ func (g *GraphHandler) Query(c echo.Context) error {
 	user, _ := c.Get("user").(string)
 
 	r := c.Request()
-	ctx := context.WithValue(r.Context(), "user", user)
+	ctx := context.WithValue(r.Context(), resolver.GraphKey("user"), user)
 
 	g.queryHandler.ServeHTTP(c.Response(), r.WithContext(ctx))
 
