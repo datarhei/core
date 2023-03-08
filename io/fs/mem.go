@@ -64,9 +64,14 @@ func (f *memFileInfo) IsDir() bool {
 	return f.dir
 }
 
-type memFile struct {
+type internalMemFile struct {
 	memFileInfo
 	data *bytes.Buffer // Contents of the file
+}
+
+type memFile struct {
+	memFileInfo
+	data *bytes.Reader
 }
 
 func (f *memFile) Name() string {
@@ -93,6 +98,14 @@ func (f *memFile) Read(p []byte) (int, error) {
 	return f.data.Read(p)
 }
 
+func (f *memFile) Seek(offset int64, whence int) (int64, error) {
+	if f.data == nil {
+		return 0, io.EOF
+	}
+
+	return f.data.Seek(offset, whence)
+}
+
 func (f *memFile) Close() error {
 	if f.data == nil {
 		return io.EOF
@@ -108,7 +121,7 @@ type memFilesystem struct {
 	metaLock sync.RWMutex
 
 	// Mapping of path to file
-	files map[string]*memFile
+	files map[string]*internalMemFile
 
 	// Mutex for the files map
 	filesLock sync.RWMutex
@@ -137,7 +150,7 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 
 	fs.logger = fs.logger.WithField("type", "mem")
 
-	fs.files = make(map[string]*memFile)
+	fs.files = make(map[string]*internalMemFile)
 
 	fs.dataPool = sync.Pool{
 		New: func() interface{} {
@@ -270,7 +283,7 @@ func (fs *memFilesystem) Open(path string) File {
 
 	if file.data != nil {
 		newFile.lastMod = file.lastMod
-		newFile.data = bytes.NewBuffer(file.data.Bytes())
+		newFile.data = bytes.NewReader(file.data.Bytes())
 		newFile.size = int64(newFile.data.Len())
 	}
 
@@ -323,7 +336,7 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 		}
 	}
 
-	newFile := &memFile{
+	newFile := &internalMemFile{
 		memFileInfo: memFileInfo{
 			name:    newname,
 			dir:     false,
@@ -346,7 +359,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 		return -1, false, fmt.Errorf("path not writeable")
 	}
 
-	newFile := &memFile{
+	newFile := &internalMemFile{
 		memFileInfo: memFileInfo{
 			name:    path,
 			dir:     false,
@@ -414,7 +427,7 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 	fs.filesLock.Lock()
 	defer fs.filesLock.Unlock()
 
-	files := []*memFile{}
+	files := []*internalMemFile{}
 
 	for _, f := range fs.files {
 		files = append(files, f)
@@ -466,7 +479,7 @@ func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 		return os.ErrExist
 	}
 
-	f := &memFile{
+	f := &internalMemFile{
 		memFileInfo: memFileInfo{
 			name:    path,
 			size:    0,
@@ -539,7 +552,7 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 	if ok {
 		fs.currentSize -= dstFile.size
 	} else {
-		dstFile = &memFile{
+		dstFile = &internalMemFile{
 			memFileInfo: memFileInfo{
 				name:    dst,
 				dir:     false,
@@ -664,7 +677,7 @@ func (fs *memFilesystem) RemoveAll() int64 {
 
 	size := fs.currentSize
 
-	fs.files = make(map[string]*memFile)
+	fs.files = make(map[string]*internalMemFile)
 	fs.currentSize = 0
 
 	return size

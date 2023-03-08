@@ -67,6 +67,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				return next(c)
 			}
 
+			if len(req.Header.Get("Range")) != 0 {
+				res.Header().Set("X-Cache", "SKIP RANGEREQ")
+				return next(c)
+			}
+
 			if obj, expireIn, _ := config.Cache.Get(key); obj == nil {
 				// cache miss
 				writer := res.Writer

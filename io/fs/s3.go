@@ -622,18 +622,10 @@ func (f *s3FileInfo) IsDir() bool {
 }
 
 type s3File struct {
-	data         io.ReadCloser
+	data         io.ReadSeekCloser
 	name         string
 	size         int64
 	lastModified time.Time
-}
-
-func (f *s3File) Read(p []byte) (int, error) {
-	return f.data.Read(p)
-}
-
-func (f *s3File) Close() error {
-	return f.data.Close()
 }
 
 func (f *s3File) Name() string {
@@ -646,4 +638,16 @@ func (f *s3File) Stat() (FileInfo, error) {
 		size:         f.size,
 		lastModified: f.lastModified,
 	}, nil
+}
+
+func (f *s3File) Read(p []byte) (int, error) {
+	return f.data.Read(p)
+}
+
+func (f *s3File) Seek(offset int64, whence int) (int64, error) {
+	return f.data.Seek(offset, whence)
+}
+
+func (f *s3File) Close() error {
+	return f.data.Close()
 }
