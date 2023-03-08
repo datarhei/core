@@ -50,7 +50,11 @@ func (h *IAMHandler) AddUser(c echo.Context) error {
 	}
 
 	for _, p := range iampolicies {
-		h.iam.AddPolicy(p.Name, p.Domain, p.Resource, p.Actions)
+		if len(p.Domain) != 0 {
+			continue
+		}
+
+		h.iam.AddPolicy(p.Name, "", p.Resource, p.Actions)
 	}
 
 	err = h.iam.SaveIdentities()
@@ -76,6 +80,10 @@ func (h *IAMHandler) AddUser(c echo.Context) error {
 func (h *IAMHandler) RemoveUser(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
+	// Remove all policies of that user
+	h.iam.RemovePolicy(name, "", "", nil)
+
+	// Remove the user
 	err := h.iam.DeleteIdentity(name)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
@@ -128,10 +136,14 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 	}
 
-	h.iam.RemovePolicy(name, "", "", nil)
+	h.iam.RemovePolicy(name, "$none", "", nil)
 
 	for _, p := range iampolicies {
-		h.iam.AddPolicy(p.Name, p.Domain, p.Resource, p.Actions)
+		if len(p.Domain) != 0 {
+			continue
+		}
+
+		h.iam.AddPolicy(p.Name, "", p.Resource, p.Actions)
 	}
 
 	err = h.iam.SaveIdentities()
@@ -161,10 +173,89 @@ func (h *IAMHandler) GetUser(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Not found", "%s", err)
 	}
 
-	iampolicies := h.iam.ListPolicies(name, "", "", nil)
+	iampolicies := h.iam.ListPolicies(name, "$none", "", nil)
 
 	user := api.IAMUser{}
 	user.Marshal(iamuser, iampolicies)
 
 	return c.JSON(http.StatusOK, user)
+}
+
+// @Router /api/v3/iam/group [post]
+func (h *IAMHandler) AddGroup(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
+
+	group := api.IAMGroup{}
+
+	if err := util.ShouldBindJSON(c, &group); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	if h.iam.HasDomain(group.Name) {
+		return api.Err(http.StatusConflict, "Conflict", "this group already exists")
+	}
+
+	for _, admin := range group.Admins {
+		_, err := h.iam.GetIdentity(admin)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "Bad request", "the user %s doesn't exist", admin)
+		}
+	}
+
+	if !h.iam.Enforce(user, group.Name, "iam:/group", "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	for _, admin := range group.Admins {
+		h.iam.AddPolicy(admin, group.Name, "iam:/group/**", []string{"read", "write"})
+	}
+
+	return c.JSON(http.StatusOK, group)
+}
+
+// @Router /api/v3/iam/group/{name} [delete]
+func (h *IAMHandler) RemoveGroup(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
+	name := util.PathParam(c, "name")
+
+	if !h.iam.HasDomain(name) {
+		return api.Err(http.StatusNotFound, "Not found")
+	}
+
+	if !h.iam.Enforce(user, name, "iam:/group", "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	h.iam.RemovePolicy("", name, "", nil)
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// @Router /api/v3/iam/group/{name} [get]
+func (h *IAMHandler) GetGroup(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
+	name := util.PathParam(c, "name")
+
+	if !h.iam.HasDomain(name) {
+		return api.Err(http.StatusNotFound, "Not found")
+	}
+
+	if !h.iam.Enforce(user, name, "iam:/group", "read") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	members := map[string]struct{}{}
+
+	policies := h.iam.ListPolicies("", name, "", nil)
+	for _, p := range policies {
+		members[p.Name] = struct{}{}
+	}
+
+	list := []string{}
+
+	for name := range members {
+		list = append(list, name)
+	}
+
+	return c.JSON(http.StatusOK, list)
 }

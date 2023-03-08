@@ -6,13 +6,13 @@ import (
 )
 
 type IAM interface {
-	Enforce(user, domain, resource, action string) bool
+	Enforce(name, domain, resource, action string) bool
 	HasDomain(domain string) bool
 
-	AddPolicy(username, domain, resource string, actions []string) bool
-	RemovePolicy(username, domain, resource string, actions []string) bool
+	AddPolicy(name, domain, resource string, actions []string) bool
+	RemovePolicy(name, domain, resource string, actions []string) bool
 
-	ListPolicies(username, domain, resource string, actions []string) []Policy
+	ListPolicies(name, domain, resource string, actions []string) []Policy
 
 	Validators() []string
 

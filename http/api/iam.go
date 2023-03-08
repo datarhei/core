@@ -123,3 +123,8 @@ type IAMPolicy struct {
 	Resource string   `json:"resource"`
 	Actions  []string `json:"actions"`
 }
+
+type IAMGroup struct {
+	Name   string   `json:"name"`
+	Admins []string `json:"admins"`
+}
