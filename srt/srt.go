@@ -387,7 +387,7 @@ func (s *server) findIdentityFromToken(key string) (string, error) {
 
 	elements := strings.Split(key, ":")
 	if len(elements) == 1 {
-		identity, err = s.iam.GetDefaultVerifier()
+		identity = s.iam.GetDefaultVerifier()
 		token = elements[0]
 	} else {
 		identity, err = s.iam.GetVerifier(elements[0])

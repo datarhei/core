@@ -444,26 +444,10 @@ func (a *api) start() error {
 		// Create default policies for anonymous users in order to mimic the behaviour before IAM
 
 		iam.RemovePolicy("$anon", "$none", "", nil)
-		iam.RemovePolicy("$localhost", "$none", "", nil)
 
 		iam.AddPolicy("$anon", "$none", "fs:/**", []string{"GET", "HEAD", "OPTIONS"})
 		iam.AddPolicy("$anon", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
 		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
-
-		if !cfg.API.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "api:/api/**", []string{"ANY"})
-			iam.AddPolicy("$anon", "$none", "process:*", []string{"ANY"})
-			iam.AddPolicy("$anon", "$none", "iam:*", []string{"ANY"})
-		} else {
-			if cfg.API.Auth.DisableLocalhost {
-				iam.AddPolicy("$localhost", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
-				iam.AddPolicy("$localhost", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
-
-				iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
-				iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
-				iam.AddPolicy("$localhost", "$none", "iam:*", []string{"ANY"})
-			}
-		}
 
 		if !cfg.Storage.Memory.Auth.Enable {
 			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", []string{"ANY"})
@@ -671,7 +655,7 @@ func (a *api) start() error {
 			var identity iam.IdentityVerifier = nil
 
 			if len(config.Owner) == 0 {
-				identity, _ = a.iam.GetDefaultVerifier()
+				identity = a.iam.GetDefaultVerifier()
 			} else {
 				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
@@ -697,7 +681,7 @@ func (a *api) start() error {
 			var identity iam.IdentityVerifier = nil
 
 			if len(config.Owner) == 0 {
-				identity, _ = a.iam.GetDefaultVerifier()
+				identity = a.iam.GetDefaultVerifier()
 			} else {
 				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
@@ -1117,14 +1101,29 @@ func (a *api) start() error {
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},
-		RTMP:                a.rtmpserver,
-		SRT:                 a.srtserver,
-		Config:              a.config.store,
-		Sessions:            a.sessions,
-		Router:              router,
-		ReadOnly:            cfg.API.ReadOnly,
-		IAM:                 a.iam,
-		IAMDisableLocalhost: cfg.API.Auth.Enable && cfg.API.Auth.DisableLocalhost,
+		RTMP:     a.rtmpserver,
+		SRT:      a.srtserver,
+		Config:   a.config.store,
+		Sessions: a.sessions,
+		Router:   router,
+		ReadOnly: cfg.API.ReadOnly,
+		IAM:      a.iam,
+		IAMSkipper: func(ip string) bool {
+			if !cfg.API.Auth.Enable {
+				return true
+			} else {
+				isLocalhost := false
+				if ip == "127.0.0.1" || ip == "::1" {
+					isLocalhost = true
+				}
+
+				if isLocalhost && cfg.API.Auth.DisableLocalhost {
+					return true
+				}
+			}
+
+			return false
+		},
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

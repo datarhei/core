@@ -424,12 +424,7 @@ func (r *restream) enforce(name, group, processid, action string) bool {
 	if len(name) == 0 {
 		// This is for backwards compatibility. Existing processes don't have an owner.
 		// All processes that will be added later will have an owner ($anon, ...).
-		identity, err := r.iam.GetDefaultVerifier()
-		if err != nil {
-			name = "$anon"
-		} else {
-			name = identity.Name()
-		}
+		name = r.iam.GetDefaultVerifier().Name()
 	}
 
 	if len(group) == 0 {

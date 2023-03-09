@@ -17,9 +17,8 @@
 // only allow JWT as authentication method.
 //
 // If the identity can't be detected, the identity of "$anon" is given, representing
-// an anonmyous user. If the request originates from localhost and DisableLocalhost
-// is configured, the identity will be $localhost, representing an anonymous user from
-// localhost.
+// an anonmyous user. If the Skipper function returns true for the request and the
+// API is accessed, the username will be the one of the IAM superuser.
 //
 // The domain is provided as query parameter "group" for all API requests or the
 // first path element after a mountpoint for filesystem requests.
@@ -57,7 +56,6 @@ type Config struct {
 	Skipper              middleware.Skipper
 	Mounts               []string
 	IAM                  iam.IAM
-	DisableLocalhost     bool
 	WaitAfterFailedLogin bool
 	Logger               log.Logger
 }
@@ -66,7 +64,6 @@ var DefaultConfig = Config{
 	Skipper:              middleware.DefaultSkipper,
 	Mounts:               []string{},
 	IAM:                  nil,
-	DisableLocalhost:     false,
 	WaitAfterFailedLogin: false,
 	Logger:               nil,
 }
@@ -111,13 +108,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if config.Skipper(c) {
-				c.Set("user", "$anon")
-				return next(c)
-			}
-
 			if config.IAM == nil {
 				return api.Err(http.StatusForbidden, "Forbidden", "IAM is not provided")
+			}
+
+			isAPISuperuser := false
+			if config.Skipper(c) {
+				isAPISuperuser = true
 			}
 
 			var identity iam.IdentityVerifier = nil
@@ -173,11 +170,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					}
 				}
 
-				if config.DisableLocalhost {
-					ip := c.RealIP()
-					if ip == "127.0.0.1" || ip == "::1" {
-						username = "$localhost"
-					}
+				if isAPISuperuser {
+					username = config.IAM.GetDefaultVerifier().Name()
 				}
 
 				domain = c.QueryParam("group")

@@ -28,7 +28,7 @@ type IAM interface {
 
 	GetVerifier(name string) (IdentityVerifier, error)
 	GetVerfierFromAuth0(name string) (IdentityVerifier, error)
-	GetDefaultVerifier() (IdentityVerifier, error)
+	GetDefaultVerifier() IdentityVerifier
 
 	CreateJWT(name string) (string, string, error)
 
@@ -107,10 +107,6 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 		}
 	}
 
-	//if name == "$localhost" {
-	//	superuser = true
-	//}
-
 	l := i.logger.Debug().WithFields(log.Fields{
 		"subject":   name,
 		"domain":    domain,
@@ -128,6 +124,10 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 	if !ok {
 		l.Log("no match")
 	} else {
+		if name == "$superuser" {
+			rule = ""
+		}
+
 		l.WithField("rule", rule).Log("match")
 	}
 
@@ -166,8 +166,10 @@ func (i *iam) GetVerfierFromAuth0(name string) (IdentityVerifier, error) {
 	return i.im.GetVerifierFromAuth0(name)
 }
 
-func (i *iam) GetDefaultVerifier() (IdentityVerifier, error) {
-	return i.im.GetDefaultVerifier()
+func (i *iam) GetDefaultVerifier() IdentityVerifier {
+	v, _ := i.im.GetDefaultVerifier()
+
+	return v
 }
 
 func (i *iam) CreateJWT(name string) (string, string, error) {

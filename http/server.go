@@ -75,25 +75,25 @@ import (
 var ListenAndServe = http.ListenAndServe
 
 type Config struct {
-	Logger              log.Logger
-	LogBuffer           log.BufferWriter
-	Restream            restream.Restreamer
-	Metrics             monitor.HistoryReader
-	Prometheus          prometheus.Reader
-	MimeTypesFile       string
-	Filesystems         []fs.FS
-	IPLimiter           net.IPLimiter
-	Profiling           bool
-	Cors                CorsConfig
-	RTMP                rtmp.Server
-	SRT                 srt.Server
-	Config              cfgstore.Store
-	Cache               cache.Cacher
-	Sessions            session.RegistryReader
-	Router              router.Router
-	ReadOnly            bool
-	IAM                 iam.IAM
-	IAMDisableLocalhost bool
+	Logger        log.Logger
+	LogBuffer     log.BufferWriter
+	Restream      restream.Restreamer
+	Metrics       monitor.HistoryReader
+	Prometheus    prometheus.Reader
+	MimeTypesFile string
+	Filesystems   []fs.FS
+	IPLimiter     net.IPLimiter
+	Profiling     bool
+	Cors          CorsConfig
+	RTMP          rtmp.Server
+	SRT           srt.Server
+	Config        cfgstore.Store
+	Cache         cache.Cacher
+	Sessions      session.RegistryReader
+	Router        router.Router
+	ReadOnly      bool
+	IAM           iam.IAM
+	IAMSkipper    func(ip string) bool
 }
 
 type CorsConfig struct {
@@ -132,8 +132,6 @@ type server struct {
 	middleware struct {
 		iplimit    echo.MiddlewareFunc
 		log        echo.MiddlewareFunc
-		accessJWT  echo.MiddlewareFunc
-		refreshJWT echo.MiddlewareFunc
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
@@ -223,9 +221,11 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
+		Skipper: func(c echo.Context) bool {
+			return config.IAMSkipper(c.RealIP())
+		},
 		IAM:                  config.IAM,
 		Mounts:               mounts,
-		DisableLocalhost:     config.IAMDisableLocalhost,
 		WaitAfterFailedLogin: true,
 		Logger:               s.logger.WithComponent("IAM"),
 	})
