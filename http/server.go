@@ -538,6 +538,17 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/iam/user/:name", s.v3handler.iam.GetUser)
 		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateUser)
 		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveUser)
+
+		v3.POST("/iam/group", s.v3handler.iam.AddGroup)
+		v3.GET("/iam/group", s.v3handler.iam.ListGroups)
+		v3.GET("/iam/group/:group", s.v3handler.iam.GetGroup)
+		v3.DELETE("/iam/group/:group", s.v3handler.iam.RemoveGroup)
+
+		v3.POST("/iam/group/:group/user", s.v3handler.iam.AddGroupUser)
+		v3.GET("/iam/group/:group/user", s.v3handler.iam.ListGroupUsers)
+		v3.GET("/iam/group/:group/user/:name", s.v3handler.iam.GetGroupUser)
+		v3.PUT("/iam/group/:group/user/:name", s.v3handler.iam.UpdateGroupUser)
+		v3.DELETE("/iam/group/:group/user/:name", s.v3handler.iam.RemoveGroupUser)
 	}
 
 	// v3 Restreamer

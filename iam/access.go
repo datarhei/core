@@ -20,12 +20,15 @@ type Policy struct {
 
 type AccessEnforcer interface {
 	Enforce(name, domain, resource, action string) (bool, string)
-	HasGroup(name string) bool
+
+	HasDomain(name string) bool
+	ListDomains() []string
 }
 
 type AccessManager interface {
 	AccessEnforcer
 
+	HasPolicy(name, domain, resource string, actions []string) bool
 	AddPolicy(name, domain, resource string, actions []string) bool
 	RemovePolicy(name, domain, resource string, actions []string) bool
 	ListPolicies(name, domain, resource string, actions []string) []Policy
@@ -84,6 +87,12 @@ func NewAccessManager(config AccessConfig) (AccessManager, error) {
 	return am, nil
 }
 
+func (am *access) HasPolicy(name, domain, resource string, actions []string) bool {
+	policy := []string{name, domain, resource, strings.Join(actions, "|")}
+
+	return am.enforcer.HasPolicy(policy)
+}
+
 func (am *access) AddPolicy(name, domain, resource string, actions []string) bool {
 	policy := []string{name, domain, resource, strings.Join(actions, "|")}
 
@@ -120,7 +129,7 @@ func (am *access) ListPolicies(name, domain, resource string, actions []string) 
 	return policies
 }
 
-func (am *access) HasGroup(name string) bool {
+func (am *access) HasDomain(name string) bool {
 	groups := am.adapter.getAllGroups()
 
 	for _, g := range groups {
@@ -130,6 +139,10 @@ func (am *access) HasGroup(name string) bool {
 	}
 
 	return false
+}
+
+func (am *access) ListDomains() []string {
+	return am.adapter.getAllGroups()
 }
 
 func (am *access) Enforce(name, domain, resource, action string) (bool, string) {

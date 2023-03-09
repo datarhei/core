@@ -7,8 +7,11 @@ import (
 
 type IAM interface {
 	Enforce(name, domain, resource, action string) bool
-	HasDomain(domain string) bool
 
+	HasDomain(domain string) bool
+	ListDomains() []string
+
+	HasPolicy(name, domain, resource string, actions []string) bool
 	AddPolicy(name, domain, resource string, actions []string) bool
 	RemovePolicy(name, domain, resource string, actions []string) bool
 
@@ -104,6 +107,10 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 		}
 	}
 
+	//if name == "$localhost" {
+	//	superuser = true
+	//}
+
 	l := i.logger.Debug().WithFields(log.Fields{
 		"subject":   name,
 		"domain":    domain,
@@ -168,11 +175,27 @@ func (i *iam) CreateJWT(name string) (string, string, error) {
 }
 
 func (i *iam) HasDomain(domain string) bool {
-	return i.am.HasGroup(domain)
+	return i.am.HasDomain(domain)
+}
+
+func (i *iam) ListDomains() []string {
+	return i.am.ListDomains()
 }
 
 func (i *iam) Validators() []string {
 	return i.im.Validators()
+}
+
+func (i *iam) HasPolicy(name, domain, resource string, actions []string) bool {
+	if len(name) == 0 {
+		name = "$anon"
+	}
+
+	if len(domain) == 0 {
+		domain = "$none"
+	}
+
+	return i.am.HasPolicy(name, domain, resource, actions)
 }
 
 func (i *iam) AddPolicy(name, domain, resource string, actions []string) bool {

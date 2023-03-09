@@ -453,6 +453,7 @@ func (a *api) start() error {
 		if !cfg.API.Auth.Enable {
 			iam.AddPolicy("$anon", "$none", "api:/api/**", []string{"ANY"})
 			iam.AddPolicy("$anon", "$none", "process:*", []string{"ANY"})
+			iam.AddPolicy("$anon", "$none", "iam:*", []string{"ANY"})
 		} else {
 			if cfg.API.Auth.DisableLocalhost {
 				iam.AddPolicy("$localhost", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
@@ -460,6 +461,7 @@ func (a *api) start() error {
 
 				iam.AddPolicy("$localhost", "$none", "api:/api/**", []string{"ANY"})
 				iam.AddPolicy("$localhost", "$none", "process:*", []string{"ANY"})
+				iam.AddPolicy("$localhost", "$none", "iam:*", []string{"ANY"})
 			}
 		}
 

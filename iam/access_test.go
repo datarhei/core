@@ -57,9 +57,9 @@ func TestAccessManager(t *testing.T) {
 		},
 	}, policies)
 
-	require.True(t, am.HasGroup("igelcamp"))
-	require.True(t, am.HasGroup("group"))
-	require.False(t, am.HasGroup("$none"))
+	require.True(t, am.HasDomain("igelcamp"))
+	require.True(t, am.HasDomain("group"))
+	require.False(t, am.HasDomain("$none"))
 
 	am.RemovePolicy("ingo", "", "", nil)
 
@@ -73,9 +73,9 @@ func TestAccessManager(t *testing.T) {
 		},
 	}, policies)
 
-	require.False(t, am.HasGroup("igelcamp"))
-	require.True(t, am.HasGroup("group"))
-	require.False(t, am.HasGroup("$none"))
+	require.False(t, am.HasDomain("igelcamp"))
+	require.True(t, am.HasDomain("group"))
+	require.False(t, am.HasDomain("$none"))
 
 	ok, _ := am.Enforce("foobar", "group", "bla:/", "read")
 	require.False(t, ok)
