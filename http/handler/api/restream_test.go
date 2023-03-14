@@ -342,7 +342,7 @@ func TestProcessReportAt(t *testing.T) {
 
 	require.Equal(t, 1, len(x.History))
 
-	at := x.History[0].CreatedAt
+	at := x.History[0].ExitedAt
 
 	mock.Request(t, http.StatusOK, router, "GET", "/test/report/"+strconv.FormatInt(at, 10), nil)
 	mock.Request(t, http.StatusNotFound, router, "GET", "/test/report/1234", nil)
@@ -384,8 +384,8 @@ func TestSearchReportHistory(t *testing.T) {
 
 	require.Equal(t, 2, len(x.History))
 
-	time1 := x.History[0].CreatedAt
-	time2 := x.History[1].CreatedAt
+	time1 := x.History[0].ExitedAt
+	time2 := x.History[1].ExitedAt
 
 	response = mock.Request(t, http.StatusOK, router, "GET", "/report/process", nil)
 
