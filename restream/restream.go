@@ -1430,6 +1430,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 				CreatedAt: h.CreatedAt,
 				Prelude:   h.Prelude,
 			},
+			ExitedAt:  h.ExitedAt,
 			ExitState: h.ExitState,
 		}
 
@@ -1487,6 +1488,7 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 				Reference: task.reference,
 				ExitState: f.ExitState,
 				CreatedAt: f.CreatedAt,
+				ExitedAt:  f.ExitedAt,
 			})
 		}
 	}

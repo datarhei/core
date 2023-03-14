@@ -732,12 +732,14 @@ type Report struct {
 type ReportHistoryEntry struct {
 	Report
 
+	ExitedAt  time.Time
 	ExitState string
 	Progress  Progress
 }
 
 type ReportHistorySearchResult struct {
 	CreatedAt time.Time
+	ExitedAt  time.Time
 	ExitState string
 }
 
@@ -756,19 +758,20 @@ func (p *parser) SearchReportHistory(state string, from, to *time.Time) []Report
 		}
 
 		if from != nil {
-			if e.CreatedAt.Before(*from) {
+			if e.ExitedAt.Before(*from) {
 				return
 			}
 		}
 
 		if to != nil {
-			if e.CreatedAt.After(*to) {
+			if e.ExitedAt.After(*to) {
 				return
 			}
 		}
 
 		result = append(result, ReportHistorySearchResult{
 			CreatedAt: e.CreatedAt,
+			ExitedAt:  e.ExitedAt,
 			ExitState: e.ExitState,
 		})
 	})
@@ -789,6 +792,7 @@ func (p *parser) storeReportHistory(state string) {
 
 	h := ReportHistoryEntry{
 		Report:    report,
+		ExitedAt:  time.Now(),
 		ExitState: state,
 		Progress:  p.Progress(),
 	}

@@ -338,9 +338,9 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 	return c.JSON(http.StatusOK, report)
 }
 
-// GetReportAt return the loh history entry of a process
+// GetReportAt return the log history entry of a process
 // @Summary Get the log history entry of a process
-// @Description Get the log history entry of a process at a certain time.
+// @Description Get the log history entry of a process that finished at a certain time.
 // @Tags v16.?.?
 // @ID process-3-get-report-at
 // @Produce json
@@ -367,7 +367,7 @@ func (h *RestreamHandler) GetReportAt(c echo.Context) error {
 	report.Unmarshal(l)
 
 	for _, r := range report.History {
-		if r.CreatedAt == at {
+		if r.ExitedAt == at {
 			return c.JSON(http.StatusOK, r)
 		}
 	}
@@ -425,6 +425,7 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 		response[i].Reference = b.Reference
 		response[i].ExitState = b.ExitState
 		response[i].CreatedAt = b.CreatedAt.Unix()
+		response[i].ExitedAt = b.ExitedAt.Unix()
 	}
 
 	return c.JSON(http.StatusOK, response)

@@ -18,6 +18,7 @@ type LogEntry struct {
 type LogHistoryEntry struct {
 	LogEntry
 
+	ExitedAt  time.Time
 	ExitState string
 	Progress  Progress
 }
@@ -31,5 +32,6 @@ type LogHistorySearchResult struct {
 	ProcessID string
 	Reference string
 	ExitState string
+	ExitedAt  time.Time
 	CreatedAt time.Time
 }

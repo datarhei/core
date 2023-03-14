@@ -16,6 +16,7 @@ type ProcessReportEntry struct {
 type ProcessReportHistoryEntry struct {
 	ProcessReportEntry
 
+	ExitedAt  int64    `json:"exited_at" format:"int64"`
 	ExitState string   `json:"exit_state"`
 	Progress  Progress `json:"progress"`
 }
@@ -49,6 +50,7 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 				Prelude:   h.Prelude,
 				Log:       make([][2]string, len(h.Log)),
 			},
+			ExitedAt:  h.ExitedAt.Unix(),
 			ExitState: h.ExitState,
 		}
 
@@ -68,4 +70,5 @@ type ProcessReportSearchResult struct {
 	Reference string `json:"reference"`
 	ExitState string `json:"exit_state"`
 	CreatedAt int64  `json:"created_at" format:"int64"`
+	ExitedAt  int64  `json:"exited_at" format:"int64"`
 }
