@@ -392,9 +392,9 @@ func (p *parser) Parse(line string) uint64 {
 
 	if isFFmpegProgress {
 		// Only consider the outputs
-		pFrames = 1
+		pFrames = 0
 		for i := range p.stats.output {
-			pFrames *= p.stats.output[i].diff.frame
+			pFrames += p.stats.output[i].diff.frame
 		}
 	}
 
