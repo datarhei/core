@@ -127,8 +127,9 @@ type Data struct {
 			} `json:"output"`
 		} `json:"access"`
 		Log struct {
-			MaxLines   int `json:"max_lines" format:"int"`
-			MaxHistory int `json:"max_history" format:"int"`
+			MaxLines          int `json:"max_lines" format:"int"`
+			MaxHistory        int `json:"max_history" format:"int"`
+			MaxMinimalHistory int `json:"max_minimal_history" format:"int"`
 		} `json:"log"`
 	} `json:"ffmpeg"`
 	Playout struct {
@@ -190,7 +191,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.API = d.API
 	data.RTMP = d.RTMP
 	data.SRT = d.SRT
-	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
@@ -210,10 +210,14 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 
 	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 
+	data.FFmpeg.Binary = d.FFmpeg.Binary
+	data.FFmpeg.MaxProcesses = d.FFmpeg.MaxProcesses
 	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
 	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
 	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Log.MaxLines = d.FFmpeg.Log.MaxLines
+	data.FFmpeg.Log.MaxHistory = d.FFmpeg.Log.MaxHistory
 
 	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
 
@@ -250,6 +254,8 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 
 	data.Storage.S3 = []value.S3Storage{}
 
+	data.FFmpeg.Log.MaxMinimalHistory = 0
+
 	data.Version = 3
 
 	return data, nil
@@ -273,7 +279,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.API = d.API
 	data.RTMP = d.RTMP
 	data.SRT = d.SRT
-	data.FFmpeg = d.FFmpeg
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
 	data.Sessions = d.Sessions
@@ -293,10 +298,14 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 
 	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
 
+	data.FFmpeg.Binary = d.FFmpeg.Binary
+	data.FFmpeg.MaxProcesses = d.FFmpeg.MaxProcesses
 	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
 	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
 	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Log.MaxLines = d.FFmpeg.Log.MaxLines
+	data.FFmpeg.Log.MaxHistory = d.FFmpeg.Log.MaxHistory
 
 	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
 

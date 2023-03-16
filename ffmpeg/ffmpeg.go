@@ -44,14 +44,15 @@ type ProcessConfig struct {
 // Config is the configuration for ffmpeg that is part of the configuration
 // for the restreamer instance.
 type Config struct {
-	Binary           string
-	MaxProc          int64
-	MaxLogLines      int
-	LogHistoryLength int
-	ValidatorInput   Validator
-	ValidatorOutput  Validator
-	Portrange        net.Portranger
-	Collector        session.Collector
+	Binary                  string
+	MaxProc                 int64
+	MaxLogLines             int
+	LogHistoryLength        int
+	LogMinimalHistoryLength int
+	ValidatorInput          Validator
+	ValidatorOutput         Validator
+	Portrange               net.Portranger
+	Collector               session.Collector
 }
 
 type ffmpeg struct {
@@ -61,8 +62,9 @@ type ffmpeg struct {
 	portrange    net.Portranger
 	skills       skills.Skills
 
-	logLines      int
-	historyLength int
+	logLines             int
+	historyLength        int
+	minimalHistoryLength int
 
 	collector session.Collector
 
@@ -80,6 +82,7 @@ func New(config Config) (FFmpeg, error) {
 
 	f.binary = binary
 	f.historyLength = config.LogHistoryLength
+	f.minimalHistoryLength = config.LogMinimalHistoryLength
 	f.logLines = config.MaxLogLines
 
 	f.portrange = config.Portrange
@@ -153,10 +156,11 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 
 func (f *ffmpeg) NewProcessParser(logger log.Logger, id, reference string) parse.Parser {
 	p := parse.New(parse.Config{
-		LogHistory: f.historyLength,
-		LogLines:   f.logLines,
-		Logger:     logger,
-		Collector:  NewWrappedCollector(id, reference, f.collector),
+		LogLines:          f.logLines,
+		LogHistory:        f.historyLength,
+		LogMinimalHistory: f.minimalHistoryLength,
+		Logger:            logger,
+		Collector:         NewWrappedCollector(id, reference, f.collector),
 	})
 
 	return p

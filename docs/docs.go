@@ -1729,7 +1729,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Get the log history entry of a process at a certain time.",
+                "description": "Get the log history entry of a process that finished at a certain time.",
                 "produces": [
                     "application/json"
                 ],
@@ -1860,13 +1860,13 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Search range of when the report has been created, older than this value. Unix timestamp, leave empty for any",
+                        "description": "Search range of when the report has been exited, older than this value. Unix timestamp, leave empty for any",
                         "name": "from",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Search range of when the report has been created, younger than this value. Unix timestamp, leave empty for any",
+                        "description": "Search range of when the report has been exited, younger than this value. Unix timestamp, leave empty for any",
                         "name": "to",
                         "in": "query"
                     }
@@ -2447,6 +2447,10 @@ const docTemplate = `{
                                     "format": "int"
                                 },
                                 "max_lines": {
+                                    "type": "integer",
+                                    "format": "int"
+                                },
+                                "max_minimal_history": {
                                     "type": "integer",
                                     "format": "int"
                                 }
@@ -3394,6 +3398,10 @@ const docTemplate = `{
                 "exit_state": {
                     "type": "string"
                 },
+                "exited_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "log": {
                     "type": "array",
                     "items": {
@@ -3423,6 +3431,10 @@ const docTemplate = `{
                 },
                 "exit_state": {
                     "type": "string"
+                },
+                "exited_at": {
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "id": {
                     "type": "string"
@@ -4276,6 +4288,10 @@ const docTemplate = `{
                                 "max_lines": {
                                     "type": "integer",
                                     "format": "int"
+                                },
+                                "max_minimal_history": {
+                                    "type": "integer",
+                                    "format": "int"
                                 }
                             }
                         },
@@ -4935,18 +4951,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "auth": {
-                    "type": "object",
-                    "properties": {
-                        "enable": {
-                            "type": "boolean"
-                        },
-                        "password": {
-                            "type": "string"
-                        },
-                        "username": {
-                            "type": "string"
-                        }
-                    }
+                    "$ref": "#/definitions/value.S3StorageAuth"
                 },
                 "bucket": {
                     "type": "string"
@@ -4968,6 +4973,20 @@ const docTemplate = `{
                 },
                 "use_ssl": {
                     "type": "boolean"
+                }
+            }
+        },
+        "value.S3StorageAuth": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         }

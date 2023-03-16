@@ -129,7 +129,7 @@ func TestParserLog(t *testing.T) {
 	require.Equal(t, 1, len(log))
 }
 
-func TestParserLasLogLine(t *testing.T) {
+func TestParserLastLogLine(t *testing.T) {
 	parser := New(Config{
 		LogLines: 20,
 	}).(*parser)
@@ -186,6 +186,86 @@ func TestParserLogHistory(t *testing.T) {
 		Drop:      3522,
 		Dup:       87463,
 	}, history[0].Progress)
+}
+
+func TestParserLogHistoryLength(t *testing.T) {
+	parser := New(Config{
+		LogLines:   20,
+		LogHistory: 3,
+	}).(*parser)
+
+	history := parser.ReportHistory()
+	require.Equal(t, 0, len(history))
+
+	for i := 0; i < 5; i++ {
+		parser.Parse("bla")
+
+		parser.prelude.done = true
+		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+		parser.Stop("finished")
+	}
+
+	history = parser.ReportHistory()
+	require.Equal(t, 3, len(history))
+}
+
+func TestParserLogMinimalHistoryLength(t *testing.T) {
+	parser := New(Config{
+		LogLines:          20,
+		LogHistory:        3,
+		LogMinimalHistory: 10,
+	}).(*parser)
+
+	history := parser.ReportHistory()
+	require.Equal(t, 0, len(history))
+
+	for i := 0; i < 15; i++ {
+		parser.Parse("bla")
+
+		parser.prelude.done = true
+		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+		parser.Stop("finished")
+	}
+
+	history = parser.ReportHistory()
+	require.Equal(t, 13, len(history))
+
+	for i := 0; i < 10; i++ {
+		require.Empty(t, history[i].Log, i)
+	}
+
+	for i := 10; i < 13; i++ {
+		require.NotEmpty(t, history[i].Log, i)
+	}
+}
+
+func TestParserLogMinimalHistoryLengthWithoutFullHistory(t *testing.T) {
+	parser := New(Config{
+		LogLines:          20,
+		LogHistory:        0,
+		LogMinimalHistory: 10,
+	}).(*parser)
+
+	history := parser.ReportHistory()
+	require.Equal(t, 0, len(history))
+
+	for i := 0; i < 15; i++ {
+		parser.Parse("bla")
+
+		parser.prelude.done = true
+		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+		parser.Stop("finished")
+	}
+
+	history = parser.ReportHistory()
+	require.Equal(t, 10, len(history))
+
+	for i := 0; i < 10; i++ {
+		require.Empty(t, history[i].Log, i)
+	}
 }
 
 func TestParserLogHistorySearch(t *testing.T) {

@@ -384,8 +384,8 @@ func (h *RestreamHandler) GetReportAt(c echo.Context) error {
 // @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern."
 // @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern."
 // @Param state query string false "State of a process, leave empty for any"
-// @Param from query int64 false "Search range of when the report has been created, older than this value. Unix timestamp, leave empty for any"
-// @Param to query int64 false "Search range of when the report has been created, younger than this value. Unix timestamp, leave empty for any"
+// @Param from query int64 false "Search range of when the report has been exited, older than this value. Unix timestamp, leave empty for any"
+// @Param to query int64 false "Search range of when the report has been exited, younger than this value. Unix timestamp, leave empty for any"
 // @Success 200 {array} api.ProcessReportSearchResult
 // @Failure 400 {object} api.Error
 // @Security ApiKeyAuth

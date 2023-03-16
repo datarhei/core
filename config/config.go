@@ -236,6 +236,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Output.Block, []string{}, " "), "ffmpeg.access.output.block", "CORE_FFMPEG_ACCESS_OUTPUT_BLOCK", nil, "List of blocked expression to match against the output addresses", false, false)
 	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxLines, 50), "ffmpeg.log.max_lines", "CORE_FFMPEG_LOG_MAXLINES", nil, "Number of latest log lines to keep for each process", false, false)
 	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxHistory, 3), "ffmpeg.log.max_history", "CORE_FFMPEG_LOG_MAXHISTORY", nil, "Number of latest logs to keep for each process", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxMinimalHistory, 0), "ffmpeg.log.max_minimal_history", "CORE_FFMPEG_LOG_MAXMINIMALHISTORY", nil, "Number of minimal logs to keep for each process on top of max_history", false, false)
 
 	// Playout
 	d.vars.Register(value.NewBool(&d.Playout.Enable, false), "playout.enable", "CORE_PLAYOUT_ENABLE", nil, "Enable playout proxy where available", false, false)

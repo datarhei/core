@@ -9,8 +9,8 @@ import (
 // ProcessReportEntry represents the logs of a run of a restream process
 type ProcessReportEntry struct {
 	CreatedAt int64       `json:"created_at" format:"int64"`
-	Prelude   []string    `json:"prelude"`
-	Log       [][2]string `json:"log"`
+	Prelude   []string    `json:"prelude,omitempty"`
+	Log       [][2]string `json:"log,omitempty"`
 }
 
 type ProcessReportHistoryEntry struct {

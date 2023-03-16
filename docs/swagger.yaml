@@ -189,6 +189,9 @@ definitions:
               max_lines:
                 format: int
                 type: integer
+              max_minimal_history:
+                format: int
+                type: integer
             type: object
           max_processes:
             format: int64
@@ -825,6 +828,9 @@ definitions:
         type: integer
       exit_state:
         type: string
+      exited_at:
+        format: int64
+        type: integer
       log:
         items:
           items:
@@ -845,6 +851,9 @@ definitions:
         type: integer
       exit_state:
         type: string
+      exited_at:
+        format: int64
+        type: integer
       id:
         type: string
       reference:
@@ -1487,6 +1496,9 @@ definitions:
               max_lines:
                 format: int
                 type: integer
+              max_minimal_history:
+                format: int
+                type: integer
             type: object
           max_processes:
             format: int64
@@ -1921,14 +1933,7 @@ definitions:
       access_key_id:
         type: string
       auth:
-        properties:
-          enable:
-            type: boolean
-          password:
-            type: string
-          username:
-            type: string
-        type: object
+        $ref: '#/definitions/value.S3StorageAuth'
       bucket:
         type: string
       endpoint:
@@ -1943,6 +1948,15 @@ definitions:
         type: string
       use_ssl:
         type: boolean
+    type: object
+  value.S3StorageAuth:
+    properties:
+      enable:
+        type: boolean
+      password:
+        type: string
+      username:
+        type: string
     type: object
 info:
   contact:
@@ -3078,7 +3092,8 @@ paths:
       - v16.7.2
   /api/v3/process/{id}/report/{at}:
     get:
-      description: Get the log history entry of a process at a certain time.
+      description: Get the log history entry of a process that finished at a certain
+        time.
       operationId: process-3-get-report-at
       parameters:
       - description: Process ID
@@ -3161,12 +3176,12 @@ paths:
         in: query
         name: state
         type: string
-      - description: Search range of when the report has been created, older than
-          this value. Unix timestamp, leave empty for any
+      - description: Search range of when the report has been exited, older than this
+          value. Unix timestamp, leave empty for any
         in: query
         name: from
         type: integer
-      - description: Search range of when the report has been created, younger than
+      - description: Search range of when the report has been exited, younger than
           this value. Unix timestamp, leave empty for any
         in: query
         name: to

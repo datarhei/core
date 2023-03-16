@@ -491,14 +491,15 @@ func (a *api) start() error {
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary:           cfg.FFmpeg.Binary,
-		MaxProc:          cfg.FFmpeg.MaxProcesses,
-		MaxLogLines:      cfg.FFmpeg.Log.MaxLines,
-		LogHistoryLength: cfg.FFmpeg.Log.MaxHistory,
-		ValidatorInput:   validatorIn,
-		ValidatorOutput:  validatorOut,
-		Portrange:        portrange,
-		Collector:        a.sessions.Collector("ffmpeg"),
+		Binary:                  cfg.FFmpeg.Binary,
+		MaxProc:                 cfg.FFmpeg.MaxProcesses,
+		MaxLogLines:             cfg.FFmpeg.Log.MaxLines,
+		LogHistoryLength:        cfg.FFmpeg.Log.MaxHistory,
+		LogMinimalHistoryLength: cfg.FFmpeg.Log.MaxMinimalHistory,
+		ValidatorInput:          validatorIn,
+		ValidatorOutput:         validatorOut,
+		Portrange:               portrange,
+		Collector:               a.sessions.Collector("ffmpeg"),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create ffmpeg: %w", err)

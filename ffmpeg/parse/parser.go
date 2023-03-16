@@ -43,12 +43,13 @@ type Parser interface {
 
 // Config is the config for the Parser implementation
 type Config struct {
-	LogHistory       int
-	LogLines         int
-	PreludeHeadLines int
-	PreludeTailLines int
-	Logger           log.Logger
-	Collector        session.Collector
+	LogLines          int
+	LogHistory        int
+	LogMinimalHistory int
+	PreludeHeadLines  int
+	PreludeTailLines  int
+	Logger            log.Logger
+	Collector         session.Collector
 }
 
 type parser struct {
@@ -75,8 +76,9 @@ type parser struct {
 	logLines int
 	logStart time.Time
 
-	logHistory       *ring.Ring
-	logHistoryLength int
+	logHistory              *ring.Ring
+	logHistoryLength        int
+	logMinimalHistoryLength int
 
 	lastLogline string
 
@@ -117,10 +119,11 @@ type parser struct {
 // New returns a Parser that satisfies the Parser interface
 func New(config Config) Parser {
 	p := &parser{
-		logHistoryLength: config.LogHistory,
-		logLines:         config.LogLines,
-		logger:           config.Logger,
-		collector:        config.Collector,
+		logLines:                config.LogLines,
+		logHistoryLength:        config.LogHistory,
+		logMinimalHistoryLength: config.LogMinimalHistory,
+		logger:                  config.Logger,
+		collector:               config.Collector,
 	}
 
 	if p.logger == nil {
@@ -157,8 +160,10 @@ func New(config Config) Parser {
 	p.lock.log.Lock()
 	p.log = ring.New(config.LogLines)
 
-	if p.logHistoryLength > 0 {
-		p.logHistory = ring.New(p.logHistoryLength)
+	historyLength := p.logHistoryLength + p.logMinimalHistoryLength
+
+	if historyLength > 0 {
+		p.logHistory = ring.New(historyLength)
 	}
 
 	if p.collector == nil {
@@ -798,6 +803,20 @@ func (p *parser) storeReportHistory(state string) {
 	}
 
 	p.logHistory.Value = h
+
+	if p.logMinimalHistoryLength > 0 {
+		// Remove the Log and Prelude from older history entries
+		r := p.logHistory.Move(-p.logHistoryLength)
+
+		if r.Value != nil {
+			history := r.Value.(ReportHistoryEntry)
+			history.Log = nil
+			history.Prelude = nil
+
+			r.Value = history
+		}
+	}
+
 	p.logHistory = p.logHistory.Next()
 }
 
