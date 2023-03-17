@@ -34,7 +34,6 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 // @Description Fetch a file from a filesystem
 // @Tags v16.7.2
 // @ID filesystem-3-get-file
-// @Tags v16.7.2
 // @Produce application/data
 // @Produce json
 // @Param storage path string true "Name of the filesystem"
@@ -60,7 +59,6 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 // @Description Writes or overwrites a file on a filesystem
 // @Tags v16.7.2
 // @ID filesystem-3-put-file
-// @Tags v16.7.2
 // @Accept application/data
 // @Produce text/plain
 // @Produce json
@@ -88,7 +86,6 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 // @Description Remove a file from a filesystem
 // @Tags v16.7.2
 // @ID filesystem-3-delete-file
-// @Tags v16.7.2
 // @Produce text/plain
 // @Param storage path string true "Name of the filesystem"
 // @Param filepath path string true "Path to file"
@@ -112,7 +109,6 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 // @Description List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.
 // @Tags v16.7.2
 // @ID filesystem-3-list-files
-// @Tags v16.7.2
 // @Produce json
 // @Param storage path string true "Name of the filesystem"
 // @Param glob query string false "glob pattern for file names"
@@ -137,7 +133,6 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 // @Description Listall registered filesystems
 // @Tags v16.12.0
 // @ID filesystem-3-list
-// @Tags v16.12.0
 // @Produce json
 // @Success 200 {array} api.FilesystemInfo
 // @Security ApiKeyAuth
