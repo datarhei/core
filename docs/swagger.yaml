@@ -2126,7 +2126,9 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all registered filesystems
-  /api/v3/fs/{name}:
+      tags:
+      - v16.12.0
+  /api/v3/fs/{storage}:
     get:
       description: List all files on a filesystem. The listing can be ordered by name,
         size, or date of last modification in ascending or descending order.
@@ -2134,7 +2136,7 @@ paths:
       parameters:
       - description: Name of the filesystem
         in: path
-        name: name
+        name: storage
         required: true
         type: string
       - description: glob pattern for file names
@@ -2161,19 +2163,21 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all files on a filesystem
-  /api/v3/fs/{name}/{path}:
+      tags:
+      - v16.7.2
+  /api/v3/fs/{storage}/{filepath}:
     delete:
       description: Remove a file from a filesystem
       operationId: filesystem-3-delete-file
       parameters:
       - description: Name of the filesystem
         in: path
-        name: name
+        name: storage
         required: true
         type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       produces:
@@ -2190,18 +2194,20 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Remove a file from a filesystem
+      tags:
+      - v16.7.2
     get:
       description: Fetch a file from a filesystem
       operationId: filesystem-3-get-file
       parameters:
       - description: Name of the filesystem
         in: path
-        name: name
+        name: storage
         required: true
         type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       produces:
@@ -2223,6 +2229,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem
+      tags:
+      - v16.7.2
     put:
       consumes:
       - application/data
@@ -2231,12 +2239,12 @@ paths:
       parameters:
       - description: Name of the filesystem
         in: path
-        name: name
+        name: storage
         required: true
         type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       - description: File data
@@ -2266,6 +2274,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem
+      tags:
+      - v16.7.2
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application
