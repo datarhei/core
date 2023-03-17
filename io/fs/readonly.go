@@ -41,7 +41,7 @@ func (r *readOnlyFilesystem) Remove(path string) int64 {
 	return -1
 }
 
-func (r *readOnlyFilesystem) RemoveAll() int64 {
+func (r *readOnlyFilesystem) RemoveList(path string, options ListOptions) int64 {
 	return 0
 }
 

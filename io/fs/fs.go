@@ -117,12 +117,12 @@ type WriteFilesystem interface {
 	Copy(src, dst string) error
 
 	// Remove removes a file at the given path from the filesystem. Returns the size of
-	// the remove file in bytes. The size is negative if the file doesn't exist.
+	// the removed file in bytes. The size is negative if the file doesn't exist.
 	Remove(path string) int64
 
-	// RemoveAll removes all files from the filesystem. Returns the size of the
+	// RemoveList removes all files from the filesystem. Returns the size of the
 	// removed files in bytes.
-	RemoveAll() int64
+	RemoveList(path string, options ListOptions) int64
 }
 
 // Filesystem is an interface that provides access to a filesystem.

@@ -88,14 +88,15 @@ func TestFilesystem(t *testing.T) {
 		"writeFileSafe":   testWriteFileSafe,
 		"writeFileReader": testWriteFileReader,
 		"writeFileDir":    testWriteFileDir,
-		"delete":          testDelete,
+		"remove":          testRemove,
 		"files":           testFiles,
 		"replace":         testReplace,
 		"list":            testList,
 		"listGlob":        testListGlob,
 		"listSize":        testListSize,
 		"listModified":    testListModified,
-		"deleteAll":       testDeleteAll,
+		"removeAll":       testRemoveAll,
+		"removeList":      testRemoveList,
 		"data":            testData,
 		"statDir":         testStatDir,
 		"mkdirAll":        testMkdirAll,
@@ -224,7 +225,7 @@ func testOpen(t *testing.T, fs Filesystem) {
 	require.Equal(t, false, stat.IsDir())
 }
 
-func testDelete(t *testing.T, fs Filesystem) {
+func testRemove(t *testing.T, fs Filesystem) {
 	size := fs.Remove("/foobar")
 
 	require.Equal(t, int64(-1), size)
@@ -461,11 +462,7 @@ func testListModified(t *testing.T, fs Filesystem) {
 	require.ElementsMatch(t, []string{"/b", "/c"}, files)
 }
 
-func testDeleteAll(t *testing.T, fs Filesystem) {
-	if _, ok := fs.(*diskFilesystem); ok {
-		return
-	}
-
+func testRemoveAll(t *testing.T, fs Filesystem) {
 	fs.WriteFileReader("/foobar1", strings.NewReader("abc"))
 	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"))
 	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"))
@@ -475,12 +472,34 @@ func testDeleteAll(t *testing.T, fs Filesystem) {
 
 	require.Equal(t, int64(4), cur)
 
-	size := fs.RemoveAll()
+	size := fs.RemoveList("/", ListOptions{
+		Pattern: "",
+	})
 	require.Equal(t, int64(12), size)
 
 	cur = fs.Files()
 
 	require.Equal(t, int64(0), cur)
+}
+
+func testRemoveList(t *testing.T, fs Filesystem) {
+	fs.WriteFileReader("/foobar1", strings.NewReader("abc"))
+	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"))
+	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"))
+	fs.WriteFileReader("/foobar4", strings.NewReader("abc"))
+
+	cur := fs.Files()
+
+	require.Equal(t, int64(4), cur)
+
+	size := fs.RemoveList("/", ListOptions{
+		Pattern: "/path/**",
+	})
+	require.Equal(t, int64(6), size)
+
+	cur = fs.Files()
+
+	require.Equal(t, int64(2), cur)
 }
 
 func testData(t *testing.T, fs Filesystem) {

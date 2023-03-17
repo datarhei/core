@@ -1446,7 +1446,7 @@ func (a *api) Destroy() {
 
 	// Free the MemFS
 	if a.memfs != nil {
-		a.memfs.RemoveAll()
+		a.memfs.RemoveList("/", fs.ListOptions{})
 		a.memfs = nil
 	}
 }

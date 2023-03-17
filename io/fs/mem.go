@@ -651,6 +651,10 @@ func (fs *memFilesystem) Remove(path string) int64 {
 	fs.filesLock.Lock()
 	defer fs.filesLock.Unlock()
 
+	return fs.remove(path)
+}
+
+func (fs *memFilesystem) remove(path string) int64 {
 	file, ok := fs.files[path]
 	if ok {
 		delete(fs.files, path)
@@ -671,14 +675,55 @@ func (fs *memFilesystem) Remove(path string) int64 {
 	return file.size
 }
 
-func (fs *memFilesystem) RemoveAll() int64 {
+func (fs *memFilesystem) RemoveList(path string, options ListOptions) int64 {
+	path = fs.cleanPath(path)
+
 	fs.filesLock.Lock()
 	defer fs.filesLock.Unlock()
 
-	size := fs.currentSize
+	var size int64 = 0
 
-	fs.files = make(map[string]*internalMemFile)
-	fs.currentSize = 0
+	for _, file := range fs.files {
+		if !strings.HasPrefix(file.name, path) {
+			continue
+		}
+
+		if len(options.Pattern) != 0 {
+			if ok, _ := glob.Match(options.Pattern, file.name, '/'); !ok {
+				continue
+			}
+		}
+
+		if options.ModifiedStart != nil {
+			if file.lastMod.Before(*options.ModifiedStart) {
+				continue
+			}
+		}
+
+		if options.ModifiedEnd != nil {
+			if file.lastMod.After(*options.ModifiedEnd) {
+				continue
+			}
+		}
+
+		if options.SizeMin > 0 {
+			if file.size < options.SizeMin {
+				continue
+			}
+		}
+
+		if options.SizeMax > 0 {
+			if file.size > options.SizeMax {
+				continue
+			}
+		}
+
+		if file.dir {
+			continue
+		}
+
+		size += fs.remove(file.name)
+	}
 
 	return size
 }

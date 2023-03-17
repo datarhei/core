@@ -519,8 +519,61 @@ func (fs *diskFilesystem) Remove(path string) int64 {
 	return size
 }
 
-func (fs *diskFilesystem) RemoveAll() int64 {
-	return 0
+func (fs *diskFilesystem) RemoveList(path string, options ListOptions) int64 {
+	path = fs.cleanPath(path)
+
+	var size int64 = 0
+
+	fs.walk(path, func(path string, info os.FileInfo) {
+		if path == fs.root {
+			return
+		}
+
+		name := strings.TrimPrefix(path, fs.root)
+		if name[0] != os.PathSeparator {
+			name = string(os.PathSeparator) + name
+		}
+
+		if info.IsDir() {
+			return
+		}
+
+		if len(options.Pattern) != 0 {
+			if ok, _ := glob.Match(options.Pattern, name, '/'); !ok {
+				return
+			}
+		}
+
+		if options.ModifiedStart != nil {
+			if info.ModTime().Before(*options.ModifiedStart) {
+				return
+			}
+		}
+
+		if options.ModifiedEnd != nil {
+			if info.ModTime().After(*options.ModifiedEnd) {
+				return
+			}
+		}
+
+		if options.SizeMin > 0 {
+			if info.Size() < options.SizeMin {
+				return
+			}
+		}
+
+		if options.SizeMax > 0 {
+			if info.Size() > options.SizeMax {
+				return
+			}
+		}
+
+		if err := os.Remove(path); err == nil {
+			size += info.Size()
+		}
+	})
+
+	return size
 }
 
 func (fs *diskFilesystem) List(path string, options ListOptions) []FileInfo {

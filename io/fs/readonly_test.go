@@ -32,7 +32,7 @@ func TestReadOnly(t *testing.T) {
 	res := ro.Remove("/readonly.go")
 	require.Equal(t, int64(-1), res)
 
-	res = ro.RemoveAll()
+	res = ro.RemoveList("/", ListOptions{})
 	require.Equal(t, int64(0), res)
 
 	rop, ok := ro.(PurgeFilesystem)

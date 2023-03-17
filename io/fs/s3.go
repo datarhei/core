@@ -428,7 +428,9 @@ func (fs *s3Filesystem) Remove(path string) int64 {
 	return stat.Size
 }
 
-func (fs *s3Filesystem) RemoveAll() int64 {
+func (fs *s3Filesystem) RemoveList(path string, options ListOptions) int64 {
+	path = fs.cleanPath(path)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -441,12 +443,54 @@ func (fs *s3Filesystem) RemoveAll() int64 {
 		defer close(objectsCh)
 
 		for object := range fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-			Recursive: true,
+			WithVersions: false,
+			WithMetadata: false,
+			Prefix:       path,
+			Recursive:    true,
+			MaxKeys:      0,
+			StartAfter:   "",
+			UseV1:        false,
 		}) {
 			if object.Err != nil {
 				fs.logger.WithError(object.Err).Log("Listing object failed")
 				continue
 			}
+			key := "/" + object.Key
+			if strings.HasSuffix(key, "/"+fakeDirEntry) {
+				// filter out fake directory entries (see MkdirAll)
+				continue
+			}
+
+			if len(options.Pattern) != 0 {
+				if ok, _ := glob.Match(options.Pattern, key, '/'); !ok {
+					continue
+				}
+			}
+
+			if options.ModifiedStart != nil {
+				if object.LastModified.Before(*options.ModifiedStart) {
+					continue
+				}
+			}
+
+			if options.ModifiedEnd != nil {
+				if object.LastModified.After(*options.ModifiedEnd) {
+					continue
+				}
+			}
+
+			if options.SizeMin > 0 {
+				if object.Size < options.SizeMin {
+					continue
+				}
+			}
+
+			if options.SizeMax > 0 {
+				if object.Size > options.SizeMax {
+					continue
+				}
+			}
+
 			totalSize += object.Size
 			objectsCh <- object
 		}
