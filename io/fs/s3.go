@@ -140,7 +140,7 @@ func (fs *s3Filesystem) SetMetadata(key, data string) {
 func (fs *s3Filesystem) Size() (int64, int64) {
 	size := int64(0)
 
-	files := fs.List("/", "")
+	files := fs.List("/", ListOptions{})
 
 	for _, file := range files {
 		size += file.Size()
@@ -463,7 +463,7 @@ func (fs *s3Filesystem) RemoveAll() int64 {
 	return totalSize
 }
 
-func (fs *s3Filesystem) List(path, pattern string) []FileInfo {
+func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -493,8 +493,32 @@ func (fs *s3Filesystem) List(path, pattern string) []FileInfo {
 			continue
 		}
 
-		if len(pattern) != 0 {
-			if ok, _ := glob.Match(pattern, key, '/'); !ok {
+		if len(options.Pattern) != 0 {
+			if ok, _ := glob.Match(options.Pattern, key, '/'); !ok {
+				continue
+			}
+		}
+
+		if options.ModifiedStart != nil {
+			if object.LastModified.Before(*options.ModifiedStart) {
+				continue
+			}
+		}
+
+		if options.ModifiedEnd != nil {
+			if object.LastModified.After(*options.ModifiedEnd) {
+				continue
+			}
+		}
+
+		if options.SizeMin > 0 {
+			if object.Size < options.SizeMin {
+				continue
+			}
+		}
+
+		if options.SizeMax > 0 {
+			if object.Size > options.SizeMax {
 				continue
 			}
 		}

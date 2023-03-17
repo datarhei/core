@@ -112,6 +112,10 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 // @Produce json
 // @Param storage path string true "Name of the filesystem"
 // @Param glob query string false "glob pattern for file names"
+// @Param size_min query int64 false "minimal size of files"
+// @Param size_max query int64 false "maximal size of files"
+// @Param lastmod_start query int64 false "minimal last modification time"
+// @Param lastmod_end query int64 false "maximal last modification time"
 // @Param sort query string false "none, name, size, lastmod"
 // @Param order query string false "asc, desc"
 // @Success 200 {array} api.FileInfo

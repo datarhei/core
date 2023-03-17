@@ -43,7 +43,7 @@ func TestMaxFiles(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/", "/*.ts") {
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
 			names = append(names, f.Name())
 		}
 
@@ -89,7 +89,7 @@ func TestMaxAge(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/", "/*.ts") {
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
 			names = append(names, f.Name())
 		}
 
@@ -135,7 +135,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/", "/*.ts") {
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
 			names = append(names, f.Name())
 		}
 
@@ -155,7 +155,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 		names := []string{}
 
-		for _, f := range cleanfs.List("/", "/*.ts") {
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
 			names = append(names, f.Name())
 		}
 

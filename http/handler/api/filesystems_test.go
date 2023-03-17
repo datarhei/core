@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/datarhei/core/v16/http/api"
 	httpfs "github.com/datarhei/core/v16/http/fs"
@@ -102,7 +105,7 @@ func TestFilesystems(t *testing.T) {
 
 	mock.Request(t, http.StatusNoContent, router, "PUT", "/foo/file", data)
 
-	require.Equal(t, 1, len(memfs.List("/", "")))
+	require.Equal(t, 1, len(memfs.List("/", fs.ListOptions{})))
 
 	response = mock.Request(t, http.StatusOK, router, "GET", "/foo", nil)
 
@@ -127,7 +130,7 @@ func TestFilesystems(t *testing.T) {
 	mock.Request(t, http.StatusOK, router, "DELETE", "/foo/file", nil)
 	mock.Request(t, http.StatusNotFound, router, "GET", "/foo/file", nil)
 
-	require.Equal(t, 0, len(memfs.List("/", "")))
+	require.Equal(t, 0, len(memfs.List("/", fs.ListOptions{})))
 
 	response = mock.Request(t, http.StatusOK, router, "GET", "/foo", nil)
 
@@ -138,6 +141,131 @@ func TestFilesystems(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(l))
+}
+
+func TestFilesystemsListSize(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	memfs.WriteFileReader("/a", strings.NewReader("a"))
+	memfs.WriteFileReader("/aa", strings.NewReader("aa"))
+	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"))
+	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/foo",
+			AllowWrite: true,
+			Filesystem: memfs,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	response := mock.Request(t, http.StatusOK, router, "GET", "/foo", nil)
+
+	f := []api.FilesystemInfo{}
+	err = json.Unmarshal(response.Raw, &f)
+	require.NoError(t, err)
+
+	require.Equal(t, 4, len(f))
+
+	getNames := func(r *mock.Response) []string {
+		files := []api.FilesystemInfo{}
+		err := json.Unmarshal(r.Raw, &files)
+		require.NoError(t, err)
+
+		names := []string{}
+		for _, f := range files {
+			names = append(names, f.Name)
+		}
+		return names
+	}
+
+	files := getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?size_min=1", nil))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?size_min=2", nil))
+	require.Equal(t, 3, len(files))
+	require.ElementsMatch(t, []string{"/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?size_max=4", nil))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?size_min=2&size_max=3", nil))
+	require.Equal(t, 2, len(files))
+	require.ElementsMatch(t, []string{"/aa", "/aaa"}, files)
+}
+
+func TestFilesystemsListLastmod(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	memfs.WriteFileReader("/a", strings.NewReader("a"))
+	time.Sleep(500 * time.Millisecond)
+	memfs.WriteFileReader("/b", strings.NewReader("b"))
+	time.Sleep(500 * time.Millisecond)
+	memfs.WriteFileReader("/c", strings.NewReader("c"))
+	time.Sleep(500 * time.Millisecond)
+	memfs.WriteFileReader("/d", strings.NewReader("d"))
+
+	var a, b, c, d time.Time
+
+	for _, f := range memfs.List("/", fs.ListOptions{}) {
+		if f.Name() == "/a" {
+			a = f.ModTime()
+		} else if f.Name() == "/b" {
+			b = f.ModTime()
+		} else if f.Name() == "/c" {
+			c = f.ModTime()
+		} else if f.Name() == "/d" {
+			d = f.ModTime()
+		}
+	}
+
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/foo",
+			AllowWrite: true,
+			Filesystem: memfs,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	getNames := func(r *mock.Response) []string {
+		files := []api.FilesystemInfo{}
+		err := json.Unmarshal(r.Raw, &files)
+		require.NoError(t, err)
+
+		names := []string{}
+		for _, f := range files {
+			names = append(names, f.Name)
+		}
+		return names
+	}
+
+	files := getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?lastmod_start="+strconv.FormatInt(a.Unix(), 10), nil))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/b", "/c", "/d"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?lastmod_start="+strconv.FormatInt(b.Unix(), 10), nil))
+	require.Equal(t, 3, len(files))
+	require.ElementsMatch(t, []string{"/b", "/c", "/d"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?lastmod_end="+strconv.FormatInt(d.Unix(), 10), nil))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/b", "/c", "/d"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?lastmod_start="+strconv.FormatInt(b.Unix(), 10)+"&lastmod_end="+strconv.FormatInt(c.Unix(), 10), nil))
+	require.Equal(t, 2, len(files))
+	require.ElementsMatch(t, []string{"/b", "/c"}, files)
 }
 
 func TestFileOperation(t *testing.T) {

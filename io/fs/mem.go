@@ -683,7 +683,7 @@ func (fs *memFilesystem) RemoveAll() int64 {
 	return size
 }
 
-func (fs *memFilesystem) List(path, pattern string) []FileInfo {
+func (fs *memFilesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 	files := []FileInfo{}
 
@@ -695,8 +695,32 @@ func (fs *memFilesystem) List(path, pattern string) []FileInfo {
 			continue
 		}
 
-		if len(pattern) != 0 {
-			if ok, _ := glob.Match(pattern, file.name, '/'); !ok {
+		if len(options.Pattern) != 0 {
+			if ok, _ := glob.Match(options.Pattern, file.name, '/'); !ok {
+				continue
+			}
+		}
+
+		if options.ModifiedStart != nil {
+			if file.lastMod.Before(*options.ModifiedStart) {
+				continue
+			}
+		}
+
+		if options.ModifiedEnd != nil {
+			if file.lastMod.After(*options.ModifiedEnd) {
+				continue
+			}
+		}
+
+		if options.SizeMin > 0 {
+			if file.size < options.SizeMin {
+				continue
+			}
+		}
+
+		if options.SizeMax > 0 {
+			if file.size > options.SizeMax {
 				continue
 			}
 		}

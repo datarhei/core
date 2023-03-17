@@ -11,7 +11,7 @@ func TestMemFromDir(t *testing.T) {
 	require.NoError(t, err)
 
 	names := []string{}
-	for _, f := range mem.List("/", "/*.go") {
+	for _, f := range mem.List("/", ListOptions{Pattern: "/*.go"}) {
 		names = append(names, f.Name())
 	}
 

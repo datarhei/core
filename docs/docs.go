@@ -322,7 +322,6 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "v16.12.0",
                     "v16.12.0"
                 ],
                 "summary": "List all registered filesystems",
@@ -402,7 +401,6 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "v16.7.2",
                     "v16.7.2"
                 ],
                 "summary": "List all files on a filesystem",
@@ -419,6 +417,30 @@ const docTemplate = `{
                         "type": "string",
                         "description": "glob pattern for file names",
                         "name": "glob",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal size of files",
+                        "name": "size_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal size of files",
+                        "name": "size_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal last modification time",
+                        "name": "lastmod_start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal last modification time",
+                        "name": "lastmod_end",
                         "in": "query"
                     },
                     {
@@ -460,7 +482,6 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "v16.7.2",
                     "v16.7.2"
                 ],
                 "summary": "Fetch a file from a filesystem",
@@ -517,7 +538,6 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "v16.7.2",
                     "v16.7.2"
                 ],
                 "summary": "Add a file to a filesystem",
@@ -582,7 +602,6 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "tags": [
-                    "v16.7.2",
                     "v16.7.2"
                 ],
                 "summary": "Remove a file from a filesystem",

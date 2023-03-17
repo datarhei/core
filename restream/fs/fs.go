@@ -135,7 +135,7 @@ func (rfs *filesystem) cleanup() {
 
 	for _, patterns := range rfs.cleanupPatterns {
 		for _, pattern := range patterns {
-			filesAndDirs := rfs.Filesystem.List("/", pattern.Pattern)
+			filesAndDirs := rfs.Filesystem.List("/", fs.ListOptions{Pattern: pattern.Pattern})
 
 			files := []fs.FileInfo{}
 			for _, f := range filesAndDirs {
@@ -175,7 +175,7 @@ func (rfs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
 			continue
 		}
 
-		files := rfs.Filesystem.List("/", pattern.Pattern)
+		files := rfs.Filesystem.List("/", fs.ListOptions{Pattern: pattern.Pattern})
 		sort.Slice(files, func(i, j int) bool { return len(files[i].Name()) > len(files[j].Name()) })
 		for _, f := range files {
 			rfs.logger.Debug().WithField("path", f.Name()).Log("Purging file")

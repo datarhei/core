@@ -93,6 +93,8 @@ func TestFilesystem(t *testing.T) {
 		"replace":         testReplace,
 		"list":            testList,
 		"listGlob":        testListGlob,
+		"listSize":        testListSize,
+		"listModified":    testListModified,
 		"deleteAll":       testDeleteAll,
 		"data":            testData,
 		"statDir":         testStatDir,
@@ -322,12 +324,12 @@ func testList(t *testing.T, fs Filesystem) {
 		return names
 	}
 
-	files := fs.List("/", "")
+	files := fs.List("/", ListOptions{})
 
 	require.Equal(t, 6, len(files))
 	require.ElementsMatch(t, []string{"/foobar1", "/foobar2", "/foobar3", "/foobar4", "/path/foobar3", "/path/to/foobar4"}, getNames(files))
 
-	files = fs.List("/path", "")
+	files = fs.List("/path", ListOptions{})
 
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/path/foobar3", "/path/to/foobar4"}, getNames(files))
@@ -351,25 +353,112 @@ func testListGlob(t *testing.T, fs Filesystem) {
 		return names
 	}
 
-	files := getNames(fs.List("/", "/foo*"))
+	files := getNames(fs.List("/", ListOptions{Pattern: "/foo*"}))
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/foobar1", "/foobar4"}, files)
 
-	files = getNames(fs.List("/", "/*bar?"))
+	files = getNames(fs.List("/", ListOptions{Pattern: "/*bar?"}))
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/foobar1", "/foobar4"}, files)
 
-	files = getNames(fs.List("/", "/path/*"))
+	files = getNames(fs.List("/", ListOptions{Pattern: "/path/*"}))
 	require.Equal(t, 1, len(files))
 	require.ElementsMatch(t, []string{"/path/foobar2"}, files)
 
-	files = getNames(fs.List("/", "/path/**"))
+	files = getNames(fs.List("/", ListOptions{Pattern: "/path/**"}))
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/path/foobar2", "/path/to/foobar3"}, files)
 
-	files = getNames(fs.List("/path", "/**"))
+	files = getNames(fs.List("/path", ListOptions{Pattern: "/**"}))
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/path/foobar2", "/path/to/foobar3"}, files)
+}
+
+func testListSize(t *testing.T, fs Filesystem) {
+	fs.WriteFileReader("/a", strings.NewReader("a"))
+	fs.WriteFileReader("/aa", strings.NewReader("aa"))
+	fs.WriteFileReader("/aaa", strings.NewReader("aaa"))
+	fs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+
+	cur := fs.Files()
+
+	require.Equal(t, int64(4), cur)
+
+	getNames := func(files []FileInfo) []string {
+		names := []string{}
+		for _, f := range files {
+			names = append(names, f.Name())
+		}
+		return names
+	}
+
+	files := getNames(fs.List("/", ListOptions{SizeMin: 1}))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(fs.List("/", ListOptions{SizeMin: 2}))
+	require.Equal(t, 3, len(files))
+	require.ElementsMatch(t, []string{"/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(fs.List("/", ListOptions{SizeMax: 4}))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/aa", "/aaa", "/aaaa"}, files)
+
+	files = getNames(fs.List("/", ListOptions{SizeMin: 2, SizeMax: 3}))
+	require.Equal(t, 2, len(files))
+	require.ElementsMatch(t, []string{"/aa", "/aaa"}, files)
+}
+
+func testListModified(t *testing.T, fs Filesystem) {
+	fs.WriteFileReader("/a", strings.NewReader("a"))
+	time.Sleep(500 * time.Millisecond)
+	fs.WriteFileReader("/b", strings.NewReader("b"))
+	time.Sleep(500 * time.Millisecond)
+	fs.WriteFileReader("/c", strings.NewReader("c"))
+	time.Sleep(500 * time.Millisecond)
+	fs.WriteFileReader("/d", strings.NewReader("d"))
+
+	cur := fs.Files()
+
+	require.Equal(t, int64(4), cur)
+
+	getNames := func(files []FileInfo) []string {
+		names := []string{}
+		for _, f := range files {
+			names = append(names, f.Name())
+		}
+		return names
+	}
+
+	var a, b, c, d time.Time
+
+	for _, f := range fs.List("/", ListOptions{}) {
+		if f.Name() == "/a" {
+			a = f.ModTime()
+		} else if f.Name() == "/b" {
+			b = f.ModTime()
+		} else if f.Name() == "/c" {
+			c = f.ModTime()
+		} else if f.Name() == "/d" {
+			d = f.ModTime()
+		}
+	}
+
+	files := getNames(fs.List("/", ListOptions{ModifiedStart: &a}))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/b", "/c", "/d"}, files)
+
+	files = getNames(fs.List("/", ListOptions{ModifiedStart: &b}))
+	require.Equal(t, 3, len(files))
+	require.ElementsMatch(t, []string{"/b", "/c", "/d"}, files)
+
+	files = getNames(fs.List("/", ListOptions{ModifiedEnd: &d}))
+	require.Equal(t, 4, len(files))
+	require.ElementsMatch(t, []string{"/a", "/b", "/c", "/d"}, files)
+
+	files = getNames(fs.List("/", ListOptions{ModifiedStart: &b, ModifiedEnd: &c}))
+	require.Equal(t, 2, len(files))
+	require.ElementsMatch(t, []string{"/b", "/c"}, files)
 }
 
 func testDeleteAll(t *testing.T, fs Filesystem) {

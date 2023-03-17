@@ -2172,7 +2172,6 @@ paths:
       summary: List all registered filesystems
       tags:
       - v16.12.0
-      - v16.12.0
     put:
       consumes:
       - application/json
@@ -2220,6 +2219,22 @@ paths:
         in: query
         name: glob
         type: string
+      - description: minimal size of files
+        in: query
+        name: size_min
+        type: integer
+      - description: maximal size of files
+        in: query
+        name: size_max
+        type: integer
+      - description: minimal last modification time
+        in: query
+        name: lastmod_start
+        type: integer
+      - description: maximal last modification time
+        in: query
+        name: lastmod_end
+        type: integer
       - description: none, name, size, lastmod
         in: query
         name: sort
@@ -2241,7 +2256,6 @@ paths:
       - ApiKeyAuth: []
       summary: List all files on a filesystem
       tags:
-      - v16.7.2
       - v16.7.2
   /api/v3/fs/{storage}/{filepath}:
     delete:
@@ -2273,7 +2287,6 @@ paths:
       - ApiKeyAuth: []
       summary: Remove a file from a filesystem
       tags:
-      - v16.7.2
       - v16.7.2
     get:
       description: Fetch a file from a filesystem
@@ -2309,7 +2322,6 @@ paths:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem
       tags:
-      - v16.7.2
       - v16.7.2
     put:
       consumes:
@@ -2355,7 +2367,6 @@ paths:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem
       tags:
-      - v16.7.2
       - v16.7.2
   /api/v3/log:
     get:

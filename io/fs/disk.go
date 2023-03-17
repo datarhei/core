@@ -523,7 +523,7 @@ func (fs *diskFilesystem) RemoveAll() int64 {
 	return 0
 }
 
-func (fs *diskFilesystem) List(path, pattern string) []FileInfo {
+func (fs *diskFilesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 	files := []FileInfo{}
 
@@ -541,8 +541,32 @@ func (fs *diskFilesystem) List(path, pattern string) []FileInfo {
 			return
 		}
 
-		if len(pattern) != 0 {
-			if ok, _ := glob.Match(pattern, name, '/'); !ok {
+		if len(options.Pattern) != 0 {
+			if ok, _ := glob.Match(options.Pattern, name, '/'); !ok {
+				return
+			}
+		}
+
+		if options.ModifiedStart != nil {
+			if info.ModTime().Before(*options.ModifiedStart) {
+				return
+			}
+		}
+
+		if options.ModifiedEnd != nil {
+			if info.ModTime().After(*options.ModifiedEnd) {
+				return
+			}
+		}
+
+		if options.SizeMin > 0 {
+			if info.Size() < options.SizeMin {
+				return
+			}
+		}
+
+		if options.SizeMax > 0 {
+			if info.Size() > options.SizeMax {
 				return
 			}
 		}

@@ -13,19 +13,20 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/fs"
+	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
 )
 
 // The FSHandler type provides handlers for manipulating a filesystem
 type FSHandler struct {
-	FS fs.FS
+	FS httpfs.FS
 }
 
 // NewFS return a new FSHandler type. You have to provide a filesystem to act on.
-func NewFS(fs fs.FS) *FSHandler {
+func NewFS(fs httpfs.FS) *FSHandler {
 	return &FSHandler{
 		FS: fs,
 	}
@@ -171,10 +172,48 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 func (h *FSHandler) ListFiles(c echo.Context) error {
 	pattern := util.DefaultQuery(c, "glob", "")
+	sizeMin := util.DefaultQuery(c, "size_min", "0")
+	sizeMax := util.DefaultQuery(c, "size_max", "0")
+	modifiedStart := util.DefaultQuery(c, "lastmod_start", "")
+	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	files := h.FS.Filesystem.List("/", pattern)
+	options := fs.ListOptions{
+		Pattern: pattern,
+	}
+
+	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+	} else {
+		options.SizeMin = x
+	}
+
+	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+	} else {
+		options.SizeMax = x
+	}
+
+	if len(modifiedStart) != 0 {
+		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		} else {
+			t := time.Unix(x, 0)
+			options.ModifiedStart = &t
+		}
+	}
+
+	if len(modifiedEnd) != 0 {
+		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		} else {
+			t := time.Unix(x+1, 0)
+			options.ModifiedEnd = &t
+		}
+	}
+
+	files := h.FS.Filesystem.List("/", options)
 
 	var sortFunc func(i, j int) bool
 

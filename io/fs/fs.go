@@ -42,6 +42,14 @@ type File interface {
 	Stat() (FileInfo, error)
 }
 
+type ListOptions struct {
+	Pattern       string
+	ModifiedStart *time.Time
+	ModifiedEnd   *time.Time
+	SizeMin       int64
+	SizeMax       int64
+}
+
 type ReadFilesystem interface {
 	// Size returns the consumed size and capacity of the filesystem in bytes. The
 	// capacity is zero or negative if the filesystem can consume as much space as it wants.
@@ -65,7 +73,7 @@ type ReadFilesystem interface {
 	Stat(path string) (FileInfo, error)
 
 	// List lists all files that are currently on the filesystem.
-	List(path, pattern string) []FileInfo
+	List(path string, options ListOptions) []FileInfo
 
 	// LookPath searches for an executable named file in the directories named by the PATH environment
 	// variable. If file contains a slash, it is tried directly and the PATH is not consulted. Otherwise,
