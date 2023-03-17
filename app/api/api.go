@@ -1366,6 +1366,9 @@ func (a *api) stop() {
 		a.cache = nil
 	}
 
+	// Free the S3 mounts
+	a.s3fs = map[string]fs.Filesystem{}
+
 	// Stop the SRT server
 	if a.srtserver != nil {
 		a.log.logger.srt.Info().Log("Stopping ...")
