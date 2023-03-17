@@ -122,7 +122,7 @@ type WriteFilesystem interface {
 
 	// RemoveList removes all files from the filesystem. Returns the size of the
 	// removed files in bytes.
-	RemoveList(path string, options ListOptions) int64
+	RemoveList(path string, options ListOptions) ([]string, int64)
 }
 
 // Filesystem is an interface that provides access to a filesystem.

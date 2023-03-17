@@ -428,13 +428,14 @@ func (fs *s3Filesystem) Remove(path string) int64 {
 	return stat.Size
 }
 
-func (fs *s3Filesystem) RemoveList(path string, options ListOptions) int64 {
+func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
 	path = fs.cleanPath(path)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	totalSize := int64(0)
+	var totalSize int64 = 0
+	files := []string{}
 
 	objectsCh := make(chan minio.ObjectInfo)
 
@@ -493,6 +494,8 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) int64 {
 
 			totalSize += object.Size
 			objectsCh <- object
+
+			files = append(files, key)
 		}
 	}()
 
@@ -504,7 +507,7 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) int64 {
 
 	fs.logger.Debug().Log("Deleted all files")
 
-	return totalSize
+	return files, totalSize
 }
 
 func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {

@@ -607,19 +607,20 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	v3.GET("/fs", handler.List)
 	v3.PUT("/fs", handler.FileOperation)
 
-	v3.GET("/fs/:name", handler.ListFiles)
-	v3.GET("/fs/:name/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
+	v3.GET("/fs/:storage", handler.ListFiles)
+	v3.GET("/fs/:storage/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
 		MimeTypesFile:      s.mimeTypesFile,
 		DefaultContentType: "application/data",
 	}))
-	v3.HEAD("/fs/:name/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
+	v3.HEAD("/fs/:storage/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
 		MimeTypesFile:      s.mimeTypesFile,
 		DefaultContentType: "application/data",
 	}))
 
 	if !s.readOnly {
-		v3.PUT("/fs/:name/*", handler.PutFile)
-		v3.DELETE("/fs/:name/*", handler.DeleteFile)
+		v3.PUT("/fs/:storage/*", handler.PutFile)
+		v3.DELETE("/fs/:storage", handler.DeleteFiles)
+		v3.DELETE("/fs/:storage/*", handler.DeleteFile)
 	}
 
 	// v3 RTMP

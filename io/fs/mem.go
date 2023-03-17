@@ -675,13 +675,14 @@ func (fs *memFilesystem) remove(path string) int64 {
 	return file.size
 }
 
-func (fs *memFilesystem) RemoveList(path string, options ListOptions) int64 {
+func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
 	path = fs.cleanPath(path)
 
 	fs.filesLock.Lock()
 	defer fs.filesLock.Unlock()
 
 	var size int64 = 0
+	files := []string{}
 
 	for _, file := range fs.files {
 		if !strings.HasPrefix(file.name, path) {
@@ -723,9 +724,11 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) int64 {
 		}
 
 		size += fs.remove(file.name)
+
+		files = append(files, file.name)
 	}
 
-	return size
+	return files, size
 }
 
 func (fs *memFilesystem) List(path string, options ListOptions) []FileInfo {

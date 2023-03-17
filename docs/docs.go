@@ -467,6 +467,72 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete all files on a filesystem based on patterns",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete all files on a filesystem based on patterns",
+                "operationId": "filesystem-3-delete-files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "glob pattern for file names",
+                        "name": "glob",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal size of files",
+                        "name": "size_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal size of files",
+                        "name": "size_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal last modification time",
+                        "name": "lastmod_start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal last modification time",
+                        "name": "lastmod_end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v3/fs/{storage}/{filepath}": {
@@ -605,7 +671,7 @@ const docTemplate = `{
                     "v16.7.2"
                 ],
                 "summary": "Remove a file from a filesystem",
-                "operationId": "filesystem-3-delete-file",
+                "operationId": "filesystem-3-delete-files",
                 "parameters": [
                     {
                         "type": "string",

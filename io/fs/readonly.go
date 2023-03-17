@@ -41,8 +41,8 @@ func (r *readOnlyFilesystem) Remove(path string) int64 {
 	return -1
 }
 
-func (r *readOnlyFilesystem) RemoveList(path string, options ListOptions) int64 {
-	return 0
+func (r *readOnlyFilesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
+	return nil, 0
 }
 
 func (r *readOnlyFilesystem) Purge(size int64) int64 {

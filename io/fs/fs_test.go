@@ -472,7 +472,7 @@ func testRemoveAll(t *testing.T, fs Filesystem) {
 
 	require.Equal(t, int64(4), cur)
 
-	size := fs.RemoveList("/", ListOptions{
+	_, size := fs.RemoveList("/", ListOptions{
 		Pattern: "",
 	})
 	require.Equal(t, int64(12), size)
@@ -492,7 +492,7 @@ func testRemoveList(t *testing.T, fs Filesystem) {
 
 	require.Equal(t, int64(4), cur)
 
-	size := fs.RemoveList("/", ListOptions{
+	_, size := fs.RemoveList("/", ListOptions{
 		Pattern: "/path/**",
 	})
 	require.Equal(t, int64(6), size)

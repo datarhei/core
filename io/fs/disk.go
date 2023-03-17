@@ -519,10 +519,11 @@ func (fs *diskFilesystem) Remove(path string) int64 {
 	return size
 }
 
-func (fs *diskFilesystem) RemoveList(path string, options ListOptions) int64 {
+func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
 	path = fs.cleanPath(path)
 
 	var size int64 = 0
+	files := []string{}
 
 	fs.walk(path, func(path string, info os.FileInfo) {
 		if path == fs.root {
@@ -569,11 +570,12 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) int64 {
 		}
 
 		if err := os.Remove(path); err == nil {
+			files = append(files, name)
 			size += info.Size()
 		}
 	})
 
-	return size
+	return files, size
 }
 
 func (fs *diskFilesystem) List(path string, options ListOptions) []FileInfo {

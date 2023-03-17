@@ -2205,6 +2205,49 @@ paths:
       tags:
       - v16.?.?
   /api/v3/fs/{storage}:
+    delete:
+      description: Delete all files on a filesystem based on patterns
+      operationId: filesystem-3-delete-files
+      parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: glob pattern for file names
+        in: query
+        name: glob
+        type: string
+      - description: minimal size of files
+        in: query
+        name: size_min
+        type: integer
+      - description: maximal size of files
+        in: query
+        name: size_max
+        type: integer
+      - description: minimal last modification time
+        in: query
+        name: lastmod_start
+        type: integer
+      - description: maximal last modification time
+        in: query
+        name: lastmod_end
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Delete all files on a filesystem based on patterns
+      tags:
+      - v16.?.?
     get:
       description: List all files on a filesystem. The listing can be ordered by name,
         size, or date of last modification in ascending or descending order.
@@ -2260,7 +2303,7 @@ paths:
   /api/v3/fs/{storage}/{filepath}:
     delete:
       description: Remove a file from a filesystem
-      operationId: filesystem-3-delete-file
+      operationId: filesystem-3-delete-files
       parameters:
       - description: Name of the filesystem
         in: path

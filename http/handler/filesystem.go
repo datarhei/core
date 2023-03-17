@@ -170,6 +170,62 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 	return c.String(http.StatusOK, "Deleted: "+path)
 }
 
+func (h *FSHandler) DeleteFiles(c echo.Context) error {
+	pattern := util.DefaultQuery(c, "glob", "")
+	sizeMin := util.DefaultQuery(c, "size_min", "0")
+	sizeMax := util.DefaultQuery(c, "size_max", "0")
+	modifiedStart := util.DefaultQuery(c, "lastmod_start", "")
+	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
+
+	if len(pattern) == 0 {
+		return api.Err(http.StatusBadRequest, "Bad request", "A glob pattern is required")
+	}
+
+	options := fs.ListOptions{
+		Pattern: pattern,
+	}
+
+	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+	} else {
+		options.SizeMin = x
+	}
+
+	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+	} else {
+		options.SizeMax = x
+	}
+
+	if len(modifiedStart) != 0 {
+		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		} else {
+			t := time.Unix(x, 0)
+			options.ModifiedStart = &t
+		}
+	}
+
+	if len(modifiedEnd) != 0 {
+		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		} else {
+			t := time.Unix(x+1, 0)
+			options.ModifiedEnd = &t
+		}
+	}
+
+	paths, _ := h.FS.Filesystem.RemoveList("/", options)
+
+	if h.FS.Cache != nil {
+		for _, path := range paths {
+			h.FS.Cache.Delete(path)
+		}
+	}
+
+	return c.JSON(http.StatusOK, paths)
+}
+
 func (h *FSHandler) ListFiles(c echo.Context) error {
 	pattern := util.DefaultQuery(c, "glob", "")
 	sizeMin := util.DefaultQuery(c, "size_min", "0")

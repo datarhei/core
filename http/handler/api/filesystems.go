@@ -29,7 +29,7 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 	}
 }
 
-// GetFileAPI returns the file at the given path
+// GetFile returns the file at the given path
 // @Summary Fetch a file from a filesystem
 // @Description Fetch a file from a filesystem
 // @Tags v16.7.2
@@ -44,7 +44,7 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage}/{filepath} [get]
 func (h *FSHandler) GetFile(c echo.Context) error {
-	name := util.PathParam(c, "name")
+	name := util.PathParam(c, "storage")
 
 	config, ok := h.filesystems[name]
 	if !ok {
@@ -54,7 +54,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	return config.Handler.GetFile(c)
 }
 
-// PutFileAPI adds or overwrites a file at the given path
+// PutFile adds or overwrites a file at the given path
 // @Summary Add a file to a filesystem
 // @Description Writes or overwrites a file on a filesystem
 // @Tags v16.7.2
@@ -71,7 +71,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage}/{filepath} [put]
 func (h *FSHandler) PutFile(c echo.Context) error {
-	name := util.PathParam(c, "name")
+	name := util.PathParam(c, "storage")
 
 	config, ok := h.filesystems[name]
 	if !ok {
@@ -81,11 +81,11 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 	return config.Handler.PutFile(c)
 }
 
-// DeleteFileAPI removes a file from a filesystem
+// DeleteFile removes a file from a filesystem
 // @Summary Remove a file from a filesystem
 // @Description Remove a file from a filesystem
 // @Tags v16.7.2
-// @ID filesystem-3-delete-file
+// @ID filesystem-3-delete-files
 // @Produce text/plain
 // @Param storage path string true "Name of the filesystem"
 // @Param filepath path string true "Path to file"
@@ -94,7 +94,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage}/{filepath} [delete]
 func (h *FSHandler) DeleteFile(c echo.Context) error {
-	name := util.PathParam(c, "name")
+	name := util.PathParam(c, "storage")
 
 	config, ok := h.filesystems[name]
 	if !ok {
@@ -102,6 +102,32 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 	}
 
 	return config.Handler.DeleteFile(c)
+}
+
+// DeleteFiles deletes all files on a filesystem based on patterns
+// @Summary Delete all files on a filesystem based on patterns
+// @Description Delete all files on a filesystem based on patterns
+// @Tags v16.?.?
+// @ID filesystem-3-delete-files
+// @Produce json
+// @Param storage path string true "Name of the filesystem"
+// @Param glob query string false "glob pattern for file names"
+// @Param size_min query int64 false "minimal size of files"
+// @Param size_max query int64 false "maximal size of files"
+// @Param lastmod_start query int64 false "minimal last modification time"
+// @Param lastmod_end query int64 false "maximal last modification time"
+// @Success 200 {array} string
+// @Security ApiKeyAuth
+// @Router /api/v3/fs/{storage} [delete]
+func (h *FSHandler) DeleteFiles(c echo.Context) error {
+	name := util.PathParam(c, "storage")
+
+	config, ok := h.filesystems[name]
+	if !ok {
+		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+	}
+
+	return config.Handler.DeleteFiles(c)
 }
 
 // ListFiles lists all files on a filesystem
@@ -122,7 +148,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage} [get]
 func (h *FSHandler) ListFiles(c echo.Context) error {
-	name := util.PathParam(c, "name")
+	name := util.PathParam(c, "storage")
 
 	config, ok := h.filesystems[name]
 	if !ok {
