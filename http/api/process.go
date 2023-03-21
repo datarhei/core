@@ -52,6 +52,8 @@ type ProcessConfig struct {
 	ReconnectDelay uint64              `json:"reconnect_delay_seconds" format:"uint64"`
 	Autostart      bool                `json:"autostart"`
 	StaleTimeout   uint64              `json:"stale_timeout_seconds" format:"uint64"`
+	Timeout        uint64              `json:"timeout_seconds" format:"uint64"`
+	Scheduler      string              `json:"scheduler"`
 	Limits         ProcessConfigLimits `json:"limits"`
 }
 
@@ -65,6 +67,8 @@ func (cfg *ProcessConfig) Marshal() *app.Config {
 		ReconnectDelay: cfg.ReconnectDelay,
 		Autostart:      cfg.Autostart,
 		StaleTimeout:   cfg.StaleTimeout,
+		Timeout:        cfg.Timeout,
+		Scheduler:      cfg.Scheduler,
 		LimitCPU:       cfg.Limits.CPU,
 		LimitMemory:    cfg.Limits.Memory * 1024 * 1024,
 		LimitWaitFor:   cfg.Limits.WaitFor,
@@ -144,6 +148,8 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	cfg.ReconnectDelay = c.ReconnectDelay
 	cfg.Autostart = c.Autostart
 	cfg.StaleTimeout = c.StaleTimeout
+	cfg.Timeout = c.Timeout
+	cfg.Scheduler = c.Scheduler
 	cfg.Limits.CPU = c.LimitCPU
 	cfg.Limits.Memory = c.LimitMemory / 1024 / 1024
 	cfg.Limits.WaitFor = c.LimitWaitFor

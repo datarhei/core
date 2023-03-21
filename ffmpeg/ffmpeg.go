@@ -32,6 +32,8 @@ type ProcessConfig struct {
 	Reconnect      bool
 	ReconnectDelay time.Duration
 	StaleTimeout   time.Duration
+	Timeout        time.Duration
+	Scheduler      string
 	Args           []string
 	Parser         process.Parser
 	Logger         log.Logger
@@ -115,12 +117,24 @@ func New(config Config) (FFmpeg, error) {
 }
 
 func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
+	var scheduler process.Scheduler = nil
+	var err error
+
+	if len(config.Scheduler) != 0 {
+		scheduler, err = process.NewScheduler(config.Scheduler)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ffmpeg, err := process.New(process.Config{
 		Binary:         f.binary,
 		Args:           config.Args,
 		Reconnect:      config.Reconnect,
 		ReconnectDelay: config.ReconnectDelay,
 		StaleTimeout:   config.StaleTimeout,
+		Timeout:        config.Timeout,
+		Scheduler:      scheduler,
 		Parser:         config.Parser,
 		Logger:         config.Logger,
 		OnArgs:         config.OnArgs,

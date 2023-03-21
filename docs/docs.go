@@ -3371,7 +3371,14 @@ const docTemplate = `{
                 "reference": {
                     "type": "string"
                 },
+                "scheduler": {
+                    "type": "string"
+                },
                 "stale_timeout_seconds": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "timeout_seconds": {
                     "type": "integer",
                     "format": "uint64"
                 },

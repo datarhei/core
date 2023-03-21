@@ -360,6 +360,8 @@ func (r *restream) load() error {
 			Reconnect:      t.config.Reconnect,
 			ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 			StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+			Timeout:        time.Duration(t.config.Timeout) * time.Second,
+			Scheduler:      t.config.Scheduler,
 			Args:           t.command,
 			Parser:         t.parser,
 			Logger:         t.logger,
@@ -506,6 +508,8 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+		Timeout:        time.Duration(t.config.Timeout) * time.Second,
+		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
@@ -1221,6 +1225,8 @@ func (r *restream) reloadProcess(id string) error {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+		Timeout:        time.Duration(t.config.Timeout) * time.Second,
+		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
@@ -1268,12 +1274,8 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	state.Command = status.CommandArgs
 	state.LastLog = task.parser.LastLogline()
 
-	if state.Order == "start" && !task.ffmpeg.IsRunning() && task.config.Reconnect {
-		state.Reconnect = float64(task.config.ReconnectDelay) - state.Duration
-
-		if state.Reconnect < 0 {
-			state.Reconnect = 0
-		}
+	if status.Reconnect >= time.Duration(0) {
+		state.Reconnect = status.Reconnect.Round(10 * time.Millisecond).Seconds()
 	}
 
 	convertProgressFromParser(&state.Progress, task.parser.Progress())

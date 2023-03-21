@@ -51,9 +51,11 @@ type Config struct {
 	Reconnect      bool                         // Whether to restart the process if it exited
 	ReconnectDelay time.Duration                // Duration to wait before restarting the process
 	StaleTimeout   time.Duration                // Kill the process after this duration if it doesn't produce any output
+	Timeout        time.Duration                // Kill the process after this duration
 	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value
 	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value
 	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration
+	Scheduler      Scheduler                    // A scheduler
 	Parser         Parser                       // A parser for the output of the process
 	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args
 	OnStart        func()                       // A callback which is called after the process started
@@ -67,6 +69,7 @@ type Status struct {
 	State       string        // State is the current state of the process. See stateType for the known states.
 	States      States        // States is the cumulative history of states the process had.
 	Order       string        // Order is the wanted condition of process, either "start" or "stop"
+	Reconnect   time.Duration // Reconnect is the time until the next reconnect, negative if no reconnect is scheduled.
 	Duration    time.Duration // Duration is the time since the last change of the state
 	Time        time.Time     // Time is the time of the last change of the state
 	CPU         float64       // Used CPU in percent
@@ -168,11 +171,15 @@ type process struct {
 		lock    sync.Mutex
 	}
 	reconn struct {
-		enable bool
-		delay  time.Duration
-		timer  *time.Timer
-		lock   sync.Mutex
+		enable      bool
+		delay       time.Duration
+		reconnectAt time.Time
+		timer       *time.Timer
+		lock        sync.Mutex
 	}
+	timeout       time.Duration
+	stopTimer     *time.Timer
+	stopTimerLock sync.Mutex
 	killTimer     *time.Timer
 	killTimerLock sync.Mutex
 	logger        log.Logger
@@ -184,7 +191,8 @@ type process struct {
 		onStateChange func(from, to string)
 		lock          sync.Mutex
 	}
-	limits Limiter
+	limits    Limiter
+	scheduler Scheduler
 }
 
 var _ Process = &process{}
@@ -192,10 +200,12 @@ var _ Process = &process{}
 // New creates a new process wrapper
 func New(config Config) (Process, error) {
 	p := &process{
-		binary: config.Binary,
-		cmd:    nil,
-		parser: config.Parser,
-		logger: config.Logger,
+		binary:    config.Binary,
+		cmd:       nil,
+		timeout:   config.Timeout,
+		parser:    config.Parser,
+		logger:    config.Logger,
+		scheduler: config.Scheduler,
 	}
 
 	p.args = make([]string, len(config.Args))
@@ -352,9 +362,11 @@ func (p *process) setState(state stateType) error {
 
 	p.state.time = time.Now()
 
+	p.callbacks.lock.Lock()
 	if p.callbacks.onStateChange != nil {
-		go p.callbacks.onStateChange(prevState.String(), p.state.state.String())
+		p.callbacks.onStateChange(prevState.String(), p.state.state.String())
 	}
+	p.callbacks.lock.Unlock()
 
 	return nil
 }
@@ -386,7 +398,7 @@ func (p *process) Status() Status {
 
 	p.state.lock.Lock()
 	stateTime := p.state.time
-	stateString := p.state.state.String()
+	state := p.state.state
 	states := p.state.states
 	p.state.lock.Unlock()
 
@@ -395,17 +407,24 @@ func (p *process) Status() Status {
 	p.order.lock.Unlock()
 
 	s := Status{
-		State:    stateString,
-		States:   states,
-		Order:    order,
-		Duration: time.Since(stateTime),
-		Time:     stateTime,
-		CPU:      cpu,
-		Memory:   memory,
+		State:     state.String(),
+		States:    states,
+		Order:     order,
+		Reconnect: time.Duration(-1),
+		Duration:  time.Since(stateTime),
+		Time:      stateTime,
+		CPU:       cpu,
+		Memory:    memory,
 	}
 
 	s.CommandArgs = make([]string, len(p.args))
 	copy(s.CommandArgs, p.args)
+
+	if order == "start" && !state.IsRunning() {
+		p.reconn.lock.Lock()
+		s.Reconnect = time.Until(p.reconn.reconnectAt)
+		p.reconn.lock.Unlock()
+	}
 
 	return s
 }
@@ -427,6 +446,17 @@ func (p *process) Start() error {
 	}
 
 	p.order.order = "start"
+
+	if p.scheduler != nil {
+		next, err := p.scheduler.Next()
+		if err != nil {
+			return err
+		}
+
+		p.reconnect(next)
+
+		return nil
+	}
 
 	err := p.start()
 	if err != nil {
@@ -462,11 +492,31 @@ func (p *process) start() error {
 	p.setState(stateStarting)
 
 	args := p.args
+
+	p.callbacks.lock.Lock()
 	if p.callbacks.onArgs != nil {
 		args = make([]string, len(p.args))
 		copy(args, p.args)
 
 		args = p.callbacks.onArgs(args)
+	}
+	p.callbacks.lock.Unlock()
+
+	// Start the stop timeout if enabled
+	if p.timeout > time.Duration(0) {
+		p.stopTimerLock.Lock()
+		if p.stopTimer == nil {
+			// Only create a new timer if there isn't already one running
+			p.stopTimer = time.AfterFunc(p.timeout, func() {
+				p.Kill(false)
+
+				p.stopTimerLock.Lock()
+				p.stopTimer.Stop()
+				p.stopTimer = nil
+				p.stopTimerLock.Unlock()
+			})
+		}
+		p.stopTimerLock.Unlock()
 	}
 
 	p.cmd = exec.Command(p.binary, args...)
@@ -478,7 +528,8 @@ func (p *process) start() error {
 
 		p.parser.Parse(err.Error())
 		p.logger.WithError(err).Error().Log("Command failed")
-		p.reconnect()
+
+		p.reconnect(p.delay(stateFailed))
 
 		return err
 	}
@@ -487,7 +538,7 @@ func (p *process) start() error {
 
 		p.parser.Parse(err.Error())
 		p.logger.WithError(err).Error().Log("Command failed")
-		p.reconnect()
+		p.reconnect(p.delay(stateFailed))
 
 		return err
 	}
@@ -503,9 +554,11 @@ func (p *process) start() error {
 	p.logger.Info().Log("Started")
 	p.debuglogger.Debug().Log("Started")
 
+	p.callbacks.lock.Lock()
 	if p.callbacks.onStart != nil {
-		go p.callbacks.onStart()
+		p.callbacks.onStart()
 	}
+	p.callbacks.lock.Unlock()
 
 	// Start the reader
 	go p.reader()
@@ -652,21 +705,21 @@ func (p *process) stop(wait bool) error {
 }
 
 // reconnect will setup a timer to restart the  process
-func (p *process) reconnect() {
-	// If restarting a process is not enabled, don't do anything
-	if !p.reconn.enable {
+func (p *process) reconnect(delay time.Duration) {
+	if delay < time.Duration(0) {
 		return
 	}
 
 	// Stop a currently running timer
 	p.unreconnect()
 
-	p.logger.Info().Log("Scheduling restart in %s", p.reconn.delay)
+	p.logger.Info().Log("Scheduling restart in %s", delay)
 
 	p.reconn.lock.Lock()
 	defer p.reconn.lock.Unlock()
 
-	p.reconn.timer = time.AfterFunc(p.reconn.delay, func() {
+	p.reconn.reconnectAt = time.Now().Add(delay)
+	p.reconn.timer = time.AfterFunc(delay, func() {
 		p.order.lock.Lock()
 		defer p.order.lock.Unlock()
 
@@ -819,6 +872,17 @@ func (p *process) waiter() {
 
 	p.limits.Stop()
 
+	// Stop the stop timer
+	if state == stateFinished {
+		// Only clear the timer if the process finished normally
+		p.stopTimerLock.Lock()
+		if p.stopTimer != nil {
+			p.stopTimer.Stop()
+			p.stopTimer = nil
+		}
+		p.stopTimerLock.Unlock()
+	}
+
 	// Stop the kill timer
 	p.killTimerLock.Lock()
 	if p.killTimer != nil {
@@ -844,7 +908,7 @@ func (p *process) waiter() {
 	// Call the onExit callback
 	p.callbacks.lock.Lock()
 	if p.callbacks.onExit != nil {
-		go p.callbacks.onExit(state.String())
+		p.callbacks.onExit(state.String())
 	}
 	p.callbacks.lock.Unlock()
 
@@ -858,8 +922,59 @@ func (p *process) waiter() {
 
 	// Restart the process
 	if p.order.order == "start" {
-		p.reconnect()
+		p.reconnect(p.delay(state))
 	}
+}
+
+// delay returns the duration for the next reconnect of the process. If no reconnect is
+// wanted, it returns a negative duration.
+func (p *process) delay(state stateType) time.Duration {
+	// By default, reconnect after the configured delay.
+	delay := p.reconn.delay
+
+	if p.scheduler == nil {
+		// No scheduler has been provided, reconnect in any case, if enabled.
+		if !p.reconn.enable {
+			return time.Duration(-1)
+		}
+
+		return delay
+	}
+
+	// Get the next scheduled start time.
+	next, err := p.scheduler.Next()
+	if err == nil {
+		// There's a next scheduled time.
+		if state == stateFinished {
+			// If the process finished without error, reconnect at the next scheduled time.
+			delay = next
+		} else {
+			// The process finished with an error.
+			if !p.reconn.enable {
+				// If reconnect is not enabled, reconnect at the next scheduled time.
+				delay = next
+			} else {
+				// If the next scheduled time is closer than the next configured delay,
+				// reconnect at the next scheduled time
+				if next < p.reconn.delay {
+					delay = next
+				}
+			}
+		}
+	} else {
+		// No next scheduled time.
+		if state == stateFinished {
+			// If the process finished without error, don't reconnect.
+			delay = time.Duration(-1)
+		} else {
+			// If the process finished with an error, reconnect if enabled.
+			if !p.reconn.enable {
+				delay = time.Duration(-1)
+			}
+		}
+	}
+
+	return delay
 }
 
 // scanLine splits the data on \r, \n, or \r\n line endings

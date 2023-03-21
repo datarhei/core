@@ -30,6 +30,9 @@ github.com/KyleBanks/depth
 # github.com/Masterminds/semver/v3 v3.1.1
 ## explicit; go 1.12
 github.com/Masterminds/semver/v3
+# github.com/adhocore/gronx v1.1.2
+## explicit; go 1.13
+github.com/adhocore/gronx
 # github.com/agnivade/levenshtein v1.1.1
 ## explicit; go 1.13
 github.com/agnivade/levenshtein

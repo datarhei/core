@@ -746,7 +746,12 @@ definitions:
         type: integer
       reference:
         type: string
+      scheduler:
+        type: string
       stale_timeout_seconds:
+        format: uint64
+        type: integer
+      timeout_seconds:
         format: uint64
         type: integer
       type:
