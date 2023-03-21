@@ -45,7 +45,7 @@ type Config struct {
 	Autostart      bool       `json:"autostart"`
 	StaleTimeout   uint64     `json:"stale_timeout_seconds"` // seconds
 	Timeout        uint64     `json:"timeout_seconds"`       // seconds
-	Scheduler      string     `json:"scheduler"`
+	Scheduler      string     `json:"scheduler"`             // crontab pattern or RFC3339 timestamp
 	LimitCPU       float64    `json:"limit_cpu_usage"`       // percent
 	LimitMemory    uint64     `json:"limit_memory_bytes"`    // bytes
 	LimitWaitFor   uint64     `json:"limit_waitfor_seconds"` // seconds
