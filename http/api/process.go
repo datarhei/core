@@ -52,7 +52,7 @@ type ProcessConfig struct {
 	ReconnectDelay uint64              `json:"reconnect_delay_seconds" format:"uint64"`
 	Autostart      bool                `json:"autostart"`
 	StaleTimeout   uint64              `json:"stale_timeout_seconds" format:"uint64"`
-	Timeout        uint64              `json:"timeout_seconds" format:"uint64"`
+	Timeout        uint64              `json:"runtime_duration_seconds" format:"uint64"`
 	Scheduler      string              `json:"scheduler"`
 	Limits         ProcessConfigLimits `json:"limits"`
 }
