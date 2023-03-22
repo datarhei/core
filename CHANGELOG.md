@@ -11,6 +11,9 @@
 -   Add GET /api/v3/report/process endpoint
 -   Fix S3 storage credential parsing from ENV
 -   Fix placeholder parameter parsing
+-   Fix better naming for storage endpoint documentation
+-   Fix freeing up S3 mounts
+-   Fix URL validation if the path contains FFmpeg specific placeholders
 
 ### Core v16.11.0 > v16.12.0
 
