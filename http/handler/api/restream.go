@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -320,59 +321,93 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 // @ID process-3-get-report
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param created_at query int64 false "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports."
+// @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports."
 // @Success 200 {object} api.ProcessReport
+// @Failure 400 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
 func (h *RestreamHandler) GetReport(c echo.Context) error {
 	id := util.PathParam(c, "id")
+	createdUnix := util.DefaultQuery(c, "created_at", "")
+	exitedUnix := util.DefaultQuery(c, "exited_at", "")
 
-	l, err := h.restream.GetProcessLog(id)
-	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
-	}
+	var createdAt *int64 = nil
+	var exitedAt *int64 = nil
 
-	report := api.ProcessReport{}
-	report.Unmarshal(l)
-
-	return c.JSON(http.StatusOK, report)
-}
-
-// GetReportAt return the log history entry of a process
-// @Summary Get the log history entry of a process
-// @Description Get the log history entry of a process that finished at a certain time.
-// @Tags v16.?.?
-// @ID process-3-get-report-at
-// @Produce json
-// @Param id path string true "Process ID"
-// @Param at path integer true "Unix timestamp"
-// @Success 200 {object} api.ProcessReportHistoryEntry
-// @Failure 404 {object} api.Error
-// @Failure 400 {object} api.Error
-// @Security ApiKeyAuth
-// @Router /api/v3/process/{id}/report/{at} [get]
-func (h *RestreamHandler) GetReportAt(c echo.Context) error {
-	id := util.PathParam(c, "id")
-	at, err := strconv.ParseInt(util.PathParam(c, "at"), 10, 64)
-	if err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid process report date", "%s", err)
-	}
-
-	l, err := h.restream.GetProcessLog(id)
-	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
-	}
-
-	report := api.ProcessReport{}
-	report.Unmarshal(l)
-
-	for _, r := range report.History {
-		if r.ExitedAt == at {
-			return c.JSON(http.StatusOK, r)
+	if len(createdUnix) != 0 {
+		if x, err := strconv.ParseInt(createdUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid created_at unix timestamp", "%s", err)
+		} else {
+			createdAt = &x
 		}
 	}
 
-	return api.Err(http.StatusNotFound, "Unknown process report date")
+	if len(exitedUnix) != 0 {
+		if x, err := strconv.ParseInt(exitedUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid exited_at unix timestamp", "%s", err)
+		} else {
+			exitedAt = &x
+		}
+	}
+
+	l, err := h.restream.GetProcessLog(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+	}
+
+	report := api.ProcessReport{}
+	report.Unmarshal(l)
+
+	if createdAt == nil && exitedAt == nil {
+		return c.JSON(http.StatusOK, report)
+	}
+
+	filteredReport := api.ProcessReport{}
+
+	report.History = append(report.History, api.ProcessReportEntry{
+		CreatedAt: report.CreatedAt,
+		Prelude:   report.Prelude,
+		Log:       report.Log,
+	})
+
+	entries := []api.ProcessReportEntry{}
+
+	for _, r := range report.History {
+		if createdAt != nil && exitedAt == nil {
+			if r.CreatedAt == *createdAt {
+				entries = append(entries, r)
+			}
+		} else if createdAt == nil && exitedAt != nil {
+			if r.ExitedAt == *exitedAt {
+				entries = append(entries, r)
+			}
+		} else {
+			if r.CreatedAt >= *createdAt || r.ExitedAt <= *exitedAt {
+				entries = append(entries, r)
+			}
+		}
+	}
+
+	if len(entries) == 0 {
+		return api.Err(http.StatusNotFound, "No matching reports found")
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].CreatedAt < entries[j].CreatedAt
+	})
+
+	if entries[0].ExitState == "" {
+		// This is a running process
+		filteredReport.CreatedAt = entries[0].CreatedAt
+		filteredReport.Prelude = entries[0].Prelude
+		filteredReport.Log = entries[0].Log
+	}
+
+	filteredReport.History = entries[1:]
+
+	return c.JSON(http.StatusOK, filteredReport)
 }
 
 // SearchReportHistory returns a list of matching report references

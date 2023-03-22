@@ -811,9 +811,14 @@ definitions:
       created_at:
         format: int64
         type: integer
+      exit_state:
+        type: string
+      exited_at:
+        format: int64
+        type: integer
       history:
         items:
-          $ref: '#/definitions/api.ProcessReportHistoryEntry'
+          $ref: '#/definitions/api.ProcessReportEntry'
         type: array
       log:
         items:
@@ -825,8 +830,10 @@ definitions:
         items:
           type: string
         type: array
+      progress:
+        $ref: '#/definitions/api.Progress'
     type: object
-  api.ProcessReportHistoryEntry:
+  api.ProcessReportEntry:
     properties:
       created_at:
         format: int64
@@ -3138,37 +3145,17 @@ paths:
         name: id
         required: true
         type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.ProcessReport'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Get the logs of a process
-      tags:
-      - v16.7.2
-  /api/v3/process/{id}/report/{at}:
-    get:
-      description: Get the log history entry of a process that finished at a certain
-        time.
-      operationId: process-3-get-report-at
-      parameters:
-      - description: Process ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Unix timestamp
-        in: path
-        name: at
-        required: true
+      - description: Select only the report with that created_at date. Unix timestamp,
+          leave empty for any. In combination with exited_at it denotes a range or
+          reports.
+        in: query
+        name: created_at
+        type: integer
+      - description: Select only the report with that exited_at date. Unix timestamp,
+          leave empty for any. In combination with created_at it denotes a range or
+          reports.
+        in: query
+        name: exited_at
         type: integer
       produces:
       - application/json
@@ -3176,7 +3163,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.ProcessReportHistoryEntry'
+            $ref: '#/definitions/api.ProcessReport'
         "400":
           description: Bad Request
           schema:
@@ -3187,9 +3174,9 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Get the log history entry of a process
+      summary: Get the logs of a process
       tags:
-      - v16.?.?
+      - v16.7.2
   /api/v3/process/{id}/state:
     get:
       description: Get the state and progress data of a process.

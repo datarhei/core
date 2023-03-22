@@ -46,7 +46,6 @@ func getDummyRestreamRouter() (*echo.Echo, error) {
 	router.GET("/:id/config", restream.GetConfig)
 	router.GET("/:id/report", restream.GetReport)
 	router.GET("/:id/state", restream.GetState)
-	router.GET("/:id/report/:at", restream.GetReportAt)
 	router.PUT("/:id", restream.Update)
 	router.DELETE("/:id", restream.Delete)
 	router.PUT("/:id/command", restream.Command)
@@ -334,18 +333,42 @@ func TestProcessReportAt(t *testing.T) {
 	mock.Request(t, http.StatusOK, router, "PUT", "/test/command", command)
 	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
 
+	command = mock.Read(t, "./fixtures/commandStart.json")
+	mock.Request(t, http.StatusOK, router, "PUT", "/test/command", command)
+	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+
+	time.Sleep(2 * time.Second)
+
+	command = mock.Read(t, "./fixtures/commandStop.json")
+	mock.Request(t, http.StatusOK, router, "PUT", "/test/command", command)
+	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+
 	response := mock.Request(t, http.StatusOK, router, "GET", "/test/report", nil)
 
 	x := api.ProcessReport{}
 	err = json.Unmarshal(response.Raw, &x)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(x.History))
+	require.Equal(t, 2, len(x.History))
 
-	at := x.History[0].ExitedAt
+	created := x.History[0].CreatedAt
+	exited := x.History[0].ExitedAt
 
-	mock.Request(t, http.StatusOK, router, "GET", "/test/report/"+strconv.FormatInt(at, 10), nil)
-	mock.Request(t, http.StatusNotFound, router, "GET", "/test/report/1234", nil)
+	mock.Request(t, http.StatusOK, router, "GET", "/test/report?created_at="+strconv.FormatInt(created, 10), nil)
+	mock.Request(t, http.StatusNotFound, router, "GET", "/test/report?created_at=1234", nil)
+
+	mock.Request(t, http.StatusOK, router, "GET", "/test/report?exited_at="+strconv.FormatInt(exited, 10), nil)
+	mock.Request(t, http.StatusNotFound, router, "GET", "/test/report?exited_at=1234", nil)
+
+	exited = x.History[1].ExitedAt
+
+	response = mock.Request(t, http.StatusOK, router, "GET", "/test/report?created_at="+strconv.FormatInt(created, 10)+"&exited_at="+strconv.FormatInt(exited, 10), nil)
+
+	x = api.ProcessReport{}
+	err = json.Unmarshal(response.Raw, &x)
+	require.NoError(t, err)
+
+	require.Equal(t, 2, len(x.History))
 }
 
 func TestSearchReportHistory(t *testing.T) {

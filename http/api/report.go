@@ -11,20 +11,19 @@ type ProcessReportEntry struct {
 	CreatedAt int64       `json:"created_at" format:"int64"`
 	Prelude   []string    `json:"prelude,omitempty"`
 	Log       [][2]string `json:"log,omitempty"`
+	ExitedAt  int64       `json:"exited_at,omitempty" format:"int64"`
+	ExitState string      `json:"exit_state,omitempty"`
+	Progress  *Progress   `json:"progress,omitempty"`
 }
 
 type ProcessReportHistoryEntry struct {
 	ProcessReportEntry
-
-	ExitedAt  int64    `json:"exited_at" format:"int64"`
-	ExitState string   `json:"exit_state"`
-	Progress  Progress `json:"progress"`
 }
 
 // ProcessReport represents the current log and the logs of previous runs of a restream process
 type ProcessReport struct {
 	ProcessReportEntry
-	History []ProcessReportHistoryEntry `json:"history"`
+	History []ProcessReportEntry `json:"history"`
 }
 
 // Unmarshal converts a restream log to a report
@@ -41,24 +40,23 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 		report.Log[i][1] = line.Data
 	}
 
-	report.History = []ProcessReportHistoryEntry{}
+	report.History = []ProcessReportEntry{}
 
 	for _, h := range l.History {
-		he := ProcessReportHistoryEntry{
-			ProcessReportEntry: ProcessReportEntry{
-				CreatedAt: h.CreatedAt.Unix(),
-				Prelude:   h.Prelude,
-				Log:       make([][2]string, len(h.Log)),
-			},
+		he := ProcessReportEntry{
+			CreatedAt: h.CreatedAt.Unix(),
+			Prelude:   h.Prelude,
+			Log:       make([][2]string, len(h.Log)),
 			ExitedAt:  h.ExitedAt.Unix(),
 			ExitState: h.ExitState,
 		}
 
+		he.Progress = &Progress{}
 		he.Progress.Unmarshal(&h.Progress)
 
 		for i, line := range h.Log {
-			he.ProcessReportEntry.Log[i][0] = strconv.FormatInt(line.Timestamp.Unix(), 10)
-			he.ProcessReportEntry.Log[i][1] = line.Data
+			he.Log[i][0] = strconv.FormatInt(line.Timestamp.Unix(), 10)
+			he.Log[i][1] = line.Data
 		}
 
 		report.History = append(report.History, he)

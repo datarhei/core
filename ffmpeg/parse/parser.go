@@ -170,7 +170,7 @@ func New(config Config) Parser {
 		p.collector = session.NewNullCollector()
 	}
 
-	p.logStart = time.Now()
+	p.logStart = time.Time{}
 	p.lock.log.Unlock()
 
 	p.ResetStats()
@@ -721,7 +721,7 @@ func (p *parser) ResetLog() {
 
 	p.lock.log.Lock()
 	p.log = ring.New(p.logLines)
-	p.logStart = time.Now()
+	p.logStart = time.Time{}
 	p.lock.log.Unlock()
 }
 
@@ -790,6 +790,8 @@ func (p *parser) storeReportHistory(state string) {
 	}
 
 	report := p.Report()
+
+	p.ResetLog()
 
 	if len(report.Prelude) == 0 {
 		return

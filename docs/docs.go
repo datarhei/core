@@ -1794,6 +1794,18 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports.",
+                        "name": "created_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
+                        "name": "exited_at",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1801,54 +1813,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.ProcessReport"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/process/{id}/report/{at}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Get the log history entry of a process that finished at a certain time.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.?.?"
-                ],
-                "summary": "Get the log history entry of a process",
-                "operationId": "process-3-get-report-at",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Process ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Unix timestamp",
-                        "name": "at",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.ProcessReportHistoryEntry"
                         }
                     },
                     "400": {
@@ -3462,10 +3426,17 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
+                "exit_state": {
+                    "type": "string"
+                },
+                "exited_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "history": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.ProcessReportHistoryEntry"
+                        "$ref": "#/definitions/api.ProcessReportEntry"
                     }
                 },
                 "log": {
@@ -3482,10 +3453,13 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "progress": {
+                    "$ref": "#/definitions/api.Progress"
                 }
             }
         },
-        "api.ProcessReportHistoryEntry": {
+        "api.ProcessReportEntry": {
             "type": "object",
             "properties": {
                 "created_at": {
