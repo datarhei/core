@@ -188,6 +188,13 @@ func (p *parser) Parse(line string) uint64 {
 	if p.logStart.IsZero() {
 		p.lock.log.Lock()
 		p.logStart = time.Now()
+
+		p.logger.WithComponent("ProcessReport").WithFields(log.Fields{
+			"exec_state": "running",
+			"report":     "created",
+			"timestamp":  p.logStart.Unix(),
+		}).Info().Log("Created")
+
 		p.lock.log.Unlock()
 	}
 
@@ -820,6 +827,12 @@ func (p *parser) storeReportHistory(state string) {
 	}
 
 	p.logHistory = p.logHistory.Next()
+
+	p.logger.WithComponent("ProcessReport").WithFields(log.Fields{
+		"exec_state": state,
+		"report":     "exited",
+		"timestamp":  h.ExitedAt.Unix(),
+	}).Info().Log("Exited")
 }
 
 func (p *parser) Report() Report {

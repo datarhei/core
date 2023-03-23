@@ -387,8 +387,11 @@ func (a *api) start() error {
 	}
 
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
-		Root:   cfg.Storage.Disk.Dir,
-		Logger: a.log.logger.core.WithComponent("DiskFS"),
+		Root: cfg.Storage.Disk.Dir,
+		Logger: a.log.logger.core.WithComponent("Filesystem").WithFields(log.Fields{
+			"type": "disk",
+			"name": "disk",
+		}),
 	})
 	if err != nil {
 		return fmt.Errorf("disk filesystem: %w", err)
@@ -420,7 +423,10 @@ func (a *api) start() error {
 
 	if a.memfs == nil {
 		memfs, _ := fs.NewMemFilesystem(fs.MemConfig{
-			Logger: a.log.logger.core.WithComponent("MemFS"),
+			Logger: a.log.logger.core.WithComponent("Filesystem").WithFields(log.Fields{
+				"type": "mem",
+				"name": "mem",
+			}),
 		})
 
 		memfs.SetMetadata("base", baseMemFS.String())
@@ -464,7 +470,10 @@ func (a *api) start() error {
 			Region:          s3.Region,
 			Bucket:          s3.Bucket,
 			UseSSL:          s3.UseSSL,
-			Logger:          a.log.logger.core.WithComponent("FS"),
+			Logger: a.log.logger.core.WithComponent("Filesystem").WithFields(log.Fields{
+				"type": "s3",
+				"name": s3.Name,
+			}),
 		})
 		if err != nil {
 			return fmt.Errorf("s3 filesystem (%s): %w", s3.Name, err)

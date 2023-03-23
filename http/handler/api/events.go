@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/log"
 
 	"github.com/labstack/echo/v4"
@@ -34,11 +35,30 @@ func NewEvents(events log.ChannelWriter) *EventsHandler {
 // @Accept json-stream
 // @Produce text/event-stream
 // @Produce json-stream
-// @Param filters body []api.EventFilter false "Event filters"
+// @Param filters body api.EventFilters false "Event filters"
 // @Success 200 {object} api.Event
 // @Security ApiKeyAuth
 // @Router /api/v3/events [post]
 func (h *EventsHandler) Events(c echo.Context) error {
+	filters := api.EventFilters{}
+
+	if err := util.ShouldBindJSON(c, &filters); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	filter := map[string]*api.EventFilter{}
+
+	for _, f := range filters.Filters {
+		f := f
+
+		if err := f.Compile(); err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid filter", "%s: %s", f.Component, err)
+		}
+
+		component := strings.ToLower(f.Component)
+		filter[component] = &f
+	}
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -64,6 +84,19 @@ func (h *EventsHandler) Events(c echo.Context) error {
 
 	done := make(chan struct{})
 
+	filterEvent := func(event *api.Event) bool {
+		if len(filter) == 0 {
+			return true
+		}
+
+		f, ok := filter[event.Component]
+		if !ok {
+			return false
+		}
+
+		return event.Filter(f)
+	}
+
 	event := api.Event{}
 
 	if contentType == "text/event-stream" {
@@ -79,7 +112,12 @@ func (h *EventsHandler) Events(c echo.Context) error {
 				res.Flush()
 			case e := <-evts:
 				event.Marshal(&e)
-				res.Write([]byte("event: " + strings.ToLower(event.Component) + "\ndata: "))
+
+				if !filterEvent(&event) {
+					continue
+				}
+
+				res.Write([]byte("event: " + event.Component + "\ndata: "))
 				if err := enc.Encode(event); err != nil {
 					close(done)
 				}
@@ -100,6 +138,11 @@ func (h *EventsHandler) Events(c echo.Context) error {
 				res.Flush()
 			case e := <-evts:
 				event.Marshal(&e)
+
+				if !filterEvent(&event) {
+					continue
+				}
+
 				if err := enc.Encode(event); err != nil {
 					close(done)
 				}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/datarhei/core/v16/log"
 )
@@ -18,9 +19,9 @@ type Event struct {
 }
 
 func (e *Event) Marshal(le *log.Event) {
-	e.Timestamp = le.Time.UnixMilli()
+	e.Timestamp = le.Time.Unix()
 	e.Level = int(le.Level)
-	e.Component = le.Component
+	e.Component = strings.ToLower(le.Component)
 	e.Message = le.Message
 
 	e.Data = make(map[string]string)
@@ -50,11 +51,7 @@ func (e *Event) Marshal(le *log.Event) {
 }
 
 func (e *Event) Filter(ef *EventFilter) bool {
-	if e.Component != ef.Component {
-		return false
-	}
-
-	for k, r := range ef.filter {
+	for k, r := range ef.data {
 		v, ok := e.Data[k]
 		if !ok {
 			continue
@@ -70,20 +67,24 @@ func (e *Event) Filter(ef *EventFilter) bool {
 
 type EventFilter struct {
 	Component string            `json:"event"`
-	Filter    map[string]string `json:"filter"`
-	filter    map[string]*regexp.Regexp
+	Data      map[string]string `json:"data"`
+	data      map[string]*regexp.Regexp
 }
 
-func (ef *EventFilter) compile() error {
-	ef.filter = make(map[string]*regexp.Regexp)
+type EventFilters struct {
+	Filters []EventFilter `json:"filters"`
+}
 
-	for k, v := range ef.Filter {
+func (ef *EventFilter) Compile() error {
+	ef.data = make(map[string]*regexp.Regexp)
+
+	for k, v := range ef.Data {
 		r, err := regexp.Compile(v)
 		if err != nil {
 			return err
 		}
 
-		ef.filter[k] = r
+		ef.data[k] = r
 	}
 
 	return nil

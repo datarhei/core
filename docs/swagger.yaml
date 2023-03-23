@@ -457,12 +457,19 @@ definitions:
     type: object
   api.EventFilter:
     properties:
-      event:
-        type: string
-      filter:
+      data:
         additionalProperties:
           type: string
         type: object
+      event:
+        type: string
+    type: object
+  api.EventFilters:
+    properties:
+      filters:
+        items:
+          $ref: '#/definitions/api.EventFilter'
+        type: array
     type: object
   api.FileInfo:
     properties:
@@ -2194,8 +2201,8 @@ paths:
   /api/v3/events:
     post:
       consumes:
-      - application/x-json-stream
       - text/event-stream
+      - application/x-json-stream
       description: Stream of event of whats happening in the core
       operationId: events
       parameters:
@@ -2203,12 +2210,10 @@ paths:
         in: body
         name: filters
         schema:
-          items:
-            $ref: '#/definitions/api.EventFilter'
-          type: array
+          $ref: '#/definitions/api.EventFilters'
       produces:
-      - application/x-json-stream
       - text/event-stream
+      - application/x-json-stream
       responses:
         "200":
           description: OK

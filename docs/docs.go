@@ -319,12 +319,12 @@ const docTemplate = `{
                 ],
                 "description": "Stream of event of whats happening in the core",
                 "consumes": [
-                    "application/x-json-stream",
-                    "text/event-stream"
+                    "text/event-stream",
+                    "application/x-json-stream"
                 ],
                 "produces": [
-                    "application/x-json-stream",
-                    "text/event-stream"
+                    "text/event-stream",
+                    "application/x-json-stream"
                 ],
                 "tags": [
                     "v16.?.?"
@@ -337,10 +337,7 @@ const docTemplate = `{
                         "name": "filters",
                         "in": "body",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.EventFilter"
-                            }
+                            "$ref": "#/definitions/api.EventFilters"
                         }
                     }
                 ],
@@ -2949,13 +2946,24 @@ const docTemplate = `{
         "api.EventFilter": {
             "type": "object",
             "properties": {
-                "event": {
-                    "type": "string"
-                },
-                "filter": {
+                "data": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.EventFilters": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.EventFilter"
                     }
                 }
             }

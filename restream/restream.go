@@ -291,7 +291,11 @@ func (r *restream) load() error {
 			reference: process.Reference,
 			process:   process,
 			config:    process.Config.Clone(),
-			logger:    r.logger.WithField("id", id),
+			logger: r.logger.WithFields(log.Fields{
+				"id":        process.ID,
+				"reference": process.Reference,
+			},
+			),
 		}
 
 		// Replace all placeholders in the config
@@ -474,7 +478,11 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		reference: process.Reference,
 		process:   process,
 		config:    process.Config.Clone(),
-		logger:    r.logger.WithField("id", process.ID),
+		logger: r.logger.WithFields(log.Fields{
+			"id":        process.ID,
+			"reference": process.Reference,
+		},
+		),
 	}
 
 	resolveStaticPlaceholders(t.config, r.replace)
