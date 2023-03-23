@@ -97,6 +97,8 @@ type Logger interface {
 	// Write implements the io.Writer interface such that it can be used in e.g. the
 	// the log/Logger facility. Messages will be printed with debug level.
 	Write(p []byte) (int, error)
+
+	Close()
 }
 
 // logger is an implementation of the Logger interface.
@@ -112,6 +114,10 @@ func New(component string) Logger {
 	}
 
 	return l
+}
+
+func (l *logger) Close() {
+	l.output.Close()
 }
 
 func (l *logger) clone() *logger {
@@ -197,6 +203,10 @@ func newEvent(l *logger) Logger {
 	}
 
 	return e
+}
+
+func (e *Event) Close() {
+	e.logger.Close()
 }
 
 func (e *Event) WithOutput(w Writer) Logger {
@@ -341,14 +351,4 @@ func (l *Event) Write(p []byte) (int, error) {
 	l.Log("%s", strings.TrimSpace(string(p)))
 
 	return len(p), nil
-}
-
-type Eventx struct {
-	Time      time.Time   `json:"ts"`
-	Level     Level       `json:"level"`
-	Component string      `json:"component"`
-	Reference string      `json:"ref"`
-	Message   string      `json:"message"`
-	Caller    string      `json:"caller"`
-	Detail    interface{} `json:"detail"`
 }

@@ -2,17 +2,21 @@ package log
 
 import (
 	"container/ring"
+	"context"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/lithammer/shortuuid/v4"
 	"github.com/mattn/go-isatty"
 )
 
 type Writer interface {
 	Write(e *Event) error
+	Close()
 }
 
 type jsonWriter struct {
@@ -40,6 +44,8 @@ func (w *jsonWriter) Write(e *Event) error {
 
 	return err
 }
+
+func (w *jsonWriter) Close() {}
 
 type consoleWriter struct {
 	writer    io.Writer
@@ -80,6 +86,8 @@ func (w *consoleWriter) Write(e *Event) error {
 	return err
 }
 
+func (w *consoleWriter) Close() {}
+
 type topicWriter struct {
 	writer Writer
 	topics map[string]struct{}
@@ -110,6 +118,10 @@ func (w *topicWriter) Write(e *Event) error {
 	err := w.writer.Write(e)
 
 	return err
+}
+
+func (w *topicWriter) Close() {
+	w.writer.Close()
 }
 
 type levelRewriter struct {
@@ -182,6 +194,10 @@ rules:
 	return w.writer.Write(e)
 }
 
+func (w *levelRewriter) Close() {
+	w.writer.Close()
+}
+
 type syncWriter struct {
 	mu     sync.Mutex
 	writer Writer
@@ -193,11 +209,18 @@ func NewSyncWriter(writer Writer) Writer {
 	}
 }
 
-func (s *syncWriter) Write(e *Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (w *syncWriter) Write(e *Event) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
-	return s.writer.Write(e)
+	return w.writer.Write(e)
+}
+
+func (w *syncWriter) Close() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.writer.Close()
 }
 
 type multiWriter struct {
@@ -212,14 +235,20 @@ func NewMultiWriter(writer ...Writer) Writer {
 	return mw
 }
 
-func (m *multiWriter) Write(e *Event) error {
-	for _, w := range m.writer {
-		if err := w.Write(e); err != nil {
+func (w *multiWriter) Write(e *Event) error {
+	for _, writer := range w.writer {
+		if err := writer.Write(e); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (w *multiWriter) Close() {
+	for _, writer := range w.writer {
+		writer.Close()
+	}
 }
 
 type BufferWriter interface {
@@ -245,33 +274,40 @@ func NewBufferWriter(level Level, lines int) BufferWriter {
 	return b
 }
 
-func (b *bufferWriter) Write(e *Event) error {
-	if b.level < e.Level || e.Level == Lsilent {
+func (w *bufferWriter) Write(e *Event) error {
+	if w.level < e.Level || e.Level == Lsilent {
 		return nil
 	}
 
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	w.lock.Lock()
+	defer w.lock.Unlock()
 
-	if b.lines != nil {
-		b.lines.Value = e.clone()
-		b.lines = b.lines.Next()
+	if w.lines != nil {
+		w.lines.Value = e.clone()
+		w.lines = w.lines.Next()
 	}
 
 	return nil
 }
 
-func (b *bufferWriter) Events() []*Event {
+func (w *bufferWriter) Close() {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	w.lines = nil
+}
+
+func (w *bufferWriter) Events() []*Event {
 	var lines = []*Event{}
 
-	if b.lines == nil {
+	if w.lines == nil {
 		return lines
 	}
 
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	w.lock.RLock()
+	defer w.lock.RUnlock()
 
-	b.lines.Do(func(l interface{}) {
+	w.lines.Do(func(l interface{}) {
 		if l == nil {
 			return
 		}
@@ -280,4 +316,103 @@ func (b *bufferWriter) Events() []*Event {
 	})
 
 	return lines
+}
+
+type ChannelWriter interface {
+	Writer
+
+	Subscribe() (<-chan Event, func())
+}
+
+type channelWriter struct {
+	publisher chan Event
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	subscriber     map[string]chan Event
+	subscriberLock sync.Mutex
+}
+
+func NewChannelWriter() ChannelWriter {
+	w := &channelWriter{
+		publisher:  make(chan Event, 1024),
+		subscriber: make(map[string]chan Event),
+	}
+
+	w.ctx, w.cancel = context.WithCancel(context.Background())
+
+	go w.broadcast()
+
+	return w
+}
+
+func (w *channelWriter) Write(e *Event) error {
+	event := e.clone()
+	event.logger = nil
+
+	select {
+	case w.publisher <- *e:
+	default:
+		return fmt.Errorf("publisher queue full")
+	}
+
+	return nil
+}
+
+func (w *channelWriter) Close() {
+	w.cancel()
+
+	close(w.publisher)
+
+	w.subscriberLock.Lock()
+	for _, c := range w.subscriber {
+		close(c)
+	}
+	w.subscriber = make(map[string]chan Event)
+	w.subscriberLock.Unlock()
+}
+
+func (w *channelWriter) Subscribe() (<-chan Event, func()) {
+	l := make(chan Event, 1024)
+
+	var id string = ""
+
+	w.subscriberLock.Lock()
+	for {
+		id = shortuuid.New()
+		if _, ok := w.subscriber[id]; !ok {
+			w.subscriber[id] = l
+			break
+		}
+	}
+	w.subscriberLock.Unlock()
+
+	unsubscribe := func() {
+		w.subscriberLock.Lock()
+		delete(w.subscriber, id)
+		w.subscriberLock.Unlock()
+	}
+
+	return l, unsubscribe
+}
+
+func (w *channelWriter) broadcast() {
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case e := <-w.publisher:
+			w.subscriberLock.Lock()
+			for _, c := range w.subscriber {
+				pp := e.clone()
+
+				select {
+				case c <- *pp:
+				default:
+				}
+			}
+			w.subscriberLock.Unlock()
+		}
+	}
 }

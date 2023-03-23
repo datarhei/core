@@ -310,6 +310,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/events": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stream of event of whats happening in the core",
+                "consumes": [
+                    "application/x-json-stream",
+                    "text/event-stream"
+                ],
+                "produces": [
+                    "application/x-json-stream",
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Stream of events",
+                "operationId": "events",
+                "parameters": [
+                    {
+                        "description": "Event filters",
+                        "name": "filters",
+                        "in": "body",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.EventFilter"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Event"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/fs": {
             "get": {
                 "security": [
@@ -2875,6 +2919,44 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "api.Event": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "ts": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "api.EventFilter": {
+            "type": "object",
+            "properties": {
+                "event": {
+                    "type": "string"
+                },
+                "filter": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },

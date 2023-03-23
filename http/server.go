@@ -76,6 +76,7 @@ var ListenAndServe = http.ListenAndServe
 type Config struct {
 	Logger        log.Logger
 	LogBuffer     log.BufferWriter
+	LogEvents     log.ChannelWriter
 	Restream      restream.Restreamer
 	Metrics       monitor.HistoryReader
 	Prometheus    prometheus.Reader
@@ -116,6 +117,7 @@ type server struct {
 
 	v3handler struct {
 		log       *api.LogHandler
+		events    *api.EventsHandler
 		restream  *api.RestreamHandler
 		playout   *api.PlayoutHandler
 		rtmp      *api.RTMPHandler
@@ -226,6 +228,10 @@ func NewServer(config Config) (Server, error) {
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
+	)
+
+	s.v3handler.events = api.NewEvents(
+		config.LogEvents,
 	)
 
 	if config.Restream != nil {
@@ -649,9 +655,18 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	}
 
 	// v3 Log
-	v3.GET("/log", s.v3handler.log.Log)
+	if s.v3handler.log != nil {
+		v3.GET("/log", s.v3handler.log.Log)
+	}
 
 	// v3 Metrics
-	v3.GET("/metrics", s.v3handler.resources.Describe)
-	v3.POST("/metrics", s.v3handler.resources.Metrics)
+	if s.v3handler.resources != nil {
+		v3.GET("/metrics", s.v3handler.resources.Describe)
+		v3.POST("/metrics", s.v3handler.resources.Metrics)
+	}
+
+	// v3 Events
+	if s.v3handler.events != nil {
+		v3.POST("/events", s.v3handler.events.Events)
+	}
 }

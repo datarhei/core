@@ -92,6 +92,7 @@ type api struct {
 	log struct {
 		writer io.Writer
 		buffer log.BufferWriter
+		events log.ChannelWriter
 		logger struct {
 			core    log.Logger
 			main    log.Logger
@@ -190,6 +191,7 @@ func (a *api) Reload() error {
 	}
 
 	buffer := log.NewBufferWriter(loglevel, cfg.Log.MaxLines)
+	events := log.NewChannelWriter()
 
 	logger = logger.WithOutput(log.NewLevelRewriter(
 		log.NewMultiWriter(
@@ -198,6 +200,7 @@ func (a *api) Reload() error {
 				cfg.Log.Topics,
 			),
 			buffer,
+			events,
 		),
 		[]log.LevelRewriteRule{
 			// FFmpeg annoyance, move all warnings about unathorized access to memfs from ffmpeg to debug level
@@ -271,6 +274,7 @@ func (a *api) Reload() error {
 	a.config.config = cfg
 	a.log.logger.core = logger
 	a.log.buffer = buffer
+	a.log.events = events
 
 	return nil
 }
@@ -1025,6 +1029,7 @@ func (a *api) start() error {
 	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
+		LogEvents:     a.log.events,
 		Restream:      a.restream,
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
@@ -1436,6 +1441,7 @@ func (a *api) stop() {
 	a.state = "idle"
 
 	logger.Info().Log("Complete")
+	logger.Close()
 }
 
 func (a *api) Stop() {

@@ -114,4 +114,9 @@ func (w *fakeWriter) Write(body []byte) (int, error) {
 	return n, err
 }
 
-func (w *fakeWriter) Flush() {}
+func (w *fakeWriter) Flush() {
+	flusher, ok := w.ResponseWriter.(http.Flusher)
+	if ok {
+		flusher.Flush()
+	}
+}

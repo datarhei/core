@@ -116,6 +116,13 @@ func (w *sizeWriter) Write(body []byte) (int, error) {
 	return n, err
 }
 
+func (w *sizeWriter) Flush() {
+	flusher, ok := w.ResponseWriter.(http.Flusher)
+	if ok {
+		flusher.Flush()
+	}
+}
+
 type sizeReadCloser struct {
 	io.ReadCloser
 

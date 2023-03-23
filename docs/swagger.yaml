@@ -439,6 +439,31 @@ definitions:
       message:
         type: string
     type: object
+  api.Event:
+    properties:
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      event:
+        type: string
+      level:
+        type: integer
+      message:
+        type: string
+      ts:
+        format: int64
+        type: integer
+    type: object
+  api.EventFilter:
+    properties:
+      event:
+        type: string
+      filter:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   api.FileInfo:
     properties:
       last_modified:
@@ -2166,6 +2191,34 @@ paths:
       summary: Reload the currently active configuration
       tags:
       - v16.7.2
+  /api/v3/events:
+    post:
+      consumes:
+      - application/x-json-stream
+      - text/event-stream
+      description: Stream of event of whats happening in the core
+      operationId: events
+      parameters:
+      - description: Event filters
+        in: body
+        name: filters
+        schema:
+          items:
+            $ref: '#/definitions/api.EventFilter'
+          type: array
+      produces:
+      - application/x-json-stream
+      - text/event-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Event'
+      security:
+      - ApiKeyAuth: []
+      summary: Stream of events
+      tags:
+      - v16.?.?
   /api/v3/fs:
     get:
       description: Listall registered filesystems
