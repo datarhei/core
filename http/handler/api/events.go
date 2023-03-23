@@ -31,8 +31,7 @@ func NewEvents(events log.ChannelWriter) *EventsHandler {
 // @Description Stream of event of whats happening in the core
 // @ID events
 // @Tags v16.?.?
-// @Accept text/event-stream
-// @Accept json-stream
+// @Accept json
 // @Produce text/event-stream
 // @Produce json-stream
 // @Param filters body api.EventFilters false "Event filters"

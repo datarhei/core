@@ -2201,8 +2201,7 @@ paths:
   /api/v3/events:
     post:
       consumes:
-      - text/event-stream
-      - application/x-json-stream
+      - application/json
       description: Stream of event of whats happening in the core
       operationId: events
       parameters:

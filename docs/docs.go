@@ -319,8 +319,7 @@ const docTemplate = `{
                 ],
                 "description": "Stream of event of whats happening in the core",
                 "consumes": [
-                    "text/event-stream",
-                    "application/x-json-stream"
+                    "application/json"
                 ],
                 "produces": [
                     "text/event-stream",
