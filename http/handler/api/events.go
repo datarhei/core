@@ -62,6 +62,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 	defer ticker.Stop()
 
 	req := c.Request()
+	reqctx := req.Context()
 
 	contentType := "text/event-stream"
 	accept := req.Header.Get(echo.HeaderAccept)
@@ -73,6 +74,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 
 	res.Header().Set(echo.HeaderContentType, contentType+"; charset=UTF-8")
 	res.Header().Set(echo.HeaderCacheControl, "no-store")
+	res.Header().Set(echo.HeaderConnection, "close")
 	res.WriteHeader(http.StatusOK)
 
 	evts, cancel := h.events.Subscribe()
@@ -81,7 +83,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 	enc := json.NewEncoder(res)
 	enc.SetIndent("", "")
 
-	done := make(chan struct{})
+	done := make(chan error, 1)
 
 	filterEvent := func(event *api.Event) bool {
 		if len(filter) == 0 {
@@ -104,8 +106,10 @@ func (h *EventsHandler) Events(c echo.Context) error {
 
 		for {
 			select {
-			case <-done:
-				return nil
+			case err := <-done:
+				return err
+			case <-reqctx.Done():
+				done <- nil
 			case <-ticker.C:
 				res.Write([]byte(":keepalive\n\n"))
 				res.Flush()
@@ -118,7 +122,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 
 				res.Write([]byte("event: " + event.Component + "\ndata: "))
 				if err := enc.Encode(event); err != nil {
-					close(done)
+					done <- err
 				}
 				res.Write([]byte("\n"))
 				res.Flush()
@@ -130,8 +134,10 @@ func (h *EventsHandler) Events(c echo.Context) error {
 
 		for {
 			select {
-			case <-done:
-				return nil
+			case err := <-done:
+				return err
+			case <-reqctx.Done():
+				done <- nil
 			case <-ticker.C:
 				res.Write([]byte("{\"event\": \"keepalive\"}\n"))
 				res.Flush()
@@ -143,7 +149,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 				}
 
 				if err := enc.Encode(event); err != nil {
-					close(done)
+					done <- err
 				}
 				res.Flush()
 			}
