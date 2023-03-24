@@ -325,7 +325,9 @@ type ChannelWriter interface {
 }
 
 type channelWriter struct {
-	publisher chan Event
+	publisher       chan Event
+	publisherClosed bool
+	publisherLock   sync.Mutex
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -336,8 +338,9 @@ type channelWriter struct {
 
 func NewChannelWriter() ChannelWriter {
 	w := &channelWriter{
-		publisher:  make(chan Event, 1024),
-		subscriber: make(map[string]chan Event),
+		publisher:       make(chan Event, 1024),
+		publisherClosed: false,
+		subscriber:      make(map[string]chan Event),
 	}
 
 	w.ctx, w.cancel = context.WithCancel(context.Background())
@@ -351,6 +354,13 @@ func (w *channelWriter) Write(e *Event) error {
 	event := e.clone()
 	event.logger = nil
 
+	w.publisherLock.Lock()
+	defer w.publisherLock.Unlock()
+
+	if w.publisherClosed {
+		return fmt.Errorf("writer is closed")
+	}
+
 	select {
 	case w.publisher <- *e:
 	default:
@@ -363,7 +373,10 @@ func (w *channelWriter) Write(e *Event) error {
 func (w *channelWriter) Close() {
 	w.cancel()
 
+	w.publisherLock.Lock()
 	close(w.publisher)
+	w.publisherClosed = true
+	w.publisherLock.Unlock()
 
 	w.subscriberLock.Lock()
 	for _, c := range w.subscriber {
