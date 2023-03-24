@@ -355,7 +355,11 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
-	if fs.isDir(path) {
+	fs.filesLock.Lock()
+	isdir := fs.isDir(path)
+	fs.filesLock.Unlock()
+
+	if isdir {
 		return -1, false, fmt.Errorf("path not writeable")
 	}
 
