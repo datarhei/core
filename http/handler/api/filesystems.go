@@ -85,7 +85,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 // @Summary Remove a file from a filesystem
 // @Description Remove a file from a filesystem
 // @Tags v16.7.2
-// @ID filesystem-3-delete-files
+// @ID filesystem-3-delete-file
 // @Produce text/plain
 // @Param storage path string true "Name of the filesystem"
 // @Param filepath path string true "Path to file"
