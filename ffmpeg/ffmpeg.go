@@ -17,7 +17,7 @@ import (
 
 type FFmpeg interface {
 	New(config ProcessConfig) (process.Process, error)
-	NewProcessParser(logger log.Logger, id, reference string) parse.Parser
+	NewProcessParser(logger log.Logger, id, reference string, logpatterns []string) parse.Parser
 	NewProbeParser(logger log.Logger) probe.Parser
 	ValidateInputAddress(address string) bool
 	ValidateOutputAddress(address string) bool
@@ -168,11 +168,12 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 	return ffmpeg, err
 }
 
-func (f *ffmpeg) NewProcessParser(logger log.Logger, id, reference string) parse.Parser {
+func (f *ffmpeg) NewProcessParser(logger log.Logger, id, reference string, logpatterns []string) parse.Parser {
 	p := parse.New(parse.Config{
 		LogLines:          f.logLines,
 		LogHistory:        f.historyLength,
 		LogMinimalHistory: f.minimalHistoryLength,
+		Patterns:          logpatterns,
 		Logger:            logger,
 		Collector:         NewWrappedCollector(id, reference, f.collector),
 	})

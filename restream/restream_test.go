@@ -1124,3 +1124,32 @@ func TestProcessReplacer(t *testing.T) {
 
 	require.Equal(t, process, rs.tasks["314159265359"].config)
 }
+
+func TestProcessLogPattern(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.LogPatterns = []string{
+		"using cpu capabilities:",
+	}
+	process.Autostart = false
+	process.Reconnect = true
+
+	err = rs.AddProcess(process)
+	require.NoError(t, err)
+
+	err = rs.StartProcess("process")
+	require.NoError(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	log, err := rs.GetProcessLog("process")
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(log.Matches))
+	require.Equal(t, "[libx264 @ 0x7fa96a800600] using cpu capabilities: MMX2 SSE2Fast SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2", log.Matches[0])
+
+	err = rs.StopProcess("process")
+	require.NoError(t, err)
+}

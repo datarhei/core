@@ -763,6 +763,10 @@ definitions:
         type: array
       limits:
         $ref: '#/definitions/api.ProcessConfigLimits'
+      log_patterns:
+        items:
+          type: string
+        type: array
       options:
         items:
           type: string
@@ -858,6 +862,10 @@ definitions:
             type: string
           type: array
         type: array
+      matches:
+        items:
+          type: string
+        type: array
       prelude:
         items:
           type: string
@@ -880,6 +888,10 @@ definitions:
           items:
             type: string
           type: array
+        type: array
+      matches:
+        items:
+          type: string
         type: array
       prelude:
         items:
@@ -2372,7 +2384,7 @@ paths:
   /api/v3/fs/{storage}/{filepath}:
     delete:
       description: Remove a file from a filesystem
-      operationId: filesystem-3-delete-files
+      operationId: filesystem-3-delete-file
       parameters:
       - description: Name of the filesystem
         in: path

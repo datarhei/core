@@ -48,6 +48,7 @@ type Config struct {
 	LogMinimalHistory int
 	PreludeHeadLines  int
 	PreludeTailLines  int
+	Patterns          []string
 	Logger            log.Logger
 	Collector         session.Collector
 }
@@ -70,6 +71,11 @@ type parser struct {
 		data           []string
 		tail           *ring.Ring
 		done           bool
+	}
+
+	logpatterns struct {
+		matches  []string
+		patterns []*regexp.Regexp
 	}
 
 	log      *ring.Ring
@@ -158,7 +164,7 @@ func New(config Config) Parser {
 	p.lock.prelude.Unlock()
 
 	p.lock.log.Lock()
-	p.log = ring.New(config.LogLines)
+	p.log = ring.New(p.logLines)
 
 	historyLength := p.logHistoryLength + p.logMinimalHistoryLength
 
@@ -171,6 +177,17 @@ func New(config Config) Parser {
 	}
 
 	p.logStart = time.Time{}
+
+	for _, pattern := range config.Patterns {
+		r, err := regexp.Compile(pattern)
+		if err != nil {
+			p.logpatterns.matches = append(p.logpatterns.matches, err.Error())
+			continue
+		}
+
+		p.logpatterns.patterns = append(p.logpatterns.patterns, r)
+	}
+
 	p.lock.log.Unlock()
 
 	p.ResetStats()
@@ -185,8 +202,8 @@ func (p *parser) Parse(line string) uint64 {
 	isFFmpegProgress := strings.HasPrefix(line, "ffmpeg.progress:")
 	isAVstreamProgress := strings.HasPrefix(line, "avstream.progress:")
 
+	p.lock.log.Lock()
 	if p.logStart.IsZero() {
-		p.lock.log.Lock()
 		p.logStart = time.Now()
 
 		p.logger.WithComponent("ProcessReport").WithFields(log.Fields{
@@ -194,9 +211,8 @@ func (p *parser) Parse(line string) uint64 {
 			"report":     "created",
 			"timestamp":  p.logStart.Unix(),
 		}).Info().Log("Created")
-
-		p.lock.log.Unlock()
 	}
+	p.lock.log.Unlock()
 
 	p.lock.prelude.Lock()
 	preludeDone := p.prelude.done
@@ -267,6 +283,14 @@ func (p *parser) Parse(line string) uint64 {
 			}
 		}
 		p.lock.prelude.Unlock()
+
+		p.lock.log.Lock()
+		for _, pattern := range p.logpatterns.patterns {
+			if pattern.MatchString(line) {
+				p.logpatterns.matches = append(p.logpatterns.matches, line)
+			}
+		}
+		p.lock.log.Unlock()
 
 		return 0
 	}
@@ -669,6 +693,16 @@ func (p *parser) Log() []process.Line {
 	return log
 }
 
+func (p *parser) Matches() []string {
+	p.lock.log.Lock()
+	defer p.lock.log.Unlock()
+
+	matches := make([]string, len(p.logpatterns.matches))
+	copy(matches, p.logpatterns.matches)
+
+	return matches
+}
+
 func (p *parser) LastLogline() string {
 	p.lock.log.RLock()
 	defer p.lock.log.RUnlock()
@@ -729,6 +763,7 @@ func (p *parser) ResetLog() {
 	p.lock.log.Lock()
 	p.log = ring.New(p.logLines)
 	p.logStart = time.Time{}
+	p.logpatterns.matches = []string{}
 	p.lock.log.Unlock()
 }
 
@@ -737,6 +772,7 @@ type Report struct {
 	CreatedAt time.Time
 	Prelude   []string
 	Log       []process.Line
+	Matches   []string
 }
 
 // ReportHistoryEntry represents an historical log report, including the exit status of the
@@ -821,6 +857,7 @@ func (p *parser) storeReportHistory(state string) {
 			history := r.Value.(ReportHistoryEntry)
 			history.Log = nil
 			history.Prelude = nil
+			history.Matches = nil
 
 			r.Value = history
 		}
@@ -839,6 +876,7 @@ func (p *parser) Report() Report {
 	h := Report{
 		Prelude: p.Prelude(),
 		Log:     p.Log(),
+		Matches: p.Matches(),
 	}
 
 	p.lock.log.RLock()

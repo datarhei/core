@@ -878,3 +878,34 @@ func TestParserProgressPlayout(t *testing.T) {
 		Dup:       0,
 	}, progress)
 }
+
+func TestParserPatterns(t *testing.T) {
+	parser := New(Config{
+		Patterns: []string{
+			"^foobar",
+			"foobar$",
+		},
+	})
+
+	parser.Parse("some foobar more")
+	require.Empty(t, parser.Report().Matches)
+
+	parser.Parse("foobar some more")
+	require.Equal(t, 1, len(parser.Report().Matches))
+	require.Equal(t, "foobar some more", parser.Report().Matches[0])
+
+	parser.Parse("some more foobar")
+	require.Equal(t, 2, len(parser.Report().Matches))
+	require.Equal(t, "some more foobar", parser.Report().Matches[1])
+}
+
+func TestParserPatternsError(t *testing.T) {
+	parser := New(Config{
+		Patterns: []string{
+			"^foobar",
+			"foo(bar$",
+		},
+	})
+
+	require.Equal(t, 1, len(parser.Report().Matches))
+}

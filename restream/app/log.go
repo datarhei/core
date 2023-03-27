@@ -13,6 +13,7 @@ type LogEntry struct {
 	CreatedAt time.Time
 	Prelude   []string
 	Log       []LogLine
+	Matches   []string
 }
 
 type LogHistoryEntry struct {

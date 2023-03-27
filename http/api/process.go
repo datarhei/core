@@ -55,6 +55,7 @@ type ProcessConfig struct {
 	StaleTimeout   uint64              `json:"stale_timeout_seconds" format:"uint64"`
 	Timeout        uint64              `json:"runtime_duration_seconds" format:"uint64"`
 	Scheduler      string              `json:"scheduler"`
+	LogPatterns    []string            `json:"log_patterns"`
 	Limits         ProcessConfigLimits `json:"limits"`
 }
 
@@ -106,6 +107,9 @@ func (cfg *ProcessConfig) Marshal() *app.Config {
 		p.Output = append(p.Output, output)
 
 	}
+
+	p.LogPatterns = make([]string, len(cfg.LogPatterns))
+	copy(p.LogPatterns, cfg.LogPatterns)
 
 	return p
 }
@@ -190,6 +194,9 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 		cfg.Output = append(cfg.Output, io)
 	}
+
+	cfg.LogPatterns = make([]string, len(c.LogPatterns))
+	copy(cfg.LogPatterns, c.LogPatterns)
 }
 
 // ProcessState represents the current state of an ffmpeg process

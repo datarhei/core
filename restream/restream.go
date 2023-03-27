@@ -358,7 +358,7 @@ func (r *restream) load() error {
 		}
 
 		t.command = t.config.CreateCommand()
-		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
+		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 			Reconnect:      t.config.Reconnect,
@@ -510,7 +510,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	}
 
 	t.command = t.config.CreateCommand()
-	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
+	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 		Reconnect:      t.config.Reconnect,
@@ -1227,7 +1227,7 @@ func (r *restream) reloadProcess(id string) error {
 		r.stopProcess(id)
 	}
 
-	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference)
+	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 		Reconnect:      t.config.Reconnect,
@@ -1431,6 +1431,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 			Data:      line.Data,
 		}
 	}
+	log.Matches = current.Matches
 
 	history := task.parser.ReportHistory()
 
@@ -1439,6 +1440,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 			LogEntry: app.LogEntry{
 				CreatedAt: h.CreatedAt,
 				Prelude:   h.Prelude,
+				Matches:   h.Matches,
 			},
 			ExitedAt:  h.ExitedAt,
 			ExitState: h.ExitState,

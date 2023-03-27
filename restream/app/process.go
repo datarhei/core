@@ -46,6 +46,7 @@ type Config struct {
 	StaleTimeout   uint64     `json:"stale_timeout_seconds"` // seconds
 	Timeout        uint64     `json:"timeout_seconds"`       // seconds
 	Scheduler      string     `json:"scheduler"`             // crontab pattern or RFC3339 timestamp
+	LogPatterns    []string   `json:"log_patterns"`
 	LimitCPU       float64    `json:"limit_cpu_usage"`       // percent
 	LimitMemory    uint64     `json:"limit_memory_bytes"`    // bytes
 	LimitWaitFor   uint64     `json:"limit_waitfor_seconds"` // seconds
@@ -79,6 +80,9 @@ func (config *Config) Clone() *Config {
 
 	clone.Options = make([]string, len(config.Options))
 	copy(clone.Options, config.Options)
+
+	clone.LogPatterns = make([]string, len(config.LogPatterns))
+	copy(clone.LogPatterns, config.LogPatterns)
 
 	return clone
 }

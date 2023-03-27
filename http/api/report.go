@@ -11,6 +11,7 @@ type ProcessReportEntry struct {
 	CreatedAt int64       `json:"created_at" format:"int64"`
 	Prelude   []string    `json:"prelude,omitempty"`
 	Log       [][2]string `json:"log,omitempty"`
+	Matches   []string    `json:"matches,omitempty"`
 	ExitedAt  int64       `json:"exited_at,omitempty" format:"int64"`
 	ExitState string      `json:"exit_state,omitempty"`
 	Progress  *Progress   `json:"progress,omitempty"`
@@ -39,6 +40,7 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 		report.Log[i][0] = strconv.FormatInt(line.Timestamp.Unix(), 10)
 		report.Log[i][1] = line.Data
 	}
+	report.Matches = l.Matches
 
 	report.History = []ProcessReportEntry{}
 

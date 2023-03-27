@@ -711,7 +711,7 @@ const docTemplate = `{
                     "v16.7.2"
                 ],
                 "summary": "Remove a file from a filesystem",
-                "operationId": "filesystem-3-delete-files",
+                "operationId": "filesystem-3-delete-file",
                 "parameters": [
                     {
                         "type": "string",
@@ -3402,6 +3402,12 @@ const docTemplate = `{
                 "limits": {
                     "$ref": "#/definitions/api.ProcessConfigLimits"
                 },
+                "log_patterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "options": {
                     "type": "array",
                     "items": {
@@ -3537,6 +3543,12 @@ const docTemplate = `{
                         }
                     }
                 },
+                "matches": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "prelude": {
                     "type": "array",
                     "items": {
@@ -3569,6 +3581,12 @@ const docTemplate = `{
                         "items": {
                             "type": "string"
                         }
+                    }
+                },
+                "matches": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "prelude": {
