@@ -1120,6 +1120,7 @@ func TestProcessReplacer(t *testing.T) {
 		ReconnectDelay: 10,
 		Autostart:      false,
 		StaleTimeout:   0,
+		LogPatterns:    []string{},
 	}
 
 	require.Equal(t, process, rs.tasks["314159265359"].config)
