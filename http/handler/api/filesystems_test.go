@@ -445,7 +445,7 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo:/elif",
+		Source:    "foo:/elif",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -455,8 +455,8 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo:/elif",
-		To:        "/bar",
+		Source:    "foo:/elif",
+		Target:    "/bar",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -466,8 +466,8 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo:/file",
-		To:        "/bar",
+		Source:    "foo:/file",
+		Target:    "/bar",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -477,8 +477,8 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "copy",
-		From:      "foo:file",
-		To:        "bar:/file",
+		Source:    "foo:file",
+		Target:    "bar:/file",
 	}
 
 	jsondata, err = json.Marshal(op)
@@ -496,8 +496,8 @@ func TestFileOperation(t *testing.T) {
 
 	op = api.FilesystemOperation{
 		Operation: "move",
-		From:      "foo:file",
-		To:        "bar:/file",
+		Source:    "foo:file",
+		Target:    "bar:/file",
 	}
 
 	jsondata, err = json.Marshal(op)

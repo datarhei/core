@@ -493,14 +493,17 @@ definitions:
     type: object
   api.FilesystemOperation:
     properties:
-      from:
-        type: string
+      bandwidth_limit_kbit:
+        description: kbit/s
+        type: integer
       operation:
         enum:
         - copy
         - move
         type: string
-      to:
+      source:
+        type: string
+      target:
         type: string
     required:
     - operation

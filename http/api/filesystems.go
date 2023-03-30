@@ -17,6 +17,7 @@ type FilesystemInfo struct {
 // FilesystemOperation represents a file operation on one or more filesystems
 type FilesystemOperation struct {
 	Operation string `json:"operation" validate:"required" enums:"copy,move" jsonschema:"enum=copy,enum=move"`
-	From      string `json:"from"`
-	To        string `json:"to"`
+	Source    string `json:"source"`
+	Target    string `json:"target"`
+	RateLimit uint64 `json:"bandwidth_limit_kbit"` // kbit/s
 }

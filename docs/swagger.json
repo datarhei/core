@@ -2996,8 +2996,9 @@
                 "operation"
             ],
             "properties": {
-                "from": {
-                    "type": "string"
+                "bandwidth_limit_kbit": {
+                    "description": "kbit/s",
+                    "type": "integer"
                 },
                 "operation": {
                     "type": "string",
@@ -3006,7 +3007,10 @@
                         "move"
                     ]
                 },
-                "to": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
                     "type": "string"
                 }
             }

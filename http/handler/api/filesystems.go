@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"regexp"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/datarhei/core/v16/http/handler"
 	"github.com/datarhei/core/v16/http/handler/util"
 
+	"github.com/fujiwara/shapeio"
 	"github.com/labstack/echo/v4"
 )
 
@@ -207,29 +209,29 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 
 	rePrefix := regexp.MustCompile(`^(.+):`)
 
-	matches := rePrefix.FindStringSubmatch(operation.From)
+	matches := rePrefix.FindStringSubmatch(operation.Source)
 	if matches == nil {
 		return api.Err(http.StatusBadRequest, "Missing source filesystem prefix")
 	}
 
 	fromFSName := matches[1]
-	fromPath := rePrefix.ReplaceAllString(operation.From, "")
+	fromPath := rePrefix.ReplaceAllString(operation.Source, "")
 	fromFS, ok := h.filesystems[fromFSName]
 	if !ok {
 		return api.Err(http.StatusBadRequest, "Source filesystem not found", "%s", fromFSName)
 	}
 
-	if operation.From == operation.To {
+	if operation.Source == operation.Target {
 		return c.JSON(http.StatusOK, "OK")
 	}
 
-	matches = rePrefix.FindStringSubmatch(operation.To)
+	matches = rePrefix.FindStringSubmatch(operation.Target)
 	if matches == nil {
 		return api.Err(http.StatusBadRequest, "Missing target filesystem prefix")
 	}
 
 	toFSName := matches[1]
-	toPath := rePrefix.ReplaceAllString(operation.To, "")
+	toPath := rePrefix.ReplaceAllString(operation.Target, "")
 	toFS, ok := h.filesystems[toFSName]
 	if !ok {
 		return api.Err(http.StatusBadRequest, "Target filesystem not found", "%s", toFSName)
@@ -242,7 +244,17 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 
 	defer fromFile.Close()
 
-	_, _, err := toFS.Handler.FS.Filesystem.WriteFileReader(toPath, fromFile)
+	var reader io.Reader = fromFile
+
+	if operation.RateLimit != 0 {
+		ratelimit := float64(operation.RateLimit) * 1024 / 8 // Calculate kbit to bytes
+		shapedReader := shapeio.NewReader(reader)
+		shapedReader.SetRateLimit(ratelimit)
+
+		reader = shapedReader
+	}
+
+	_, _, err := toFS.Handler.FS.Filesystem.WriteFileReader(toPath, reader)
 	if err != nil {
 		toFS.Handler.FS.Filesystem.Remove(toPath)
 		return api.Err(http.StatusBadRequest, "Writing target file failed", "%s", err)

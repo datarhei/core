@@ -3003,8 +3003,9 @@ const docTemplate = `{
                 "operation"
             ],
             "properties": {
-                "from": {
-                    "type": "string"
+                "bandwidth_limit_kbit": {
+                    "description": "kbit/s",
+                    "type": "integer"
                 },
                 "operation": {
                     "type": "string",
@@ -3013,7 +3014,10 @@ const docTemplate = `{
                         "move"
                     ]
                 },
-                "to": {
+                "source": {
+                    "type": "string"
+                },
+                "target": {
                     "type": "string"
                 }
             }

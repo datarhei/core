@@ -5,10 +5,12 @@ go 1.18
 require (
 	github.com/99designs/gqlgen v0.17.20
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/adhocore/gronx v1.1.2
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/datarhei/gosrt v0.3.1
 	github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
+	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.4.3
@@ -35,7 +37,6 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/adhocore/gronx v1.1.2 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
