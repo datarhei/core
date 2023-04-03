@@ -90,6 +90,13 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	if h.fs.Cache != nil {
 		h.fs.Cache.Delete(path)
+
+		if len(h.fs.DefaultFile) != 0 {
+			if strings.HasSuffix(path, "/"+h.fs.DefaultFile) {
+				path := strings.TrimSuffix(path, h.fs.DefaultFile)
+				h.fs.Cache.Delete(path)
+			}
+		}
 	}
 
 	c.Response().Header().Set("Content-Location", req.URL.RequestURI())
