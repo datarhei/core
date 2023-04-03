@@ -141,6 +141,13 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	if h.FS.Cache != nil {
 		h.FS.Cache.Delete(path)
+
+		if len(h.FS.DefaultFile) != 0 {
+			if strings.HasSuffix(path, "/"+h.FS.DefaultFile) {
+				path := strings.TrimSuffix(path, h.FS.DefaultFile)
+				h.FS.Cache.Delete(path)
+			}
+		}
 	}
 
 	c.Response().Header().Set("Content-Location", req.URL.RequestURI())
@@ -227,6 +234,13 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 	if h.FS.Cache != nil {
 		for _, path := range paths {
 			h.FS.Cache.Delete(path)
+
+			if len(h.FS.DefaultFile) != 0 {
+				if strings.HasSuffix(path, "/"+h.FS.DefaultFile) {
+					path := strings.TrimSuffix(path, h.FS.DefaultFile)
+					h.FS.Cache.Delete(path)
+				}
+			}
 		}
 	}
 
