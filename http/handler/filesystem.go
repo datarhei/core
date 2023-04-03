@@ -166,10 +166,6 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	size := h.FS.Filesystem.Remove(path)
 
-	if size < 0 {
-		return api.Err(http.StatusNotFound, "File not found", path)
-	}
-
 	if h.FS.Cache != nil {
 		h.FS.Cache.Delete(path)
 
@@ -179,6 +175,10 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 				h.FS.Cache.Delete(path)
 			}
 		}
+	}
+
+	if size < 0 {
+		return api.Err(http.StatusNotFound, "File not found", path)
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/handler"
 	"github.com/datarhei/core/v16/http/mock"
@@ -392,7 +393,7 @@ func TestFilesystemsDeleteFilesLastmod(t *testing.T) {
 	require.Equal(t, int64(2), memfs.Files())
 }
 
-func TestFileOperation(t *testing.T) {
+func TestFilesystemsFileOperation(t *testing.T) {
 	memfs1, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
@@ -512,4 +513,64 @@ func TestFileOperation(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, filedata, response.Raw)
+}
+
+func TestFilesystemsPurgeCache(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	memfs.MkdirAll("/path", 0744)
+
+	cache, err := cache.NewLRUCache(cache.LRUConfig{
+		TTL: 5 * time.Minute,
+	})
+	require.NoError(t, err)
+
+	filesystems := []httpfs.FS{
+		{
+			Name:        "foo",
+			Mountpoint:  "/foo",
+			AllowWrite:  true,
+			Filesystem:  memfs,
+			DefaultFile: "index.html",
+			Cache:       cache,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	data := mock.Read(t, "./fixtures/addProcess.json")
+	require.NotNil(t, data)
+
+	mock.Request(t, http.StatusCreated, router, "PUT", "/foo/path/index.html", data)
+
+	cache.Put("/path/", "foobar", 42)
+	cache.Put("/path/index.html", "barfoo", 42)
+
+	mock.Request(t, http.StatusOK, router, "DELETE", "/foo/path/index.html", nil)
+
+	f, _, err := cache.Get("/path/")
+	require.Nil(t, f)
+	require.NoError(t, err)
+
+	f, _, err = cache.Get("/path/index.html")
+	require.Nil(t, f)
+	require.NoError(t, err)
+
+	cache.Put("/path/", "foobar", 42)
+	cache.Put("/path/index.html", "barfoo", 42)
+
+	data = mock.Read(t, "./fixtures/addProcess.json")
+	require.NotNil(t, data)
+
+	mock.Request(t, http.StatusCreated, router, "PUT", "/foo/path/index.html", data)
+
+	f, _, err = cache.Get("/path/")
+	require.Nil(t, f)
+	require.NoError(t, err)
+
+	f, _, err = cache.Get("/path/index.html")
+	require.Nil(t, f)
+	require.NoError(t, err)
 }
