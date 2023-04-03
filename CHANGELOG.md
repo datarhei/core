@@ -14,6 +14,7 @@
 -   Fix better naming for storage endpoint documentation
 -   Fix freeing up S3 mounts
 -   Fix URL validation if the path contains FFmpeg specific placeholders
+-   Fix purging default file from HTTP cache
 
 ### Core v16.11.0 > v16.12.0
 

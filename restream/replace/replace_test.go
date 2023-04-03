@@ -58,6 +58,20 @@ func TestReplace(t *testing.T) {
 	require.Equal(t, "", replaced)
 }
 
+func TestReplaceInvalid(t *testing.T) {
+	r := New()
+	r.RegisterReplaceFunc(
+		"foo:bar",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello " + params["who"] + "! " + params["what"] + "?"
+		},
+		nil,
+	)
+
+	replaced := r.Replace("{foo:bar, who=World}", "foo:bar", "", nil, nil, "")
+	require.Equal(t, "Hello World! defaultWhat?", replaced)
+}
+
 func TestReplacerFunc(t *testing.T) {
 	r := New()
 	r.RegisterReplaceFunc(

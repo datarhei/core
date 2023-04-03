@@ -165,6 +165,13 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	if h.FS.Cache != nil {
 		h.FS.Cache.Delete(path)
+
+		if len(h.FS.DefaultFile) != 0 {
+			if strings.HasSuffix(path, "/"+h.FS.DefaultFile) {
+				path := strings.TrimSuffix(path, h.FS.DefaultFile)
+				h.FS.Cache.Delete(path)
+			}
+		}
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)
