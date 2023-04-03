@@ -69,7 +69,7 @@ func TestReplaceInvalid(t *testing.T) {
 	)
 
 	replaced := r.Replace("{foo:bar, who=World}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello World! defaultWhat?", replaced)
+	require.Equal(t, "Hello ! ?", replaced)
 }
 
 func TestReplacerFunc(t *testing.T) {
