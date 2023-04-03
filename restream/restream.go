@@ -947,7 +947,7 @@ func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (s
 			}
 
 			if matches["source"] == "hls" {
-				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.Path, ".m3u8") {
+				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.RawPath, ".m3u8") {
 					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
 				}
 			} else if matches["source"] == "rtmp" {

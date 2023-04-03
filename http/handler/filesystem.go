@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/fs"
@@ -89,6 +90,13 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	if h.fs.Cache != nil {
 		h.fs.Cache.Delete(path)
+
+		if len(h.fs.DefaultFile) != 0 {
+			if strings.HasSuffix(path, "/"+h.fs.DefaultFile) {
+				path := strings.TrimSuffix(path, h.fs.DefaultFile)
+				h.fs.Cache.Delete(path)
+			}
+		}
 	}
 
 	c.Response().Header().Set("Content-Location", req.URL.RequestURI())
@@ -107,12 +115,19 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	size := h.fs.Filesystem.Remove(path)
 
-	if size < 0 {
-		return api.Err(http.StatusNotFound, "File not found", path)
-	}
-
 	if h.fs.Cache != nil {
 		h.fs.Cache.Delete(path)
+
+		if len(h.fs.DefaultFile) != 0 {
+			if strings.HasSuffix(path, "/"+h.fs.DefaultFile) {
+				path := strings.TrimSuffix(path, h.fs.DefaultFile)
+				h.fs.Cache.Delete(path)
+			}
+		}
+	}
+
+	if size < 0 {
+		return api.Err(http.StatusNotFound, "File not found", path)
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)

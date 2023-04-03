@@ -240,6 +240,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.12.0"
+                ],
                 "summary": "List all registered filesystems",
                 "operationId": "filesystem-3-list",
                 "responses": {
@@ -255,7 +258,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/{name}": {
+        "/api/v3/fs/{storage}": {
             "get": {
                 "security": [
                     {
@@ -266,13 +269,16 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "List all files on a filesystem",
                 "operationId": "filesystem-3-list-files",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Name of the filesystem",
-                        "name": "name",
+                        "name": "storage",
                         "in": "path",
                         "required": true
                     },
@@ -308,7 +314,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/fs/{name}/{path}": {
+        "/api/v3/fs/{storage}/{filepath}": {
             "get": {
                 "security": [
                     {
@@ -320,20 +326,23 @@ const docTemplate = `{
                     "application/data",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Fetch a file from a filesystem",
                 "operationId": "filesystem-3-get-file",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Name of the filesystem",
-                        "name": "name",
+                        "name": "storage",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Path to file",
-                        "name": "path",
+                        "name": "filepath",
                         "in": "path",
                         "required": true
                     }
@@ -373,20 +382,23 @@ const docTemplate = `{
                     "text/plain",
                     "application/json"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Add a file to a filesystem",
                 "operationId": "filesystem-3-put-file",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Name of the filesystem",
-                        "name": "name",
+                        "name": "storage",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Path to file",
-                        "name": "path",
+                        "name": "filepath",
                         "in": "path",
                         "required": true
                     },
@@ -434,20 +446,23 @@ const docTemplate = `{
                 "produces": [
                     "text/plain"
                 ],
+                "tags": [
+                    "v16.7.2"
+                ],
                 "summary": "Remove a file from a filesystem",
                 "operationId": "filesystem-3-delete-file",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Name of the filesystem",
-                        "name": "name",
+                        "name": "storage",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Path to file",
-                        "name": "path",
+                        "name": "filepath",
                         "in": "path",
                         "required": true
                     }
