@@ -902,6 +902,10 @@ definitions:
         type: string
       coder:
         type: string
+      extradata_size_bytes:
+        description: bytes
+        format: uint64
+        type: integer
       format:
         type: string
       fps:
@@ -916,6 +920,9 @@ definitions:
         type: string
       index:
         description: General
+        format: uint64
+        type: integer
+      keyframe:
         format: uint64
         type: integer
       layout:

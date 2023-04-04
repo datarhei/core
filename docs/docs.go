@@ -3342,6 +3342,11 @@ const docTemplate = `{
                 "coder": {
                     "type": "string"
                 },
+                "extradata_size_bytes": {
+                    "description": "bytes",
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "format": {
                     "type": "string"
                 },
@@ -3361,6 +3366,10 @@ const docTemplate = `{
                 },
                 "index": {
                     "description": "General",
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "keyframe": {
                     "type": "integer",
                     "format": "uint64"
                 },
