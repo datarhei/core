@@ -384,7 +384,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 				entries = append(entries, r)
 			}
 		} else {
-			if r.CreatedAt >= *createdAt || r.ExitedAt <= *exitedAt {
+			if r.CreatedAt >= *createdAt && r.ExitedAt <= *exitedAt {
 				entries = append(entries, r)
 			}
 		}
