@@ -368,7 +368,7 @@ func TestProcessReportAt(t *testing.T) {
 	err = json.Unmarshal(response.Raw, &x)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(x.History))
+	require.Equal(t, 2, len(x.History))
 }
 
 func TestSearchReportHistory(t *testing.T) {

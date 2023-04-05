@@ -366,6 +366,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 
 	filteredReport := api.ProcessReport{}
 
+	// Add the current report as a fake history entry
 	report.History = append(report.History, api.ProcessReportEntry{
 		CreatedAt: report.CreatedAt,
 		Prelude:   report.Prelude,
@@ -395,7 +396,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].CreatedAt < entries[j].CreatedAt
+		return entries[i].CreatedAt > entries[j].CreatedAt
 	})
 
 	if entries[0].ExitState == "" {
@@ -403,9 +404,11 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 		filteredReport.CreatedAt = entries[0].CreatedAt
 		filteredReport.Prelude = entries[0].Prelude
 		filteredReport.Log = entries[0].Log
-	}
 
-	filteredReport.History = entries[1:]
+		filteredReport.History = entries[1:]
+	} else {
+		filteredReport.History = entries
+	}
 
 	return c.JSON(http.StatusOK, filteredReport)
 }
