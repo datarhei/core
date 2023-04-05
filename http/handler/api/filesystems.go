@@ -8,6 +8,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/fujiwara/shapeio"
 	"github.com/labstack/echo/v4"
@@ -244,6 +245,11 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 
 	defer fromFile.Close()
 
+	fromFileStat, err := fromFile.Stat()
+	if err != nil {
+		return api.Err(http.StatusBadRequest, "Source files with unknown size", "%s", fromFSName)
+	}
+
 	var reader io.Reader = fromFile
 
 	if operation.RateLimit != 0 {
@@ -254,7 +260,10 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 		reader = shapedReader
 	}
 
-	_, _, err := toFS.Handler.FS.Filesystem.WriteFileReader(toPath, reader)
+	// In case the target is S3, allow it to determine the size of the file
+	sizer := fs.NewReadSizer(reader, fromFileStat.Size())
+
+	_, _, err = toFS.Handler.FS.Filesystem.WriteFileReader(toPath, sizer)
 	if err != nil {
 		toFS.Handler.FS.Filesystem.Remove(toPath)
 		return api.Err(http.StatusBadRequest, "Writing target file failed", "%s", err)

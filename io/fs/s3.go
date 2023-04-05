@@ -296,7 +296,13 @@ func (fs *s3Filesystem) write(path string, r io.Reader) (int64, bool, error) {
 		overwrite = true
 	}
 
-	info, err := fs.client.PutObject(ctx, fs.bucket, path, r, -1, minio.PutObjectOptions{
+	var size int64 = -1
+	sizer, ok := r.(Sizer)
+	if ok {
+		size = sizer.Size()
+	}
+
+	info, err := fs.client.PutObject(ctx, fs.bucket, path, r, size, minio.PutObjectOptions{
 		UserMetadata:            map[string]string{},
 		UserTags:                map[string]string{},
 		Progress:                nil,
@@ -337,11 +343,13 @@ func (fs *s3Filesystem) WriteFileReader(path string, r io.Reader) (int64, bool, 
 }
 
 func (fs *s3Filesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+	rs := NewReadSizer(bytes.NewBuffer(data), int64(len(data)))
+	return fs.WriteFileReader(path, rs)
 }
 
 func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+	rs := NewReadSizer(bytes.NewBuffer(data), int64(len(data)))
+	return fs.WriteFileReader(path, rs)
 }
 
 func (fs *s3Filesystem) Rename(src, dst string) error {

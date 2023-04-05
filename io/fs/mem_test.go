@@ -26,5 +26,6 @@ func TestMemFromDir(t *testing.T) {
 		"/s3.go",
 		"/sized_test.go",
 		"/sized.go",
+		"/sizer.go",
 	}, names)
 }
