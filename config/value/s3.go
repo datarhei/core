@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-
-	"golang.org/x/net/publicsuffix"
 )
 
 // array of s3 storages
@@ -105,23 +103,9 @@ func (s *s3StorageListValue) Set(val string) error {
 		password, _ := u.User.Password()
 		t.SecretAccessKey = password
 
-		hostname := u.Hostname()
-		port := u.Port()
-
-		domain, err := publicsuffix.EffectiveTLDPlusOne(hostname)
-		if err != nil {
-			return fmt.Errorf("invalid eTLD (%s): %w", hostname, err)
-		}
-
-		t.Endpoint = domain
-		if len(port) != 0 {
-			t.Endpoint += ":" + port
-		}
-
-		region := strings.TrimSuffix(hostname, domain)
-		if len(region) != 0 {
-			t.Region = strings.TrimSuffix(region, ".")
-		}
+		region, endpoint, _ := strings.Cut(u.Host, ".")
+		t.Endpoint = endpoint
+		t.Region = region
 
 		secret, ok := u.User.Password()
 		if ok {
