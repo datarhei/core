@@ -66,7 +66,7 @@ func (f *memFileInfo) IsDir() bool {
 
 type internalMemFile struct {
 	memFileInfo
-	data *bytes.Buffer // Contents of the file
+	data bytes.Buffer // Contents of the file
 }
 
 type memFile struct {
@@ -126,9 +126,6 @@ type memFilesystem struct {
 	// Mutex for the files map
 	filesLock sync.RWMutex
 
-	// Pool for the storage of the contents of files
-	dataPool sync.Pool
-
 	// Current size of the filesystem in bytes
 	currentSize int64
 
@@ -151,12 +148,6 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 	fs.logger = fs.logger.WithField("type", "mem")
 
 	fs.files = make(map[string]*internalMemFile)
-
-	fs.dataPool = sync.Pool{
-		New: func() interface{} {
-			return new(bytes.Buffer)
-		},
-	}
 
 	fs.logger.Debug().Log("Created")
 
@@ -281,11 +272,9 @@ func (fs *memFilesystem) Open(path string) File {
 		}
 	}
 
-	if file.data != nil {
-		newFile.lastMod = file.lastMod
-		newFile.data = bytes.NewReader(file.data.Bytes())
-		newFile.size = int64(newFile.data.Len())
-	}
+	newFile.lastMod = file.lastMod
+	newFile.data = bytes.NewReader(file.data.Bytes())
+	newFile.size = int64(file.data.Len())
 
 	return newFile
 }
@@ -308,11 +297,7 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 		}
 	}
 
-	if file.data != nil {
-		return file.data.Bytes(), nil
-	}
-
-	return nil, nil
+	return file.data.Bytes(), nil
 }
 
 func (fs *memFilesystem) Symlink(oldname, newname string) error {
@@ -344,7 +329,6 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 			lastMod: time.Now(),
 			linkTo:  oldname,
 		},
-		data: nil,
 	}
 
 	fs.files[newname] = newFile
@@ -370,7 +354,6 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 			size:    0,
 			lastMod: time.Now(),
 		},
-		data: fs.dataPool.Get().(*bytes.Buffer),
 	}
 
 	newFile.data.Reset()
@@ -381,6 +364,8 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 			"filesize_bytes": size,
 			"error":          err,
 		}).Warn().Log("Incomplete file")
+
+		newFile.data = bytes.Buffer{}
 
 		return -1, false, fmt.Errorf("incomplete file")
 	}
@@ -396,8 +381,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 
 		fs.currentSize -= file.size
 
-		fs.dataPool.Put(file.data)
-		file.data = nil
+		file.data = bytes.Buffer{}
 	}
 
 	fs.files[path] = newFile
@@ -449,8 +433,7 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 		freed += f.size
 		fs.currentSize -= f.size
 
-		fs.dataPool.Put(f.data)
-		f.data = nil
+		f.data = bytes.Buffer{}
 
 		fs.logger.WithFields(log.Fields{
 			"path":           f.name,
@@ -490,7 +473,6 @@ func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 			dir:     true,
 			lastMod: time.Now(),
 		},
-		data: nil,
 	}
 
 	fs.files[path] = f
@@ -518,8 +500,7 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 	if ok {
 		fs.currentSize -= dstFile.size
 
-		fs.dataPool.Put(dstFile.data)
-		dstFile.data = nil
+		dstFile.data = bytes.Buffer{}
 	}
 
 	fs.files[dst] = srcFile
@@ -563,7 +544,6 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 				size:    srcFile.size,
 				lastMod: time.Now(),
 			},
-			data: fs.dataPool.Get().(*bytes.Buffer),
 		}
 	}
 
@@ -664,8 +644,7 @@ func (fs *memFilesystem) remove(path string) int64 {
 		delete(fs.files, path)
 		fs.currentSize -= file.size
 
-		fs.dataPool.Put(file.data)
-		file.data = nil
+		file.data = bytes.Buffer{}
 	} else {
 		return -1
 	}
