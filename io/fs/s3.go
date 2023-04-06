@@ -302,6 +302,16 @@ func (fs *s3Filesystem) write(path string, r io.Reader) (int64, bool, error) {
 		size = sizer.Size()
 	}
 
+	disableMultipart := false
+	var partSize uint64 = 0
+	if size == -1 {
+		partSize = (16 * 1024 * 1024)
+	} else {
+		if size < (32 * 1024 * 1024) {
+			disableMultipart = true
+		}
+	}
+
 	info, err := fs.client.PutObject(ctx, fs.bucket, path, r, size, minio.PutObjectOptions{
 		UserMetadata:            map[string]string{},
 		UserTags:                map[string]string{},
@@ -317,11 +327,11 @@ func (fs *s3Filesystem) write(path string, r io.Reader) (int64, bool, error) {
 		NumThreads:              0,
 		StorageClass:            "",
 		WebsiteRedirectLocation: "",
-		PartSize:                0,
+		PartSize:                partSize,
 		LegalHold:               "",
 		SendContentMd5:          false,
 		DisableContentSha256:    false,
-		DisableMultipart:        false,
+		DisableMultipart:        disableMultipart,
 		Internal:                minio.AdvancedPutOptions{},
 	})
 	if err != nil {
@@ -343,13 +353,11 @@ func (fs *s3Filesystem) WriteFileReader(path string, r io.Reader) (int64, bool, 
 }
 
 func (fs *s3Filesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	rs := NewReadSizer(bytes.NewBuffer(data), int64(len(data)))
-	return fs.WriteFileReader(path, rs)
+	return fs.WriteFileReader(path, bytes.NewReader(data))
 }
 
 func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
-	rs := NewReadSizer(bytes.NewBuffer(data), int64(len(data)))
-	return fs.WriteFileReader(path, rs)
+	return fs.WriteFileReader(path, bytes.NewReader(data))
 }
 
 func (fs *s3Filesystem) Rename(src, dst string) error {

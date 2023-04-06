@@ -366,7 +366,7 @@ func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool
 }
 
 func (fs *diskFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data))
 }
 
 func (fs *diskFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {

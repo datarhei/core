@@ -420,11 +420,11 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 }
 
 func (fs *memFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data))
 }
 
 func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewBuffer(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data))
 }
 
 func (fs *memFilesystem) Purge(size int64) int64 {
