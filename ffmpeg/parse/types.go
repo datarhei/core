@@ -243,18 +243,20 @@ type ProgressIO struct {
 	Address string
 
 	// General
-	Index   uint64
-	Stream  uint64
-	Format  string
-	Type    string
-	Codec   string
-	Coder   string
-	Frame   uint64
-	FPS     float64
-	Packet  uint64
-	PPS     float64
-	Size    uint64  // bytes
-	Bitrate float64 // bit/s
+	Index     uint64
+	Stream    uint64
+	Format    string
+	Type      string
+	Codec     string
+	Coder     string
+	Frame     uint64
+	Keyframe  uint64
+	FPS       float64
+	Packet    uint64
+	PPS       float64
+	Size      uint64  // bytes
+	Bitrate   float64 // bit/s
+	Extradata uint64  // bytes
 
 	// Video
 	Pixfmt    string
