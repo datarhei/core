@@ -17,7 +17,7 @@ func NewFFmpegCollector(f ffmpeg.FFmpeg) metric.Collector {
 		ffmpeg: f,
 	}
 
-	c.processDescr = metric.NewDesc("ffmpeg_process", "State of the ffmpeg process", []string{"state"})
+	c.processDescr = metric.NewDesc("ffmpeg_process", "Accumulated state changes of all ffmpeg processes", []string{"state"})
 
 	return c
 }

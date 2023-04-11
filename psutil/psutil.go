@@ -2,6 +2,7 @@ package psutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -282,6 +283,10 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	times, err := cpu.Times(false)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(times) == 0 {
+		return nil, errors.New("cpu.Times() returned an empty slice")
 	}
 
 	s := &cpuTimesStat{
