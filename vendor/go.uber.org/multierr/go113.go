@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,44 +18,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build go1.19
-// +build go1.19
+// +build go1.13
 
-package atomic
+package multierr
 
-import "sync/atomic"
+import "errors"
 
-// Pointer is an atomic pointer of type *T.
-type Pointer[T any] struct {
-	_ nocmp // disallow non-atomic comparison
-	p atomic.Pointer[T]
-}
-
-// NewPointer creates a new Pointer.
-func NewPointer[T any](v *T) *Pointer[T] {
-	var p Pointer[T]
-	if v != nil {
-		p.p.Store(v)
+// As attempts to find the first error in the error list that matches the type
+// of the value that target points to.
+//
+// This function allows errors.As to traverse the values stored on the
+// multierr error.
+func (merr *multiError) As(target interface{}) bool {
+	for _, err := range merr.Errors() {
+		if errors.As(err, target) {
+			return true
+		}
 	}
-	return &p
+	return false
 }
 
-// Load atomically loads the wrapped value.
-func (p *Pointer[T]) Load() *T {
-	return p.p.Load()
-}
-
-// Store atomically stores the passed value.
-func (p *Pointer[T]) Store(val *T) {
-	p.p.Store(val)
-}
-
-// Swap atomically swaps the wrapped pointer and returns the old value.
-func (p *Pointer[T]) Swap(val *T) (old *T) {
-	return p.p.Swap(val)
-}
-
-// CompareAndSwap is an atomic compare-and-swap.
-func (p *Pointer[T]) CompareAndSwap(old, new *T) (swapped bool) {
-	return p.p.CompareAndSwap(old, new)
+// Is attempts to match the provided error against errors in the error list.
+//
+// This function allows errors.Is to traverse the values stored on the
+// multierr error.
+func (merr *multiError) Is(target error) bool {
+	for _, err := range merr.Errors() {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }

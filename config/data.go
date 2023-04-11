@@ -138,9 +138,10 @@ type Data struct {
 		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling   bool  `json:"profiling"`
-		ForceGC     int   `json:"force_gc" format:"int"`
-		MemoryLimit int64 `json:"memory_limit_mbytes" format:"int64"`
+		Profiling    bool  `json:"profiling"`
+		ForceGC      int   `json:"force_gc" format:"int"`
+		MemoryLimit  int64 `json:"memory_limit_mbytes" format:"int64"`
+		AutoMaxProcs bool  `json:"auto_max_procs"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`

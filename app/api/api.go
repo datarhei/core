@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/lestrrat-go/strftime"
+	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
 )
 
@@ -112,6 +114,8 @@ type api struct {
 	lock   sync.Mutex
 	wgStop sync.WaitGroup
 	state  string
+
+	undoMaxprocs func()
 }
 
 // ErrConfigReload is an error returned to indicate that a reload of
@@ -283,6 +287,20 @@ func (a *api) start() error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
+	cfg := a.config.store.GetActive()
+
+	if cfg.Debug.AutoMaxProcs {
+		undoMaxprocs, err := maxprocs.Set(maxprocs.Logger(func(format string, args ...interface{}) {
+			format = strings.TrimPrefix(format, "maxprocs: ")
+			a.log.logger.core.Debug().Log(format, args...)
+		}))
+		if err != nil {
+			a.log.logger.core.Warn().Log("%s", err.Error())
+		}
+
+		a.undoMaxprocs = undoMaxprocs
+	}
+
 	if a.errorChan == nil {
 		a.errorChan = make(chan error, 1)
 	}
@@ -292,8 +310,6 @@ func (a *api) start() error {
 	}
 
 	a.state = "starting"
-
-	cfg := a.config.store.GetActive()
 
 	if cfg.Sessions.Enable {
 		sessionConfig := session.Config{
@@ -1460,6 +1476,10 @@ func (a *api) stop() {
 	}
 
 	a.state = "idle"
+
+	if a.undoMaxprocs != nil {
+		a.undoMaxprocs()
+	}
 
 	logger.Info().Log("Complete")
 	logger.Close()

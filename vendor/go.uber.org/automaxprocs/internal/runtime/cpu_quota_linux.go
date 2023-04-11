@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Uber Technologies, Inc.
+// Copyright (c) 2017 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,43 +18,54 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build go1.18 && !go1.19
-// +build go1.18,!go1.19
+//go:build linux
+// +build linux
 
-package atomic
+package runtime
 
-import "unsafe"
+import (
+	"errors"
+	"math"
 
-type Pointer[T any] struct {
-	_ nocmp // disallow non-atomic comparison
-	p UnsafePointer
-}
+	cg "go.uber.org/automaxprocs/internal/cgroups"
+)
 
-// NewPointer creates a new Pointer.
-func NewPointer[T any](v *T) *Pointer[T] {
-	var p Pointer[T]
-	if v != nil {
-		p.p.Store(unsafe.Pointer(v))
+// CPUQuotaToGOMAXPROCS converts the CPU quota applied to the calling process
+// to a valid GOMAXPROCS value.
+func CPUQuotaToGOMAXPROCS(minValue int) (int, CPUQuotaStatus, error) {
+	cgroups, err := newQueryer()
+	if err != nil {
+		return -1, CPUQuotaUndefined, err
 	}
-	return &p
+
+	quota, defined, err := cgroups.CPUQuota()
+	if !defined || err != nil {
+		return -1, CPUQuotaUndefined, err
+	}
+
+	maxProcs := int(math.Floor(quota))
+	if minValue > 0 && maxProcs < minValue {
+		return minValue, CPUQuotaMinUsed, nil
+	}
+	return maxProcs, CPUQuotaUsed, nil
 }
 
-// Load atomically loads the wrapped value.
-func (p *Pointer[T]) Load() *T {
-	return (*T)(p.p.Load())
+type queryer interface {
+	CPUQuota() (float64, bool, error)
 }
 
-// Store atomically stores the passed value.
-func (p *Pointer[T]) Store(val *T) {
-	p.p.Store(unsafe.Pointer(val))
-}
+var (
+	_newCgroups2 = cg.NewCGroups2ForCurrentProcess
+	_newCgroups  = cg.NewCGroupsForCurrentProcess
+)
 
-// Swap atomically swaps the wrapped pointer and returns the old value.
-func (p *Pointer[T]) Swap(val *T) (old *T) {
-	return (*T)(p.p.Swap(unsafe.Pointer(val)))
-}
-
-// CompareAndSwap is an atomic compare-and-swap.
-func (p *Pointer[T]) CompareAndSwap(old, new *T) (swapped bool) {
-	return p.p.CompareAndSwap(unsafe.Pointer(old), unsafe.Pointer(new))
+func newQueryer() (queryer, error) {
+	cgroups, err := _newCgroups2()
+	if err == nil {
+		return cgroups, nil
+	}
+	if errors.Is(err, cg.ErrNotV2) {
+		return _newCgroups()
+	}
+	return nil, err
 }

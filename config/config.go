@@ -247,6 +247,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.Debug.Profiling, false), "debug.profiling", "CORE_DEBUG_PROFILING", nil, "Enable profiling endpoint on /profiling", false, false)
 	d.vars.Register(value.NewInt(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCE_GC", []string{"CORE_DEBUG_FORCEGC"}, "Number of seconds between forcing GC to return memory to the OS", false, false)
 	d.vars.Register(value.NewInt64(&d.Debug.MemoryLimit, 0), "debug.memory_limit_mbytes", "CORE_DEBUG_MEMORY_LIMIT_MBYTES", nil, "Impose a soft memory limit for the core, in megabytes", false, false)
+	d.vars.Register(value.NewBool(&d.Debug.AutoMaxProcs, false), "debug.auto_max_procs", "CORE_DEBUG_AUTO_MAX_PROCS", nil, "Enable setting GOMAXPROCS automatically", false, false)
 
 	// Metrics
 	d.vars.Register(value.NewBool(&d.Metrics.Enable, false), "metrics.enable", "CORE_METRICS_ENABLE", nil, "Enable collecting historic metrics data", false, false)
