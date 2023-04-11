@@ -150,7 +150,7 @@ func (d *Config) init() {
 	// Log
 	d.vars.Register(value.NewString(&d.Log.Level, "info"), "log.level", "CORE_LOG_LEVEL", nil, "Loglevel: silent, error, warn, info, debug", false, false)
 	d.vars.Register(value.NewStringList(&d.Log.Topics, []string{}, ","), "log.topics", "CORE_LOG_TOPICS", nil, "Show only selected log topics", false, false)
-	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAXLINES", nil, "Number of latest log lines to keep in memory", false, false)
+	d.vars.Register(value.NewInt(&d.Log.MaxLines, 1000), "log.max_lines", "CORE_LOG_MAX_LINES", []string{"CORE_LOG_MAXLINES"}, "Number of latest log lines to keep in memory", false, false)
 
 	// DB
 	d.vars.Register(value.NewMustDir(&d.DB.Dir, "./config", d.fs), "db.dir", "CORE_DB_DIR", nil, "Directory for holding the operational data", false, false)
@@ -182,19 +182,19 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
 	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
-	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEYFILE", nil, "Path to key file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERT_FILE", []string{"CORE_TLS_CERTFILE"}, "Path to certificate file in PEM format", false, false)
+	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEY_FILE", []string{"CORE_TLS_KEYFILE"}, "Path to key file in PEM format", false, false)
 
 	// Storage
 	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
 
 	// Storage (Disk)
 	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data", d.fs), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)
-	d.vars.Register(value.NewInt64(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAXSIZEMBYTES", nil, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
+	d.vars.Register(value.NewInt64(&d.Storage.Disk.Size, 0), "storage.disk.max_size_mbytes", "CORE_STORAGE_DISK_MAX_SIZE_MBYTES", []string{"CORE_STORAGE_DISK_MAXSIZEMBYTES"}, "Max. allowed megabytes for storage.disk.dir, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Disk.Cache.Enable, true), "storage.disk.cache.enable", "CORE_STORAGE_DISK_CACHE_ENABLE", nil, "Enable cache for /", false, false)
-	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES", nil, "Max. allowed cache size, 0 for unlimited", false, false)
-	d.vars.Register(value.NewInt64(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTLSECONDS", nil, "Seconds to keep files in cache", false, false)
-	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES", nil, "Max. file size to put in cache", false, false)
+	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.Size, 0), "storage.disk.cache.max_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAX_SIZE_MBYTES", []string{"CORE_STORAGE_DISK_CACHE_MAXSIZEMBYTES"}, "Max. allowed cache size, 0 for unlimited", false, false)
+	d.vars.Register(value.NewInt64(&d.Storage.Disk.Cache.TTL, 300), "storage.disk.cache.ttl_seconds", "CORE_STORAGE_DISK_CACHE_TTL_SECONDS", []string{"CORE_STORAGE_DISK_CACHE_TTLSECONDS"}, "Seconds to keep files in cache", false, false)
+	d.vars.Register(value.NewUint64(&d.Storage.Disk.Cache.FileSize, 1), "storage.disk.cache.max_file_size_mbytes", "CORE_STORAGE_DISK_CACHE_MAX_FILE_SIZE_MBYTES", []string{"CORE_STORAGE_DISK_CACHE_MAXFILESIZEMBYTES"}, "Max. file size to put in cache", false, false)
 	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Allow, []string{}, " "), "storage.disk.cache.type.allow", "CORE_STORAGE_DISK_CACHE_TYPES_ALLOW", []string{"CORE_STORAGE_DISK_CACHE_TYPES"}, "File extensions to cache, empty for all", false, false)
 	d.vars.Register(value.NewStringList(&d.Storage.Disk.Cache.Types.Block, []string{".m3u8", ".mpd"}, " "), "storage.disk.cache.type.block", "CORE_STORAGE_DISK_CACHE_TYPES_BLOCK", nil, "File extensions not to cache, empty for none", false, false)
 
@@ -202,7 +202,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Auth.Enable, true), "storage.memory.auth.enable", "CORE_STORAGE_MEMORY_AUTH_ENABLE", nil, "Enable basic auth for PUT,POST, and DELETE on /memfs", false, false)
 	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Username, "admin"), "storage.memory.auth.username", "CORE_STORAGE_MEMORY_AUTH_USERNAME", nil, "Username for Basic-Auth of /memfs", false, false)
 	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
-	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAXSIZEMBYTES", nil, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
+	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAX_SIZE_MBYTES", []string{"CORE_STORAGE_MEMORY_MAXSIZEMBYTES"}, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
 
 	// Storage (S3)
@@ -234,18 +234,18 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Output.Allow, []string{}, " "), "ffmpeg.access.output.allow", "CORE_FFMPEG_ACCESS_OUTPUT_ALLOW", nil, "List of allowed expression to match against the output addresses", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Output.Block, []string{}, " "), "ffmpeg.access.output.block", "CORE_FFMPEG_ACCESS_OUTPUT_BLOCK", nil, "List of blocked expression to match against the output addresses", false, false)
-	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxLines, 50), "ffmpeg.log.max_lines", "CORE_FFMPEG_LOG_MAXLINES", nil, "Number of latest log lines to keep for each process", false, false)
-	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxHistory, 3), "ffmpeg.log.max_history", "CORE_FFMPEG_LOG_MAXHISTORY", nil, "Number of latest logs to keep for each process", false, false)
-	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxMinimalHistory, 0), "ffmpeg.log.max_minimal_history", "CORE_FFMPEG_LOG_MAXMINIMALHISTORY", nil, "Number of minimal logs to keep for each process on top of max_history", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxLines, 50), "ffmpeg.log.max_lines", "CORE_FFMPEG_LOG_MAX_LINES", []string{"CORE_FFMPEG_LOG_MAXLINES"}, "Number of latest log lines to keep for each process", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxHistory, 3), "ffmpeg.log.max_history", "CORE_FFMPEG_LOG_MAX_HISTORY", []string{"CORE_FFMPEG_LOG_MAXHISTORY"}, "Number of latest logs to keep for each process", false, false)
+	d.vars.Register(value.NewInt(&d.FFmpeg.Log.MaxMinimalHistory, 0), "ffmpeg.log.max_minimal_history", "CORE_FFMPEG_LOG_MAX_MINIMAL_HISTORY", []string{"CORE_FFMPEG_LOG_MAXMINIMALHISTORY"}, "Number of minimal logs to keep for each process on top of max_history", false, false)
 
 	// Playout
 	d.vars.Register(value.NewBool(&d.Playout.Enable, false), "playout.enable", "CORE_PLAYOUT_ENABLE", nil, "Enable playout proxy where available", false, false)
-	d.vars.Register(value.NewPort(&d.Playout.MinPort, 0), "playout.min_port", "CORE_PLAYOUT_MINPORT", nil, "Min. playout server port", false, false)
-	d.vars.Register(value.NewPort(&d.Playout.MaxPort, 0), "playout.max_port", "CORE_PLAYOUT_MAXPORT", nil, "Max. playout server port", false, false)
+	d.vars.Register(value.NewPort(&d.Playout.MinPort, 0), "playout.min_port", "CORE_PLAYOUT_MIN_PORT", []string{"CORE_PLAYOUT_MINPORT"}, "Min. playout server port", false, false)
+	d.vars.Register(value.NewPort(&d.Playout.MaxPort, 0), "playout.max_port", "CORE_PLAYOUT_MAX_PORT", []string{"CORE_PLAYOUT_MAXPORT"}, "Max. playout server port", false, false)
 
 	// Debug
 	d.vars.Register(value.NewBool(&d.Debug.Profiling, false), "debug.profiling", "CORE_DEBUG_PROFILING", nil, "Enable profiling endpoint on /profiling", false, false)
-	d.vars.Register(value.NewInt(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCEGC", nil, "Number of seconds between forcing GC to return memory to the OS", false, false)
+	d.vars.Register(value.NewInt(&d.Debug.ForceGC, 0), "debug.force_gc", "CORE_DEBUG_FORCE_GC", []string{"CORE_DEBUG_FORCEGC"}, "Number of seconds between forcing GC to return memory to the OS", false, false)
 	d.vars.Register(value.NewInt64(&d.Debug.MemoryLimit, 0), "debug.memory_limit_mbytes", "CORE_DEBUG_MEMORY_LIMIT_MBYTES", nil, "Impose a soft memory limit for the core, in megabytes", false, false)
 
 	// Metrics
@@ -261,7 +261,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored as sessions.json in db.dir", false, false)
 	d.vars.Register(value.NewInt(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history", false, false)
 	d.vars.Register(value.NewUint64(&d.Sessions.MaxBitrate, 0), "sessions.max_bitrate_mbit", "CORE_SESSIONS_MAXBITRATE_MBIT", nil, "Max. allowed outgoing bitrate in mbit/s, 0 for unlimited", false, false)
-	d.vars.Register(value.NewUint64(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAXSESSIONS", nil, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)
+	d.vars.Register(value.NewUint64(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAX_SESSIONS", []string{"CORE_SESSIONS_MAXSESSIONS"}, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)
 
 	// Service
 	d.vars.Register(value.NewBool(&d.Service.Enable, false), "service.enable", "CORE_SERVICE_ENABLE", nil, "Enable connecting to the Restreamer Service", false, false)

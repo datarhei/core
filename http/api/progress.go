@@ -13,18 +13,20 @@ type ProgressIO struct {
 	Address string `json:"address" jsonschema:"minLength=1"`
 
 	// General
-	Index   uint64      `json:"index" format:"uint64"`
-	Stream  uint64      `json:"stream" format:"uint64"`
-	Format  string      `json:"format"`
-	Type    string      `json:"type"`
-	Codec   string      `json:"codec"`
-	Coder   string      `json:"coder"`
-	Frame   uint64      `json:"frame" format:"uint64"`
-	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Packet  uint64      `json:"packet" format:"uint64"`
-	PPS     json.Number `json:"pps" swaggertype:"number" jsonschema:"type=number"`
-	Size    uint64      `json:"size_kb" format:"uint64"`                                    // kbytes
-	Bitrate json.Number `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	Index     uint64      `json:"index" format:"uint64"`
+	Stream    uint64      `json:"stream" format:"uint64"`
+	Format    string      `json:"format"`
+	Type      string      `json:"type"`
+	Codec     string      `json:"codec"`
+	Coder     string      `json:"coder"`
+	Frame     uint64      `json:"frame" format:"uint64"`
+	Keyframe  uint64      `json:"keyframe" format:"uint64"`
+	FPS       json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	Packet    uint64      `json:"packet" format:"uint64"`
+	PPS       json.Number `json:"pps" swaggertype:"number" jsonschema:"type=number"`
+	Size      uint64      `json:"size_kb" format:"uint64"`                                    // kbytes
+	Bitrate   json.Number `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	Extradata uint64      `json:"extradata_size_bytes" format:"uint64"`                       // bytes
 
 	// Video
 	Pixfmt    string      `json:"pix_fmt,omitempty"`
@@ -56,11 +58,13 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 	i.Codec = io.Codec
 	i.Coder = io.Coder
 	i.Frame = io.Frame
+	i.Keyframe = io.Keyframe
 	i.FPS = json.Number(fmt.Sprintf("%.3f", io.FPS))
 	i.Packet = io.Packet
 	i.PPS = json.Number(fmt.Sprintf("%.3f", io.PPS))
 	i.Size = io.Size / 1024
 	i.Bitrate = json.Number(fmt.Sprintf("%.3f", io.Bitrate/1024))
+	i.Extradata = io.Extradata
 	i.Pixfmt = io.Pixfmt
 	i.Quantizer = json.Number(fmt.Sprintf("%.3f", io.Quantizer))
 	i.Width = io.Width

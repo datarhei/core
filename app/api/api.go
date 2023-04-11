@@ -11,6 +11,7 @@ import (
 	gohttp "net/http"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -1274,15 +1275,31 @@ func (a *api) start() error {
 	a.gcTickerStop = cancel
 
 	if cfg.Debug.ForceGC > 0 {
+		/*
+			go func(ctx context.Context) {
+				ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						debug.FreeOSMemory()
+					}
+				}
+			}(ctx)
+		*/
 		go func(ctx context.Context) {
 			ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
 			defer ticker.Stop()
+			var mem runtime.MemStats
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					debug.FreeOSMemory()
+					runtime.ReadMemStats(&mem)
+					fmt.Printf("mem in use: %.02f MiB\n", float64(mem.HeapInuse)/(1<<20))
 				}
 			}
 		}(ctx)
