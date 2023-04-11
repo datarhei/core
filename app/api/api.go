@@ -11,7 +11,6 @@ import (
 	gohttp "net/http"
 	"net/url"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -1271,35 +1270,31 @@ func (a *api) start() error {
 	// Wait for all servers to be started
 	wgStart.Wait()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	a.gcTickerStop = cancel
-
 	if cfg.Debug.ForceGC > 0 {
-		/*
-			go func(ctx context.Context) {
-				ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-ticker.C:
-						debug.FreeOSMemory()
-					}
-				}
-			}(ctx)
-		*/
+		ctx, cancel := context.WithCancel(context.Background())
+		a.gcTickerStop = cancel
+
 		go func(ctx context.Context) {
 			ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
 			defer ticker.Stop()
-			var mem runtime.MemStats
 			for {
 				select {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					runtime.ReadMemStats(&mem)
-					fmt.Printf("mem in use: %.02f MiB\n", float64(mem.HeapInuse)/(1<<20))
+					debug.FreeOSMemory()
+					/*
+						var mem runtime.MemStats
+						runtime.ReadMemStats(&mem)
+						a.log.logger.main.WithComponent("memory").Debug().WithFields(log.Fields{
+							"Sys":          float64(mem.Sys) / (1 << 20),
+							"HeapSys":      float64(mem.HeapSys) / (1 << 20),
+							"HeapAlloc":    float64(mem.HeapAlloc) / (1 << 20),
+							"HeapIdle":     float64(mem.HeapIdle) / (1 << 20),
+							"HeapInuse":    float64(mem.HeapInuse) / (1 << 20),
+							"HeapReleased": float64(mem.HeapReleased) / (1 << 20),
+						}).Log("")
+					*/
 				}
 			}
 		}(ctx)
