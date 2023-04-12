@@ -242,7 +242,7 @@ func (n *node) files() {
 		}
 
 		for _, file := range files {
-			filesChan <- "memfs:" + file.Name
+			filesChan <- "mem:" + file.Name
 		}
 	}(filesChan)
 
@@ -255,7 +255,7 @@ func (n *node) files() {
 		}
 
 		for _, file := range files {
-			filesChan <- "diskfs:" + file.Name
+			filesChan <- "disk:" + file.Name
 		}
 	}(filesChan)
 
@@ -316,9 +316,9 @@ func (n *node) getURL(path string) (string, error) {
 
 	u := ""
 
-	if prefix == "memfs:" {
+	if prefix == "mem:" {
 		u = n.address + "/" + filepath.Join("memfs", path)
-	} else if prefix == "diskfs:" {
+	} else if prefix == "disk:" {
 		u = n.address + path
 	} else if prefix == "rtmp:" {
 		u = n.rtmpAddress + path
@@ -347,9 +347,9 @@ func (n *node) getFile(path string) (io.ReadCloser, error) {
 	prefix := n.prefix.FindString(path)
 	path = n.prefix.ReplaceAllString(path, "")
 
-	if prefix == "memfs:" {
+	if prefix == "mem:" {
 		return n.peer.MemFSGetFile(path)
-	} else if prefix == "diskfs:" {
+	} else if prefix == "disk:" {
 		return n.peer.DiskFSGetFile(path)
 	}
 

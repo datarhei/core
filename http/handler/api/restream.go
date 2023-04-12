@@ -27,6 +27,7 @@ func NewRestream(restream restream.Restreamer) *RestreamHandler {
 // Add adds a new process
 // @Summary Add a new process
 // @Description Add a new FFmpeg process
+// @Tags v16.7.2
 // @ID process-3-add
 // @Accept json
 // @Produce json
@@ -50,7 +51,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
 	}
 
-	if len(process.Input) == 0 && len(process.Output) == 0 {
+	if len(process.Input) == 0 || len(process.Output) == 0 {
 		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
 	}
 
@@ -68,6 +69,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // GetAll returns all known processes
 // @Summary List all known processes
 // @Description List all known processes. Use the query parameter to filter the listed processes.
+// @Tags v16.7.2
 // @ID process-3-get-all
 // @Produce json
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
@@ -118,6 +120,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 // Get returns the process with the given ID
 // @Summary List a process by its ID
 // @Description List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.
+// @Tags v16.7.2
 // @ID process-3-get
 // @Produce json
 // @Param id path string true "Process ID"
@@ -141,6 +144,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 // Delete deletes the process with the given ID
 // @Summary Delete a process by its ID
 // @Description Delete a process by its ID
+// @Tags v16.7.2
 // @ID process-3-delete
 // @Produce json
 // @Param id path string true "Process ID"
@@ -164,7 +168,8 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 
 // Update replaces an existing process
 // @Summary Replace an existing process
-// @Description Replace an existing process
+// @Description Replace an existing process.
+// @Tags v16.7.2
 // @ID process-3-update
 // @Accept json
 // @Produce json
@@ -183,6 +188,14 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		Type:      "ffmpeg",
 		Autostart: true,
 	}
+
+	current, err := h.restream.GetProcess(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+	}
+
+	// Prefill the config with the current values
+	process.Unmarshal(current.Config)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
@@ -206,6 +219,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 // Command issues a command to a process
 // @Summary Issue a command to a process
 // @Description Issue a command to a process: start, stop, reload, restart
+// @Tags v16.7.2
 // @ID process-3-command
 // @Accept json
 // @Produce json
@@ -248,6 +262,7 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 // GetConfig returns the configuration of a process
 // @Summary Get the configuration of a process
 // @Description Get the configuration of a process. This is the configuration as provided by Add or Update.
+// @Tags v16.7.2
 // @ID process-3-get-config
 // @Produce json
 // @Param id path string true "Process ID"
@@ -272,7 +287,8 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 
 // GetState returns the current state of a process
 // @Summary Get the state of a process
-// @Description Get the state and progress data of a process
+// @Description Get the state and progress data of a process.
+// @Tags v16.7.2
 // @ID process-3-get-state
 // @Produce json
 // @Param id path string true "Process ID"
@@ -297,7 +313,8 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 
 // GetReport return the current log and the log history of a process
 // @Summary Get the logs of a process
-// @Description Get the logs and the log history of a process
+// @Description Get the logs and the log history of a process.
+// @Tags v16.7.2
 // @ID process-3-get-report
 // @Produce json
 // @Param id path string true "Process ID"
@@ -322,7 +339,8 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 
 // Probe probes a process
 // @Summary Probe a process
-// @Description Probe an existing process to get a detailed stream information on the inputs
+// @Description Probe an existing process to get a detailed stream information on the inputs.
+// @Tags v16.7.2
 // @ID process-3-probe
 // @Produce json
 // @Param id path string true "Process ID"
@@ -342,7 +360,8 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 
 // Skills returns the detected FFmpeg capabilities
 // @Summary FFmpeg capabilities
-// @Description List all detected FFmpeg capabilities
+// @Description List all detected FFmpeg capabilities.
+// @Tags v16.7.2
 // @ID skills-3
 // @Produce json
 // @Success 200 {object} api.Skills
@@ -359,7 +378,8 @@ func (h *RestreamHandler) Skills(c echo.Context) error {
 
 // ReloadSkills will refresh the FFmpeg capabilities
 // @Summary Refresh FFmpeg capabilities
-// @Description Refresh the available FFmpeg capabilities
+// @Description Refresh the available FFmpeg capabilities.
+// @Tags v16.7.2
 // @ID skills-3-reload
 // @Produce json
 // @Success 200 {object} api.Skills
@@ -378,6 +398,7 @@ func (h *RestreamHandler) ReloadSkills(c echo.Context) error {
 // GetProcessMetadata returns the metadata stored with a process
 // @Summary Retrieve JSON metadata stored with a process under a key
 // @Description Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.
+// @Tags v16.7.2
 // @ID process-3-get-process-metadata
 // @Produce json
 // @Param id path string true "Process ID"
@@ -402,6 +423,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 // SetProcessMetadata stores metadata with a process
 // @Summary Add JSON metadata with a process under the given key
 // @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
+// @Tags v16.7.2
 // @ID process-3-set-process-metadata
 // @Produce json
 // @Param id path string true "Process ID"
@@ -436,6 +458,7 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 // GetMetadata returns the metadata stored with the Restreamer
 // @Summary Retrieve JSON metadata from a key
 // @Description Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.
+// @Tags v16.7.2
 // @ID metadata-3-get
 // @Produce json
 // @Param key path string true "Key for data store"
@@ -458,6 +481,7 @@ func (h *RestreamHandler) GetMetadata(c echo.Context) error {
 // SetMetadata stores metadata with the Restreamer
 // @Summary Add JSON metadata under the given key
 // @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
+// @Tags v16.7.2
 // @ID metadata-3-set
 // @Produce json
 // @Param key path string true "Key for data store"

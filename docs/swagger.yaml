@@ -3,14 +3,18 @@ definitions:
   api.AVstream:
     properties:
       aqueue:
+        format: uint64
         type: integer
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       duplicating:
         type: boolean
       enc:
+        format: uint64
         type: integer
       gop:
         type: string
@@ -21,11 +25,13 @@ definitions:
       output:
         $ref: '#/definitions/api.AVstreamIO'
       queue:
+        format: uint64
         type: integer
     type: object
   api.AVstreamIO:
     properties:
       packet:
+        format: uint64
         type: integer
       size_kb:
         type: integer
@@ -94,21 +100,6 @@ definitions:
     required:
     - command
     type: object
-  api.Config:
-    properties:
-      config:
-        $ref: '#/definitions/api.ConfigData'
-      created_at:
-        type: string
-      loaded_at:
-        type: string
-      overrides:
-        items:
-          type: string
-        type: array
-      updated_at:
-        type: string
-    type: object
   api.ConfigData:
     properties:
       address:
@@ -148,7 +139,7 @@ definitions:
                     type: boolean
                   tenants:
                     items:
-                      $ref: '#/definitions/config.Auth0Tenant'
+                      $ref: '#/definitions/value.Auth0Tenant'
                     type: array
                 type: object
               disable_localhost:
@@ -169,6 +160,7 @@ definitions:
             type: boolean
         type: object
       created_at:
+        description: When this config has been persisted
         type: string
       db:
         properties:
@@ -178,6 +170,10 @@ definitions:
       debug:
         properties:
           force_gc:
+            format: int
+            type: integer
+          memory_limit_mbytes:
+            format: int64
             type: integer
           profiling:
             type: boolean
@@ -214,11 +210,14 @@ definitions:
           log:
             properties:
               max_history:
+                format: int
                 type: integer
               max_lines:
+                format: int
                 type: integer
             type: object
           max_processes:
+            format: int64
             type: integer
         type: object
       host:
@@ -243,6 +242,7 @@ definitions:
             - silent
             type: string
           max_lines:
+            format: int
             type: integer
           topics:
             items:
@@ -257,9 +257,11 @@ definitions:
             type: boolean
           interval_sec:
             description: seconds
+            format: int64
             type: integer
           range_sec:
             description: seconds
+            format: int64
             type: integer
         type: object
       name:
@@ -269,8 +271,10 @@ definitions:
           enable:
             type: boolean
           max_port:
+            format: int
             type: integer
           min_port:
+            format: int
             type: integer
         type: object
       router:
@@ -319,14 +323,18 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
+            format: uint64
             type: integer
           max_sessions:
+            format: uint64
             type: integer
           persist:
             type: boolean
           persist_interval_sec:
+            format: int
             type: integer
           session_timeout_sec:
+            format: int
             type: integer
         type: object
       srt:
@@ -365,10 +373,13 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
+                    format: uint64
                     type: integer
                   max_size_mbytes:
+                    format: uint64
                     type: integer
                   ttl_seconds:
+                    format: int64
                     type: integer
                   types:
                     properties:
@@ -385,6 +396,7 @@ definitions:
               dir:
                 type: string
               max_size_mbytes:
+                format: int64
                 type: integer
             type: object
           memory:
@@ -399,12 +411,17 @@ definitions:
                     type: string
                 type: object
               max_size_mbytes:
+                format: int64
                 type: integer
               purge:
                 type: boolean
             type: object
           mimetypes_file:
             type: string
+          s3:
+            items:
+              $ref: '#/definitions/value.S3Storage'
+            type: array
         type: object
       tls:
         properties:
@@ -414,6 +431,8 @@ definitions:
             type: boolean
           cert_file:
             type: string
+          email:
+            type: string
           enable:
             type: boolean
           key_file:
@@ -422,6 +441,7 @@ definitions:
       update_check:
         type: boolean
       version:
+        format: int64
         type: integer
     type: object
   api.ConfigError:
@@ -433,6 +453,7 @@ definitions:
   api.Error:
     properties:
       code:
+        format: int
         type: integer
       details:
         items:
@@ -444,11 +465,22 @@ definitions:
   api.FileInfo:
     properties:
       last_modified:
+        format: int64
         type: integer
       name:
         type: string
       size_bytes:
+        format: int64
         type: integer
+    type: object
+  api.FilesystemInfo:
+    properties:
+      mount:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
     type: object
   api.GraphQuery:
     properties:
@@ -502,12 +534,14 @@ definitions:
   api.MetricsQuery:
     properties:
       interval_sec:
+        format: int64
         type: integer
       metrics:
         items:
           $ref: '#/definitions/api.MetricsQueryMetric'
         type: array
       timerange_sec:
+        format: int64
         type: integer
     type: object
   api.MetricsQueryMetric:
@@ -522,12 +556,14 @@ definitions:
   api.MetricsResponse:
     properties:
       interval_sec:
+        format: int64
         type: integer
       metrics:
         items:
           $ref: '#/definitions/api.MetricsResponseMetric'
         type: array
       timerange_sec:
+        format: int64
         type: integer
     type: object
   api.MetricsResponseMetric:
@@ -553,15 +589,19 @@ definitions:
   api.PlayoutStatus:
     properties:
       aqueue:
+        format: uint64
         type: integer
       debug: {}
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       duplicating:
         type: boolean
       enc:
+        format: uint64
         type: integer
       gop:
         type: string
@@ -574,8 +614,10 @@ definitions:
       output:
         $ref: '#/definitions/api.PlayoutStatusIO'
       queue:
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       swap:
         $ref: '#/definitions/api.PlayoutStatusSwap'
@@ -585,8 +627,10 @@ definitions:
   api.PlayoutStatusIO:
     properties:
       packet:
+        format: uint64
         type: integer
       size_kb:
+        format: uint64
         type: integer
       state:
         enum:
@@ -594,6 +638,7 @@ definitions:
         - idle
         type: string
       time:
+        format: uint64
         type: integer
     type: object
   api.PlayoutStatusSwap:
@@ -623,6 +668,7 @@ definitions:
       bitrate_kbps:
         type: number
       channels:
+        format: uint64
         type: integer
       codec:
         type: string
@@ -636,8 +682,10 @@ definitions:
         description: video
         type: number
       height:
+        format: uint64
         type: integer
       index:
+        format: uint64
         type: integer
       language:
         type: string
@@ -647,8 +695,10 @@ definitions:
         type: string
       sampling_hz:
         description: audio
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       type:
         type: string
@@ -656,6 +706,7 @@ definitions:
         description: common
         type: string
       width:
+        format: uint64
         type: integer
     type: object
   api.Process:
@@ -663,6 +714,7 @@ definitions:
       config:
         $ref: '#/definitions/api.ProcessConfig'
       created_at:
+        format: int64
         type: integer
       id:
         type: string
@@ -699,10 +751,12 @@ definitions:
       reconnect:
         type: boolean
       reconnect_delay_seconds:
+        format: uint64
         type: integer
       reference:
         type: string
       stale_timeout_seconds:
+        format: uint64
         type: integer
       type:
         enum:
@@ -733,8 +787,10 @@ definitions:
   api.ProcessConfigIOCleanup:
     properties:
       max_file_age_seconds:
+        format: uint
         type: integer
       max_files:
+        format: uint
         type: integer
       pattern:
         type: string
@@ -748,13 +804,16 @@ definitions:
       cpu_usage:
         type: number
       memory_mbytes:
+        format: uint64
         type: integer
       waitfor_seconds:
+        format: uint64
         type: integer
     type: object
   api.ProcessReport:
     properties:
       created_at:
+        format: int64
         type: integer
       history:
         items:
@@ -774,6 +833,7 @@ definitions:
   api.ProcessReportHistoryEntry:
     properties:
       created_at:
+        format: int64
         type: integer
       log:
         items:
@@ -799,14 +859,17 @@ definitions:
       last_logline:
         type: string
       memory_bytes:
+        format: uint64
         type: integer
       order:
         type: string
       progress:
         $ref: '#/definitions/api.Progress'
       reconnect_seconds:
+        format: int64
         type: integer
       runtime_seconds:
+        format: int64
         type: integer
     type: object
   api.Progress:
@@ -815,12 +878,15 @@ definitions:
         description: kbit/s
         type: number
       drop:
+        format: uint64
         type: integer
       dup:
+        format: uint64
         type: integer
       fps:
         type: number
       frame:
+        format: uint64
         type: integer
       inputs:
         items:
@@ -831,11 +897,13 @@ definitions:
           $ref: '#/definitions/api.ProgressIO'
         type: array
       packet:
+        format: uint64
         type: integer
       q:
         type: number
       size_kb:
         description: kbytes
+        format: uint64
         type: integer
       speed:
         type: number
@@ -847,33 +915,46 @@ definitions:
       address:
         type: string
       avstream:
-        $ref: '#/definitions/api.AVstream'
+        allOf:
+        - $ref: '#/definitions/api.AVstream'
         description: avstream
       bitrate_kbit:
         description: kbit/s
         type: number
       channels:
+        format: uint64
         type: integer
       codec:
         type: string
       coder:
         type: string
+      extradata_size_bytes:
+        description: bytes
+        format: uint64
+        type: integer
       format:
         type: string
       fps:
         type: number
       frame:
+        format: uint64
         type: integer
       height:
+        format: uint64
         type: integer
       id:
         type: string
       index:
         description: General
+        format: uint64
+        type: integer
+      keyframe:
+        format: uint64
         type: integer
       layout:
         type: string
       packet:
+        format: uint64
         type: integer
       pix_fmt:
         description: Video
@@ -884,15 +965,19 @@ definitions:
         type: number
       sampling_hz:
         description: Audio
+        format: uint64
         type: integer
       size_kb:
         description: kbytes
+        format: uint64
         type: integer
       stream:
+        format: uint64
         type: integer
       type:
         type: string
       width:
+        format: uint64
         type: integer
     type: object
   api.RTMPChannel:
@@ -939,34 +1024,41 @@ definitions:
           type: string
         type: array
       ts:
+        format: int64
         type: integer
     type: object
   api.SRTStatistics:
     properties:
       avail_recv_buf_bytes:
         description: The available space in the receiver's buffer, in bytes
+        format: uint64
         type: integer
       avail_send_buf_bytes:
         description: The available space in the sender's buffer, in bytes
+        format: uint64
         type: integer
       bandwidth_mbit:
         description: Estimated bandwidth of the network link, in Mbps
         type: number
       flight_size_pkt:
         description: The number of packets in flight
+        format: uint64
         type: integer
       flow_window_pkt:
         description: The maximum number of packets that can be "in flight"
+        format: uint64
         type: integer
       max_bandwidth_mbit:
         description: Transmission bandwidth limit, in Mbps
         type: number
       mss_bytes:
         description: Maximum Segment Size (MSS), in bytes
+        format: uint64
         type: integer
       pkt_recv_avg_belated_time_ms:
         description: Accumulated difference between the current time and the time-to-play
           of a packet that is received late
+        format: uint64
         type: integer
       pkt_send_period_us:
         description: Current minimum time interval between which consecutive packets
@@ -974,79 +1066,98 @@ definitions:
         type: number
       recv_ack_pkt:
         description: The total number of received ACK (Acknowledgement) control packets
+        format: uint64
         type: integer
       recv_buf_bytes:
         description: Instantaneous (current) value of pktRcvBuf, expressed in bytes,
           including payload and all headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_buf_ms:
         description: The timespan (msec) of acknowledged packets in the receiver's
           buffer
+        format: uint64
         type: integer
       recv_buf_pkt:
         description: The number of acknowledged packets in receiver's buffer
+        format: uint64
         type: integer
       recv_bytes:
         description: Same as pktRecv, but expressed in bytes, including payload and
           all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_drop_bytes:
         description: Same as pktRcvDrop, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_drop_pkt:
         description: The total number of dropped by the SRT receiver and, as a result,
           not delivered to the upstream application DATA packets
+        format: uint64
         type: integer
       recv_km_pkt:
         description: The total number of received KM (Key Material) control packets
+        format: uint64
         type: integer
-      recv_loss__bytes:
+      recv_loss_bytes:
         description: Same as pktRcvLoss, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT), bytes for the presently missing (either
           reordered or lost) packets' payloads are estimated based on the average
           packet size
+        format: uint64
         type: integer
       recv_loss_pkt:
         description: The total number of SRT DATA packets detected as presently missing
           (either reordered or lost) at the receiver side
+        format: uint64
         type: integer
       recv_nak_pkt:
         description: The total number of received NAK (Negative Acknowledgement) control
           packets
+        format: uint64
         type: integer
       recv_pkt:
         description: The total number of received DATA packets, including retransmitted
           packets
+        format: uint64
         type: integer
       recv_retran_pkts:
         description: The total number of retransmitted packets registered at the receiver
           side
+        format: uint64
         type: integer
       recv_tsbpd_delay_ms:
         description: Timestamp-based Packet Delivery Delay value set on the socket
           via SRTO_RCVLATENCY or SRTO_LATENCY
+        format: uint64
         type: integer
       recv_undecrypt_bytes:
         description: Same as pktRcvUndecrypt, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_undecrypt_pkt:
         description: The total number of packets that failed to be decrypted at the
           receiver side
+        format: uint64
         type: integer
       recv_unique_bytes:
         description: Same as pktRecvUnique, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       recv_unique_pkt:
         description: The total number of unique original, retransmitted or recovered
           by the packet filter DATA packets received in time, decrypted without errors
           and, as a result, scheduled for delivery to the upstream application by
           the SRT receiver.
+        format: uint64
         type: integer
       reorder_tolerance_pkt:
         description: Instant value of the packet reorder tolerance
+        format: uint64
         type: integer
       rtt_ms:
         description: Smoothed round-trip time (SRTT), an exponentially-weighted moving
@@ -1055,71 +1166,89 @@ definitions:
       send_buf_bytes:
         description: Instantaneous (current) value of pktSndBuf, but expressed in
           bytes, including payload and all headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       send_buf_ms:
         description: The timespan (msec) of packets in the sender's buffer (unacknowledged
           packets)
+        format: uint64
         type: integer
       send_buf_pkt:
         description: The number of packets in the sender's buffer that are already
           scheduled for sending or even possibly sent, but not yet acknowledged
+        format: uint64
         type: integer
       send_drop_bytes:
         description: Same as pktSndDrop, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       send_drop_pkt:
         description: The total number of dropped by the SRT sender DATA packets that
           have no chance to be delivered in time
+        format: uint64
         type: integer
       send_duration_us:
         description: The total accumulated time in microseconds, during which the
           SRT sender has some data to transmit, including packets that have been sent,
           but not yet acknowledged
+        format: uint64
         type: integer
       send_km_pkt:
         description: The total number of sent KM (Key Material) control packets
+        format: uint64
         type: integer
       send_loss_pkt:
         description: The total number of data packets considered or reported as lost
           at the sender side. Does not correspond to the packets detected as lost
           at the receiver side.
+        format: uint64
         type: integer
       send_tsbpd_delay_ms:
         description: Timestamp-based Packet Delivery Delay value of the peer
+        format: uint64
         type: integer
       sent_ack_pkt:
         description: The total number of sent ACK (Acknowledgement) control packets
+        format: uint64
         type: integer
       sent_bytes:
         description: Same as pktSent, but expressed in bytes, including payload and
           all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_nak_pkt:
         description: The total number of sent NAK (Negative Acknowledgement) control
           packets
+        format: uint64
         type: integer
       sent_pkt:
         description: The total number of sent DATA packets, including retransmitted
           packets
+        format: uint64
         type: integer
       sent_retrans_bytes:
         description: Same as pktRetrans, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_retrans_pkt:
         description: The total number of retransmitted packets sent by the SRT sender
+        format: uint64
         type: integer
-      sent_unique__bytes:
+      sent_unique_bytes:
         description: Same as pktSentUnique, but expressed in bytes, including payload
           and all the headers (IP, TCP, SRT)
+        format: uint64
         type: integer
       sent_unique_pkt:
         description: The total number of unique DATA packets sent by the SRT sender
+        format: uint64
         type: integer
       timestamp_ms:
         description: The time elapsed, in milliseconds, since the SRT socket has been
           created
+        format: uint64
         type: integer
     type: object
   api.Session:
@@ -1131,10 +1260,13 @@ definitions:
         description: kbit/s
         type: number
       bytes_rx:
+        format: uint64
         type: integer
       bytes_tx:
+        format: uint64
         type: integer
       created_at:
+        format: int64
         type: integer
       extra:
         type: string
@@ -1154,19 +1286,25 @@ definitions:
           $ref: '#/definitions/api.SessionStats'
         type: object
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionStats:
     properties:
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionSummary:
@@ -1195,8 +1333,10 @@ definitions:
         description: mbit/s
         type: number
       max_sessions:
+        format: uint64
         type: integer
       sessions:
+        format: uint64
         type: integer
     type: object
   api.SessionSummarySummary:
@@ -1214,10 +1354,13 @@ definitions:
           $ref: '#/definitions/api.SessionPeers'
         type: object
       sessions:
+        format: uint64
         type: integer
       traffic_rx_mb:
+        format: uint64
         type: integer
       traffic_tx_mb:
+        format: uint64
         type: integer
     type: object
   api.SessionsActive:
@@ -1269,7 +1412,7 @@ definitions:
                     type: boolean
                   tenants:
                     items:
-                      $ref: '#/definitions/config.Auth0Tenant'
+                      $ref: '#/definitions/value.Auth0Tenant'
                     type: array
                 type: object
               disable_localhost:
@@ -1290,6 +1433,7 @@ definitions:
             type: boolean
         type: object
       created_at:
+        description: When this config has been persisted
         type: string
       db:
         properties:
@@ -1299,6 +1443,10 @@ definitions:
       debug:
         properties:
           force_gc:
+            format: int
+            type: integer
+          memory_limit_mbytes:
+            format: int64
             type: integer
           profiling:
             type: boolean
@@ -1335,11 +1483,14 @@ definitions:
           log:
             properties:
               max_history:
+                format: int
                 type: integer
               max_lines:
+                format: int
                 type: integer
             type: object
           max_processes:
+            format: int64
             type: integer
         type: object
       host:
@@ -1364,6 +1515,7 @@ definitions:
             - silent
             type: string
           max_lines:
+            format: int
             type: integer
           topics:
             items:
@@ -1378,9 +1530,11 @@ definitions:
             type: boolean
           interval_sec:
             description: seconds
+            format: int64
             type: integer
           range_sec:
             description: seconds
+            format: int64
             type: integer
         type: object
       name:
@@ -1390,8 +1544,10 @@ definitions:
           enable:
             type: boolean
           max_port:
+            format: int
             type: integer
           min_port:
+            format: int
             type: integer
         type: object
       router:
@@ -1440,14 +1596,18 @@ definitions:
               type: string
             type: array
           max_bitrate_mbit:
+            format: uint64
             type: integer
           max_sessions:
+            format: uint64
             type: integer
           persist:
             type: boolean
           persist_interval_sec:
+            format: int
             type: integer
           session_timeout_sec:
+            format: int
             type: integer
         type: object
       srt:
@@ -1486,10 +1646,13 @@ definitions:
                   enable:
                     type: boolean
                   max_file_size_mbytes:
+                    format: uint64
                     type: integer
                   max_size_mbytes:
+                    format: uint64
                     type: integer
                   ttl_seconds:
+                    format: int64
                     type: integer
                   types:
                     properties:
@@ -1506,6 +1669,7 @@ definitions:
               dir:
                 type: string
               max_size_mbytes:
+                format: int64
                 type: integer
             type: object
           memory:
@@ -1520,12 +1684,17 @@ definitions:
                     type: string
                 type: object
               max_size_mbytes:
+                format: int64
                 type: integer
               purge:
                 type: boolean
             type: object
           mimetypes_file:
             type: string
+          s3:
+            items:
+              $ref: '#/definitions/value.S3Storage'
+            type: array
         type: object
       tls:
         properties:
@@ -1535,6 +1704,8 @@ definitions:
             type: boolean
           cert_file:
             type: string
+          email:
+            type: string
           enable:
             type: boolean
           key_file:
@@ -1543,6 +1714,7 @@ definitions:
       update_check:
         type: boolean
       version:
+        format: int64
         type: integer
     type: object
   api.Skills:
@@ -1709,13 +1881,30 @@ definitions:
   api.WidgetProcess:
     properties:
       current_sessions:
+        format: uint64
         type: integer
       total_sessions:
+        format: uint64
         type: integer
       uptime:
         type: integer
     type: object
-  config.Auth0Tenant:
+  github_com_datarhei_core_v16_http_api.Config:
+    properties:
+      config:
+        $ref: '#/definitions/api.ConfigData'
+      created_at:
+        type: string
+      loaded_at:
+        type: string
+      overrides:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  value.Auth0Tenant:
     properties:
       audience:
         type: string
@@ -1727,6 +1916,34 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  value.S3Storage:
+    properties:
+      access_key_id:
+        type: string
+      auth:
+        properties:
+          enable:
+            type: boolean
+          password:
+            type: string
+          username:
+            type: string
+        type: object
+      bucket:
+        type: string
+      endpoint:
+        type: string
+      mountpoint:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      secret_access_key:
+        type: string
+      use_ssl:
+        type: boolean
     type: object
 info:
   contact:
@@ -1740,34 +1957,6 @@ info:
   title: datarhei Core API
   version: "3.0"
 paths:
-  /{path}:
-    get:
-      description: Fetch a file from the filesystem. If the file is a directory, a
-        index.html is returned, if it exists.
-      operationId: diskfs-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      summary: Fetch a file from the filesystem
   /api:
     get:
       description: API version and build infos in case auth is valid or not required.
@@ -2053,10 +2242,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.Config'
+            $ref: '#/definitions/github_com_datarhei_core_v16_http_api.Config'
       security:
       - ApiKeyAuth: []
       summary: Retrieve the currently active Restreamer configuration
+      tags:
+      - v16.7.2
     put:
       consumes:
       - application/json
@@ -2088,13 +2279,15 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Update the current Restreamer configuration
+      tags:
+      - v16.7.2
   /api/v3/config/reload:
     get:
       description: Reload the currently active configuration. This will trigger a
-        restart of the Restreamer.
+        restart of the Core.
       operationId: config-3-reload
       produces:
-      - text/plain
+      - application/json
       responses:
         "200":
           description: OK
@@ -2103,12 +2296,37 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Reload the currently active configuration
-  /api/v3/fs/disk:
+      tags:
+      - v16.7.2
+  /api/v3/fs:
     get:
-      description: List all files on the filesystem. The listing can be ordered by
-        name, size, or date of last modification in ascending or descending order.
-      operationId: diskfs-3-list-files
+      description: Listall registered filesystems
+      operationId: filesystem-3-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.FilesystemInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all registered filesystems
+      tags:
+      - v16.12.0
+  /api/v3/fs/{storage}:
+    get:
+      description: List all files on a filesystem. The listing can be ordered by name,
+        size, or date of last modification in ascending or descending order.
+      operationId: filesystem-3-list-files
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
       - description: glob pattern for file names
         in: query
         name: glob
@@ -2132,15 +2350,22 @@ paths:
             type: array
       security:
       - ApiKeyAuth: []
-      summary: List all files on the filesystem
-  /api/v3/fs/disk/{path}:
+      summary: List all files on a filesystem
+      tags:
+      - v16.7.2
+  /api/v3/fs/{storage}/{filepath}:
     delete:
-      description: Remove a file from the filesystem
-      operationId: diskfs-3-delete-file
+      description: Remove a file from a filesystem
+      operationId: filesystem-3-delete-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       produces:
@@ -2156,15 +2381,21 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Remove a file from the filesystem
+      summary: Remove a file from a filesystem
+      tags:
+      - v16.7.2
     get:
-      description: Fetch a file from the filesystem. The contents of that file are
-        returned.
-      operationId: diskfs-3-get-file
+      description: Fetch a file from a filesystem
+      operationId: filesystem-3-get-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       produces:
@@ -2185,16 +2416,23 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Fetch a file from the filesystem
+      summary: Fetch a file from a filesystem
+      tags:
+      - v16.7.2
     put:
       consumes:
       - application/data
-      description: Writes or overwrites a file on the filesystem
-      operationId: diskfs-3-put-file
+      description: Writes or overwrites a file on a filesystem
+      operationId: filesystem-3-put-file
       parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
       - description: Path to file
         in: path
-        name: path
+        name: filepath
         required: true
         type: string
       - description: File data
@@ -2223,160 +2461,9 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Add a file to the filesystem
-  /api/v3/fs/mem:
-    get:
-      description: List all files on the memory filesystem. The listing can be ordered
-        by name, size, or date of last modification in ascending or descending order.
-      operationId: memfs-3-list-files
-      parameters:
-      - description: glob pattern for file names
-        in: query
-        name: glob
-        type: string
-      - description: none, name, size, lastmod
-        in: query
-        name: sort
-        type: string
-      - description: asc, desc
-        in: query
-        name: order
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/api.FileInfo'
-            type: array
-      security:
-      - ApiKeyAuth: []
-      summary: List all files on the memory filesystem
-  /api/v3/fs/mem/{path}:
-    delete:
-      description: Remove a file from the memory filesystem
-      operationId: memfs-3-delete-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Remove a file from the memory filesystem
-    get:
-      description: Fetch a file from the memory filesystem
-      operationId: memfs-3-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Fetch a file from the memory filesystem
-    patch:
-      consumes:
-      - application/data
-      description: Create a link to a file in the memory filesystem. The file linked
-        to has to exist.
-      operationId: memfs-3-patch
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Path to the file to link to
-        in: body
-        name: url
-        required: true
-        schema:
-          type: string
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Create a link to a file in the memory filesystem
-    put:
-      consumes:
-      - application/data
-      description: Writes or overwrites a file on the memory filesystem
-      operationId: memfs-3-put-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: File data
-        in: body
-        name: data
-        required: true
-        schema:
-          items:
-            type: integer
-          type: array
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "507":
-          description: Insufficient Storage
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Add a file to the memory filesystem
+      summary: Add a file to a filesystem
+      tags:
+      - v16.7.2
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application
@@ -2398,6 +2485,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Application log
+      tags:
+      - v16.7.2
   /api/v3/metadata/{key}:
     get:
       description: Retrieve the previously stored JSON metadata under the given key.
@@ -2426,6 +2515,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Retrieve JSON metadata from a key
+      tags:
+      - v16.7.2
     put:
       description: Add arbitrary JSON metadata under the given key. If the key exists,
         all already stored metadata with this key will be overwritten. If the key
@@ -2455,6 +2546,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata under the given key
+      tags:
+      - v16.7.2
   /api/v3/metrics:
     get:
       description: List all known metrics with their description and labels
@@ -2471,6 +2564,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all known metrics with their description and labels
+      tags:
+      - v16.10.0
     post:
       consumes:
       - application/json
@@ -2497,6 +2592,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Query the collected metrics
+      tags:
+      - v16.7.2
   /api/v3/process:
     get:
       description: List all known processes. Use the query parameter to filter the
@@ -2541,6 +2638,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all known processes
+      tags:
+      - v16.7.2
     post:
       consumes:
       - application/json
@@ -2567,6 +2666,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add a new process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}:
     delete:
       description: Delete a process by its ID
@@ -2591,6 +2692,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Delete a process by its ID
+      tags:
+      - v16.7.2
     get:
       description: List a process by its ID. Use the filter parameter to specifiy
         the level of detail of the output.
@@ -2620,10 +2723,12 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List a process by its ID
+      tags:
+      - v16.7.2
     put:
       consumes:
       - application/json
-      description: Replace an existing process
+      description: Replace an existing process.
       operationId: process-3-update
       parameters:
       - description: Process ID
@@ -2655,6 +2760,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Replace an existing process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/command:
     put:
       consumes:
@@ -2691,6 +2798,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Issue a command to a process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/config:
     get:
       description: Get the configuration of a process. This is the configuration as
@@ -2720,6 +2829,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get the configuration of a process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/metadata/{key}:
     get:
       description: Retrieve the previously stored JSON metadata under the given key.
@@ -2753,6 +2864,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Retrieve JSON metadata stored with a process under a key
+      tags:
+      - v16.7.2
     put:
       description: Add arbitrary JSON metadata under the given key. If the key exists,
         all already stored metadata with this key will be overwritten. If the key
@@ -2792,6 +2905,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata with a process under the given key
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/errorframe/{name}:
     post:
       consumes:
@@ -2841,6 +2956,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Upload an error frame
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/errorframe/encode:
     get:
       description: Immediately encode the errorframe (if available and looping)
@@ -2875,6 +2992,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Encode the errorframe
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/keyframe/{name}:
     get:
       description: Get the last keyframe of an input of a process. The extension of
@@ -2916,6 +3035,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get the last keyframe
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/reopen:
     get:
       description: Close the current input stream such that it will be automatically
@@ -2950,6 +3071,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Close the current input stream
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/status:
     get:
       description: Get the current playout status of an input of a process
@@ -2983,6 +3106,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get the current playout status
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/playout/{inputid}/stream:
     put:
       consumes:
@@ -3026,10 +3151,12 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Switch to a new stream
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/probe:
     get:
       description: Probe an existing process to get a detailed stream information
-        on the inputs
+        on the inputs.
       operationId: process-3-probe
       parameters:
       - description: Process ID
@@ -3047,9 +3174,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Probe a process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/report:
     get:
-      description: Get the logs and the log history of a process
+      description: Get the logs and the log history of a process.
       operationId: process-3-get-report
       parameters:
       - description: Process ID
@@ -3075,9 +3204,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get the logs of a process
+      tags:
+      - v16.7.2
   /api/v3/process/{id}/state:
     get:
-      description: Get the state and progress data of a process
+      description: Get the state and progress data of a process.
       operationId: process-3-get-state
       parameters:
       - description: Process ID
@@ -3103,9 +3234,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get the state of a process
+      tags:
+      - v16.7.2
   /api/v3/rtmp:
     get:
-      description: List all currently publishing RTMP streams
+      description: List all currently publishing RTMP streams.
       operationId: rtmp-3-list-channels
       produces:
       - application/json
@@ -3119,9 +3252,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all publishing RTMP streams
+      tags:
+      - v16.7.2
   /api/v3/session:
     get:
-      description: Get a summary of all active and past sessions of the given collector
+      description: Get a summary of all active and past sessions of the given collector.
       operationId: session-3-summary
       parameters:
       - description: Comma separated list of collectors
@@ -3138,10 +3273,12 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get a summary of all active and past sessions
+      tags:
+      - v16.7.2
   /api/v3/session/active:
     get:
       description: Get a minimal summary of all active sessions (i.e. number of sessions,
-        bandwidth)
+        bandwidth).
       operationId: session-3-current
       parameters:
       - description: Comma separated list of collectors
@@ -3158,9 +3295,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get a minimal summary of all active sessions
+      tags:
+      - v16.7.2
   /api/v3/skills:
     get:
-      description: List all detected FFmpeg capabilities
+      description: List all detected FFmpeg capabilities.
       operationId: skills-3
       produces:
       - application/json
@@ -3172,9 +3311,11 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: FFmpeg capabilities
+      tags:
+      - v16.7.2
   /api/v3/skills/reload:
     get:
-      description: Refresh the available FFmpeg capabilities
+      description: Refresh the available FFmpeg capabilities.
       operationId: skills-3-reload
       produces:
       - application/json
@@ -3186,6 +3327,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Refresh FFmpeg capabilities
+      tags:
+      - v16.7.2
   /api/v3/srt:
     get:
       description: List all currently publishing SRT streams. This endpoint is EXPERIMENTAL
@@ -3205,6 +3348,8 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List all publishing SRT treams
+      tags:
+      - v16.9.0
   /api/v3/widget/process/{id}:
     get:
       description: Fetch minimal statistics about a process, which is not protected
@@ -3228,94 +3373,8 @@ paths:
           schema:
             $ref: '#/definitions/api.Error'
       summary: Fetch minimal statistics about a process
-  /memfs/{path}:
-    delete:
-      description: Remove a file from the memory filesystem
-      operationId: memfs-delete-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - BasicAuth: []
-      summary: Remove a file from the memory filesystem
-    get:
-      description: Fetch a file from the memory filesystem
-      operationId: memfs-get-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/data
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "301":
-          description: Moved Permanently
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      summary: Fetch a file from the memory filesystem
-    put:
-      consumes:
-      - application/data
-      description: Writes or overwrites a file on the memory filesystem
-      operationId: memfs-put-file
-      parameters:
-      - description: Path to file
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: File data
-        in: body
-        name: data
-        required: true
-        schema:
-          items:
-            type: integer
-          type: array
-      produces:
-      - text/plain
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "507":
-          description: Insufficient Storage
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - BasicAuth: []
-      summary: Add a file to the memory filesystem
+      tags:
+      - v16.7.2
   /metrics:
     get:
       description: Prometheus metrics

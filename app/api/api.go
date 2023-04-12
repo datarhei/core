@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	golog "log"
+	"math"
 	gonet "net"
 	gohttp "net/http"
 	"net/url"
@@ -17,9 +18,12 @@ import (
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/config"
+	configstore "github.com/datarhei/core/v16/config/store"
+	configvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
+	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/io/fs"
@@ -29,8 +33,9 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
 	"github.com/datarhei/core/v16/restream"
+	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
-	"github.com/datarhei/core/v16/restream/store"
+	restreamstore "github.com/datarhei/core/v16/restream/store"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
@@ -38,6 +43,7 @@ import (
 	"github.com/datarhei/core/v16/update"
 
 	"github.com/caddyserver/certmagic"
+	"go.uber.org/zap"
 )
 
 // The API interface is the implementation for the restreamer API.
@@ -65,6 +71,7 @@ type api struct {
 	ffmpeg          ffmpeg.FFmpeg
 	diskfs          fs.Filesystem
 	memfs           fs.Filesystem
+	s3fs            map[string]fs.Filesystem
 	rtmpserver      rtmp.Server
 	srtserver       srt.Server
 	metrics         monitor.HistoryMonitor
@@ -99,7 +106,7 @@ type api struct {
 
 	config struct {
 		path   string
-		store  config.Store
+		store  configstore.Store
 		config *config.Config
 	}
 
@@ -116,6 +123,7 @@ var ErrConfigReload = fmt.Errorf("configuration reload")
 func New(configpath string, logwriter io.Writer) (API, error) {
 	a := &api{
 		state: "idle",
+		s3fs:  map[string]fs.Filesystem{},
 	}
 
 	a.config.path = configpath
@@ -148,7 +156,8 @@ func (a *api) Reload() error {
 
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
 
-	store, err := config.NewJSONStore(a.config.path, func() {
+	rootfs, _ := fs.NewDiskFilesystem(fs.DiskConfig{})
+	store, err := configstore.NewJSON(rootfs, a.config.path, func() {
 		a.errorChan <- ErrConfigReload
 	})
 	if err != nil {
@@ -160,7 +169,7 @@ func (a *api) Reload() error {
 	cfg.Merge()
 
 	if len(cfg.Host.Name) == 0 && cfg.Host.Auto {
-		cfg.SetPublicIPs()
+		cfg.Host.Name = net.GetPublicIPs(5 * time.Second)
 	}
 
 	cfg.Validate(false)
@@ -228,8 +237,10 @@ func (a *api) Reload() error {
 
 	logger.Info().WithFields(logfields).Log("")
 
+	logger.Info().WithField("path", a.config.path).Log("Read config file")
+
 	configlogger := logger.WithComponent("Config")
-	cfg.Messages(func(level string, v config.Variable, message string) {
+	cfg.Messages(func(level string, v configvars.Variable, message string) {
 		configlogger = configlogger.WithFields(log.Fields{
 			"variable":    v.Name,
 			"value":       v.Value,
@@ -253,6 +264,8 @@ func (a *api) Reload() error {
 		logger.Error().WithField("error", "Not all variables are set or are valid. Check the error messages above. Bailing out.").Log("")
 		return fmt.Errorf("not all variables are set or valid")
 	}
+
+	cfg.LoadedAt = time.Now()
 
 	store.SetActive(cfg)
 
@@ -286,7 +299,13 @@ func (a *api) start() error {
 		}
 
 		if cfg.Sessions.Persist {
-			sessionConfig.PersistDir = filepath.Join(cfg.DB.Dir, "sessions")
+			fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+				Root: filepath.Join(cfg.DB.Dir, "sessions"),
+			})
+			if err != nil {
+				return fmt.Errorf("unable to create filesystem for persisting sessions: %w", err)
+			}
+			sessionConfig.PersistFS = fs
 		}
 
 		sessions, err := session.New(sessionConfig)
@@ -367,18 +386,18 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
-	store := store.NewJSONStore(store.JSONConfig{
-		Dir:    cfg.DB.Dir,
-		Logger: a.log.logger.core.WithComponent("ProcessStore"),
-	})
-
-	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{
-		Dir:    cfg.Storage.Disk.Dir,
-		Size:   cfg.Storage.Disk.Size * 1024 * 1024,
+	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+		Root:   cfg.Storage.Disk.Dir,
 		Logger: a.log.logger.core.WithComponent("DiskFS"),
 	})
 	if err != nil {
+		return fmt.Errorf("disk filesystem: %w", err)
+	}
+
+	if diskfsRoot, err := filepath.Abs(cfg.Storage.Disk.Dir); err != nil {
 		return err
+	} else {
+		diskfs.SetMetadata("base", diskfsRoot)
 	}
 
 	a.diskfs = diskfs
@@ -400,17 +419,60 @@ func (a *api) start() error {
 	}
 
 	if a.memfs == nil {
-		memfs := fs.NewMemFilesystem(fs.MemConfig{
-			Base:   baseMemFS.String(),
-			Size:   cfg.Storage.Memory.Size * 1024 * 1024,
-			Purge:  cfg.Storage.Memory.Purge,
+		memfs, _ := fs.NewMemFilesystem(fs.MemConfig{
 			Logger: a.log.logger.core.WithComponent("MemFS"),
 		})
 
-		a.memfs = memfs
+		memfs.SetMetadata("base", baseMemFS.String())
+
+		sizedfs, _ := fs.NewSizedFilesystem(memfs, cfg.Storage.Memory.Size*1024*1024, cfg.Storage.Memory.Purge)
+
+		a.memfs = sizedfs
 	} else {
-		a.memfs.Rebase(baseMemFS.String())
-		a.memfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
+		a.memfs.SetMetadata("base", baseMemFS.String())
+		if sizedfs, ok := a.memfs.(fs.SizedFilesystem); ok {
+			sizedfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
+		}
+	}
+
+	for _, s3 := range cfg.Storage.S3 {
+		if _, ok := a.s3fs[s3.Name]; ok {
+			return fmt.Errorf("the name '%s' for a s3 filesystem is already in use", s3.Name)
+		}
+
+		baseS3FS := url.URL{
+			Scheme: "http",
+			Path:   s3.Mountpoint,
+		}
+
+		host, port, _ := gonet.SplitHostPort(cfg.Address)
+		if len(host) == 0 {
+			baseS3FS.Host = "localhost:" + port
+		} else {
+			baseS3FS.Host = cfg.Address
+		}
+
+		if s3.Auth.Enable {
+			baseS3FS.User = url.UserPassword(s3.Auth.Username, s3.Auth.Password)
+		}
+
+		s3fs, err := fs.NewS3Filesystem(fs.S3Config{
+			Name:            s3.Name,
+			Endpoint:        s3.Endpoint,
+			AccessKeyID:     s3.AccessKeyID,
+			SecretAccessKey: s3.SecretAccessKey,
+			Region:          s3.Region,
+			Bucket:          s3.Bucket,
+			UseSSL:          s3.UseSSL,
+			Logger:          a.log.logger.core.WithComponent("FS"),
+		})
+		if err != nil {
+			return fmt.Errorf("s3 filesystem (%s): %w", s3.Name, err)
+		}
+
+		s3fs.SetMetadata("base", baseS3FS.String())
+
+		a.s3fs[s3.Name] = s3fs
 	}
 
 	var portrange net.Portranger
@@ -418,18 +480,18 @@ func (a *api) start() error {
 	if cfg.Playout.Enable {
 		portrange, err = net.NewPortrange(cfg.Playout.MinPort, cfg.Playout.MaxPort)
 		if err != nil {
-			return err
+			return fmt.Errorf("playout port range: %w", err)
 		}
 	}
 
 	validatorIn, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Input.Allow, cfg.FFmpeg.Access.Input.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("input address validator: %w", err)
 	}
 
 	validatorOut, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Output.Allow, cfg.FFmpeg.Access.Output.Block)
 	if err != nil {
-		return err
+		return fmt.Errorf("output address validator: %w", err)
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
@@ -443,7 +505,7 @@ func (a *api) start() error {
 		Collector:        a.sessions.Collector("ffmpeg"),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create ffmpeg: %w", err)
 	}
 
 	a.ffmpeg = ffmpeg
@@ -451,47 +513,103 @@ func (a *api) start() error {
 	a.replacer = replace.New()
 
 	{
-		a.replacer.RegisterTemplate("diskfs", a.diskfs.Base())
-		a.replacer.RegisterTemplate("memfs", a.memfs.Base())
+		a.replacer.RegisterTemplateFunc("diskfs", func(config *restreamapp.Config, section string) string {
+			return a.diskfs.Metadata("base")
+		}, nil)
 
-		host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
-		if len(host) == 0 {
-			host = "localhost"
+		a.replacer.RegisterTemplateFunc("fs:disk", func(config *restreamapp.Config, section string) string {
+			return a.diskfs.Metadata("base")
+		}, nil)
+
+		a.replacer.RegisterTemplateFunc("memfs", func(config *restreamapp.Config, section string) string {
+			return a.memfs.Metadata("base")
+		}, nil)
+
+		a.replacer.RegisterTemplateFunc("fs:mem", func(config *restreamapp.Config, section string) string {
+			return a.memfs.Metadata("base")
+		}, nil)
+
+		for name, s3 := range a.s3fs {
+			a.replacer.RegisterTemplate("fs:"+name, s3.Metadata("base"), nil)
 		}
 
-		template := "rtmp://" + host + ":" + port
-		if cfg.RTMP.App != "/" {
-			template += cfg.RTMP.App
-		}
-		template += "/{name}"
+		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {
+			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
 
-		if len(cfg.RTMP.Token) != 0 {
-			template += "?token=" + cfg.RTMP.Token
-		}
+			template := "rtmp://" + host + ":" + port
+			if cfg.RTMP.App != "/" {
+				template += cfg.RTMP.App
+			}
+			template += "/{name}"
 
-		a.replacer.RegisterTemplate("rtmp", template)
+			if len(cfg.RTMP.Token) != 0 {
+				template += "?token=" + cfg.RTMP.Token
+			}
 
-		host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
-		if len(host) == 0 {
-			host = "localhost"
-		}
+			return template
+		}, nil)
 
-		template = "srt://" + host + ":" + port + "?mode=caller&transtype=live&streamid=#!:m={mode},r={name}"
-		if len(cfg.SRT.Token) != 0 {
-			template += ",token=" + cfg.SRT.Token
+		a.replacer.RegisterTemplateFunc("srt", func(config *restreamapp.Config, section string) string {
+			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
+			if len(host) == 0 {
+				host = "localhost"
+			}
+
+			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name}"
+			if section == "output" {
+				template += ",mode:publish"
+			} else {
+				template += ",mode:request"
+			}
+			if len(cfg.SRT.Token) != 0 {
+				template += ",token:" + cfg.SRT.Token
+			}
+			if len(cfg.SRT.Passphrase) != 0 {
+				template += "&passphrase=" + cfg.SRT.Passphrase
+			}
+
+			return template
+		}, map[string]string{
+			"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
+		})
+	}
+
+	filesystems := []fs.Filesystem{
+		a.diskfs,
+		a.memfs,
+	}
+
+	for _, fs := range a.s3fs {
+		filesystems = append(filesystems, fs)
+	}
+
+	var store restreamstore.Store = nil
+
+	{
+		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+			Root: cfg.DB.Dir,
+		})
+		if err != nil {
+			return err
 		}
-		if len(cfg.SRT.Passphrase) != 0 {
-			template += "&passphrase=" + cfg.SRT.Passphrase
+		store, err = restreamstore.NewJSON(restreamstore.JSONConfig{
+			Filesystem: fs,
+			Filepath:   "/db.json",
+			Logger:     a.log.logger.core.WithComponent("ProcessStore"),
+		})
+		if err != nil {
+			return err
 		}
-		a.replacer.RegisterTemplate("srt", template)
 	}
 
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
 		Name:         cfg.Name,
 		Store:        store,
-		DiskFS:       a.diskfs,
-		MemFS:        a.memfs,
+		Filesystems:  filesystems,
 		Replace:      a.replacer,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
@@ -569,9 +687,12 @@ func (a *api) start() error {
 	metrics.Register(monitor.NewCPUCollector())
 	metrics.Register(monitor.NewMemCollector())
 	metrics.Register(monitor.NewNetCollector())
-	metrics.Register(monitor.NewDiskCollector(a.diskfs.Base()))
-	metrics.Register(monitor.NewFilesystemCollector("diskfs", diskfs))
+	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base")))
+	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
+	for name, fs := range a.s3fs {
+		metrics.Register(monitor.NewFilesystemCollector(name, fs))
+	}
 	metrics.Register(monitor.NewRestreamCollector(a.restream))
 	metrics.Register(monitor.NewFFmpegCollector(a.ffmpeg))
 	metrics.Register(monitor.NewSessionCollector(a.sessions, []string{}))
@@ -646,7 +767,7 @@ func (a *api) start() error {
 	}
 
 	if cfg.Storage.Disk.Cache.Enable {
-		diskCache, err := cache.NewLRUCache(cache.LRUConfig{
+		cache, err := cache.NewLRUCache(cache.LRUConfig{
 			TTL:             time.Duration(cfg.Storage.Disk.Cache.TTL) * time.Second,
 			MaxSize:         cfg.Storage.Disk.Cache.Size * 1024 * 1024,
 			MaxFileSize:     cfg.Storage.Disk.Cache.FileSize * 1024 * 1024,
@@ -656,106 +777,111 @@ func (a *api) start() error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("unable to create disk cache: %w", err)
+			return fmt.Errorf("unable to create cache: %w", err)
 		}
 
-		a.cache = diskCache
+		a.cache = cache
 	}
 
 	var autocertManager *certmagic.Config
 
-	if cfg.TLS.Enable && cfg.TLS.Auto {
-		if len(cfg.Host.Name) == 0 {
-			return fmt.Errorf("at least one host must be provided in host.name or RS_HOST_NAME")
-		}
-
-		certmagic.DefaultACME.Agreed = true
-		certmagic.DefaultACME.Email = cfg.TLS.Email
-		certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
-		certmagic.DefaultACME.DisableHTTPChallenge = false
-		certmagic.DefaultACME.DisableTLSALPNChallenge = true
-		certmagic.DefaultACME.Logger = nil
-
-		certmagic.Default.Storage = &certmagic.FileStorage{
-			Path: cfg.DB.Dir + "/cert",
-		}
-		certmagic.Default.DefaultServerName = cfg.Host.Name[0]
-		certmagic.Default.Logger = nil
-		certmagic.Default.OnEvent = func(event string, data interface{}) {
-			message := ""
-
-			switch data := data.(type) {
-			case string:
-				message = data
-			case fmt.Stringer:
-				message = data.String()
+	if cfg.TLS.Enable {
+		if cfg.TLS.Auto {
+			if len(cfg.Host.Name) == 0 {
+				return fmt.Errorf("at least one host must be provided in host.name or CORE_HOST_NAME")
 			}
 
-			if len(message) != 0 {
-				a.log.logger.core.WithComponent("certmagic").Info().WithField("event", event).Log(message)
+			certmagic.Default.Storage = &certmagic.FileStorage{
+				Path: cfg.DB.Dir + "/cert",
 			}
-		}
+			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
+			certmagic.Default.Logger = zap.NewNop()
 
-		magic := certmagic.NewDefault()
-		acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
+			certmagic.DefaultACME.Agreed = true
+			certmagic.DefaultACME.Email = cfg.TLS.Email
+			certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
+			certmagic.DefaultACME.DisableHTTPChallenge = false
+			certmagic.DefaultACME.DisableTLSALPNChallenge = true
+			certmagic.DefaultACME.Logger = zap.NewNop()
 
-		magic.Issuers = []certmagic.Issuer{acme}
+			magic := certmagic.NewDefault()
+			acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
+			acme.Logger = zap.NewNop()
 
-		autocertManager = magic
+			magic.Issuers = []certmagic.Issuer{acme}
+			magic.Logger = zap.NewNop()
 
-		// Start temporary http server on configured port
-		tempserver := &gohttp.Server{
-			Addr: cfg.Address,
-			Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
-				w.WriteHeader(gohttp.StatusNotFound)
-			})),
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20,
-		}
+			autocertManager = magic
 
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-
-		go func() {
-			tempserver.ListenAndServe()
-			wg.Done()
-		}()
-
-		var certerror bool
-
-		// For each domain, get the certificate
-		for _, host := range cfg.Host.Name {
-			logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
-			logger.Info().Log("Acquiring certificate ...")
-
-			ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
-
-			err := autocertManager.ManageSync(ctx, []string{host})
-
-			cancel()
-
-			if err != nil {
-				logger.Error().WithField("error", err).Log("Failed to acquire certificate")
-				certerror = true
-				break
+			// Start temporary http server on configured port
+			tempserver := &gohttp.Server{
+				Addr: cfg.Address,
+				Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
+					w.WriteHeader(gohttp.StatusNotFound)
+				})),
+				ReadTimeout:    10 * time.Second,
+				WriteTimeout:   10 * time.Second,
+				MaxHeaderBytes: 1 << 20,
 			}
 
-			logger.Info().Log("Successfully acquired certificate")
-		}
+			wg := sync.WaitGroup{}
+			wg.Add(1)
 
-		// Shut down the temporary http server
-		tempserver.Close()
+			go func() {
+				tempserver.ListenAndServe()
+				wg.Done()
+			}()
 
-		wg.Wait()
+			var certerror bool
 
-		if certerror {
-			a.log.logger.core.Warn().Log("Continuing with disabled TLS")
-			autocertManager = nil
-			cfg.TLS.Enable = false
+			// For each domain, get the certificate
+			for _, host := range cfg.Host.Name {
+				logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
+				logger.Info().Log("Acquiring certificate ...")
+
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
+
+				err := autocertManager.ManageSync(ctx, []string{host})
+
+				cancel()
+
+				if err != nil {
+					logger.Error().WithField("error", err).Log("Failed to acquire certificate")
+					certerror = true
+					/*
+						problems, err := letsdebug.Check(host, letsdebug.HTTP01)
+						if err != nil {
+							logger.Error().WithField("error", err).Log("Failed to debug certificate acquisition")
+						}
+
+						for _, p := range problems {
+							logger.Error().WithFields(log.Fields{
+								"name":   p.Name,
+								"detail": p.Detail,
+							}).Log(p.Explanation)
+						}
+					*/
+					break
+				}
+
+				logger.Info().Log("Successfully acquired certificate")
+			}
+
+			// Shut down the temporary http server
+			tempserver.Close()
+
+			wg.Wait()
+
+			if certerror {
+				a.log.logger.core.Warn().Log("Continuing with disabled TLS")
+				autocertManager = nil
+				cfg.TLS.Enable = false
+			} else {
+				cfg.TLS.CertFile = ""
+				cfg.TLS.KeyFile = ""
+			}
 		} else {
-			cfg.TLS.CertFile = ""
-			cfg.TLS.KeyFile = ""
+			a.log.logger.core.Info().Log("Enabling TLS with cert and key files")
 		}
 	}
 
@@ -772,14 +898,15 @@ func (a *api) start() error {
 			Cluster:   a.cluster,
 		}
 
-		if autocertManager != nil && cfg.RTMP.EnableTLS {
-			config.TLSConfig = &tls.Config{
-				GetCertificate: autocertManager.GetCertificate,
-			}
-
+		if cfg.RTMP.EnableTLS {
 			config.Logger = config.Logger.WithComponent("RTMP/S")
 
 			a.log.logger.rtmps = a.log.logger.core.WithComponent("RTMPS").WithField("address", cfg.RTMP.AddressTLS)
+			if autocertManager != nil {
+				config.TLSConfig = &tls.Config{
+					GetCertificate: autocertManager.GetCertificate,
+				}
+			}
 		}
 
 		rtmpserver, err := rtmp.New(config)
@@ -843,22 +970,61 @@ func (a *api) start() error {
 
 	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
 
-	mainserverhandler, err := http.NewServer(http.Config{
+	httpfilesystems := []httpfs.FS{
+		{
+			Name:               a.diskfs.Name(),
+			Mountpoint:         "",
+			AllowWrite:         false,
+			EnableAuth:         false,
+			Username:           "",
+			Password:           "",
+			DefaultFile:        "index.html",
+			DefaultContentType: "text/html",
+			Gzip:               true,
+			Filesystem:         a.diskfs,
+			Cache:              a.cache,
+		},
+		{
+			Name:               a.memfs.Name(),
+			Mountpoint:         "/memfs",
+			AllowWrite:         true,
+			EnableAuth:         cfg.Storage.Memory.Auth.Enable,
+			Username:           cfg.Storage.Memory.Auth.Username,
+			Password:           cfg.Storage.Memory.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.memfs,
+			Cache:              nil,
+		},
+	}
+
+	for _, s3 := range cfg.Storage.S3 {
+		httpfilesystems = append(httpfilesystems, httpfs.FS{
+			Name:               s3.Name,
+			Mountpoint:         s3.Mountpoint,
+			AllowWrite:         true,
+			EnableAuth:         s3.Auth.Enable,
+			Username:           s3.Auth.Username,
+			Password:           s3.Auth.Password,
+			DefaultFile:        "",
+			DefaultContentType: "application/data",
+			Gzip:               true,
+			Filesystem:         a.s3fs[s3.Name],
+			Cache:              a.cache,
+		})
+	}
+
+	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
 		Restream:      a.restream,
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypes,
-		DiskFS:        a.diskfs,
-		MemFS: http.MemFSConfig{
-			EnableAuth: cfg.Storage.Memory.Auth.Enable,
-			Username:   cfg.Storage.Memory.Auth.Username,
-			Password:   cfg.Storage.Memory.Auth.Password,
-			Filesystem: a.memfs,
-		},
-		IPLimiter: iplimiter,
-		Profiling: cfg.Debug.Profiling,
+		Filesystems:   httpfilesystems,
+		IPLimiter:     iplimiter,
+		Profiling:     cfg.Debug.Profiling,
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},
@@ -866,12 +1032,13 @@ func (a *api) start() error {
 		SRT:      a.srtserver,
 		JWT:      a.httpjwt,
 		Config:   a.config.store,
-		Cache:    a.cache,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
 		Cluster:  a.cluster,
-	})
+	}
+
+	mainserverhandler, err := http.NewServer(serverConfig)
 
 	if err != nil {
 		return fmt.Errorf("unable to create server: %w", err)
@@ -906,35 +1073,10 @@ func (a *api) start() error {
 
 		a.log.logger.sidecar = a.log.logger.core.WithComponent("HTTP").WithField("address", cfg.Address)
 
-		sidecarserverhandler, err := http.NewServer(http.Config{
-			Logger:        a.log.logger.sidecar,
-			LogBuffer:     a.log.buffer,
-			Restream:      a.restream,
-			Metrics:       a.metrics,
-			Prometheus:    a.prom,
-			MimeTypesFile: cfg.Storage.MimeTypes,
-			DiskFS:        a.diskfs,
-			MemFS: http.MemFSConfig{
-				EnableAuth: cfg.Storage.Memory.Auth.Enable,
-				Username:   cfg.Storage.Memory.Auth.Username,
-				Password:   cfg.Storage.Memory.Auth.Password,
-				Filesystem: a.memfs,
-			},
-			IPLimiter: iplimiter,
-			Profiling: cfg.Debug.Profiling,
-			Cors: http.CorsConfig{
-				Origins: cfg.Storage.CORS.Origins,
-			},
-			RTMP:     a.rtmpserver,
-			SRT:      a.srtserver,
-			JWT:      a.httpjwt,
-			Config:   a.config.store,
-			Cache:    a.cache,
-			Sessions: a.sessions,
-			Router:   router,
-			ReadOnly: cfg.API.ReadOnly,
-			Cluster:  a.cluster,
-		})
+		serverConfig.Logger = a.log.logger.sidecar
+		serverConfig.IPLimiter = iplimiter
+
+		sidecarserverhandler, err := http.NewServer(serverConfig)
 
 		if err != nil {
 			return fmt.Errorf("unable to create sidecar HTTP server: %w", err)
@@ -1126,6 +1268,12 @@ func (a *api) start() error {
 		}(ctx)
 	}
 
+	if cfg.Debug.MemoryLimit > 0 {
+		debug.SetMemoryLimit(cfg.Debug.MemoryLimit * 1024 * 1024)
+	} else {
+		debug.SetMemoryLimit(math.MaxInt64)
+	}
+
 	// Start the restream processes
 	restream.Start()
 
@@ -1216,6 +1364,9 @@ func (a *api) stop() {
 		a.cache = nil
 	}
 
+	// Free the S3 mounts
+	a.s3fs = map[string]fs.Filesystem{}
+
 	// Stop the SRT server
 	if a.srtserver != nil {
 		a.log.logger.srt.Info().Log("Stopping ...")
@@ -1296,7 +1447,7 @@ func (a *api) Destroy() {
 
 	// Free the MemFS
 	if a.memfs != nil {
-		a.memfs.DeleteAll()
+		a.memfs.RemoveAll()
 		a.memfs = nil
 	}
 }

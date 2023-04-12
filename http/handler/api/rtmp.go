@@ -23,7 +23,8 @@ func NewRTMP(rtmp rtmp.Server) *RTMPHandler {
 
 // ListChannels lists all currently publishing RTMP streams
 // @Summary List all publishing RTMP streams
-// @Description List all currently publishing RTMP streams
+// @Description List all currently publishing RTMP streams.
+// @Tags v16.7.2
 // @ID rtmp-3-list-channels
 // @Produce json
 // @Success 200 {array} api.RTMPChannel

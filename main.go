@@ -5,6 +5,7 @@ import (
 	"os/signal"
 
 	"github.com/datarhei/core/v16/app/api"
+	"github.com/datarhei/core/v16/config/store"
 	"github.com/datarhei/core/v16/log"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -13,7 +14,9 @@ import (
 func main() {
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(os.Stderr, log.Lwarn, true))
 
-	app, err := api.New(os.Getenv("CORE_CONFIGFILE"), os.Stderr)
+	configfile := store.Location(os.Getenv("CORE_CONFIGFILE"))
+
+	app, err := api.New(configfile, os.Stderr)
 	if err != nil {
 		logger.Error().WithError(err).Log("Failed to create new API")
 		os.Exit(1)

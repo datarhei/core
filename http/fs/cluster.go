@@ -2,6 +2,7 @@ package fs
 
 import (
 	"io"
+	gofs "io/fs"
 	"time"
 
 	"github.com/datarhei/core/v16/cluster"
@@ -15,14 +16,18 @@ type Filesystem interface {
 type filesystem struct {
 	fs.Filesystem
 
-	what    string
+	name    string
 	cluster cluster.ClusterReader
 }
 
-func NewClusterFS(what string, fs fs.Filesystem, cluster cluster.Cluster) Filesystem {
+func NewClusterFS(name string, fs fs.Filesystem, cluster cluster.Cluster) Filesystem {
+	if cluster == nil {
+		return fs
+	}
+
 	f := &filesystem{
 		Filesystem: fs,
-		what:       what,
+		name:       name,
 		cluster:    cluster,
 	}
 
@@ -36,7 +41,7 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	data, err := fs.cluster.GetFile(fs.what + ":" + path)
+	data, err := fs.cluster.GetFile(fs.name + ":" + path)
 	if err != nil {
 		return nil
 	}
@@ -61,6 +66,10 @@ func (f *file) Name() string {
 
 func (f *file) Stat() (fs.FileInfo, error) {
 	return f, nil
+}
+
+func (f *file) Mode() gofs.FileMode {
+	return gofs.FileMode(gofs.ModePerm)
 }
 
 func (f *file) Size() int64 {

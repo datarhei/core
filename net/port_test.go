@@ -3,19 +3,30 @@ package net
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPortrange(t *testing.T) {
 	_, err := NewPortrange(1000, 1999)
 
-	assert.Nil(t, err, "Valid port range not accepted: %s", err)
+	require.Nil(t, err, "Valid port range not accepted: %s", err)
 }
 
 func TestInvalidPortrange(t *testing.T) {
 	_, err := NewPortrange(1999, 1000)
 
-	assert.NotNil(t, err, "Invalid port range accepted")
+	require.NotNil(t, err, "Invalid port range accepted")
+}
+
+func TestOutOfRangePortrange(t *testing.T) {
+	p, err := NewPortrange(-1, 70000)
+
+	require.NoError(t, err)
+
+	portrange := p.(*portrange)
+
+	require.Equal(t, 1, portrange.min)
+	require.Equal(t, 65535, len(portrange.ports))
 }
 
 func TestGetPort(t *testing.T) {
@@ -23,26 +34,26 @@ func TestGetPort(t *testing.T) {
 
 	port, err := portrange.Get()
 
-	assert.Nil(t, err)
-	assert.Equal(t, 1000, port)
+	require.Nil(t, err)
+	require.Equal(t, 1000, port)
 }
 
 func TestGetPutPort(t *testing.T) {
 	portrange, _ := NewPortrange(1000, 1999)
 
 	port, err := portrange.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 1000, port)
+	require.Nil(t, err)
+	require.Equal(t, 1000, port)
 
 	port, err = portrange.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 1001, port)
+	require.Nil(t, err)
+	require.Equal(t, 1001, port)
 
 	portrange.Put(1000)
 
 	port, err = portrange.Get()
-	assert.Nil(t, err)
-	assert.Equal(t, 1000, port)
+	require.Nil(t, err)
+	require.Equal(t, 1000, port)
 }
 
 func TestPortUnavailable(t *testing.T) {
@@ -50,12 +61,12 @@ func TestPortUnavailable(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		port, _ := portrange.Get()
-		assert.Equal(t, 1000+i, port, "at index %d", i)
+		require.Equal(t, 1000+i, port, "at index %d", i)
 	}
 
 	port, err := portrange.Get()
-	assert.NotNil(t, err)
-	assert.Less(t, port, 0)
+	require.NotNil(t, err)
+	require.Less(t, port, 0)
 }
 
 func TestPutPort(t *testing.T) {
@@ -73,16 +84,27 @@ func TestClampRange(t *testing.T) {
 
 	port, _ := portrange.Get()
 
-	assert.Equal(t, 65000, port)
+	require.Equal(t, 65000, port)
 
 	portrange.Put(65000)
 
 	for i := 65000; i <= 65535; i++ {
 		port, _ := portrange.Get()
-		assert.Equal(t, i, port, "at index %d", i)
+		require.Equal(t, i, port, "at index %d", i)
 	}
 
 	port, _ = portrange.Get()
 
-	assert.Less(t, port, 0)
+	require.Less(t, port, 0)
+}
+
+func TestDummyPortranger(t *testing.T) {
+	portrange := NewDummyPortrange()
+
+	port, err := portrange.Get()
+
+	require.Error(t, err)
+	require.Equal(t, 0, port)
+
+	portrange.Put(42)
 }

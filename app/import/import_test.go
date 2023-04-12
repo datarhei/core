@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/stretchr/testify/require"
@@ -36,8 +37,13 @@ import (
 var id string = "4186b095-7f0a-4e94-8c3d-f17459ab252f"
 
 func testV1Import(t *testing.T, v1Fixture, v4Fixture string, config importConfig) {
+	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+		Root: ".",
+	})
+	require.NoError(t, err)
+
 	// Import v1 database
-	v4, err := importV1(v1Fixture, config)
+	v4, err := importV1(diskfs, v1Fixture, config)
 	require.Equal(t, nil, err)
 
 	// Reset variants
@@ -50,7 +56,7 @@ func testV1Import(t *testing.T, v1Fixture, v4Fixture string, config importConfig
 	require.Equal(t, nil, err)
 
 	// Read the wanted result
-	wantdatav4, err := os.ReadFile(v4Fixture)
+	wantdatav4, err := diskfs.ReadFile(v4Fixture)
 	require.Equal(t, nil, err)
 
 	var wantv4 store.StoreData

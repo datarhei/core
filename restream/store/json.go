@@ -7,18 +7,19 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 )
 
 type JSONConfig struct {
-	Dir    string
-	Logger log.Logger
+	Filesystem fs.Filesystem
+	Filepath   string // Full path to the database file
+	Logger     log.Logger
 }
 
 type jsonStore struct {
-	filename string
-	dir      string
+	fs       fs.Filesystem
+	filepath string
 	logger   log.Logger
 
 	// Mutex to serialize access to the backend
@@ -27,25 +28,33 @@ type jsonStore struct {
 
 var version uint64 = 4
 
-func NewJSONStore(config JSONConfig) Store {
+func NewJSON(config JSONConfig) (Store, error) {
 	s := &jsonStore{
-		filename: "db.json",
-		dir:      config.Dir,
+		fs:       config.Filesystem,
+		filepath: config.Filepath,
 		logger:   config.Logger,
 	}
 
-	if s.logger == nil {
-		s.logger = log.New("JSONStore")
+	if len(s.filepath) == 0 {
+		s.filepath = "/db.json"
 	}
 
-	return s
+	if s.fs == nil {
+		return nil, fmt.Errorf("no valid filesystem provided")
+	}
+
+	if s.logger == nil {
+		s.logger = log.New("")
+	}
+
+	return s, nil
 }
 
 func (s *jsonStore) Load() (StoreData, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	data, err := s.load(version)
+	data, err := s.load(s.filepath, version)
 	if err != nil {
 		return NewStoreData(), err
 	}
@@ -63,7 +72,7 @@ func (s *jsonStore) Store(data StoreData) error {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	err := s.store(data)
+	err := s.store(s.filepath, data)
 	if err != nil {
 		return fmt.Errorf("failed to store data: %w", err)
 	}
@@ -71,34 +80,18 @@ func (s *jsonStore) Store(data StoreData) error {
 	return nil
 }
 
-func (s *jsonStore) store(data StoreData) error {
+func (s *jsonStore) store(filepath string, data StoreData) error {
 	jsondata, err := gojson.MarshalIndent(&data, "", "    ")
 	if err != nil {
 		return err
 	}
 
-	tmpfile, err := os.CreateTemp(s.dir, s.filename)
+	_, _, err = s.fs.WriteFileSafe(filepath, jsondata)
 	if err != nil {
 		return err
 	}
 
-	defer os.Remove(tmpfile.Name())
-
-	if _, err := tmpfile.Write(jsondata); err != nil {
-		return err
-	}
-
-	if err := tmpfile.Close(); err != nil {
-		return err
-	}
-
-	filename := s.dir + "/" + s.filename
-
-	if err := file.Rename(tmpfile.Name(), filename); err != nil {
-		return err
-	}
-
-	s.logger.WithField("file", filename).Debug().Log("Stored data")
+	s.logger.WithField("file", filepath).Debug().Log("Stored data")
 
 	return nil
 }
@@ -107,12 +100,10 @@ type storeVersion struct {
 	Version uint64 `json:"version"`
 }
 
-func (s *jsonStore) load(version uint64) (StoreData, error) {
+func (s *jsonStore) load(filepath string, version uint64) (StoreData, error) {
 	r := NewStoreData()
 
-	filename := s.dir + "/" + s.filename
-
-	_, err := os.Stat(filename)
+	_, err := s.fs.Stat(filepath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return r, nil
@@ -121,7 +112,7 @@ func (s *jsonStore) load(version uint64) (StoreData, error) {
 		return r, err
 	}
 
-	jsondata, err := os.ReadFile(filename)
+	jsondata, err := s.fs.ReadFile(filepath)
 	if err != nil {
 		return r, err
 	}
@@ -140,7 +131,7 @@ func (s *jsonStore) load(version uint64) (StoreData, error) {
 		return r, json.FormatError(jsondata, err)
 	}
 
-	s.logger.WithField("file", filename).Debug().Log("Read data")
+	s.logger.WithField("file", filepath).Debug().Log("Read data")
 
 	return r, nil
 }

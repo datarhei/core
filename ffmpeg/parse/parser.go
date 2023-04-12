@@ -356,7 +356,7 @@ func (p *parser) Parse(line string) uint64 {
 
 			if p.collector.IsCollectableIP(p.process.input[i].IP) {
 				p.collector.Activate("")
-				p.collector.Ingress("", int64(p.stats.input[i].diff.size)*1024)
+				p.collector.Ingress("", int64(p.stats.input[i].diff.size))
 			}
 		}
 	}
@@ -373,19 +373,18 @@ func (p *parser) Parse(line string) uint64 {
 
 			if p.collector.IsCollectableIP(p.process.output[i].IP) {
 				p.collector.Activate("")
-				p.collector.Egress("", int64(p.stats.output[i].diff.size)*1024)
+				p.collector.Egress("", int64(p.stats.output[i].diff.size))
 			}
 		}
 	}
 
 	// Calculate if any of the processed frames staled.
-	// If one number of frames in an output is the same as
-	// before, then pFrames becomes 0.
-	var pFrames uint64 = 0
-
-	pFrames = p.stats.main.diff.frame
+	// If one number of frames in an output is the same as before, then pFrames becomes 0.
+	pFrames := p.stats.main.diff.frame
 
 	if isFFmpegProgress {
+		// Only consider the outputs
+		pFrames = 1
 		for i := range p.stats.output {
 			pFrames *= p.stats.output[i].diff.frame
 		}
@@ -411,7 +410,7 @@ func (p *parser) parseDefaultProgress(line string) error {
 
 	if matches = p.re.size.FindStringSubmatch(line); matches != nil {
 		if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-			p.progress.ffmpeg.Size = x
+			p.progress.ffmpeg.Size = x * 1024
 		}
 	}
 
@@ -484,6 +483,26 @@ func (p *parser) parseFFmpegProgress(line string) error {
 
 	if len(progress.Output) != len(p.process.output) {
 		return fmt.Errorf("output length mismatch (have: %d, want: %d)", len(progress.Output), len(p.process.output))
+	}
+
+	if progress.Size == 0 {
+		progress.Size = progress.SizeKB * 1024
+	}
+
+	for i, io := range progress.Input {
+		if io.Size == 0 {
+			io.Size = io.SizeKB * 1024
+		}
+
+		progress.Input[i].Size = io.Size
+	}
+
+	for i, io := range progress.Output {
+		if io.Size == 0 {
+			io.Size = io.SizeKB * 1024
+		}
+
+		progress.Output[i].Size = io.Size
 	}
 
 	p.progress.ffmpeg = progress

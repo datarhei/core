@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/restream/replace"
 )
 
 type ConfigIOCleanup struct {
@@ -37,6 +36,7 @@ func (io ConfigIO) Clone() ConfigIO {
 type Config struct {
 	ID             string     `json:"id"`
 	Reference      string     `json:"reference"`
+	FFVersion      string     `json:"ffversion"`
 	Input          []ConfigIO `json:"input"`
 	Output         []ConfigIO `json:"output"`
 	Options        []string   `json:"options"`
@@ -53,6 +53,7 @@ func (config *Config) Clone() *Config {
 	clone := &Config{
 		ID:             config.ID,
 		Reference:      config.Reference,
+		FFVersion:      config.FFVersion,
 		Reconnect:      config.Reconnect,
 		ReconnectDelay: config.ReconnectDelay,
 		Autostart:      config.Autostart,
@@ -76,79 +77,6 @@ func (config *Config) Clone() *Config {
 	copy(clone.Options, config.Options)
 
 	return clone
-}
-
-// ReplacePlaceholders replaces all placeholders in the config. The config
-// will be modified in place.
-func (config *Config) ResolvePlaceholders(r replace.Replacer) {
-	for i, option := range config.Options {
-		// Replace any known placeholders
-		option = r.Replace(option, "diskfs", "")
-
-		config.Options[i] = option
-	}
-
-	// Resolving the given inputs
-	for i, input := range config.Input {
-		// Replace any known placeholders
-		input.ID = r.Replace(input.ID, "processid", config.ID)
-		input.ID = r.Replace(input.ID, "reference", config.Reference)
-		input.Address = r.Replace(input.Address, "inputid", input.ID)
-		input.Address = r.Replace(input.Address, "processid", config.ID)
-		input.Address = r.Replace(input.Address, "reference", config.Reference)
-		input.Address = r.Replace(input.Address, "diskfs", "")
-		input.Address = r.Replace(input.Address, "memfs", "")
-		input.Address = r.Replace(input.Address, "rtmp", "")
-		input.Address = r.Replace(input.Address, "srt", "")
-
-		for j, option := range input.Options {
-			// Replace any known placeholders
-			option = r.Replace(option, "inputid", input.ID)
-			option = r.Replace(option, "processid", config.ID)
-			option = r.Replace(option, "reference", config.Reference)
-			option = r.Replace(option, "diskfs", "")
-			option = r.Replace(option, "memfs", "")
-
-			input.Options[j] = option
-		}
-
-		config.Input[i] = input
-	}
-
-	// Resolving the given outputs
-	for i, output := range config.Output {
-		// Replace any known placeholders
-		output.ID = r.Replace(output.ID, "processid", config.ID)
-		output.Address = r.Replace(output.Address, "outputid", output.ID)
-		output.Address = r.Replace(output.Address, "processid", config.ID)
-		output.Address = r.Replace(output.Address, "reference", config.Reference)
-		output.Address = r.Replace(output.Address, "diskfs", "")
-		output.Address = r.Replace(output.Address, "memfs", "")
-		output.Address = r.Replace(output.Address, "rtmp", "")
-		output.Address = r.Replace(output.Address, "srt", "")
-
-		for j, option := range output.Options {
-			// Replace any known placeholders
-			option = r.Replace(option, "outputid", output.ID)
-			option = r.Replace(option, "processid", config.ID)
-			option = r.Replace(option, "reference", config.Reference)
-			option = r.Replace(option, "diskfs", "")
-			option = r.Replace(option, "memfs", "")
-
-			output.Options[j] = option
-		}
-
-		for j, cleanup := range output.Cleanup {
-			// Replace any known placeholders
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "outputid", output.ID)
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "processid", config.ID)
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference)
-
-			output.Cleanup[j] = cleanup
-		}
-
-		config.Output[i] = output
-	}
 }
 
 // CreateCommand created the FFmpeg command from this config.

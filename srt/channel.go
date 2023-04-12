@@ -49,10 +49,11 @@ func (c *client) ticker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			stats := c.conn.Stats()
+			stats := &srt.Statistics{}
+			c.conn.Stats(stats)
 
-			rxbytes := stats.ByteRecv
-			txbytes := stats.ByteSent
+			rxbytes := stats.Accumulated.ByteRecv
+			txbytes := stats.Accumulated.ByteSent
 
 			c.collector.Ingress(c.id, int64(rxbytes-c.rxbytes))
 			c.collector.Egress(c.id, int64(txbytes-c.txbytes))

@@ -1,5 +1,38 @@
 # Core
 
+### Core v16.12.0 > v16.?.?
+
+-   Fix better naming for storage endpoint documentation
+-   Fix freeing up S3 mounts
+-   Fix URL validation if the path contains FFmpeg specific placeholders
+-   Fix purging default file from HTTP cache
+
+### Core v16.11.0 > v16.12.0
+
+-   Add S3 storage support
+-   Add support for variables in placeholde parameter
+-   Add support for RTMP token as stream key as last element in path
+-   Add support for soft memory limit with debug.memory_limit_mbytes in config
+-   Add support for partial process config updates
+-   Add support for alternative syntax for auth0 tenants as environment variable
+-   Fix config timestamps created_at and loaded_at
+-   Fix /config/reload return type
+-   Fix modifying DTS in RTMP packets ([restreamer/#487](https://github.com/datarhei/restreamer/issues/487), [restreamer/#367](https://github.com/datarhei/restreamer/issues/367))
+-   Fix default internal SRT latency to 20ms
+
+### Core v16.10.1 > v16.11.0
+
+-   Add FFmpeg 4.4 to FFmpeg 5.1 migration tool
+-   Add alternative SRT streamid
+-   Mod bump FFmpeg to v5.1.2 (datarhei/core:tag bundles)
+-   Fix crash with custom SSL certificates ([restreamer/#425](https://github.com/datarhei/restreamer/issues/425))
+-   Fix proper version handling for config
+-   Fix widged session data
+-   Fix resetting process stats when process stopped
+-   Fix stale FFmpeg process detection for streams with only audio
+-   Fix wrong return status code ([#6](https://github.com/datarhei/core/issues/6)))
+-   Fix use SRT defaults for key material exchange
+
 ### Core v16.10.0 > v16.10.1
 
 -   Add email address in TLS config for Let's Encrypt
@@ -20,11 +53,11 @@
 -   Fix process cleanup on delete, remove empty directories from disk
 -   Fix SRT blocking port on restart (upgrade datarhei/gosrt)
 -   Fix RTMP communication (Blackmagic Web Presenter, thx 235 MEDIA)
--   Fix RTMP communication (Blackmagic ATEM Mini, datarhei/restreamer#385)
+-   Fix RTMP communication (Blackmagic ATEM Mini, [#385](https://github.com/datarhei/restreamer/issues/385))
 -   Fix injecting commit, branch, and build info
 -   Fix API metadata endpoints responses
 
-#### Core v16.9.0 > v16.9.1
+#### Core v16.9.0 > v16.9.1^
 
 -   Fix v1 import app
 -   Fix race condition

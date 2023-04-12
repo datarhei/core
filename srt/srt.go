@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -111,8 +112,6 @@ func New(config Config) (Server, error) {
 
 	srtconfig := srt.DefaultConfig()
 
-	srtconfig.KMPreAnnounce = 200
-	srtconfig.KMRefreshRate = 10000
 	srtconfig.Passphrase = config.Passphrase
 	srtconfig.Logger = s.srtlogger
 
@@ -176,8 +175,11 @@ func (s *server) Channels() []Channel {
 
 		socket2channel[socketId] = len(channels)
 
+		stats := &srt.Statistics{}
+		ch.publisher.conn.Stats(stats)
+
 		channel.Connections[socketId] = Connection{
-			Stats: ch.publisher.conn.Stats(),
+			Stats: *stats,
 			Log:   map[string][]Log{},
 		}
 
@@ -185,8 +187,11 @@ func (s *server) Channels() []Channel {
 			socketId := c.conn.SocketId()
 			channel.Subscriber = append(channel.Subscriber, socketId)
 
+			stats := &srt.Statistics{}
+			c.conn.Stats(stats)
+
 			channel.Connections[socketId] = Connection{
-				Stats: c.conn.Stats(),
+				Stats: *stats,
 				Log:   map[string][]Log{},
 			}
 
@@ -276,6 +281,59 @@ type streamInfo struct {
 func parseStreamId(streamid string) (streamInfo, error) {
 	si := streamInfo{}
 
+	if strings.HasPrefix(streamid, "#!:") {
+		return parseOldStreamId(streamid)
+	}
+
+	re := regexp.MustCompile(`,(token|mode):(.+)`)
+
+	results := map[string]string{}
+
+	idEnd := -1
+	value := streamid
+	key := ""
+
+	for {
+		matches := re.FindStringSubmatchIndex(value)
+		if matches == nil {
+			break
+		}
+
+		if idEnd < 0 {
+			idEnd = matches[2] - 1
+		}
+
+		if len(key) != 0 {
+			results[key] = value[:matches[2]-1]
+		}
+
+		key = value[matches[2]:matches[3]]
+		value = value[matches[4]:matches[5]]
+
+		results[key] = value
+	}
+
+	if idEnd < 0 {
+		idEnd = len(streamid)
+	}
+
+	si.resource = streamid[:idEnd]
+	if token, ok := results["token"]; ok {
+		si.token = token
+	}
+
+	if mode, ok := results["mode"]; ok {
+		si.mode = mode
+	} else {
+		si.mode = "request"
+	}
+
+	return si, nil
+}
+
+func parseOldStreamId(streamid string) (streamInfo, error) {
+	si := streamInfo{}
+
 	if !strings.HasPrefix(streamid, "#!:") {
 		return si, fmt.Errorf("unknown streamid format")
 	}
@@ -284,7 +342,7 @@ func parseStreamId(streamid string) (streamInfo, error) {
 
 	kvs := strings.Split(streamid, ",")
 
-	split := func(s, sep string) (string, string, error) {
+	splitFn := func(s, sep string) (string, string, error) {
 		splitted := strings.SplitN(s, sep, 2)
 
 		if len(splitted) != 2 {
@@ -295,7 +353,7 @@ func parseStreamId(streamid string) (streamInfo, error) {
 	}
 
 	for _, kv := range kvs {
-		key, value, err := split(kv, "=")
+		key, value, err := splitFn(kv, "=")
 		if err != nil {
 			continue
 		}

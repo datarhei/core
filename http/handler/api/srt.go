@@ -24,6 +24,7 @@ func NewSRT(srt srt.Server) *SRTHandler {
 // ListChannels lists all currently publishing SRT streams
 // @Summary List all publishing SRT treams
 // @Description List all currently publishing SRT streams. This endpoint is EXPERIMENTAL and may change in future.
+// @Tags v16.9.0
 // @ID srt-3-list-channels
 // @Produce json
 // @Success 200 {array} []api.SRTChannel

@@ -29,21 +29,21 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/datarhei/core/v16/cluster"
-	"github.com/datarhei/core/v16/config"
+	cfgstore "github.com/datarhei/core/v16/config/store"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
-	clusterfs "github.com/datarhei/core/v16/http/fs"
+	"github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/graph/resolver"
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
-	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
@@ -81,27 +81,19 @@ type Config struct {
 	Metrics       monitor.HistoryReader
 	Prometheus    prometheus.Reader
 	MimeTypesFile string
-	DiskFS        fs.Filesystem
-	MemFS         MemFSConfig
+	Filesystems   []fs.FS
 	IPLimiter     net.IPLimitValidator
 	Profiling     bool
 	Cors          CorsConfig
 	RTMP          rtmp.Server
 	SRT           srt.Server
 	JWT           jwt.JWT
-	Config        config.Store
+	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
 	Router        router.Router
 	ReadOnly      bool
 	Cluster       cluster.Cluster
-}
-
-type MemFSConfig struct {
-	EnableAuth bool
-	Username   string
-	Password   string
-	Filesystem fs.Filesystem
 }
 
 type CorsConfig struct {
@@ -117,8 +109,6 @@ type server struct {
 
 	handler struct {
 		about      *api.AboutHandler
-		memfs      *handler.MemFSHandler
-		diskfs     *handler.DiskFSHandler
 		prometheus *handler.PrometheusHandler
 		profiling  *handler.ProfilingHandler
 		ping       *handler.PingHandler
@@ -130,8 +120,6 @@ type server struct {
 		log       *api.LogHandler
 		restream  *api.RestreamHandler
 		playout   *api.PlayoutHandler
-		memfs     *api.MemFSHandler
-		diskfs    *api.DiskFSHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
@@ -152,17 +140,11 @@ type server struct {
 		hlsrewrite echo.MiddlewareFunc
 	}
 
-	memfs struct {
-		enableAuth bool
-		username   string
-		password   string
-	}
-
-	diskfs fs.Filesystem
-
 	gzip struct {
 		mimetypes []string
 	}
+
+	filesystems map[string]*filesystem
 
 	router        *echo.Echo
 	mimeTypesFile string
@@ -171,37 +153,67 @@ type server struct {
 	readOnly bool
 }
 
+type filesystem struct {
+	fs.FS
+
+	handler    *handler.FSHandler
+	middleware echo.MiddlewareFunc
+}
+
 func NewServer(config Config) (Server, error) {
 	s := &server{
 		logger:        config.Logger,
 		mimeTypesFile: config.MimeTypesFile,
 		profiling:     config.Profiling,
-		diskfs:        config.DiskFS,
 		readOnly:      config.ReadOnly,
 	}
 
-	s.v3handler.diskfs = api.NewDiskFS(
-		config.DiskFS,
-		config.Cache,
-	)
+	s.filesystems = map[string]*filesystem{}
 
-	filesystem := config.DiskFS
-	if config.Cluster != nil {
-		filesystem = clusterfs.NewClusterFS("diskfs", filesystem, config.Cluster)
+	corsPrefixes := map[string][]string{
+		"/api": {"*"},
 	}
 
-	s.handler.diskfs = handler.NewDiskFS(
-		filesystem,
-		config.Cache,
-	)
+	for _, httpfs := range config.Filesystems {
+		if _, ok := s.filesystems[httpfs.Name]; ok {
+			return nil, fmt.Errorf("the filesystem name '%s' is already in use", httpfs.Name)
+		}
 
-	s.middleware.hlsrewrite = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
-		PathPrefix: config.DiskFS.Base(),
-	})
+		if !strings.HasPrefix(httpfs.Mountpoint, "/") {
+			httpfs.Mountpoint = "/" + httpfs.Mountpoint
+		}
 
-	s.memfs.enableAuth = config.MemFS.EnableAuth
-	s.memfs.username = config.MemFS.Username
-	s.memfs.password = config.MemFS.Password
+		if !strings.HasSuffix(httpfs.Mountpoint, "/") {
+			httpfs.Mountpoint = strings.TrimSuffix(httpfs.Mountpoint, "/")
+		}
+
+		if _, ok := corsPrefixes[httpfs.Mountpoint]; ok {
+			return nil, fmt.Errorf("the mount point '%s' is already in use (%s)", httpfs.Mountpoint, httpfs.Name)
+		}
+
+		corsPrefixes[httpfs.Mountpoint] = config.Cors.Origins
+
+		if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
+			httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster)
+		}
+
+		filesystem := &filesystem{
+			FS:      httpfs,
+			handler: handler.NewFS(httpfs),
+		}
+
+		if httpfs.Filesystem.Type() == "disk" {
+			filesystem.middleware = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
+				PathPrefix: httpfs.Filesystem.Metadata("base"),
+			})
+		}
+
+		s.filesystems[filesystem.Name] = filesystem
+	}
+
+	if _, ok := corsPrefixes["/"]; !ok {
+		return nil, fmt.Errorf("one filesystem must be mounted at /")
+	}
 
 	if config.Logger == nil {
 		s.logger = log.New("HTTP")
@@ -230,21 +242,6 @@ func NewServer(config Config) (Server, error) {
 
 		s.v3handler.playout = api.NewPlayout(
 			config.Restream,
-		)
-	}
-
-	if config.MemFS.Filesystem != nil {
-		s.v3handler.memfs = api.NewMemFS(
-			config.MemFS.Filesystem,
-		)
-
-		filesystem := config.MemFS.Filesystem
-		if config.Cluster != nil {
-			filesystem = clusterfs.NewClusterFS("memfs", filesystem, config.Cluster)
-		}
-
-		s.handler.memfs = handler.NewMemFS(
-			filesystem,
 		)
 	}
 
@@ -306,12 +303,6 @@ func NewServer(config Config) (Server, error) {
 		Logger: s.logger,
 	})
 
-	if config.Cache != nil {
-		s.middleware.cache = mwcache.NewWithConfig(mwcache.Config{
-			Cache: config.Cache,
-		})
-	}
-
 	s.v3handler.widget = api.NewWidget(api.WidgetConfig{
 		Restream: config.Restream,
 		Registry: config.Sessions,
@@ -326,11 +317,7 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
-		Prefixes: map[string][]string{
-			"/":      config.Cors.Origins,
-			"/api":   {"*"},
-			"/memfs": config.Cors.Origins,
-		},
+		Prefixes: corsPrefixes,
 	}); err != nil {
 		return nil, err
 	} else {
@@ -455,65 +442,66 @@ func (s *server) setRoutes() {
 	doc.Use(gzipMiddleware)
 	doc.GET("", echoSwagger.WrapHandler)
 
-	// Serve static data
-	fs := s.router.Group("/*")
-	fs.Use(mwmime.NewWithConfig(mwmime.Config{
-		MimeTypesFile:      s.mimeTypesFile,
-		DefaultContentType: "text/html",
-	}))
-	fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-		Level:     mwgzip.BestSpeed,
-		MinLength: 1000,
-		Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
-	}))
-	if s.middleware.cache != nil {
-		fs.Use(s.middleware.cache)
-	}
-	fs.Use(s.middleware.hlsrewrite)
-	if s.middleware.session != nil {
-		fs.Use(s.middleware.session)
-	}
+	// Mount filesystems
+	for _, filesystem := range s.filesystems {
+		// Define a local variable because later in the loop we have a closure
+		filesystem := filesystem
 
-	fs.GET("", s.handler.diskfs.GetFile)
-	fs.HEAD("", s.handler.diskfs.GetFile)
-
-	// Memory FS
-	if s.handler.memfs != nil {
-		memfs := s.router.Group("/memfs/*")
-		memfs.Use(mwmime.NewWithConfig(mwmime.Config{
-			MimeTypesFile:      s.mimeTypesFile,
-			DefaultContentType: "application/data",
-		}))
-		memfs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-			Level:     mwgzip.BestSpeed,
-			MinLength: 1000,
-			Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
-		}))
-		if s.middleware.session != nil {
-			memfs.Use(s.middleware.session)
+		mountpoint := filesystem.Mountpoint + "/*"
+		if filesystem.Mountpoint == "/" {
+			mountpoint = "/*"
 		}
 
-		memfs.HEAD("", s.handler.memfs.GetFile)
-		memfs.GET("", s.handler.memfs.GetFile)
+		fs := s.router.Group(mountpoint)
+		fs.Use(mwmime.NewWithConfig(mwmime.Config{
+			MimeTypesFile:      s.mimeTypesFile,
+			DefaultContentType: filesystem.DefaultContentType,
+		}))
 
-		var authmw echo.MiddlewareFunc
+		if filesystem.Gzip {
+			fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
+				Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
+				Level:     mwgzip.BestSpeed,
+				MinLength: 1000,
+			}))
+		}
 
-		if s.memfs.enableAuth {
-			authmw = middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-				if username == s.memfs.username && password == s.memfs.password {
-					return true, nil
-				}
-
-				return false, nil
+		if filesystem.Cache != nil {
+			mwcache := mwcache.NewWithConfig(mwcache.Config{
+				Cache: filesystem.Cache,
 			})
+			fs.Use(mwcache)
+		}
 
-			memfs.POST("", s.handler.memfs.PutFile, authmw)
-			memfs.PUT("", s.handler.memfs.PutFile, authmw)
-			memfs.DELETE("", s.handler.memfs.DeleteFile, authmw)
-		} else {
-			memfs.POST("", s.handler.memfs.PutFile)
-			memfs.PUT("", s.handler.memfs.PutFile)
-			memfs.DELETE("", s.handler.memfs.DeleteFile)
+		if filesystem.middleware != nil {
+			fs.Use(filesystem.middleware)
+		}
+
+		if s.middleware.session != nil {
+			fs.Use(s.middleware.session)
+		}
+
+		fs.GET("", filesystem.handler.GetFile)
+		fs.HEAD("", filesystem.handler.GetFile)
+
+		if filesystem.AllowWrite {
+			if filesystem.EnableAuth {
+				authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+					if username == filesystem.Username && password == filesystem.Password {
+						return true, nil
+					}
+
+					return false, nil
+				})
+
+				fs.POST("", filesystem.handler.PutFile, authmw)
+				fs.PUT("", filesystem.handler.PutFile, authmw)
+				fs.DELETE("", filesystem.handler.DeleteFile, authmw)
+			} else {
+				fs.POST("", filesystem.handler.PutFile)
+				fs.PUT("", filesystem.handler.PutFile)
+				fs.DELETE("", filesystem.handler.DeleteFile)
+			}
 		}
 	}
 
@@ -611,32 +599,33 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		}
 	}
 
-	// v3 Memory FS
-	if s.v3handler.memfs != nil {
-		v3.GET("/fs/mem", s.v3handler.memfs.ListFiles)
-		v3.GET("/fs/mem/*", s.v3handler.memfs.GetFile)
-
-		if !s.readOnly {
-			v3.DELETE("/fs/mem/*", s.v3handler.memfs.DeleteFile)
-			v3.PUT("/fs/mem/*", s.v3handler.memfs.PutFile)
-			v3.PATCH("/fs/mem/*", s.v3handler.memfs.PatchFile)
+	// v3 Filesystems
+	fshandlers := map[string]api.FSConfig{}
+	for _, fs := range s.filesystems {
+		fshandlers[fs.Name] = api.FSConfig{
+			Type:       fs.Filesystem.Type(),
+			Mountpoint: fs.Mountpoint,
+			Handler:    fs.handler,
 		}
 	}
 
-	// v3 Disk FS
-	v3.GET("/fs/disk", s.v3handler.diskfs.ListFiles)
-	v3.GET("/fs/disk/*", s.v3handler.diskfs.GetFile, mwmime.NewWithConfig(mwmime.Config{
+	handler := api.NewFS(fshandlers)
+
+	v3.GET("/fs", handler.List)
+
+	v3.GET("/fs/:name", handler.ListFiles)
+	v3.GET("/fs/:name/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
 		MimeTypesFile:      s.mimeTypesFile,
 		DefaultContentType: "application/data",
 	}))
-	v3.HEAD("/fs/disk/*", s.v3handler.diskfs.GetFile, mwmime.NewWithConfig(mwmime.Config{
+	v3.HEAD("/fs/:name/*", handler.GetFile, mwmime.NewWithConfig(mwmime.Config{
 		MimeTypesFile:      s.mimeTypesFile,
 		DefaultContentType: "application/data",
 	}))
 
 	if !s.readOnly {
-		v3.PUT("/fs/disk/*", s.v3handler.diskfs.PutFile)
-		v3.DELETE("/fs/disk/*", s.v3handler.diskfs.DeleteFile)
+		v3.PUT("/fs/:name/*", handler.PutFile)
+		v3.DELETE("/fs/:name/*", handler.DeleteFile)
 	}
 
 	// v3 RTMP

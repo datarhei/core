@@ -9,7 +9,7 @@ import (
 // SendConfig is the configuration for the liveSend congestion control
 type SendConfig struct {
 	InitialSequenceNumber circular.Number
-	DropInterval          uint64
+	DropThreshold         uint64
 	MaxBW                 int64
 	InputBW               int64
 	MinInputBW            int64
@@ -25,6 +25,7 @@ type Sender interface {
 	Tick(now uint64)
 	ACK(sequenceNumber circular.Number)
 	NAK(sequenceNumbers []circular.Number)
+	SetDropThreshold(threshold uint64)
 }
 
 // ReceiveConfig is the configuration for the liveResv congestion control
@@ -40,7 +41,7 @@ type ReceiveConfig struct {
 // Receiver is the receiving part of the congestion control
 type Receiver interface {
 	Stats() ReceiveStats
-	PacketRate() (pps, bps uint32)
+	PacketRate() (pps, bps, capacity float64)
 	Flush()
 	Push(pkt packet.Packet)
 	Tick(now uint64)
@@ -49,55 +50,68 @@ type Receiver interface {
 
 // SendStats are collected statistics from liveSend
 type SendStats struct {
-	PktSent  uint64
-	ByteSent uint64
+	Pkt  uint64 // Sent packets in total
+	Byte uint64 // Sent bytes in total
 
-	PktSentUnique  uint64
-	ByteSentUnique uint64
+	PktUnique  uint64
+	ByteUnique uint64
 
-	PktSndLoss  uint64
-	ByteSndLoss uint64
+	PktLoss  uint64
+	ByteLoss uint64
 
 	PktRetrans  uint64
 	ByteRetrans uint64
 
 	UsSndDuration uint64 // microseconds
 
-	PktSndDrop  uint64
-	ByteSndDrop uint64
+	PktDrop  uint64
+	ByteDrop uint64
 
 	// instantaneous
-	PktSndBuf  uint64
-	ByteSndBuf uint64
-	MsSndBuf   uint64
+	PktBuf  uint64
+	ByteBuf uint64
+	MsBuf   uint64
 
 	PktFlightSize uint64
 
 	UsPktSndPeriod float64 // microseconds
 	BytePayload    uint64
+
+	MbpsEstimatedInputBandwidth float64
+	MbpsEstimatedSentBandwidth  float64
+
+	PktLossRate float64
 }
 
 // ReceiveStats are collected statistics from liveRecv
 type ReceiveStats struct {
-	PktRecv  uint64
-	ByteRecv uint64
+	Pkt  uint64
+	Byte uint64
 
-	PktRecvUnique  uint64
-	ByteRecvUnique uint64
+	PktUnique  uint64
+	ByteUnique uint64
 
-	PktRcvLoss  uint64
-	ByteRcvLoss uint64
+	PktLoss  uint64
+	ByteLoss uint64
 
-	PktRcvRetrans  uint64
-	ByteRcvRetrans uint64
+	PktRetrans  uint64
+	ByteRetrans uint64
 
-	PktRcvDrop  uint64
-	ByteRcvDrop uint64
+	PktBelated  uint64
+	ByteBelated uint64
+
+	PktDrop  uint64
+	ByteDrop uint64
 
 	// instantaneous
-	PktRcvBuf  uint64
-	ByteRcvBuf uint64
-	MsRcvBuf   uint64
+	PktBuf  uint64
+	ByteBuf uint64
+	MsBuf   uint64
 
 	BytePayload uint64
+
+	MbpsEstimatedRecvBandwidth float64
+	MbpsEstimatedLinkCapacity  float64
+
+	PktLossRate float64
 }

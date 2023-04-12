@@ -3,13 +3,11 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/io/file"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 
@@ -244,6 +242,7 @@ type collector struct {
 
 	persist struct {
 		enable   bool
+		fs       fs.Filesystem
 		path     string
 		interval time.Duration
 		done     context.CancelFunc
@@ -275,7 +274,7 @@ const (
 // NewCollector returns a new collector according to the provided configuration. If such a
 // collector can't be created, a NullCollector is returned.
 func NewCollector(config CollectorConfig) Collector {
-	collector, err := newCollector("", "", nil, config)
+	collector, err := newCollector("", nil, nil, config)
 	if err != nil {
 		return NewNullCollector()
 	}
@@ -285,7 +284,7 @@ func NewCollector(config CollectorConfig) Collector {
 	return collector
 }
 
-func newCollector(id, persistPath string, logger log.Logger, config CollectorConfig) (*collector, error) {
+func newCollector(id string, persistFS fs.Filesystem, logger log.Logger, config CollectorConfig) (*collector, error) {
 	c := &collector{
 		maxRxBitrate:    float64(config.MaxRxBitrate),
 		maxTxBitrate:    float64(config.MaxTxBitrate),
@@ -379,11 +378,12 @@ func newCollector(id, persistPath string, logger log.Logger, config CollectorCon
 
 	c.history.Sessions = make(map[string]totals)
 
-	c.persist.enable = len(persistPath) != 0
-	c.persist.path = persistPath
+	c.persist.enable = persistFS != nil
+	c.persist.fs = persistFS
+	c.persist.path = "/" + id + ".json"
 	c.persist.interval = config.PersistInterval
 
-	c.loadHistory(c.persist.path, &c.history)
+	c.loadHistory(c.persist.fs, c.persist.path, &c.history)
 
 	c.stopOnce.Do(func() {})
 
@@ -433,7 +433,7 @@ func (c *collector) Persist() {
 	c.lock.history.RLock()
 	defer c.lock.history.RUnlock()
 
-	c.saveHistory(c.persist.path, &c.history)
+	c.saveHistory(c.persist.fs, c.persist.path, &c.history)
 }
 
 func (c *collector) persister(ctx context.Context, interval time.Duration) {
@@ -450,17 +450,20 @@ func (c *collector) persister(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (c *collector) loadHistory(path string, data *history) {
-	c.logger.WithComponent("SessionStore").WithField("path", path).Debug().Log("Loading history")
-
-	if len(path) == 0 {
+func (c *collector) loadHistory(fs fs.Filesystem, path string, data *history) {
+	if fs == nil {
 		return
 	}
+
+	c.logger.WithComponent("SessionStore").WithFields(log.Fields{
+		"base": fs.Metadata("base"),
+		"path": path,
+	}).Debug().Log("Loading history")
 
 	c.lock.persist.Lock()
 	defer c.lock.persist.Unlock()
 
-	jsondata, err := os.ReadFile(path)
+	jsondata, err := fs.ReadFile(path)
 	if err != nil {
 		return
 	}
@@ -470,12 +473,15 @@ func (c *collector) loadHistory(path string, data *history) {
 	}
 }
 
-func (c *collector) saveHistory(path string, data *history) {
-	if len(path) == 0 {
+func (c *collector) saveHistory(fs fs.Filesystem, path string, data *history) {
+	if fs == nil {
 		return
 	}
 
-	c.logger.WithComponent("SessionStore").WithField("path", path).Debug().Log("Storing history")
+	c.logger.WithComponent("SessionStore").WithFields(log.Fields{
+		"base": fs.Metadata("base"),
+		"path": path,
+	}).Debug().Log("Storing history")
 
 	c.lock.persist.Lock()
 	defer c.lock.persist.Unlock()
@@ -485,25 +491,8 @@ func (c *collector) saveHistory(path string, data *history) {
 		return
 	}
 
-	dir := filepath.Dir(path)
-	filename := filepath.Base(path)
-
-	tmpfile, err := os.CreateTemp(dir, filename)
+	_, _, err = fs.WriteFileSafe(path, jsondata)
 	if err != nil {
-		return
-	}
-
-	defer os.Remove(tmpfile.Name())
-
-	if _, err := tmpfile.Write(jsondata); err != nil {
-		return
-	}
-
-	if err := tmpfile.Close(); err != nil {
-		return
-	}
-
-	if err := file.Rename(tmpfile.Name(), path); err != nil {
 		return
 	}
 }

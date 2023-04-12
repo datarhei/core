@@ -29,8 +29,8 @@ func (v versionInfo) MinorString() string {
 // Version of the app
 var Version = versionInfo{
 	Major: 16,
-	Minor: 10,
-	Patch: 1,
+	Minor: 12,
+	Patch: 0,
 }
 
 // Commit is the git commit the app is build from. It should be filled in during compilation

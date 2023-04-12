@@ -25,7 +25,7 @@ func NewRestreamCollector(r restream.Restreamer) metric.Collector {
 	c.restreamProcessDescr = metric.NewDesc("restream_process", "Current process values by name", []string{"processid", "state", "order", "name"})
 	c.restreamProcessStatesDescr = metric.NewDesc("restream_process_states", "Current process state", []string{"processid", "state"})
 	c.restreamProcessIODescr = metric.NewDesc("restream_io", "Current process IO values by name", []string{"processid", "type", "id", "address", "index", "stream", "media", "name"})
-	c.restreamStatesDescr = metric.NewDesc("restream_state", "Summarized process states", []string{"state"})
+	c.restreamStatesDescr = metric.NewDesc("restream_state", "Summarized current process states", []string{"state"})
 
 	return c
 }

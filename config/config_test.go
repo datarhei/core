@@ -1,55 +1,84 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/datarhei/core/v16/config/vars"
+	"github.com/datarhei/core/v16/io/fs"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigCopy(t *testing.T) {
-	config1 := New()
+	fs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+	config1 := New(fs)
 
 	config1.Version = 42
 	config1.DB.Dir = "foo"
 
-	val1 := config1.findVariable("version")
-	val2 := config1.findVariable("db.dir")
-	val3 := config1.findVariable("host.name")
+	val1, _ := config1.Get("version")
+	val2, _ := config1.Get("db.dir")
+	val3, _ := config1.Get("host.name")
 
-	assert.Equal(t, "42", val1.value.String())
-	assert.Equal(t, nil, val1.value.Validate())
-	assert.Equal(t, false, val1.value.IsEmpty())
+	require.Equal(t, "42", val1)
+	require.Equal(t, "foo", val2)
+	require.Equal(t, "(empty)", val3)
 
-	assert.Equal(t, "foo", val2.value.String())
-	assert.Equal(t, "(empty)", val3.value.String())
+	config1.Set("host.name", "foo.com")
+	val3, _ = config1.Get("host.name")
+	require.Equal(t, "foo.com", val3)
 
-	val3.value.Set("foo.com")
+	config2 := config1.Clone()
 
-	assert.Equal(t, "foo.com", val3.value.String())
+	require.Equal(t, int64(42), config2.Version)
+	require.Equal(t, "foo", config2.DB.Dir)
+	require.Equal(t, []string{"foo.com"}, config2.Host.Name)
 
-	config2 := NewConfigFrom(config1)
+	config1.Set("version", "77")
 
-	assert.Equal(t, int64(42), config2.Version)
-	assert.Equal(t, "foo", config2.DB.Dir)
-	assert.Equal(t, []string{"foo.com"}, config2.Host.Name)
+	require.Equal(t, int64(77), config1.Version)
+	require.Equal(t, int64(42), config2.Version)
 
-	val1.value.Set("77")
+	config1.Set("db.dir", "bar")
 
-	assert.Equal(t, int64(77), config1.Version)
-	assert.Equal(t, int64(42), config2.Version)
-
-	val2.value.Set("bar")
-
-	assert.Equal(t, "bar", config1.DB.Dir)
-	assert.Equal(t, "foo", config2.DB.Dir)
+	require.Equal(t, "bar", config1.DB.Dir)
+	require.Equal(t, "foo", config2.DB.Dir)
 
 	config2.DB.Dir = "baz"
 
-	assert.Equal(t, "bar", config1.DB.Dir)
-	assert.Equal(t, "baz", config2.DB.Dir)
+	require.Equal(t, "bar", config1.DB.Dir)
+	require.Equal(t, "baz", config2.DB.Dir)
 
 	config1.Host.Name[0] = "bar.com"
 
-	assert.Equal(t, []string{"bar.com"}, config1.Host.Name)
-	assert.Equal(t, []string{"foo.com"}, config2.Host.Name)
+	require.Equal(t, []string{"bar.com"}, config1.Host.Name)
+	require.Equal(t, []string{"foo.com"}, config2.Host.Name)
+}
+
+func TestValidateDefault(t *testing.T) {
+	fs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	size, fresh, err := fs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
+	require.Equal(t, int64(5), size)
+	require.Equal(t, true, fresh)
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	cfg := New(fs)
+
+	cfg.Validate(true)
+
+	errors := []string{}
+	cfg.Messages(func(level string, v vars.Variable, message string) {
+		if level == "error" {
+			errors = append(errors, message)
+		}
+	})
+
+	require.Equal(t, 0, len(cfg.Overrides()))
+	require.Equal(t, false, cfg.HasErrors(), errors)
 }

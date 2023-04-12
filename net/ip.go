@@ -4,7 +4,11 @@ package net
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"sync"
+	"time"
 )
 
 var (
@@ -57,4 +61,70 @@ func ipVersion(ipAddress string) int {
 	}
 
 	return 0
+}
+
+// GetPublicIPs will try to figure out the public IPs (v4 and v6)
+// we're running on. If it fails, an empty list will be returned.
+func GetPublicIPs(timeout time.Duration) []string {
+	var wg sync.WaitGroup
+
+	ipv4 := ""
+	ipv6 := ""
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+
+		ipv4 = doRequest("https://api.ipify.org", timeout)
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		ipv6 = doRequest("https://api6.ipify.org", timeout)
+	}()
+
+	wg.Wait()
+
+	ips := []string{}
+
+	if len(ipv4) != 0 {
+		ips = append(ips, ipv4)
+	}
+
+	if len(ipv6) != 0 && ipv4 != ipv6 {
+		ips = append(ips, ipv6)
+	}
+
+	return ips
+}
+
+func doRequest(url string, timeout time.Duration) string {
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return ""
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	if resp.StatusCode != 200 {
+		return ""
+	}
+
+	return string(body)
 }

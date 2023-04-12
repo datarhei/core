@@ -17,6 +17,7 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/store"
@@ -495,14 +496,14 @@ type importConfigAudio struct {
 	sampling string
 }
 
-func importV1(path string, cfg importConfig) (store.StoreData, error) {
+func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData, error) {
 	if len(cfg.id) == 0 {
 		cfg.id = uuid.New().String()
 	}
 
 	r := store.NewStoreData()
 
-	jsondata, err := os.ReadFile(path)
+	jsondata, err := fs.ReadFile(path)
 	if err != nil {
 		return r, fmt.Errorf("failed to read data from %s: %w", path, err)
 	}
@@ -1417,9 +1418,19 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
+	dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+	store, err := store.NewJSON(store.JSONConfig{
+		Filesystem: dummyfs,
+		Filepath:   "/",
+		Logger:     nil,
+	})
+	if err != nil {
+		return app.Probe{}
+	}
+
 	rs, err := restream.New(restream.Config{
 		FFmpeg: ffmpeg,
-		Store:  store.NewDummyStore(store.DummyConfig{}),
+		Store:  store,
 	})
 	if err != nil {
 		return app.Probe{}

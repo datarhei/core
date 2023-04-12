@@ -312,15 +312,16 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 		// Create a new socket ID
 		socketId := uint32(time.Since(ln.start).Microseconds())
 
-		// Select the largest TSBPD delay advertised by the caller, but at
-		// least 120ms
-		tsbpdDelay := uint16(120)
-		if request.handshake.RecvTSBPDDelay > tsbpdDelay {
-			tsbpdDelay = request.handshake.RecvTSBPDDelay
+		// Select the largest TSBPD delay advertised by the listener, but at least 120ms
+		recvTsbpdDelay := uint16(ln.config.ReceiverLatency.Milliseconds())
+		sendTsbpdDelay := uint16(ln.config.PeerLatency.Milliseconds())
+
+		if request.handshake.SendTSBPDDelay > recvTsbpdDelay {
+			recvTsbpdDelay = request.handshake.SendTSBPDDelay
 		}
 
-		if request.handshake.SendTSBPDDelay > tsbpdDelay {
-			tsbpdDelay = request.handshake.SendTSBPDDelay
+		if request.handshake.RecvTSBPDDelay > sendTsbpdDelay {
+			sendTsbpdDelay = request.handshake.RecvTSBPDDelay
 		}
 
 		ln.config.StreamId = request.handshake.StreamId
@@ -335,7 +336,8 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 			socketId:                    socketId,
 			peerSocketId:                request.handshake.SRTSocketId,
 			tsbpdTimeBase:               uint64(request.timestamp),
-			tsbpdDelay:                  uint64(tsbpdDelay) * 1000,
+			tsbpdDelay:                  uint64(recvTsbpdDelay) * 1000,
+			peerTsbpdDelay:              uint64(sendTsbpdDelay) * 1000,
 			initialPacketSequenceNumber: request.handshake.InitialPacketSequenceNumber,
 			crypto:                      request.crypto,
 			keyBaseEncryption:           packet.EvenKeyEncrypted,
@@ -359,6 +361,8 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 		request.handshake.SRTFlags.REXMITFLG = true
 		request.handshake.SRTFlags.STREAM = false
 		request.handshake.SRTFlags.PACKET_FILTER = false
+		request.handshake.RecvTSBPDDelay = recvTsbpdDelay
+		request.handshake.SendTSBPDDelay = sendTsbpdDelay
 
 		ln.accept(request)
 
