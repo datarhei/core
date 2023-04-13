@@ -3647,6 +3647,20 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
+                "framerate": {
+                    "type": "object",
+                    "properties": {
+                        "avg": {
+                            "type": "number"
+                        },
+                        "max": {
+                            "type": "number"
+                        },
+                        "min": {
+                            "type": "number"
+                        }
+                    }
+                },
                 "height": {
                     "type": "integer",
                     "format": "uint64"
@@ -5021,18 +5035,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "auth": {
-                    "type": "object",
-                    "properties": {
-                        "enable": {
-                            "type": "boolean"
-                        },
-                        "password": {
-                            "type": "string"
-                        },
-                        "username": {
-                            "type": "string"
-                        }
-                    }
+                    "$ref": "#/definitions/value.S3StorageAuth"
                 },
                 "bucket": {
                     "type": "string"
@@ -5054,6 +5057,20 @@ const docTemplate = `{
                 },
                 "use_ssl": {
                     "type": "boolean"
+                }
+            }
+        },
+        "value.S3StorageAuth": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         }
