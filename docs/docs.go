@@ -2475,6 +2475,9 @@ const docTemplate = `{
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "auto_max_procs": {
+                            "type": "boolean"
+                        },
                         "force_gc": {
                             "type": "integer",
                             "format": "int"
@@ -3762,18 +3765,7 @@ const docTemplate = `{
                     "format": "uint64"
                 },
                 "framerate": {
-                    "type": "object",
-                    "properties": {
-                        "avg": {
-                            "type": "number"
-                        },
-                        "max": {
-                            "type": "number"
-                        },
-                        "min": {
-                            "type": "number"
-                        }
-                    }
+                    "$ref": "#/definitions/api.ProgressIOFramerate"
                 },
                 "height": {
                     "type": "integer",
@@ -3828,6 +3820,20 @@ const docTemplate = `{
                 "width": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProgressIOFramerate": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "min": {
+                    "type": "number"
                 }
             }
         },
@@ -4425,6 +4431,9 @@ const docTemplate = `{
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "auto_max_procs": {
+                            "type": "boolean"
+                        },
                         "force_gc": {
                             "type": "integer",
                             "format": "int"

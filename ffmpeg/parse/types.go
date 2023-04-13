@@ -259,6 +259,11 @@ type ProgressIO struct {
 	Coder     string
 	Frame     uint64
 	Keyframe  uint64
+	Framerate struct {
+		Min     float64
+		Max     float64
+		Average float64
+	}
 	FPS       float64
 	Packet    uint64
 	PPS       float64

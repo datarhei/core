@@ -2468,6 +2468,9 @@
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "auto_max_procs": {
+                            "type": "boolean"
+                        },
                         "force_gc": {
                             "type": "integer",
                             "format": "int"
@@ -3755,18 +3758,7 @@
                     "format": "uint64"
                 },
                 "framerate": {
-                    "type": "object",
-                    "properties": {
-                        "avg": {
-                            "type": "number"
-                        },
-                        "max": {
-                            "type": "number"
-                        },
-                        "min": {
-                            "type": "number"
-                        }
-                    }
+                    "$ref": "#/definitions/api.ProgressIOFramerate"
                 },
                 "height": {
                     "type": "integer",
@@ -3821,6 +3813,20 @@
                 "width": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProgressIOFramerate": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "min": {
+                    "type": "number"
                 }
             }
         },
@@ -4418,6 +4424,9 @@
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "auto_max_procs": {
+                            "type": "boolean"
+                        },
                         "force_gc": {
                             "type": "integer",
                             "format": "int"

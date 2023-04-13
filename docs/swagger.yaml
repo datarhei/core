@@ -143,6 +143,8 @@ definitions:
         type: object
       debug:
         properties:
+          auto_max_procs:
+            type: boolean
           force_gc:
             format: int
             type: integer
@@ -1012,14 +1014,7 @@ definitions:
         format: uint64
         type: integer
       framerate:
-        properties:
-          avg:
-            type: number
-          max:
-            type: number
-          min:
-            type: number
-        type: object
+        $ref: '#/definitions/api.ProgressIOFramerate'
       height:
         format: uint64
         type: integer
@@ -1060,6 +1055,15 @@ definitions:
       width:
         format: uint64
         type: integer
+    type: object
+  api.ProgressIOFramerate:
+    properties:
+      avg:
+        type: number
+      max:
+        type: number
+      min:
+        type: number
     type: object
   api.RTMPChannel:
     properties:
@@ -1525,6 +1529,8 @@ definitions:
         type: object
       debug:
         properties:
+          auto_max_procs:
+            type: boolean
           force_gc:
             format: int
             type: integer
