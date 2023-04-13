@@ -913,6 +913,15 @@ definitions:
       frame:
         format: uint64
         type: integer
+      framerate:
+        properties:
+          avg:
+            type: number
+          max:
+            type: number
+          min:
+            type: number
+        type: object
       height:
         format: uint64
         type: integer
@@ -1898,14 +1907,7 @@ definitions:
       access_key_id:
         type: string
       auth:
-        properties:
-          enable:
-            type: boolean
-          password:
-            type: string
-          username:
-            type: string
-        type: object
+        $ref: '#/definitions/value.S3StorageAuth'
       bucket:
         type: string
       endpoint:
@@ -1920,6 +1922,15 @@ definitions:
         type: string
       use_ssl:
         type: boolean
+    type: object
+  value.S3StorageAuth:
+    properties:
+      enable:
+        type: boolean
+      password:
+        type: string
+      username:
+        type: string
     type: object
 info:
   contact:

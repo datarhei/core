@@ -11,8 +11,13 @@ type ProgressIO struct {
 	Type      string
 	Codec     string
 	Coder     string
-	Frame     uint64  // counter
-	Keyframe  uint64  // counter
+	Frame     uint64 // counter
+	Keyframe  uint64 // counter
+	Framerate struct {
+		Min     float64
+		Max     float64
+		Average float64
+	}
 	FPS       float64 // rate, frames per second
 	Packet    uint64  // counter
 	PPS       float64 // rate, packets per second

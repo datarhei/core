@@ -93,11 +93,16 @@ type ffmpegProgressIO struct {
 	// common
 	Index     uint64  `json:"index"`
 	Stream    uint64  `json:"stream"`
-	SizeKB    uint64  `json:"size_kb"`              // kbytes
-	Size      uint64  `json:"size_bytes"`           // bytes
-	Bitrate   float64 `json:"-"`                    // bit/s
-	Frame     uint64  `json:"frame"`                // counter
-	Keyframe  uint64  `json:"keyframe"`             // counter
+	SizeKB    uint64  `json:"size_kb"`    // kbytes
+	Size      uint64  `json:"size_bytes"` // bytes
+	Bitrate   float64 `json:"-"`          // bit/s
+	Frame     uint64  `json:"frame"`      // counter
+	Keyframe  uint64  `json:"keyframe"`   // counter
+	Framerate struct {
+		Min     float64 `json:"min"`
+		Max     float64 `json:"max"`
+		Average float64 `json:"avg"`
+	} `json:"framerate"`
 	Packet    uint64  `json:"packet"`               // counter
 	Extradata uint64  `json:"extradata_size_bytes"` // bytes
 	FPS       float64 `json:"-"`                    // rate, frames per second
@@ -112,6 +117,9 @@ func (io *ffmpegProgressIO) exportTo(progress *app.ProgressIO) {
 	progress.Stream = io.Stream
 	progress.Frame = io.Frame
 	progress.Keyframe = io.Keyframe
+	progress.Framerate.Min = io.Framerate.Min
+	progress.Framerate.Max = io.Framerate.Max
+	progress.Framerate.Average = io.Framerate.Average
 	progress.Packet = io.Packet
 	progress.FPS = io.FPS
 	progress.PPS = io.PPS
