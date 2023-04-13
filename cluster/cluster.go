@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	gonet "net"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
-
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
@@ -44,7 +44,8 @@ type Cluster interface {
 	RemoveNode(id string) error
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
-	Stop()
+	Leave() error // gracefully leave the cluster
+	Shutdown() error
 	ClusterReader
 }
 
@@ -75,6 +76,21 @@ type cluster struct {
 	once   sync.Once
 
 	logger log.Logger
+
+	raft                  *raft.Raft
+	raftTransport         *raft.NetworkTransport
+	raftAddress           string
+	raftNotifyCh          <-chan bool
+	raftStore             *raftboltdb.BoltStore
+	raftRemoveGracePeriod time.Duration
+
+	reassertLeaderCh chan chan error
+
+	leaveCh chan struct{}
+
+	shutdown     bool
+	shutdownCh   chan struct{}
+	shutdownLock sync.Mutex
 }
 
 func New(config ClusterConfig) (Cluster, error) {
@@ -89,6 +105,10 @@ func New(config ClusterConfig) (Cluster, error) {
 		limiter:  config.IPLimiter,
 		updates:  make(chan NodeState, 64),
 		logger:   config.Logger,
+
+		reassertLeaderCh: make(chan chan error),
+		leaveCh:          make(chan struct{}),
+		shutdownCh:       make(chan struct{}),
 	}
 
 	if c.limiter == nil {
@@ -104,62 +124,12 @@ func New(config ClusterConfig) (Cluster, error) {
 		return nil, err
 	}
 
-	snapshotLogger := NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("snapshot")
-	snapShotStore, err := raft.NewFileSnapshotStoreWithLogger(filepath.Join(c.path, "snapshots"), 10, snapshotLogger)
-	if err != nil {
-		return nil, err
-	}
+	c.startRaft(fsm, true, false)
 
-	boltdb, err := raftboltdb.New(raftboltdb.Options{
-		Path: filepath.Join(c.path, "store.db"),
-		BoltOptions: &bbolt.Options{
-			Timeout: 5 * time.Second,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	boltdb.Stats()
-
-	raftConfig := raft.DefaultConfig()
-	raftConfig.Logger = NewLogger(c.logger.WithComponent("raft"), hclog.Debug)
-
-	raftTransport, err := raft.NewTCPTransportWithConfig("127.0.0.1:8090", nil, &raft.NetworkTransportConfig{
-		ServerAddressProvider: nil,
-		Logger:                NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("transport"),
-		Stream:                &raft.TCPStreamLayer{},
-		MaxPool:               5,
-		Timeout:               5 * time.Second,
-	})
-	if err != nil {
-		boltdb.Close()
-		return nil, err
-	}
-
-	node, err := raft.NewRaft(raftConfig, fsm, boltdb, boltdb, snapShotStore, raftTransport)
-	if err != nil {
-		boltdb.Close()
-		return nil, err
-	}
-
-	node.BootstrapCluster(raft.Configuration{
-		Servers: []raft.Server{
-			{
-				Suffrage: raft.Voter,
-				ID:       raft.ServerID(config.Name),
-				Address:  raftTransport.LocalAddr(),
-			},
-		},
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	c.cancel = cancel
-
-	go func(ctx context.Context) {
+	go func() {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-c.shutdownCh:
 				return
 			case state := <-c.updates:
 				c.logger.Debug().WithFields(log.Fields{
@@ -190,24 +160,103 @@ func New(config ClusterConfig) (Cluster, error) {
 				c.lock.Unlock()
 			}
 		}
-	}(ctx)
+	}()
 
 	return c, nil
 }
 
-func (c *cluster) Stop() {
-	c.once.Do(func() {
-		c.lock.Lock()
-		defer c.lock.Unlock()
+func (c *cluster) Shutdown() error {
+	c.logger.Info().Log("shutting down cluster")
+	c.shutdownLock.Lock()
+	defer c.shutdownLock.Unlock()
 
-		for _, node := range c.nodes {
-			node.stop()
+	if c.shutdown {
+		return nil
+	}
+
+	c.shutdown = true
+	close(c.shutdownCh)
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for _, node := range c.nodes {
+		node.stop()
+	}
+
+	c.nodes = map[string]*node{}
+
+	c.shutdownRaft()
+
+	return nil
+}
+
+// https://github.com/hashicorp/consul/blob/44b39240a86bc94ddc67bc105286ab450bd869a9/agent/consul/server.go#L1369
+func (c *cluster) Leave() error {
+	addr := c.raftTransport.LocalAddr()
+
+	// Get the latest configuration.
+	future := c.raft.GetConfiguration()
+	if err := future.Error(); err != nil {
+		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		return err
+	}
+
+	numPeers := len(future.Configuration().Servers)
+
+	// If we are the current leader, and we have any other peers (cluster has multiple
+	// servers), we should do a RemoveServer/RemovePeer to safely reduce the quorum size.
+	// If we are not the leader, then we should issue our leave intention and wait to be
+	// removed for some reasonable period of time.
+	isLeader := c.IsLeader()
+	if isLeader && numPeers > 1 {
+		if err := c.leadershipTransfer(); err == nil {
+			isLeader = false
+		} else {
+			future := c.raft.RemoveServer(raft.ServerID(c.id), 0, 0)
+			if err := future.Error(); err != nil {
+				c.logger.Error().WithError(err).Log("failed to remove ourself as raft peer")
+			}
+		}
+	}
+
+	// If we were not leader, wait to be safely removed from the cluster. We
+	// must wait to allow the raft replication to take place, otherwise an
+	// immediate shutdown could cause a loss of quorum.
+	if !isLeader {
+		left := false
+		limit := time.Now().Add(c.raftRemoveGracePeriod)
+		for !left && time.Now().Before(limit) {
+			// Sleep a while before we check.
+			time.Sleep(50 * time.Millisecond)
+
+			// Get the latest configuration.
+			future := c.raft.GetConfiguration()
+			if err := future.Error(); err != nil {
+				c.logger.Error().WithError(err).Log("failed to get raft configuration")
+				break
+			}
+
+			// See if we are no longer included.
+			left = true
+			for _, server := range future.Configuration().Servers {
+				if server.Address == addr {
+					left = false
+					break
+				}
+			}
 		}
 
-		c.nodes = map[string]*node{}
+		if !left {
+			c.logger.Warn().Log("failed to leave raft configuration gracefully, timeout")
+		}
+	}
 
-		c.cancel()
-	})
+	return nil
+}
+
+func (c *cluster) IsLeader() bool {
+	return c.raft.State() == raft.Leader
 }
 
 func (c *cluster) AddNode(address, username, password string) (string, error) {
@@ -370,4 +419,113 @@ func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
 	c.logger.Debug().WithField("path", path).Log("File cluster path")
 
 	return data, nil
+}
+
+func (c *cluster) startRaft(fsm raft.FSM, bootstrap, inmem bool) error {
+	defer func() {
+		if c.raft == nil && c.raftStore != nil {
+			c.raftStore.Close()
+		}
+	}()
+
+	c.raftRemoveGracePeriod = 5 * time.Second
+
+	addr, err := gonet.ResolveTCPAddr("tcp", c.raftAddress)
+	if err != nil {
+		return err
+	}
+
+	transport, err := raft.NewTCPTransportWithLogger(c.raftAddress, addr, 3, 10*time.Second, NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("transport"))
+	if err != nil {
+		return err
+	}
+
+	snapshotLogger := NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("snapshot")
+	snapshots, err := raft.NewFileSnapshotStoreWithLogger(filepath.Join(c.path, "snapshots"), 10, snapshotLogger)
+	if err != nil {
+		return err
+	}
+
+	var logStore raft.LogStore
+	var stableStore raft.StableStore
+	if inmem {
+		logStore = raft.NewInmemStore()
+		stableStore = raft.NewInmemStore()
+	} else {
+		bolt, err := raftboltdb.New(raftboltdb.Options{
+			Path: filepath.Join(c.path, "raftlog.db"),
+			BoltOptions: &bbolt.Options{
+				Timeout: 5 * time.Second,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("bolt: %w", err)
+		}
+		logStore = bolt
+		stableStore = bolt
+
+		cacheStore, err := raft.NewLogCache(512, logStore)
+		if err != nil {
+			return err
+		}
+		logStore = cacheStore
+
+		c.raftStore = bolt
+	}
+
+	cfg := raft.DefaultConfig()
+	cfg.LocalID = raft.ServerID(c.id)
+	cfg.Logger = NewLogger(c.logger.WithComponent("raft"), hclog.Debug)
+
+	if bootstrap {
+		hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
+		if err != nil {
+			return err
+		}
+		if !hasState {
+			configuration := raft.Configuration{
+				Servers: []raft.Server{
+					{
+						Suffrage: raft.Voter,
+						ID:       raft.ServerID(c.id),
+						Address:  transport.LocalAddr(),
+					},
+				},
+			}
+
+			if err := raft.BootstrapCluster(cfg,
+				logStore, stableStore, snapshots, transport, configuration); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Set up a channel for reliable leader notifications.
+	raftNotifyCh := make(chan bool, 10)
+	cfg.NotifyCh = raftNotifyCh
+	c.raftNotifyCh = raftNotifyCh
+
+	node, err := raft.NewRaft(cfg, fsm, logStore, stableStore, snapshots, transport)
+	if err != nil {
+		return err
+	}
+
+	c.raft = node
+
+	go c.monitorLeadership()
+
+	return nil
+}
+
+func (c *cluster) shutdownRaft() {
+	if c.raft != nil {
+		c.raftTransport.Close()
+		future := c.raft.Shutdown()
+		if err := future.Error(); err != nil {
+			c.logger.Warn().WithError(err).Log("error shutting down raft")
+		}
+		if c.raftStore != nil {
+			c.raftStore.Close()
+		}
+	}
 }

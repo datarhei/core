@@ -166,6 +166,11 @@ type Data struct {
 		Routes          map[string]string `json:"routes"`
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
+	Cluster struct {
+		Enable    bool `json:"enable"`
+		Bootstrap bool `json:"bootstrap"`
+		Debug     bool `json:"debug"`
+	} `json:"cluster"`
 }
 
 func UpgradeV2ToV3(d *v2.Data, fs fs.Filesystem) (*Data, error) {

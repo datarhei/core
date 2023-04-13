@@ -622,16 +622,18 @@ func (a *api) start() error {
 
 	a.restream = restream
 
-	if cluster, err := cluster.New(cluster.ClusterConfig{
-		ID:        cfg.ID,
-		Name:      cfg.Name,
-		Path:      filepath.Join(cfg.DB.Dir, "cluster"),
-		IPLimiter: a.sessionsLimiter,
-		Logger:    a.log.logger.core.WithComponent("Cluster"),
-	}); err != nil {
-		return fmt.Errorf("unable to create cluster: %w", err)
-	} else {
-		a.cluster = cluster
+	if cfg.Cluster.Enable {
+		if cluster, err := cluster.New(cluster.ClusterConfig{
+			ID:        cfg.ID,
+			Name:      cfg.Name,
+			Path:      filepath.Join(cfg.DB.Dir, "cluster"),
+			IPLimiter: a.sessionsLimiter,
+			Logger:    a.log.logger.core.WithComponent("Cluster"),
+		}); err != nil {
+			return fmt.Errorf("unable to create cluster: %w", err)
+		} else {
+			a.cluster = cluster
+		}
 	}
 
 	var httpjwt jwt.JWT
@@ -1318,7 +1320,8 @@ func (a *api) stop() {
 	}
 
 	if a.cluster != nil {
-		a.cluster.Stop()
+		a.cluster.Leave()
+		a.cluster.Shutdown()
 	}
 
 	// Stop JWT authentication
