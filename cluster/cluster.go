@@ -5,11 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
+
+	hclog "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
+	"go.etcd.io/bbolt"
 )
 
 var ErrNodeNotFound = errors.New("node not found")
@@ -44,12 +50,16 @@ type Cluster interface {
 
 type ClusterConfig struct {
 	ID        string
+	Name      string
+	Path      string
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
 }
 
 type cluster struct {
-	id string
+	id   string
+	name string
+	path string
 
 	nodes    map[string]*node     // List of known nodes
 	idfiles  map[string][]string  // Map from nodeid to list of files
@@ -70,6 +80,8 @@ type cluster struct {
 func New(config ClusterConfig) (Cluster, error) {
 	c := &cluster{
 		id:       config.ID,
+		name:     config.Name,
+		path:     config.Path,
 		nodes:    map[string]*node{},
 		idfiles:  map[string][]string{},
 		idupdate: map[string]time.Time{},
@@ -86,6 +98,60 @@ func New(config ClusterConfig) (Cluster, error) {
 	if c.logger == nil {
 		c.logger = log.New("")
 	}
+
+	fsm, err := NewFSM()
+	if err != nil {
+		return nil, err
+	}
+
+	snapshotLogger := NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("snapshot")
+	snapShotStore, err := raft.NewFileSnapshotStoreWithLogger(filepath.Join(c.path, "snapshots"), 10, snapshotLogger)
+	if err != nil {
+		return nil, err
+	}
+
+	boltdb, err := raftboltdb.New(raftboltdb.Options{
+		Path: filepath.Join(c.path, "store.db"),
+		BoltOptions: &bbolt.Options{
+			Timeout: 5 * time.Second,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	boltdb.Stats()
+
+	raftConfig := raft.DefaultConfig()
+	raftConfig.Logger = NewLogger(c.logger.WithComponent("raft"), hclog.Debug)
+
+	raftTransport, err := raft.NewTCPTransportWithConfig("127.0.0.1:8090", nil, &raft.NetworkTransportConfig{
+		ServerAddressProvider: nil,
+		Logger:                NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("transport"),
+		Stream:                &raft.TCPStreamLayer{},
+		MaxPool:               5,
+		Timeout:               5 * time.Second,
+	})
+	if err != nil {
+		boltdb.Close()
+		return nil, err
+	}
+
+	node, err := raft.NewRaft(raftConfig, fsm, boltdb, boltdb, snapShotStore, raftTransport)
+	if err != nil {
+		boltdb.Close()
+		return nil, err
+	}
+
+	node.BootstrapCluster(raft.Configuration{
+		Servers: []raft.Server{
+			{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(config.Name),
+				Address:  raftTransport.LocalAddr(),
+			},
+		},
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel

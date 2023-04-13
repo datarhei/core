@@ -624,6 +624,8 @@ func (a *api) start() error {
 
 	if cluster, err := cluster.New(cluster.ClusterConfig{
 		ID:        cfg.ID,
+		Name:      cfg.Name,
+		Path:      filepath.Join(cfg.DB.Dir, "cluster"),
 		IPLimiter: a.sessionsLimiter,
 		Logger:    a.log.logger.core.WithComponent("Cluster"),
 	}); err != nil {
@@ -792,7 +794,7 @@ func (a *api) start() error {
 			}
 
 			certmagic.Default.Storage = &certmagic.FileStorage{
-				Path: cfg.DB.Dir + "/cert",
+				Path: filepath.Join(cfg.DB.Dir, "cert"),
 			}
 			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
 			certmagic.Default.Logger = zap.NewNop()
