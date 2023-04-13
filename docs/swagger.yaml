@@ -1011,6 +1011,15 @@ definitions:
       frame:
         format: uint64
         type: integer
+      framerate:
+        properties:
+          avg:
+            type: number
+          max:
+            type: number
+          min:
+            type: number
+        type: object
       height:
         format: uint64
         type: integer

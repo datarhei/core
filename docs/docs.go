@@ -3761,6 +3761,20 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
+                "framerate": {
+                    "type": "object",
+                    "properties": {
+                        "avg": {
+                            "type": "number"
+                        },
+                        "max": {
+                            "type": "number"
+                        },
+                        "min": {
+                            "type": "number"
+                        }
+                    }
+                },
                 "height": {
                     "type": "integer",
                     "format": "uint64"
