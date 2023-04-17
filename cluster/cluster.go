@@ -2,11 +2,13 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	gonet "net"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 
@@ -17,6 +19,26 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
 	"go.etcd.io/bbolt"
 )
+
+/*
+	/api/v3:
+		GET /cluster/db/node - list all nodes that are stored in the FSM - Cluster.Store.ListNodes()
+		POST /cluster/db/node - add a node to the FSM - Cluster.Store.AddNode()
+		DELETE /cluster/db/node/:id - remove a node from the FSM - Cluster.Store.RemoveNode()
+
+		GET /cluster/db/process - list all process configs that are stored in the FSM - Cluster.Store.ListProcesses()
+		POST /cluster/db/process - add a process config to the FSM - Cluster.Store.AddProcess()
+		PUT /cluster/db/process/:id - update a process config in the FSM - Cluster.Store.UpdateProcess()
+		DELETE /cluster/db/process/:id - remove a process config from the FSM - Cluster.Store.RemoveProcess()
+
+		** for the processes, the leader will decide where to actually run them. the process configs will
+		also be added to the regular process DB of each core.
+
+		POST /cluster/join - join the cluster - Cluster.Join()
+		DELETE /cluster/:id - leave the cluster - Cluster.Leave()
+
+		** all these endpoints will forward the request to the leader.
+*/
 
 var ErrNodeNotFound = errors.New("node not found")
 
@@ -55,6 +77,8 @@ type ClusterConfig struct {
 	Path      string
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
+	Bootstrap bool
+	Address   string
 }
 
 type cluster struct {
@@ -84,6 +108,8 @@ type cluster struct {
 	raftStore             *raftboltdb.BoltStore
 	raftRemoveGracePeriod time.Duration
 
+	store Store
+
 	reassertLeaderCh chan chan error
 
 	leaveCh chan struct{}
@@ -106,6 +132,8 @@ func New(config ClusterConfig) (Cluster, error) {
 		updates:  make(chan NodeState, 64),
 		logger:   config.Logger,
 
+		raftAddress: config.Address,
+
 		reassertLeaderCh: make(chan chan error),
 		leaveCh:          make(chan struct{}),
 		shutdownCh:       make(chan struct{}),
@@ -119,12 +147,19 @@ func New(config ClusterConfig) (Cluster, error) {
 		c.logger = log.New("")
 	}
 
-	fsm, err := NewFSM()
+	store, err := NewStore()
 	if err != nil {
 		return nil, err
 	}
 
-	c.startRaft(fsm, true, false)
+	c.store = store
+
+	c.logger.Debug().Log("starting raft")
+
+	err = c.startRaft(store, config.Bootstrap, false)
+	if err != nil {
+		return nil, err
+	}
 
 	go func() {
 		for {
@@ -213,6 +248,7 @@ func (c *cluster) Leave() error {
 		if err := c.leadershipTransfer(); err == nil {
 			isLeader = false
 		} else {
+			c.StoreRemoveNode(c.id)
 			future := c.raft.RemoveServer(raft.ServerID(c.id), 0, 0)
 			if err := future.Error(); err != nil {
 				c.logger.Error().WithError(err).Log("failed to remove ourself as raft peer")
@@ -224,6 +260,9 @@ func (c *cluster) Leave() error {
 	// must wait to allow the raft replication to take place, otherwise an
 	// immediate shutdown could cause a loss of quorum.
 	if !isLeader {
+		// Send leave-request to leader
+		// DELETE leader//api/v3/cluster/node/:id
+
 		left := false
 		limit := time.Now().Add(c.raftRemoveGracePeriod)
 		for !left && time.Now().Before(limit) {
@@ -257,6 +296,210 @@ func (c *cluster) Leave() error {
 
 func (c *cluster) IsLeader() bool {
 	return c.raft.State() == raft.Leader
+}
+
+func (c *cluster) leave(id string) error {
+	if !c.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+
+	c.logger.Debug().WithFields(log.Fields{
+		"nodeid": id,
+	}).Log("received leave request for remote node")
+
+	if id == c.id {
+		err := c.leadershipTransfer()
+		if err != nil {
+			c.logger.Warn().WithError(err).Log("failed to transfer leadership")
+		}
+	}
+
+	future := c.raft.RemoveServer(raft.ServerID(id), 0, 0)
+	if err := future.Error(); err != nil {
+		c.logger.Error().WithError(err).WithFields(log.Fields{
+			"nodeid": id,
+		}).Log("failed to remove node")
+	}
+
+	return nil
+}
+
+func (c *cluster) Join(id, raftAddress, apiAddress, username, password string) error {
+	if !c.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+
+	c.logger.Debug().WithFields(log.Fields{
+		"nodeid":  id,
+		"address": raftAddress,
+	}).Log("received join request for remote node")
+
+	configFuture := c.raft.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		return err
+	}
+
+	for _, srv := range configFuture.Configuration().Servers {
+		// If a node already exists with either the joining node's ID or address,
+		// that node may need to be removed from the config first.
+		if srv.ID == raft.ServerID(id) || srv.Address == raft.ServerAddress(raftAddress) {
+			// However if *both* the ID and the address are the same, then nothing -- not even
+			// a join operation -- is needed.
+			if srv.ID == raft.ServerID(id) && srv.Address == raft.ServerAddress(raftAddress) {
+				c.logger.Debug().WithFields(log.Fields{
+					"nodeid":  id,
+					"address": raftAddress,
+				}).Log("node is already member of cluster, ignoring join request")
+				return nil
+			}
+
+			future := c.raft.RemoveServer(srv.ID, 0, 0)
+			if err := future.Error(); err != nil {
+				c.logger.Error().WithError(err).WithFields(log.Fields{
+					"nodeid":  id,
+					"address": raftAddress,
+				}).Log("error removing existing node")
+				return fmt.Errorf("error removing existing node %s at %s: %w", id, raftAddress, err)
+			}
+		}
+	}
+
+	f := c.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(raftAddress), 0, 5*time.Second)
+	if err := f.Error(); err != nil {
+		return err
+	}
+
+	if err := c.StoreAddNode(id, apiAddress, username, password); err != nil {
+		future := c.raft.RemoveServer(raft.ServerID(id), 0, 0)
+		if err := future.Error(); err != nil {
+			c.logger.Error().WithError(err).WithFields(log.Fields{
+				"nodeid":  id,
+				"address": raftAddress,
+			}).Log("error removing existing node")
+			return err
+		}
+		return err
+	}
+
+	c.logger.Info().WithFields(log.Fields{
+		"nodeid":  id,
+		"address": raftAddress,
+	}).Log("node joined successfully")
+
+	return nil
+}
+
+type command struct {
+	Operation string
+	Data      interface{}
+}
+
+type addNodeCommand struct {
+	ID       string
+	Address  string
+	Username string
+	Password string
+}
+
+func (c *cluster) StoreListNodes() []addNodeCommand {
+	c.store.ListNodes()
+
+	return nil
+}
+
+func (c *cluster) StoreAddNode(id, address, username, password string) error {
+	if !c.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+
+	com := &command{
+		Operation: "addNode",
+		Data: &addNodeCommand{
+			ID:       id,
+			Address:  address,
+			Username: username,
+			Password: password,
+		},
+	}
+
+	b, err := json.Marshal(com)
+	if err != nil {
+		return err
+	}
+
+	future := c.raft.Apply(b, 5*time.Second)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("applying command failed: %w", err)
+	}
+
+	return nil
+}
+
+type removeNodeCommand struct {
+	ID string
+}
+
+func (c *cluster) StoreRemoveNode(id string) error {
+	if !c.IsLeader() {
+		return fmt.Errorf("not leader")
+	}
+
+	com := &command{
+		Operation: "removeNode",
+		Data: &removeNodeCommand{
+			ID: id,
+		},
+	}
+
+	b, err := json.Marshal(com)
+	if err != nil {
+		return err
+	}
+
+	future := c.raft.Apply(b, 5*time.Second)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("applying command failed: %w", err)
+	}
+
+	return nil
+}
+
+// trackLeaderChanges registers an Observer with raft in order to receive updates
+// about leader changes, in order to keep the forwarder up to date.
+func (c *cluster) trackLeaderChanges() {
+	obsCh := make(chan raft.Observation, 16)
+	observer := raft.NewObserver(obsCh, false, func(o *raft.Observation) bool {
+		_, leaderOK := o.Data.(raft.LeaderObservation)
+		_, peerOK := o.Data.(raft.PeerObservation)
+
+		return leaderOK || peerOK
+	})
+	c.raft.RegisterObserver(observer)
+
+	for {
+		select {
+		case obs := <-obsCh:
+			if leaderObs, ok := obs.Data.(raft.LeaderObservation); ok {
+				// TODO: update the forwarder
+				c.logger.Debug().WithFields(log.Fields{
+					"id":      leaderObs.LeaderID,
+					"address": leaderObs.LeaderAddr,
+				}).Log("new leader observation")
+			} else if peerObs, ok := obs.Data.(raft.PeerObservation); ok {
+				c.logger.Debug().WithFields(log.Fields{
+					"removed": peerObs.Removed,
+					"address": peerObs.Peer.Address,
+				}).Log("new peer observation")
+			} else {
+				c.logger.Debug().WithField("type", reflect.TypeOf(obs.Data)).Log("got unknown observation type from raft")
+				continue
+			}
+		case <-c.shutdownCh:
+			c.raft.DeregisterObserver(observer)
+			return
+		}
+	}
 }
 
 func (c *cluster) AddNode(address, username, password string) (string, error) {
@@ -312,6 +555,8 @@ func (c *cluster) RemoveNode(id string) error {
 	for _, ip := range ips {
 		c.limiter.RemoveBlock(ip)
 	}
+
+	c.leave(id)
 
 	c.logger.Info().WithFields(log.Fields{
 		"id": id,
@@ -435,12 +680,16 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, inmem bool) error {
 		return err
 	}
 
-	transport, err := raft.NewTCPTransportWithLogger(c.raftAddress, addr, 3, 10*time.Second, NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("transport"))
+	c.logger.Debug().Log("address: %s", addr)
+
+	transport, err := raft.NewTCPTransportWithLogger(c.raftAddress, addr, 3, 10*time.Second, NewLogger(c.logger, hclog.Debug).Named("raft-transport"))
 	if err != nil {
 		return err
 	}
 
-	snapshotLogger := NewLogger(c.logger.WithComponent("raft"), hclog.Debug).Named("snapshot")
+	c.raftTransport = transport
+
+	snapshotLogger := NewLogger(c.logger, hclog.Debug).Named("raft-snapshot")
 	snapshots, err := raft.NewFileSnapshotStoreWithLogger(filepath.Join(c.path, "snapshots"), 10, snapshotLogger)
 	if err != nil {
 		return err
@@ -475,7 +724,7 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, inmem bool) error {
 
 	cfg := raft.DefaultConfig()
 	cfg.LocalID = raft.ServerID(c.id)
-	cfg.Logger = NewLogger(c.logger.WithComponent("raft"), hclog.Debug)
+	cfg.Logger = NewLogger(c.logger, hclog.Debug).Named("raft")
 
 	if bootstrap {
 		hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
@@ -512,7 +761,10 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, inmem bool) error {
 
 	c.raft = node
 
+	go c.trackLeaderChanges()
 	go c.monitorLeadership()
+
+	c.logger.Debug().Log("raft started")
 
 	return nil
 }
@@ -529,3 +781,7 @@ func (c *cluster) shutdownRaft() {
 		}
 	}
 }
+
+// nodeLoop is run by every node in the cluster. This is mainly to check the list
+// of nodes from the FSM, in order to connect to them and to fetch their file lists.
+func (c *cluster) nodeLoop() {}

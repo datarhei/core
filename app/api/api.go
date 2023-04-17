@@ -623,17 +623,20 @@ func (a *api) start() error {
 	a.restream = restream
 
 	if cfg.Cluster.Enable {
-		if cluster, err := cluster.New(cluster.ClusterConfig{
+		cluster, err := cluster.New(cluster.ClusterConfig{
 			ID:        cfg.ID,
 			Name:      cfg.Name,
 			Path:      filepath.Join(cfg.DB.Dir, "cluster"),
 			IPLimiter: a.sessionsLimiter,
 			Logger:    a.log.logger.core.WithComponent("Cluster"),
-		}); err != nil {
+			Bootstrap: cfg.Cluster.Bootstrap,
+			Address:   cfg.Cluster.Address,
+		})
+		if err != nil {
 			return fmt.Errorf("unable to create cluster: %w", err)
-		} else {
-			a.cluster = cluster
 		}
+
+		a.cluster = cluster
 	}
 
 	var httpjwt jwt.JWT

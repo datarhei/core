@@ -242,7 +242,7 @@ func (n *node) files() {
 		}
 
 		for _, file := range files {
-			filesChan <- "mem:" + file.Name
+			f <- "mem:" + file.Name
 		}
 	}(filesChan)
 
@@ -255,7 +255,7 @@ func (n *node) files() {
 		}
 
 		for _, file := range files {
-			filesChan <- "disk:" + file.Name
+			f <- "disk:" + file.Name
 		}
 	}(filesChan)
 
@@ -271,7 +271,7 @@ func (n *node) files() {
 			}
 
 			for _, file := range files {
-				filesChan <- "rtmp:" + file.Name
+				f <- "rtmp:" + file.Name
 			}
 		}(filesChan)
 	}
@@ -288,7 +288,7 @@ func (n *node) files() {
 			}
 
 			for _, file := range files {
-				filesChan <- "srt:" + file.Name
+				f <- "srt:" + file.Name
 			}
 		}(filesChan)
 	}

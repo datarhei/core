@@ -167,9 +167,11 @@ type Data struct {
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
 	Cluster struct {
-		Enable    bool `json:"enable"`
-		Bootstrap bool `json:"bootstrap"`
-		Debug     bool `json:"debug"`
+		Enable      bool   `json:"enable"`
+		Bootstrap   bool   `json:"bootstrap"`
+		Debug       bool   `json:"debug"`
+		Address     string `json:"address"`
+		JoinAddress string `json:"join_address"`
 	} `json:"cluster"`
 }
 

@@ -1,27 +1,68 @@
 package cluster
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/hashicorp/raft"
 )
 
-// Implement a FSM
-type fsm struct{}
+type Store interface {
+	raft.FSM
 
-func NewFSM() (raft.FSM, error) {
-	return &fsm{}, nil
+	ListNodes() []string
 }
 
-func (f *fsm) Apply(*raft.Log) interface{} {
+// Implement a FSM
+type store struct{}
+
+func NewStore() (Store, error) {
+	return &store{}, nil
+}
+
+func (s *store) Apply(log *raft.Log) interface{} {
+	fmt.Printf("a log entry came in (index=%d, term=%d): %s\n", log.Index, log.Term, string(log.Data))
+
+	c := command{}
+
+	err := json.Unmarshal(log.Data, &c)
+	if err != nil {
+		fmt.Printf("invalid log entry\n")
+		return nil
+	}
+
+	fmt.Printf("op: %s\n", c.Operation)
+	fmt.Printf("op: %+v\n", c)
+
+	switch c.Operation {
+	case "addNode":
+		b, _ := json.Marshal(c.Data)
+		cmd := addNodeCommand{}
+		json.Unmarshal(b, &cmd)
+
+		fmt.Printf("addNode: %+v\n", cmd)
+	case "removeNode":
+		b, _ := json.Marshal(c.Data)
+		cmd := removeNodeCommand{}
+		json.Unmarshal(b, &cmd)
+
+		fmt.Printf("removeNode: %+v\n", cmd)
+	}
 	return nil
 }
 
-func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
+func (s *store) Snapshot() (raft.FSMSnapshot, error) {
+	fmt.Printf("a snapshot is requested\n")
 	return &fsmSnapshot{}, nil
 }
 
-func (f *fsm) Restore(snapshot io.ReadCloser) error {
+func (s *store) Restore(snapshot io.ReadCloser) error {
+	fmt.Printf("a snapshot is restored\n")
+	return nil
+}
+
+func (s *store) ListNodes() []string {
 	return nil
 }
 

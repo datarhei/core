@@ -21,6 +21,7 @@ func (c *cluster) monitorLeadership() {
 
 	var weAreLeaderCh chan struct{}
 	var leaderLoop sync.WaitGroup
+
 	for {
 		select {
 		case isLeader := <-raftNotifyCh:
@@ -38,6 +39,8 @@ func (c *cluster) monitorLeadership() {
 					c.leaderLoop(ch)
 				}(weAreLeaderCh)
 				c.logger.Info().Log("cluster leadership acquired")
+
+				c.StoreAddNode(c.id, ":8080", "foo", "bar")
 
 			default:
 				if weAreLeaderCh == nil {
@@ -87,7 +90,7 @@ func (c *cluster) leaderLoop(stopCh chan struct{}) {
 	establishedLeader := false
 RECONCILE:
 	// Setup a reconciliation timer
-	interval := time.After(s.config.ReconcileInterval)
+	interval := time.After(10 * time.Second)
 
 	// Apply a raft barrier to ensure our FSM is caught up
 	barrier := c.raft.Barrier(time.Minute)
@@ -98,7 +101,7 @@ RECONCILE:
 
 	// Check if we need to handle initial leadership actions
 	if !establishedLeader {
-		if err := c.establishLeadership(stopCtx); err != nil {
+		if err := c.establishLeadership(context.TODO()); err != nil {
 			c.logger.Error().WithError(err).Log("failed to establish leadership")
 			// Immediately revoke leadership since we didn't successfully
 			// establish leadership.
@@ -130,8 +133,7 @@ WAIT:
 	default:
 	}
 
-	// Periodically reconcile as long as we are the leader,
-	// or when Serf events arrive
+	// Periodically reconcile as long as we are the leader
 	for {
 		select {
 		case <-stopCh:
@@ -157,7 +159,7 @@ WAIT:
 			// leader, which means revokeLeadership followed by an
 			// establishLeadership().
 			c.revokeLeadership()
-			err := c.establishLeadership(stopCtx)
+			err := c.establishLeadership(context.TODO())
 			errCh <- err
 
 			// in case establishLeadership failed, we will try to
@@ -187,9 +189,10 @@ WAIT:
 }
 
 func (c *cluster) establishLeadership(ctx context.Context) error {
+	c.logger.Debug().Log("establishing leadership")
 	return nil
 }
 
 func (c *cluster) revokeLeadership() {
-
+	c.logger.Debug().Log("revoking leadership")
 }

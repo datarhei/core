@@ -20,23 +20,8 @@ type hclogger struct {
 }
 
 func NewLogger(logger log.Logger, lvl hclog.Level) hclog.Logger {
-	level := log.Linfo
-
-	switch lvl {
-	case hclog.Trace:
-		level = log.Ldebug
-	case hclog.Debug:
-		level = log.Ldebug
-	case hclog.Info:
-		level = log.Linfo
-	case hclog.Warn:
-		level = log.Lwarn
-	case hclog.Error:
-		level = log.Lerror
-	}
-
 	return &hclogger{
-		logger: logger.WithOutput(log.NewSyncWriter(log.NewConsoleWriter(os.Stderr, level, true))),
+		logger: logger,
 		level:  lvl,
 	}
 }
