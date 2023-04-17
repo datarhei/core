@@ -883,23 +883,35 @@ func TestParserProgressPlayout(t *testing.T) {
 }
 
 func TestParserPatterns(t *testing.T) {
-	parser := New(Config{
+	p := New(Config{
+		LogHistory: 3,
 		Patterns: []string{
 			"^foobar",
 			"foobar$",
 		},
 	})
 
-	parser.Parse("some foobar more")
-	require.Empty(t, parser.Report().Matches)
+	p.Parse("some foobar more")
+	require.Empty(t, p.Report().Matches)
 
-	parser.Parse("foobar some more")
-	require.Equal(t, 1, len(parser.Report().Matches))
-	require.Equal(t, "foobar some more", parser.Report().Matches[0])
+	p.Parse("foobar some more")
+	require.Equal(t, 1, len(p.Report().Matches))
+	require.Equal(t, "foobar some more", p.Report().Matches[0])
 
-	parser.Parse("some more foobar")
-	require.Equal(t, 2, len(parser.Report().Matches))
-	require.Equal(t, "some more foobar", parser.Report().Matches[1])
+	p.Parse("some more foobar")
+	require.Equal(t, 2, len(p.Report().Matches))
+	require.Equal(t, "some more foobar", p.Report().Matches[1])
+
+	pp, ok := p.(*parser)
+	require.True(t, ok)
+
+	pp.storeReportHistory("something")
+
+	report := p.ReportHistory()
+	require.Equal(t, 1, len(report))
+	require.Equal(t, 2, len(report[0].Matches))
+	require.Equal(t, "foobar some more", report[0].Matches[0])
+	require.Equal(t, "some more foobar", report[0].Matches[1])
 }
 
 func TestParserPatternsError(t *testing.T) {

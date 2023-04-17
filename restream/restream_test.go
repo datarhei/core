@@ -25,10 +25,11 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary:          binary,
-		Portrange:       portrange,
-		ValidatorInput:  validatorIn,
-		ValidatorOutput: validatorOut,
+		Binary:           binary,
+		Portrange:        portrange,
+		ValidatorInput:   validatorIn,
+		ValidatorOutput:  validatorOut,
+		LogHistoryLength: 3,
 	})
 	if err != nil {
 		return nil, err
@@ -402,6 +403,27 @@ func TestReloadProcess(t *testing.T) {
 	require.Equal(t, "start", state.Order, "Process should be started")
 
 	rs.StopProcess(process.ID)
+}
+
+func TestParseProcessPattern(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.LogPatterns = []string{"libx264"}
+
+	rs.AddProcess(process)
+	rs.StartProcess(process.ID)
+
+	time.Sleep(3 * time.Second)
+
+	rs.StopProcess(process.ID)
+
+	log, err := rs.GetProcessLog(process.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(log.History))
+	require.Equal(t, 8, len(log.History[0].Matches))
 }
 
 func TestProbeProcess(t *testing.T) {

@@ -49,6 +49,7 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 			CreatedAt: h.CreatedAt.Unix(),
 			Prelude:   h.Prelude,
 			Log:       make([][2]string, len(h.Log)),
+			Matches:   h.Matches,
 			ExitedAt:  h.ExitedAt.Unix(),
 			ExitState: h.ExitState,
 		}

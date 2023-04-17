@@ -877,7 +877,6 @@ func (p *parser) storeReportHistory(state string) {
 			history := r.Value.(ReportHistoryEntry)
 			history.Log = nil
 			history.Prelude = nil
-			history.Matches = nil
 
 			r.Value = history
 		}
