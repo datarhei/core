@@ -469,12 +469,14 @@ func TestLog(t *testing.T) {
 	rs.AddProcess(process)
 
 	_, err = rs.GetProcessLog("foobar")
-	require.NotEqual(t, nil, err, "shouldn't be able to get log from non-existing process")
+	require.Error(t, err)
 
 	log, err := rs.GetProcessLog(process.ID)
-	require.Equal(t, nil, err, "should be able to get log from existing process")
+	require.NoError(t, err)
 	require.Equal(t, 0, len(log.Prelude))
 	require.Equal(t, 0, len(log.Log))
+	require.Equal(t, 0, len(log.Matches))
+	require.Equal(t, 0, len(log.History))
 
 	rs.StartProcess(process.ID)
 
@@ -484,13 +486,16 @@ func TestLog(t *testing.T) {
 
 	require.NotEqual(t, 0, len(log.Prelude))
 	require.NotEqual(t, 0, len(log.Log))
+	require.Equal(t, 0, len(log.Matches))
+	require.Equal(t, 0, len(log.History))
 
 	rs.StopProcess(process.ID)
 
 	log, _ = rs.GetProcessLog(process.ID)
 
-	require.NotEqual(t, 0, len(log.Prelude))
-	require.NotEqual(t, 0, len(log.Log))
+	require.Equal(t, 0, len(log.Prelude))
+	require.Equal(t, 0, len(log.Log))
+	require.Equal(t, 1, len(log.History))
 }
 
 func TestPlayoutNoRange(t *testing.T) {
