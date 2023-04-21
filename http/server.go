@@ -42,6 +42,7 @@ import (
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/jwt"
+	httplog "github.com/datarhei/core/v16/http/log"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/log"
@@ -358,7 +359,7 @@ func NewServer(config Config) (Server, error) {
 	s.router.HideBanner = true
 	s.router.HidePort = true
 
-	s.router.Logger.SetOutput(newLogwrapper(s.logger))
+	s.router.Logger.SetOutput(httplog.NewWrapper(s.logger))
 
 	if s.middleware.cors != nil {
 		s.router.Use(s.middleware.cors)

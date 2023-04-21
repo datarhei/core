@@ -624,13 +624,17 @@ func (a *api) start() error {
 
 	if cfg.Cluster.Enable {
 		cluster, err := cluster.New(cluster.ClusterConfig{
-			ID:        cfg.ID,
-			Name:      cfg.Name,
-			Path:      filepath.Join(cfg.DB.Dir, "cluster"),
-			IPLimiter: a.sessionsLimiter,
-			Logger:    a.log.logger.core.WithComponent("Cluster"),
-			Bootstrap: cfg.Cluster.Bootstrap,
-			Address:   cfg.Cluster.Address,
+			ID:              cfg.ID,
+			Name:            cfg.Name,
+			Path:            filepath.Join(cfg.DB.Dir, "cluster"),
+			Bootstrap:       cfg.Cluster.Bootstrap,
+			Address:         cfg.Cluster.Address,
+			JoinAddress:     cfg.Cluster.JoinAddress,
+			CoreAPIAddress:  cfg.Address,
+			CoreAPIUsername: cfg.API.Auth.Username,
+			CoreAPIPassword: cfg.API.Auth.Password,
+			IPLimiter:       a.sessionsLimiter,
+			Logger:          a.log.logger.core.WithComponent("Cluster"),
 		})
 		if err != nil {
 			return fmt.Errorf("unable to create cluster: %w", err)
@@ -1323,7 +1327,7 @@ func (a *api) stop() {
 	}
 
 	if a.cluster != nil {
-		a.cluster.Leave()
+		a.cluster.Leave("", "")
 		a.cluster.Shutdown()
 	}
 

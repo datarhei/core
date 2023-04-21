@@ -37,7 +37,7 @@ func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster [get]
 func (h *ClusterHandler) GetCluster(c echo.Context) error {
-	nodes := h.cluster.ListNodes()
+	nodes := h.cluster.ListNodesX()
 
 	list := []api.ClusterNode{}
 
@@ -74,7 +74,7 @@ func (h *ClusterHandler) AddNode(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	id, err := h.cluster.AddNode(node.Address, "", "")
+	id, err := h.cluster.AddNodeX(node.Address, "", "")
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Failed to add node", "%s", err)
 	}
@@ -96,7 +96,7 @@ func (h *ClusterHandler) AddNode(c echo.Context) error {
 func (h *ClusterHandler) DeleteNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	if err := h.cluster.RemoveNode(id); err != nil {
+	if err := h.cluster.RemoveNodeX(id); err != nil {
 		if err == cluster.ErrNodeNotFound {
 			return api.Err(http.StatusNotFound, err.Error(), "%s", id)
 		}
@@ -120,7 +120,7 @@ func (h *ClusterHandler) DeleteNode(c echo.Context) error {
 func (h *ClusterHandler) GetNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.cluster.GetNode(id)
+	peer, err := h.cluster.GetNodeX(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
@@ -150,7 +150,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 func (h *ClusterHandler) GetNodeProxy(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.cluster.GetNode(id)
+	peer, err := h.cluster.GetNodeX(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
@@ -200,7 +200,7 @@ func (h *ClusterHandler) UpdateNode(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Failed to remove node", "%s", err)
 	}
 
-	id, err := h.cluster.AddNode(node.Address, "", "")
+	id, err := h.cluster.AddNodeX(node.Address, "", "")
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "Failed to add node", "%s", err)
 	}

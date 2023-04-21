@@ -12,6 +12,36 @@ type Store interface {
 	raft.FSM
 
 	ListNodes() []string
+	GetNode(id string) string
+}
+
+type operation string
+
+const (
+	opAddNode       operation = "addNode"
+	opRemoveNode    operation = "removeNode"
+	opAddProcess    operation = "addProcess"
+	opRemoveProcess operation = "removeProcess"
+)
+
+type command struct {
+	Operation operation
+	Data      interface{}
+}
+
+type addNodeCommand struct {
+	ID       string
+	Address  string
+	Username string
+	Password string
+}
+
+type removeNodeCommand struct {
+	ID string
+}
+
+type addProcessCommand struct {
+	Config []byte
 }
 
 // Implement a FSM
@@ -36,13 +66,13 @@ func (s *store) Apply(log *raft.Log) interface{} {
 	fmt.Printf("op: %+v\n", c)
 
 	switch c.Operation {
-	case "addNode":
+	case opAddNode:
 		b, _ := json.Marshal(c.Data)
 		cmd := addNodeCommand{}
 		json.Unmarshal(b, &cmd)
 
 		fmt.Printf("addNode: %+v\n", cmd)
-	case "removeNode":
+	case opRemoveNode:
 		b, _ := json.Marshal(c.Data)
 		cmd := removeNodeCommand{}
 		json.Unmarshal(b, &cmd)
@@ -64,6 +94,10 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 
 func (s *store) ListNodes() []string {
 	return nil
+}
+
+func (s *store) GetNode(id string) string {
+	return ""
 }
 
 type fsmSnapshot struct{}

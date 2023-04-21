@@ -9,6 +9,10 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
+const NOTIFY_FOLLOWER = 0
+const NOTIFY_LEADER = 1
+const NOTIFY_EMERGENCY = 2
+
 // monitorLeadership listens to the raf notify channel in order to find
 // out if we got the leadership or lost it.
 // https://github.com/hashicorp/consul/blob/44b39240a86bc94ddc67bc105286ab450bd869a9/agent/consul/leader.go#L71
@@ -17,42 +21,161 @@ func (c *cluster) monitorLeadership() {
 	// leaderCh, which is only notified best-effort. Doing this ensures
 	// that we get all notifications in order, which is required for
 	// cleanup and to ensure we never run multiple leader loops.
-	raftNotifyCh := c.raftNotifyCh
+	notifyCh := make(chan int, 10)
+	var notifyLoop sync.WaitGroup
+
+	notifyLoop.Add(1)
+
+	go func() {
+		raftNotifyCh := c.raftNotifyCh
+		raftEmergencyNotifyCh := c.raftEmergencyNotifyCh
+
+		isRaftLeader := false
+
+		notifyCh <- NOTIFY_FOLLOWER
+
+		notifyLoop.Done()
+
+		for {
+			select {
+			case isEmergencyLeader := <-raftEmergencyNotifyCh:
+				if isEmergencyLeader {
+					isRaftLeader = false
+					notifyCh <- NOTIFY_EMERGENCY
+				} else {
+					if !isRaftLeader {
+						notifyCh <- NOTIFY_FOLLOWER
+					}
+				}
+			case isLeader := <-raftNotifyCh:
+				if isLeader {
+					isRaftLeader = true
+					notifyCh <- NOTIFY_LEADER
+				} else {
+					isRaftLeader = false
+					notifyCh <- NOTIFY_FOLLOWER
+				}
+			case <-c.shutdownCh:
+				return
+			}
+		}
+	}()
+
+	notifyLoop.Wait()
 
 	var weAreLeaderCh chan struct{}
+	var weAreEmergencyLeaderCh chan struct{}
+	var weAreFollowerCh chan struct{}
+
 	var leaderLoop sync.WaitGroup
+	var emergencyLeaderLoop sync.WaitGroup
+	var followerLoop sync.WaitGroup
 
 	for {
 		select {
-		case isLeader := <-raftNotifyCh:
-			switch {
-			case isLeader:
-				if weAreLeaderCh != nil {
-					c.logger.Error().Log("attempted to start the leader loop while running")
+		case notification := <-notifyCh:
+			if notification == NOTIFY_FOLLOWER {
+				if weAreFollowerCh != nil {
+					// we are already follower, don't do anything
 					continue
+				}
+
+				// shutdown any leader and emergency loop
+				if weAreLeaderCh != nil {
+					c.logger.Debug().Log("shutting down leader loop")
+					close(weAreLeaderCh)
+					leaderLoop.Wait()
+					weAreLeaderCh = nil
+				}
+
+				if weAreEmergencyLeaderCh != nil {
+					c.logger.Debug().Log("shutting down emergency leader loop")
+					close(weAreEmergencyLeaderCh)
+					emergencyLeaderLoop.Wait()
+					weAreEmergencyLeaderCh = nil
+				}
+
+				weAreFollowerCh = make(chan struct{})
+				followerLoop.Add(1)
+				go func(ch chan struct{}) {
+					defer followerLoop.Done()
+					c.followerLoop(ch)
+				}(weAreFollowerCh)
+
+				c.logger.Info().Log("cluster followship acquired")
+
+				c.leaderLock.Lock()
+				c.isRaftLeader = false
+				c.isLeader = false
+				c.leaderLock.Unlock()
+			} else if notification == NOTIFY_LEADER {
+				if weAreLeaderCh != nil {
+					// we are already leader, don't do anything
+					continue
+				}
+
+				// shutdown any follower and emergency loop
+				if weAreFollowerCh != nil {
+					c.logger.Debug().Log("shutting down follower loop")
+					close(weAreFollowerCh)
+					followerLoop.Wait()
+					weAreFollowerCh = nil
+				}
+
+				if weAreEmergencyLeaderCh != nil {
+					c.logger.Debug().Log("shutting down emergency leader loop")
+					close(weAreEmergencyLeaderCh)
+					emergencyLeaderLoop.Wait()
+					weAreEmergencyLeaderCh = nil
 				}
 
 				weAreLeaderCh = make(chan struct{})
 				leaderLoop.Add(1)
 				go func(ch chan struct{}) {
 					defer leaderLoop.Done()
-					c.leaderLoop(ch)
+					c.leaderLoop(ch, false)
 				}(weAreLeaderCh)
 				c.logger.Info().Log("cluster leadership acquired")
 
-				c.StoreAddNode(c.id, ":8080", "foo", "bar")
+				c.leaderLock.Lock()
+				c.isRaftLeader = true
+				c.isLeader = true
+				c.leaderLock.Unlock()
 
-			default:
-				if weAreLeaderCh == nil {
-					c.logger.Error().Log("attempted to stop the leader loop while not running")
+				c.AddNode(c.id, c.core.address, c.core.username, c.core.password)
+			} else if notification == NOTIFY_EMERGENCY {
+				if weAreEmergencyLeaderCh != nil {
+					// we are already emergency leader, don't do anything
 					continue
 				}
 
-				c.logger.Debug().Log("shutting down leader loop")
-				close(weAreLeaderCh)
-				leaderLoop.Wait()
-				weAreLeaderCh = nil
-				c.logger.Info().Log("cluster leadership lost")
+				// shutdown any follower and leader loop
+				if weAreFollowerCh != nil {
+					c.logger.Debug().Log("shutting down follower loop")
+					close(weAreFollowerCh)
+					followerLoop.Wait()
+					weAreFollowerCh = nil
+				}
+
+				if weAreLeaderCh != nil {
+					c.logger.Debug().Log("shutting down leader loop")
+					close(weAreLeaderCh)
+					leaderLoop.Wait()
+					weAreLeaderCh = nil
+				}
+
+				weAreEmergencyLeaderCh = make(chan struct{})
+				emergencyLeaderLoop.Add(1)
+				go func(ch chan struct{}) {
+					defer emergencyLeaderLoop.Done()
+					c.leaderLoop(ch, true)
+				}(weAreEmergencyLeaderCh)
+				c.logger.Info().Log("cluster emergency leadership acquired")
+
+				c.leaderLock.Lock()
+				c.isRaftLeader = false
+				c.isLeader = true
+				c.leaderLock.Unlock()
 			}
 		case <-c.shutdownCh:
 			return
@@ -77,26 +200,42 @@ func (c *cluster) leadershipTransfer() error {
 				"attempt":     i,
 				"retry_limit": retryCount,
 			}).Log("successfully transferred leadership")
+
+			for {
+				c.logger.Debug().Log("waiting for losing leadership")
+
+				time.Sleep(50 * time.Millisecond)
+
+				c.leaderLock.Lock()
+				isLeader := c.isRaftLeader
+				c.leaderLock.Unlock()
+
+				if !isLeader {
+					break
+				}
+			}
+
 			return nil
 		}
-
 	}
 	return fmt.Errorf("failed to transfer leadership in %d attempts", retryCount)
 }
 
 // leaderLoop runs as long as we are the leader to run various maintenance activities
 // https://github.com/hashicorp/consul/blob/44b39240a86bc94ddc67bc105286ab450bd869a9/agent/consul/leader.go#L146
-func (c *cluster) leaderLoop(stopCh chan struct{}) {
+func (c *cluster) leaderLoop(stopCh chan struct{}, emergency bool) {
 	establishedLeader := false
 RECONCILE:
 	// Setup a reconciliation timer
 	interval := time.After(10 * time.Second)
 
 	// Apply a raft barrier to ensure our FSM is caught up
-	barrier := c.raft.Barrier(time.Minute)
-	if err := barrier.Error(); err != nil {
-		c.logger.Error().WithError(err).Log("failed to wait for barrier")
-		goto WAIT
+	if !emergency {
+		barrier := c.raft.Barrier(time.Minute)
+		if err := barrier.Error(); err != nil {
+			c.logger.Error().WithError(err).Log("failed to wait for barrier")
+			goto WAIT
+		}
 	}
 
 	// Check if we need to handle initial leadership actions

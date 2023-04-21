@@ -1,4 +1,4 @@
-package http
+package log
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ type logentry struct {
 	Message string `json:"message"`
 }
 
-func newLogwrapper(writer io.Writer) *logwrapper {
+func NewWrapper(writer io.Writer) *logwrapper {
 	return &logwrapper{
 		writer: writer,
 	}
