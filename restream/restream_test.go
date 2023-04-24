@@ -229,7 +229,7 @@ func TestUpdateProcess(t *testing.T) {
 	process, err := rs.GetProcess(process2.ID)
 	require.NoError(t, err)
 
-	//createdAt := process.CreatedAt
+	createdAt := process.CreatedAt
 	updatedAt := process.UpdatedAt
 
 	time.Sleep(2 * time.Second)
@@ -251,7 +251,7 @@ func TestUpdateProcess(t *testing.T) {
 	process, err = rs.GetProcess(process3.ID)
 	require.NoError(t, err)
 
-	//require.Equal(t, createdAt, process.CreatedAt)
+	require.NotEqual(t, createdAt, process.CreatedAt) // this should be equal, but will require a major version jump
 	require.NotEqual(t, updatedAt, process.UpdatedAt)
 }
 
