@@ -867,6 +867,7 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 		return ErrUnknownProcess
 	}
 
+	task.parser.TransferReportHistory(t.parser)
 	t.process.Order = task.process.Order
 
 	if id != t.id {

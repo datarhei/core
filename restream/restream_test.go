@@ -21,10 +21,11 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary:          binary,
-		Portrange:       portrange,
-		ValidatorInput:  validatorIn,
-		ValidatorOutput: validatorOut,
+		Binary:           binary,
+		LogHistoryLength: 3,
+		Portrange:        portrange,
+		ValidatorInput:   validatorIn,
+		ValidatorOutput:  validatorOut,
 	})
 	if err != nil {
 		return nil, err
@@ -437,10 +438,10 @@ func TestLog(t *testing.T) {
 	rs.AddProcess(process)
 
 	_, err = rs.GetProcessLog("foobar")
-	require.NotEqual(t, nil, err, "shouldn't be able to get log from non-existing process")
+	require.Error(t, err)
 
 	log, err := rs.GetProcessLog(process.ID)
-	require.Equal(t, nil, err, "should be able to get log from existing process")
+	require.NoError(t, err)
 	require.Equal(t, 0, len(log.Prelude))
 	require.Equal(t, 0, len(log.Log))
 
@@ -459,6 +460,34 @@ func TestLog(t *testing.T) {
 
 	require.NotEqual(t, 0, len(log.Prelude))
 	require.NotEqual(t, 0, len(log.Log))
+}
+
+func TestLogTransfer(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+
+	err = rs.AddProcess(process)
+	require.NoError(t, err)
+
+	rs.StartProcess(process.ID)
+	time.Sleep(3 * time.Second)
+	rs.StopProcess(process.ID)
+
+	rs.StartProcess(process.ID)
+	rs.StopProcess(process.ID)
+
+	log, _ := rs.GetProcessLog(process.ID)
+
+	require.Equal(t, 1, len(log.History))
+
+	err = rs.UpdateProcess(process.ID, process)
+	require.NoError(t, err)
+
+	log, _ = rs.GetProcessLog(process.ID)
+
+	require.Equal(t, 1, len(log.History))
 }
 
 func TestPlayoutNoRange(t *testing.T) {
