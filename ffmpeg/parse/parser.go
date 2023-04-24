@@ -39,6 +39,9 @@ type Parser interface {
 
 	// LastLogline returns the last parsed log line
 	LastLogline() string
+
+	// TransferReportHistory transfers the report history to another parser
+	TransferReportHistory(Parser) error
 }
 
 // Config is the config for the Parser implementation
@@ -917,4 +920,22 @@ func (p *parser) ReportHistory() []ReportHistoryEntry {
 	})
 
 	return history
+}
+
+func (p *parser) TransferReportHistory(dst Parser) error {
+	pp, ok := dst.(*parser)
+	if !ok {
+		return fmt.Errorf("the target parser is not of the required type")
+	}
+
+	p.logHistory.Do(func(l interface{}) {
+		if l == nil {
+			return
+		}
+
+		pp.logHistory.Value = l
+		pp.logHistory = pp.logHistory.Next()
+	})
+
+	return nil
 }

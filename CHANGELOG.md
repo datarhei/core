@@ -9,12 +9,18 @@
 -   Add support for date placeholder in process config
 -   Add support for creating directories for output files to be written on disk
 -   Add GET /api/v3/report/process endpoint
--   Fix S3 storage credential parsing from ENV
+-   Add updated_at field in process infos
+-   Add preserve process log history when updating a process
+-   Add support for input framerate data from jsonstats patch
+-   Add number of keyframes and extradata size to process progress data
 -   Fix placeholder parameter parsing
 -   Fix better naming for storage endpoint documentation
 -   Fix freeing up S3 mounts
 -   Fix URL validation if the path contains FFmpeg specific placeholders
 -   Fix purging default file from HTTP cache
+-   Fix parsing S3 storage definition from environment variable
+-   Fix checking length of CPU time array ([#10](https://github.com/datarhei/core/issues/10))
+-   Deprecate ENV names that do not correspond to JSON name
 
 ### Core v16.11.0 > v16.12.0
 

@@ -469,6 +469,8 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		CreatedAt: time.Now().Unix(),
 	}
 
+	process.UpdatedAt = process.CreatedAt
+
 	if config.Autostart {
 		process.Order = "start"
 	}
@@ -918,6 +920,10 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 		return ErrUnknownProcess
 	}
 
+	// This would require a major version jump
+	//t.process.CreatedAt = task.process.CreatedAt
+	t.process.UpdatedAt = time.Now().Unix()
+	task.parser.TransferReportHistory(t.parser)
 	t.process.Order = task.process.Order
 
 	if id != t.id {

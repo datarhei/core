@@ -114,6 +114,7 @@ type Process struct {
 	Reference string  `json:"reference"`
 	Config    *Config `json:"config"`
 	CreatedAt int64   `json:"created_at"`
+	UpdatedAt int64   `json:"updated_at"`
 	Order     string  `json:"order"`
 }
 
@@ -123,6 +124,7 @@ func (process *Process) Clone() *Process {
 		Reference: process.Reference,
 		Config:    process.Config.Clone(),
 		CreatedAt: process.CreatedAt,
+		UpdatedAt: process.UpdatedAt,
 		Order:     process.Order,
 	}
 
