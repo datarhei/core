@@ -216,6 +216,14 @@ func TestUpdateProcess(t *testing.T) {
 	err = rs.AddProcess(process2)
 	require.Equal(t, nil, err)
 
+	process, err := rs.GetProcess(process2.ID)
+	require.NoError(t, err)
+
+	//createdAt := process.CreatedAt
+	updatedAt := process.UpdatedAt
+
+	time.Sleep(2 * time.Second)
+
 	process3 := getDummyProcess()
 	require.NotNil(t, process3)
 	process3.ID = "process2"
@@ -230,8 +238,11 @@ func TestUpdateProcess(t *testing.T) {
 	_, err = rs.GetProcess(process1.ID)
 	require.Error(t, err)
 
-	_, err = rs.GetProcess(process3.ID)
+	process, err = rs.GetProcess(process3.ID)
 	require.NoError(t, err)
+
+	//require.Equal(t, createdAt, process.CreatedAt)
+	require.NotEqual(t, updatedAt, process.UpdatedAt)
 }
 
 func TestGetProcess(t *testing.T) {
