@@ -93,6 +93,7 @@ type ClusterConfig struct {
 	Name        string // Name of the node
 	Path        string // Path where to store all cluster data
 	Bootstrap   bool   // Whether to bootstrap a cluster
+	Recover     bool   // Whether to recover this node
 	Address     string // Listen address for the raft protocol
 	JoinAddress string // Address of a member of a cluster to join
 
@@ -226,7 +227,7 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	c.logger.Debug().Log("starting raft")
 
-	err = c.startRaft(store, config.Bootstrap, false)
+	err = c.startRaft(store, config.Bootstrap, config.Recover, false)
 	if err != nil {
 		c.shutdownAPI()
 		return nil, err
@@ -880,7 +881,7 @@ func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
 	return data, nil
 }
 
-func (c *cluster) startRaft(fsm raft.FSM, bootstrap, inmem bool) error {
+func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover, inmem bool) error {
 	defer func() {
 		if c.raft == nil && c.raftStore != nil {
 			c.raftStore.Close()

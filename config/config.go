@@ -105,6 +105,7 @@ func (d *Config) Clone() *Config {
 	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
+	data.Cluster = d.Cluster
 
 	data.Log.Topics = copy.Slice(d.Log.Topics)
 
@@ -133,8 +134,6 @@ func (d *Config) Clone() *Config {
 
 	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
-
-	data.Cluster = d.Cluster
 
 	data.vars.Transfer(&d.vars)
 
@@ -277,9 +276,10 @@ func (d *Config) init() {
 	// Cluster
 	d.vars.Register(value.NewBool(&d.Cluster.Enable, false), "cluster.enable", "CORE_CLUSTER_ENABLE", nil, "Enable cluster mode", false, false)
 	d.vars.Register(value.NewBool(&d.Cluster.Bootstrap, false), "cluster.bootstrap", "CORE_CLUSTER_BOOTSTRAP", nil, "Bootstrap a cluster", false, false)
+	d.vars.Register(value.NewBool(&d.Cluster.Recover, false), "cluster.recover", "CORE_CLUSTER_RECOVER", nil, "Recover a cluster", false, false)
 	d.vars.Register(value.NewBool(&d.Cluster.Debug, false), "cluster.debug", "CORE_CLUSTER_DEBUG", nil, "Switch to debug mode, not for production", false, false)
 	d.vars.Register(value.NewAddress(&d.Cluster.Address, ":8000"), "cluster.address", "CORE_CLUSTER_ADDRESS", nil, "Raft listen address", false, true)
-	d.vars.Register(value.NewString(&d.Cluster.JoinAddress, ""), "cluster.join_address", "CORE_CLUSTER_JOIN_ADDRESS", nil, "Address of a core that is part of the cluster", false, true)
+	d.vars.Register(value.NewString(&d.Cluster.JoinAddress, ""), "cluster.join_address", "CORE_CLUSTER_JOIN_ADDRESS", nil, "Raft address of a core that is part of the cluster", false, true)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are

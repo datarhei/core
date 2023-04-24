@@ -169,6 +169,7 @@ type Data struct {
 	Cluster struct {
 		Enable      bool   `json:"enable"`
 		Bootstrap   bool   `json:"bootstrap"`
+		Recover     bool   `json:"recover"`
 		Debug       bool   `json:"debug"`
 		Address     string `json:"address"`
 		JoinAddress string `json:"join_address"`
