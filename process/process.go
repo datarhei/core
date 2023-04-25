@@ -72,9 +72,19 @@ type Status struct {
 	Reconnect   time.Duration // Reconnect is the time until the next reconnect, negative if no reconnect is scheduled.
 	Duration    time.Duration // Duration is the time since the last change of the state
 	Time        time.Time     // Time is the time of the last change of the state
-	CPU         float64       // Used CPU in percent
-	Memory      uint64        // Used memory in bytes
 	CommandArgs []string      // Currently running command arguments
+	CPU         struct {
+		Current float64
+		Average float64
+		Max     float64
+		Limit   float64
+	} // Used CPU in percent
+	Memory struct {
+		Current uint64
+		Average float64
+		Max     uint64
+		Limit   uint64
+	} // Used memory in bytes
 }
 
 // States
@@ -275,8 +285,9 @@ func (p *process) initState(state stateType) {
 
 // setState sets a new state. It also checks if the transition
 // of the current state to the new state is allowed. If not,
-// the current state will not be changed.
-func (p *process) setState(state stateType) error {
+// the current state will not be changed. It returns the previous
+// state or an error
+func (p *process) setState(state stateType) (stateType, error) {
 	p.state.lock.Lock()
 	defer p.state.lock.Unlock()
 
@@ -353,11 +364,11 @@ func (p *process) setState(state stateType) error {
 			failed = true
 		}
 	} else {
-		return fmt.Errorf("current state is unhandled: %s", p.state.state)
+		return "", fmt.Errorf("current state is unhandled: %s", p.state.state)
 	}
 
 	if failed {
-		return fmt.Errorf("can't change from state %s to %s", p.state.state, state)
+		return "", fmt.Errorf("can't change from state %s to %s", p.state.state, state)
 	}
 
 	p.state.time = time.Now()
@@ -368,7 +379,7 @@ func (p *process) setState(state stateType) error {
 	}
 	p.callbacks.lock.Unlock()
 
-	return nil
+	return prevState, nil
 }
 
 func (p *process) getState() stateType {
@@ -394,7 +405,7 @@ func (p *process) getStateString() string {
 
 // Status returns the current status of the process
 func (p *process) Status() Status {
-	cpu, memory := p.limits.Current()
+	usage := p.limits.Usage()
 
 	p.state.lock.Lock()
 	stateTime := p.state.time
@@ -413,8 +424,8 @@ func (p *process) Status() Status {
 		Reconnect: time.Duration(-1),
 		Duration:  time.Since(stateTime),
 		Time:      stateTime,
-		CPU:       cpu,
-		Memory:    memory,
+		CPU:       usage.CPU,
+		Memory:    usage.Memory,
 	}
 
 	s.CommandArgs = make([]string, len(p.args))
@@ -489,7 +500,11 @@ func (p *process) start() error {
 	// Stop any restart timer in order to start the process immediately
 	p.unreconnect()
 
+	fmt.Printf("q\n")
+
 	p.setState(stateStarting)
+
+	fmt.Printf("w\n")
 
 	args := p.args
 
@@ -501,6 +516,8 @@ func (p *process) start() error {
 		args = p.callbacks.onArgs(args)
 	}
 	p.callbacks.lock.Unlock()
+
+	fmt.Printf("e\n")
 
 	// Start the stop timeout if enabled
 	if p.timeout > time.Duration(0) {
@@ -518,6 +535,8 @@ func (p *process) start() error {
 		}
 		p.stopTimerLock.Unlock()
 	}
+
+	fmt.Printf("r\n")
 
 	p.cmd = exec.Command(p.binary, args...)
 	p.cmd.Env = []string{}
@@ -545,7 +564,8 @@ func (p *process) start() error {
 
 	p.pid = int32(p.cmd.Process.Pid)
 
-	if proc, err := psutil.NewProcess(p.pid); err == nil {
+	if proc, err := psutil.NewProcess(p.pid, false); err == nil {
+		fmt.Printf("starting limiter\n")
 		p.limits.Start(proc)
 	}
 
@@ -651,9 +671,6 @@ func (p *process) stop(wait bool) error {
 			p.callbacks.onExit = func(string) {
 				wg.Done()
 
-				p.callbacks.lock.Lock()
-				defer p.callbacks.lock.Unlock()
-
 				p.callbacks.onExit = nil
 			}
 		} else {
@@ -661,9 +678,6 @@ func (p *process) stop(wait bool) error {
 			p.callbacks.onExit = func(state string) {
 				cb(state)
 				wg.Done()
-
-				p.callbacks.lock.Lock()
-				defer p.callbacks.lock.Unlock()
 
 				p.callbacks.onExit = cb
 			}
@@ -878,6 +892,7 @@ func (p *process) waiter() {
 	p.logger.Info().Log("Stopped")
 	p.debuglogger.WithField("log", p.parser.Log()).Debug().Log("Stopped")
 
+	pusage := p.limits.Usage()
 	p.limits.Stop()
 
 	// Stop the stop timer
@@ -908,7 +923,7 @@ func (p *process) waiter() {
 	p.stale.lock.Unlock()
 
 	// Send exit state to the parser
-	p.parser.Stop(state.String())
+	p.parser.Stop(state.String(), pusage)
 
 	// Reset the parser stats
 	p.parser.ResetStats()

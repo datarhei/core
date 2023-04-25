@@ -111,7 +111,7 @@ func (p *prober) parseDefault() {
 	}
 }
 
-func (p *prober) Stop(state string) {}
+func (p *prober) Stop(state string, usage process.Usage) {}
 
 func (p *prober) Log() []process.Line {
 	return p.data

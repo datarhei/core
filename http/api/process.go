@@ -231,3 +231,18 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 
 	s.Progress.Unmarshal(&state.Progress)
 }
+
+type ProcessUsageCPU struct {
+	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max     json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`
+}
+
+type ProcessUsageMemory struct {
+	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max     uint64      `json:"max" format:"uint64"`
+}
+
+type ProcessUsage struct {
+	CPU    ProcessUsageCPU    `json:"cpu_usage"`
+	Memory ProcessUsageMemory `json:"memory_bytes"`
+}

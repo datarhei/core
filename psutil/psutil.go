@@ -46,35 +46,42 @@ func init() {
 }
 
 type MemoryInfoStat struct {
-	Total     uint64
-	Available uint64
-	Used      uint64
+	Total     uint64 // bytes
+	Available uint64 // bytes
+	Used      uint64 // bytes
 }
 
 type CPUInfoStat struct {
-	System float64
-	User   float64
-	Idle   float64
-	Other  float64
+	System float64 // percent 0-100
+	User   float64 // percent 0-100
+	Idle   float64 // percent 0-100
+	Other  float64 // percent 0-100
 }
 
 type cpuTimesStat struct {
-	total  float64
-	system float64
-	user   float64
-	idle   float64
-	other  float64
+	total  float64 // seconds
+	system float64 // seconds
+	user   float64 // seconds
+	idle   float64 // seconds
+	other  float64 // seconds
 }
 
 type Util interface {
 	Start()
 	Stop()
+
+	// CPUCounts returns the number of cores, either logical or physical.
 	CPUCounts(logical bool) (float64, error)
+
+	// CPUPercent returns the current CPU load in percent. The values range
+	// from 0 to 100, independently of the number of logical cores.
 	CPUPercent() (*CPUInfoStat, error)
 	DiskUsage(path string) (*disk.UsageStat, error)
 	VirtualMemory() (*MemoryInfoStat, error)
 	NetIOCounters(pernic bool) ([]net.IOCountersStat, error)
-	Process(pid int32) (Process, error)
+
+	// Process returns a process observer for a process with the given pid.
+	Process(pid int32, limit bool) (Process, error)
 }
 
 type util struct {
@@ -131,7 +138,7 @@ func (u *util) Start() {
 		ctx, cancel := context.WithCancel(context.Background())
 		u.stopTicker = cancel
 
-		go u.tick(ctx, time.Second)
+		go u.tick(ctx, 100*time.Millisecond)
 	})
 }
 
@@ -240,6 +247,9 @@ func (u *util) tick(ctx context.Context, interval time.Duration) {
 			u.statPrevious, u.statCurrent = u.statCurrent, stat
 			u.statPreviousTime, u.statCurrentTime = u.statCurrentTime, t
 			u.lock.Unlock()
+
+			//p, _ := u.CPUPercent()
+			//fmt.Printf("%+v\n", p)
 		}
 	}
 }
@@ -273,6 +283,7 @@ func CPUCounts(logical bool) (float64, error) {
 	return DefaultUtil.CPUCounts(logical)
 }
 
+// cpuTimes returns the current cpu usage times in seconds.
 func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	if u.hasCgroup && u.cpuLimit > 0 {
 		if stat, err := u.cgroupCPUTimes(u.cgroupType); err == nil {
@@ -280,7 +291,7 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 		}
 	}
 
-	times, err := cpu.Times(false)
+	times, err := cpu.Times(true)
 	if err != nil {
 		return nil, err
 	}
@@ -289,14 +300,19 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 		return nil, errors.New("cpu.Times() returned an empty slice")
 	}
 
-	s := &cpuTimesStat{
-		total:  cpuTotal(&times[0]),
-		system: times[0].System,
-		user:   times[0].User,
-		idle:   times[0].Idle,
-	}
+	s := &cpuTimesStat{}
 
-	s.other = s.total - s.system - s.user - s.idle
+	for _, t := range times {
+		s.total += cpuTotal(&t)
+		s.system += t.System
+		s.user += t.User
+		s.idle += t.Idle
+
+		s.other = s.total - s.system - s.user - s.idle
+		if s.other < 0.0001 {
+			s.other = 0
+		}
+	}
 
 	return s, nil
 }

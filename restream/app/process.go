@@ -162,3 +162,20 @@ type State struct {
 	CPU       float64       // Current CPU consumption in percent
 	Command   []string      // ffmpeg command line parameters
 }
+
+type ProcessUsageCPU struct {
+	Average float64
+	Max     float64
+	Limit   float64
+}
+
+type ProcessUsageMemory struct {
+	Average float64
+	Max     uint64
+	Limit   uint64
+}
+
+type ProcessUsage struct {
+	CPU    ProcessUsageCPU
+	Memory ProcessUsageMemory
+}

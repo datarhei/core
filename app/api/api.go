@@ -32,6 +32,7 @@ import (
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
+	"github.com/datarhei/core/v16/psutil"
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -116,6 +117,8 @@ type api struct {
 	state  string
 
 	undoMaxprocs func()
+
+	process psutil.Process
 }
 
 // ErrConfigReload is an error returned to indicate that a reload of
@@ -1322,6 +1325,9 @@ func (a *api) start() error {
 		debug.SetMemoryLimit(math.MaxInt64)
 	}
 
+	//p, _ := psutil.NewProcess(int32(os.Getpid()), false)
+	//a.process = p
+
 	// Start the restream processes
 	restream.Start()
 
@@ -1383,6 +1389,11 @@ func (a *api) stop() {
 		logger.Info().Log("Stopping all processes ...")
 		a.restream.Stop()
 		a.restream = nil
+	}
+
+	if a.process != nil {
+		a.process.Stop()
+		a.process = nil
 	}
 
 	// Stop the session tracker

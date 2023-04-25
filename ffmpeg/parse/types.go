@@ -321,3 +321,16 @@ type AVstream struct {
 	Duplicating bool
 	GOP         string
 }
+
+type Usage struct {
+	CPU struct {
+		Average float64
+		Max     float64
+		Limit   float64
+	}
+	Memory struct {
+		Average float64
+		Max     uint64
+		Limit   uint64
+	}
+}

@@ -570,9 +570,20 @@ func (p *parser) parseAVstreamProgress(line string) error {
 	return nil
 }
 
-func (p *parser) Stop(state string) {
+func (p *parser) Stop(state string, pusage process.Usage) {
+	fmt.Printf("%+v\n", pusage)
+	usage := Usage{}
+
+	usage.CPU.Average = pusage.CPU.Average
+	usage.CPU.Max = pusage.CPU.Max
+	usage.CPU.Limit = pusage.CPU.Limit
+
+	usage.Memory.Average = pusage.Memory.Average
+	usage.Memory.Max = pusage.Memory.Max
+	usage.Memory.Limit = pusage.Memory.Limit
+
 	// The process stopped. The right moment to store the current state to the log history
-	p.storeReportHistory(state)
+	p.storeReportHistory(state, usage)
 }
 
 func (p *parser) Progress() Progress {
@@ -806,6 +817,7 @@ type ReportHistoryEntry struct {
 	ExitedAt  time.Time
 	ExitState string
 	Progress  Progress
+	Usage     Usage
 }
 
 type ReportHistorySearchResult struct {
@@ -850,7 +862,7 @@ func (p *parser) SearchReportHistory(state string, from, to *time.Time) []Report
 	return result
 }
 
-func (p *parser) storeReportHistory(state string) {
+func (p *parser) storeReportHistory(state string, usage Usage) {
 	if p.logHistory == nil {
 		return
 	}
@@ -868,6 +880,7 @@ func (p *parser) storeReportHistory(state string) {
 		ExitedAt:  time.Now(),
 		ExitState: state,
 		Progress:  p.Progress(),
+		Usage:     usage,
 	}
 
 	p.logHistory.Value = h

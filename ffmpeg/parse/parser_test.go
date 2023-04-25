@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/datarhei/core/v16/process"
 	"github.com/stretchr/testify/require"
 )
 
@@ -165,7 +166,7 @@ func TestParserLogHistory(t *testing.T) {
 	history := parser.ReportHistory()
 	require.Equal(t, 0, len(history))
 
-	parser.Stop("finished")
+	parser.Stop("finished", process.Usage{})
 
 	history = parser.ReportHistory()
 	require.Equal(t, 1, len(history))
@@ -203,7 +204,7 @@ func TestParserLogHistoryLength(t *testing.T) {
 		parser.prelude.done = true
 		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-		parser.Stop("finished")
+		parser.Stop("finished", process.Usage{})
 	}
 
 	history = parser.ReportHistory()
@@ -226,7 +227,7 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 		parser.prelude.done = true
 		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-		parser.Stop("finished")
+		parser.Stop("finished", process.Usage{})
 	}
 
 	history = parser.ReportHistory()
@@ -257,7 +258,7 @@ func TestParserLogMinimalHistoryLengthWithoutFullHistory(t *testing.T) {
 		parser.prelude.done = true
 		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-		parser.Stop("finished")
+		parser.Stop("finished", process.Usage{})
 	}
 
 	history = parser.ReportHistory()
@@ -279,7 +280,7 @@ func TestParserLogHistorySearch(t *testing.T) {
 	parser.prelude.done = true
 	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-	parser.Stop("finished")
+	parser.Stop("finished", process.Usage{})
 
 	parser.ResetStats()
 
@@ -292,7 +293,7 @@ func TestParserLogHistorySearch(t *testing.T) {
 	parser.prelude.done = true
 	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-	parser.Stop("finished")
+	parser.Stop("finished", process.Usage{})
 
 	parser.ResetStats()
 
@@ -305,7 +306,7 @@ func TestParserLogHistorySearch(t *testing.T) {
 	parser.prelude.done = true
 	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
 
-	parser.Stop("failed")
+	parser.Stop("failed", process.Usage{})
 
 	res := parser.SearchReportHistory("", nil, nil)
 	require.Equal(t, 3, len(res))
@@ -905,7 +906,7 @@ func TestParserPatterns(t *testing.T) {
 	pp, ok := p.(*parser)
 	require.True(t, ok)
 
-	pp.storeReportHistory("something")
+	pp.storeReportHistory("something", Usage{})
 
 	report := p.ReportHistory()
 	require.Equal(t, 1, len(report))

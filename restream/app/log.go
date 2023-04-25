@@ -22,6 +22,7 @@ type LogHistoryEntry struct {
 	ExitedAt  time.Time
 	ExitState string
 	Progress  Progress
+	Usage     ProcessUsage
 }
 
 type Log struct {

@@ -2,6 +2,8 @@ package psutil
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -9,8 +11,14 @@ import (
 )
 
 type Process interface {
+	// CPUPercent returns the current CPU load for this process only. The values
+	// are normed to the range of 0 to 100.
 	CPUPercent() (*CPUInfoStat, error)
+
+	// VirtualMemory returns the current memory usage in bytes of this process only.
 	VirtualMemory() (uint64, error)
+
+	// Stop will stop collecting CPU and memory data for this process.
 	Stop()
 }
 
@@ -28,14 +36,17 @@ type process struct {
 	statCurrentTime  time.Time
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
+
+	imposeLimit bool
 }
 
-func (u *util) Process(pid int32) (Process, error) {
+func (u *util) Process(pid int32, limit bool) (Process, error) {
 	p := &process{
-		pid:       pid,
-		hasCgroup: u.hasCgroup,
-		cpuLimit:  u.cpuLimit,
-		ncpu:      u.ncpu,
+		pid:         pid,
+		hasCgroup:   u.hasCgroup,
+		cpuLimit:    u.cpuLimit,
+		ncpu:        u.ncpu,
+		imposeLimit: limit,
 	}
 
 	proc, err := psprocess.NewProcess(pid)
@@ -47,18 +58,22 @@ func (u *util) Process(pid int32) (Process, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	p.stopTicker = cancel
-	go p.tick(ctx)
+	go p.tick(ctx, 1000*time.Millisecond)
 
 	return p, nil
 }
 
-func NewProcess(pid int32) (Process, error) {
-	return DefaultUtil.Process(pid)
+func NewProcess(pid int32, limit bool) (Process, error) {
+	return DefaultUtil.Process(pid, limit)
 }
 
-func (p *process) tick(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
+func (p *process) tick(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+
+	if p.imposeLimit {
+		go p.limit(ctx, interval)
+	}
 
 	for {
 		select {
@@ -71,6 +86,65 @@ func (p *process) tick(ctx context.Context) {
 			p.statPrevious, p.statCurrent = p.statCurrent, stat
 			p.statPreviousTime, p.statCurrentTime = p.statCurrentTime, t
 			p.lock.Unlock()
+
+			pct, _ := p.CPUPercent()
+			pcpu := (pct.System + pct.User + pct.Other) / 100
+
+			fmt.Printf("%d\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu)
+		}
+	}
+}
+
+func (p *process) limit(ctx context.Context, interval time.Duration) {
+	var limit float64 = 50.0 / 100.0 / p.ncpu
+	var workingrate float64 = -1
+
+	counter := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			pct, _ := p.CPUPercent()
+			/*
+				pct.System *= p.ncpu
+				pct.Idle *= p.ncpu
+				pct.User *= p.ncpu
+				pct.Other *= p.ncpu
+			*/
+
+			pcpu := (pct.System + pct.User + pct.Other) / 100
+
+			if workingrate < 0 {
+				workingrate = limit
+			} else {
+				workingrate = math.Min(workingrate/pcpu*limit, 1)
+			}
+
+			worktime := float64(interval.Nanoseconds()) * workingrate
+			sleeptime := float64(interval.Nanoseconds()) - worktime
+			/*
+				if counter%20 == 0 {
+					fmt.Printf("\nPID\t%%CPU\twork quantum\tsleep quantum\tactive rate\n")
+					counter = 0
+				}
+
+				fmt.Printf("%d\t%0.2f%%\t%.2f us\t%.2f us\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu, worktime/1000, sleeptime/1000, workingrate*100)
+			*/
+			if p.imposeLimit {
+				p.proc.Resume()
+			}
+			time.Sleep(time.Duration(worktime) * time.Nanosecond)
+
+			if sleeptime > 0 {
+				if p.imposeLimit {
+					p.proc.Suspend()
+				}
+				time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
+			}
+
+			counter++
 		}
 	}
 }
@@ -104,6 +178,9 @@ func (p *process) cpuTimes() (*cpuTimesStat, error) {
 	}
 
 	s.other = s.total - s.system - s.user
+	if s.other < 0.0001 {
+		s.other = 0
+	}
 
 	return s, nil
 }

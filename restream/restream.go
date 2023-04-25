@@ -1281,8 +1281,8 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	state.State = status.State
 	state.States.Marshal(status.States)
 	state.Time = status.Time.Unix()
-	state.Memory = status.Memory
-	state.CPU = status.CPU
+	state.Memory = status.Memory.Current
+	state.CPU = status.CPU.Current
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
 	state.Reconnect = -1
 	state.Command = status.CommandArgs
@@ -1456,6 +1456,18 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 			},
 			ExitedAt:  h.ExitedAt,
 			ExitState: h.ExitState,
+			Usage: app.ProcessUsage{
+				CPU: app.ProcessUsageCPU{
+					Average: h.Usage.CPU.Average,
+					Max:     h.Usage.CPU.Max,
+					Limit:   h.Usage.CPU.Limit,
+				},
+				Memory: app.ProcessUsageMemory{
+					Average: h.Usage.Memory.Average,
+					Max:     h.Usage.Memory.Max,
+					Limit:   h.Usage.Memory.Limit,
+				},
+			},
 		}
 
 		convertProgressFromParser(&e.Progress, h.Progress)
