@@ -3384,6 +3384,10 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3564,6 +3568,9 @@ const docTemplate = `{
                 },
                 "progress": {
                     "$ref": "#/definitions/api.Progress"
+                },
+                "resources": {
+                    "$ref": "#/definitions/api.ProcessUsage"
                 }
             }
         },
@@ -3604,6 +3611,9 @@ const docTemplate = `{
                 },
                 "progress": {
                     "$ref": "#/definitions/api.Progress"
+                },
+                "resources": {
+                    "$ref": "#/definitions/api.ProcessUsage"
                 }
             }
         },
@@ -3639,6 +3649,7 @@ const docTemplate = `{
                     }
                 },
                 "cpu_usage": {
+                    "description": "deprecated, use Resources.Memory.Current",
                     "type": "number"
                 },
                 "exec": {
@@ -3648,6 +3659,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "memory_bytes": {
+                    "description": "deprecated, use Resources.CPU.Current",
                     "type": "integer",
                     "format": "uint64"
                 },
@@ -3661,9 +3673,60 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
+                "resources": {
+                    "$ref": "#/definitions/api.ProcessUsage"
+                },
                 "runtime_seconds": {
                     "type": "integer",
                     "format": "int64"
+                }
+            }
+        },
+        "api.ProcessUsage": {
+            "type": "object",
+            "properties": {
+                "cpu_usage": {
+                    "$ref": "#/definitions/api.ProcessUsageCPU"
+                },
+                "memory_bytes": {
+                    "$ref": "#/definitions/api.ProcessUsageMemory"
+                }
+            }
+        },
+        "api.ProcessUsageCPU": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "cur": {
+                    "type": "number"
+                },
+                "limit": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ProcessUsageMemory": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "cur": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "limit": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "max": {
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },

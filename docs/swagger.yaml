@@ -755,6 +755,9 @@ definitions:
         $ref: '#/definitions/api.ProcessState'
       type:
         type: string
+      updated_at:
+        format: int64
+        type: integer
     type: object
   api.ProcessConfig:
     properties:
@@ -877,6 +880,8 @@ definitions:
         type: array
       progress:
         $ref: '#/definitions/api.Progress'
+      resources:
+        $ref: '#/definitions/api.ProcessUsage'
     type: object
   api.ProcessReportEntry:
     properties:
@@ -904,6 +909,8 @@ definitions:
         type: array
       progress:
         $ref: '#/definitions/api.Progress'
+      resources:
+        $ref: '#/definitions/api.ProcessUsage'
     type: object
   api.ProcessReportSearchResult:
     properties:
@@ -927,12 +934,14 @@ definitions:
           type: string
         type: array
       cpu_usage:
+        description: deprecated, use Resources.Memory.Current
         type: number
       exec:
         type: string
       last_logline:
         type: string
       memory_bytes:
+        description: deprecated, use Resources.CPU.Current
         format: uint64
         type: integer
       order:
@@ -942,8 +951,42 @@ definitions:
       reconnect_seconds:
         format: int64
         type: integer
+      resources:
+        $ref: '#/definitions/api.ProcessUsage'
       runtime_seconds:
         format: int64
+        type: integer
+    type: object
+  api.ProcessUsage:
+    properties:
+      cpu_usage:
+        $ref: '#/definitions/api.ProcessUsageCPU'
+      memory_bytes:
+        $ref: '#/definitions/api.ProcessUsageMemory'
+    type: object
+  api.ProcessUsageCPU:
+    properties:
+      avg:
+        type: number
+      cur:
+        type: number
+      limit:
+        type: number
+      max:
+        type: number
+    type: object
+  api.ProcessUsageMemory:
+    properties:
+      avg:
+        type: number
+      cur:
+        format: uint64
+        type: integer
+      limit:
+        format: uint64
+        type: integer
+      max:
+        format: uint64
         type: integer
     type: object
   api.Progress:

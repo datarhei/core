@@ -202,15 +202,16 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 // ProcessState represents the current state of an ffmpeg process
 type ProcessState struct {
-	Order     string      `json:"order" jsonschema:"enum=start,enum=stop"`
-	State     string      `json:"exec" jsonschema:"enum=finished,enum=starting,enum=running,enum=finishing,enum=killed,enum=failed"`
-	Runtime   int64       `json:"runtime_seconds" jsonschema:"minimum=0" format:"int64"`
-	Reconnect int64       `json:"reconnect_seconds" format:"int64"`
-	LastLog   string      `json:"last_logline"`
-	Progress  *Progress   `json:"progress"`
-	Memory    uint64      `json:"memory_bytes" format:"uint64"`
-	CPU       json.Number `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"`
-	Command   []string    `json:"command"`
+	Order     string       `json:"order" jsonschema:"enum=start,enum=stop"`
+	State     string       `json:"exec" jsonschema:"enum=finished,enum=starting,enum=running,enum=finishing,enum=killed,enum=failed"`
+	Runtime   int64        `json:"runtime_seconds" jsonschema:"minimum=0" format:"int64"`
+	Reconnect int64        `json:"reconnect_seconds" format:"int64"`
+	LastLog   string       `json:"last_logline"`
+	Progress  *Progress    `json:"progress"`
+	Memory    uint64       `json:"memory_bytes" format:"uint64"`                            // deprecated, use Resources.CPU.Current
+	CPU       json.Number  `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"` // deprecated, use Resources.Memory.Current
+	Resources ProcessUsage `json:"resources"`
+	Command   []string     `json:"command"`
 }
 
 // Unmarshal converts a restreamer ffmpeg process state to a state in API representation
@@ -227,19 +228,35 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
 	s.CPU = toNumber(state.CPU)
+	s.Resources.CPU = ProcessUsageCPU{
+		Current: toNumber(state.Resources.CPU.Current),
+		Average: toNumber(state.Resources.CPU.Average),
+		Max:     toNumber(state.Resources.CPU.Max),
+		Limit:   toNumber(state.Resources.CPU.Limit),
+	}
+	s.Resources.Memory = ProcessUsageMemory{
+		Current: state.Resources.Memory.Current,
+		Average: toNumber(state.Resources.Memory.Average),
+		Max:     state.Resources.Memory.Max,
+		Limit:   state.Resources.Memory.Limit,
+	}
 	s.Command = state.Command
 
 	s.Progress.Unmarshal(&state.Progress)
 }
 
 type ProcessUsageCPU struct {
+	Current json.Number `json:"cur" swaggertype:"number" jsonschema:"type=number"`
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
 	Max     json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`
+	Limit   json.Number `json:"limit" swaggertype:"number" jsonschema:"type=number"`
 }
 
 type ProcessUsageMemory struct {
+	Current uint64      `json:"cur" format:"uint64"`
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
 	Max     uint64      `json:"max" format:"uint64"`
+	Limit   uint64      `json:"limit" format:"uint64"`
 }
 
 type ProcessUsage struct {

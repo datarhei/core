@@ -57,10 +57,12 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 				CPU: ProcessUsageCPU{
 					Average: toNumber(h.Usage.CPU.Average),
 					Max:     toNumber(h.Usage.CPU.Max),
+					Limit:   toNumber(h.Usage.CPU.Limit),
 				},
 				Memory: ProcessUsageMemory{
 					Average: toNumber(h.Usage.Memory.Average),
 					Max:     h.Usage.Memory.Max,
+					Limit:   h.Usage.Memory.Limit,
 				},
 			},
 		}

@@ -1283,6 +1283,8 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	state.Time = status.Time.Unix()
 	state.Memory = status.Memory.Current
 	state.CPU = status.CPU.Current
+	state.Resources.CPU = status.CPU
+	state.Resources.Memory = status.Memory
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
 	state.Reconnect = -1
 	state.Command = status.CommandArgs
