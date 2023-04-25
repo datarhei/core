@@ -1217,3 +1217,26 @@ func TestProcessLogPattern(t *testing.T) {
 	err = rs.StopProcess("process")
 	require.NoError(t, err)
 }
+
+func TestProcessLimit(t *testing.T) {
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.LimitCPU = 61
+	process.LimitMemory = 42
+	process.Autostart = false
+
+	err = rsi.AddProcess(process)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
+
+	task, ok := rs.tasks[process.ID]
+	require.True(t, ok)
+
+	status := task.ffmpeg.Status()
+
+	require.Equal(t, float64(61), status.CPU.Limit)
+	require.Equal(t, uint64(42), status.Memory.Limit)
+}
