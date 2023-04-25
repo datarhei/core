@@ -2,7 +2,6 @@ package psutil
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -86,11 +85,12 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 			p.statPrevious, p.statCurrent = p.statCurrent, stat
 			p.statPreviousTime, p.statCurrentTime = p.statCurrentTime, t
 			p.lock.Unlock()
+			/*
+				pct, _ := p.CPUPercent()
+				pcpu := (pct.System + pct.User + pct.Other) / 100
 
-			pct, _ := p.CPUPercent()
-			pcpu := (pct.System + pct.User + pct.Other) / 100
-
-			fmt.Printf("%d\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu)
+				fmt.Printf("%d\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu)
+			*/
 		}
 	}
 }

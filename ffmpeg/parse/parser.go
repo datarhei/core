@@ -571,7 +571,6 @@ func (p *parser) parseAVstreamProgress(line string) error {
 }
 
 func (p *parser) Stop(state string, pusage process.Usage) {
-	fmt.Printf("%+v\n", pusage)
 	usage := Usage{}
 
 	usage.CPU.Average = pusage.CPU.Average

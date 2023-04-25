@@ -500,11 +500,7 @@ func (p *process) start() error {
 	// Stop any restart timer in order to start the process immediately
 	p.unreconnect()
 
-	fmt.Printf("q\n")
-
 	p.setState(stateStarting)
-
-	fmt.Printf("w\n")
 
 	args := p.args
 
@@ -516,8 +512,6 @@ func (p *process) start() error {
 		args = p.callbacks.onArgs(args)
 	}
 	p.callbacks.lock.Unlock()
-
-	fmt.Printf("e\n")
 
 	// Start the stop timeout if enabled
 	if p.timeout > time.Duration(0) {
@@ -535,8 +529,6 @@ func (p *process) start() error {
 		}
 		p.stopTimerLock.Unlock()
 	}
-
-	fmt.Printf("r\n")
 
 	p.cmd = exec.Command(p.binary, args...)
 	p.cmd.Env = []string{}
@@ -565,7 +557,6 @@ func (p *process) start() error {
 	p.pid = int32(p.cmd.Process.Pid)
 
 	if proc, err := psutil.NewProcess(p.pid, false); err == nil {
-		fmt.Printf("starting limiter\n")
 		p.limits.Start(proc)
 	}
 
