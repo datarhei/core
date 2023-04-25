@@ -594,9 +594,6 @@ func (p *process) stop(wait bool) error {
 			p.callbacks.onExit = func() {
 				wg.Done()
 
-				p.callbacks.lock.Lock()
-				defer p.callbacks.lock.Unlock()
-
 				p.callbacks.onExit = nil
 			}
 		} else {
@@ -604,9 +601,6 @@ func (p *process) stop(wait bool) error {
 			p.callbacks.onExit = func() {
 				cb()
 				wg.Done()
-
-				p.callbacks.lock.Lock()
-				defer p.callbacks.lock.Unlock()
 
 				p.callbacks.onExit = cb
 			}
