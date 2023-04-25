@@ -49,6 +49,10 @@ type Limiter interface {
 	// Usage returns the current state of the limiter, such as current, average, max, and
 	// limit values for CPU and memory.
 	Usage() Usage
+
+	// Limit enables or disables the throttling of the CPU or killing because of to much
+	// memory consumption.
+	Limit(enable bool) error
 }
 
 type limiter struct {
@@ -256,4 +260,8 @@ func (l *limiter) Usage() Usage {
 
 func (l *limiter) Limits() (cpu float64, memory uint64) {
 	return l.cpu, l.memory
+}
+
+func (l *limiter) Limit(enable bool) error {
+	return nil
 }

@@ -105,6 +105,7 @@ func (d *Config) Clone() *Config {
 	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
+	data.Resources = d.Resources
 
 	data.Log.Topics = copy.Slice(d.Log.Topics)
 
@@ -273,6 +274,10 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.Router.BlockedPrefixes, []string{"/api"}, ","), "router.blocked_prefixes", "CORE_ROUTER_BLOCKED_PREFIXES", nil, "List of path prefixes that can't be routed", false, false)
 	d.vars.Register(value.NewStringMapString(&d.Router.Routes, nil), "router.routes", "CORE_ROUTER_ROUTES", nil, "List of route mappings", false, false)
 	d.vars.Register(value.NewDir(&d.Router.UIPath, "", d.fs), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
+
+	// Resources
+	d.vars.Register(value.NewFloat(&d.Resources.MaxCPUUsage, 0), "resources.max_cpu_usage", "CORE_RESOURCES_MAX_CPU_USAGE", nil, "Maximum system CPU usage in percent, from 0 (no limit) to 100*ncpu", false, false)
+	d.vars.Register(value.NewFloat(&d.Resources.MaxMemoryUsage, 0), "resources.max_memory_usage", "CORE_RESOURCES_MAX_MEMORY_USAGE", nil, "Maximum system usage in percent, from 0 (no limit) to 100", false, false)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are

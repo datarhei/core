@@ -279,3 +279,34 @@ func (u *Uint64) Validate() error {
 func (u *Uint64) IsEmpty() bool {
 	return uint64(*u) == 0
 }
+
+// float64
+
+type Float64 float64
+
+func NewFloat(p *float64, val float64) *Float64 {
+	*p = val
+
+	return (*Float64)(p)
+}
+
+func (u *Float64) Set(val string) error {
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return err
+	}
+	*u = Float64(v)
+	return nil
+}
+
+func (u *Float64) String() string {
+	return strconv.FormatFloat(float64(*u), 'f', -1, 64)
+}
+
+func (u *Float64) Validate() error {
+	return nil
+}
+
+func (u *Float64) IsEmpty() bool {
+	return float64(*u) == 0
+}

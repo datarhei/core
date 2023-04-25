@@ -145,3 +145,23 @@ func TestUint64Value(t *testing.T) {
 
 	require.Equal(t, uint64(77), x)
 }
+
+func TestFloat64Value(t *testing.T) {
+	var x float64
+
+	val := NewFloat(&x, 11.1)
+
+	require.Equal(t, "11.1", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	x = 42.5
+
+	require.Equal(t, "42.5", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	val.Set("77.7")
+
+	require.Equal(t, float64(77.7), x)
+}

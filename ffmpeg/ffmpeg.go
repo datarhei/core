@@ -29,18 +29,21 @@ type FFmpeg interface {
 }
 
 type ProcessConfig struct {
-	Reconnect      bool
-	ReconnectDelay time.Duration
-	StaleTimeout   time.Duration
-	Timeout        time.Duration
-	Scheduler      string
-	Args           []string
-	Parser         process.Parser
-	Logger         log.Logger
-	OnArgs         func([]string) []string
-	OnExit         func(state string)
-	OnStart        func()
-	OnStateChange  func(from, to string)
+	Reconnect      bool                    // Whether to reconnect
+	ReconnectDelay time.Duration           // Duration until next reconnect
+	StaleTimeout   time.Duration           // Duration to wait until killing the process if there is no progress in the process
+	Timeout        time.Duration           // Duration to wait until killing the process
+	LimitCPU       float64                 // Kill the process if the CPU usage in percent is above this value.
+	LimitMemory    uint64                  // Kill the process if the memory consumption in bytes is above this value.
+	LimitDuration  time.Duration           // Kill the process if the limits are exceeded for this duration.
+	Scheduler      string                  // A scheduler for starting the process, either a concrete date (RFC3339) or in crontab syntax
+	Args           []string                // Arguments for the process
+	Parser         process.Parser          // Parser for the process output
+	Logger         log.Logger              // Logger
+	OnArgs         func([]string) []string // Callback before starting the process to retrieve new arguments
+	OnExit         func(state string)      // Callback called after the process stopped with exit state as argument
+	OnStart        func()                  // Callback called after process has been started
+	OnStateChange  func(from, to string)   // Callback called on state change
 }
 
 // Config is the configuration for ffmpeg that is part of the configuration
@@ -134,6 +137,9 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		ReconnectDelay: config.ReconnectDelay,
 		StaleTimeout:   config.StaleTimeout,
 		Timeout:        config.Timeout,
+		LimitCPU:       config.LimitCPU,
+		LimitMemory:    config.LimitMemory,
+		LimitDuration:  config.LimitDuration,
 		Scheduler:      scheduler,
 		Parser:         config.Parser,
 		Logger:         config.Logger,

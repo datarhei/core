@@ -42,25 +42,31 @@ type Process interface {
 	// IsRunning returns whether the process is currently
 	// running or not.
 	IsRunning() bool
+
+	// Limit enabled or disables CPU and memory limiting. CPU will be throttled
+	// into the configured limit. If memory consumption is above the configured
+	// limit, the process will be killed.
+	Limit(enable bool) error
 }
 
 // Config is the configuration of a process
 type Config struct {
-	Binary         string                       // Path to the ffmpeg binary
-	Args           []string                     // List of arguments for the binary
-	Reconnect      bool                         // Whether to restart the process if it exited
-	ReconnectDelay time.Duration                // Duration to wait before restarting the process
-	StaleTimeout   time.Duration                // Kill the process after this duration if it doesn't produce any output
-	Timeout        time.Duration                // Kill the process after this duration
-	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value
-	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value
-	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration
-	Scheduler      Scheduler                    // A scheduler
-	Parser         Parser                       // A parser for the output of the process
-	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args
-	OnStart        func()                       // A callback which is called after the process started
-	OnExit         func(state string)           // A callback which is called after the process exited with the exit state
-	OnStateChange  func(from, to string)        // A callback which is called after a state changed
+	Binary         string                       // Path to the ffmpeg binary.
+	Args           []string                     // List of arguments for the binary.
+	Reconnect      bool                         // Whether to restart the process if it exited.
+	ReconnectDelay time.Duration                // Duration to wait before restarting the process.
+	StaleTimeout   time.Duration                // Kill the process after this duration if it doesn't produce any output.
+	Timeout        time.Duration                // Kill the process after this duration.
+	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value.
+	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value.
+	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration.
+	Scheduler      Scheduler                    // A scheduler.
+	Parser         Parser                       // A parser for the output of the process.
+	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args.
+	OnBeforeStart  func() error                 // A callback which is called before the process will be started. If error is non-nil, the start will be refused.
+	OnStart        func()                       // A callback which is called after the process started.
+	OnExit         func(state string)           // A callback which is called after the process exited with the exit state.
+	OnStateChange  func(from, to string)        // A callback which is called after a state changed.
 	Logger         log.Logger
 }
 
@@ -74,16 +80,16 @@ type Status struct {
 	Time        time.Time     // Time is the time of the last change of the state
 	CommandArgs []string      // Currently running command arguments
 	CPU         struct {
-		Current float64
-		Average float64
-		Max     float64
-		Limit   float64
+		Current float64 // Currently consumed CPU in percent
+		Average float64 // Average consumed CPU in percent
+		Max     float64 // Max. consumed CPU in percent
+		Limit   float64 // Usage limit in percent
 	} // Used CPU in percent
 	Memory struct {
-		Current uint64
-		Average float64
-		Max     uint64
-		Limit   uint64
+		Current uint64  // Currently consumed memory in bytes
+		Average float64 // Average consumed memory in bytes
+		Max     uint64  // Max. consumed memory in bytes
+		Limit   uint64  // Usage limit in bytes
 	} // Used memory in bytes
 }
 
@@ -196,6 +202,7 @@ type process struct {
 	debuglogger   log.Logger
 	callbacks     struct {
 		onArgs        func(args []string) []string
+		onBeforeStart func() error
 		onStart       func()
 		onExit        func(state string)
 		onStateChange func(from, to string)
@@ -252,6 +259,7 @@ func New(config Config) (Process, error) {
 	p.stale.timeout = config.StaleTimeout
 
 	p.callbacks.onArgs = config.OnArgs
+	p.callbacks.onBeforeStart = config.OnBeforeStart
 	p.callbacks.onStart = config.OnStart
 	p.callbacks.onExit = config.OnExit
 	p.callbacks.onStateChange = config.OnStateChange
@@ -445,6 +453,10 @@ func (p *process) IsRunning() bool {
 	return p.isRunning()
 }
 
+func (p *process) Limit(enable bool) error {
+	return p.limits.Limit(enable)
+}
+
 // Start will start the process and sets the order to "start". If the
 // process has alread the "start" order, nothing will be done. Returns
 // an error if start failed.
@@ -510,6 +522,19 @@ func (p *process) start() error {
 		copy(args, p.args)
 
 		args = p.callbacks.onArgs(args)
+	}
+
+	if p.callbacks.onBeforeStart != nil {
+		if err := p.callbacks.onBeforeStart(); err != nil {
+			p.setState(stateFailed)
+
+			p.parser.Parse(err.Error())
+			p.logger.WithError(err).Error().Log("Starting failed")
+
+			p.reconnect(p.delay(stateFailed))
+
+			return err
+		}
 	}
 	p.callbacks.lock.Unlock()
 

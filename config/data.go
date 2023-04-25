@@ -139,7 +139,7 @@ type Data struct {
 	} `json:"playout"`
 	Debug struct {
 		Profiling    bool  `json:"profiling"`
-		ForceGC      int   `json:"force_gc" format:"int"`
+		ForceGC      int   `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
 		MemoryLimit  int64 `json:"memory_limit_mbytes" format:"int64"`
 		AutoMaxProcs bool  `json:"auto_max_procs"`
 	} `json:"debug"`
@@ -168,6 +168,10 @@ type Data struct {
 		Routes          map[string]string `json:"routes"`
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
+	Resources struct {
+		MaxCPUUsage    float64 `json:"max_cpu_usage"`
+		MaxMemoryUsage float64 `json:"max_memory_usage"`
+	} `json:"resources"`
 }
 
 func UpgradeV2ToV3(d *v2.Data, fs fs.Filesystem) (*Data, error) {
