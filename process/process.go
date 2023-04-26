@@ -527,6 +527,21 @@ func (p *process) start() error {
 		args = p.callbacks.onArgs(args)
 	}
 
+	p.cmd = exec.Command(p.binary, args...)
+	p.cmd.Env = []string{}
+
+	p.stdout, err = p.cmd.StderrPipe()
+	if err != nil {
+		p.setState(stateFailed)
+
+		p.parser.Parse(err.Error())
+		p.logger.WithError(err).Error().Log("Command failed")
+
+		p.reconnect(p.delay(stateFailed))
+
+		return err
+	}
+
 	if p.callbacks.onBeforeStart != nil {
 		if err := p.callbacks.onBeforeStart(); err != nil {
 			p.setState(stateFailed)
@@ -538,6 +553,22 @@ func (p *process) start() error {
 
 			return nil
 		}
+	}
+
+	if err := p.cmd.Start(); err != nil {
+		p.setState(stateFailed)
+
+		p.parser.Parse(err.Error())
+		p.logger.WithError(err).Error().Log("Command failed")
+		p.reconnect(p.delay(stateFailed))
+
+		p.callbacks.lock.Lock()
+		if p.callbacks.onExit != nil {
+			p.callbacks.onExit(stateFailed.String())
+		}
+		p.callbacks.lock.Unlock()
+
+		return err
 	}
 
 	// Start the stop timeout if enabled
@@ -555,30 +586,6 @@ func (p *process) start() error {
 			})
 		}
 		p.stopTimerLock.Unlock()
-	}
-
-	p.cmd = exec.Command(p.binary, args...)
-	p.cmd.Env = []string{}
-
-	p.stdout, err = p.cmd.StderrPipe()
-	if err != nil {
-		p.setState(stateFailed)
-
-		p.parser.Parse(err.Error())
-		p.logger.WithError(err).Error().Log("Command failed")
-
-		p.reconnect(p.delay(stateFailed))
-
-		return err
-	}
-	if err := p.cmd.Start(); err != nil {
-		p.setState(stateFailed)
-
-		p.parser.Parse(err.Error())
-		p.logger.WithError(err).Error().Log("Command failed")
-		p.reconnect(p.delay(stateFailed))
-
-		return err
 	}
 
 	p.pid = int32(p.cmd.Process.Pid)
