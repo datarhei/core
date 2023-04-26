@@ -10,6 +10,7 @@ import (
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/psutil"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -1237,6 +1238,9 @@ func TestProcessLimit(t *testing.T) {
 
 	status := task.ffmpeg.Status()
 
-	require.Equal(t, float64(244), status.CPU.Limit)
-	require.Equal(t, uint64(42), status.Memory.Limit)
+	ncpu, err := psutil.CPUCounts(true)
+	require.NoError(t, err)
+
+	require.Equal(t, ncpu*process.LimitCPU, status.CPU.Limit)
+	require.Equal(t, process.LimitMemory, status.Memory.Limit)
 }
