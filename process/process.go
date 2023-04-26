@@ -63,26 +63,19 @@ type Config struct {
 
 // Status represents the current status of a process
 type Status struct {
-	// State is the current state of the process. See stateType for the known states.
-	State string
-
-	// States is the cumulative history of states the process had.
-	States States
-
-	// Order is the wanted condition of process, either "start" or "stop"
-	Order string
-
-	// Duration is the time since the last change of the state
-	Duration time.Duration
-
-	// Time is the time of the last change of the state
-	Time time.Time
-
-	// Used CPU in percent
-	CPU float64
-
-	// Used memory in bytes
-	Memory uint64
+	State    string        // State is the current state of the process. See stateType for the known states.
+	States   States        // States is the cumulative history of states the process had.
+	Order    string        // Order is the wanted condition of process, either "start" or "stop"
+	Duration time.Duration // Duration is the time since the last change of the state
+	Time     time.Time     // Time is the time of the last change of the state
+	CPU      struct {
+		Current float64 // Used CPU in percent
+		Limit   float64 // Limit in percent
+	}
+	Memory struct {
+		Current uint64 // Used memory in bytes
+		Limit   uint64 // Limit in bytes
+	}
 }
 
 // States
@@ -390,6 +383,7 @@ func (p *process) getStateString() string {
 // Status returns the current status of the process
 func (p *process) Status() Status {
 	cpu, memory := p.limits.Current()
+	cpuLimit, memoryLimit := p.limits.Limits()
 
 	p.state.lock.Lock()
 	stateTime := p.state.time
@@ -407,9 +401,13 @@ func (p *process) Status() Status {
 		Order:    order,
 		Duration: time.Since(stateTime),
 		Time:     stateTime,
-		CPU:      cpu,
-		Memory:   memory,
 	}
+
+	s.CPU.Current = cpu
+	s.CPU.Limit = cpuLimit
+
+	s.Memory.Current = memory
+	s.Memory.Limit = memoryLimit
 
 	return s
 }

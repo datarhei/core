@@ -883,3 +883,26 @@ func TestReplacer(t *testing.T) {
 
 	require.Equal(t, process, rs.tasks["314159265359"].config)
 }
+
+func TestProcessLimit(t *testing.T) {
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.LimitCPU = 61
+	process.LimitMemory = 42
+	process.Autostart = false
+
+	err = rsi.AddProcess(process)
+	require.NoError(t, err)
+
+	rs := rsi.(*restream)
+
+	task, ok := rs.tasks[process.ID]
+	require.True(t, ok)
+
+	status := task.ffmpeg.Status()
+
+	require.Equal(t, float64(61), status.CPU.Limit)
+	require.Equal(t, uint64(42), status.Memory.Limit)
+}
