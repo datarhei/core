@@ -24,6 +24,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/resources"
 	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/Masterminds/semver/v3"
@@ -68,6 +69,8 @@ type Config struct {
 	Replace      replace.Replacer
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
+	MaxCPU       float64 // percent 0-100*ncpu
+	MaxMemory    float64 // percent 0-100
 	Logger       log.Logger
 }
 
@@ -95,15 +98,19 @@ type restream struct {
 	maxProc   int64
 	nProc     int64
 	fs        struct {
-		list         []rfs.Filesystem
-		stopObserver context.CancelFunc
+		list []rfs.Filesystem
 	}
 	replace  replace.Replacer
 	tasks    map[string]*task
 	logger   log.Logger
 	metadata map[string]interface{}
 
+	resources       resources.Resources
+	enableSoftLimit bool
+
 	lock sync.RWMutex
+
+	cancelObserver context.CancelFunc
 
 	startOnce sync.Once
 	stopOnce  sync.Once
@@ -159,6 +166,11 @@ func New(config Config) (Restreamer, error) {
 
 	r.maxProc = config.MaxProcesses
 
+	if config.MaxCPU > 0 || config.MaxMemory > 0 {
+		r.resources, _ = resources.New(config.MaxCPU, config.MaxMemory)
+		r.enableSoftLimit = true
+	}
+
 	if err := r.load(); err != nil {
 		return nil, fmt.Errorf("failed to load data from DB (%w)", err)
 	}
@@ -175,6 +187,13 @@ func (r *restream) Start() {
 		r.lock.Lock()
 		defer r.lock.Unlock()
 
+		ctx, cancel := context.WithCancel(context.Background())
+		r.cancelObserver = cancel
+
+		if r.enableSoftLimit {
+			go r.resourceObserver(ctx, r.resources)
+		}
+
 		for id, t := range r.tasks {
 			if t.process.Order == "start" {
 				r.startProcess(id)
@@ -184,14 +203,11 @@ func (r *restream) Start() {
 			r.setCleanup(id, t.config)
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		r.fs.stopObserver = cancel
-
 		for _, fs := range r.fs.list {
 			fs.Start()
 
 			if fs.Type() == "disk" {
-				go r.observe(ctx, fs, 10*time.Second)
+				go r.filesystemObserver(ctx, fs, 10*time.Second)
 			}
 		}
 
@@ -215,7 +231,7 @@ func (r *restream) Stop() {
 			r.unsetCleanup(id)
 		}
 
-		r.fs.stopObserver()
+		r.cancelObserver()
 
 		// Stop the cleanup jobs
 		for _, fs := range r.fs.list {
@@ -226,7 +242,7 @@ func (r *restream) Stop() {
 	})
 }
 
-func (r *restream) observe(ctx context.Context, fs fs.Filesystem, interval time.Duration) {
+func (r *restream) filesystemObserver(ctx context.Context, fs fs.Filesystem, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -262,6 +278,36 @@ func (r *restream) observe(ctx context.Context, fs fs.Filesystem, interval time.
 				}
 				r.lock.Unlock()
 			}
+		}
+	}
+}
+
+func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources) {
+	rsc.Start()
+	defer rsc.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case limit := <-rsc.Limit():
+			if limit {
+				r.logger.Warn().WithField("limit", limit).Log("limiter triggered")
+			}
+
+			r.lock.Lock()
+			for id, t := range r.tasks {
+				if !t.valid {
+					continue
+				}
+
+				r.logger.Debug().WithFields(log.Fields{
+					"limit": limit,
+					"id":    id,
+				}).Log("limiting process")
+				t.ffmpeg.Limit(limit)
+			}
+			r.lock.Unlock()
 		}
 	}
 }
@@ -360,6 +406,11 @@ func (r *restream) load() error {
 		t.command = t.config.CreateCommand()
 		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
+		limitMode := "hard"
+		if r.enableSoftLimit {
+			limitMode = "soft"
+		}
+
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 			Reconnect:      t.config.Reconnect,
 			ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
@@ -368,13 +419,30 @@ func (r *restream) load() error {
 			LimitCPU:       t.config.LimitCPU,
 			LimitMemory:    t.config.LimitMemory,
 			LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-			LimitMode:      "hard",
+			LimitMode:      limitMode,
 			Scheduler:      t.config.Scheduler,
 			Args:           t.command,
 			Parser:         t.parser,
 			Logger:         t.logger,
 			OnArgs:         r.onArgs(t.config.Clone()),
-			OnBeforeStart:  func() error { return nil },
+			OnBeforeStart: func() error {
+				if !r.enableSoftLimit {
+					return nil
+				}
+
+				if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
+					return fmt.Errorf("not enough resources available")
+				}
+
+				return nil
+			},
+			OnExit: func(string) {
+				if !r.enableSoftLimit {
+					return
+				}
+
+				r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
+			},
 		})
 		if err != nil {
 			return err
@@ -519,6 +587,11 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	t.command = t.config.CreateCommand()
 	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
+	limitMode := "hard"
+	if r.enableSoftLimit {
+		limitMode = "soft"
+	}
+
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
@@ -527,13 +600,30 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		LimitCPU:       t.config.LimitCPU,
 		LimitMemory:    t.config.LimitMemory,
 		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-		LimitMode:      "hard",
+		LimitMode:      limitMode,
 		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
 		OnArgs:         r.onArgs(t.config.Clone()),
-		OnBeforeStart:  func() error { return nil },
+		OnBeforeStart: func() error {
+			if !r.enableSoftLimit {
+				return nil
+			}
+
+			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
+				return fmt.Errorf("not enough resources available")
+			}
+
+			return nil
+		},
+		OnExit: func(string) {
+			if !r.enableSoftLimit {
+				return
+			}
+
+			r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -1245,6 +1335,11 @@ func (r *restream) reloadProcess(id string) error {
 
 	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
 
+	limitMode := "hard"
+	if r.enableSoftLimit {
+		limitMode = "soft"
+	}
+
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
@@ -1253,13 +1348,30 @@ func (r *restream) reloadProcess(id string) error {
 		LimitCPU:       t.config.LimitCPU,
 		LimitMemory:    t.config.LimitMemory,
 		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-		LimitMode:      "hard",
+		LimitMode:      limitMode,
 		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
 		OnArgs:         r.onArgs(t.config.Clone()),
-		OnBeforeStart:  func() error { return nil },
+		OnBeforeStart: func() error {
+			if !r.enableSoftLimit {
+				return nil
+			}
+
+			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
+				return fmt.Errorf("not enough resources available")
+			}
+
+			return nil
+		},
+		OnExit: func(string) {
+			if !r.enableSoftLimit {
+				return
+			}
+
+			r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
+		},
 	})
 	if err != nil {
 		return err
