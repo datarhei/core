@@ -55,7 +55,7 @@ func TestScheme(t *testing.T) {
 	require.False(t, r)
 }
 
-func TestPars(t *testing.T) {
+func TestParse(t *testing.T) {
 	u, err := Parse("http://localhost/foobar")
 	require.NoError(t, err)
 	require.Equal(t, &URL{

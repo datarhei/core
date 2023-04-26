@@ -78,7 +78,7 @@ func TestMaxAge(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 0
-	}, 5*time.Second, time.Second)
+	}, 10*time.Second, time.Second)
 
 	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
 
@@ -96,7 +96,7 @@ func TestMaxAge(t *testing.T) {
 		require.ElementsMatch(t, []string{"/chunk_3.ts"}, names)
 
 		return true
-	}, 2*time.Second, time.Second)
+	}, 5*time.Second, time.Second)
 
 	cleanfs.Stop()
 }

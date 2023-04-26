@@ -14,6 +14,7 @@
 -   Add support for input framerate data from jsonstats patch
 -   Add number of keyframes and extradata size to process progress data
 -   Fix placeholder parameter parsing
+-   Mod bumps FFmpeg to v5.1.3 (datarhei/core:tag bundles)
 -   Fix better naming for storage endpoint documentation
 -   Fix freeing up S3 mounts
 -   Fix URL validation if the path contains FFmpeg specific placeholders
