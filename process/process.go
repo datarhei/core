@@ -60,6 +60,7 @@ type Config struct {
 	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value.
 	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value.
 	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration.
+	LimitMode      LimitMode                    // Select limiting mode
 	Scheduler      Scheduler                    // A scheduler.
 	Parser         Parser                       // A parser for the output of the process.
 	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args.
@@ -268,6 +269,7 @@ func New(config Config) (Process, error) {
 		CPU:     config.LimitCPU,
 		Memory:  config.LimitMemory,
 		WaitFor: config.LimitDuration,
+		Mode:    config.LimitMode,
 		OnLimit: func(cpu float64, memory uint64) {
 			p.logger.WithFields(log.Fields{
 				"cpu":    cpu,
@@ -381,11 +383,9 @@ func (p *process) setState(state stateType) (stateType, error) {
 
 	p.state.time = time.Now()
 
-	p.callbacks.lock.Lock()
 	if p.callbacks.onStateChange != nil {
 		p.callbacks.onStateChange(prevState.String(), p.state.state.String())
 	}
-	p.callbacks.lock.Unlock()
 
 	return prevState, nil
 }
@@ -432,9 +432,13 @@ func (p *process) Status() Status {
 		Reconnect: time.Duration(-1),
 		Duration:  time.Since(stateTime),
 		Time:      stateTime,
-		CPU:       usage.CPU,
 		Memory:    usage.Memory,
 	}
+
+	s.CPU.Current = usage.CPU.Current
+	s.CPU.Average = usage.CPU.Average
+	s.CPU.Max = usage.CPU.Max
+	s.CPU.Limit = usage.CPU.Limit
 
 	s.CommandArgs = make([]string, len(p.args))
 	copy(s.CommandArgs, p.args)
@@ -516,7 +520,6 @@ func (p *process) start() error {
 
 	args := p.args
 
-	p.callbacks.lock.Lock()
 	if p.callbacks.onArgs != nil {
 		args = make([]string, len(p.args))
 		copy(args, p.args)
@@ -533,10 +536,9 @@ func (p *process) start() error {
 
 			p.reconnect(p.delay(stateFailed))
 
-			return err
+			return nil
 		}
 	}
-	p.callbacks.lock.Unlock()
 
 	// Start the stop timeout if enabled
 	if p.timeout > time.Duration(0) {
@@ -590,11 +592,9 @@ func (p *process) start() error {
 	p.logger.Info().Log("Started")
 	p.debuglogger.Debug().Log("Started")
 
-	p.callbacks.lock.Lock()
 	if p.callbacks.onStart != nil {
 		p.callbacks.onStart()
 	}
-	p.callbacks.lock.Unlock()
 
 	// Start the reader
 	go p.reader()

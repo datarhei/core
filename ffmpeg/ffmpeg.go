@@ -36,13 +36,15 @@ type ProcessConfig struct {
 	LimitCPU       float64                 // Kill the process if the CPU usage in percent is above this value.
 	LimitMemory    uint64                  // Kill the process if the memory consumption in bytes is above this value.
 	LimitDuration  time.Duration           // Kill the process if the limits are exceeded for this duration.
+	LimitMode      string                  // How to limit the process, "hard" or "soft"
 	Scheduler      string                  // A scheduler for starting the process, either a concrete date (RFC3339) or in crontab syntax
 	Args           []string                // Arguments for the process
 	Parser         process.Parser          // Parser for the process output
 	Logger         log.Logger              // Logger
 	OnArgs         func([]string) []string // Callback before starting the process to retrieve new arguments
-	OnExit         func(state string)      // Callback called after the process stopped with exit state as argument
+	OnBeforeStart  func() error            // Callback which is called before the process will be started. If error is non-nil, the start will be refused.
 	OnStart        func()                  // Callback called after process has been started
+	OnExit         func(state string)      // Callback called after the process stopped with exit state as argument
 	OnStateChange  func(from, to string)   // Callback called on state change
 }
 
@@ -140,10 +142,12 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		LimitCPU:       config.LimitCPU,
 		LimitMemory:    config.LimitMemory,
 		LimitDuration:  config.LimitDuration,
+		LimitMode:      process.LimitModeHard,
 		Scheduler:      scheduler,
 		Parser:         config.Parser,
 		Logger:         config.Logger,
 		OnArgs:         config.OnArgs,
+		OnBeforeStart:  config.OnBeforeStart,
 		OnStart:        config.OnStart,
 		OnExit:         config.OnExit,
 		OnStateChange: func(from, to string) {

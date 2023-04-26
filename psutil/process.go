@@ -2,7 +2,6 @@ package psutil
 
 import (
 	"context"
-	"math"
 	"sync"
 	"time"
 
@@ -19,6 +18,12 @@ type Process interface {
 
 	// Stop will stop collecting CPU and memory data for this process.
 	Stop()
+
+	// Suspend will send SIGSTOP to the process
+	Suspend() error
+
+	// Resume will send SIGCONT to the process
+	Resume() error
 }
 
 type process struct {
@@ -70,10 +75,6 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	if p.imposeLimit {
-		go p.limit(ctx, interval)
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -85,66 +86,6 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 			p.statPrevious, p.statCurrent = p.statCurrent, stat
 			p.statPreviousTime, p.statCurrentTime = p.statCurrentTime, t
 			p.lock.Unlock()
-			/*
-				pct, _ := p.CPUPercent()
-				pcpu := (pct.System + pct.User + pct.Other) / 100
-
-				fmt.Printf("%d\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu)
-			*/
-		}
-	}
-}
-
-func (p *process) limit(ctx context.Context, interval time.Duration) {
-	var limit float64 = 50.0 / 100.0 / p.ncpu
-	var workingrate float64 = -1
-
-	counter := 0
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			pct, _ := p.CPUPercent()
-			/*
-				pct.System *= p.ncpu
-				pct.Idle *= p.ncpu
-				pct.User *= p.ncpu
-				pct.Other *= p.ncpu
-			*/
-
-			pcpu := (pct.System + pct.User + pct.Other) / 100
-
-			if workingrate < 0 {
-				workingrate = limit
-			} else {
-				workingrate = math.Min(workingrate/pcpu*limit, 1)
-			}
-
-			worktime := float64(interval.Nanoseconds()) * workingrate
-			sleeptime := float64(interval.Nanoseconds()) - worktime
-			/*
-				if counter%20 == 0 {
-					fmt.Printf("\nPID\t%%CPU\twork quantum\tsleep quantum\tactive rate\n")
-					counter = 0
-				}
-
-				fmt.Printf("%d\t%0.2f%%\t%.2f us\t%.2f us\t%0.2f%%\n", p.pid, pcpu*100*p.ncpu, worktime/1000, sleeptime/1000, workingrate*100)
-			*/
-			if p.imposeLimit {
-				p.proc.Resume()
-			}
-			time.Sleep(time.Duration(worktime) * time.Nanosecond)
-
-			if sleeptime > 0 {
-				if p.imposeLimit {
-					p.proc.Suspend()
-				}
-				time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
-			}
-
-			counter++
 		}
 	}
 }
@@ -163,6 +104,14 @@ func (p *process) collect() cpuTimesStat {
 
 func (p *process) Stop() {
 	p.stopTicker()
+}
+
+func (p *process) Suspend() error {
+	return p.proc.Suspend()
+}
+
+func (p *process) Resume() error {
+	return p.proc.Resume()
 }
 
 func (p *process) cpuTimes() (*cpuTimesStat, error) {

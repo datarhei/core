@@ -52,3 +52,29 @@ func (p *nullParser) Stop(string, Usage)  {}
 func (p *nullParser) ResetStats()         {}
 func (p *nullParser) ResetLog()           {}
 func (p *nullParser) Log() []Line         { return []Line{} }
+
+type bufferParser struct {
+	log []Line
+}
+
+// NewBufferParser returns a dummy parser that is just storing
+// the lines and returns progress.
+func NewBufferParser() Parser {
+	return &bufferParser{}
+}
+
+var _ Parser = &bufferParser{}
+
+func (p *bufferParser) Parse(line string) uint64 {
+	p.log = append(p.log, Line{
+		Timestamp: time.Now(),
+		Data:      line,
+	})
+	return 1
+}
+func (p *bufferParser) Stop(string, Usage) {}
+func (p *bufferParser) ResetStats()        {}
+func (p *bufferParser) ResetLog() {
+	p.log = []Line{}
+}
+func (p *bufferParser) Log() []Line { return p.log }

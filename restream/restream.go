@@ -368,11 +368,13 @@ func (r *restream) load() error {
 			LimitCPU:       t.config.LimitCPU,
 			LimitMemory:    t.config.LimitMemory,
 			LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
+			LimitMode:      "hard",
 			Scheduler:      t.config.Scheduler,
 			Args:           t.command,
 			Parser:         t.parser,
 			Logger:         t.logger,
 			OnArgs:         r.onArgs(t.config.Clone()),
+			OnBeforeStart:  func() error { return nil },
 		})
 		if err != nil {
 			return err
@@ -525,11 +527,13 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		LimitCPU:       t.config.LimitCPU,
 		LimitMemory:    t.config.LimitMemory,
 		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
+		LimitMode:      "hard",
 		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
 		OnArgs:         r.onArgs(t.config.Clone()),
+		OnBeforeStart:  func() error { return nil },
 	})
 	if err != nil {
 		return nil, err
@@ -1249,11 +1253,13 @@ func (r *restream) reloadProcess(id string) error {
 		LimitCPU:       t.config.LimitCPU,
 		LimitMemory:    t.config.LimitMemory,
 		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
+		LimitMode:      "hard",
 		Scheduler:      t.config.Scheduler,
 		Args:           t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
 		OnArgs:         r.onArgs(t.config.Clone()),
+		OnBeforeStart:  func() error { return nil },
 	})
 	if err != nil {
 		return err

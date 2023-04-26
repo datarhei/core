@@ -1237,6 +1237,6 @@ func TestProcessLimit(t *testing.T) {
 
 	status := task.ffmpeg.Status()
 
-	require.Equal(t, float64(61), status.CPU.Limit)
+	require.Equal(t, float64(244), status.CPU.Limit)
 	require.Equal(t, uint64(42), status.Memory.Limit)
 }

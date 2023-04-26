@@ -25,7 +25,9 @@ func (p *psproc) VirtualMemory() (uint64, error) {
 	return 197, nil
 }
 
-func (p *psproc) Stop() {}
+func (p *psproc) Stop()          {}
+func (p *psproc) Suspend() error { return nil }
+func (p *psproc) Resume() error  { return nil }
 
 func TestCPULimit(t *testing.T) {
 	lock := sync.Mutex{}

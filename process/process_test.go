@@ -1,6 +1,7 @@
 package process
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -23,15 +24,19 @@ func TestProcess(t *testing.T) {
 
 	p.Start()
 
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
 	require.Equal(t, "running", p.Status().State)
 
-	time.Sleep(5 * time.Second)
-
-	require.Equal(t, "running", p.Status().State)
+	time.Sleep(2 * time.Second)
 
 	p.Stop(false)
 
-	time.Sleep(2 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "killed"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	require.Equal(t, "killed", p.Status().State)
 }
@@ -49,9 +54,11 @@ func TestReconnectProcess(t *testing.T) {
 
 	p.Start()
 
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	require.Equal(t, "finished", p.Status().State)
+	require.Greater(t, p.Status().Reconnect, time.Duration(0))
 
 	p.Stop(false)
 
@@ -70,9 +77,9 @@ func TestStaleProcess(t *testing.T) {
 
 	p.Start()
 
-	time.Sleep(5 * time.Second)
-
-	require.Equal(t, "killed", p.Status().State)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "killed"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	p.Stop(false)
 
@@ -85,15 +92,24 @@ func TestStaleReconnectProcess(t *testing.T) {
 		Args: []string{
 			"10",
 		},
-		Reconnect:    false,
-		StaleTimeout: 2 * time.Second,
+		Reconnect:      true,
+		ReconnectDelay: 2 * time.Second,
+		StaleTimeout:   3 * time.Second,
 	})
 
 	p.Start()
 
-	time.Sleep(10 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "killed"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	require.Equal(t, "killed", p.Status().State)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return p.Status().State == "killed"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	p.Stop(false)
 
@@ -113,9 +129,11 @@ func TestNonExistingProcess(t *testing.T) {
 
 	p.Start()
 
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "failed"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	require.Equal(t, "failed", p.Status().State)
+	require.Negative(t, p.Status().Reconnect)
 
 	p.Stop(false)
 
@@ -135,9 +153,11 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 
 	p.Start()
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "failed"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	require.Equal(t, "failed", p.Status().State)
+	require.Greater(t, p.Status().Reconnect, time.Duration(0))
 
 	p.Stop(false)
 
@@ -156,7 +176,9 @@ func TestProcessFailed(t *testing.T) {
 
 	p.Start()
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "failed"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	p.Stop(false)
 
@@ -173,16 +195,22 @@ func TestFFmpegWaitStop(t *testing.T) {
 		Reconnect:    false,
 		StaleTimeout: 0,
 		OnExit: func(state string) {
-			time.Sleep(2 * time.Second)
+			time.Sleep(3 * time.Second)
 		},
 	})
 
 	err = p.Start()
 	require.NoError(t, err)
 
-	time.Sleep(4 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	p.Stop(true)
+	start := time.Now()
+	err = p.Stop(true)
+	require.NoError(t, err)
+
+	require.Greater(t, time.Since(start), 2*time.Second)
 
 	require.Equal(t, "finished", p.Status().State)
 }
@@ -201,13 +229,15 @@ func TestFFmpegKill(t *testing.T) {
 	err = p.Start()
 	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	p.Stop(false)
 
-	time.Sleep(3 * time.Second)
-
-	require.Equal(t, "finished", p.Status().State)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
 }
 
 func TestProcessForceKill(t *testing.T) {
@@ -224,17 +254,23 @@ func TestProcessForceKill(t *testing.T) {
 	err = p.Start()
 	require.NoError(t, err)
 
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	start := time.Now()
 
 	p.Stop(false)
 
-	time.Sleep(1 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finishing"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	require.Equal(t, "finishing", p.Status().State)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "killed"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	time.Sleep(5 * time.Second)
-
-	require.Equal(t, "killed", p.Status().State)
+	require.Greater(t, time.Since(start), 5*time.Second)
 }
 
 func TestProcessDuration(t *testing.T) {
@@ -252,16 +288,23 @@ func TestProcessDuration(t *testing.T) {
 	require.Equal(t, "stop", status.Order)
 	require.Equal(t, "finished", status.State)
 
+	start := time.Now()
+
 	err = p.Start()
 	require.NoError(t, err)
 
-	time.Sleep(time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	status = p.Status()
 	require.Equal(t, "start", status.Order)
-	require.Equal(t, "running", status.State)
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	require.InEpsilon(t, float64(3), time.Since(start).Seconds(), 1)
 
 	status = p.Status()
 	require.Equal(t, "start", status.Order)
@@ -296,18 +339,21 @@ func TestProcessSchedulePointInTime(t *testing.T) {
 	status = p.Status()
 	require.Equal(t, "start", status.Order)
 	require.Equal(t, "finished", status.State)
-	require.Greater(t, status.Reconnect, time.Duration(0))
+	require.Positive(t, status.Reconnect)
 
-	time.Sleep(status.Reconnect + (2 * time.Second))
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
 
-	status = p.Status()
-	require.Equal(t, "running", status.State)
+	require.InEpsilon(t, time.Since(now).Seconds(), 5, 1)
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	status = p.Status()
 	require.Equal(t, "finished", status.State)
-	require.Less(t, status.Reconnect, time.Duration(0))
+	require.Negative(t, status.Reconnect)
 }
 
 func TestProcessSchedulePointInTimeGone(t *testing.T) {
@@ -357,17 +403,19 @@ func TestProcessScheduleCron(t *testing.T) {
 	require.NoError(t, err)
 
 	status = p.Status()
+	require.Positive(t, status.Reconnect)
 
-	time.Sleep(status.Reconnect + (2 * time.Second))
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 60*time.Second, 500*time.Millisecond)
 
-	status = p.Status()
-	require.Equal(t, "running", status.State)
-
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	status = p.Status()
 	require.Equal(t, "finished", status.State)
-	require.Greater(t, status.Reconnect, time.Duration(0))
+	require.Positive(t, status.Reconnect)
 }
 
 func TestProcessDelayNoScheduler(t *testing.T) {
@@ -511,6 +559,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 
 func TestProcessCallbacks(t *testing.T) {
 	var args []string
+	onBeforeStart := false
 	onStart := false
 	onExit := ""
 	onState := []string{}
@@ -530,6 +579,14 @@ func TestProcessCallbacks(t *testing.T) {
 			args = make([]string, len(a))
 			copy(args, a)
 			return a
+		},
+		OnBeforeStart: func() error {
+			lock.Lock()
+			defer lock.Unlock()
+
+			onBeforeStart = true
+
+			return nil
 		},
 		OnStart: func() {
 			lock.Lock()
@@ -555,10 +612,17 @@ func TestProcessCallbacks(t *testing.T) {
 	err = p.Start()
 	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second)
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
 
 	lock.Lock()
 	require.ElementsMatch(t, []string{"2"}, args)
+	require.True(t, onBeforeStart)
 	require.True(t, onStart)
 	require.Equal(t, stateFinished.String(), onExit)
 	require.ElementsMatch(t, []string{
@@ -567,4 +631,38 @@ func TestProcessCallbacks(t *testing.T) {
 		"running/finished",
 	}, onState)
 	lock.Unlock()
+}
+
+func TestProcessCallbacksOnBeforeStart(t *testing.T) {
+	parser := NewBufferParser()
+	p, err := New(Config{
+		Binary: "sleep",
+		Args: []string{
+			"2",
+		},
+		Parser:         parser,
+		Reconnect:      true,
+		ReconnectDelay: 10 * time.Second,
+		OnBeforeStart: func() error {
+			return fmt.Errorf("no, not now")
+		},
+	})
+	require.NoError(t, err)
+
+	err = p.Start()
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return p.Status().State == "failed"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	status := p.Status()
+
+	require.Equal(t, "failed", status.State)
+	require.Equal(t, "start", status.Order)
+	require.Positive(t, status.Reconnect)
+
+	lines := parser.Log()
+	require.Equal(t, 1, len(lines))
+	require.Equal(t, "no, not now", lines[0].Data)
 }

@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -11,10 +12,11 @@ import (
 
 type Usage struct {
 	CPU struct {
-		Current float64 // percent 0-100
-		Average float64 // percent 0-100
-		Max     float64 // percent 0-100
-		Limit   float64 // percent 0-100
+		NCPU    float64 // number of logical processors
+		Current float64 // percent 0-100*ncpu
+		Average float64 // percent 0-100*ncpu
+		Max     float64 // percent 0-100*ncpu
+		Limit   float64 // percent 0-100*ncpu
 	}
 	Memory struct {
 		Current uint64  // bytes
@@ -26,11 +28,19 @@ type Usage struct {
 
 type LimitFunc func(cpu float64, memory uint64)
 
+type LimitMode int
+
+const (
+	LimitModeHard LimitMode = 0 // Killing the process if either CPU or memory is above the limit (for a certain time)
+	LimitModeSoft LimitMode = 1 // Throttling the CPU if activated, killing the process if memory is above the limit
+)
+
 type LimiterConfig struct {
-	CPU     float64       // Max. CPU usage in percent
+	CPU     float64       // Max. CPU usage in percent 0-100 in hard mode, 0-100*ncpu in softmode
 	Memory  uint64        // Max. memory usage in bytes
-	WaitFor time.Duration // Duration one of the limits has to be above the limit until OnLimit gets triggered
+	WaitFor time.Duration // Duration for one of the limits has to be above the limit until OnLimit gets triggered
 	OnLimit LimitFunc     // Function to be triggered if limits are exceeded
+	Mode    LimitMode     // How to limit CPU usage
 }
 
 type Limiter interface {
@@ -41,9 +51,11 @@ type Limiter interface {
 	Stop()
 
 	// Current returns the current CPU and memory values
+	// Deprecated: use Usage()
 	Current() (cpu float64, memory uint64)
 
 	// Limits returns the defined CPU and memory limits. Values <= 0 means no limit
+	// Deprecated: use Usage()
 	Limits() (cpu float64, memory uint64)
 
 	// Usage returns the current state of the limiter, such as current, average, max, and
@@ -56,6 +68,7 @@ type Limiter interface {
 }
 
 type limiter struct {
+	ncpu    float64
 	proc    psutil.Process
 	lock    sync.Mutex
 	cancel  context.CancelFunc
@@ -77,7 +90,10 @@ type limiter struct {
 	memoryLast       uint64
 	memoryLimitSince time.Time
 
-	waitFor time.Duration
+	waitFor     time.Duration
+	mode        LimitMode
+	enableLimit bool
+	cancelLimit context.CancelFunc
 }
 
 // NewLimiter returns a new Limiter
@@ -87,6 +103,17 @@ func NewLimiter(config LimiterConfig) Limiter {
 		memory:  config.Memory,
 		waitFor: config.WaitFor,
 		onLimit: config.OnLimit,
+		mode:    config.Mode,
+	}
+
+	if ncpu, err := psutil.CPUCounts(true); err != nil {
+		l.ncpu = 1
+	} else {
+		l.ncpu = ncpu
+	}
+
+	if l.mode == LimitModeSoft {
+		l.cpu /= l.ncpu
 	}
 
 	if l.onLimit == nil {
@@ -194,31 +221,40 @@ func (l *limiter) collect(t time.Time) {
 
 	isLimitExceeded := false
 
-	if l.cpu > 0 {
-		if l.cpuCurrent > l.cpu {
-			// Current value is higher than the limit
-			if l.cpuLast <= l.cpu {
-				// If the previous value is below the limit, then we reached the
-				// limit as of now
-				l.cpuLimitSince = time.Now()
-			}
+	if l.mode == LimitModeHard {
+		if l.cpu > 0 {
+			if l.cpuCurrent > l.cpu {
+				// Current value is higher than the limit
+				if l.cpuLast <= l.cpu {
+					// If the previous value is below the limit, then we reached the
+					// limit as of now
+					l.cpuLimitSince = time.Now()
+				}
 
-			if time.Since(l.cpuLimitSince) >= l.waitFor {
-				isLimitExceeded = true
+				if time.Since(l.cpuLimitSince) >= l.waitFor {
+					isLimitExceeded = true
+				}
 			}
 		}
-	}
 
-	if l.memory > 0 {
-		if l.memoryCurrent > l.memory {
-			// Current value is higher than the limit
-			if l.memoryLast <= l.memory {
-				// If the previous value is below the limit, then we reached the
-				// limit as of now
-				l.memoryLimitSince = time.Now()
+		if l.memory > 0 {
+			if l.memoryCurrent > l.memory {
+				// Current value is higher than the limit
+				if l.memoryLast <= l.memory {
+					// If the previous value is below the limit, then we reached the
+					// limit as of now
+					l.memoryLimitSince = time.Now()
+				}
+
+				if time.Since(l.memoryLimitSince) >= l.waitFor {
+					isLimitExceeded = true
+				}
 			}
-
-			if time.Since(l.memoryLimitSince) >= l.waitFor {
+		}
+	} else if l.mode == LimitModeSoft && l.enableLimit {
+		if l.memory > 0 {
+			if l.memoryCurrent > l.memory {
+				// Current value is higher than the limit
 				isLimitExceeded = true
 			}
 		}
@@ -226,6 +262,73 @@ func (l *limiter) collect(t time.Time) {
 
 	if isLimitExceeded {
 		go l.onLimit(l.cpuCurrent, l.memoryCurrent)
+	}
+}
+
+func (l *limiter) Limit(enable bool) error {
+	if enable {
+		if l.enableLimit {
+			return nil
+		}
+
+		if l.cancelLimit != nil {
+			l.cancelLimit()
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		l.cancelLimit = cancel
+
+		l.enableLimit = true
+
+		go l.limit(ctx, l.cpu/100, time.Second)
+	} else {
+		if !l.enableLimit {
+			return nil
+		}
+
+		if l.cancelLimit == nil {
+			return nil
+		}
+
+		l.cancelLimit()
+		l.cancelLimit = nil
+	}
+
+	return nil
+}
+
+// limit will limit the CPU usage of this process. The limit is the max. CPU usage
+// normed to 0-1. The interval defines how long a time slot is that will be splitted
+// into sleeping and working.
+func (l *limiter) limit(ctx context.Context, limit float64, interval time.Duration) {
+	var workingrate float64 = -1
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			l.lock.Lock()
+			pcpu := l.cpuCurrent / 100
+			l.lock.Unlock()
+
+			if workingrate < 0 {
+				workingrate = limit
+			} else {
+				workingrate = math.Min(workingrate/pcpu*limit, 1)
+			}
+
+			worktime := float64(interval.Nanoseconds()) * workingrate
+			sleeptime := float64(interval.Nanoseconds()) - worktime
+
+			l.proc.Resume()
+			time.Sleep(time.Duration(worktime) * time.Nanosecond)
+
+			if sleeptime > 0 {
+				l.proc.Suspend()
+				time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
+			}
+		}
 	}
 }
 
@@ -245,10 +348,11 @@ func (l *limiter) Usage() Usage {
 
 	usage := Usage{}
 
-	usage.CPU.Limit = l.cpu
-	usage.CPU.Current = l.cpuCurrent
-	usage.CPU.Average = l.cpuAvg
-	usage.CPU.Max = l.cpuMax
+	usage.CPU.NCPU = l.ncpu
+	usage.CPU.Limit = l.cpu * l.ncpu
+	usage.CPU.Current = l.cpuCurrent * l.ncpu
+	usage.CPU.Average = l.cpuAvg * l.ncpu
+	usage.CPU.Max = l.cpuMax * l.ncpu
 
 	usage.Memory.Limit = l.memory
 	usage.Memory.Current = l.memoryCurrent
@@ -260,8 +364,4 @@ func (l *limiter) Usage() Usage {
 
 func (l *limiter) Limits() (cpu float64, memory uint64) {
 	return l.cpu, l.memory
-}
-
-func (l *limiter) Limit(enable bool) error {
-	return nil
 }
