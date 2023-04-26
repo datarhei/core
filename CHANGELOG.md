@@ -3,24 +3,27 @@
 ### Core v16.11.0 > v16.?.?
 
 -   Add PUT /api/v3/fs endpoint for file operations
--   Add GET /api/v3/process/:id/report/:at endpoint for retrieving a specific report history entry
+-   Add GET /api/v3/process/:id/report query parameters for retrieving a specific report history entry
 -   Add last progress report to report history
 -   Add exit status to report history
 -   Add support for date placeholder in process config
 -   Add support for creating directories for output files to be written on disk
--   Add GET /api/v3/report/process endpoint
+-   Add /api/v3/events endpoint
 -   Add updated_at field in process infos
 -   Add preserve process log history when updating a process
 -   Add support for input framerate data from jsonstats patch
 -   Add number of keyframes and extradata size to process progress data
--   Fix placeholder parameter parsing
+-   Add log_patterns to process config
+-   Add scheduler and timeout to processes
 -   Mod bumps FFmpeg to v5.1.3 (datarhei/core:tag bundles)
+-   Fix placeholder parameter parsing
 -   Fix better naming for storage endpoint documentation
 -   Fix freeing up S3 mounts
 -   Fix URL validation if the path contains FFmpeg specific placeholders
 -   Fix purging default file from HTTP cache
 -   Fix parsing S3 storage definition from environment variable
 -   Fix checking length of CPU time array ([#10](https://github.com/datarhei/core/issues/10))
+-   Fix memory consumption of memfs
 -   Deprecate ENV names that do not correspond to JSON name
 
 ### Core v16.11.0 > v16.12.0
