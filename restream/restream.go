@@ -167,12 +167,26 @@ func New(config Config) (Restreamer, error) {
 	r.maxProc = config.MaxProcesses
 
 	if config.MaxCPU > 0 || config.MaxMemory > 0 {
-		r.resources, _ = resources.New(config.MaxCPU, config.MaxMemory)
+		if config.MaxCPU <= 0 || config.MaxMemory <= 0 {
+			return nil, fmt.Errorf("both MaxCPU and MaxMemory have to be set")
+		}
+
+		resources, err := resources.New(resources.Config{
+			MaxCPU:    config.MaxCPU,
+			MaxMemory: config.MaxMemory,
+			Logger:    r.logger.WithComponent("Resources"),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize resource manager: %w", err)
+		}
+		r.resources = resources
 		r.enableSoftLimit = true
+
+		r.logger.Debug().Log("Enabling resource manager")
 	}
 
 	if err := r.load(); err != nil {
-		return nil, fmt.Errorf("failed to load data from DB (%w)", err)
+		return nil, fmt.Errorf("failed to load data from DB: %w", err)
 	}
 
 	r.save()
@@ -291,10 +305,6 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 		case <-ctx.Done():
 			return
 		case limit := <-rsc.Limit():
-			if limit {
-				r.logger.Warn().WithField("limit", limit).Log("limiter triggered")
-			}
-
 			r.lock.Lock()
 			for id, t := range r.tasks {
 				if !t.valid {
@@ -363,6 +373,8 @@ func (r *restream) load() error {
 	// replaced, we can resolve references and validate the
 	// inputs and outputs.
 	for _, t := range tasks {
+		t := t
+
 		// Just warn if the ffmpeg version constraint doesn't match the available ffmpeg version
 		if c, err := semver.NewConstraint(t.config.FFVersion); err == nil {
 			if v, err := semver.NewVersion(skills.FFmpeg.Version); err == nil {
@@ -428,6 +440,10 @@ func (r *restream) load() error {
 			OnBeforeStart: func() error {
 				if !r.enableSoftLimit {
 					return nil
+				}
+
+				if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
+					return fmt.Errorf("process needs to have CPU and memory limits defined")
 				}
 
 				if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
@@ -609,6 +625,10 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		OnBeforeStart: func() error {
 			if !r.enableSoftLimit {
 				return nil
+			}
+
+			if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
+				return fmt.Errorf("process needs to have CPU and memory limits defined")
 			}
 
 			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
@@ -1357,6 +1377,10 @@ func (r *restream) reloadProcess(id string) error {
 		OnBeforeStart: func() error {
 			if !r.enableSoftLimit {
 				return nil
+			}
+
+			if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
+				return fmt.Errorf("process needs to have CPU and memory limits defined")
 			}
 
 			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {

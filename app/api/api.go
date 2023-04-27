@@ -664,6 +664,8 @@ func (a *api) start() error {
 		Replace:      a.replacer,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
+		MaxCPU:       cfg.Resources.MaxCPUUsage,
+		MaxMemory:    cfg.Resources.MaxMemoryUsage,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 

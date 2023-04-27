@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/psutil"
 )
 
@@ -41,6 +42,7 @@ type LimiterConfig struct {
 	WaitFor time.Duration // Duration for one of the limits has to be above the limit until OnLimit gets triggered
 	OnLimit LimitFunc     // Function to be triggered if limits are exceeded
 	Mode    LimitMode     // How to limit CPU usage
+	Logger  log.Logger
 }
 
 type Limiter interface {
@@ -68,11 +70,12 @@ type Limiter interface {
 }
 
 type limiter struct {
-	ncpu    float64
-	proc    psutil.Process
-	lock    sync.Mutex
-	cancel  context.CancelFunc
-	onLimit LimitFunc
+	ncpu       float64
+	ncpuFactor float64
+	proc       psutil.Process
+	lock       sync.Mutex
+	cancel     context.CancelFunc
+	onLimit    LimitFunc
 
 	cpu           float64
 	cpuCurrent    float64
@@ -94,6 +97,8 @@ type limiter struct {
 	mode        LimitMode
 	enableLimit bool
 	cancelLimit context.CancelFunc
+
+	logger log.Logger
 }
 
 // NewLimiter returns a new Limiter
@@ -104,6 +109,11 @@ func NewLimiter(config LimiterConfig) Limiter {
 		waitFor: config.WaitFor,
 		onLimit: config.OnLimit,
 		mode:    config.Mode,
+		logger:  config.Logger,
+	}
+
+	if l.logger == nil {
+		l.logger = log.New("")
 	}
 
 	if ncpu, err := psutil.CPUCounts(true); err != nil {
@@ -112,18 +122,31 @@ func NewLimiter(config LimiterConfig) Limiter {
 		l.ncpu = ncpu
 	}
 
+	l.ncpuFactor = 1
+
+	mode := "hard"
 	if l.mode == LimitModeSoft {
+		mode = "soft"
 		l.cpu /= l.ncpu
+		l.ncpuFactor = l.ncpu
 	}
 
 	if l.onLimit == nil {
 		l.onLimit = func(float64, uint64) {}
 	}
 
+	l.logger = l.logger.WithFields(log.Fields{
+		"cpu":    l.cpu * l.ncpuFactor,
+		"memory": l.memory,
+		"mode":   mode,
+	})
+
 	return l
 }
 
 func (l *limiter) reset() {
+	l.enableLimit = false
+
 	l.cpuCurrent = 0
 	l.cpuLast = 0
 	l.cpuAvg = 0
@@ -152,7 +175,7 @@ func (l *limiter) Start(process psutil.Process) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
 
-	go l.ticker(ctx, 500*time.Millisecond)
+	go l.ticker(ctx, 1000*time.Millisecond)
 
 	return nil
 }
@@ -166,6 +189,13 @@ func (l *limiter) Stop() {
 	}
 
 	l.cancel()
+
+	if l.cancelLimit != nil {
+		l.cancelLimit()
+		l.cancelLimit = nil
+	}
+
+	l.enableLimit = false
 
 	l.proc.Stop()
 	l.proc = nil
@@ -232,6 +262,7 @@ func (l *limiter) collect(t time.Time) {
 				}
 
 				if time.Since(l.cpuLimitSince) >= l.waitFor {
+					l.logger.Warn().Log("CPU limit exceeded")
 					isLimitExceeded = true
 				}
 			}
@@ -247,6 +278,7 @@ func (l *limiter) collect(t time.Time) {
 				}
 
 				if time.Since(l.memoryLimitSince) >= l.waitFor {
+					l.logger.Warn().Log("Memory limit exceeded")
 					isLimitExceeded = true
 				}
 			}
@@ -255,17 +287,31 @@ func (l *limiter) collect(t time.Time) {
 		if l.memory > 0 {
 			if l.memoryCurrent > l.memory {
 				// Current value is higher than the limit
+				l.logger.Warn().Log("Memory limit exceeded")
 				isLimitExceeded = true
 			}
 		}
 	}
 
+	l.logger.Debug().WithFields(log.Fields{
+		"cur_cpu":  l.cpuCurrent * l.ncpuFactor,
+		"cur_mem":  l.memoryCurrent,
+		"exceeded": isLimitExceeded,
+	}).Log("Observation")
+
 	if isLimitExceeded {
-		go l.onLimit(l.cpuCurrent, l.memoryCurrent)
+		go l.onLimit(l.cpuCurrent*l.ncpuFactor, l.memoryCurrent)
 	}
 }
 
 func (l *limiter) Limit(enable bool) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.mode == LimitModeHard {
+		return nil
+	}
+
 	if enable {
 		if l.enableLimit {
 			return nil
@@ -280,6 +326,8 @@ func (l *limiter) Limit(enable bool) error {
 
 		l.enableLimit = true
 
+		l.logger.Debug().Log("Limiter enabled")
+
 		go l.limit(ctx, l.cpu/100, time.Second)
 	} else {
 		if !l.enableLimit {
@@ -290,8 +338,12 @@ func (l *limiter) Limit(enable bool) error {
 			return nil
 		}
 
+		l.enableLimit = false
+
 		l.cancelLimit()
 		l.cancelLimit = nil
+
+		l.logger.Debug().Log("Limiter disabled")
 	}
 
 	return nil
@@ -301,33 +353,60 @@ func (l *limiter) Limit(enable bool) error {
 // normed to 0-1. The interval defines how long a time slot is that will be splitted
 // into sleeping and working.
 func (l *limiter) limit(ctx context.Context, limit float64, interval time.Duration) {
+	defer func() {
+		l.lock.Lock()
+		if l.proc != nil {
+			l.proc.Resume()
+		}
+		l.lock.Unlock()
+
+		l.logger.Debug().Log("CPU throttler disabled")
+	}()
 	var workingrate float64 = -1
+
+	l.logger.Debug().Log("CPU throttler enabled")
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
+		}
+
+		l.lock.Lock()
+		pcpu := l.cpuCurrent / 100
+		l.lock.Unlock()
+
+		if workingrate < 0 {
+			workingrate = limit
+		} else {
+			workingrate = math.Min(workingrate/pcpu*limit, 1)
+		}
+
+		worktime := float64(interval.Nanoseconds()) * workingrate
+		sleeptime := float64(interval.Nanoseconds()) - worktime
+
+		l.logger.Debug().WithFields(log.Fields{
+			"worktime":  (time.Duration(worktime) * time.Nanosecond).String(),
+			"sleeptime": (time.Duration(sleeptime) * time.Nanosecond).String(),
+		}).Log("Throttler")
+
+		l.lock.Lock()
+		if l.proc != nil {
+			l.proc.Resume()
+		}
+		l.lock.Unlock()
+
+		time.Sleep(time.Duration(worktime) * time.Nanosecond)
+
+		if sleeptime > 0 {
 			l.lock.Lock()
-			pcpu := l.cpuCurrent / 100
+			if l.proc != nil {
+				l.proc.Suspend()
+			}
 			l.lock.Unlock()
 
-			if workingrate < 0 {
-				workingrate = limit
-			} else {
-				workingrate = math.Min(workingrate/pcpu*limit, 1)
-			}
-
-			worktime := float64(interval.Nanoseconds()) * workingrate
-			sleeptime := float64(interval.Nanoseconds()) - worktime
-
-			l.proc.Resume()
-			time.Sleep(time.Duration(worktime) * time.Nanosecond)
-
-			if sleeptime > 0 {
-				l.proc.Suspend()
-				time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
-			}
+			time.Sleep(time.Duration(sleeptime) * time.Nanosecond)
 		}
 	}
 }

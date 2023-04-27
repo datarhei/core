@@ -138,7 +138,7 @@ func (u *util) Start() {
 		ctx, cancel := context.WithCancel(context.Background())
 		u.stopTicker = cancel
 
-		go u.tick(ctx, 100*time.Millisecond)
+		go u.tick(ctx, 1000*time.Millisecond)
 	})
 }
 
@@ -247,9 +247,6 @@ func (u *util) tick(ctx context.Context, interval time.Duration) {
 			u.statPrevious, u.statCurrent = u.statCurrent, stat
 			u.statPreviousTime, u.statCurrentTime = u.statCurrentTime, t
 			u.lock.Unlock()
-
-			//p, _ := u.CPUPercent()
-			//fmt.Printf("%+v\n", p)
 		}
 	}
 }

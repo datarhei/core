@@ -132,6 +132,11 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		}
 	}
 
+	limitMode := process.LimitModeHard
+	if config.LimitMode == "soft" {
+		limitMode = process.LimitModeSoft
+	}
+
 	ffmpeg, err := process.New(process.Config{
 		Binary:         f.binary,
 		Args:           config.Args,
@@ -142,7 +147,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		LimitCPU:       config.LimitCPU,
 		LimitMemory:    config.LimitMemory,
 		LimitDuration:  config.LimitDuration,
-		LimitMode:      process.LimitModeHard,
+		LimitMode:      limitMode,
 		Scheduler:      scheduler,
 		Parser:         config.Parser,
 		Logger:         config.Logger,

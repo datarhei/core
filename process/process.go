@@ -271,7 +271,12 @@ func New(config Config) (Process, error) {
 		Memory:  config.LimitMemory,
 		WaitFor: config.LimitDuration,
 		Mode:    config.LimitMode,
+		Logger:  p.logger.WithComponent("ProcessLimiter"),
 		OnLimit: func(cpu float64, memory uint64) {
+			if !p.isRunning() {
+				return
+			}
+
 			p.logger.WithFields(log.Fields{
 				"cpu":    cpu,
 				"memory": memory,
@@ -455,6 +460,16 @@ func (p *process) IsRunning() bool {
 }
 
 func (p *process) Limit(enable bool) error {
+	if !p.isRunning() {
+		return nil
+	}
+
+	if p.limits == nil {
+		return nil
+	}
+
+	p.logger.Warn().WithField("limit", enable).Log("Limiter triggered")
+
 	return p.limits.Limit(enable)
 }
 

@@ -457,6 +457,17 @@ func (d *Config) Validate(resetLogs bool) {
 			d.vars.Log("error", "metrics.interval", "must be smaller than the range")
 		}
 	}
+
+	// If resource limits are given, all values must be set
+	if d.Resources.MaxCPUUsage > 0 || d.Resources.MaxMemoryUsage > 0 {
+		if d.Resources.MaxCPUUsage <= 0 {
+			d.vars.Log("error", "resources.max_cpu_usage", "must be greater than 0")
+		}
+
+		if d.Resources.MaxMemoryUsage <= 0 {
+			d.vars.Log("error", "resources.max_memory_usage", "must be greater than 0")
+		}
+	}
 }
 
 // Merge merges the values of the known environment variables into the configuration
