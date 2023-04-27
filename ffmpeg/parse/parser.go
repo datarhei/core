@@ -573,6 +573,7 @@ func (p *parser) parseAVstreamProgress(line string) error {
 func (p *parser) Stop(state string, pusage process.Usage) {
 	usage := Usage{}
 
+	usage.CPU.NCPU = pusage.CPU.NCPU
 	usage.CPU.Average = pusage.CPU.Average
 	usage.CPU.Max = pusage.CPU.Max
 	usage.CPU.Limit = pusage.CPU.Limit

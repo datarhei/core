@@ -146,6 +146,7 @@ definitions:
           auto_max_procs:
             type: boolean
           force_gc:
+            description: deprecated, use MemoryLimit instead
             format: int
             type: integer
           memory_limit_mbytes:
@@ -255,6 +256,13 @@ definitions:
           min_port:
             format: int
             type: integer
+        type: object
+      resources:
+        properties:
+          max_cpu_usage:
+            type: number
+          max_memory_usage:
+            type: number
         type: object
       router:
         properties:
@@ -974,6 +982,8 @@ definitions:
         type: number
       max:
         type: number
+      ncpu:
+        type: number
     type: object
   api.ProcessUsageMemory:
     properties:
@@ -1575,6 +1585,7 @@ definitions:
           auto_max_procs:
             type: boolean
           force_gc:
+            description: deprecated, use MemoryLimit instead
             format: int
             type: integer
           memory_limit_mbytes:
@@ -1684,6 +1695,13 @@ definitions:
           min_port:
             format: int
             type: integer
+        type: object
+      resources:
+        properties:
+          max_cpu_usage:
+            type: number
+          max_memory_usage:
+            type: number
         type: object
       router:
         properties:

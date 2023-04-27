@@ -1409,7 +1409,7 @@ func (r *restream) GetProcessState(id string) (*app.State, error) {
 	state.States.Marshal(status.States)
 	state.Time = status.Time.Unix()
 	state.Memory = status.Memory.Current
-	state.CPU = status.CPU.Current
+	state.CPU = status.CPU.Current / status.CPU.NCPU
 	state.Resources.CPU = status.CPU
 	state.Resources.Memory = status.Memory
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
@@ -1587,6 +1587,7 @@ func (r *restream) GetProcessLog(id string) (*app.Log, error) {
 			ExitState: h.ExitState,
 			Usage: app.ProcessUsage{
 				CPU: app.ProcessUsageCPU{
+					NCPU:    h.Usage.CPU.NCPU,
 					Average: h.Usage.CPU.Average,
 					Max:     h.Usage.CPU.Max,
 					Limit:   h.Usage.CPU.Limit,

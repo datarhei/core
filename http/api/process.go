@@ -229,6 +229,7 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.Memory = state.Memory
 	s.CPU = toNumber(state.CPU)
 	s.Resources.CPU = ProcessUsageCPU{
+		NCPU:    toNumber(state.Resources.CPU.NCPU),
 		Current: toNumber(state.Resources.CPU.Current),
 		Average: toNumber(state.Resources.CPU.Average),
 		Max:     toNumber(state.Resources.CPU.Max),
@@ -246,6 +247,7 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 }
 
 type ProcessUsageCPU struct {
+	NCPU    json.Number `json:"ncpu" swaggertype:"number" jsonschema:"type=number"`
 	Current json.Number `json:"cur" swaggertype:"number" jsonschema:"type=number"`
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
 	Max     json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`

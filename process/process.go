@@ -81,6 +81,7 @@ type Status struct {
 	Time        time.Time     // Time is the time of the last change of the state
 	CommandArgs []string      // Currently running command arguments
 	CPU         struct {
+		NCPU    float64 // Number of logical CPUs
 		Current float64 // Currently consumed CPU in percent
 		Average float64 // Average consumed CPU in percent
 		Max     float64 // Max. consumed CPU in percent
@@ -432,13 +433,9 @@ func (p *process) Status() Status {
 		Reconnect: time.Duration(-1),
 		Duration:  time.Since(stateTime),
 		Time:      stateTime,
+		CPU:       usage.CPU,
 		Memory:    usage.Memory,
 	}
-
-	s.CPU.Current = usage.CPU.Current
-	s.CPU.Average = usage.CPU.Average
-	s.CPU.Max = usage.CPU.Max
-	s.CPU.Limit = usage.CPU.Limit
 
 	s.CommandArgs = make([]string, len(p.args))
 	copy(s.CommandArgs, p.args)

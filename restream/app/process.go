@@ -165,10 +165,11 @@ type State struct {
 }
 
 type ProcessUsageCPU struct {
-	Current float64 // percent 0-100
-	Average float64 // percent 0-100
-	Max     float64 // percent 0-100
-	Limit   float64 // percent 0-100
+	NCPU    float64 // Number of logical CPUs
+	Current float64 // percent 0-100*ncpu
+	Average float64 // percent 0-100*ncpu
+	Max     float64 // percent 0-100*ncpu
+	Limit   float64 // percent 0-100*ncpu
 }
 
 type ProcessUsageMemory struct {

@@ -2479,6 +2479,7 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "force_gc": {
+                            "description": "deprecated, use MemoryLimit instead",
                             "type": "integer",
                             "format": "int"
                         },
@@ -2638,6 +2639,17 @@ const docTemplate = `{
                         "min_port": {
                             "type": "integer",
                             "format": "int"
+                        }
+                    }
+                },
+                "resources": {
+                    "type": "object",
+                    "properties": {
+                        "max_cpu_usage": {
+                            "type": "number"
+                        },
+                        "max_memory_usage": {
+                            "type": "number"
                         }
                     }
                 },
@@ -3707,6 +3719,9 @@ const docTemplate = `{
                 },
                 "max": {
                     "type": "number"
+                },
+                "ncpu": {
+                    "type": "number"
                 }
             }
         },
@@ -4498,6 +4513,7 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "force_gc": {
+                            "description": "deprecated, use MemoryLimit instead",
                             "type": "integer",
                             "format": "int"
                         },
@@ -4657,6 +4673,17 @@ const docTemplate = `{
                         "min_port": {
                             "type": "integer",
                             "format": "int"
+                        }
+                    }
+                },
+                "resources": {
+                    "type": "object",
+                    "properties": {
+                        "max_cpu_usage": {
+                            "type": "number"
+                        },
+                        "max_memory_usage": {
+                            "type": "number"
                         }
                     }
                 },

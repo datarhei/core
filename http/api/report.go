@@ -55,6 +55,7 @@ func (report *ProcessReport) Unmarshal(l *app.Log) {
 			ExitState: h.ExitState,
 			Resources: &ProcessUsage{
 				CPU: ProcessUsageCPU{
+					NCPU:    toNumber(h.Usage.CPU.NCPU),
 					Average: toNumber(h.Usage.CPU.Average),
 					Max:     toNumber(h.Usage.CPU.Max),
 					Limit:   toNumber(h.Usage.CPU.Limit),

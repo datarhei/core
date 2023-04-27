@@ -324,6 +324,7 @@ type AVstream struct {
 
 type Usage struct {
 	CPU struct {
+		NCPU    float64
 		Average float64
 		Max     float64
 		Limit   float64
