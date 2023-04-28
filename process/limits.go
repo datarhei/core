@@ -362,6 +362,7 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 
 		l.logger.Debug().Log("CPU throttler disabled")
 	}()
+
 	var workingrate float64 = -1
 
 	l.logger.Debug().Log("CPU throttler enabled")
@@ -387,6 +388,7 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 		sleeptime := float64(interval.Nanoseconds()) - worktime
 
 		l.logger.Debug().WithFields(log.Fields{
+			"pcpu":      pcpu,
 			"worktime":  (time.Duration(worktime) * time.Nanosecond).String(),
 			"sleeptime": (time.Duration(sleeptime) * time.Nanosecond).String(),
 		}).Log("Throttler")

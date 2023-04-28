@@ -15,9 +15,6 @@ type resources struct {
 	maxCPU    float64
 	maxMemory uint64
 
-	consumerCPU    float64
-	consumerMemory uint64
-
 	limit      chan bool
 	isLimiting bool
 
@@ -36,8 +33,7 @@ type Resources interface {
 
 	Limit() <-chan bool
 
-	Add(cpu float64, memory uint64) bool
-	Remove(cpu float64, memory uint64)
+	Request(cpu float64, memory uint64) error
 }
 
 type Config struct {
@@ -64,6 +60,7 @@ func New(config Config) (Resources, error) {
 
 	r.ncpu = ncpu
 
+	r.maxCPU *= r.ncpu
 	r.maxMemory = uint64(float64(vmstat.Total) * config.MaxMemory / 100)
 
 	if r.logger == nil {
@@ -71,6 +68,7 @@ func New(config Config) (Resources, error) {
 	}
 
 	r.logger = r.logger.WithFields(log.Fields{
+		"ncpu":       r.ncpu,
 		"max_cpu":    r.maxCPU,
 		"max_memory": r.maxMemory,
 	})
@@ -124,7 +122,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			cpustat, err := psutil.CPUPercent()
 			if err != nil {
-				r.logger.Warn().WithError(err).Log("Failed to determine CPU load")
+				r.logger.Warn().WithError(err).Log("Failed to determine system CPU usage")
 				continue
 			}
 
@@ -132,6 +130,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 
 			vmstat, err := psutil.VirtualMemory()
 			if err != nil {
+				r.logger.Warn().WithError(err).Log("Failed to determine system memory usage")
 				continue
 			}
 
@@ -179,75 +178,55 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (r *resources) Add(cpu float64, memory uint64) bool {
+func (r *resources) Request(cpu float64, memory uint64) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
 	logger := r.logger.WithFields(log.Fields{
-		"cpu":    cpu,
-		"memory": memory,
+		"req_cpu":    cpu,
+		"req_memory": memory,
 	})
 
-	logger.Debug().WithFields(log.Fields{
-		"used_cpu":    r.consumerCPU,
-		"used_memory": r.consumerMemory,
-	}).Log("Request for acquiring resources")
+	logger.Debug().Log("Request for acquiring resources")
 
 	if r.isLimiting {
 		logger.Debug().Log("Rejected, currently limiting")
-		return false
+		return fmt.Errorf("resources are currenlty actively limited")
 	}
 
 	if cpu <= 0 || memory == 0 {
 		logger.Debug().Log("Rejected, invalid values")
-		return false
+		return fmt.Errorf("the cpu and/or memory values are invalid: cpu=%f, memory=%d", cpu, memory)
 	}
 
-	if r.consumerCPU+cpu > r.maxCPU {
-		logger.Debug().Log("Rejected, CPU limit exceeded")
-		return false
+	cpustat, err := psutil.CPUPercent()
+	if err != nil {
+		r.logger.Warn().WithError(err).Log("Failed to determine system CPU usage")
+		return fmt.Errorf("the system CPU usage couldn't be determined")
 	}
 
-	if r.consumerMemory+memory > r.maxMemory {
-		logger.Debug().Log("Rejected, memory limit exceeded")
-		return false
+	cpuload := (cpustat.User + cpustat.System + cpustat.Other) * r.ncpu
+
+	vmstat, err := psutil.VirtualMemory()
+	if err != nil {
+		r.logger.Warn().WithError(err).Log("Failed to determine system memory usage")
+		return fmt.Errorf("the system memory usage couldn't be determined")
 	}
 
-	r.consumerCPU += cpu
-	r.consumerMemory += memory
+	if cpuload+cpu > r.maxCPU {
+		logger.Debug().WithField("cur_cpu", cpuload).Log("Rejected, CPU limit exceeded")
+		return fmt.Errorf("the CPU limit would be exceeded: %f + %f > %f", cpuload, cpu, r.maxCPU)
+	}
+
+	if vmstat.Used+memory > r.maxMemory {
+		logger.Debug().WithField("cur_memory", vmstat.Used).Log("Rejected, memory limit exceeded")
+		return fmt.Errorf("the memory limit would be exceeded: %d + %d > %d", vmstat.Used, memory, r.maxMemory)
+	}
 
 	logger.Debug().WithFields(log.Fields{
-		"used_cpu":    r.consumerCPU,
-		"used_memory": r.consumerMemory,
+		"cur_cpu":    cpuload,
+		"cur_memory": vmstat.Used,
 	}).Log("Acquiring approved")
 
-	return true
-}
-
-func (r *resources) Remove(cpu float64, memory uint64) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	logger := r.logger.WithFields(log.Fields{
-		"cpu":    cpu,
-		"memory": memory,
-	})
-
-	logger.Debug().WithFields(log.Fields{
-		"used_cpu":    r.consumerCPU,
-		"used_memory": r.consumerMemory,
-	}).Log("Request for releasing resources")
-
-	r.consumerCPU -= cpu
-	r.consumerMemory -= memory
-
-	if r.consumerCPU < 0 {
-		logger.Warn().WithField("used_cpu", r.consumerCPU).Log("Used CPU resources below 0")
-		r.consumerCPU = 0
-	}
-
-	logger.Debug().WithFields(log.Fields{
-		"used_cpu":    r.consumerCPU,
-		"used_memory": r.consumerMemory,
-	}).Log("Releasing approved")
+	return nil
 }

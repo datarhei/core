@@ -81,7 +81,7 @@ type Util interface {
 	NetIOCounters(pernic bool) ([]net.IOCountersStat, error)
 
 	// Process returns a process observer for a process with the given pid.
-	Process(pid int32, limit bool) (Process, error)
+	Process(pid int32) (Process, error)
 }
 
 type util struct {
@@ -101,6 +101,7 @@ type util struct {
 	statCurrentTime  time.Time
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
+	nTicks           uint64
 }
 
 // New returns a new util, it will be started automatically
@@ -246,6 +247,7 @@ func (u *util) tick(ctx context.Context, interval time.Duration) {
 			u.lock.Lock()
 			u.statPrevious, u.statCurrent = u.statCurrent, stat
 			u.statPreviousTime, u.statCurrentTime = u.statCurrentTime, t
+			u.nTicks++
 			u.lock.Unlock()
 		}
 	}
@@ -316,6 +318,19 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 
 func (u *util) CPUPercent() (*CPUInfoStat, error) {
 	var total float64
+
+	for {
+		u.lock.RLock()
+		nTicks := u.nTicks
+		u.lock.RUnlock()
+
+		if nTicks < 2 {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		break
+	}
 
 	u.lock.RLock()
 	defer u.lock.RUnlock()

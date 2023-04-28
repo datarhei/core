@@ -442,22 +442,11 @@ func (r *restream) load() error {
 					return nil
 				}
 
-				if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
-					return fmt.Errorf("process needs to have CPU and memory limits defined")
-				}
-
-				if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
-					return fmt.Errorf("not enough resources available")
+				if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
+					return err
 				}
 
 				return nil
-			},
-			OnExit: func(string) {
-				if !r.enableSoftLimit {
-					return
-				}
-
-				r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
 			},
 		})
 		if err != nil {
@@ -627,22 +616,11 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 				return nil
 			}
 
-			if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
-				return fmt.Errorf("process needs to have CPU and memory limits defined")
-			}
-
-			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
-				return fmt.Errorf("not enough resources available")
+			if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
+				return err
 			}
 
 			return nil
-		},
-		OnExit: func(string) {
-			if !r.enableSoftLimit {
-				return
-			}
-
-			r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
 		},
 	})
 	if err != nil {
@@ -1379,22 +1357,11 @@ func (r *restream) reloadProcess(id string) error {
 				return nil
 			}
 
-			if t.config.LimitCPU <= 0 || t.config.LimitMemory == 0 {
-				return fmt.Errorf("process needs to have CPU and memory limits defined")
-			}
-
-			if !r.resources.Add(t.config.LimitCPU, t.config.LimitMemory) {
-				return fmt.Errorf("not enough resources available")
+			if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
+				return err
 			}
 
 			return nil
-		},
-		OnExit: func(string) {
-			if !r.enableSoftLimit {
-				return
-			}
-
-			r.resources.Remove(t.config.LimitCPU, t.config.LimitMemory)
 		},
 	})
 	if err != nil {

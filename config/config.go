@@ -276,7 +276,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewDir(&d.Router.UIPath, "", d.fs), "router.ui_path", "CORE_ROUTER_UI_PATH", nil, "Path to a directory holding UI files mounted as /ui", false, false)
 
 	// Resources
-	d.vars.Register(value.NewFloat(&d.Resources.MaxCPUUsage, 0), "resources.max_cpu_usage", "CORE_RESOURCES_MAX_CPU_USAGE", nil, "Maximum system CPU usage in percent, from 0 (no limit) to 100*ncpu", false, false)
+	d.vars.Register(value.NewFloat(&d.Resources.MaxCPUUsage, 0), "resources.max_cpu_usage", "CORE_RESOURCES_MAX_CPU_USAGE", nil, "Maximum system CPU usage in percent, from 0 (no limit) to 100", false, false)
 	d.vars.Register(value.NewFloat(&d.Resources.MaxMemoryUsage, 0), "resources.max_memory_usage", "CORE_RESOURCES_MAX_MEMORY_USAGE", nil, "Maximum system usage in percent, from 0 (no limit) to 100", false, false)
 }
 
@@ -460,12 +460,12 @@ func (d *Config) Validate(resetLogs bool) {
 
 	// If resource limits are given, all values must be set
 	if d.Resources.MaxCPUUsage > 0 || d.Resources.MaxMemoryUsage > 0 {
-		if d.Resources.MaxCPUUsage <= 0 {
-			d.vars.Log("error", "resources.max_cpu_usage", "must be greater than 0")
+		if d.Resources.MaxCPUUsage <= 0 || d.Resources.MaxCPUUsage > 100 {
+			d.vars.Log("error", "resources.max_cpu_usage", "must be greater than 0 and smaller or equal to 100")
 		}
 
 		if d.Resources.MaxMemoryUsage <= 0 {
-			d.vars.Log("error", "resources.max_memory_usage", "must be greater than 0")
+			d.vars.Log("error", "resources.max_memory_usage", "must be greater than 0 and smaller or equal to 100")
 		}
 	}
 }

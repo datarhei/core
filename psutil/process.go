@@ -40,17 +40,15 @@ type process struct {
 	statCurrentTime  time.Time
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
-
-	imposeLimit bool
+	nTicks           uint64
 }
 
-func (u *util) Process(pid int32, limit bool) (Process, error) {
+func (u *util) Process(pid int32) (Process, error) {
 	p := &process{
-		pid:         pid,
-		hasCgroup:   u.hasCgroup,
-		cpuLimit:    u.cpuLimit,
-		ncpu:        u.ncpu,
-		imposeLimit: limit,
+		pid:       pid,
+		hasCgroup: u.hasCgroup,
+		cpuLimit:  u.cpuLimit,
+		ncpu:      u.ncpu,
 	}
 
 	proc, err := psprocess.NewProcess(pid)
@@ -68,7 +66,7 @@ func (u *util) Process(pid int32, limit bool) (Process, error) {
 }
 
 func NewProcess(pid int32, limit bool) (Process, error) {
-	return DefaultUtil.Process(pid, limit)
+	return DefaultUtil.Process(pid)
 }
 
 func (p *process) tick(ctx context.Context, interval time.Duration) {
@@ -85,6 +83,7 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 			p.lock.Lock()
 			p.statPrevious, p.statCurrent = p.statCurrent, stat
 			p.statPreviousTime, p.statCurrentTime = p.statCurrentTime, t
+			p.nTicks++
 			p.lock.Unlock()
 		}
 	}
@@ -136,6 +135,19 @@ func (p *process) cpuTimes() (*cpuTimesStat, error) {
 
 func (p *process) CPUPercent() (*CPUInfoStat, error) {
 	var diff float64
+
+	for {
+		p.lock.RLock()
+		nTicks := p.nTicks
+		p.lock.RUnlock()
+
+		if nTicks < 2 {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		break
+	}
 
 	p.lock.RLock()
 	defer p.lock.RUnlock()
