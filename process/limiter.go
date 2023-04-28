@@ -66,7 +66,7 @@ type Limiter interface {
 
 	// Limit enables or disables the throttling of the CPU or killing because of to much
 	// memory consumption.
-	Limit(enable bool) error
+	Limit(limit int) error
 }
 
 type limiter struct {
@@ -80,6 +80,7 @@ type limiter struct {
 	cpu           float64
 	cpuCurrent    float64
 	cpuMax        float64
+	cpuTop        float64
 	cpuAvg        float64
 	cpuAvgCounter uint64
 	cpuLast       float64
@@ -88,6 +89,7 @@ type limiter struct {
 	memory           uint64
 	memoryCurrent    uint64
 	memoryMax        uint64
+	memoryTop        uint64
 	memoryAvg        float64
 	memoryAvgCounter uint64
 	memoryLast       uint64
@@ -152,12 +154,14 @@ func (l *limiter) reset() {
 	l.cpuAvg = 0
 	l.cpuAvgCounter = 0
 	l.cpuMax = 0
+	l.cpuTop = 0
 
 	l.memoryCurrent = 0
 	l.memoryLast = 0
 	l.memoryAvg = 0
 	l.memoryAvgCounter = 0
 	l.memoryMax = 0
+	l.memoryTop = 0
 }
 
 func (l *limiter) Start(process psutil.Process) error {
@@ -232,6 +236,12 @@ func (l *limiter) collect(t time.Time) {
 			l.memoryMax = l.memoryCurrent
 		}
 
+		if l.memoryCurrent > l.memoryTop {
+			l.memoryTop = l.memoryCurrent
+		} else {
+			l.memoryTop = uint64(float64(l.memoryTop) * 0.95)
+		}
+
 		l.memoryAvgCounter++
 
 		l.memoryAvg = ((l.memoryAvg * float64(l.memoryAvgCounter-1)) + float64(l.memoryCurrent)) / float64(l.memoryAvgCounter)
@@ -242,6 +252,12 @@ func (l *limiter) collect(t time.Time) {
 
 		if l.cpuCurrent > l.cpuMax {
 			l.cpuMax = l.cpuCurrent
+		}
+
+		if l.cpuCurrent > l.cpuTop {
+			l.cpuTop = l.cpuCurrent
+		} else {
+			l.cpuTop = l.cpuTop * 0.95
 		}
 
 		l.cpuAvgCounter++
@@ -295,7 +311,9 @@ func (l *limiter) collect(t time.Time) {
 
 	l.logger.Debug().WithFields(log.Fields{
 		"cur_cpu":  l.cpuCurrent * l.ncpuFactor,
+		"top_cpu":  l.cpuTop * l.ncpuFactor,
 		"cur_mem":  l.memoryCurrent,
+		"top_mem":  l.memoryTop,
 		"exceeded": isLimitExceeded,
 	}).Log("Observation")
 
@@ -304,7 +322,7 @@ func (l *limiter) collect(t time.Time) {
 	}
 }
 
-func (l *limiter) Limit(enable bool) error {
+func (l *limiter) Limit(limit int) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -312,7 +330,7 @@ func (l *limiter) Limit(enable bool) error {
 		return nil
 	}
 
-	if enable {
+	if limit > 0 {
 		if l.enableLimit {
 			return nil
 		}
@@ -344,6 +362,7 @@ func (l *limiter) Limit(enable bool) error {
 		l.cancelLimit = nil
 
 		l.logger.Debug().Log("Limiter disabled")
+
 	}
 
 	return nil
@@ -383,6 +402,8 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 		} else {
 			workingrate = math.Min(workingrate/pcpu*limit, 1)
 		}
+
+		workingrate = limit
 
 		worktime := float64(interval.Nanoseconds()) * workingrate
 		sleeptime := float64(interval.Nanoseconds()) - worktime
