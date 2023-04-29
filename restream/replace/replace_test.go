@@ -58,7 +58,7 @@ func TestReplace(t *testing.T) {
 	require.Equal(t, "", replaced)
 }
 
-func TestReplaceInvalid(t *testing.T) {
+func TestReplaceSpaces(t *testing.T) {
 	r := New()
 	r.RegisterReplaceFunc(
 		"foo:bar",
@@ -68,8 +68,8 @@ func TestReplaceInvalid(t *testing.T) {
 		nil,
 	)
 
-	replaced := r.Replace("{foo:bar, who=World}", "foo:bar", "", nil, nil, "")
-	require.Equal(t, "Hello ! ?", replaced)
+	replaced := r.Replace("{foo:bar, who=World,   what=What}", "foo:bar", "", nil, nil, "")
+	require.Equal(t, "Hello World! What?", replaced)
 }
 
 func TestReplacerFunc(t *testing.T) {

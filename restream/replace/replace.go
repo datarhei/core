@@ -101,11 +101,13 @@ func (r *replacer) Replace(str, placeholder, value string, vars map[string]strin
 }
 
 // parseParametes parses the parameters of a placeholder. The params string is a comma-separated
-// string of key=value pairs. The key and values can be escaped as in net/url.QueryEscape.
+// string of key=value pairs. The key and values can be escaped with an \.
 // The provided defaults will be used as basis. Any parsed key/value from the params might overwrite
 // the default value. Any variables in the values will be replaced by their value from the
 // vars parameter.
 func (r *replacer) parseParametes(params string, vars map[string]string, defaults map[string]string) map[string]string {
+	reSpace := regexp.MustCompile(`^\s+`)
+
 	p := make(map[string]string)
 
 	if len(params) == 0 && len(defaults) == 0 {
@@ -125,6 +127,8 @@ func (r *replacer) parseParametes(params string, vars map[string]string, default
 	for params != "" {
 		var key string
 		key, params, _ = cut([]rune(params), ',')
+		key = reSpace.ReplaceAllString(key, "") // Remove all leading spaces
+
 		if key == "" {
 			continue
 		}
