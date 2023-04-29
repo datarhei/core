@@ -99,6 +99,7 @@ type limiter struct {
 	mode        LimitMode
 	enableLimit bool
 	cancelLimit context.CancelFunc
+	factorLimit int
 
 	logger log.Logger
 }
@@ -331,6 +332,8 @@ func (l *limiter) Limit(limit int) error {
 	}
 
 	if limit > 0 {
+		l.factorLimit = limit
+
 		if l.enableLimit {
 			return nil
 		}
@@ -384,7 +387,7 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 
 	var workingrate float64 = -1
 
-	l.logger.Debug().Log("CPU throttler enabled")
+	l.logger.Debug().WithField("limit", limit).Log("CPU throttler enabled")
 
 	for {
 		select {
@@ -393,8 +396,11 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 		default:
 		}
 
+		lim := limit
+
 		l.lock.Lock()
 		pcpu := l.cpuCurrent / 100
+		lim += (100 - float64(l.factorLimit)) / 100 * ((l.cpuTop / 100) - limit)
 		l.lock.Unlock()
 
 		if workingrate < 0 {
@@ -403,12 +409,13 @@ func (l *limiter) limit(ctx context.Context, limit float64, interval time.Durati
 			workingrate = math.Min(workingrate/pcpu*limit, 1)
 		}
 
-		workingrate = limit
+		workingrate = lim
 
 		worktime := float64(interval.Nanoseconds()) * workingrate
 		sleeptime := float64(interval.Nanoseconds()) - worktime
 
 		l.logger.Debug().WithFields(log.Fields{
+			"limit":     lim,
 			"pcpu":      pcpu,
 			"worktime":  (time.Duration(worktime) * time.Nanosecond).String(),
 			"sleeptime": (time.Duration(sleeptime) * time.Nanosecond).String(),
