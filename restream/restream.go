@@ -1331,7 +1331,9 @@ func (r *restream) reloadProcess(id string) error {
 		r.stopProcess(id)
 	}
 
-	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
+	parser := r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
+	t.parser.TransferReportHistory(parser)
+	t.parser = parser
 
 	limitMode := "hard"
 	if r.enableSoftLimit {
