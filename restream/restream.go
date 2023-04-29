@@ -1271,7 +1271,8 @@ func (r *restream) restartProcess(id string) error {
 	}
 
 	if task.ffmpeg != nil {
-		task.ffmpeg.Kill(true)
+		task.ffmpeg.Stop(true)
+		task.ffmpeg.Start()
 	}
 
 	return nil
