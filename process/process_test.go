@@ -55,6 +55,10 @@ func TestReconnectProcess(t *testing.T) {
 	p.Start()
 
 	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	require.Eventually(t, func() bool {
 		return p.Status().State == "finished"
 	}, 10*time.Second, 500*time.Millisecond)
 
@@ -565,6 +569,9 @@ func TestProcessCallbacks(t *testing.T) {
 	onState := []string{}
 
 	lock := sync.Mutex{}
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
 
 	p, err := New(Config{
 		Binary: "sleep",
@@ -599,6 +606,8 @@ func TestProcessCallbacks(t *testing.T) {
 			defer lock.Unlock()
 
 			onExit = state
+
+			wg.Done()
 		},
 		OnStateChange: func(from, to string) {
 			lock.Lock()
@@ -619,6 +628,8 @@ func TestProcessCallbacks(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return p.Status().State == "finished"
 	}, 10*time.Second, 500*time.Millisecond)
+
+	wg.Wait()
 
 	lock.Lock()
 	require.ElementsMatch(t, []string{"2"}, args)
