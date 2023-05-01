@@ -42,14 +42,20 @@ func TestProcess(t *testing.T) {
 }
 
 func TestReconnectProcess(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
 	p, _ := New(Config{
 		Binary: "sleep",
 		Args: []string{
 			"2",
 		},
 		Reconnect:      true,
-		ReconnectDelay: 2 * time.Second,
+		ReconnectDelay: 10 * time.Second,
 		StaleTimeout:   0,
+		OnExit: func(string) {
+			wg.Done()
+		},
 	})
 
 	p.Start()
@@ -61,6 +67,8 @@ func TestReconnectProcess(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return p.Status().State == "finished"
 	}, 10*time.Second, 500*time.Millisecond)
+
+	wg.Wait()
 
 	require.Greater(t, p.Status().Reconnect, time.Duration(0))
 
