@@ -42,6 +42,7 @@ type LimiterConfig struct {
 	WaitFor time.Duration // Duration for one of the limits has to be above the limit until OnLimit gets triggered
 	OnLimit LimitFunc     // Function to be triggered if limits are exceeded
 	Mode    LimitMode     // How to limit CPU usage
+	PSUtil  psutil.Util
 	Logger  log.Logger
 }
 
@@ -70,6 +71,8 @@ type Limiter interface {
 }
 
 type limiter struct {
+	psutil psutil.Util
+
 	ncpu       float64
 	ncpuFactor float64
 	proc       psutil.Process
@@ -113,6 +116,7 @@ func NewLimiter(config LimiterConfig) Limiter {
 		waitFor: config.WaitFor,
 		onLimit: config.OnLimit,
 		mode:    config.Mode,
+		psutil:  config.PSUtil,
 		logger:  config.Logger,
 	}
 
@@ -120,7 +124,11 @@ func NewLimiter(config LimiterConfig) Limiter {
 		l.logger = log.New("")
 	}
 
-	if ncpu, err := psutil.CPUCounts(true); err != nil {
+	if l.psutil == nil {
+		l.psutil = psutil.DefaultUtil
+	}
+
+	if ncpu, err := l.psutil.CPUCounts(true); err != nil {
 		l.ncpu = 1
 	} else {
 		l.ncpu = ncpu

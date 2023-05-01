@@ -174,3 +174,42 @@ func TestMemoryLimitWaitFor(t *testing.T) {
 		return done
 	}, 10*time.Second, 1*time.Second)
 }
+
+func TestMemoryLimitSoftMode(t *testing.T) {
+	lock := sync.Mutex{}
+
+	lock.Lock()
+	done := false
+	lock.Unlock()
+
+	go func() {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		l := NewLimiter(LimiterConfig{
+			Memory: 42,
+			Mode:   LimitModeSoft,
+			OnLimit: func(float64, uint64) {
+				wg.Done()
+			},
+		})
+
+		l.Start(&psproc{})
+		defer l.Stop()
+
+		l.Limit(false, true)
+
+		wg.Wait()
+
+		lock.Lock()
+		done = true
+		lock.Unlock()
+	}()
+
+	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
+		return done
+	}, 2*time.Second, 100*time.Millisecond)
+}

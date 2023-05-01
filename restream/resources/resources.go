@@ -11,6 +11,8 @@ import (
 )
 
 type resources struct {
+	psutil psutil.Util
+
 	ncpu      float64
 	maxCPU    float64
 	maxMemory uint64
@@ -43,21 +45,31 @@ type Resources interface {
 type Config struct {
 	MaxCPU    float64
 	MaxMemory float64
+	PSUtil    psutil.Util
 	Logger    log.Logger
 }
 
 func New(config Config) (Resources, error) {
 	r := &resources{
 		maxCPU: config.MaxCPU,
+		psutil: config.PSUtil,
 		logger: config.Logger,
 	}
 
-	vmstat, err := psutil.VirtualMemory()
+	if r.logger == nil {
+		r.logger = log.New("")
+	}
+
+	if r.psutil == nil {
+		r.psutil = psutil.DefaultUtil
+	}
+
+	vmstat, err := r.psutil.VirtualMemory()
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine available memory: %w", err)
 	}
 
-	ncpu, err := psutil.CPUCounts(true)
+	ncpu, err := r.psutil.CPUCounts(true)
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine number of logical CPUs: %w", err)
 	}
@@ -66,10 +78,6 @@ func New(config Config) (Resources, error) {
 
 	r.maxCPU *= r.ncpu
 	r.maxMemory = uint64(float64(vmstat.Total) * config.MaxMemory / 100)
-
-	if r.logger == nil {
-		r.logger = log.New("")
-	}
 
 	r.logger = r.logger.WithFields(log.Fields{
 		"ncpu":       r.ncpu,
@@ -129,7 +137,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			cpustat, err := psutil.CPUPercent()
+			cpustat, err := r.psutil.CPUPercent()
 			if err != nil {
 				r.logger.Warn().WithError(err).Log("Failed to determine system CPU usage")
 				continue
@@ -137,7 +145,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 
 			cpuload := (cpustat.User + cpustat.System + cpustat.Other) * r.ncpu
 
-			vmstat, err := psutil.VirtualMemory()
+			vmstat, err := r.psutil.VirtualMemory()
 			if err != nil {
 				r.logger.Warn().WithError(err).Log("Failed to determine system memory usage")
 				continue
@@ -228,7 +236,7 @@ func (r *resources) Request(cpu float64, memory uint64) error {
 		return fmt.Errorf("the cpu and/or memory values are invalid: cpu=%f, memory=%d", cpu, memory)
 	}
 
-	cpustat, err := psutil.CPUPercent()
+	cpustat, err := r.psutil.CPUPercent()
 	if err != nil {
 		r.logger.Warn().WithError(err).Log("Failed to determine system CPU usage")
 		return fmt.Errorf("the system CPU usage couldn't be determined")
@@ -236,7 +244,7 @@ func (r *resources) Request(cpu float64, memory uint64) error {
 
 	cpuload := (cpustat.User + cpustat.System + cpustat.Other) * r.ncpu
 
-	vmstat, err := psutil.VirtualMemory()
+	vmstat, err := r.psutil.VirtualMemory()
 	if err != nil {
 		r.logger.Warn().WithError(err).Log("Failed to determine system memory usage")
 		return fmt.Errorf("the system memory usage couldn't be determined")
