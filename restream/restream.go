@@ -300,11 +300,13 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 	rsc.Start()
 	defer rsc.Stop()
 
+	limitCPU, limitMemory := false, false
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case limit := <-rsc.Limit():
+		case limitCPU = <-rsc.LimitCPU():
 			r.lock.Lock()
 			for id, t := range r.tasks {
 				if !t.valid {
@@ -312,10 +314,24 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 				}
 
 				r.logger.Debug().WithFields(log.Fields{
-					"limit": limit,
-					"id":    id,
-				}).Log("limiting process")
-				t.ffmpeg.Limit(limit)
+					"limit_cpu": limitCPU,
+					"id":        id,
+				}).Log("Limiting process CPU consumption")
+				t.ffmpeg.Limit(limitCPU, limitMemory)
+			}
+			r.lock.Unlock()
+		case limitMemory = <-rsc.LimitMemory():
+			r.lock.Lock()
+			for id, t := range r.tasks {
+				if !t.valid {
+					continue
+				}
+
+				r.logger.Debug().WithFields(log.Fields{
+					"limit_memory": limitMemory,
+					"id":           id,
+				}).Log("Limiting process memory consumption")
+				t.ffmpeg.Limit(limitCPU, limitMemory)
 			}
 			r.lock.Unlock()
 		}

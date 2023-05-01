@@ -46,7 +46,7 @@ type Process interface {
 	// Limit enabled or disables CPU and memory limiting. CPU will be throttled
 	// into the configured limit. If memory consumption is above the configured
 	// limit, the process will be killed.
-	Limit(limit int) error
+	Limit(cpu, memory bool) error
 }
 
 // Config is the configuration of a process
@@ -459,7 +459,7 @@ func (p *process) IsRunning() bool {
 	return p.isRunning()
 }
 
-func (p *process) Limit(limit int) error {
+func (p *process) Limit(cpu, memory bool) error {
 	if !p.isRunning() {
 		return nil
 	}
@@ -468,9 +468,12 @@ func (p *process) Limit(limit int) error {
 		return nil
 	}
 
-	p.logger.Warn().WithField("limit", limit).Log("Limiter triggered")
+	p.logger.Warn().WithFields(log.Fields{
+		"limit_cpu":    cpu,
+		"limit_memory": memory,
+	}).Log("Limiter triggered")
 
-	return p.limits.Limit(limit)
+	return p.limits.Limit(cpu, memory)
 }
 
 // Start will start the process and sets the order to "start". If the

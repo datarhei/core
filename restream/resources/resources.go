@@ -15,9 +15,11 @@ type resources struct {
 	maxCPU    float64
 	maxMemory uint64
 
-	limitCh    chan int
-	limitRate  int
-	isLimiting bool
+	limitCPUCh    chan bool
+	isCPULimiting bool
+
+	limitMemoryCh    chan bool
+	isMemoryLimiting bool
 
 	cancelObserver context.CancelFunc
 
@@ -32,7 +34,8 @@ type Resources interface {
 	Start()
 	Stop()
 
-	Limit() <-chan int
+	LimitCPU() <-chan bool
+	LimitMemory() <-chan bool
 
 	Request(cpu float64, memory uint64) error
 }
@@ -83,7 +86,8 @@ func New(config Config) (Resources, error) {
 
 func (r *resources) Start() {
 	r.startOnce.Do(func() {
-		r.limitCh = make(chan int, 10)
+		r.limitCPUCh = make(chan bool, 10)
+		r.limitMemoryCh = make(chan bool, 10)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		r.cancelObserver = cancel
@@ -106,8 +110,12 @@ func (r *resources) Stop() {
 	})
 }
 
-func (r *resources) Limit() <-chan int {
-	return r.limitCh
+func (r *resources) LimitCPU() <-chan bool {
+	return r.limitCPUCh
+}
+
+func (r *resources) LimitMemory() <-chan bool {
+	return r.limitMemoryCh
 }
 
 func (r *resources) observe(ctx context.Context, interval time.Duration) {
@@ -140,52 +148,57 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 				"cur_memory": vmstat.Used,
 			}).Log("Observation")
 
-			doLimit := false
+			doCPULimit := false
 
-			if !r.isLimiting {
+			if !r.isCPULimiting {
 				if cpuload > r.maxCPU {
 					r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit reached")
-					doLimit = true
-				}
-
-				if vmstat.Used > r.maxMemory {
-					r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit reached")
-					doLimit = true
+					doCPULimit = true
 				}
 			} else {
-				doLimit = true
-				if cpuload <= r.maxCPU && vmstat.Used <= r.maxMemory {
-					doLimit = false
+				doCPULimit = true
+				if cpuload <= r.maxCPU {
+					r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit released")
+					doCPULimit = false
+				}
+			}
+
+			doMemoryLimit := false
+
+			if !r.isMemoryLimiting {
+				if vmstat.Used > r.maxMemory {
+					r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit reached")
+					doMemoryLimit = true
+				}
+			} else {
+				doMemoryLimit = true
+				if vmstat.Used <= r.maxMemory {
+					r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit released")
+					doMemoryLimit = false
 				}
 			}
 
 			r.lock.Lock()
-			if r.isLimiting != doLimit {
-				if !r.isLimiting {
-					r.limitRate = 100
-				} else {
-					if r.limitRate > 0 {
-						r.limitRate -= 10
-						doLimit = true
-
-						if r.limitRate == 0 {
-							r.logger.Debug().WithFields(log.Fields{
-								"cpu":    cpuload,
-								"memory": vmstat.Used,
-							}).Log("CPU and memory limit released")
-							doLimit = false
-						}
-					}
-				}
-
+			if r.isCPULimiting != doCPULimit {
 				r.logger.Debug().WithFields(log.Fields{
-					"enabled": doLimit,
-					"rate":    r.limitRate,
-				}).Log("Limiting")
+					"enabled": doCPULimit,
+				}).Log("Limiting CPU")
 
-				r.isLimiting = doLimit
+				r.isCPULimiting = doCPULimit
 				select {
-				case r.limitCh <- r.limitRate:
+				case r.limitCPUCh <- doCPULimit:
+				default:
+				}
+			}
+
+			if r.isMemoryLimiting != doMemoryLimit {
+				r.logger.Debug().WithFields(log.Fields{
+					"enabled": doMemoryLimit,
+				}).Log("Limiting memory")
+
+				r.isMemoryLimiting = doMemoryLimit
+				select {
+				case r.limitMemoryCh <- doMemoryLimit:
 				default:
 				}
 			}
@@ -205,7 +218,7 @@ func (r *resources) Request(cpu float64, memory uint64) error {
 
 	logger.Debug().Log("Request for acquiring resources")
 
-	if r.isLimiting {
+	if r.isCPULimiting || r.isMemoryLimiting {
 		logger.Debug().Log("Rejected, currently limiting")
 		return fmt.Errorf("resources are currenlty actively limited")
 	}
