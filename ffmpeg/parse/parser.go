@@ -119,9 +119,10 @@ type parser struct {
 	logger log.Logger
 
 	lock struct {
-		progress sync.RWMutex
-		prelude  sync.RWMutex
-		log      sync.RWMutex
+		progress   sync.RWMutex
+		prelude    sync.RWMutex
+		log        sync.RWMutex
+		logHistory sync.RWMutex
 	}
 }
 
@@ -168,12 +169,15 @@ func New(config Config) Parser {
 
 	p.lock.log.Lock()
 	p.log = ring.New(p.logLines)
+	p.lock.log.Unlock()
 
+	p.lock.logHistory.Lock()
 	historyLength := p.logHistoryLength + p.logMinimalHistoryLength
 
 	if historyLength > 0 {
 		p.logHistory = ring.New(historyLength)
 	}
+	p.lock.logHistory.Unlock()
 
 	if p.collector == nil {
 		p.collector = session.NewNullCollector()
@@ -190,8 +194,6 @@ func New(config Config) Parser {
 
 		p.logpatterns.patterns = append(p.logpatterns.patterns, r)
 	}
-
-	p.lock.log.Unlock()
 
 	p.ResetStats()
 
@@ -827,6 +829,9 @@ type ReportHistorySearchResult struct {
 }
 
 func (p *parser) SearchReportHistory(state string, from, to *time.Time) []ReportHistorySearchResult {
+	p.lock.logHistory.RLock()
+	defer p.lock.logHistory.RUnlock()
+
 	result := []ReportHistorySearchResult{}
 
 	p.logHistory.Do(func(l interface{}) {
@@ -868,6 +873,7 @@ func (p *parser) storeReportHistory(state string, usage Usage) {
 	}
 
 	report := p.Report()
+	progress := p.Progress()
 
 	p.ResetLog()
 
@@ -875,11 +881,14 @@ func (p *parser) storeReportHistory(state string, usage Usage) {
 		return
 	}
 
+	p.lock.logHistory.Lock()
+	defer p.lock.logHistory.Unlock()
+
 	h := ReportHistoryEntry{
 		Report:    report,
 		ExitedAt:  time.Now(),
 		ExitState: state,
-		Progress:  p.Progress(),
+		Progress:  progress,
 		Usage:     usage,
 	}
 
@@ -922,6 +931,9 @@ func (p *parser) Report() Report {
 }
 
 func (p *parser) ReportHistory() []ReportHistoryEntry {
+	p.lock.logHistory.RLock()
+	defer p.lock.logHistory.RUnlock()
+
 	var history = []ReportHistoryEntry{}
 
 	p.logHistory.Do(func(l interface{}) {
@@ -936,10 +948,16 @@ func (p *parser) ReportHistory() []ReportHistoryEntry {
 }
 
 func (p *parser) TransferReportHistory(dst Parser) error {
+	p.lock.logHistory.RLock()
+	defer p.lock.logHistory.RUnlock()
+
 	pp, ok := dst.(*parser)
 	if !ok {
 		return fmt.Errorf("the target parser is not of the required type")
 	}
+
+	pp.lock.logHistory.Lock()
+	defer pp.lock.logHistory.Unlock()
 
 	p.logHistory.Do(func(l interface{}) {
 		if l == nil {
