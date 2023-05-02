@@ -628,6 +628,7 @@ func (a *api) start() error {
 			Name:            cfg.Name,
 			Path:            filepath.Join(cfg.DB.Dir, "cluster"),
 			Bootstrap:       cfg.Cluster.Bootstrap,
+			Recover:         cfg.Cluster.Recover,
 			Address:         cfg.Cluster.Address,
 			JoinAddress:     cfg.Cluster.JoinAddress,
 			CoreAPIAddress:  cfg.Address,

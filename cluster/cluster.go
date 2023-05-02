@@ -941,26 +941,50 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover, inmem bool) error 
 	cfg.LocalID = raft.ServerID(c.id)
 	cfg.Logger = NewLogger(c.logger, hclog.Debug).Named("raft")
 
-	if bootstrap {
-		hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
+	hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
+	if err != nil {
+		return err
+	}
+
+	if !hasState {
+		// Bootstrap cluster
+		configuration := raft.Configuration{
+			Servers: []raft.Server{
+				{
+					Suffrage: raft.Voter,
+					ID:       raft.ServerID(c.id),
+					Address:  transport.LocalAddr(),
+				},
+			},
+		}
+
+		if err := raft.BootstrapCluster(cfg, logStore, stableStore, snapshots, transport, configuration); err != nil {
+			return err
+		}
+
+		c.logger.Debug().Log("raft node bootstrapped")
+	} else {
+		// Recover cluster
+		fsm, err := NewStore()
 		if err != nil {
 			return err
 		}
-		if !hasState {
-			configuration := raft.Configuration{
-				Servers: []raft.Server{
-					{
-						Suffrage: raft.Voter,
-						ID:       raft.ServerID(c.id),
-						Address:  transport.LocalAddr(),
-					},
-				},
-			}
 
-			if err := raft.BootstrapCluster(cfg, logStore, stableStore, snapshots, transport, configuration); err != nil {
-				return err
-			}
+		configuration := raft.Configuration{
+			Servers: []raft.Server{
+				{
+					Suffrage: raft.Voter,
+					ID:       raft.ServerID(c.id),
+					Address:  transport.LocalAddr(),
+				},
+			},
 		}
+
+		if err := raft.RecoverCluster(cfg, fsm, logStore, stableStore, snapshots, transport, configuration); err != nil {
+			return err
+		}
+
+		c.logger.Debug().Log("raft node recoverd")
 	}
 
 	// Set up a channel for reliable leader notifications.

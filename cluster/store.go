@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/hashicorp/raft"
 )
@@ -45,10 +46,15 @@ type addProcessCommand struct {
 }
 
 // Implement a FSM
-type store struct{}
+type store struct {
+	lock  sync.RWMutex
+	Nodes map[string]string
+}
 
 func NewStore() (Store, error) {
-	return &store{}, nil
+	return &store{
+		Nodes: map[string]string{},
+	}, nil
 }
 
 func (s *store) Apply(log *raft.Log) interface{} {
@@ -72,23 +78,53 @@ func (s *store) Apply(log *raft.Log) interface{} {
 		json.Unmarshal(b, &cmd)
 
 		fmt.Printf("addNode: %+v\n", cmd)
+
+		s.lock.Lock()
+		s.Nodes[cmd.ID] = cmd.Address
+		s.lock.Unlock()
 	case opRemoveNode:
 		b, _ := json.Marshal(c.Data)
 		cmd := removeNodeCommand{}
 		json.Unmarshal(b, &cmd)
 
 		fmt.Printf("removeNode: %+v\n", cmd)
+
+		s.lock.Lock()
+		delete(s.Nodes, cmd.ID)
+		s.lock.Unlock()
 	}
 	return nil
 }
 
 func (s *store) Snapshot() (raft.FSMSnapshot, error) {
 	fmt.Printf("a snapshot is requested\n")
-	return &fsmSnapshot{}, nil
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fsmSnapshot{
+		data: data,
+	}, nil
 }
 
 func (s *store) Restore(snapshot io.ReadCloser) error {
 	fmt.Printf("a snapshot is restored\n")
+
+	defer snapshot.Close()
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	dec := json.NewDecoder(snapshot)
+	if err := dec.Decode(s); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -100,10 +136,20 @@ func (s *store) GetNode(id string) string {
 	return ""
 }
 
-type fsmSnapshot struct{}
+type fsmSnapshot struct {
+	data []byte
+}
 
 func (s *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
+	if _, err := sink.Write(s.data); err != nil {
+		sink.Cancel()
+		return err
+	}
+
+	sink.Close()
 	return nil
 }
 
-func (s *fsmSnapshot) Release() {}
+func (s *fsmSnapshot) Release() {
+	s.data = nil
+}
