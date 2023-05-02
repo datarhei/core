@@ -79,6 +79,9 @@ func New(config Config) (Resources, error) {
 	r.maxCPU *= r.ncpu
 	r.maxMemory = uint64(float64(vmstat.Total) * config.MaxMemory / 100)
 
+	r.limitCPUCh = make(chan bool, 10)
+	r.limitMemoryCh = make(chan bool, 10)
+
 	r.logger = r.logger.WithFields(log.Fields{
 		"ncpu":       r.ncpu,
 		"max_cpu":    r.maxCPU,
@@ -94,9 +97,6 @@ func New(config Config) (Resources, error) {
 
 func (r *resources) Start() {
 	r.startOnce.Do(func() {
-		r.limitCPUCh = make(chan bool, 10)
-		r.limitMemoryCh = make(chan bool, 10)
-
 		ctx, cancel := context.WithCancel(context.Background())
 		r.cancelObserver = cancel
 
