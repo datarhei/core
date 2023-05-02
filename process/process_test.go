@@ -51,12 +51,28 @@ func TestReconnectProcess(t *testing.T) {
 			"2",
 		},
 		Reconnect:      true,
-		ReconnectDelay: 10 * time.Second,
+		ReconnectDelay: 3 * time.Second,
 		StaleTimeout:   0,
 		OnExit: func(string) {
 			wg.Done()
 		},
 	})
+
+	p.Start()
+
+	require.Eventually(t, func() bool {
+		return p.Status().State == "running"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return p.Status().State == "finished"
+	}, 10*time.Second, 500*time.Millisecond)
+
+	wg.Wait()
+
+	require.Greater(t, p.Status().Reconnect, time.Duration(0))
+
+	wg.Add(1)
 
 	p.Start()
 
