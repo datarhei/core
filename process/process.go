@@ -250,7 +250,7 @@ func New(config Config) (Process, error) {
 		"args":   p.args,
 	})
 
-	p.order.order = "stop"
+	p.setOrder("stop")
 
 	p.initState(stateFinished)
 
@@ -403,6 +403,29 @@ func (p *process) getState() stateType {
 	return p.state.state
 }
 
+func (p *process) getOrder() string {
+	p.order.lock.Lock()
+	defer p.order.lock.Unlock()
+
+	return p.order.order
+}
+
+// setOrder sets the order to the given value. If the
+// order already has that order, it returns true. Otherwise
+// false.
+func (p *process) setOrder(order string) bool {
+	p.order.lock.Lock()
+	defer p.order.lock.Unlock()
+
+	if p.order.order == order {
+		return true
+	}
+
+	p.order.order = order
+
+	return false
+}
+
 func (p *process) isRunning() bool {
 	p.state.lock.Lock()
 	defer p.state.lock.Unlock()
@@ -427,9 +450,7 @@ func (p *process) Status() Status {
 	states := p.state.states
 	p.state.lock.Unlock()
 
-	p.order.lock.Lock()
-	order := p.order.order
-	p.order.lock.Unlock()
+	order := p.getOrder()
 
 	s := Status{
 		State:     state.String(),
@@ -480,14 +501,9 @@ func (p *process) Limit(cpu, memory bool) error {
 // process has alread the "start" order, nothing will be done. Returns
 // an error if start failed.
 func (p *process) Start() error {
-	p.order.lock.Lock()
-	defer p.order.lock.Unlock()
-
-	if p.order.order == "start" {
+	if p.setOrder("start") {
 		return nil
 	}
-
-	p.order.order = "start"
 
 	if p.scheduler != nil {
 		next, err := p.scheduler.Next()
@@ -504,7 +520,7 @@ func (p *process) Start() error {
 	if err != nil {
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),
-			"order": p.order.order,
+			"order": p.getOrder(),
 			"error": err,
 		}).Debug().Log("Starting failed")
 	}
@@ -525,7 +541,7 @@ func (p *process) start() error {
 	p.logger.Info().Log("Starting")
 	p.debuglogger.WithFields(log.Fields{
 		"state": p.getStateString(),
-		"order": p.order.order,
+		"order": p.getOrder(),
 	}).Debug().Log("Starting")
 
 	// Stop any restart timer in order to start the process immediately
@@ -640,20 +656,15 @@ func (p *process) start() error {
 
 // Stop will stop the process and set the order to "stop"
 func (p *process) Stop(wait bool) error {
-	p.order.lock.Lock()
-	defer p.order.lock.Unlock()
-
-	if p.order.order == "stop" {
+	if p.setOrder("stop") {
 		return nil
 	}
-
-	p.order.order = "stop"
 
 	err := p.stop(wait)
 	if err != nil {
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),
-			"order": p.order.order,
+			"order": p.getOrder(),
 			"error": err,
 		}).Debug().Log("Stopping failed")
 	}
@@ -669,9 +680,6 @@ func (p *process) Kill(wait bool) error {
 	if !p.isRunning() {
 		return nil
 	}
-
-	p.order.lock.Lock()
-	defer p.order.lock.Unlock()
 
 	err := p.stop(wait)
 
@@ -696,7 +704,7 @@ func (p *process) stop(wait bool) error {
 	p.logger.Info().Log("Stopping")
 	p.debuglogger.WithFields(log.Fields{
 		"state": p.getStateString(),
-		"order": p.order.order,
+		"order": p.getOrder(),
 	}).Debug().Log("Stopping")
 
 	wg := sync.WaitGroup{}
@@ -754,7 +762,7 @@ func (p *process) stop(wait bool) error {
 		p.parser.Parse(err.Error())
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),
-			"order": p.order.order,
+			"order": p.getOrder(),
 			"error": err,
 		}).Debug().Log("Stopping failed")
 
@@ -780,9 +788,6 @@ func (p *process) reconnect(delay time.Duration) {
 
 	p.reconn.reconnectAt = time.Now().Add(delay)
 	p.reconn.timer = time.AfterFunc(delay, func() {
-		p.order.lock.Lock()
-		defer p.order.lock.Unlock()
-
 		p.start()
 	})
 }
@@ -966,25 +971,22 @@ func (p *process) waiter() {
 	// Reset the parser stats
 	p.parser.ResetStats()
 
+	p.debuglogger.WithFields(log.Fields{
+		"state": state.String(),
+		"order": p.getOrder(),
+	}).Debug().Log("Waiting")
+
+	// Restart the process
+	if p.getOrder() == "start" {
+		p.reconnect(p.delay(state))
+	}
+
 	// Call the onExit callback
 	p.callbacks.lock.Lock()
 	if p.callbacks.onExit != nil {
 		p.callbacks.onExit(state.String())
 	}
 	p.callbacks.lock.Unlock()
-
-	p.order.lock.Lock()
-	defer p.order.lock.Unlock()
-
-	p.debuglogger.WithFields(log.Fields{
-		"state": p.getStateString(),
-		"order": p.order.order,
-	}).Debug().Log("Waiting")
-
-	// Restart the process
-	if p.order.order == "start" {
-		p.reconnect(p.delay(state))
-	}
 }
 
 // delay returns the duration for the next reconnect of the process. If no reconnect is
