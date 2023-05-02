@@ -2,6 +2,7 @@ package parse
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -158,35 +159,46 @@ func TestParserLogHistory(t *testing.T) {
 		LogHistory: 5,
 	}).(*parser)
 
-	parser.Parse("bla")
+	for i := 0; i < 7; i++ {
+		parser.Parse("bla")
 
-	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.prelude.done = true
+		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+
+		history := parser.ReportHistory()
+		require.Equal(t, int(math.Min(float64(i), 5)), len(history))
+
+		parser.Stop("finished", process.Usage{})
+		parser.ResetStats()
+
+		time.Sleep(time.Second)
+	}
 
 	history := parser.ReportHistory()
-	require.Equal(t, 0, len(history))
+	require.Equal(t, 5, len(history))
 
-	parser.Stop("finished", process.Usage{})
+	for i := 0; i < 5; i++ {
+		require.Equal(t, "finished", history[i].ExitState)
+		require.Equal(t, "bla", history[i].Log[0].Data)
+		require.Equal(t, "bla", history[i].Prelude[0])
 
-	history = parser.ReportHistory()
-	require.Equal(t, 1, len(history))
+		d, _ := time.ParseDuration("3m58s440ms")
+		require.Equal(t, Progress{
+			Frame:     5968,
+			FPS:       0, // is calculated with averager
+			Quantizer: 19.4,
+			Size:      453632,
+			Time:      d.Seconds(),
+			Bitrate:   0, // is calculated with averager
+			Speed:     0.999,
+			Drop:      3522,
+			Dup:       87463,
+		}, history[i].Progress)
 
-	require.Equal(t, "finished", history[0].ExitState)
-	require.Equal(t, "bla", history[0].Log[0].Data)
-	require.Equal(t, "bla", history[0].Prelude[0])
-
-	d, _ := time.ParseDuration("3m58s440ms")
-	require.Equal(t, Progress{
-		Frame:     5968,
-		FPS:       0, // is calculated with averager
-		Quantizer: 19.4,
-		Size:      453632,
-		Time:      d.Seconds(),
-		Bitrate:   0, // is calculated with averager
-		Speed:     0.999,
-		Drop:      3522,
-		Dup:       87463,
-	}, history[0].Progress)
+		if i != 0 {
+			require.Greater(t, history[i].CreatedAt, history[i-1].ExitedAt)
+		}
+	}
 }
 
 func TestParserLogHistoryLength(t *testing.T) {
@@ -221,7 +233,7 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 	history := parser.ReportHistory()
 	require.Equal(t, 0, len(history))
 
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 42; i++ {
 		parser.Parse("bla")
 
 		parser.prelude.done = true
@@ -235,10 +247,36 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		require.Empty(t, history[i].Log, i)
+
+		d, _ := time.ParseDuration("3m58s440ms")
+		require.Equal(t, Progress{
+			Frame:     5968,
+			FPS:       0, // is calculated with averager
+			Quantizer: 19.4,
+			Size:      453632,
+			Time:      d.Seconds(),
+			Bitrate:   0, // is calculated with averager
+			Speed:     0.999,
+			Drop:      3522,
+			Dup:       87463,
+		}, history[i].Progress)
 	}
 
 	for i := 10; i < 13; i++ {
 		require.NotEmpty(t, history[i].Log, i)
+
+		d, _ := time.ParseDuration("3m58s440ms")
+		require.Equal(t, Progress{
+			Frame:     5968,
+			FPS:       0, // is calculated with averager
+			Quantizer: 19.4,
+			Size:      453632,
+			Time:      d.Seconds(),
+			Bitrate:   0, // is calculated with averager
+			Speed:     0.999,
+			Drop:      3522,
+			Dup:       87463,
+		}, history[i].Progress)
 	}
 }
 
