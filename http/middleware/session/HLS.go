@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	urlpath "path"
 	"path/filepath"
 	"regexp"
@@ -298,7 +299,7 @@ func (r *bodyReader) Close() error {
 func (r *bodyReader) getSegments(dir string) []string {
 	segments := []string{}
 
-	// Find all segments URLS in the .m3u8
+	// Find all segment URLs in the .m3u8
 	scanner := bufio.NewScanner(&r.buffer)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -405,9 +406,23 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 
 		q := u.Query()
 
+		loop := false
+
 		// If this is a master manifest (i.e. an m3u8 which contains references to other m3u8), then
 		// we give each substream an own session ID if they don't have already.
 		if strings.HasSuffix(u.Path, ".m3u8") {
+			// Check if we're referring to ourselves. This will cause an infinite loop
+			// and has to be stopped.
+			file := u.Path
+			if !strings.HasPrefix(file, "/") {
+				dir := path.Dir(requestURL.Path)
+				file = filepath.Join(dir, file)
+			}
+
+			if requestURL.Path == file {
+				loop = true
+			}
+
 			q.Set("session", shortuuid.New())
 
 			isMaster = true
@@ -417,7 +432,11 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 
 		u.RawQuery = q.Encode()
 
-		buffer.WriteString(u.String() + "\n")
+		if loop {
+			buffer.WriteString("# m3u8 is referencing itself: " + u.String() + "\n")
+		} else {
+			buffer.WriteString(u.String() + "\n")
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
