@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -103,14 +104,19 @@ type Logger interface {
 
 // logger is an implementation of the Logger interface.
 type logger struct {
-	output    Writer
-	component string
+	output     Writer
+	component  string
+	modulePath string
 }
 
 // New returns an implementation of the Logger interface.
 func New(component string) Logger {
 	l := &logger{
 		component: component,
+	}
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		l.modulePath = info.Path
 	}
 
 	return l
@@ -122,8 +128,9 @@ func (l *logger) Close() {
 
 func (l *logger) clone() *logger {
 	clone := &logger{
-		output:    l.output,
-		component: l.component,
+		output:     l.output,
+		component:  l.component,
+		modulePath: l.modulePath,
 	}
 
 	return clone
@@ -223,6 +230,7 @@ func (e *Event) WithComponent(component string) Logger {
 
 func (e *Event) Log(format string, args ...interface{}) {
 	_, file, line, _ := runtime.Caller(1)
+	file = strings.TrimPrefix(file, e.logger.modulePath)
 
 	n := e.clone()
 
