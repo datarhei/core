@@ -15,11 +15,11 @@ init:
 
 ## build: Build core (default)
 build:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core${BINSUFFIX}
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core${BINSUFFIX} -trimpath
 
 # github workflow workaround
 build_linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -trimpath
 
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:
@@ -69,19 +69,19 @@ lint:
 
 ## import: Build import binary
 import:
-	cd app/import && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../import -ldflags="-s -w"
+	cd app/import && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../import -trimpath -ldflags="-s -w"
 
 # github workflow workaround
 import_linux:
-	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -ldflags="-s -w"
+	cd app/import && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../import -trimpath -ldflags="-s -w"
 
 ## ffmigrate: Build ffmpeg migration binary
 ffmigrate:
-	cd app/ffmigrate && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../ffmigrate -ldflags="-s -w"
+	cd app/ffmigrate && CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o ../../ffmigrate -trimpath -ldflags="-s -w"
 
 # github workflow workaround
 ffmigrate_linux:
-	cd app/ffmigrate && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../ffmigrate -ldflags="-s -w"
+	cd app/ffmigrate && CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o ../../ffmigrate -trimpath -ldflags="-s -w"
 
 ## coverage: Generate code coverage analysis
 coverage:
@@ -94,11 +94,11 @@ commit: vet fmt lint test build
 
 ## release: Build a release binary of core
 release:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
+	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o core -trimpath -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
 
 # github workflow workaround
 release_linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=${OSARCH} go build -o core -trimpath -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
 
 ## docker: Build standard Docker image
 docker:
