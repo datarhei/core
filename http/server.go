@@ -314,7 +314,7 @@ func NewServer(config Config) (Server, error) {
 	})
 
 	if config.Cluster != nil {
-		s.v3handler.cluster = api.NewCluster(config.Cluster)
+		//s.v3handler.cluster = api.NewCluster(config.Cluster)
 	}
 
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
@@ -656,17 +656,19 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	}
 
 	// v3 Cluster
-	if s.v3handler.cluster != nil {
-		v3.GET("/cluster", s.v3handler.cluster.GetCluster)
-		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
-		v3.GET("/cluster/node/:id/proxy", s.v3handler.cluster.GetNodeProxy)
+	/*
+		if s.v3handler.cluster != nil {
+			v3.GET("/cluster", s.v3handler.cluster.GetCluster)
+			v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
+			v3.GET("/cluster/node/:id/proxy", s.v3handler.cluster.GetNodeProxy)
 
-		if !s.readOnly {
-			v3.POST("/cluster/node", s.v3handler.cluster.AddNode)
-			v3.PUT("/cluster/node/:id", s.v3handler.cluster.UpdateNode)
-			v3.DELETE("/cluster/node/:id", s.v3handler.cluster.DeleteNode)
+			if !s.readOnly {
+				v3.POST("/cluster/node", s.v3handler.cluster.AddNode)
+				v3.PUT("/cluster/node/:id", s.v3handler.cluster.UpdateNode)
+				v3.DELETE("/cluster/node/:id", s.v3handler.cluster.DeleteNode)
+			}
 		}
-	}
+	*/
 
 	// v3 Log
 	v3.GET("/log", s.v3handler.log.Log)

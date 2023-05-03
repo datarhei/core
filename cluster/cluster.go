@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	gonet "net"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -69,33 +70,33 @@ type Cluster interface {
 	Addr() string
 	APIAddr(raftAddress string) (string, error)
 
-	Join(origin, id, raftAddress, apiAddress, apiUsername, apiPassword string) error
+	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
 	Snapshot() ([]byte, error)
 
 	Shutdown() error
 
-	AddNode(id, address, username, password string) error
+	AddNode(id, address string) error
 	RemoveNode(id string) error
 	ListNodes() []addNodeCommand
 	GetNode(id string) (addNodeCommand, error)
 
-	AddNodeX(address, username, password string) (string, error)
-	RemoveNodeX(id string) error
-	ListNodesX() []NodeReader
-	GetNodeX(id string) (NodeReader, error)
-
 	ClusterReader
 }
 
+type Peer struct {
+	ID      string
+	Address string
+}
+
 type ClusterConfig struct {
-	ID          string // ID of the node
-	Name        string // Name of the node
-	Path        string // Path where to store all cluster data
-	Bootstrap   bool   // Whether to bootstrap a cluster
-	Recover     bool   // Whether to recover this node
-	Address     string // Listen address for the raft protocol
-	JoinAddress string // Address of a member of a cluster to join
+	ID        string // ID of the node
+	Name      string // Name of the node
+	Path      string // Path where to store all cluster data
+	Bootstrap bool   // Whether to bootstrap a cluster
+	Recover   bool   // Whether to recover this node
+	Address   string // Listen address for the raft protocol
+	Peers     []Peer // Address of a member of a cluster to join
 
 	CoreAPIAddress  string // Address of the core API
 	CoreAPIUsername string // Username for the core API
@@ -110,19 +111,6 @@ type cluster struct {
 	name string
 	path string
 
-	nodes    map[string]*node     // List of known nodes
-	idfiles  map[string][]string  // Map from nodeid to list of files
-	idupdate map[string]time.Time // Map from nodeid to time of last update
-	fileid   map[string]string    // Map from file name to nodeid
-
-	limiter net.IPLimiter
-
-	updates chan NodeState
-
-	lock   sync.RWMutex
-	cancel context.CancelFunc
-	once   sync.Once
-
 	logger log.Logger
 
 	raft                  *raft.Raft
@@ -133,7 +121,7 @@ type cluster struct {
 	raftStore             *raftboltdb.BoltStore
 	raftRemoveGracePeriod time.Duration
 
-	joinAddress string
+	peers []Peer
 
 	store Store
 
@@ -147,12 +135,9 @@ type cluster struct {
 
 	forwarder Forwarder
 	api       API
+	proxy     Proxy
 
-	core struct {
-		address  string
-		username string
-		password string
-	}
+	coreAddress string
 
 	isRaftLeader  bool
 	hasRaftLeader bool
@@ -162,32 +147,31 @@ type cluster struct {
 
 func New(config ClusterConfig) (Cluster, error) {
 	c := &cluster{
-		id:       config.ID,
-		name:     config.Name,
-		path:     config.Path,
-		nodes:    map[string]*node{},
-		idfiles:  map[string][]string{},
-		idupdate: map[string]time.Time{},
-		fileid:   map[string]string{},
-		limiter:  config.IPLimiter,
-		updates:  make(chan NodeState, 64),
-		logger:   config.Logger,
+		id:     config.ID,
+		name:   config.Name,
+		path:   config.Path,
+		logger: config.Logger,
 
 		raftAddress: config.Address,
-		joinAddress: config.JoinAddress,
+		peers:       config.Peers,
 
 		reassertLeaderCh: make(chan chan error),
 		leaveCh:          make(chan struct{}),
 		shutdownCh:       make(chan struct{}),
 	}
 
-	c.core.address = config.CoreAPIAddress
-	c.core.username = config.CoreAPIUsername
-	c.core.password = config.CoreAPIPassword
-
-	if c.limiter == nil {
-		c.limiter = net.NewNullIPLimiter()
+	u, err := url.Parse(config.CoreAPIAddress)
+	if err != nil {
+		return nil, fmt.Errorf("invalid core API address: %w", err)
 	}
+
+	if len(config.CoreAPIPassword) == 0 {
+		u.User = url.User(config.CoreAPIUsername)
+	} else {
+		u.User = url.UserPassword(config.CoreAPIUsername, config.CoreAPIPassword)
+	}
+
+	c.coreAddress = u.String()
 
 	if c.logger == nil {
 		c.logger = log.New("")
@@ -215,6 +199,23 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	c.api = api
 
+	proxy, err := NewProxy(ProxyConfig{
+		ID:        c.id,
+		Name:      c.name,
+		IPLimiter: config.IPLimiter,
+		Logger:    c.logger.WithField("logname", "proxy"),
+	})
+	if err != nil {
+		c.shutdownAPI()
+		return nil, err
+	}
+
+	go func(proxy Proxy) {
+		proxy.Start()
+	}(proxy)
+
+	c.proxy = proxy
+
 	if forwarder, err := NewForwarder(ForwarderConfig{
 		ID:     c.id,
 		Logger: c.logger.WithField("logname", "forwarder"),
@@ -227,73 +228,42 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	c.logger.Debug().Log("starting raft")
 
-	err = c.startRaft(store, config.Bootstrap, config.Recover, false)
+	err = c.startRaft(store, config.Bootstrap, config.Recover, config.Peers, false)
 	if err != nil {
 		c.shutdownAPI()
 		return nil, err
 	}
 
-	if len(c.joinAddress) != 0 {
-		addr, _ := c.APIAddr(c.joinAddress)
-		c.forwarder.SetLeader(addr)
-
-		go func(addr string) {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-c.shutdownCh:
-					return
-				case <-ticker.C:
-					c.logger.Debug().Log("joining cluster at %s", c.joinAddress)
-					err := c.Join("", c.id, c.raftAddress, c.core.address, c.core.username, c.core.password)
-					if err != nil {
-						c.logger.Warn().WithError(err).Log("unable to join %s", c.joinAddress)
-						continue
-					}
-
-					return
-				}
+	if len(config.Peers) != 0 {
+		for i := 0; i < len(config.Peers); i++ {
+			peerAddress, err := c.APIAddr(config.Peers[i].Address)
+			if err != nil {
+				c.shutdownAPI()
+				c.shutdownRaft()
+				return nil, err
 			}
-		}(addr)
-	}
 
-	go func() {
-		for {
-			select {
-			case <-c.shutdownCh:
-				return
-			case state := <-c.updates:
-				c.logger.Debug().WithFields(log.Fields{
-					"node":  state.ID,
-					"state": state.State,
-					"files": len(state.Files),
-				}).Log("Got update")
+			go func(peerAddress string) {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
 
-				c.lock.Lock()
+				for {
+					select {
+					case <-c.shutdownCh:
+						return
+					case <-ticker.C:
+						err := c.Join("", c.id, c.raftAddress, c.coreAddress, peerAddress)
+						if err != nil {
+							c.logger.Warn().WithError(err).Log("unable to join cluster")
+							continue
+						}
 
-				// Cleanup
-				files := c.idfiles[state.ID]
-				for _, file := range files {
-					delete(c.fileid, file)
-				}
-				delete(c.idfiles, state.ID)
-				delete(c.idupdate, state.ID)
-
-				if state.State == "connected" {
-					// Add files
-					for _, file := range state.Files {
-						c.fileid[file] = state.ID
+						return
 					}
-					c.idfiles[state.ID] = files
-					c.idupdate[state.ID] = state.LastUpdate
 				}
-
-				c.lock.Unlock()
-			}
+			}(peerAddress)
 		}
-	}()
+	}
 
 	return c, nil
 }
@@ -329,15 +299,11 @@ func (c *cluster) Shutdown() error {
 	c.shutdown = true
 	close(c.shutdownCh)
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	for _, node := range c.nodes {
-		node.stop()
+	if c.proxy != nil {
+		c.proxy.Stop()
 	}
 
-	c.nodes = map[string]*node{}
-
+	c.shutdownAPI()
 	c.shutdownRaft()
 
 	return nil
@@ -488,10 +454,10 @@ func (c *cluster) Leave(origin, id string) error {
 	return nil
 }
 
-func (c *cluster) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPassword string) error {
+func (c *cluster) Join(origin, id, raftAddress, apiAddress, peerAddress string) error {
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("not leader, forwarding to leader")
-		return c.forwarder.Join(origin, id, raftAddress, apiAddress, apiUsername, apiPassword)
+		return c.forwarder.Join(origin, id, raftAddress, apiAddress, peerAddress)
 	}
 
 	c.logger.Debug().Log("leader: joining %s", raftAddress)
@@ -501,11 +467,15 @@ func (c *cluster) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPass
 		"address": raftAddress,
 	}).Log("received join request for remote node")
 
+	// connect to the peer's API in order to find out if our version is compatible
+
 	configFuture := c.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
 		c.logger.Error().WithError(err).Log("failed to get raft configuration")
 		return err
 	}
+
+	nodeExists := false
 
 	for _, srv := range configFuture.Configuration().Servers {
 		// If a node already exists with either the joining node's ID or address,
@@ -514,30 +484,32 @@ func (c *cluster) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPass
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.ID == raft.ServerID(id) && srv.Address == raft.ServerAddress(raftAddress) {
+				nodeExists = true
 				c.logger.Debug().WithFields(log.Fields{
 					"nodeid":  id,
 					"address": raftAddress,
 				}).Log("node is already member of cluster, ignoring join request")
-				return nil
-			}
-
-			future := c.raft.RemoveServer(srv.ID, 0, 0)
-			if err := future.Error(); err != nil {
-				c.logger.Error().WithError(err).WithFields(log.Fields{
-					"nodeid":  id,
-					"address": raftAddress,
-				}).Log("error removing existing node")
-				return fmt.Errorf("error removing existing node %s at %s: %w", id, raftAddress, err)
+			} else {
+				future := c.raft.RemoveServer(srv.ID, 0, 0)
+				if err := future.Error(); err != nil {
+					c.logger.Error().WithError(err).WithFields(log.Fields{
+						"nodeid":  id,
+						"address": raftAddress,
+					}).Log("error removing existing node")
+					return fmt.Errorf("error removing existing node %s at %s: %w", id, raftAddress, err)
+				}
 			}
 		}
 	}
 
-	f := c.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(raftAddress), 0, 0)
-	if err := f.Error(); err != nil {
-		return err
+	if !nodeExists {
+		f := c.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(raftAddress), 0, 0)
+		if err := f.Error(); err != nil {
+			return err
+		}
 	}
 
-	if err := c.AddNode(id, apiAddress, apiUsername, apiPassword); err != nil {
+	if err := c.AddNode(id, apiAddress); err != nil {
 		/*
 			future := c.raft.RemoveServer(raft.ServerID(id), 0, 0)
 			if err := future.Error(); err != nil {
@@ -616,7 +588,7 @@ func (c *cluster) GetNode(id string) (addNodeCommand, error) {
 	return addNodeCommand{}, nil
 }
 
-func (c *cluster) AddNode(id, address, username, password string) error {
+func (c *cluster) AddNode(id, address string) error {
 	if !c.IsRaftLeader() {
 		return fmt.Errorf("not leader")
 	}
@@ -624,10 +596,8 @@ func (c *cluster) AddNode(id, address, username, password string) error {
 	com := &command{
 		Operation: opAddNode,
 		Data: &addNodeCommand{
-			ID:       id,
-			Address:  address,
-			Username: username,
-			Password: password,
+			ID:      id,
+			Address: address,
 		},
 	}
 
@@ -717,171 +687,7 @@ func (c *cluster) trackLeaderChanges() {
 	}
 }
 
-func (c *cluster) AddNodeX(address, username, password string) (string, error) {
-	node, err := newNode(address, username, password, c.updates)
-	if err != nil {
-		return "", err
-	}
-
-	id := node.ID()
-
-	if id == c.id {
-		return "", fmt.Errorf("can't add myself as node or a node with the same ID")
-	}
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if _, ok := c.nodes[id]; ok {
-		node.stop()
-		return id, nil
-	}
-
-	ips := node.IPs()
-	for _, ip := range ips {
-		c.limiter.AddBlock(ip)
-	}
-
-	c.nodes[id] = node
-
-	c.logger.Info().WithFields(log.Fields{
-		"address": address,
-		"id":      id,
-	}).Log("Added node")
-
-	return id, nil
-}
-
-func (c *cluster) RemoveNodeX(id string) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	node, ok := c.nodes[id]
-	if !ok {
-		return ErrNodeNotFound
-	}
-
-	node.stop()
-
-	delete(c.nodes, id)
-
-	ips := node.IPs()
-
-	for _, ip := range ips {
-		c.limiter.RemoveBlock(ip)
-	}
-
-	c.Leave("", id)
-
-	c.logger.Info().WithFields(log.Fields{
-		"id": id,
-	}).Log("Removed node")
-
-	return nil
-}
-
-func (c *cluster) ListNodesX() []NodeReader {
-	list := []NodeReader{}
-
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	for _, node := range c.nodes {
-		list = append(list, node)
-	}
-
-	return list
-}
-
-func (c *cluster) GetNodeX(id string) (NodeReader, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	node, ok := c.nodes[id]
-	if !ok {
-		return nil, fmt.Errorf("node not found")
-	}
-
-	return node, nil
-}
-
-func (c *cluster) GetURL(path string) (string, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	id, ok := c.fileid[path]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Not found")
-		return "", fmt.Errorf("file not found")
-	}
-
-	ts, ok := c.idupdate[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("No age information found")
-		return "", fmt.Errorf("file not found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		c.logger.Debug().WithField("path", path).Log("File too old")
-		return "", fmt.Errorf("file not found")
-	}
-
-	node, ok := c.nodes[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Unknown node")
-		return "", fmt.Errorf("file not found")
-	}
-
-	url, err := node.getURL(path)
-	if err != nil {
-		c.logger.Debug().WithField("path", path).Log("Invalid path")
-		return "", fmt.Errorf("file not found")
-	}
-
-	c.logger.Debug().WithField("url", url).Log("File cluster url")
-
-	return url, nil
-}
-
-func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	id, ok := c.fileid[path]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Not found")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	ts, ok := c.idupdate[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("No age information found")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		c.logger.Debug().WithField("path", path).Log("File too old")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	node, ok := c.nodes[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Unknown node")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	data, err := node.getFile(path)
-	if err != nil {
-		c.logger.Debug().WithField("path", path).Log("Invalid path")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	c.logger.Debug().WithField("path", path).Log("File cluster path")
-
-	return data, nil
-}
-
-func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover, inmem bool) error {
+func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover bool, peers []Peer, inmem bool) error {
 	defer func() {
 		if c.raft == nil && c.raftStore != nil {
 			c.raftStore.Close()
@@ -948,14 +754,24 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover, inmem bool) error 
 
 	if !hasState {
 		// Bootstrap cluster
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					Suffrage: raft.Voter,
-					ID:       raft.ServerID(c.id),
-					Address:  transport.LocalAddr(),
-				},
+		servers := []raft.Server{
+			{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(c.id),
+				Address:  transport.LocalAddr(),
 			},
+		}
+
+		for _, p := range peers {
+			servers = append(servers, raft.Server{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(p.ID),
+				Address:  raft.ServerAddress(p.Address),
+			})
+		}
+
+		configuration := raft.Configuration{
+			Servers: servers,
 		}
 
 		if err := raft.BootstrapCluster(cfg, logStore, stableStore, snapshots, transport, configuration); err != nil {
@@ -970,14 +786,24 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover, inmem bool) error 
 			return err
 		}
 
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					Suffrage: raft.Voter,
-					ID:       raft.ServerID(c.id),
-					Address:  transport.LocalAddr(),
-				},
+		servers := []raft.Server{
+			{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(c.id),
+				Address:  transport.LocalAddr(),
 			},
+		}
+
+		for _, p := range peers {
+			servers = append(servers, raft.Server{
+				Suffrage: raft.Voter,
+				ID:       raft.ServerID(p.ID),
+				Address:  raft.ServerAddress(p.Address),
+			})
+		}
+
+		configuration := raft.Configuration{
+			Servers: servers,
 		}
 
 		if err := raft.RecoverCluster(cfg, fsm, logStore, stableStore, snapshots, transport, configuration); err != nil {
@@ -1122,4 +948,12 @@ func (c *cluster) sentinel() {
 			}
 		}
 	}
+}
+
+func (c *cluster) GetURL(path string) (string, error) {
+	return c.proxy.GetURL(path)
+}
+
+func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
+	return c.proxy.GetFile(path)
 }

@@ -29,6 +29,11 @@ type NodeState struct {
 	LastUpdate time.Time
 }
 
+type NodeSpecs struct {
+	ID      string
+	Address string
+}
+
 type nodeState string
 
 func (n nodeState) String() string {
@@ -67,7 +72,7 @@ type node struct {
 	prefix *regexp.Regexp
 }
 
-func newNode(address, username, password string, updates chan<- NodeState) (*node, error) {
+func newNode(address string, updates chan<- NodeState) (*node, error) {
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
@@ -81,6 +86,12 @@ func newNode(address, username, password string, updates chan<- NodeState) (*nod
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return nil, fmt.Errorf("lookup failed: %w", err)
+	}
+
+	username := u.User.Username()
+	password := ""
+	if pw, ok := u.User.Password(); ok {
+		password = pw
 	}
 
 	n := &node{

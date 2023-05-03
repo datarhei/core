@@ -135,6 +135,8 @@ func (d *Config) Clone() *Config {
 	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
+	data.Cluster.Peers = copy.Slice(d.Cluster.Peers)
+
 	data.vars.Transfer(&d.vars)
 
 	return data
@@ -278,8 +280,8 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.Cluster.Bootstrap, false), "cluster.bootstrap", "CORE_CLUSTER_BOOTSTRAP", nil, "Bootstrap a cluster", false, false)
 	d.vars.Register(value.NewBool(&d.Cluster.Recover, false), "cluster.recover", "CORE_CLUSTER_RECOVER", nil, "Recover a cluster", false, false)
 	d.vars.Register(value.NewBool(&d.Cluster.Debug, false), "cluster.debug", "CORE_CLUSTER_DEBUG", nil, "Switch to debug mode, not for production", false, false)
-	d.vars.Register(value.NewAddress(&d.Cluster.Address, ":8000"), "cluster.address", "CORE_CLUSTER_ADDRESS", nil, "Raft listen address", false, true)
-	d.vars.Register(value.NewString(&d.Cluster.JoinAddress, ""), "cluster.join_address", "CORE_CLUSTER_JOIN_ADDRESS", nil, "Raft address of a core that is part of the cluster", false, true)
+	d.vars.Register(value.NewClusterAddress(&d.Cluster.Address, ""), "cluster.address", "CORE_CLUSTER_ADDRESS", nil, "Raft listen address", false, true)
+	d.vars.Register(value.NewClusterPeerList(&d.Cluster.Peers, []string{""}, ","), "cluster.peers", "CORE_CLUSTER_PEERS", nil, "Raft address of a cores that are part of the cluster", false, true)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are
@@ -462,8 +464,8 @@ func (d *Config) Validate(resetLogs bool) {
 
 	// If cluster mode is enabled, we can't join and bootstrap at the same time
 	if d.Cluster.Enable {
-		if d.Cluster.Bootstrap && len(d.Cluster.JoinAddress) != 0 {
-			d.vars.Log("error", "cluster.join_address", "can't be set if cluster.bootstrap is enabled")
+		if len(d.Cluster.Address) == 0 {
+			d.vars.Log("error", "cluster.address", "must be provided")
 		}
 	}
 }

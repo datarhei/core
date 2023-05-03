@@ -31,10 +31,8 @@ type command struct {
 }
 
 type addNodeCommand struct {
-	ID       string
-	Address  string
-	Username string
-	Password string
+	ID      string
+	Address string
 }
 
 type removeNodeCommand struct {
@@ -93,6 +91,10 @@ func (s *store) Apply(log *raft.Log) interface{} {
 		delete(s.Nodes, cmd.ID)
 		s.lock.Unlock()
 	}
+
+	s.lock.RLock()
+	fmt.Printf("\n==> %+v\n\n", s.Nodes)
+	s.lock.RUnlock()
 	return nil
 }
 

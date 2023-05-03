@@ -42,8 +42,6 @@ type JoinRequest struct {
 	ID          string `json:"id"`
 	RaftAddress string `json:"raft_address"`
 	APIAddress  string `json:"api_address"`
-	APIUsername string `json:"api_username"`
-	APIPassword string `json:"api_password"`
 }
 
 type LeaveRequest struct {
@@ -73,8 +71,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.Debug = true
 	a.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
 	a.router.Validator = validator.New()
-	a.router.HideBanner = false
-	a.router.HidePort = false
+	a.router.HideBanner = true
+	a.router.HidePort = true
 
 	mwlog.NewWithConfig(mwlog.Config{
 		Logger: a.logger,
@@ -105,7 +103,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, r.APIAddress, r.APIUsername, r.APIPassword)
+		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, r.APIAddress, "")
 		if err != nil {
 			a.logger.Debug().WithError(err).Log("unable to join cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)

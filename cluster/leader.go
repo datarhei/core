@@ -141,8 +141,6 @@ func (c *cluster) monitorLeadership() {
 				c.isRaftLeader = true
 				c.isLeader = true
 				c.leaderLock.Unlock()
-
-				c.AddNode(c.id, c.core.address, c.core.username, c.core.password)
 			} else if notification == NOTIFY_EMERGENCY {
 				if weAreEmergencyLeaderCh != nil {
 					// we are already emergency leader, don't do anything

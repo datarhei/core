@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -623,6 +624,46 @@ func (a *api) start() error {
 	a.restream = restream
 
 	if cfg.Cluster.Enable {
+		scheme := "http://"
+		address := cfg.Address
+
+		if cfg.TLS.Enable {
+			scheme = "https://"
+			address = cfg.TLS.Address
+		}
+
+		host, port, err := gonet.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("invalid core address: %s: %w", address, err)
+		}
+
+		if len(host) == 0 {
+			chost, _, err := gonet.SplitHostPort(cfg.Cluster.Address)
+			if err != nil {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			if len(chost) == 0 {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			host = chost
+		}
+
+		peers := []cluster.Peer{}
+
+		for _, p := range cfg.Cluster.Peers {
+			id, address, found := strings.Cut(p, "@")
+			if !found {
+				continue
+			}
+
+			peers = append(peers, cluster.Peer{
+				ID:      id,
+				Address: address,
+			})
+		}
+
 		cluster, err := cluster.New(cluster.ClusterConfig{
 			ID:              cfg.ID,
 			Name:            cfg.Name,
@@ -630,8 +671,8 @@ func (a *api) start() error {
 			Bootstrap:       cfg.Cluster.Bootstrap,
 			Recover:         cfg.Cluster.Recover,
 			Address:         cfg.Cluster.Address,
-			JoinAddress:     cfg.Cluster.JoinAddress,
-			CoreAPIAddress:  cfg.Address,
+			Peers:           peers,
+			CoreAPIAddress:  scheme + gonet.JoinHostPort(host, port),
 			CoreAPIUsername: cfg.API.Auth.Username,
 			CoreAPIPassword: cfg.API.Auth.Password,
 			IPLimiter:       a.sessionsLimiter,

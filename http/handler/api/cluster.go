@@ -1,16 +1,9 @@
 package api
 
 import (
-	"net/http"
 	"regexp"
-	"sort"
-	"strings"
 
 	"github.com/datarhei/core/v16/cluster"
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/handler/util"
-
-	"github.com/labstack/echo/v4"
 )
 
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
@@ -19,6 +12,7 @@ type ClusterHandler struct {
 	prefix  *regexp.Regexp
 }
 
+/*
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.
 func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	return &ClusterHandler{
@@ -207,3 +201,4 @@ func (h *ClusterHandler) UpdateNode(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, id)
 }
+*/

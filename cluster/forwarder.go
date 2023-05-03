@@ -17,7 +17,7 @@ import (
 type Forwarder interface {
 	SetLeader(address string)
 	HasLeader() bool
-	Join(origin, id, raftAddress, apiAddress, apiUsername, apiPassword string) error
+	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
 	Leave(origin, id string) error
 	Snapshot() ([]byte, error)
 	AddProcess() error
@@ -82,7 +82,7 @@ func (f *forwarder) HasLeader() bool {
 	return len(f.leaderAddr) != 0
 }
 
-func (f *forwarder) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPassword string) error {
+func (f *forwarder) Join(origin, id, raftAddress, apiAddress, peerAddress string) error {
 	if origin == "" {
 		origin = f.id
 	}
@@ -92,8 +92,6 @@ func (f *forwarder) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPa
 		ID:          id,
 		RaftAddress: raftAddress,
 		APIAddress:  apiAddress,
-		APIUsername: apiUsername,
-		APIPassword: apiPassword,
 	}
 
 	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
@@ -103,7 +101,7 @@ func (f *forwarder) Join(origin, id, raftAddress, apiAddress, apiUsername, apiPa
 		return err
 	}
 
-	_, err = f.call(http.MethodPost, "/join", "application/json", bytes.NewReader(data))
+	_, err = f.call(http.MethodPost, "/join", "application/json", bytes.NewReader(data), peerAddress)
 
 	return err
 }
@@ -125,13 +123,13 @@ func (f *forwarder) Leave(origin, id string) error {
 		return err
 	}
 
-	_, err = f.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data))
+	_, err = f.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data), "")
 
 	return err
 }
 
 func (f *forwarder) Snapshot() ([]byte, error) {
-	r, err := f.stream(http.MethodGet, "/snapshot", "", nil)
+	r, err := f.stream(http.MethodGet, "/snapshot", "", nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -156,13 +154,18 @@ func (f *forwarder) RemoveProcess() error {
 	return fmt.Errorf("not implemented")
 }
 
-func (f *forwarder) stream(method, path, contentType string, data io.Reader) (io.ReadCloser, error) {
-	if len(f.leaderAddr) == 0 {
+func (f *forwarder) stream(method, path, contentType string, data io.Reader, leaderOverride string) (io.ReadCloser, error) {
+	leaderAddr := f.leaderAddr
+	if len(leaderOverride) != 0 {
+		leaderAddr = leaderOverride
+	}
+
+	if len(leaderAddr) == 0 {
 		return nil, fmt.Errorf("no leader address defined")
 	}
 
 	f.lock.RLock()
-	address := "http://" + f.leaderAddr + "/v1" + path
+	address := "http://" + leaderAddr + "/v1" + path
 	f.lock.RUnlock()
 
 	f.logger.Debug().Log("address: %s", address)
@@ -196,8 +199,8 @@ func (f *forwarder) stream(method, path, contentType string, data io.Reader) (io
 	return body, nil
 }
 
-func (f *forwarder) call(method, path, contentType string, data io.Reader) ([]byte, error) {
-	body, err := f.stream(method, path, contentType, data)
+func (f *forwarder) call(method, path, contentType string, data io.Reader, leaderOverride string) ([]byte, error) {
+	body, err := f.stream(method, path, contentType, data, leaderOverride)
 	if err != nil {
 		return nil, err
 	}
