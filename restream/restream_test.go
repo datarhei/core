@@ -256,6 +256,56 @@ func TestUpdateProcess(t *testing.T) {
 	require.NotEqual(t, updatedAt, process.UpdatedAt)
 }
 
+func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	p := getDummyProcess()
+	require.NotNil(t, p)
+	p.ID = "process1"
+
+	err = rs.AddProcess(p)
+	require.Equal(t, nil, err)
+
+	rs.StartProcess(p.ID)
+
+	require.Eventually(t, func() bool {
+		state, _ := rs.GetProcessState(p.ID)
+		return state.State == "running"
+	}, 10*time.Second, time.Second)
+
+	log, err := rs.GetProcessLog(p.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, len(log.History))
+
+	p = getDummyProcess()
+	require.NotNil(t, p)
+
+	p.ID = "process2"
+	err = rs.UpdateProcess("process1", p)
+	require.NoError(t, err)
+
+	_, err = rs.GetProcess(p.ID)
+	require.NoError(t, err)
+
+	state, _ := rs.GetProcessState(p.ID)
+	require.Equal(t, "start", state.Order)
+
+	require.Eventually(t, func() bool {
+		state, _ := rs.GetProcessState(p.ID)
+		return state.State == "running"
+	}, 10*time.Second, time.Second)
+
+	log, err = rs.GetProcessLog(p.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(log.History))
+
+	err = rs.StopProcess(p.ID)
+	require.NoError(t, err)
+}
+
 func TestGetProcess(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)
