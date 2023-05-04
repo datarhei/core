@@ -195,7 +195,7 @@ func NewServer(config Config) (Server, error) {
 		corsPrefixes[httpfs.Mountpoint] = config.Cors.Origins
 
 		if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
-			httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster)
+			httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
 		}
 
 		filesystem := &filesystem{
@@ -314,7 +314,7 @@ func NewServer(config Config) (Server, error) {
 	})
 
 	if config.Cluster != nil {
-		//s.v3handler.cluster = api.NewCluster(config.Cluster)
+		s.v3handler.cluster = api.NewCluster(config.Cluster)
 	}
 
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
@@ -656,19 +656,20 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	}
 
 	// v3 Cluster
-	/*
-		if s.v3handler.cluster != nil {
-			v3.GET("/cluster", s.v3handler.cluster.GetCluster)
-			v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
-			v3.GET("/cluster/node/:id/proxy", s.v3handler.cluster.GetNodeProxy)
+	if s.v3handler.cluster != nil {
+		v3.GET("/cluster", s.v3handler.cluster.About)
 
+		v3.GET("/cluster/proxy", s.v3handler.cluster.GetProxyNodes)
+		v3.GET("/cluster/proxy/node/:id", s.v3handler.cluster.GetProxyNode)
+		v3.GET("/cluster/proxy/node/:id/files", s.v3handler.cluster.GetProxyNodeFiles)
+		/*
 			if !s.readOnly {
 				v3.POST("/cluster/node", s.v3handler.cluster.AddNode)
 				v3.PUT("/cluster/node/:id", s.v3handler.cluster.UpdateNode)
 				v3.DELETE("/cluster/node/:id", s.v3handler.cluster.DeleteNode)
 			}
-		}
-	*/
+		*/
+	}
 
 	// v3 Log
 	v3.GET("/log", s.v3handler.log.Log)

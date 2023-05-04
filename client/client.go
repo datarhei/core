@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -32,7 +33,8 @@ type RestClient interface {
 	// Address returns the address of the connected datarhei Core
 	Address() string
 
-	About() api.About // GET /
+	About() api.About            // GET /
+	Ping() (bool, time.Duration) // GET /ping
 
 	Config() (api.Config, error)           // GET /config
 	ConfigSet(config api.ConfigData) error // POST /config
@@ -120,6 +122,27 @@ func New(config Config) (RestClient, error) {
 		client:     config.Client,
 	}
 
+	u, err := url.Parse(r.address)
+	if err != nil {
+		return nil, err
+	}
+
+	username := u.User.Username()
+	if len(username) != 0 {
+		r.username = username
+	}
+
+	if password, ok := u.User.Password(); ok {
+		r.password = password
+	}
+
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+
+	r.address = u.String()
+	fmt.Printf("address: %s\n", r.address)
+
 	if r.client == nil {
 		r.client = &http.Client{
 			Timeout: 15 * time.Second,
@@ -137,6 +160,12 @@ func New(config Config) (RestClient, error) {
 		return nil, fmt.Errorf("didn't receive the expected API response (got: %s, want: %s)", r.about.Name, coreapp)
 	}
 
+	if len(r.about.ID) == 0 {
+		if err := r.login(); err != nil {
+			return nil, err
+		}
+	}
+
 	c, _ := semver.NewConstraint(coreversion)
 	v, err := semver.NewVersion(r.about.Version.Number)
 	if err != nil {
@@ -145,12 +174,6 @@ func New(config Config) (RestClient, error) {
 
 	if !c.Check(v) {
 		return nil, fmt.Errorf("the core version (%s) is not supported (%s)", r.about.Version.Number, coreversion)
-	}
-
-	if len(r.about.ID) == 0 {
-		if err := r.login(); err != nil {
-			return nil, err
-		}
 	}
 
 	return r, nil
@@ -170,6 +193,28 @@ func (r *restclient) Address() string {
 
 func (r *restclient) About() api.About {
 	return r.about
+}
+
+func (r *restclient) Ping() (bool, time.Duration) {
+	req, err := http.NewRequest(http.MethodGet, r.address+"/ping", nil)
+	if err != nil {
+		return false, time.Duration(0)
+	}
+
+	start := time.Now()
+
+	status, body, err := r.request(req)
+	if err != nil {
+		return false, time.Since(start)
+	}
+
+	defer body.Close()
+
+	if status != 200 {
+		return false, time.Since(start)
+	}
+
+	return true, time.Since(start)
 }
 
 func (r *restclient) login() error {

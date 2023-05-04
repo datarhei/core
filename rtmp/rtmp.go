@@ -58,7 +58,7 @@ type Config struct {
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
 
-	Cluster cluster.ClusterReader
+	Proxy cluster.ProxyReader
 }
 
 // Server represents a RTMP server
@@ -93,7 +93,7 @@ type server struct {
 	channels map[string]*channel
 	lock     sync.RWMutex
 
-	cluster cluster.ClusterReader
+	proxy cluster.ProxyReader
 }
 
 // New creates a new RTMP server according to the given config
@@ -111,15 +111,15 @@ func New(config Config) (Server, error) {
 		token:     config.Token,
 		logger:    config.Logger,
 		collector: config.Collector,
-		cluster:   config.Cluster,
+		proxy:     config.Proxy,
 	}
 
 	if s.collector == nil {
 		s.collector = session.NewNullCollector()
 	}
 
-	if s.cluster == nil {
-		s.cluster = cluster.NewDummyClusterReader()
+	if s.proxy == nil {
+		s.proxy = cluster.NewNullProxyReader()
 	}
 
 	s.server = &rtmp.Server{
@@ -254,7 +254,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	if ch == nil {
 		// Check in the cluster for that stream
-		url, err := s.cluster.GetURL("rtmp:" + conn.URL.Path)
+		url, err := s.proxy.GetURL("rtmp:" + conn.URL.Path)
 		if err != nil {
 			s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
 			return

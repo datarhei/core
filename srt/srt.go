@@ -40,7 +40,7 @@ type Config struct {
 
 	SRTLogTopics []string
 
-	Cluster cluster.ClusterReader
+	Proxy cluster.ProxyReader
 }
 
 // Server represents a SRT server
@@ -77,7 +77,7 @@ type server struct {
 	srtlog          map[string]*ring.Ring // Per logtopic a dedicated ring buffer
 	srtlogLock      sync.RWMutex
 
-	cluster cluster.ClusterReader
+	proxy cluster.ProxyReader
 }
 
 func New(config Config) (Server, error) {
@@ -87,15 +87,15 @@ func New(config Config) (Server, error) {
 		passphrase: config.Passphrase,
 		collector:  config.Collector,
 		logger:     config.Logger,
-		cluster:    config.Cluster,
+		proxy:      config.Proxy,
 	}
 
 	if s.collector == nil {
 		s.collector = session.NewNullCollector()
 	}
 
-	if s.cluster == nil {
-		s.cluster = cluster.NewDummyClusterReader()
+	if s.proxy == nil {
+		s.proxy = cluster.NewNullProxyReader()
 	}
 
 	if s.logger == nil {
@@ -438,7 +438,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 
 	if ch == nil {
 		// Check in the cluster for the stream and proxy it
-		srturl, err := s.cluster.GetURL("srt:" + si.resource)
+		srturl, err := s.proxy.GetURL("srt:" + si.resource)
 		if err != nil {
 			s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
 			return

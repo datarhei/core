@@ -16,7 +16,21 @@ import (
 	"github.com/datarhei/core/v16/client"
 )
 
+type Node interface {
+	Connect() error
+	Disconnect()
+
+	Start(updates chan<- NodeState) error
+	Stop()
+
+	GetURL(path string) (string, error)
+	GetFile(path string) (io.ReadCloser, error)
+
+	NodeReader
+}
+
 type NodeReader interface {
+	ID() string
 	Address() string
 	IPs() []string
 	State() NodeState
@@ -26,12 +40,9 @@ type NodeState struct {
 	ID         string
 	State      string
 	Files      []string
+	LastPing   time.Time
 	LastUpdate time.Time
-}
-
-type NodeSpecs struct {
-	ID      string
-	Address string
+	Latency    time.Duration
 }
 
 type nodeState string
@@ -46,18 +57,24 @@ const (
 )
 
 type node struct {
-	address    string
-	ips        []string
-	state      nodeState
-	username   string
-	password   string
-	updates    chan<- NodeState
+	address string
+	ips     []string
+
 	peer       client.RestClient
-	filesList  []string
-	lastUpdate time.Time
-	lock       sync.RWMutex
-	cancel     context.CancelFunc
-	once       sync.Once
+	peerLock   sync.RWMutex
+	lastPing   time.Time
+	cancelPing context.CancelFunc
+
+	state       nodeState
+	latency     float64 // Seconds
+	stateLock   sync.RWMutex
+	updates     chan<- NodeState
+	filesList   []string
+	lastUpdate  time.Time
+	cancelFiles context.CancelFunc
+
+	runningLock sync.Mutex
+	running     bool
 
 	host          string
 	secure        bool
@@ -72,56 +89,54 @@ type node struct {
 	prefix *regexp.Regexp
 }
 
-func newNode(address string, updates chan<- NodeState) (*node, error) {
-	u, err := url.Parse(address)
+func NewNode(address string) Node {
+	n := &node{
+		address: address,
+		state:   stateDisconnected,
+		prefix:  regexp.MustCompile(`^[a-z]+:`),
+		secure:  strings.HasPrefix(address, "https://"),
+	}
+
+	return n
+}
+
+func (n *node) Connect() error {
+	n.peerLock.Lock()
+	defer n.peerLock.Unlock()
+
+	if n.peer != nil {
+		return nil
+	}
+
+	u, err := url.Parse(n.address)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address: %w", err)
+		return fmt.Errorf("invalid address: %w", err)
 	}
 
 	host, _, err := net.SplitHostPort(u.Host)
 	if err != nil {
-		return nil, fmt.Errorf("invalid address: %w", err)
+		return fmt.Errorf("invalid address: %w", err)
 	}
 
 	addrs, err := net.LookupHost(host)
 	if err != nil {
-		return nil, fmt.Errorf("lookup failed: %w", err)
-	}
-
-	username := u.User.Username()
-	password := ""
-	if pw, ok := u.User.Password(); ok {
-		password = pw
-	}
-
-	n := &node{
-		address:  address,
-		ips:      addrs,
-		username: username,
-		password: password,
-		state:    stateDisconnected,
-		updates:  updates,
-		prefix:   regexp.MustCompile(`^[a-z]+:`),
-		host:     host,
-		secure:   strings.HasPrefix(address, "https://"),
+		return fmt.Errorf("lookup failed: %w", err)
 	}
 
 	peer, err := client.New(client.Config{
-		Address:    address,
-		Username:   username,
-		Password:   password,
+		Address:    n.address,
 		Auth0Token: "",
 		Client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
 	})
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("creating client failed (%s): %w", n.address, err)
 	}
 
 	config, err := peer.Config()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if config.Config.RTMP.Enable {
@@ -159,10 +174,67 @@ func newNode(address string, updates chan<- NodeState) (*node, error) {
 		}
 	}
 
+	n.ips = addrs
+	n.host = host
+
 	n.peer = peer
 
 	ctx, cancel := context.WithCancel(context.Background())
-	n.cancel = cancel
+	n.cancelPing = cancel
+
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// ping
+				ok, latency := n.peer.Ping()
+
+				n.stateLock.Lock()
+				if !ok {
+					n.state = stateDisconnected
+				} else {
+					n.lastPing = time.Now()
+					n.state = stateConnected
+				}
+				n.latency = n.latency*0.2 + latency.Seconds()*0.8
+				n.stateLock.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx)
+
+	return nil
+}
+
+func (n *node) Disconnect() {
+	n.peerLock.Lock()
+	defer n.peerLock.Unlock()
+
+	if n.cancelPing != nil {
+		n.cancelPing()
+		n.cancelPing = nil
+	}
+
+	n.peer = nil
+}
+
+func (n *node) Start(updates chan<- NodeState) error {
+	n.runningLock.Lock()
+	defer n.runningLock.Unlock()
+
+	if n.running {
+		return nil
+	}
+
+	n.running = true
+	n.updates = updates
+
+	ctx, cancel := context.WithCancel(context.Background())
+	n.cancelFiles = cancel
 
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second)
@@ -183,7 +255,20 @@ func newNode(address string, updates chan<- NodeState) (*node, error) {
 		}
 	}(ctx)
 
-	return n, nil
+	return nil
+}
+
+func (n *node) Stop() {
+	n.runningLock.Lock()
+	defer n.runningLock.Unlock()
+
+	if !n.running {
+		return
+	}
+
+	n.running = false
+
+	n.cancelFiles()
 }
 
 func (n *node) Address() string {
@@ -199,12 +284,14 @@ func (n *node) ID() string {
 }
 
 func (n *node) State() NodeState {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 
 	state := NodeState{
 		ID:         n.peer.ID(),
+		LastPing:   n.lastPing,
 		LastUpdate: n.lastUpdate,
+		Latency:    time.Duration(n.latency * float64(time.Second)),
 	}
 
 	if n.state == stateDisconnected || time.Since(n.lastUpdate) > 2*time.Second {
@@ -216,10 +303,6 @@ func (n *node) State() NodeState {
 	}
 
 	return state
-}
-
-func (n *node) stop() {
-	n.once.Do(func() { n.cancel() })
 }
 
 func (n *node) files() {
@@ -247,6 +330,9 @@ func (n *node) files() {
 	go func(f chan<- string) {
 		defer wg.Done()
 
+		n.peerLock.RLock()
+		defer n.peerLock.RUnlock()
+
 		files, err := n.peer.MemFSList("name", "asc")
 		if err != nil {
 			return
@@ -259,6 +345,9 @@ func (n *node) files() {
 
 	go func(f chan<- string) {
 		defer wg.Done()
+
+		n.peerLock.RLock()
+		defer n.peerLock.RUnlock()
 
 		files, err := n.peer.DiskFSList("name", "asc")
 		if err != nil {
@@ -275,6 +364,9 @@ func (n *node) files() {
 
 		go func(f chan<- string) {
 			defer wg.Done()
+
+			n.peerLock.RLock()
+			defer n.peerLock.RUnlock()
 
 			files, err := n.peer.RTMPChannels()
 			if err != nil {
@@ -293,6 +385,9 @@ func (n *node) files() {
 		go func(f chan<- string) {
 			defer wg.Done()
 
+			n.peerLock.RLock()
+			defer n.peerLock.RUnlock()
+
 			files, err := n.peer.SRTChannels()
 			if err != nil {
 				return
@@ -310,17 +405,16 @@ func (n *node) files() {
 
 	wgList.Wait()
 
-	n.lock.Lock()
+	n.stateLock.Lock()
 
 	n.filesList = make([]string, len(filesList))
 	copy(n.filesList, filesList)
 	n.lastUpdate = time.Now()
-	n.state = stateConnected
 
-	n.lock.Unlock()
+	n.stateLock.Unlock()
 }
 
-func (n *node) getURL(path string) (string, error) {
+func (n *node) GetURL(path string) (string, error) {
 	// Remove prefix from path
 	prefix := n.prefix.FindString(path)
 	path = n.prefix.ReplaceAllString(path, "")
@@ -353,10 +447,13 @@ func (n *node) getURL(path string) (string, error) {
 	return u, nil
 }
 
-func (n *node) getFile(path string) (io.ReadCloser, error) {
+func (n *node) GetFile(path string) (io.ReadCloser, error) {
 	// Remove prefix from path
 	prefix := n.prefix.FindString(path)
 	path = n.prefix.ReplaceAllString(path, "")
+
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
 
 	if prefix == "mem:" {
 		return n.peer.MemFSGetFile(path)

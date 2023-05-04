@@ -3,8 +3,12 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	httpapi "github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"
@@ -60,7 +64,7 @@ func NewAPI(config APIConfig) (API, error) {
 		a.logger = log.New("")
 	}
 
-	address, err := config.Cluster.APIAddr("")
+	address, err := config.Cluster.ClusterAPIAddress("")
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +101,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().Log("got join request: %+v", r)
+		a.logger.Debug().WithField("id", r.ID).Log("got join request: %+v", r)
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -105,7 +109,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, r.APIAddress, "")
 		if err != nil {
-			a.logger.Debug().WithError(err).Log("unable to join cluster")
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to join cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)
 		}
 
@@ -119,7 +123,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().Log("got leave request: %+v", r)
+		a.logger.Debug().WithField("id", r.ID).Log("got leave request: %+v", r)
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -127,7 +131,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.Leave(r.Origin, r.ID)
 		if err != nil {
-			a.logger.Debug().WithError(err).Log("unable to leave cluster")
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to leave cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to leave cluster", "%s", err)
 		}
 
@@ -141,7 +145,9 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusInternalServerError, "unable to create snapshot", "%s", err)
 		}
 
-		return c.Stream(http.StatusOK, "application/octet-stream", bytes.NewReader(data))
+		defer data.Close()
+
+		return c.Stream(http.StatusOK, "application/octet-stream", data)
 	})
 
 	a.router.POST("/v1/process", func(c echo.Context) error {
@@ -150,6 +156,11 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.DELETE("/v1/process/:id", func(c echo.Context) error {
 		return httpapi.Err(http.StatusNotImplemented, "")
+	})
+
+	a.router.GET("/v1/core", func(c echo.Context) error {
+		address, _ := a.cluster.CoreAPIAddress("")
+		return c.JSON(http.StatusOK, address)
 	})
 
 	return a, nil
@@ -162,4 +173,120 @@ func (a *api) Start() error {
 
 func (a *api) Shutdown(ctx context.Context) error {
 	return a.router.Shutdown(ctx)
+}
+
+type APIClient struct {
+	Address string
+	Client  *http.Client
+}
+
+func (c *APIClient) CoreAPIAddress() (string, error) {
+	data, err := c.call(http.MethodGet, "/core", "", nil)
+	if err != nil {
+		return "", err
+	}
+
+	var address string
+	err = json.Unmarshal(data, &address)
+	if err != nil {
+		return "", err
+	}
+
+	return address, nil
+}
+
+func (c *APIClient) Join(r JoinRequest) error {
+	data, err := json.Marshal(&r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/join", "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) Leave(r LeaveRequest) error {
+	data, err := json.Marshal(&r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) Snapshot() (io.ReadCloser, error) {
+	return c.stream(http.MethodGet, "/snapshot", "", nil)
+}
+
+func (c *APIClient) stream(method, path, contentType string, data io.Reader) (io.ReadCloser, error) {
+	if len(c.Address) == 0 {
+		return nil, fmt.Errorf("no address defined")
+	}
+
+	address := "http://" + c.Address + "/v1" + path
+
+	req, err := http.NewRequest(method, address, data)
+	if err != nil {
+		return nil, err
+	}
+
+	if method == "POST" || method == "PUT" {
+		req.Header.Add("Content-Type", contentType)
+	}
+
+	status, body, err := c.request(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if status < 200 || status >= 300 {
+		e := httpapi.Error{}
+
+		defer body.Close()
+
+		x, _ := io.ReadAll(body)
+
+		json.Unmarshal(x, &e)
+
+		return nil, e
+	}
+
+	return body, nil
+}
+
+func (c *APIClient) call(method, path, contentType string, data io.Reader) ([]byte, error) {
+	body, err := c.stream(method, path, contentType, data)
+	if err != nil {
+		return nil, err
+	}
+
+	defer body.Close()
+
+	x, _ := io.ReadAll(body)
+
+	return x, nil
+}
+
+func (c *APIClient) request(req *http.Request) (int, io.ReadCloser, error) {
+	if c.Client == nil {
+		tr := &http.Transport{
+			MaxIdleConns:    10,
+			IdleConnTimeout: 30 * time.Second,
+		}
+
+		c.Client = &http.Client{
+			Transport: tr,
+			Timeout:   5 * time.Second,
+		}
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	return resp.StatusCode, resp.Body, nil
 }

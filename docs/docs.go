@@ -225,6 +225,35 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
+                            "$ref": "#/definitions/api.ClusterAbout"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/proxy": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of proxy nodes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "List of proxy nodes in the cluster",
+                "operationId": "cluster-3-get-proxy-nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/api.ClusterNode"
@@ -240,62 +269,19 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/cluster/node": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Add a new node to the cluster",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Add a new node",
-                "operationId": "cluster-3-add-node",
-                "parameters": [
-                    {
-                        "description": "Node config",
-                        "name": "config",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.ClusterNodeConfig"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/cluster/node/{id}": {
+        "/api/v3/cluster/proxy/node/{id}": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List a node by its ID",
+                "description": "List a proxy node by its ID",
                 "produces": [
                     "application/json"
                 ],
-                "summary": "List a node by its ID",
-                "operationId": "cluster-3-get-node",
+                "summary": "List a proxy node by its ID",
+                "operationId": "cluster-3-get-proxy-node",
                 "parameters": [
                     {
                         "type": "string",
@@ -319,117 +305,21 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "put": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Replaces an existing node and returns the new node ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Replaces an existing node",
-                "operationId": "cluster-3-update-node",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Node ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Node config",
-                        "name": "config",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.ClusterNodeConfig"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Delete a node by its ID",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Delete a node by its ID",
-                "operationId": "cluster-3-delete-node",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Node ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
             }
         },
-        "/api/v3/cluster/node/{id}/proxy": {
+        "/api/v3/cluster/proxy/node/{id}/files": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List the files of a node by its ID",
+                "description": "List the files of a proxy node by its ID",
                 "produces": [
                     "application/json"
                 ],
-                "summary": "List the files of a node by its ID",
-                "operationId": "cluster-3-get-node-proxy",
+                "summary": "List the files of a proxy node by its ID",
+                "operationId": "cluster-3-get-proxy-node-files",
                 "parameters": [
                     {
                         "type": "string",
@@ -2342,6 +2232,32 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterAbout": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "cluster_api_address": {
+                    "type": "string"
+                },
+                "core_api_address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterServer"
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/api.ClusterStats"
+                }
+            }
+        },
         "api.ClusterNode": {
             "type": "object",
             "properties": {
@@ -2351,24 +2267,17 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "last_ping": {
+                    "type": "integer"
+                },
                 "last_update": {
                     "type": "integer"
                 },
+                "latency_ms": {
+                    "description": "milliseconds",
+                    "type": "number"
+                },
                 "state": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.ClusterNodeConfig": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "username": {
                     "type": "string"
                 }
             }
@@ -2378,6 +2287,37 @@ const docTemplate = `{
             "additionalProperties": {
                 "type": "array",
                 "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterServer": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "leader": {
+                    "type": "boolean"
+                },
+                "voter": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.ClusterStats": {
+            "type": "object",
+            "properties": {
+                "last_contact_ms": {
+                    "type": "number"
+                },
+                "num_peers": {
+                    "type": "integer"
+                },
+                "state": {
                     "type": "string"
                 }
             }
@@ -2487,6 +2427,32 @@ const docTemplate = `{
                             }
                         },
                         "read_only": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "cluster": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "bootstrap": {
+                            "type": "boolean"
+                        },
+                        "debug": {
+                            "type": "boolean"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "peers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recover": {
                             "type": "boolean"
                         }
                     }
@@ -3334,6 +3300,10 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3648,18 +3618,7 @@ const docTemplate = `{
                     "format": "uint64"
                 },
                 "framerate": {
-                    "type": "object",
-                    "properties": {
-                        "avg": {
-                            "type": "number"
-                        },
-                        "max": {
-                            "type": "number"
-                        },
-                        "min": {
-                            "type": "number"
-                        }
-                    }
+                    "$ref": "#/definitions/api.ProgressIOFramerate"
                 },
                 "height": {
                     "type": "integer",
@@ -3714,6 +3673,20 @@ const docTemplate = `{
                 "width": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProgressIOFramerate": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "min": {
+                    "type": "number"
                 }
             }
         },
@@ -4289,6 +4262,32 @@ const docTemplate = `{
                             }
                         },
                         "read_only": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "cluster": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "bootstrap": {
+                            "type": "boolean"
+                        },
+                        "debug": {
+                            "type": "boolean"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "peers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recover": {
                             "type": "boolean"
                         }
                     }

@@ -16,19 +16,19 @@ type Filesystem interface {
 type filesystem struct {
 	fs.Filesystem
 
-	name    string
-	cluster cluster.ClusterReader
+	name  string
+	proxy cluster.ProxyReader
 }
 
-func NewClusterFS(name string, fs fs.Filesystem, cluster cluster.Cluster) Filesystem {
-	if cluster == nil {
+func NewClusterFS(name string, fs fs.Filesystem, proxy cluster.ProxyReader) Filesystem {
+	if proxy == nil {
 		return fs
 	}
 
 	f := &filesystem{
 		Filesystem: fs,
 		name:       name,
-		cluster:    cluster,
+		proxy:      proxy,
 	}
 
 	return f
@@ -41,7 +41,7 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	data, err := fs.cluster.GetFile(fs.name + ":" + path)
+	data, err := fs.proxy.GetFile(fs.name + ":" + path)
 	if err != nil {
 		return nil
 	}

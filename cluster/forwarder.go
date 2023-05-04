@@ -1,15 +1,12 @@
 package cluster
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
 	"time"
 
-	httpapi "github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -19,18 +16,17 @@ type Forwarder interface {
 	HasLeader() bool
 	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
 	Leave(origin, id string) error
-	Snapshot() ([]byte, error)
+	Snapshot() (io.ReadCloser, error)
 	AddProcess() error
 	UpdateProcess() error
 	RemoveProcess() error
 }
 
 type forwarder struct {
-	id         string
-	leaderAddr string
-	lock       sync.RWMutex
+	id   string
+	lock sync.RWMutex
 
-	client *http.Client
+	client APIClient
 
 	logger log.Logger
 }
@@ -60,7 +56,9 @@ func NewForwarder(config ForwarderConfig) (Forwarder, error) {
 		Timeout:   5 * time.Second,
 	}
 
-	f.client = client
+	f.client = APIClient{
+		Client: client,
+	}
 
 	return f, nil
 }
@@ -69,17 +67,17 @@ func (f *forwarder) SetLeader(address string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	if f.leaderAddr == address {
+	if f.client.Address == address {
 		return
 	}
 
 	f.logger.Debug().Log("setting leader address to %s", address)
 
-	f.leaderAddr = address
+	f.client.Address = address
 }
 
 func (f *forwarder) HasLeader() bool {
-	return len(f.leaderAddr) != 0
+	return len(f.client.Address) != 0
 }
 
 func (f *forwarder) Join(origin, id, raftAddress, apiAddress, peerAddress string) error {
@@ -96,14 +94,18 @@ func (f *forwarder) Join(origin, id, raftAddress, apiAddress, peerAddress string
 
 	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
 
-	data, err := json.Marshal(&r)
-	if err != nil {
-		return err
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	if len(peerAddress) != 0 {
+		client = APIClient{
+			Address: peerAddress,
+			Client:  f.client.Client,
+		}
 	}
 
-	_, err = f.call(http.MethodPost, "/join", "application/json", bytes.NewReader(data), peerAddress)
-
-	return err
+	return client.Join(r)
 }
 
 func (f *forwarder) Leave(origin, id string) error {
@@ -118,28 +120,19 @@ func (f *forwarder) Leave(origin, id string) error {
 
 	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
 
-	data, err := json.Marshal(&r)
-	if err != nil {
-		return err
-	}
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
 
-	_, err = f.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data), "")
-
-	return err
+	return client.Leave(r)
 }
 
-func (f *forwarder) Snapshot() ([]byte, error) {
-	r, err := f.stream(http.MethodGet, "/snapshot", "", nil, "")
-	if err != nil {
-		return nil, err
-	}
+func (f *forwarder) Snapshot() (io.ReadCloser, error) {
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
 
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return client.Snapshot()
 }
 
 func (f *forwarder) AddProcess() error {
@@ -152,71 +145,4 @@ func (f *forwarder) UpdateProcess() error {
 
 func (f *forwarder) RemoveProcess() error {
 	return fmt.Errorf("not implemented")
-}
-
-func (f *forwarder) stream(method, path, contentType string, data io.Reader, leaderOverride string) (io.ReadCloser, error) {
-	leaderAddr := f.leaderAddr
-	if len(leaderOverride) != 0 {
-		leaderAddr = leaderOverride
-	}
-
-	if len(leaderAddr) == 0 {
-		return nil, fmt.Errorf("no leader address defined")
-	}
-
-	f.lock.RLock()
-	address := "http://" + leaderAddr + "/v1" + path
-	f.lock.RUnlock()
-
-	f.logger.Debug().Log("address: %s", address)
-
-	req, err := http.NewRequest(method, address, data)
-	if err != nil {
-		return nil, err
-	}
-
-	if method == "POST" || method == "PUT" {
-		req.Header.Add("Content-Type", contentType)
-	}
-
-	status, body, err := f.request(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if status < 200 || status >= 300 {
-		e := httpapi.Error{}
-
-		defer body.Close()
-
-		x, _ := io.ReadAll(body)
-
-		json.Unmarshal(x, &e)
-
-		return nil, e
-	}
-
-	return body, nil
-}
-
-func (f *forwarder) call(method, path, contentType string, data io.Reader, leaderOverride string) ([]byte, error) {
-	body, err := f.stream(method, path, contentType, data, leaderOverride)
-	if err != nil {
-		return nil, err
-	}
-
-	defer body.Close()
-
-	x, _ := io.ReadAll(body)
-
-	return x, nil
-}
-
-func (f *forwarder) request(req *http.Request) (int, io.ReadCloser, error) {
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return -1, nil, err
-	}
-
-	return resp.StatusCode, resp.Body, nil
 }

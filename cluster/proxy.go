@@ -15,13 +15,60 @@ type Proxy interface {
 	Start()
 	Stop()
 
-	AddNode(address string) (string, error)
+	AddNode(id string, node Node) (string, error)
 	RemoveNode(id string) error
+
+	ProxyReader
+
+	Reader() ProxyReader
+}
+
+type ProxyReader interface {
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
 
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
+}
+
+func NewNullProxyReader() ProxyReader {
+	return &proxyReader{}
+}
+
+type proxyReader struct {
+	proxy *proxy
+}
+
+func (p *proxyReader) ListNodes() []NodeReader {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.ListNodes()
+}
+
+func (p *proxyReader) GetNode(id string) (NodeReader, error) {
+	if p.proxy == nil {
+		return nil, fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.GetNode(id)
+}
+
+func (p *proxyReader) GetURL(path string) (string, error) {
+	if p.proxy == nil {
+		return "", fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.GetURL(path)
+}
+
+func (p *proxyReader) GetFile(path string) (io.ReadCloser, error) {
+	if p.proxy == nil {
+		return nil, fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.GetFile(path)
 }
 
 type ProxyConfig struct {
@@ -36,7 +83,7 @@ type proxy struct {
 	id   string
 	name string
 
-	nodes    map[string]*node     // List of known nodes
+	nodes    map[string]Node      // List of known nodes
 	idfiles  map[string][]string  // Map from nodeid to list of files
 	idupdate map[string]time.Time // Map from nodeid to time of last update
 	fileid   map[string]string    // Map from file name to nodeid
@@ -57,7 +104,7 @@ func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{
 		id:       config.ID,
 		name:     config.Name,
-		nodes:    map[string]*node{},
+		nodes:    map[string]Node{},
 		idfiles:  map[string][]string{},
 		idupdate: map[string]time.Time{},
 		fileid:   map[string]string{},
@@ -141,30 +188,45 @@ func (p *proxy) Stop() {
 
 	p.logger.Debug().Log("stopping proxy")
 
+	p.cancel()
+	p.cancel = nil
+
 	for _, node := range p.nodes {
-		node.stop()
+		node.Stop()
 	}
 
-	p.nodes = map[string]*node{}
+	p.nodes = map[string]Node{}
 }
 
-func (p *proxy) AddNode(address string) (string, error) {
-	node, err := newNode(address, p.updates)
-	if err != nil {
-		return "", err
+func (p *proxy) Reader() ProxyReader {
+	return &proxyReader{
+		proxy: p,
 	}
+}
 
-	id := node.ID()
-
+func (p *proxy) AddNode(id string, node Node) (string, error) {
 	if id == p.id {
 		return "", fmt.Errorf("can't add myself as node or a node with the same ID")
+	}
+
+	if id != node.ID() {
+		return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, node.ID())
 	}
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if _, ok := p.nodes[id]; ok {
-		node.stop()
+	if n, ok := p.nodes[id]; ok {
+		n.Stop()
+
+		delete(p.nodes, id)
+
+		ips := node.IPs()
+
+		for _, ip := range ips {
+			p.limiter.RemoveBlock(ip)
+		}
+
 		return id, nil
 	}
 
@@ -175,8 +237,10 @@ func (p *proxy) AddNode(address string) (string, error) {
 
 	p.nodes[id] = node
 
+	node.Start(p.updates)
+
 	p.logger.Info().WithFields(log.Fields{
-		"address": address,
+		"address": node.Address(),
 		"id":      id,
 	}).Log("Added node")
 
@@ -192,7 +256,7 @@ func (p *proxy) RemoveNode(id string) error {
 		return ErrNodeNotFound
 	}
 
-	node.stop()
+	node.Stop()
 
 	delete(p.nodes, id)
 
@@ -261,7 +325,7 @@ func (c *proxy) GetURL(path string) (string, error) {
 		return "", fmt.Errorf("file not found")
 	}
 
-	url, err := node.getURL(path)
+	url, err := node.GetURL(path)
 	if err != nil {
 		c.logger.Debug().WithField("path", path).Log("Invalid path")
 		return "", fmt.Errorf("file not found")
@@ -299,7 +363,7 @@ func (p *proxy) GetFile(path string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("file not found")
 	}
 
-	data, err := node.getFile(path)
+	data, err := node.GetFile(path)
 	if err != nil {
 		p.logger.Debug().WithField("path", path).Log("Invalid path")
 		return nil, fmt.Errorf("file not found")

@@ -62,24 +62,37 @@ definitions:
       version:
         $ref: '#/definitions/api.Version'
     type: object
+  api.ClusterAbout:
+    properties:
+      address:
+        type: string
+      cluster_api_address:
+        type: string
+      core_api_address:
+        type: string
+      id:
+        type: string
+      nodes:
+        items:
+          $ref: '#/definitions/api.ClusterServer'
+        type: array
+      stats:
+        $ref: '#/definitions/api.ClusterStats'
+    type: object
   api.ClusterNode:
     properties:
       address:
         type: string
       id:
         type: string
+      last_ping:
+        type: integer
       last_update:
         type: integer
+      latency_ms:
+        description: milliseconds
+        type: number
       state:
-        type: string
-    type: object
-  api.ClusterNodeConfig:
-    properties:
-      address:
-        type: string
-      password:
-        type: string
-      username:
         type: string
     type: object
   api.ClusterNodeFiles:
@@ -87,6 +100,26 @@ definitions:
       items:
         type: string
       type: array
+    type: object
+  api.ClusterServer:
+    properties:
+      address:
+        type: string
+      id:
+        type: string
+      leader:
+        type: boolean
+      voter:
+        type: boolean
+    type: object
+  api.ClusterStats:
+    properties:
+      last_contact_ms:
+        type: number
+      num_peers:
+        type: integer
+      state:
+        type: string
     type: object
   api.Command:
     properties:
@@ -157,6 +190,23 @@ definitions:
                 type: string
             type: object
           read_only:
+            type: boolean
+        type: object
+      cluster:
+        properties:
+          address:
+            type: string
+          bootstrap:
+            type: boolean
+          debug:
+            type: boolean
+          enable:
+            type: boolean
+          peers:
+            items:
+              type: string
+            type: array
+          recover:
             type: boolean
         type: object
       created_at:
@@ -727,6 +777,9 @@ definitions:
         $ref: '#/definitions/api.ProcessState'
       type:
         type: string
+      updated_at:
+        format: int64
+        type: integer
     type: object
   api.ProcessConfig:
     properties:
@@ -940,14 +993,7 @@ definitions:
         format: uint64
         type: integer
       framerate:
-        properties:
-          avg:
-            type: number
-          max:
-            type: number
-          min:
-            type: number
-        type: object
+        $ref: '#/definitions/api.ProgressIOFramerate'
       height:
         format: uint64
         type: integer
@@ -988,6 +1034,15 @@ definitions:
       width:
         format: uint64
         type: integer
+    type: object
+  api.ProgressIOFramerate:
+    properties:
+      avg:
+        type: number
+      max:
+        type: number
+      min:
+        type: number
     type: object
   api.RTMPChannel:
     properties:
@@ -1439,6 +1494,23 @@ definitions:
                 type: string
             type: object
           read_only:
+            type: boolean
+        type: object
+      cluster:
+        properties:
+          address:
+            type: string
+          bootstrap:
+            type: boolean
+          debug:
+            type: boolean
+          enable:
+            type: boolean
+          peers:
+            items:
+              type: string
+            type: array
+          recover:
             type: boolean
         type: object
       created_at:
@@ -2096,6 +2168,24 @@ paths:
         "200":
           description: OK
           schema:
+            $ref: '#/definitions/api.ClusterAbout'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List of nodes in the cluster
+  /api/v3/cluster/proxy:
+    get:
+      description: List of proxy nodes in the cluster
+      operationId: cluster-3-get-proxy-nodes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
             items:
               $ref: '#/definitions/api.ClusterNode'
             type: array
@@ -2105,65 +2195,11 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: List of nodes in the cluster
-  /api/v3/cluster/node:
-    post:
-      consumes:
-      - application/json
-      description: Add a new node to the cluster
-      operationId: cluster-3-add-node
-      parameters:
-      - description: Node config
-        in: body
-        name: config
-        required: true
-        schema:
-          $ref: '#/definitions/api.ClusterNodeConfig'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Add a new node
-  /api/v3/cluster/node/{id}:
-    delete:
-      description: Delete a node by its ID
-      operationId: cluster-3-delete-node
-      parameters:
-      - description: Node ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Delete a node by its ID
+      summary: List of proxy nodes in the cluster
+  /api/v3/cluster/proxy/node/{id}:
     get:
-      description: List a node by its ID
-      operationId: cluster-3-get-node
+      description: List a proxy node by its ID
+      operationId: cluster-3-get-proxy-node
       parameters:
       - description: Node ID
         in: path
@@ -2183,46 +2219,11 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: List a node by its ID
-    put:
-      consumes:
-      - application/json
-      description: Replaces an existing node and returns the new node ID
-      operationId: cluster-3-update-node
-      parameters:
-      - description: Node ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Node config
-        in: body
-        name: config
-        required: true
-        schema:
-          $ref: '#/definitions/api.ClusterNodeConfig'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiKeyAuth: []
-      summary: Replaces an existing node
-  /api/v3/cluster/node/{id}/proxy:
+      summary: List a proxy node by its ID
+  /api/v3/cluster/proxy/node/{id}/files:
     get:
-      description: List the files of a node by its ID
-      operationId: cluster-3-get-node-proxy
+      description: List the files of a proxy node by its ID
+      operationId: cluster-3-get-proxy-node-files
       parameters:
       - description: Node ID
         in: path
@@ -2242,7 +2243,7 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: List the files of a node by its ID
+      summary: List the files of a proxy node by its ID
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration

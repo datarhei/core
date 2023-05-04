@@ -1,37 +1,44 @@
 package api
 
 import (
+	"net/http"
 	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/datarhei/core/v16/cluster"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/labstack/echo/v4"
 )
 
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
 type ClusterHandler struct {
 	cluster cluster.Cluster
+	proxy   cluster.ProxyReader
 	prefix  *regexp.Regexp
 }
 
-/*
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.
 func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	return &ClusterHandler{
 		cluster: cluster,
+		proxy:   cluster.ProxyReader(),
 		prefix:  regexp.MustCompile(`^[a-z]+:`),
 	}
 }
 
-// GetCluster returns the list of nodes in the cluster
-// @Summary List of nodes in the cluster
-// @Description List of nodes in the cluster
-// @ID cluster-3-get-cluster
+// GetProxyNodes returns the list of proxy nodes in the cluster
+// @Summary List of proxy nodes in the cluster
+// @Description List of proxy nodes in the cluster
+// @ID cluster-3-get-proxy-nodes
 // @Produce json
 // @Success 200 {array} api.ClusterNode
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster [get]
-func (h *ClusterHandler) GetCluster(c echo.Context) error {
-	nodes := h.cluster.ListNodesX()
+// @Router /api/v3/cluster/proxy [get]
+func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
+	nodes := h.proxy.ListNodes()
 
 	list := []api.ClusterNode{}
 
@@ -40,7 +47,9 @@ func (h *ClusterHandler) GetCluster(c echo.Context) error {
 		n := api.ClusterNode{
 			Address:    node.Address(),
 			ID:         state.ID,
+			LastPing:   state.LastPing.Unix(),
 			LastUpdate: state.LastUpdate.Unix(),
+			Latency:    state.Latency.Seconds() * 1000,
 			State:      state.State,
 		}
 
@@ -50,6 +59,108 @@ func (h *ClusterHandler) GetCluster(c echo.Context) error {
 	return c.JSON(http.StatusOK, list)
 }
 
+// GetProxyNode returns the proxy node with the given ID
+// @Summary List a proxy node by its ID
+// @Description List a proxy node by its ID
+// @ID cluster-3-get-proxy-node
+// @Produce json
+// @Param id path string true "Node ID"
+// @Success 200 {object} api.ClusterNode
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/proxy/node/{id} [get]
+func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	peer, err := h.proxy.GetNode(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+	}
+
+	state := peer.State()
+
+	node := api.ClusterNode{
+		Address:    peer.Address(),
+		ID:         state.ID,
+		LastUpdate: state.LastUpdate.Unix(),
+		State:      state.State,
+	}
+
+	return c.JSON(http.StatusOK, node)
+}
+
+// GetProxyNodeFiles returns the files from the proxy node with the given ID
+// @Summary List the files of a proxy node by its ID
+// @Description List the files of a proxy node by its ID
+// @ID cluster-3-get-proxy-node-files
+// @Produce json
+// @Param id path string true "Node ID"
+// @Success 200 {object} api.ClusterNodeFiles
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/proxy/node/{id}/files [get]
+func (h *ClusterHandler) GetProxyNodeFiles(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	peer, err := h.proxy.GetNode(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+	}
+
+	files := api.ClusterNodeFiles{}
+
+	state := peer.State()
+
+	sort.Strings(state.Files)
+
+	for _, path := range state.Files {
+		prefix := strings.TrimSuffix(h.prefix.FindString(path), ":")
+		path = h.prefix.ReplaceAllString(path, "")
+
+		files[prefix] = append(files[prefix], path)
+	}
+
+	return c.JSON(http.StatusOK, files)
+}
+
+// GetCluster returns the list of nodes in the cluster
+// @Summary List of nodes in the cluster
+// @Description List of nodes in the cluster
+// @ID cluster-3-get-cluster
+// @Produce json
+// @Success 200 {object} api.ClusterAbout
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster [get]
+func (h *ClusterHandler) About(c echo.Context) error {
+	state, _ := h.cluster.About()
+
+	about := api.ClusterAbout{
+		ID:                state.ID,
+		Address:           state.Address,
+		ClusterAPIAddress: state.ClusterAPIAddress,
+		CoreAPIAddress:    state.CoreAPIAddress,
+		Nodes:             []api.ClusterServer{},
+		Stats: api.ClusterStats{
+			State:       state.Stats.State,
+			LastContact: state.Stats.LastContact.Seconds() * 1000,
+			NumPeers:    state.Stats.NumPeers,
+		},
+	}
+
+	for _, n := range state.Nodes {
+		about.Nodes = append(about.Nodes, api.ClusterServer{
+			ID:      n.ID,
+			Address: n.Address,
+			Voter:   n.Voter,
+			Leader:  n.Leader,
+		})
+	}
+
+	return c.JSON(http.StatusOK, about)
+}
+
+/*
 // AddNode adds a new node
 // @Summary Add a new node
 // @Description Add a new node to the cluster

@@ -27,14 +27,14 @@ import (
 
 /*
 	/api/v3:
-		GET /cluster/db/node - list all nodes that are stored in the FSM - Cluster.Store.ListNodes()
-		POST /cluster/db/node - add a node to the FSM - Cluster.Store.AddNode()
-		DELETE /cluster/db/node/:id - remove a node from the FSM - Cluster.Store.RemoveNode()
+		GET /cluster/store/node - list all nodes that are stored in the FSM - Cluster.Store.ListNodes()
+		POST /cluster/store/node - add a node to the FSM - Cluster.Store.AddNode()
+		DELETE /cluster/store/node/:id - remove a node from the FSM - Cluster.Store.RemoveNode()
 
-		GET /cluster/db/process - list all process configs that are stored in the FSM - Cluster.Store.ListProcesses()
-		POST /cluster/db/process - add a process config to the FSM - Cluster.Store.AddProcess()
-		PUT /cluster/db/process/:id - update a process config in the FSM - Cluster.Store.UpdateProcess()
-		DELETE /cluster/db/process/:id - remove a process config from the FSM - Cluster.Store.RemoveProcess()
+		GET /cluster/store/process - list all process configs that are stored in the FSM - Cluster.Store.ListProcesses()
+		POST /cluster/store/process - add a process config to the FSM - Cluster.Store.AddProcess()
+		PUT /cluster/store/process/:id - update a process config in the FSM - Cluster.Store.UpdateProcess()
+		DELETE /cluster/store/process/:id - remove a process config from the FSM - Cluster.Store.RemoveProcess()
 
 		** for the processes, the leader will decide where to actually run them. the process configs will
 		also be added to the regular process DB of each core.
@@ -47,32 +47,23 @@ import (
 
 var ErrNodeNotFound = errors.New("node not found")
 
-type ClusterReader interface {
-	GetURL(path string) (string, error)
-	GetFile(path string) (io.ReadCloser, error)
-}
-
-type dummyClusterReader struct{}
-
-func NewDummyClusterReader() ClusterReader {
-	return &dummyClusterReader{}
-}
-
-func (r *dummyClusterReader) GetURL(path string) (string, error) {
-	return "", fmt.Errorf("not implemented in dummy cluster")
-}
-
-func (r *dummyClusterReader) GetFile(path string) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("not implemented in dummy cluster")
-}
-
 type Cluster interface {
-	Addr() string
-	APIAddr(raftAddress string) (string, error)
+	// Address returns the raft address of this node
+	Address() string
+
+	// ClusterAPIAddress returns the address of the cluster API of a node
+	// with the given raft address.
+	ClusterAPIAddress(raftAddress string) (string, error)
+
+	// CoreAPIAddress returns the address of the core API of a node with
+	// the given raft address.
+	CoreAPIAddress(raftAddress string) (string, error)
+
+	About() (ClusterAbout, error)
 
 	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
-	Snapshot() ([]byte, error)
+	Snapshot() (io.ReadCloser, error)
 
 	Shutdown() error
 
@@ -81,7 +72,7 @@ type Cluster interface {
 	ListNodes() []addNodeCommand
 	GetNode(id string) (addNodeCommand, error)
 
-	ClusterReader
+	ProxyReader() ProxyReader
 }
 
 type Peer struct {
@@ -143,6 +134,9 @@ type cluster struct {
 	hasRaftLeader bool
 	isLeader      bool
 	leaderLock    sync.Mutex
+
+	nodes     map[string]Node
+	nodesLock sync.RWMutex
 }
 
 func New(config ClusterConfig) (Cluster, error) {
@@ -158,6 +152,8 @@ func New(config ClusterConfig) (Cluster, error) {
 		reassertLeaderCh: make(chan chan error),
 		leaveCh:          make(chan struct{}),
 		shutdownCh:       make(chan struct{}),
+
+		nodes: map[string]Node{},
 	}
 
 	u, err := url.Parse(config.CoreAPIAddress)
@@ -216,6 +212,8 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	c.proxy = proxy
 
+	go c.trackNodeChanges()
+
 	if forwarder, err := NewForwarder(ForwarderConfig{
 		ID:     c.id,
 		Logger: c.logger.WithField("logname", "forwarder"),
@@ -236,7 +234,7 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	if len(config.Peers) != 0 {
 		for i := 0; i < len(config.Peers); i++ {
-			peerAddress, err := c.APIAddr(config.Peers[i].Address)
+			peerAddress, err := c.ClusterAPIAddress(config.Peers[i].Address)
 			if err != nil {
 				c.shutdownAPI()
 				c.shutdownRaft()
@@ -268,13 +266,13 @@ func New(config ClusterConfig) (Cluster, error) {
 	return c, nil
 }
 
-func (c *cluster) Addr() string {
+func (c *cluster) Address() string {
 	return c.raftAddress
 }
 
-func (c *cluster) APIAddr(raftAddress string) (string, error) {
+func (c *cluster) ClusterAPIAddress(raftAddress string) (string, error) {
 	if len(raftAddress) == 0 {
-		raftAddress = c.raftAddress
+		raftAddress = c.Address()
 	}
 
 	host, port, _ := gonet.SplitHostPort(raftAddress)
@@ -285,6 +283,29 @@ func (c *cluster) APIAddr(raftAddress string) (string, error) {
 	}
 
 	return gonet.JoinHostPort(host, strconv.Itoa(p+1)), nil
+}
+
+func (c *cluster) CoreAPIAddress(raftAddress string) (string, error) {
+	if len(raftAddress) == 0 {
+		raftAddress = c.Address()
+	}
+
+	if raftAddress == c.Address() {
+		return c.coreAddress, nil
+	}
+
+	addr, err := c.ClusterAPIAddress(raftAddress)
+	if err != nil {
+		return "", err
+	}
+
+	client := APIClient{
+		Address: addr,
+	}
+
+	coreAddress, err := client.CoreAPIAddress()
+
+	return coreAddress, err
 }
 
 func (c *cluster) Shutdown() error {
@@ -298,6 +319,11 @@ func (c *cluster) Shutdown() error {
 
 	c.shutdown = true
 	close(c.shutdownCh)
+
+	for id, node := range c.nodes {
+		node.Disconnect()
+		c.proxy.RemoveNode(id)
+	}
 
 	if c.proxy != nil {
 		c.proxy.Stop()
@@ -437,11 +463,6 @@ func (c *cluster) Leave(origin, id string) error {
 		return nil
 	}
 
-	err := c.RemoveNode(id)
-	if err != nil {
-		c.logger.Error().WithError(err).Log("failed to apply log for removal")
-	}
-
 	// Remove another sever from the cluster
 	if future := c.raft.RemoveServer(raft.ServerID(id), 0, 0); future.Error() != nil {
 		c.logger.Error().WithError(future.Error()).WithFields(log.Fields{
@@ -468,6 +489,17 @@ func (c *cluster) Join(origin, id, raftAddress, apiAddress, peerAddress string) 
 	}).Log("received join request for remote node")
 
 	// connect to the peer's API in order to find out if our version is compatible
+	address, err := c.CoreAPIAddress(raftAddress)
+	if err != nil {
+		return fmt.Errorf("peer API doesn't respond: %w", err)
+	}
+
+	node := NewNode(address)
+	err = node.Connect()
+	if err != nil {
+		return fmt.Errorf("couldn't connect to peer: %w", err)
+	}
+	defer node.Disconnect()
 
 	configFuture := c.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
@@ -509,21 +541,6 @@ func (c *cluster) Join(origin, id, raftAddress, apiAddress, peerAddress string) 
 		}
 	}
 
-	if err := c.AddNode(id, apiAddress); err != nil {
-		/*
-			future := c.raft.RemoveServer(raft.ServerID(id), 0, 0)
-			if err := future.Error(); err != nil {
-				c.logger.Error().WithError(err).WithFields(log.Fields{
-					"nodeid":  id,
-					"address": raftAddress,
-				}).Log("error removing existing node")
-				return err
-			}
-			return err
-		*/
-		c.logger.Debug().WithError(err).Log("")
-	}
-
 	c.logger.Info().WithFields(log.Fields{
 		"nodeid":  id,
 		"address": raftAddress,
@@ -537,7 +554,7 @@ type Snapshot struct {
 	Data     []byte
 }
 
-func (c *cluster) Snapshot() ([]byte, error) {
+func (c *cluster) Snapshot() (io.ReadCloser, error) {
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("not leader, forwarding to leader")
 		return c.forwarder.Snapshot()
@@ -573,7 +590,19 @@ func (c *cluster) Snapshot() ([]byte, error) {
 		return nil, err
 	}
 
-	return buffer.Bytes(), nil
+	return &readCloserWrapper{&buffer}, nil
+}
+
+type readCloserWrapper struct {
+	io.Reader
+}
+
+func (rcw *readCloserWrapper) Read(p []byte) (int, error) {
+	return rcw.Reader.Read(p)
+}
+
+func (rcw *readCloserWrapper) Close() error {
+	return nil
 }
 
 func (c *cluster) ListNodes() []addNodeCommand {
@@ -639,6 +668,81 @@ func (c *cluster) RemoveNode(id string) error {
 	return nil
 }
 
+func (c *cluster) trackNodeChanges() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Get the latest configuration.
+			future := c.raft.GetConfiguration()
+			if err := future.Error(); err != nil {
+				c.logger.Error().WithError(err).Log("failed to get raft configuration")
+				continue
+			}
+
+			c.nodesLock.Lock()
+
+			removeNodes := map[string]struct{}{}
+			for id := range c.nodes {
+				removeNodes[id] = struct{}{}
+			}
+
+			for _, server := range future.Configuration().Servers {
+				id := string(server.ID)
+				if id == c.id {
+					continue
+				}
+
+				_, ok := c.nodes[id]
+				if !ok {
+					address, err := c.CoreAPIAddress(string(server.Address))
+					if err != nil {
+						c.logger.Warn().WithError(err).WithFields(log.Fields{
+							"id":      id,
+							"address": server.Address,
+						}).Log("Discovering core API address failed")
+						continue
+					}
+
+					node := NewNode(address)
+					err = node.Connect()
+					if err != nil {
+						c.logger.Warn().WithError(err).WithFields(log.Fields{
+							"id":      id,
+							"address": server.Address,
+						}).Log("Connecting to core API failed")
+						continue
+					}
+
+					if _, err := c.proxy.AddNode(id, node); err != nil {
+						c.logger.Warn().WithError(err).WithFields(log.Fields{
+							"id":      id,
+							"address": address,
+						}).Log("Adding node failed")
+					}
+
+					c.nodes[id] = node
+				} else {
+					delete(removeNodes, id)
+				}
+			}
+
+			for id := range removeNodes {
+				if node, ok := c.nodes[id]; ok {
+					node.Disconnect()
+					c.proxy.RemoveNode(id)
+				}
+			}
+
+			c.nodesLock.Unlock()
+		case <-c.shutdownCh:
+			return
+		}
+	}
+}
+
 // trackLeaderChanges registers an Observer with raft in order to receive updates
 // about leader changes, in order to keep the forwarder up to date.
 func (c *cluster) trackLeaderChanges() {
@@ -661,7 +765,7 @@ func (c *cluster) trackLeaderChanges() {
 				}).Log("new leader observation")
 				addr := string(leaderObs.LeaderAddr)
 				if len(addr) != 0 {
-					addr, _ = c.APIAddr(addr)
+					addr, _ = c.ClusterAPIAddress(addr)
 				}
 				c.forwarder.SetLeader(addr)
 				c.leaderLock.Lock()
@@ -901,6 +1005,76 @@ func (c *cluster) applyCommand(cmd *command) error {
 	return nil
 }
 
+type ClusterServer struct {
+	ID      string
+	Address string
+	Voter   bool
+	Leader  bool
+}
+
+type ClusterStats struct {
+	State       string
+	LastContact time.Duration
+	NumPeers    uint64
+}
+
+type ClusterAbout struct {
+	ID                string
+	Address           string
+	ClusterAPIAddress string
+	CoreAPIAddress    string
+	Nodes             []ClusterServer
+	Stats             ClusterStats
+}
+
+func (c *cluster) About() (ClusterAbout, error) {
+	about := ClusterAbout{
+		ID:      c.id,
+		Address: c.Address(),
+	}
+
+	if address, err := c.ClusterAPIAddress(""); err == nil {
+		about.ClusterAPIAddress = address
+	}
+
+	if address, err := c.CoreAPIAddress(""); err == nil {
+		about.CoreAPIAddress = address
+	}
+
+	stats := c.raft.Stats()
+
+	about.Stats.State = stats["state"]
+
+	if x, err := time.ParseDuration(stats["last_contact"]); err == nil {
+		about.Stats.LastContact = x
+	}
+
+	if x, err := strconv.ParseUint(stats["num_peers"], 10, 64); err == nil {
+		about.Stats.NumPeers = x
+	}
+
+	_, leaderID := c.raft.LeaderWithID()
+
+	future := c.raft.GetConfiguration()
+	if err := future.Error(); err != nil {
+		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		return ClusterAbout{}, err
+	}
+
+	for _, server := range future.Configuration().Servers {
+		node := ClusterServer{
+			ID:      string(server.ID),
+			Address: string(server.Address),
+			Voter:   server.Suffrage == raft.Voter,
+			Leader:  server.ID == leaderID,
+		}
+
+		about.Nodes = append(about.Nodes, node)
+	}
+
+	return about, nil
+}
+
 func (c *cluster) sentinel() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -918,7 +1092,6 @@ func (c *cluster) sentinel() {
 			stats := c.raft.Stats()
 
 			fields := log.Fields{}
-
 			for k, v := range stats {
 				fields[k] = v
 			}
@@ -950,10 +1123,6 @@ func (c *cluster) sentinel() {
 	}
 }
 
-func (c *cluster) GetURL(path string) (string, error) {
-	return c.proxy.GetURL(path)
-}
-
-func (c *cluster) GetFile(path string) (io.ReadCloser, error) {
-	return c.proxy.GetFile(path)
+func (c *cluster) ProxyReader() ProxyReader {
+	return c.proxy.Reader()
 }

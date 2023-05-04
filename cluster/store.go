@@ -12,8 +12,8 @@ import (
 type Store interface {
 	raft.FSM
 
-	ListNodes() []string
-	GetNode(id string) string
+	ListNodes() []StoreNode
+	GetNode(id string) (StoreNode, error)
 }
 
 type operation string
@@ -37,6 +37,11 @@ type addNodeCommand struct {
 
 type removeNodeCommand struct {
 	ID string
+}
+
+type StoreNode struct {
+	ID      string
+	Address string
 }
 
 type addProcessCommand struct {
@@ -130,12 +135,35 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	return nil
 }
 
-func (s *store) ListNodes() []string {
-	return nil
+func (s *store) ListNodes() []StoreNode {
+	nodes := []StoreNode{}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for id, address := range s.Nodes {
+		nodes = append(nodes, StoreNode{
+			ID:      id,
+			Address: address,
+		})
+	}
+
+	return nodes
 }
 
-func (s *store) GetNode(id string) string {
-	return ""
+func (s *store) GetNode(id string) (StoreNode, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	address, ok := s.Nodes[id]
+	if !ok {
+		return StoreNode{}, fmt.Errorf("not found")
+	}
+
+	return StoreNode{
+		ID:      id,
+		Address: address,
+	}, nil
 }
 
 type fsmSnapshot struct {
