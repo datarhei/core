@@ -45,7 +45,6 @@ type JoinRequest struct {
 	Origin      string `json:"origin"`
 	ID          string `json:"id"`
 	RaftAddress string `json:"raft_address"`
-	APIAddress  string `json:"api_address"`
 }
 
 type LeaveRequest struct {
@@ -107,7 +106,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, r.APIAddress, "")
+		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, "")
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to join cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)

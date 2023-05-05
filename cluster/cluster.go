@@ -61,7 +61,7 @@ type Cluster interface {
 
 	About() (ClusterAbout, error)
 
-	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
+	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
 	Snapshot() (io.ReadCloser, error)
 
@@ -250,7 +250,7 @@ func New(config ClusterConfig) (Cluster, error) {
 					case <-c.shutdownCh:
 						return
 					case <-ticker.C:
-						err := c.Join("", c.id, c.raftAddress, c.coreAddress, peerAddress)
+						err := c.Join("", c.id, c.raftAddress, peerAddress)
 						if err != nil {
 							c.logger.Warn().WithError(err).Log("unable to join cluster")
 							continue
@@ -475,10 +475,10 @@ func (c *cluster) Leave(origin, id string) error {
 	return nil
 }
 
-func (c *cluster) Join(origin, id, raftAddress, apiAddress, peerAddress string) error {
+func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("not leader, forwarding to leader")
-		return c.forwarder.Join(origin, id, raftAddress, apiAddress, peerAddress)
+		return c.forwarder.Join(origin, id, raftAddress, peerAddress)
 	}
 
 	c.logger.Debug().Log("leader: joining %s", raftAddress)

@@ -14,7 +14,7 @@ import (
 type Forwarder interface {
 	SetLeader(address string)
 	HasLeader() bool
-	Join(origin, id, raftAddress, apiAddress, peerAddress string) error
+	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error
 	Snapshot() (io.ReadCloser, error)
 	AddProcess() error
@@ -80,7 +80,7 @@ func (f *forwarder) HasLeader() bool {
 	return len(f.client.Address) != 0
 }
 
-func (f *forwarder) Join(origin, id, raftAddress, apiAddress, peerAddress string) error {
+func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 	if origin == "" {
 		origin = f.id
 	}
@@ -89,7 +89,6 @@ func (f *forwarder) Join(origin, id, raftAddress, apiAddress, peerAddress string
 		Origin:      origin,
 		ID:          id,
 		RaftAddress: raftAddress,
-		APIAddress:  apiAddress,
 	}
 
 	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
