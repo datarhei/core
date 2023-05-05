@@ -178,6 +178,7 @@ func (self *Server) Serve(listener net.Listener) error {
 			if Debug {
 				fmt.Println("rtmp: server: client closed err:", err)
 			}
+			conn.Close()
 		}()
 	}
 }
@@ -190,6 +191,7 @@ func (self *Server) Close() {
 	close(self.doneChan)
 
 	self.listener.Close()
+	self.listener = nil
 }
 
 const (
@@ -398,7 +400,7 @@ func getTcUrl(u *url.URL) string {
 	return nu.String()
 }
 
-func createURL(tcurl, app, play string) (u *url.URL) {
+func createURL(tcurl, app, play string) (*url.URL, error) {
 	ps := strings.Split(app+"/"+play, "/")
 	out := []string{""}
 	for _, s := range ps {
@@ -410,7 +412,11 @@ func createURL(tcurl, app, play string) (u *url.URL) {
 		out = append(out, "")
 	}
 	path := strings.Join(out, "/")
-	u, _ = url.ParseRequestURI(path)
+
+	u, err := url.ParseRequestURI(path)
+	if err != nil {
+		return nil, err
+	}
 
 	if tcurl != "" {
 		tu, _ := url.Parse(tcurl)
@@ -419,7 +425,8 @@ func createURL(tcurl, app, play string) (u *url.URL) {
 			u.Scheme = tu.Scheme
 		}
 	}
-	return
+
+	return u, nil
 }
 
 var CodecTypes = flv.CodecTypes
@@ -553,7 +560,13 @@ func (self *Conn) readConnect() (err error) {
 					return
 				}
 
-				self.URL = createURL(tcurl, connectpath, publishpath)
+				u, uerr := createURL(tcurl, connectpath, publishpath)
+				if uerr != nil {
+					err = fmt.Errorf("invalid URL: %w", uerr)
+					return
+				}
+
+				self.URL = u
 				self.publishing = true
 				self.reading = true
 				self.stage++
@@ -599,7 +612,13 @@ func (self *Conn) readConnect() (err error) {
 					return
 				}
 
-				self.URL = createURL(tcurl, connectpath, playpath)
+				u, uerr := createURL(tcurl, connectpath, playpath)
+				if uerr != nil {
+					err = fmt.Errorf("invalid URL: %w", uerr)
+					return
+				}
+
+				self.URL = u
 				self.playing = true
 				self.writing = true
 				self.stage++
