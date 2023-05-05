@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 // Forwarder forwards any HTTP request from a follower to the leader
@@ -17,9 +18,9 @@ type Forwarder interface {
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error
 	Snapshot() (io.ReadCloser, error)
-	AddProcess() error
+	AddProcess(origin string, config *app.Config) error
 	UpdateProcess() error
-	RemoveProcess() error
+	RemoveProcess(origin, id string) error
 }
 
 type forwarder struct {
@@ -134,14 +135,40 @@ func (f *forwarder) Snapshot() (io.ReadCloser, error) {
 	return client.Snapshot()
 }
 
-func (f *forwarder) AddProcess() error {
-	return fmt.Errorf("not implemented")
+func (f *forwarder) AddProcess(origin string, config *app.Config) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := AddProcessRequest{
+		Origin: origin,
+		Config: *config,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.AddProcess(r)
 }
 
 func (f *forwarder) UpdateProcess() error {
 	return fmt.Errorf("not implemented")
 }
 
-func (f *forwarder) RemoveProcess() error {
-	return fmt.Errorf("not implemented")
+func (f *forwarder) RemoveProcess(origin, id string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := RemoveProcessRequest{
+		Origin: origin,
+		ID:     id,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.RemoveProcess(r)
 }

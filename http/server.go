@@ -664,13 +664,11 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/proxy", s.v3handler.cluster.GetProxyNodes)
 		v3.GET("/cluster/proxy/node/:id", s.v3handler.cluster.GetProxyNode)
 		v3.GET("/cluster/proxy/node/:id/files", s.v3handler.cluster.GetProxyNodeFiles)
-		/*
-			if !s.readOnly {
-				v3.POST("/cluster/node", s.v3handler.cluster.AddNode)
-				v3.PUT("/cluster/node/:id", s.v3handler.cluster.UpdateNode)
-				v3.DELETE("/cluster/node/:id", s.v3handler.cluster.DeleteNode)
-			}
-		*/
+
+		if !s.readOnly {
+			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
+			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
+		}
 	}
 
 	// v3 Log

@@ -26,6 +26,12 @@ type Node interface {
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
 
+	ProcessGetAll() ([]string, error)
+	ProcessSet() error
+	ProcessStart(id string) error
+	ProcessStop(id string) error
+	ProcessDelete(id string) error
+
 	NodeReader
 }
 
@@ -462,4 +468,35 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 	}
 
 	return nil, fmt.Errorf("unknown prefix")
+}
+
+func (n *node) ProcessGetAll() ([]string, error) {
+	processes, err := n.peer.ProcessList(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	list := []string{}
+
+	for _, p := range processes {
+		list = append(list, p.ID)
+	}
+
+	return list, nil
+}
+
+func (n *node) ProcessSet() error {
+	return nil
+}
+
+func (n *node) ProcessStart(id string) error {
+	return n.peer.ProcessCommand(id, "start")
+}
+
+func (n *node) ProcessStop(id string) error {
+	return n.peer.ProcessCommand(id, "stop")
+}
+
+func (n *node) ProcessDelete(id string) error {
+	return n.peer.ProcessDelete(id)
 }

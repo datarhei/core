@@ -6,6 +6,8 @@ import (
 	"io"
 	"sync"
 
+	"github.com/datarhei/core/v16/restream/app"
+
 	"github.com/hashicorp/raft"
 )
 
@@ -14,6 +16,9 @@ type Store interface {
 
 	ListNodes() []StoreNode
 	GetNode(id string) (StoreNode, error)
+
+	ListProcesses() []app.Config
+	GetProcess(id string) (app.Config, error)
 }
 
 type operation string
@@ -45,18 +50,24 @@ type StoreNode struct {
 }
 
 type addProcessCommand struct {
-	Config []byte
+	app.Config
+}
+
+type removeProcessCommand struct {
+	ID string
 }
 
 // Implement a FSM
 type store struct {
-	lock  sync.RWMutex
-	Nodes map[string]string
+	lock    sync.RWMutex
+	Nodes   map[string]string
+	Process map[string]app.Config
 }
 
 func NewStore() (Store, error) {
 	return &store{
-		Nodes: map[string]string{},
+		Nodes:   map[string]string{},
+		Process: map[string]app.Config{},
 	}, nil
 }
 
@@ -95,10 +106,26 @@ func (s *store) Apply(log *raft.Log) interface{} {
 		s.lock.Lock()
 		delete(s.Nodes, cmd.ID)
 		s.lock.Unlock()
+	case opAddProcess:
+		b, _ := json.Marshal(c.Data)
+		cmd := addProcessCommand{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		s.Process[cmd.ID] = cmd.Config
+		s.lock.Unlock()
+	case opRemoveProcess:
+		b, _ := json.Marshal(c.Data)
+		cmd := removeProcessCommand{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		delete(s.Process, cmd.ID)
+		s.lock.Unlock()
 	}
 
 	s.lock.RLock()
-	fmt.Printf("\n==> %+v\n\n", s.Nodes)
+	fmt.Printf("\n==> %+v\n\n", s.Process)
 	s.lock.RUnlock()
 	return nil
 }
@@ -164,6 +191,31 @@ func (s *store) GetNode(id string) (StoreNode, error) {
 		ID:      id,
 		Address: address,
 	}, nil
+}
+
+func (s *store) ListProcesses() []app.Config {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	processes := []app.Config{}
+
+	for _, cfg := range s.Process {
+		processes = append(processes, *cfg.Clone())
+	}
+
+	return processes
+}
+
+func (s *store) GetProcess(id string) (app.Config, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	cfg, ok := s.Process[id]
+	if !ok {
+		return app.Config{}, fmt.Errorf("not found")
+	}
+
+	return *cfg.Clone(), nil
 }
 
 type fsmSnapshot struct {

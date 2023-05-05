@@ -72,6 +72,9 @@ type Cluster interface {
 	ListNodes() []addNodeCommand
 	GetNode(id string) (addNodeCommand, error)
 
+	AddProcess(origin string, config *app.Config) error
+	RemoveProcess(origin, id string) error
+
 	ProxyReader() ProxyReader
 }
 
@@ -976,15 +979,30 @@ func (c *cluster) followerLoop(stopCh chan struct{}) {
 	}
 }
 
-func (c *cluster) AddProcess(config app.Config) error {
+func (c *cluster) AddProcess(origin string, config *app.Config) error {
 	if !c.IsRaftLeader() {
-		return c.forwarder.AddProcess()
+		return c.forwarder.AddProcess(origin, config)
 	}
 
 	cmd := &command{
-		Operation: "addProcess",
+		Operation: opAddProcess,
 		Data: &addProcessCommand{
-			Config: nil,
+			Config: *config,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) RemoveProcess(origin, id string) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.RemoveProcess(origin, id)
+	}
+
+	cmd := &command{
+		Operation: opRemoveProcess,
+		Data: &removeProcessCommand{
+			ID: id,
 		},
 	}
 

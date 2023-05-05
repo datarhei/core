@@ -10,6 +10,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/labstack/echo/v4"
+	"github.com/lithammer/shortuuid/v4"
 )
 
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
@@ -31,6 +32,7 @@ func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 // GetProxyNodes returns the list of proxy nodes in the cluster
 // @Summary List of proxy nodes in the cluster
 // @Description List of proxy nodes in the cluster
+// @Tags v16.?.?
 // @ID cluster-3-get-proxy-nodes
 // @Produce json
 // @Success 200 {array} api.ClusterNode
@@ -62,6 +64,7 @@ func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
 // GetProxyNode returns the proxy node with the given ID
 // @Summary List a proxy node by its ID
 // @Description List a proxy node by its ID
+// @Tags v16.?.?
 // @ID cluster-3-get-proxy-node
 // @Produce json
 // @Param id path string true "Node ID"
@@ -92,6 +95,7 @@ func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
 // GetProxyNodeFiles returns the files from the proxy node with the given ID
 // @Summary List the files of a proxy node by its ID
 // @Description List the files of a proxy node by its ID
+// @Tags v16.?.?
 // @ID cluster-3-get-proxy-node-files
 // @Produce json
 // @Param id path string true "Node ID"
@@ -126,6 +130,7 @@ func (h *ClusterHandler) GetProxyNodeFiles(c echo.Context) error {
 // GetCluster returns the list of nodes in the cluster
 // @Summary List of nodes in the cluster
 // @Description List of nodes in the cluster
+// @Tags v16.?.?
 // @ID cluster-3-get-cluster
 // @Produce json
 // @Success 200 {object} api.ClusterAbout
@@ -158,6 +163,67 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, about)
+}
+
+// Add adds a new process to the cluster
+// @Summary Add a new process
+// @Description Add a new FFmpeg process
+// @Tags v16.?.?
+// @ID cluster-3-add-process
+// @Accept json
+// @Produce json
+// @Param config body api.ProcessConfig true "Process config"
+// @Success 200 {object} api.ProcessConfig
+// @Failure 400 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process [post]
+func (h *ClusterHandler) AddProcess(c echo.Context) error {
+	process := api.ProcessConfig{
+		ID:        shortuuid.New(),
+		Type:      "ffmpeg",
+		Autostart: true,
+	}
+
+	if err := util.ShouldBindJSON(c, &process); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	if process.Type != "ffmpeg" {
+		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
+	}
+
+	if len(process.Input) == 0 || len(process.Output) == 0 {
+		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
+	}
+
+	config := process.Marshal()
+
+	if err := h.cluster.AddProcess("", config); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, process)
+}
+
+// Delete deletes the process with the given ID from the cluster
+// @Summary Delete a process by its ID
+// @Description Delete a process by its ID
+// @Tags v16.?.?
+// @ID cluster-3-delete-process
+// @Produce json
+// @Param id path string true "Process ID"
+// @Success 200 {string} string
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id} [delete]
+func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	if err := h.cluster.RemoveProcess("", id); err != nil {
+		return api.Err(http.StatusInternalServerError, "Process can't be deleted", "%s", err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 /*

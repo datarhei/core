@@ -17,6 +17,7 @@ import (
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -48,6 +49,16 @@ type JoinRequest struct {
 }
 
 type LeaveRequest struct {
+	Origin string `json:"origin"`
+	ID     string `json:"id"`
+}
+
+type AddProcessRequest struct {
+	Origin string     `json:"origin"`
+	Config app.Config `json:"config"`
+}
+
+type RemoveProcessRequest struct {
 	Origin string `json:"origin"`
 	ID     string `json:"id"`
 }
@@ -150,11 +161,47 @@ func NewAPI(config APIConfig) (API, error) {
 	})
 
 	a.router.POST("/v1/process", func(c echo.Context) error {
-		return httpapi.Err(http.StatusNotImplemented, "")
+		r := AddProcessRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		a.logger.Debug().WithField("id", r.Config.ID).Log("got add process request")
+
+		if r.Origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		err := a.cluster.AddProcess(r.Origin, &r.Config)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("unable to add process")
+			return httpapi.Err(http.StatusInternalServerError, "unable to add process", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
 	})
 
-	a.router.DELETE("/v1/process/:id", func(c echo.Context) error {
-		return httpapi.Err(http.StatusNotImplemented, "")
+	a.router.POST("/v1/process/:id", func(c echo.Context) error {
+		r := RemoveProcessRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		a.logger.Debug().WithField("id", r.ID).Log("got remove process request")
+
+		if r.Origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		err := a.cluster.RemoveProcess(r.Origin, r.ID)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to remove process")
+			return httpapi.Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
 	})
 
 	a.router.GET("/v1/core", func(c echo.Context) error {
@@ -212,6 +259,28 @@ func (c *APIClient) Leave(r LeaveRequest) error {
 	}
 
 	_, err = c.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) AddProcess(r AddProcessRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/process", "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) RemoveProcess(r RemoveProcessRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/process/"+r.ID, "application/json", bytes.NewReader(data))
 
 	return err
 }
