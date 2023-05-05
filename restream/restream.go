@@ -1509,14 +1509,15 @@ func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress)
 					Time:   pinput.AVstream.Output.Time,
 					Size:   pinput.AVstream.Output.Size,
 				},
-				Aqueue:      pinput.AVstream.Aqueue,
-				Queue:       pinput.AVstream.Queue,
-				Dup:         pinput.AVstream.Dup,
-				Drop:        pinput.AVstream.Drop,
-				Enc:         pinput.AVstream.Enc,
-				Looping:     pinput.AVstream.Looping,
-				Duplicating: pinput.AVstream.Duplicating,
-				GOP:         pinput.AVstream.GOP,
+				Aqueue:         pinput.AVstream.Aqueue,
+				Queue:          pinput.AVstream.Queue,
+				Dup:            pinput.AVstream.Dup,
+				Drop:           pinput.AVstream.Drop,
+				Enc:            pinput.AVstream.Enc,
+				Looping:        pinput.AVstream.Looping,
+				LoopingRuntime: pinput.AVstream.LoopingRuntime,
+				Duplicating:    pinput.AVstream.Duplicating,
+				GOP:            pinput.AVstream.GOP,
 			}
 
 			input.AVstream = avstream

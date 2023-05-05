@@ -24,6 +24,10 @@
 -   Fix parsing S3 storage definition from environment variable
 -   Fix checking length of CPU time array ([#10](https://github.com/datarhei/core/issues/10))
 -   Fix memory consumption of memfs
+-   Fix possible infinite loop with HLS session rewriter
+-   Fix not propagating process limits
+-   Fix URL validation if the path contains FFmpeg specific placeholders
+-   Fix RTMP DoS attack (thx Johannes Frank)
 -   Deprecate ENV names that do not correspond to JSON name
 
 ### Core v16.11.0 > v16.12.0

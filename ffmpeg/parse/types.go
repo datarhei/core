@@ -57,33 +57,35 @@ func (avio *ffmpegAVstreamIO) export() AVstreamIO {
 }
 
 type ffmpegAVstream struct {
-	Input       ffmpegAVstreamIO `json:"input"`
-	Output      ffmpegAVstreamIO `json:"output"`
-	Address     string           `json:"id"`
-	URL         string           `json:"url"`
-	Stream      uint64           `json:"stream"`
-	Aqueue      uint64           `json:"aqueue"`
-	Queue       uint64           `json:"queue"`
-	Dup         uint64           `json:"dup"`
-	Drop        uint64           `json:"drop"`
-	Enc         uint64           `json:"enc"`
-	Looping     bool             `json:"looping"`
-	Duplicating bool             `json:"duplicating"`
-	GOP         string           `json:"gop"`
+	Input          ffmpegAVstreamIO `json:"input"`
+	Output         ffmpegAVstreamIO `json:"output"`
+	Address        string           `json:"id"`
+	URL            string           `json:"url"`
+	Stream         uint64           `json:"stream"`
+	Aqueue         uint64           `json:"aqueue"`
+	Queue          uint64           `json:"queue"`
+	Dup            uint64           `json:"dup"`
+	Drop           uint64           `json:"drop"`
+	Enc            uint64           `json:"enc"`
+	Looping        bool             `json:"looping"`
+	LoopingRuntime uint64           `json:"looping_runtime"`
+	Duplicating    bool             `json:"duplicating"`
+	GOP            string           `json:"gop"`
 }
 
 func (av *ffmpegAVstream) export() *AVstream {
 	return &AVstream{
-		Aqueue:      av.Aqueue,
-		Queue:       av.Queue,
-		Drop:        av.Drop,
-		Dup:         av.Dup,
-		Enc:         av.Enc,
-		Looping:     av.Looping,
-		Duplicating: av.Duplicating,
-		GOP:         av.GOP,
-		Input:       av.Input.export(),
-		Output:      av.Output.export(),
+		Aqueue:         av.Aqueue,
+		Queue:          av.Queue,
+		Drop:           av.Drop,
+		Dup:            av.Dup,
+		Enc:            av.Enc,
+		Looping:        av.Looping,
+		LoopingRuntime: av.LoopingRuntime,
+		Duplicating:    av.Duplicating,
+		GOP:            av.GOP,
+		Input:          av.Input.export(),
+		Output:         av.Output.export(),
 	}
 }
 
@@ -310,16 +312,17 @@ type AVstreamIO struct {
 }
 
 type AVstream struct {
-	Input       AVstreamIO
-	Output      AVstreamIO
-	Aqueue      uint64
-	Queue       uint64
-	Dup         uint64
-	Drop        uint64
-	Enc         uint64
-	Looping     bool
-	Duplicating bool
-	GOP         string
+	Input          AVstreamIO
+	Output         AVstreamIO
+	Aqueue         uint64
+	Queue          uint64
+	Dup            uint64
+	Drop           uint64
+	Enc            uint64
+	Looping        bool
+	LoopingRuntime uint64
+	Duplicating    bool
+	GOP            string
 }
 
 type Usage struct {
