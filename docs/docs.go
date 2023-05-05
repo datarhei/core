@@ -2032,6 +2032,10 @@ const docTemplate = `{
                 "looping": {
                     "type": "boolean"
                 },
+                "looping_runtime": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "output": {
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
@@ -3044,6 +3048,10 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -3358,18 +3366,7 @@ const docTemplate = `{
                     "format": "uint64"
                 },
                 "framerate": {
-                    "type": "object",
-                    "properties": {
-                        "avg": {
-                            "type": "number"
-                        },
-                        "max": {
-                            "type": "number"
-                        },
-                        "min": {
-                            "type": "number"
-                        }
-                    }
+                    "$ref": "#/definitions/api.ProgressIOFramerate"
                 },
                 "height": {
                     "type": "integer",
@@ -3424,6 +3421,20 @@ const docTemplate = `{
                 "width": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProgressIOFramerate": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "min": {
+                    "type": "number"
                 }
             }
         },

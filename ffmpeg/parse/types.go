@@ -59,33 +59,35 @@ func (avio *ffmpegAVstreamIO) export() app.AVstreamIO {
 }
 
 type ffmpegAVstream struct {
-	Input       ffmpegAVstreamIO `json:"input"`
-	Output      ffmpegAVstreamIO `json:"output"`
-	Address     string           `json:"id"`
-	URL         string           `json:"url"`
-	Stream      uint64           `json:"stream"`
-	Aqueue      uint64           `json:"aqueue"`
-	Queue       uint64           `json:"queue"`
-	Dup         uint64           `json:"dup"`
-	Drop        uint64           `json:"drop"`
-	Enc         uint64           `json:"enc"`
-	Looping     bool             `json:"looping"`
-	Duplicating bool             `json:"duplicating"`
-	GOP         string           `json:"gop"`
+	Input          ffmpegAVstreamIO `json:"input"`
+	Output         ffmpegAVstreamIO `json:"output"`
+	Address        string           `json:"id"`
+	URL            string           `json:"url"`
+	Stream         uint64           `json:"stream"`
+	Aqueue         uint64           `json:"aqueue"`
+	Queue          uint64           `json:"queue"`
+	Dup            uint64           `json:"dup"`
+	Drop           uint64           `json:"drop"`
+	Enc            uint64           `json:"enc"`
+	Looping        bool             `json:"looping"`
+	LoopingRuntime uint64           `json:"looping_runtime"`
+	Duplicating    bool             `json:"duplicating"`
+	GOP            string           `json:"gop"`
 }
 
 func (av *ffmpegAVstream) export() *app.AVstream {
 	return &app.AVstream{
-		Aqueue:      av.Aqueue,
-		Queue:       av.Queue,
-		Drop:        av.Drop,
-		Dup:         av.Dup,
-		Enc:         av.Enc,
-		Looping:     av.Looping,
-		Duplicating: av.Duplicating,
-		GOP:         av.GOP,
-		Input:       av.Input.export(),
-		Output:      av.Output.export(),
+		Aqueue:         av.Aqueue,
+		Queue:          av.Queue,
+		Drop:           av.Drop,
+		Dup:            av.Dup,
+		Enc:            av.Enc,
+		Looping:        av.Looping,
+		LoopingRuntime: av.LoopingRuntime,
+		Duplicating:    av.Duplicating,
+		GOP:            av.GOP,
+		Input:          av.Input.export(),
+		Output:         av.Output.export(),
 	}
 }
 

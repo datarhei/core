@@ -22,6 +22,9 @@ definitions:
         $ref: '#/definitions/api.AVstreamIO'
       looping:
         type: boolean
+      looping_runtime:
+        format: uint64
+        type: integer
       output:
         $ref: '#/definitions/api.AVstreamIO'
       queue:
@@ -701,6 +704,9 @@ definitions:
         $ref: '#/definitions/api.ProcessState'
       type:
         type: string
+      updated_at:
+        format: int64
+        type: integer
     type: object
   api.ProcessConfig:
     properties:
@@ -914,14 +920,7 @@ definitions:
         format: uint64
         type: integer
       framerate:
-        properties:
-          avg:
-            type: number
-          max:
-            type: number
-          min:
-            type: number
-        type: object
+        $ref: '#/definitions/api.ProgressIOFramerate'
       height:
         format: uint64
         type: integer
@@ -962,6 +961,15 @@ definitions:
       width:
         format: uint64
         type: integer
+    type: object
+  api.ProgressIOFramerate:
+    properties:
+      avg:
+        type: number
+      max:
+        type: number
+      min:
+        type: number
     type: object
   api.RTMPChannel:
     properties:

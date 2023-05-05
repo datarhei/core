@@ -23,16 +23,17 @@ func (i *AVstreamIO) Unmarshal(io *app.AVstreamIO) {
 }
 
 type AVstream struct {
-	Input       AVstreamIO `json:"input"`
-	Output      AVstreamIO `json:"output"`
-	Aqueue      uint64     `json:"aqueue" format:"uint64"`
-	Queue       uint64     `json:"queue" format:"uint64"`
-	Dup         uint64     `json:"dup" format:"uint64"`
-	Drop        uint64     `json:"drop" format:"uint64"`
-	Enc         uint64     `json:"enc" format:"uint64"`
-	Looping     bool       `json:"looping"`
-	Duplicating bool       `json:"duplicating"`
-	GOP         string     `json:"gop"`
+	Input          AVstreamIO `json:"input"`
+	Output         AVstreamIO `json:"output"`
+	Aqueue         uint64     `json:"aqueue" format:"uint64"`
+	Queue          uint64     `json:"queue" format:"uint64"`
+	Dup            uint64     `json:"dup" format:"uint64"`
+	Drop           uint64     `json:"drop" format:"uint64"`
+	Enc            uint64     `json:"enc" format:"uint64"`
+	Looping        bool       `json:"looping"`
+	LoopingRuntime uint64     `json:"looping_runtime" format:"uint64"`
+	Duplicating    bool       `json:"duplicating"`
+	GOP            string     `json:"gop"`
 }
 
 func (a *AVstream) Unmarshal(av *app.AVstream) {
@@ -46,6 +47,7 @@ func (a *AVstream) Unmarshal(av *app.AVstream) {
 	a.Drop = av.Drop
 	a.Enc = av.Enc
 	a.Looping = av.Looping
+	a.LoopingRuntime = av.LoopingRuntime
 	a.Duplicating = av.Duplicating
 	a.GOP = av.GOP
 
