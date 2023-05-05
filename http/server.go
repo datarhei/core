@@ -194,8 +194,10 @@ func NewServer(config Config) (Server, error) {
 
 		corsPrefixes[httpfs.Mountpoint] = config.Cors.Origins
 
-		if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
-			httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
+		if config.Cluster != nil {
+			if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
+				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
+			}
 		}
 
 		filesystem := &filesystem{

@@ -948,7 +948,10 @@ func (a *api) start() error {
 			Token:     cfg.RTMP.Token,
 			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
-			Proxy:     a.cluster.ProxyReader(),
+		}
+
+		if a.cluster != nil {
+			config.Proxy = a.cluster.ProxyReader()
 		}
 
 		if cfg.RTMP.EnableTLS {
@@ -977,7 +980,10 @@ func (a *api) start() error {
 			Token:      cfg.SRT.Token,
 			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
 			Collector:  a.sessions.Collector("srt"),
-			Proxy:      a.cluster.ProxyReader(),
+		}
+
+		if a.cluster != nil {
+			config.Proxy = a.cluster.ProxyReader()
 		}
 
 		if cfg.SRT.Log.Enable {
