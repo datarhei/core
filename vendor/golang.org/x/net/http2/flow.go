@@ -18,7 +18,7 @@ type inflow struct {
 	unsent int32
 }
 
-// init sets the initial window.
+// set sets the initial window.
 func (f *inflow) init(n int32) {
 	f.avail = n
 }

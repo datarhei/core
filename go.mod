@@ -8,11 +8,13 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/datarhei/gosrt v0.3.1
-	github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
+	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/uuid v1.3.0
+	github.com/hashicorp/go-hclog v1.5.0
+	github.com/hashicorp/raft v1.4.0
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/invopop/jsonschema v0.4.0
 	github.com/joho/godotenv v1.4.0
@@ -31,7 +33,6 @@ require (
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.7.0
-	golang.org/x/net v0.7.0
 )
 
 require (
@@ -56,11 +57,9 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/hashicorp/go-hclog v1.5.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/raft v1.4.0 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -105,6 +104,7 @@ require (
 	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect

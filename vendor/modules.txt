@@ -65,7 +65,7 @@ github.com/datarhei/gosrt/internal/congestion
 github.com/datarhei/gosrt/internal/crypto
 github.com/datarhei/gosrt/internal/net
 github.com/datarhei/gosrt/internal/packet
-# github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
+# github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 ## explicit; go 1.14
 github.com/datarhei/joy4/av
 github.com/datarhei/joy4/av/avutil
@@ -399,7 +399,7 @@ golang.org/x/crypto/sha3
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.7.0
+# golang.org/x/net v0.5.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/http/httpguts

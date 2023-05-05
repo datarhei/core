@@ -1569,7 +1569,7 @@ func (cs *clientStream) cleanupWriteRequest(err error) {
 	close(cs.donec)
 }
 
-// awaitOpenSlotForStreamLocked waits until len(streams) < maxConcurrentStreams.
+// awaitOpenSlotForStream waits until len(streams) < maxConcurrentStreams.
 // Must hold cc.mu.
 func (cc *ClientConn) awaitOpenSlotForStreamLocked(cs *clientStream) error {
 	for {
