@@ -2172,6 +2172,10 @@ const docTemplate = `{
                 "looping": {
                     "type": "boolean"
                 },
+                "looping_runtime": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "output": {
                     "$ref": "#/definitions/api.AVstreamIO"
                 },

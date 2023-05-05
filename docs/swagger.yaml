@@ -22,6 +22,9 @@ definitions:
         $ref: '#/definitions/api.AVstreamIO'
       looping:
         type: boolean
+      looping_runtime:
+        format: uint64
+        type: integer
       output:
         $ref: '#/definitions/api.AVstreamIO'
       queue:
