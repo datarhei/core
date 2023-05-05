@@ -9,7 +9,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/datarhei/gosrt v0.3.1
-	github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
+	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/gobwas/glob v0.2.3
