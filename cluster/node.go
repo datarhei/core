@@ -8,20 +8,20 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/client"
+	httpapi "github.com/datarhei/core/v16/http/api"
 )
 
 type Node interface {
 	Connect() error
 	Disconnect()
 
-	Start(updates chan<- NodeState) error
-	Stop()
+	StartFiles(updates chan<- NodeFiles) error
+	StopFiles()
 
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
@@ -39,16 +39,23 @@ type NodeReader interface {
 	ID() string
 	Address() string
 	IPs() []string
+	Files() NodeFiles
 	State() NodeState
 }
 
-type NodeState struct {
+type NodeFiles struct {
 	ID         string
-	State      string
 	Files      []string
-	LastPing   time.Time
 	LastUpdate time.Time
-	Latency    time.Duration
+}
+
+type NodeState struct {
+	ID          string
+	State       string
+	LastContact time.Time
+	Latency     time.Duration
+	CPU         float64
+	Mem         float64
 }
 
 type nodeState string
@@ -68,13 +75,19 @@ type node struct {
 
 	peer       client.RestClient
 	peerLock   sync.RWMutex
-	lastPing   time.Time
 	cancelPing context.CancelFunc
+
+	lastContact time.Time
+
+	resources struct {
+		cpu float64
+		mem float64
+	}
 
 	state       nodeState
 	latency     float64 // Seconds
 	stateLock   sync.RWMutex
-	updates     chan<- NodeState
+	updates     chan<- NodeFiles
 	filesList   []string
 	lastUpdate  time.Time
 	cancelFiles context.CancelFunc
@@ -91,15 +104,12 @@ type node struct {
 	srtAddress    string
 	srtPassphrase string
 	srtToken      string
-
-	prefix *regexp.Regexp
 }
 
 func NewNode(address string) Node {
 	n := &node{
 		address: address,
 		state:   stateDisconnected,
-		prefix:  regexp.MustCompile(`^[a-z]+:`),
 		secure:  strings.HasPrefix(address, "https://"),
 	}
 
@@ -195,17 +205,74 @@ func (n *node) Connect() error {
 		for {
 			select {
 			case <-ticker.C:
-				// ping
+				// Ping
 				ok, latency := n.peer.Ping()
 
 				n.stateLock.Lock()
 				if !ok {
 					n.state = stateDisconnected
 				} else {
-					n.lastPing = time.Now()
+					n.lastContact = time.Now()
 					n.state = stateConnected
 				}
 				n.latency = n.latency*0.2 + latency.Seconds()*0.8
+				n.stateLock.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx)
+
+	go func(ctx context.Context) {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// Metrics
+				metrics, err := n.peer.Metrics(httpapi.MetricsQuery{
+					Metrics: []httpapi.MetricsQueryMetric{
+						{
+							Name: "cpu_idle",
+						},
+						{
+							Name: "mem_total",
+						},
+						{
+							Name: "mem_free",
+						},
+					},
+				})
+				if err != nil {
+					n.stateLock.Lock()
+					n.resources.cpu = 100
+					n.resources.mem = 100
+					n.stateLock.Unlock()
+				}
+
+				cpu_idle := .0
+				mem_total := .0
+				mem_free := .0
+
+				for _, x := range metrics.Metrics {
+					if x.Name == "cpu_idle" {
+						cpu_idle = x.Values[0].Value
+					} else if x.Name == "mem_total" {
+						mem_total = x.Values[0].Value
+					} else if x.Name == "mem_free" {
+						mem_free = x.Values[0].Value
+					}
+				}
+
+				n.stateLock.Lock()
+				n.resources.cpu = 100 - cpu_idle
+				if mem_total != 0 {
+					n.resources.mem = (mem_total - mem_free) / mem_total * 100
+				} else {
+					n.resources.mem = 100
+				}
+				n.lastContact = time.Now()
 				n.stateLock.Unlock()
 			case <-ctx.Done():
 				return
@@ -228,7 +295,7 @@ func (n *node) Disconnect() {
 	n.peer = nil
 }
 
-func (n *node) Start(updates chan<- NodeState) error {
+func (n *node) StartFiles(updates chan<- NodeFiles) error {
 	n.runningLock.Lock()
 	defer n.runningLock.Unlock()
 
@@ -254,7 +321,7 @@ func (n *node) Start(updates chan<- NodeState) error {
 				n.files()
 
 				select {
-				case n.updates <- n.State():
+				case n.updates <- n.Files():
 				default:
 				}
 			}
@@ -264,7 +331,7 @@ func (n *node) Start(updates chan<- NodeState) error {
 	return nil
 }
 
-func (n *node) Stop() {
+func (n *node) StopFiles() {
 	n.runningLock.Lock()
 	defer n.runningLock.Unlock()
 
@@ -289,23 +356,34 @@ func (n *node) ID() string {
 	return n.peer.ID()
 }
 
+func (n *node) Files() NodeFiles {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	state := NodeFiles{
+		ID:         n.peer.ID(),
+		LastUpdate: n.lastUpdate,
+	}
+
+	if n.state != stateDisconnected && time.Since(n.lastUpdate) <= 2*time.Second {
+		state.Files = make([]string, len(n.filesList))
+		copy(state.Files, n.filesList)
+	}
+
+	return state
+}
+
 func (n *node) State() NodeState {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	state := NodeState{
-		ID:         n.peer.ID(),
-		LastPing:   n.lastPing,
-		LastUpdate: n.lastUpdate,
-		Latency:    time.Duration(n.latency * float64(time.Second)),
-	}
-
-	if n.state == stateDisconnected || time.Since(n.lastUpdate) > 2*time.Second {
-		state.State = stateDisconnected.String()
-	} else {
-		state.State = n.state.String()
-		state.Files = make([]string, len(n.filesList))
-		copy(state.Files, n.filesList)
+		ID:          n.peer.ID(),
+		LastContact: n.lastContact,
+		State:       n.state.String(),
+		Latency:     time.Duration(n.latency * float64(time.Second)),
+		CPU:         n.resources.cpu,
+		Mem:         n.resources.mem,
 	}
 
 	return state
@@ -416,27 +494,29 @@ func (n *node) files() {
 	n.filesList = make([]string, len(filesList))
 	copy(n.filesList, filesList)
 	n.lastUpdate = time.Now()
+	n.lastContact = time.Now()
 
 	n.stateLock.Unlock()
 }
 
 func (n *node) GetURL(path string) (string, error) {
-	// Remove prefix from path
-	prefix := n.prefix.FindString(path)
-	path = n.prefix.ReplaceAllString(path, "")
+	prefix, path, found := strings.Cut(path, ":")
+	if !found {
+		return "", fmt.Errorf("no prefix provided")
+	}
 
 	u := ""
 
-	if prefix == "mem:" {
+	if prefix == "mem" {
 		u = n.address + "/" + filepath.Join("memfs", path)
-	} else if prefix == "disk:" {
+	} else if prefix == "disk" {
 		u = n.address + path
-	} else if prefix == "rtmp:" {
+	} else if prefix == "rtmp" {
 		u = n.rtmpAddress + path
 		if len(n.rtmpToken) != 0 {
 			u += "?token=" + url.QueryEscape(n.rtmpToken)
 		}
-	} else if prefix == "srt:" {
+	} else if prefix == "srt" {
 		u = n.srtAddress + "?mode=caller"
 		if len(n.srtPassphrase) != 0 {
 			u += "&passphrase=" + url.QueryEscape(n.srtPassphrase)
@@ -454,16 +534,17 @@ func (n *node) GetURL(path string) (string, error) {
 }
 
 func (n *node) GetFile(path string) (io.ReadCloser, error) {
-	// Remove prefix from path
-	prefix := n.prefix.FindString(path)
-	path = n.prefix.ReplaceAllString(path, "")
+	prefix, path, found := strings.Cut(path, ":")
+	if !found {
+		return nil, fmt.Errorf("no prefix provided")
+	}
 
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
-	if prefix == "mem:" {
+	if prefix == "mem" {
 		return n.peer.MemFSGetFile(path)
-	} else if prefix == "disk:" {
+	} else if prefix == "disk" {
 		return n.peer.DiskFSGetFile(path)
 	}
 

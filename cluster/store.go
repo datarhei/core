@@ -14,9 +14,6 @@ import (
 type Store interface {
 	raft.FSM
 
-	ListNodes() []StoreNode
-	GetNode(id string) (StoreNode, error)
-
 	ListProcesses() []app.Config
 	GetProcess(id string) (app.Config, error)
 }
@@ -24,8 +21,6 @@ type Store interface {
 type operation string
 
 const (
-	opAddNode       operation = "addNode"
-	opRemoveNode    operation = "removeNode"
 	opAddProcess    operation = "addProcess"
 	opRemoveProcess operation = "removeProcess"
 )
@@ -33,15 +28,6 @@ const (
 type command struct {
 	Operation operation
 	Data      interface{}
-}
-
-type addNodeCommand struct {
-	ID      string
-	Address string
-}
-
-type removeNodeCommand struct {
-	ID string
 }
 
 type StoreNode struct {
@@ -60,13 +46,11 @@ type removeProcessCommand struct {
 // Implement a FSM
 type store struct {
 	lock    sync.RWMutex
-	Nodes   map[string]string
 	Process map[string]app.Config
 }
 
 func NewStore() (Store, error) {
 	return &store{
-		Nodes:   map[string]string{},
 		Process: map[string]app.Config{},
 	}, nil
 }
@@ -86,26 +70,6 @@ func (s *store) Apply(log *raft.Log) interface{} {
 	fmt.Printf("op: %+v\n", c)
 
 	switch c.Operation {
-	case opAddNode:
-		b, _ := json.Marshal(c.Data)
-		cmd := addNodeCommand{}
-		json.Unmarshal(b, &cmd)
-
-		fmt.Printf("addNode: %+v\n", cmd)
-
-		s.lock.Lock()
-		s.Nodes[cmd.ID] = cmd.Address
-		s.lock.Unlock()
-	case opRemoveNode:
-		b, _ := json.Marshal(c.Data)
-		cmd := removeNodeCommand{}
-		json.Unmarshal(b, &cmd)
-
-		fmt.Printf("removeNode: %+v\n", cmd)
-
-		s.lock.Lock()
-		delete(s.Nodes, cmd.ID)
-		s.lock.Unlock()
 	case opAddProcess:
 		b, _ := json.Marshal(c.Data)
 		cmd := addProcessCommand{}
@@ -160,37 +124,6 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	}
 
 	return nil
-}
-
-func (s *store) ListNodes() []StoreNode {
-	nodes := []StoreNode{}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	for id, address := range s.Nodes {
-		nodes = append(nodes, StoreNode{
-			ID:      id,
-			Address: address,
-		})
-	}
-
-	return nodes
-}
-
-func (s *store) GetNode(id string) (StoreNode, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	address, ok := s.Nodes[id]
-	if !ok {
-		return StoreNode{}, fmt.Errorf("not found")
-	}
-
-	return StoreNode{
-		ID:      id,
-		Address: address,
-	}, nil
 }
 
 func (s *store) ListProcesses() []app.Config {

@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -17,7 +16,6 @@ import (
 type ClusterHandler struct {
 	cluster cluster.Cluster
 	proxy   cluster.ProxyReader
-	prefix  *regexp.Regexp
 }
 
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.
@@ -25,7 +23,6 @@ func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	return &ClusterHandler{
 		cluster: cluster,
 		proxy:   cluster.ProxyReader(),
-		prefix:  regexp.MustCompile(`^[a-z]+:`),
 	}
 }
 
@@ -47,12 +44,13 @@ func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
 	for _, node := range nodes {
 		state := node.State()
 		n := api.ClusterNode{
-			Address:    node.Address(),
-			ID:         state.ID,
-			LastPing:   state.LastPing.Unix(),
-			LastUpdate: state.LastUpdate.Unix(),
-			Latency:    state.Latency.Seconds() * 1000,
-			State:      state.State,
+			Address:     node.Address(),
+			ID:          state.ID,
+			LastContact: state.LastContact.Unix(),
+			Latency:     state.Latency.Seconds() * 1000,
+			State:       state.State,
+			CPU:         state.CPU,
+			Mem:         state.Mem,
 		}
 
 		list = append(list, n)
@@ -83,10 +81,13 @@ func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
 	state := peer.State()
 
 	node := api.ClusterNode{
-		Address:    peer.Address(),
-		ID:         state.ID,
-		LastUpdate: state.LastUpdate.Unix(),
-		State:      state.State,
+		Address:     peer.Address(),
+		ID:          state.ID,
+		LastContact: state.LastContact.Unix(),
+		Latency:     state.Latency.Seconds() * 1000,
+		State:       state.State,
+		CPU:         state.CPU,
+		Mem:         state.Mem,
 	}
 
 	return c.JSON(http.StatusOK, node)
@@ -111,17 +112,23 @@ func (h *ClusterHandler) GetProxyNodeFiles(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
 
-	files := api.ClusterNodeFiles{}
+	files := api.ClusterNodeFiles{
+		Files: make(map[string][]string),
+	}
 
-	state := peer.State()
+	peerFiles := peer.Files()
 
-	sort.Strings(state.Files)
+	files.LastUpdate = peerFiles.LastUpdate.Unix()
 
-	for _, path := range state.Files {
-		prefix := strings.TrimSuffix(h.prefix.FindString(path), ":")
-		path = h.prefix.ReplaceAllString(path, "")
+	sort.Strings(peerFiles.Files)
 
-		files[prefix] = append(files[prefix], path)
+	for _, path := range peerFiles.Files {
+		prefix, path, found := strings.Cut(path, ":")
+		if !found {
+			continue
+		}
+
+		files.Files[prefix] = append(files.Files[prefix], path)
 	}
 
 	return c.JSON(http.StatusOK, files)

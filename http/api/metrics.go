@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -48,6 +49,21 @@ func (v MetricsResponseValue) MarshalJSON() ([]byte, error) {
 	s += "]"
 
 	return []byte(s), nil
+}
+
+// MarshalJSON unmarshals a JSON to MetricsResponseValue
+func (v *MetricsResponseValue) UnmarshalJSON(data []byte) error {
+	x := []float64{}
+
+	err := json.Unmarshal(data, &x)
+	if err != nil {
+		return err
+	}
+
+	v.TS = time.Unix(int64(x[0]), 0)
+	v.Value = x[1]
+
+	return nil
 }
 
 type MetricsResponse struct {

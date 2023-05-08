@@ -7,15 +7,19 @@ type ClusterNodeConfig struct {
 }
 
 type ClusterNode struct {
-	Address    string  `json:"address"`
-	ID         string  `json:"id"`
-	LastPing   int64   `json:"last_ping"`
-	LastUpdate int64   `json:"last_update"`
-	Latency    float64 `json:"latency_ms"` // milliseconds
-	State      string  `json:"state"`
+	Address     string  `json:"address"`
+	ID          string  `json:"id"`
+	LastContact int64   `json:"last_contact"` // unix timestamp
+	Latency     float64 `json:"latency_ms"`   // milliseconds
+	State       string  `json:"state"`
+	CPU         float64 `json:"cpu_used"` // percent
+	Mem         float64 `json:"mem_used"` // percent
 }
 
-type ClusterNodeFiles map[string][]string
+type ClusterNodeFiles struct {
+	LastUpdate int64               `json:"last_update"` // unix timestamp
+	Files      map[string][]string `json:"files"`
+}
 
 type ClusterServer struct {
 	ID      string `json:"id"`

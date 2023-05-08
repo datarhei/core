@@ -19,6 +19,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
+
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
@@ -66,11 +67,6 @@ type Cluster interface {
 	Snapshot() (io.ReadCloser, error)
 
 	Shutdown() error
-
-	AddNode(id, address string) error
-	RemoveNode(id string) error
-	ListNodes() []addNodeCommand
-	GetNode(id string) (addNodeCommand, error)
 
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin, id string) error
@@ -608,69 +604,6 @@ func (rcw *readCloserWrapper) Close() error {
 	return nil
 }
 
-func (c *cluster) ListNodes() []addNodeCommand {
-	c.store.ListNodes()
-
-	return nil
-}
-
-func (c *cluster) GetNode(id string) (addNodeCommand, error) {
-	c.store.GetNode(id)
-
-	return addNodeCommand{}, nil
-}
-
-func (c *cluster) AddNode(id, address string) error {
-	if !c.IsRaftLeader() {
-		return fmt.Errorf("not leader")
-	}
-
-	com := &command{
-		Operation: opAddNode,
-		Data: &addNodeCommand{
-			ID:      id,
-			Address: address,
-		},
-	}
-
-	b, err := json.Marshal(com)
-	if err != nil {
-		return err
-	}
-
-	future := c.raft.Apply(b, 5*time.Second)
-	if err := future.Error(); err != nil {
-		return fmt.Errorf("applying command failed: %w", err)
-	}
-
-	return nil
-}
-
-func (c *cluster) RemoveNode(id string) error {
-	if !c.IsRaftLeader() {
-		return fmt.Errorf("not leader")
-	}
-
-	com := &command{
-		Operation: opRemoveNode,
-		Data: &removeNodeCommand{
-			ID: id,
-		},
-	}
-
-	b, err := json.Marshal(com)
-	if err != nil {
-		return err
-	}
-
-	future := c.raft.Apply(b, 5*time.Second)
-	if err := future.Error(); err != nil {
-		return fmt.Errorf("applying command failed: %w", err)
-	}
-
-	return nil
-}
-
 func (c *cluster) trackNodeChanges() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -694,9 +627,6 @@ func (c *cluster) trackNodeChanges() {
 
 			for _, server := range future.Configuration().Servers {
 				id := string(server.ID)
-				if id == c.id {
-					continue
-				}
 
 				_, ok := c.nodes[id]
 				if !ok {
@@ -733,10 +663,14 @@ func (c *cluster) trackNodeChanges() {
 			}
 
 			for id := range removeNodes {
-				if node, ok := c.nodes[id]; ok {
-					node.Disconnect()
-					c.proxy.RemoveNode(id)
+				node, ok := c.nodes[id]
+				if !ok {
+					continue
 				}
+
+				node.Disconnect()
+				c.proxy.RemoveNode(id)
+				delete(c.nodes, id)
 			}
 
 			c.nodesLock.Unlock()
