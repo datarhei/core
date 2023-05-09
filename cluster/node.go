@@ -14,6 +14,7 @@ import (
 
 	"github.com/datarhei/core/v16/client"
 	httpapi "github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Node interface {
@@ -26,8 +27,8 @@ type Node interface {
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
 
-	ProcessGetAll() ([]string, error)
-	ProcessSet() error
+	ProcessList() ([]ProcessConfig, error)
+	ProcessAdd(*app.Config) error
 	ProcessStart(id string) error
 	ProcessStop(id string) error
 	ProcessDelete(id string) error
@@ -49,13 +50,19 @@ type NodeFiles struct {
 	LastUpdate time.Time
 }
 
+type NodeResources struct {
+	NCPU     float64
+	CPU      float64
+	Mem      float64
+	MemTotal float64
+}
+
 type NodeState struct {
 	ID          string
 	State       string
 	LastContact time.Time
 	Latency     time.Duration
-	CPU         float64
-	Mem         float64
+	Resources   NodeResources
 }
 
 type nodeState string
@@ -80,8 +87,10 @@ type node struct {
 	lastContact time.Time
 
 	resources struct {
-		cpu float64
-		mem float64
+		ncpu     float64
+		cpu      float64
+		mem      float64
+		memTotal float64
 	}
 
 	state       nodeState
@@ -234,6 +243,9 @@ func (n *node) Connect() error {
 				metrics, err := n.peer.Metrics(httpapi.MetricsQuery{
 					Metrics: []httpapi.MetricsQueryMetric{
 						{
+							Name: "cpu_ncpu",
+						},
+						{
 							Name: "cpu_idle",
 						},
 						{
@@ -247,10 +259,13 @@ func (n *node) Connect() error {
 				if err != nil {
 					n.stateLock.Lock()
 					n.resources.cpu = 100
+					n.resources.ncpu = 1
 					n.resources.mem = 100
+					n.resources.memTotal = 1
 					n.stateLock.Unlock()
 				}
 
+				cpu_ncpu := .0
 				cpu_idle := .0
 				mem_total := .0
 				mem_free := .0
@@ -258,6 +273,8 @@ func (n *node) Connect() error {
 				for _, x := range metrics.Metrics {
 					if x.Name == "cpu_idle" {
 						cpu_idle = x.Values[0].Value
+					} else if x.Name == "cpu_ncpu" {
+						cpu_ncpu = x.Values[0].Value
 					} else if x.Name == "mem_total" {
 						mem_total = x.Values[0].Value
 					} else if x.Name == "mem_free" {
@@ -266,11 +283,14 @@ func (n *node) Connect() error {
 				}
 
 				n.stateLock.Lock()
+				n.resources.ncpu = cpu_ncpu
 				n.resources.cpu = 100 - cpu_idle
 				if mem_total != 0 {
 					n.resources.mem = (mem_total - mem_free) / mem_total * 100
+					n.resources.memTotal = mem_total
 				} else {
 					n.resources.mem = 100
+					n.resources.memTotal = 1
 				}
 				n.lastContact = time.Now()
 				n.stateLock.Unlock()
@@ -382,8 +402,12 @@ func (n *node) State() NodeState {
 		LastContact: n.lastContact,
 		State:       n.state.String(),
 		Latency:     time.Duration(n.latency * float64(time.Second)),
-		CPU:         n.resources.cpu,
-		Mem:         n.resources.mem,
+		Resources: NodeResources{
+			NCPU:     n.resources.ncpu,
+			CPU:      n.resources.cpu,
+			Mem:      n.resources.mem,
+			MemTotal: n.resources.memTotal,
+		},
 	}
 
 	return state
@@ -551,23 +575,41 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("unknown prefix")
 }
 
-func (n *node) ProcessGetAll() ([]string, error) {
-	processes, err := n.peer.ProcessList(nil, nil)
+func (n *node) ProcessList() ([]ProcessConfig, error) {
+	list, err := n.peer.ProcessList(nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	list := []string{}
+	processes := []ProcessConfig{}
 
-	for _, p := range processes {
-		list = append(list, p.ID)
+	for _, p := range list {
+		process := ProcessConfig{
+			NodeID:  n.ID(),
+			Order:   p.State.Order,
+			State:   p.State.State,
+			Mem:     float64(p.State.Memory) / float64(n.resources.memTotal),
+			Runtime: time.Duration(p.State.Runtime) * time.Second,
+			Config:  p.Config.Marshal(),
+		}
+
+		if x, err := p.State.CPU.Float64(); err == nil {
+			process.CPU = x / n.resources.ncpu
+		} else {
+			process.CPU = 100
+		}
+
+		processes = append(processes, process)
 	}
 
-	return list, nil
+	return processes, nil
 }
 
-func (n *node) ProcessSet() error {
-	return nil
+func (n *node) ProcessAdd(config *app.Config) error {
+	cfg := httpapi.ProcessConfig{}
+	cfg.Unmarshal(config)
+
+	return n.peer.ProcessAdd(cfg)
 }
 
 func (n *node) ProcessStart(id string) error {

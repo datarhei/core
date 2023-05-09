@@ -14,7 +14,7 @@ import (
 type Store interface {
 	raft.FSM
 
-	ListProcesses() []app.Config
+	ProcessList() []app.Config
 	GetProcess(id string) (app.Config, error)
 }
 
@@ -126,7 +126,7 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	return nil
 }
 
-func (s *store) ListProcesses() []app.Config {
+func (s *store) ProcessList() []app.Config {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

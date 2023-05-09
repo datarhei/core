@@ -49,8 +49,8 @@ func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
 			LastContact: state.LastContact.Unix(),
 			Latency:     state.Latency.Seconds() * 1000,
 			State:       state.State,
-			CPU:         state.CPU,
-			Mem:         state.Mem,
+			CPU:         state.Resources.CPU,
+			Mem:         state.Resources.Mem,
 		}
 
 		list = append(list, n)
@@ -86,8 +86,8 @@ func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
 		LastContact: state.LastContact.Unix(),
 		Latency:     state.Latency.Seconds() * 1000,
 		State:       state.State,
-		CPU:         state.CPU,
-		Mem:         state.Mem,
+		CPU:         state.Resources.CPU,
+		Mem:         state.Resources.Mem,
 	}
 
 	return c.JSON(http.StatusOK, node)

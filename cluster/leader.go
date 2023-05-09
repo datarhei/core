@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 const NOTIFY_FOLLOWER = 0
@@ -279,57 +280,395 @@ WAIT:
 			return
 		case <-interval:
 			goto RECONCILE
-		case errCh := <-c.reassertLeaderCh:
-			// we can get into this state when the initial
-			// establishLeadership has failed as well as the follow
-			// up leadershipTransfer. Afterwards we will be waiting
-			// for the interval to trigger a reconciliation and can
-			// potentially end up here. There is no point to
-			// reassert because this agent was never leader in the
-			// first place.
-			if !establishedLeader {
-				errCh <- fmt.Errorf("leadership has not been established")
-				continue
-			}
-
-			// continue to reassert only if we previously were the
-			// leader, which means revokeLeadership followed by an
-			// establishLeadership().
-			c.revokeLeadership()
-			err := c.establishLeadership(context.TODO())
-			errCh <- err
-
-			// in case establishLeadership failed, we will try to
-			// transfer leadership. At this time raft thinks we are
-			// the leader, but we disagree.
-			if err != nil {
-				if err := c.leadershipTransfer(); err != nil {
-					// establishedLeader was true before,
-					// but it no longer is since it revoked
-					// leadership and Leadership transfer
-					// also failed. Which is why it stays
-					// in the leaderLoop, but now
-					// establishedLeader needs to be set to
-					// false.
-					establishedLeader = false
-					interval = time.After(5 * time.Second)
-					goto WAIT
-				}
-
-				// leadershipTransfer was successful and it is
-				// time to leave the leaderLoop.
-				return
-			}
-
 		}
 	}
 }
 
 func (c *cluster) establishLeadership(ctx context.Context) error {
 	c.logger.Debug().Log("establishing leadership")
+
+	ctx, cancel := context.WithCancel(ctx)
+	c.cancelLeaderShip = cancel
+
+	go c.startRebalance(ctx)
+
 	return nil
 }
 
 func (c *cluster) revokeLeadership() {
 	c.logger.Debug().Log("revoking leadership")
+
+	c.cancelLeaderShip()
+}
+
+func (c *cluster) startRebalance(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.doSynchronize()
+			//c.doRebalance()
+		}
+	}
+}
+
+func (c *cluster) applyOpStack(stack []interface{}) {
+	for _, op := range stack {
+		switch v := op.(type) {
+		case processOpAdd:
+			err := c.proxy.ProcessAdd(v.nodeid, v.config)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.config.ID,
+					"nodeid":    v.nodeid,
+				}).Log("Adding process failed")
+				break
+			}
+			err = c.proxy.ProcessStart(v.nodeid, v.config.ID)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.config.ID,
+					"nodeid":    v.nodeid,
+				}).Log("Starting process failed")
+				break
+			}
+			c.logger.Info().WithFields(log.Fields{
+				"processid": v.config.ID,
+				"nodeid":    v.nodeid,
+			}).Log("Adding process")
+		case processOpDelete:
+			err := c.proxy.ProcessDelete(v.nodeid, v.processid)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.processid,
+					"nodeid":    v.nodeid,
+				}).Log("Removing process failed")
+				break
+			}
+			c.logger.Info().WithFields(log.Fields{
+				"processid": v.processid,
+				"nodeid":    v.nodeid,
+			}).Log("Removing process")
+		case processOpMove:
+			err := c.proxy.ProcessAdd(v.toNodeid, v.config)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid":  v.config.ID,
+					"fromnodeid": v.fromNodeid,
+					"tonodeid":   v.toNodeid,
+				}).Log("Moving process, adding process failed")
+				break
+			}
+			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ID)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid":  v.config.ID,
+					"fromnodeid": v.fromNodeid,
+					"tonodeid":   v.toNodeid,
+				}).Log("Moving process, removing process failed")
+				break
+			}
+			err = c.proxy.ProcessStart(v.toNodeid, v.config.ID)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid":  v.config.ID,
+					"fromnodeid": v.fromNodeid,
+					"tonodeid":   v.toNodeid,
+				}).Log("Moving process, starting process failed")
+				break
+			}
+			c.logger.Info().WithFields(log.Fields{
+				"processid":  v.config.ID,
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process")
+		case processOpStart:
+			err := c.proxy.ProcessStart(v.nodeid, v.processid)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.processid,
+					"nodeid":    v.nodeid,
+				}).Log("Starting process failed")
+				break
+			}
+			c.logger.Info().WithFields(log.Fields{
+				"processid": v.processid,
+				"nodeid":    v.nodeid,
+			}).Log("Starting process")
+		case processOpSkip:
+			c.logger.Warn().WithField("processid", v.processid).Log("Not enough resources to deploy process")
+		default:
+			c.logger.Warn().Log("Unknown operation on stack: %+v", v)
+		}
+	}
+}
+
+func (c *cluster) doSynchronize() {
+	want := c.store.ProcessList()
+	have := c.proxy.ProcessList()
+	resources := c.proxy.Resources()
+
+	opStack := synchronize(want, have, resources)
+
+	c.applyOpStack(opStack)
+}
+
+func (c *cluster) doRebalance() {
+	have := c.proxy.ProcessList()
+	resources := c.proxy.Resources()
+
+	opStack := c.rebalance(have, resources)
+
+	c.applyOpStack(opStack)
+}
+
+type processOpDelete struct {
+	nodeid    string
+	processid string
+}
+
+type processOpMove struct {
+	fromNodeid string
+	toNodeid   string
+	config     *app.Config
+}
+
+type processOpStart struct {
+	nodeid    string
+	processid string
+}
+
+type processOpAdd struct {
+	nodeid string
+	config *app.Config
+}
+
+type processOpSkip struct {
+	processid string
+}
+
+// normalizeProcessesAndResources normalizes the CPU and memory consumption of the processes and resources in-place.
+func normalizeProcessesAndResources(processes []ProcessConfig, resources map[string]NodeResources) {
+	maxNCPU := .0
+	maxMemTotal := .0
+
+	for _, r := range resources {
+		if r.NCPU > maxNCPU {
+			maxNCPU = r.NCPU
+		}
+		if r.MemTotal > maxMemTotal {
+			maxMemTotal = r.MemTotal
+		}
+	}
+
+	for id, r := range resources {
+		factor := maxNCPU / r.NCPU
+		r.CPU = 100 - (100-r.CPU)/factor
+
+		factor = maxMemTotal / r.MemTotal
+		r.Mem = 100 - (100-r.Mem)/factor
+
+		resources[id] = r
+	}
+
+	for i, p := range processes {
+		r, ok := resources[p.NodeID]
+		if !ok {
+			p.CPU = 100
+			p.Mem = 100
+		}
+
+		factor := maxNCPU / r.NCPU
+		p.CPU = 100 - (100-p.CPU)/factor
+
+		factor = maxMemTotal / r.MemTotal
+		p.Mem = 100 - (100-p.Mem)/factor
+
+		processes[i] = p
+	}
+
+	for id, r := range resources {
+		r.NCPU = maxNCPU
+		r.MemTotal = maxMemTotal
+
+		resources[id] = r
+	}
+}
+
+// synchronize returns a list of operations in order to adjust the "have" list to the "want" list
+// with taking the available resources on each node into account.
+func synchronize(want []app.Config, have []ProcessConfig, resources map[string]NodeResources) []interface{} {
+	opStack := []interface{}{}
+
+	normalizeProcessesAndResources(have, resources)
+
+	// A map from the process ID to the process config of the processes
+	// we want to be running on the nodes.
+	wantMap := map[string]*app.Config{}
+	for _, config := range want {
+		wantMap[config.ID] = &config
+	}
+
+	haveAfterRemove := []ProcessConfig{}
+
+	// Now we iterate through the processes we actually have running on the nodes
+	// and remove them from the wantMap. We also make sure that they are running.
+	// If a process is not on the wantMap, it will be deleted from the nodes.
+	for _, p := range have {
+		if _, ok := wantMap[p.Config.ID]; !ok {
+			opStack = append(opStack, processOpDelete{
+				nodeid:    p.NodeID,
+				processid: p.Config.ID,
+			})
+
+			r, ok := resources[p.NodeID]
+			if ok {
+				r.CPU -= p.CPU
+				r.Mem -= p.Mem
+				resources[p.NodeID] = r
+			}
+
+			continue
+		}
+
+		delete(wantMap, p.Config.ID)
+
+		if p.Order != "start" {
+			opStack = append(opStack, processOpStart{
+				nodeid:    p.NodeID,
+				processid: p.Config.ID,
+			})
+		}
+
+		haveAfterRemove = append(haveAfterRemove, p)
+	}
+
+	have = haveAfterRemove
+
+	// A map from the process reference to the node it is running on
+	haveReferenceAffinityMap := map[string]string{}
+	for _, p := range have {
+		haveReferenceAffinityMap[p.Config.Reference] = p.NodeID
+	}
+
+	// Now all remaining processes in the wantMap must be added to one of the nodes
+	for _, config := range wantMap {
+		// Check if there are already processes with the same reference, and if so
+		// chose this node. Then check the node if it has enough resources left. If
+		// not, then select a node with the most available resources.
+		reference := config.Reference
+		nodeid := haveReferenceAffinityMap[reference]
+
+		if len(nodeid) != 0 {
+			cpu := config.LimitCPU / resources[nodeid].NCPU
+			mem := float64(config.LimitMemory) / float64(resources[nodeid].MemTotal)
+
+			if resources[nodeid].CPU+cpu < 90 && resources[nodeid].Mem+mem < 90 {
+				opStack = append(opStack, processOpAdd{
+					nodeid: nodeid,
+					config: config,
+				})
+
+				continue
+			}
+		}
+
+		// Find the node with the most resources available
+		nodeid = ""
+		for id, r := range resources {
+			cpu := config.LimitCPU / r.NCPU
+			mem := float64(config.LimitMemory) / float64(r.MemTotal)
+
+			if len(nodeid) == 0 {
+				if r.CPU+cpu < 90 && r.Mem+mem < 90 {
+					nodeid = id
+				}
+
+				continue
+			}
+
+			if r.CPU+r.Mem < resources[nodeid].CPU+resources[nodeid].Mem {
+				nodeid = id
+			}
+			/*
+				if r.CPU < resources[nodeid].CPU && r.Mem < resources[nodeid].Mem {
+					nodeid = id
+				} else if r.Mem < resources[nodeid].Mem {
+					nodeid = id
+				} else if r.CPU < resources[nodeid].CPU {
+					nodeid = id
+				}
+			*/
+		}
+
+		if len(nodeid) != 0 {
+			opStack = append(opStack, processOpAdd{
+				nodeid: nodeid,
+				config: config,
+			})
+		} else {
+			opStack = append(opStack, processOpSkip{
+				processid: config.ID,
+			})
+		}
+	}
+
+	return opStack
+}
+
+// rebalance returns a list of operations that will lead to nodes that are not overloaded
+func (c *cluster) rebalance(have []ProcessConfig, resources map[string]NodeResources) []interface{} {
+	processNodeMap := map[string][]ProcessConfig{}
+
+	for _, p := range have {
+		processNodeMap[p.NodeID] = append(processNodeMap[p.NodeID], p)
+	}
+
+	opStack := []interface{}{}
+
+	// Check if any of the nodes is overloaded
+	for id, r := range resources {
+		if r.CPU >= 90 || r.Mem >= 90 {
+			// Node is overloaded
+
+			// Find another node with more resources available
+			nodeid := id
+			for id, r := range resources {
+				if id == nodeid {
+					continue
+				}
+
+				if r.CPU < resources[nodeid].CPU && r.Mem < resources[nodeid].Mem {
+					nodeid = id
+				}
+			}
+
+			if nodeid != id {
+				// there's an other node with more resources available
+				diff_cpu := r.CPU - resources[nodeid].CPU
+				diff_mem := r.Mem - resources[nodeid].Mem
+
+				// all processes that could be moved, should be listed in
+				// an arry. this array should be sorted by the process' runtime
+				// in order to chose the one with the least runtime. repeat.
+				for _, p := range processNodeMap[id] {
+					if p.CPU < diff_cpu && p.Mem < diff_mem {
+						opStack = append(opStack, processOpMove{
+							fromNodeid: id,
+							toNodeid:   nodeid,
+							config:     p.Config,
+						})
+
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return opStack
 }

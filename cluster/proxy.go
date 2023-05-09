@@ -9,6 +9,7 @@ import (
 
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Proxy interface {
@@ -19,8 +20,63 @@ type Proxy interface {
 	RemoveNode(id string) error
 
 	ProxyReader
-
 	Reader() ProxyReader
+
+	ProxyProcessor
+	Processor() ProxyProcessor
+}
+
+type ProxyProcessor interface {
+	Resources() map[string]NodeResources
+
+	ProcessList() []ProcessConfig
+	ProcessAdd(nodeid string, config *app.Config) error
+	ProcessDelete(nodeid string, id string) error
+	ProcessStart(nodeid string, id string) error
+}
+
+type proxyProcessor struct {
+	proxy *proxy
+}
+
+func (p *proxyProcessor) Resources() map[string]NodeResources {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.Resources()
+}
+
+func (p *proxyProcessor) ProcessList() []ProcessConfig {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.ProcessList()
+}
+
+func (p *proxyProcessor) ProcessAdd(nodeid string, config *app.Config) error {
+	if p.proxy == nil {
+		return fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.ProcessAdd(nodeid, config)
+}
+
+func (p *proxyProcessor) ProcessDelete(nodeid string, id string) error {
+	if p.proxy == nil {
+		return fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.ProcessDelete(nodeid, id)
+}
+
+func (p *proxyProcessor) ProcessStart(nodeid string, id string) error {
+	if p.proxy == nil {
+		return fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.ProcessStart(nodeid, id)
 }
 
 type ProxyReader interface {
@@ -205,6 +261,25 @@ func (p *proxy) Reader() ProxyReader {
 	}
 }
 
+func (p *proxy) Processor() ProxyProcessor {
+	return &proxyProcessor{
+		proxy: p,
+	}
+}
+
+func (p *proxy) Resources() map[string]NodeResources {
+	resources := map[string]NodeResources{}
+
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	for _, node := range p.nodes {
+		resources[node.ID()] = node.State().Resources
+	}
+
+	return resources
+}
+
 func (p *proxy) AddNode(id string, node Node) (string, error) {
 	if id != node.ID() {
 		return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, node.ID())
@@ -369,4 +444,115 @@ func (p *proxy) GetFile(path string) (io.ReadCloser, error) {
 	p.logger.Debug().WithField("path", path).Log("File cluster path")
 
 	return data, nil
+}
+
+type ProcessConfig struct {
+	NodeID  string
+	Order   string
+	State   string
+	CPU     float64
+	Mem     float64
+	Runtime time.Duration
+	Config  *app.Config
+}
+
+func (p *proxy) ProcessList() []ProcessConfig {
+	processChan := make(chan ProcessConfig, 64)
+	processList := []ProcessConfig{}
+
+	wgList := sync.WaitGroup{}
+	wgList.Add(1)
+
+	go func() {
+		defer wgList.Done()
+
+		for file := range processChan {
+			processList = append(processList, file)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+
+	p.lock.RLock()
+	for _, node := range p.nodes {
+		wg.Add(1)
+
+		go func(node Node, p chan<- ProcessConfig) {
+			defer wg.Done()
+
+			processes, err := node.ProcessList()
+			if err != nil {
+				return
+			}
+
+			for _, process := range processes {
+				p <- process
+			}
+		}(node, processChan)
+	}
+	p.lock.RUnlock()
+
+	wg.Wait()
+
+	close(processChan)
+
+	wgList.Wait()
+
+	return processList
+}
+
+func (p *proxy) ProcessAdd(nodeid string, config *app.Config) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	err := node.ProcessAdd(config)
+	if err != nil {
+		return err
+	}
+
+	err = node.ProcessStart(config.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *proxy) ProcessDelete(nodeid string, id string) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	err := node.ProcessDelete(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *proxy) ProcessStart(nodeid string, id string) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	err := node.ProcessStart(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

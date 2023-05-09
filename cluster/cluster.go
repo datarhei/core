@@ -116,6 +116,7 @@ type cluster struct {
 	store Store
 
 	reassertLeaderCh chan chan error
+	cancelLeaderShip context.CancelFunc
 
 	leaveCh chan struct{}
 
