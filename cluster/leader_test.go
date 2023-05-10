@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/datarhei/core/v16/restream/app"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,6 +163,71 @@ func TestSynchronizeAdd(t *testing.T) {
 			MemLimit: 90,
 		},
 	}, resources)
+}
+
+func TestSynchronizeAddReferenceAffinity(t *testing.T) {
+	want := []app.Config{
+		{
+			ID:          "foobar",
+			Reference:   "barfoo",
+			LimitCPU:    10,
+			LimitMemory: 50 * 1024 * 1024,
+		},
+		{
+			ID:          "foobar2",
+			Reference:   "barfoo",
+			LimitCPU:    10,
+			LimitMemory: 50 * 1024 * 1024,
+		},
+	}
+
+	have := []ProcessConfig{
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     12,
+			Mem:     5,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar",
+				Reference: "barfoo",
+			},
+		},
+	}
+
+	resources := map[string]NodeResources{
+		"node1": {
+			NCPU:     1,
+			CPU:      1,
+			Mem:      1,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node2": {
+			NCPU:     1,
+			CPU:      1,
+			Mem:      1,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+	}
+
+	stack := synchronize(want, have, resources)
+
+	require.Equal(t, []interface{}{
+		processOpAdd{
+			nodeid: "node2",
+			config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 50 * 1024 * 1024,
+			},
+		},
+	}, stack)
 }
 
 func TestSynchronizeAddLimit(t *testing.T) {
@@ -689,7 +755,7 @@ func TestRebalanceSkip(t *testing.T) {
 
 	require.NotEmpty(t, opStack)
 
-	require.Equal(t, []interface{}{
+	require.ElementsMatch(t, []interface{}{
 		processOpSkip{
 			nodeid:    "node1",
 			processid: "foobar3",
