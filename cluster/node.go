@@ -53,8 +53,10 @@ type NodeFiles struct {
 type NodeResources struct {
 	NCPU     float64
 	CPU      float64
+	CPULimit float64
 	Mem      float64
 	MemTotal float64
+	MemLimit float64
 }
 
 type NodeState struct {
@@ -405,8 +407,10 @@ func (n *node) State() NodeState {
 		Resources: NodeResources{
 			NCPU:     n.resources.ncpu,
 			CPU:      n.resources.cpu,
+			CPULimit: 90,
 			Mem:      n.resources.mem,
 			MemTotal: n.resources.memTotal,
+			MemLimit: 90,
 		},
 	}
 
@@ -576,7 +580,10 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 }
 
 func (n *node) ProcessList() ([]ProcessConfig, error) {
-	list, err := n.peer.ProcessList(nil, nil)
+	list, err := n.peer.ProcessList(nil, []string{
+		"state",
+		"config",
+	})
 	if err != nil {
 		return nil, err
 	}
