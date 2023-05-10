@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster"
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 	srt "github.com/datarhei/gosrt"
@@ -40,7 +40,7 @@ type Config struct {
 
 	SRTLogTopics []string
 
-	Proxy cluster.ProxyReader
+	Proxy proxy.ProxyReader
 }
 
 // Server represents a SRT server
@@ -77,7 +77,7 @@ type server struct {
 	srtlog          map[string]*ring.Ring // Per logtopic a dedicated ring buffer
 	srtlogLock      sync.RWMutex
 
-	proxy cluster.ProxyReader
+	proxy proxy.ProxyReader
 }
 
 func New(config Config) (Server, error) {
@@ -95,7 +95,7 @@ func New(config Config) (Server, error) {
 	}
 
 	if s.proxy == nil {
-		s.proxy = cluster.NewNullProxyReader()
+		s.proxy = proxy.NewNullProxyReader()
 	}
 
 	if s.logger == nil {

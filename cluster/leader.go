@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 )
@@ -471,7 +472,7 @@ func (c *cluster) doRebalance() {
 }
 
 // normalizeProcessesAndResources normalizes the CPU and memory consumption of the processes and resources in-place.
-func normalizeProcessesAndResources(processes []ProcessConfig, resources map[string]NodeResources) {
+func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources map[string]proxy.NodeResources) {
 	maxNCPU := .0
 	maxMemTotal := .0
 
@@ -520,7 +521,7 @@ func normalizeProcessesAndResources(processes []ProcessConfig, resources map[str
 
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
-func synchronize(want []app.Config, have []ProcessConfig, resources map[string]NodeResources) []interface{} {
+func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
 	normalizeProcessesAndResources(have, resources)
 
 	// A map from the process ID to the process config of the processes
@@ -535,7 +536,7 @@ func synchronize(want []app.Config, have []ProcessConfig, resources map[string]N
 	// Now we iterate through the processes we actually have running on the nodes
 	// and remove them from the wantMap. We also make sure that they are running.
 	// If a process is not on the wantMap, it will be deleted from the nodes.
-	haveAfterRemove := []ProcessConfig{}
+	haveAfterRemove := []proxy.ProcessConfig{}
 
 	for _, p := range have {
 		if _, ok := wantMap[p.Config.ID]; !ok {
@@ -664,7 +665,7 @@ type referenceAffinityNodeCount struct {
 	count  uint64
 }
 
-func createReferenceAffinityMap(processes []ProcessConfig) map[string][]referenceAffinityNodeCount {
+func createReferenceAffinityMap(processes []proxy.ProcessConfig) map[string][]referenceAffinityNodeCount {
 	referenceAffinityMap := map[string][]referenceAffinityNodeCount{}
 	for _, p := range processes {
 		if len(p.Config.Reference) == 0 {
@@ -709,11 +710,11 @@ func createReferenceAffinityMap(processes []ProcessConfig) map[string][]referenc
 
 // rebalance returns a list of operations that will move running processes away from nodes
 // that are overloaded.
-func rebalance(have []ProcessConfig, resources map[string]NodeResources) []interface{} {
+func rebalance(have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
 	normalizeProcessesAndResources(have, resources)
 
 	// Group the processes by node
-	processNodeMap := map[string][]ProcessConfig{}
+	processNodeMap := map[string][]proxy.ProcessConfig{}
 
 	for _, p := range have {
 		processNodeMap[p.NodeID] = append(processNodeMap[p.NodeID], p)

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster"
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 
@@ -58,7 +58,7 @@ type Config struct {
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
 
-	Proxy cluster.ProxyReader
+	Proxy proxy.ProxyReader
 }
 
 // Server represents a RTMP server
@@ -93,7 +93,7 @@ type server struct {
 	channels map[string]*channel
 	lock     sync.RWMutex
 
-	proxy cluster.ProxyReader
+	proxy proxy.ProxyReader
 }
 
 // New creates a new RTMP server according to the given config
@@ -119,7 +119,7 @@ func New(config Config) (Server, error) {
 	}
 
 	if s.proxy == nil {
-		s.proxy = cluster.NewNullProxyReader()
+		s.proxy = proxy.NewNullProxyReader()
 	}
 
 	s.server = &rtmp.Server{

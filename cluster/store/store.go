@@ -1,4 +1,4 @@
-package cluster
+package store
 
 import (
 	"encoding/json"
@@ -21,25 +21,20 @@ type Store interface {
 type operation string
 
 const (
-	opAddProcess    operation = "addProcess"
-	opRemoveProcess operation = "removeProcess"
+	OpAddProcess    operation = "addProcess"
+	OpRemoveProcess operation = "removeProcess"
 )
 
-type command struct {
+type Command struct {
 	Operation operation
 	Data      interface{}
 }
 
-type StoreNode struct {
-	ID      string
-	Address string
-}
-
-type addProcessCommand struct {
+type CommandAddProcess struct {
 	app.Config
 }
 
-type removeProcessCommand struct {
+type CommandRemoveProcess struct {
 	ID string
 }
 
@@ -58,7 +53,7 @@ func NewStore() (Store, error) {
 func (s *store) Apply(log *raft.Log) interface{} {
 	fmt.Printf("a log entry came in (index=%d, term=%d): %s\n", log.Index, log.Term, string(log.Data))
 
-	c := command{}
+	c := Command{}
 
 	err := json.Unmarshal(log.Data, &c)
 	if err != nil {
@@ -70,17 +65,17 @@ func (s *store) Apply(log *raft.Log) interface{} {
 	fmt.Printf("op: %+v\n", c)
 
 	switch c.Operation {
-	case opAddProcess:
+	case OpAddProcess:
 		b, _ := json.Marshal(c.Data)
-		cmd := addProcessCommand{}
+		cmd := CommandAddProcess{}
 		json.Unmarshal(b, &cmd)
 
 		s.lock.Lock()
 		s.Process[cmd.ID] = cmd.Config
 		s.lock.Unlock()
-	case opRemoveProcess:
+	case OpRemoveProcess:
 		b, _ := json.Marshal(c.Data)
-		cmd := removeProcessCommand{}
+		cmd := CommandRemoveProcess{}
 		json.Unmarshal(b, &cmd)
 
 		s.lock.Lock()

@@ -1,7 +1,8 @@
-package cluster
+package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -155,6 +156,8 @@ type proxy struct {
 
 	logger log.Logger
 }
+
+var ErrNodeNotFound = errors.New("node not found")
 
 func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{

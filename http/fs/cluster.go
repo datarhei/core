@@ -5,7 +5,7 @@ import (
 	gofs "io/fs"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster"
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/io/fs"
 )
 
@@ -17,10 +17,10 @@ type filesystem struct {
 	fs.Filesystem
 
 	name  string
-	proxy cluster.ProxyReader
+	proxy proxy.ProxyReader
 }
 
-func NewClusterFS(name string, fs fs.Filesystem, proxy cluster.ProxyReader) Filesystem {
+func NewClusterFS(name string, fs fs.Filesystem, proxy proxy.ProxyReader) Filesystem {
 	if proxy == nil {
 		return fs
 	}

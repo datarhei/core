@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	gonet "net"
@@ -16,6 +15,11 @@ import (
 	"sync"
 	"time"
 
+	apiclient "github.com/datarhei/core/v16/cluster/client"
+	"github.com/datarhei/core/v16/cluster/forwarder"
+	raftlogger "github.com/datarhei/core/v16/cluster/logger"
+	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
@@ -46,8 +50,6 @@ import (
 		** all these endpoints will forward the request to the leader.
 */
 
-var ErrNodeNotFound = errors.New("node not found")
-
 type Cluster interface {
 	// Address returns the raft address of this node
 	Address() string
@@ -71,7 +73,7 @@ type Cluster interface {
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin, id string) error
 
-	ProxyReader() ProxyReader
+	ProxyReader() proxy.ProxyReader
 }
 
 type Peer struct {
@@ -113,7 +115,7 @@ type cluster struct {
 
 	peers []Peer
 
-	store Store
+	store store.Store
 
 	reassertLeaderCh chan chan error
 	cancelLeaderShip context.CancelFunc
@@ -124,9 +126,9 @@ type cluster struct {
 	shutdownCh   chan struct{}
 	shutdownLock sync.Mutex
 
-	forwarder Forwarder
+	forwarder forwarder.Forwarder
 	api       API
-	proxy     Proxy
+	proxy     proxy.Proxy
 
 	coreAddress string
 
@@ -135,7 +137,7 @@ type cluster struct {
 	isLeader      bool
 	leaderLock    sync.Mutex
 
-	nodes     map[string]Node
+	nodes     map[string]proxy.Node
 	nodesLock sync.RWMutex
 }
 
@@ -153,7 +155,7 @@ func New(config ClusterConfig) (Cluster, error) {
 		leaveCh:          make(chan struct{}),
 		shutdownCh:       make(chan struct{}),
 
-		nodes: map[string]Node{},
+		nodes: map[string]proxy.Node{},
 	}
 
 	u, err := url.Parse(config.CoreAPIAddress)
@@ -173,7 +175,7 @@ func New(config ClusterConfig) (Cluster, error) {
 		c.logger = log.New("")
 	}
 
-	store, err := NewStore()
+	store, err := store.NewStore()
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +197,7 @@ func New(config ClusterConfig) (Cluster, error) {
 
 	c.api = api
 
-	proxy, err := NewProxy(ProxyConfig{
+	nodeproxy, err := proxy.NewProxy(proxy.ProxyConfig{
 		ID:        c.id,
 		Name:      c.name,
 		IPLimiter: config.IPLimiter,
@@ -206,15 +208,15 @@ func New(config ClusterConfig) (Cluster, error) {
 		return nil, err
 	}
 
-	go func(proxy Proxy) {
-		proxy.Start()
-	}(proxy)
+	go func(nodeproxy proxy.Proxy) {
+		nodeproxy.Start()
+	}(nodeproxy)
 
-	c.proxy = proxy
+	c.proxy = nodeproxy
 
 	go c.trackNodeChanges()
 
-	if forwarder, err := NewForwarder(ForwarderConfig{
+	if forwarder, err := forwarder.New(forwarder.ForwarderConfig{
 		ID:     c.id,
 		Logger: c.logger.WithField("logname", "forwarder"),
 	}); err != nil {
@@ -299,7 +301,7 @@ func (c *cluster) CoreAPIAddress(raftAddress string) (string, error) {
 		return "", err
 	}
 
-	client := APIClient{
+	client := apiclient.APIClient{
 		Address: addr,
 	}
 
@@ -494,7 +496,7 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 		return fmt.Errorf("peer API doesn't respond: %w", err)
 	}
 
-	node := NewNode(address)
+	node := proxy.NewNode(address)
 	err = node.Connect()
 	if err != nil {
 		return fmt.Errorf("couldn't connect to peer: %w", err)
@@ -640,7 +642,7 @@ func (c *cluster) trackNodeChanges() {
 						continue
 					}
 
-					node := NewNode(address)
+					node := proxy.NewNode(address)
 					err = node.Connect()
 					if err != nil {
 						c.logger.Warn().WithError(err).WithFields(log.Fields{
@@ -745,14 +747,14 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover bool, peers []Peer,
 
 	c.logger.Debug().Log("address: %s", addr)
 
-	transport, err := raft.NewTCPTransportWithLogger(c.raftAddress, addr, 3, 10*time.Second, NewLogger(c.logger, hclog.Debug).Named("raft-transport"))
+	transport, err := raft.NewTCPTransportWithLogger(c.raftAddress, addr, 3, 10*time.Second, raftlogger.New(c.logger, hclog.Debug).Named("raft-transport"))
 	if err != nil {
 		return err
 	}
 
 	c.raftTransport = transport
 
-	snapshotLogger := NewLogger(c.logger, hclog.Debug).Named("raft-snapshot")
+	snapshotLogger := raftlogger.New(c.logger, hclog.Debug).Named("raft-snapshot")
 	snapshots, err := raft.NewFileSnapshotStoreWithLogger(c.path, 3, snapshotLogger)
 	if err != nil {
 		return err
@@ -787,7 +789,7 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover bool, peers []Peer,
 
 	cfg := raft.DefaultConfig()
 	cfg.LocalID = raft.ServerID(c.id)
-	cfg.Logger = NewLogger(c.logger, hclog.Debug).Named("raft")
+	cfg.Logger = raftlogger.New(c.logger, hclog.Debug).Named("raft")
 
 	hasState, err := raft.HasExistingState(logStore, stableStore, snapshots)
 	if err != nil {
@@ -823,7 +825,7 @@ func (c *cluster) startRaft(fsm raft.FSM, bootstrap, recover bool, peers []Peer,
 		c.logger.Debug().Log("raft node bootstrapped")
 	} else {
 		// Recover cluster
-		fsm, err := NewStore()
+		fsm, err := store.NewStore()
 		if err != nil {
 			return err
 		}
@@ -919,9 +921,9 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 		return c.forwarder.AddProcess(origin, config)
 	}
 
-	cmd := &command{
-		Operation: opAddProcess,
-		Data: &addProcessCommand{
+	cmd := &store.Command{
+		Operation: store.OpAddProcess,
+		Data: &store.CommandAddProcess{
 			Config: *config,
 		},
 	}
@@ -934,9 +936,9 @@ func (c *cluster) RemoveProcess(origin, id string) error {
 		return c.forwarder.RemoveProcess(origin, id)
 	}
 
-	cmd := &command{
-		Operation: opRemoveProcess,
-		Data: &removeProcessCommand{
+	cmd := &store.Command{
+		Operation: store.OpRemoveProcess,
+		Data: &store.CommandRemoveProcess{
 			ID: id,
 		},
 	}
@@ -944,7 +946,7 @@ func (c *cluster) RemoveProcess(origin, id string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) applyCommand(cmd *command) error {
+func (c *cluster) applyCommand(cmd *store.Command) error {
 	b, err := json.Marshal(cmd)
 	if err != nil {
 		return err
@@ -1076,6 +1078,6 @@ func (c *cluster) sentinel() {
 	}
 }
 
-func (c *cluster) ProxyReader() ProxyReader {
+func (c *cluster) ProxyReader() proxy.ProxyReader {
 	return c.proxy.Reader()
 }

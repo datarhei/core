@@ -1,4 +1,4 @@
-package cluster
+package proxy
 
 import (
 	"context"
@@ -375,6 +375,13 @@ func (n *node) IPs() []string {
 }
 
 func (n *node) ID() string {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return ""
+	}
+
 	return n.peer.ID()
 }
 
@@ -383,7 +390,7 @@ func (n *node) Files() NodeFiles {
 	defer n.stateLock.RUnlock()
 
 	state := NodeFiles{
-		ID:         n.peer.ID(),
+		ID:         n.ID(),
 		LastUpdate: n.lastUpdate,
 	}
 
@@ -400,7 +407,7 @@ func (n *node) State() NodeState {
 	defer n.stateLock.RUnlock()
 
 	state := NodeState{
-		ID:          n.peer.ID(),
+		ID:          n.ID(),
 		LastContact: n.lastContact,
 		State:       n.state.String(),
 		Latency:     time.Duration(n.latency * float64(time.Second)),
@@ -445,6 +452,10 @@ func (n *node) files() {
 		n.peerLock.RLock()
 		defer n.peerLock.RUnlock()
 
+		if n.peer == nil {
+			return
+		}
+
 		files, err := n.peer.MemFSList("name", "asc")
 		if err != nil {
 			return
@@ -460,6 +471,10 @@ func (n *node) files() {
 
 		n.peerLock.RLock()
 		defer n.peerLock.RUnlock()
+
+		if n.peer == nil {
+			return
+		}
 
 		files, err := n.peer.DiskFSList("name", "asc")
 		if err != nil {
@@ -480,6 +495,10 @@ func (n *node) files() {
 			n.peerLock.RLock()
 			defer n.peerLock.RUnlock()
 
+			if n.peer == nil {
+				return
+			}
+
 			files, err := n.peer.RTMPChannels()
 			if err != nil {
 				return
@@ -499,6 +518,10 @@ func (n *node) files() {
 
 			n.peerLock.RLock()
 			defer n.peerLock.RUnlock()
+
+			if n.peer == nil {
+				return
+			}
 
 			files, err := n.peer.SRTChannels()
 			if err != nil {
@@ -570,6 +593,10 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
+	if n.peer == nil {
+		return nil, fmt.Errorf("not connected")
+	}
+
 	if prefix == "mem" {
 		return n.peer.MemFSGetFile(path)
 	} else if prefix == "disk" {
@@ -580,6 +607,13 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 }
 
 func (n *node) ProcessList() ([]ProcessConfig, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return nil, fmt.Errorf("not connected")
+	}
+
 	list, err := n.peer.ProcessList(nil, []string{
 		"state",
 		"config",
@@ -613,6 +647,13 @@ func (n *node) ProcessList() ([]ProcessConfig, error) {
 }
 
 func (n *node) ProcessAdd(config *app.Config) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
 	cfg := httpapi.ProcessConfig{}
 	cfg.Unmarshal(config)
 
@@ -620,13 +661,34 @@ func (n *node) ProcessAdd(config *app.Config) error {
 }
 
 func (n *node) ProcessStart(id string) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
 	return n.peer.ProcessCommand(id, "start")
 }
 
 func (n *node) ProcessStop(id string) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
 	return n.peer.ProcessCommand(id, "stop")
 }
 
 func (n *node) ProcessDelete(id string) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
 	return n.peer.ProcessDelete(id)
 }

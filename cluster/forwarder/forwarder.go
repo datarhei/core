@@ -1,4 +1,4 @@
-package cluster
+package forwarder
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 )
@@ -27,7 +28,7 @@ type forwarder struct {
 	id   string
 	lock sync.RWMutex
 
-	client APIClient
+	client apiclient.APIClient
 
 	logger log.Logger
 }
@@ -37,7 +38,7 @@ type ForwarderConfig struct {
 	Logger log.Logger
 }
 
-func NewForwarder(config ForwarderConfig) (Forwarder, error) {
+func New(config ForwarderConfig) (Forwarder, error) {
 	f := &forwarder{
 		id:     config.ID,
 		logger: config.Logger,
@@ -57,7 +58,7 @@ func NewForwarder(config ForwarderConfig) (Forwarder, error) {
 		Timeout:   5 * time.Second,
 	}
 
-	f.client = APIClient{
+	f.client = apiclient.APIClient{
 		Client: client,
 	}
 
@@ -86,7 +87,7 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 		origin = f.id
 	}
 
-	r := JoinRequest{
+	r := apiclient.JoinRequest{
 		Origin:      origin,
 		ID:          id,
 		RaftAddress: raftAddress,
@@ -99,7 +100,7 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 	f.lock.RUnlock()
 
 	if len(peerAddress) != 0 {
-		client = APIClient{
+		client = apiclient.APIClient{
 			Address: peerAddress,
 			Client:  f.client.Client,
 		}
@@ -113,7 +114,7 @@ func (f *forwarder) Leave(origin, id string) error {
 		origin = f.id
 	}
 
-	r := LeaveRequest{
+	r := apiclient.LeaveRequest{
 		Origin: origin,
 		ID:     id,
 	}
@@ -140,7 +141,7 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 		origin = f.id
 	}
 
-	r := AddProcessRequest{
+	r := apiclient.AddProcessRequest{
 		Origin: origin,
 		Config: *config,
 	}
@@ -161,7 +162,7 @@ func (f *forwarder) RemoveProcess(origin, id string) error {
 		origin = f.id
 	}
 
-	r := RemoveProcessRequest{
+	r := apiclient.RemoveProcessRequest{
 		Origin: origin,
 		ID:     id,
 	}

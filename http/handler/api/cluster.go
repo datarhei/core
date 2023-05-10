@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/datarhei/core/v16/cluster"
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/labstack/echo/v4"
@@ -15,7 +16,7 @@ import (
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
 type ClusterHandler struct {
 	cluster cluster.Cluster
-	proxy   cluster.ProxyReader
+	proxy   proxy.ProxyReader
 }
 
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.

@@ -1,4 +1,4 @@
-package cluster
+package logger
 
 import (
 	"io"
@@ -19,7 +19,7 @@ type hclogger struct {
 	args   []interface{}
 }
 
-func NewLogger(logger log.Logger, lvl hclog.Level) hclog.Logger {
+func New(logger log.Logger, lvl hclog.Level) hclog.Logger {
 	return &hclogger{
 		logger: logger,
 		level:  lvl,

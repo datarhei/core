@@ -3,13 +3,14 @@ package cluster
 import (
 	"testing"
 
+	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestNormalize(t *testing.T) {
-	have := []ProcessConfig{
+	have := []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -23,7 +24,7 @@ func TestNormalize(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     2,
 			CPU:      7,
@@ -40,7 +41,7 @@ func TestNormalize(t *testing.T) {
 
 	normalizeProcessesAndResources(have, resources)
 
-	require.Equal(t, []ProcessConfig{
+	require.Equal(t, []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -54,7 +55,7 @@ func TestNormalize(t *testing.T) {
 		},
 	}, have)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     2,
 			CPU:      7,
@@ -72,7 +73,7 @@ func TestNormalize(t *testing.T) {
 	// test idempotency
 	normalizeProcessesAndResources(have, resources)
 
-	require.Equal(t, []ProcessConfig{
+	require.Equal(t, []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -86,7 +87,7 @@ func TestNormalize(t *testing.T) {
 		},
 	}, have)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     2,
 			CPU:      7,
@@ -111,9 +112,9 @@ func TestSynchronizeAdd(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{}
+	have := []proxy.ProcessConfig{}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
@@ -145,7 +146,7 @@ func TestSynchronizeAdd(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      17,
@@ -181,7 +182,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{
+	have := []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -196,7 +197,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      1,
@@ -239,9 +240,9 @@ func TestSynchronizeAddLimit(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{}
+	have := []proxy.ProcessConfig{}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -273,7 +274,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -302,9 +303,9 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{}
+	have := []proxy.ProcessConfig{}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -342,9 +343,9 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{}
+	have := []proxy.ProcessConfig{}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -380,9 +381,9 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{}
+	have := []proxy.ProcessConfig{}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -414,7 +415,7 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 func TestSynchronizeRemove(t *testing.T) {
 	want := []app.Config{}
 
-	have := []ProcessConfig{
+	have := []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -428,7 +429,7 @@ func TestSynchronizeRemove(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
@@ -456,7 +457,7 @@ func TestSynchronizeRemove(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
@@ -485,7 +486,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}
 
-	have := []ProcessConfig{
+	have := []proxy.ProcessConfig{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -499,7 +500,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
@@ -535,7 +536,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      17,
@@ -556,7 +557,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 }
 
 func TestRebalanceNothingToDo(t *testing.T) {
-	processes := []ProcessConfig{
+	processes := []proxy.ProcessConfig{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -581,7 +582,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      42,
@@ -606,7 +607,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 }
 
 func TestRebalanceOverload(t *testing.T) {
-	processes := []ProcessConfig{
+	processes := []proxy.ProcessConfig{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -642,7 +643,7 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      91,
@@ -675,7 +676,7 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      74,
@@ -696,7 +697,7 @@ func TestRebalanceOverload(t *testing.T) {
 }
 
 func TestRebalanceSkip(t *testing.T) {
-	processes := []ProcessConfig{
+	processes := []proxy.ProcessConfig{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -732,7 +733,7 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      91,
@@ -773,7 +774,7 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      91,
@@ -794,7 +795,7 @@ func TestRebalanceSkip(t *testing.T) {
 }
 
 func TestRebalanceReferenceAffinity(t *testing.T) {
-	processes := []ProcessConfig{
+	processes := []proxy.ProcessConfig{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -856,7 +857,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	resources := map[string]NodeResources{
+	resources := map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      90,
@@ -898,7 +899,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]NodeResources{
+	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
 			NCPU:     1,
 			CPU:      89,
@@ -927,7 +928,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 }
 
 func TestCreateReferenceAffinityNodeMap(t *testing.T) {
-	processes := []ProcessConfig{
+	processes := []proxy.ProcessConfig{
 		{
 			NodeID:  "node1",
 			Order:   "start",
