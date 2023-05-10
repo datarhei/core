@@ -572,6 +572,13 @@ func synchronize(want []app.Config, have []ProcessConfig, resources map[string]N
 	// A map from the process reference to the node it is running on
 	haveReferenceAffinityMap := map[string]string{}
 	for _, p := range have {
+		if len(p.Config.Reference) == 0 {
+			continue
+		}
+
+		// This is a simplification because a reference could be on several nodes,
+		// but here take into consideration on which node the reference has been
+		// seen the last. This is good enough for now.
 		haveReferenceAffinityMap[p.Config.Reference] = p.NodeID
 	}
 
@@ -659,6 +666,54 @@ func synchronize(want []app.Config, have []ProcessConfig, resources map[string]N
 	return opStack
 }
 
+type referenceAffinityNodeCount struct {
+	nodeid string
+	count  uint64
+}
+
+func createReferenceAffinityMap(processes []ProcessConfig) map[string][]referenceAffinityNodeCount {
+	referenceAffinityMap := map[string][]referenceAffinityNodeCount{}
+	for _, p := range processes {
+		if len(p.Config.Reference) == 0 {
+			continue
+		}
+
+		// Here we count how often a reference is present on a node. When
+		// moving processes to a different node, the node with the highest
+		// count of same references will be the first candidate.
+		found := false
+		arr := referenceAffinityMap[p.Config.Reference]
+		for i, count := range arr {
+			if count.nodeid == p.NodeID {
+				count.count++
+				arr[i] = count
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			arr = append(arr, referenceAffinityNodeCount{
+				nodeid: p.NodeID,
+				count:  1,
+			})
+		}
+
+		referenceAffinityMap[p.Config.Reference] = arr
+	}
+
+	// Sort every reference count in decreasing order for each reference
+	for ref, count := range referenceAffinityMap {
+		sort.SliceStable(count, func(a, b int) bool {
+			return count[a].count > count[b].count
+		})
+
+		referenceAffinityMap[ref] = count
+	}
+
+	return referenceAffinityMap
+}
+
 // rebalance returns a list of operations that will move running processes away from nodes
 // that are overloaded.
 func rebalance(have []ProcessConfig, resources map[string]NodeResources) []interface{} {
@@ -686,6 +741,9 @@ func rebalance(have []ProcessConfig, resources map[string]NodeResources) []inter
 		processNodeMap[nodeid] = processes
 	}
 
+	// A map from the process reference to the nodes it is running on
+	haveReferenceAffinityMap := createReferenceAffinityMap(have)
+
 	opStack := []interface{}{}
 
 	// Check if any of the nodes is overloaded
@@ -695,7 +753,8 @@ func rebalance(have []ProcessConfig, resources map[string]NodeResources) []inter
 			continue
 		}
 
-		// Pick the first process from that node and move it to another node with enough free resources
+		// Move processes from this noed to another node with enough free resources.
+		// The processes are ordered ascending by their runtime.
 		processes := processNodeMap[id]
 		if len(processes) == 0 {
 			// If there are no processes on that node, we can't do anything
@@ -704,23 +763,42 @@ func rebalance(have []ProcessConfig, resources map[string]NodeResources) []inter
 
 		overloadedNodeid := id
 
-		for _, p := range processes {
+		for i, p := range processes {
 			if p.State != "running" {
 				// We consider only currently running processes
 				continue
 			}
 
-			// Find another node with enough resources available
 			availableNodeid := ""
-			for id, r := range resources {
-				if id == overloadedNodeid {
-					// Skip the overloaded node
-					continue
-				}
 
-				if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit {
-					availableNodeid = id
-					break
+			// Try to move the process to a node where other processes with the same
+			// reference currently reside.
+			if len(p.Config.Reference) != 0 {
+				for _, count := range haveReferenceAffinityMap[p.Config.Reference] {
+					if count.nodeid == overloadedNodeid {
+						continue
+					}
+
+					r := resources[count.nodeid]
+					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit {
+						availableNodeid = count.nodeid
+						break
+					}
+				}
+			}
+
+			// Find another node with enough resources available
+			if len(availableNodeid) == 0 {
+				for id, r := range resources {
+					if id == overloadedNodeid {
+						// Skip the overloaded node
+						continue
+					}
+
+					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit {
+						availableNodeid = id
+						break
+					}
 				}
 			}
 
@@ -739,6 +817,10 @@ func rebalance(have []ProcessConfig, resources map[string]NodeResources) []inter
 				toNodeid:   availableNodeid,
 				config:     p.Config,
 			})
+
+			// Adjust the process
+			p.NodeID = availableNodeid
+			processes[i] = p
 
 			// Adjust the resources
 			r = resources[availableNodeid]

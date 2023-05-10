@@ -726,3 +726,239 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}, resources)
 }
+
+func TestRebalanceReferenceAffinity(t *testing.T) {
+	processes := []ProcessConfig{
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 1,
+			Config: &app.Config{
+				ID:        "foobar2",
+				Reference: "barfoo",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar3",
+				Reference: "barfoo",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar4",
+				Reference: "barfoo",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar5",
+				Reference: "barfoo",
+			},
+		},
+	}
+
+	resources := map[string]NodeResources{
+		"node1": {
+			NCPU:     1,
+			CPU:      90,
+			Mem:      90,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node2": {
+			NCPU:     1,
+			CPU:      1,
+			Mem:      1,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node3": {
+			NCPU:     1,
+			CPU:      1,
+			Mem:      1,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+	}
+
+	opStack := rebalance(processes, resources)
+
+	require.NotEmpty(t, opStack)
+
+	require.Equal(t, []interface{}{
+		processOpMove{
+			fromNodeid: "node1",
+			toNodeid:   "node3",
+			config: &app.Config{
+				ID:        "foobar2",
+				Reference: "barfoo",
+			},
+		},
+	}, opStack)
+
+	require.Equal(t, map[string]NodeResources{
+		"node1": {
+			NCPU:     1,
+			CPU:      89,
+			Mem:      89,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node2": {
+			NCPU:     1,
+			CPU:      1,
+			Mem:      1,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node3": {
+			NCPU:     1,
+			CPU:      2,
+			Mem:      2,
+			MemTotal: 4 * 1024 * 1024 * 1024,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+	}, resources)
+}
+
+func TestCreateReferenceAffinityNodeMap(t *testing.T) {
+	processes := []ProcessConfig{
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 1,
+			Config: &app.Config{
+				ID:        "foobar2",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar3",
+				Reference: "ref3",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar3",
+				Reference: "ref2",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar4",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar5",
+				Reference: "ref1",
+			},
+		},
+	}
+
+	affinityMap := createReferenceAffinityMap(processes)
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+		"ref3": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+	}, affinityMap)
+}
