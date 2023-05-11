@@ -17,9 +17,6 @@ const NOTIFY_FOLLOWER = 0
 const NOTIFY_LEADER = 1
 const NOTIFY_EMERGENCY = 2
 
-// monitorLeadership listens to the raf notify channel in order to find
-// out if we got the leadership or lost it.
-// https://github.com/hashicorp/consul/blob/44b39240a86bc94ddc67bc105286ab450bd869a9/agent/consul/leader.go#L71
 func (c *cluster) monitorLeadership() {
 	// We use the notify channel we configured Raft with, NOT Raft's
 	// leaderCh, which is only notified best-effort. Doing this ensures
@@ -187,12 +184,11 @@ func (c *cluster) monitorLeadership() {
 
 // leadershipTransfer tries to transfer the leadership to another node e.g. in order
 // to do a graceful shutdown.
-// https://github.com/hashicorp/consul/blob/44b39240a86bc94ddc67bc105286ab450bd869a9/agent/consul/leader.go#L122
 func (c *cluster) leadershipTransfer() error {
 	retryCount := 3
 	for i := 0; i < retryCount; i++ {
-		future := c.raft.LeadershipTransfer()
-		if err := future.Error(); err != nil {
+		err := c.raft.LeadershipTransfer()
+		if err != nil {
 			c.logger.Error().WithError(err).WithFields(log.Fields{
 				"attempt":     i,
 				"retry_limit": retryCount,
@@ -234,8 +230,8 @@ RECONCILE:
 
 	// Apply a raft barrier to ensure our FSM is caught up
 	if !emergency {
-		barrier := c.raft.Barrier(time.Minute)
-		if err := barrier.Error(); err != nil {
+		err := c.raft.Barrier(time.Minute)
+		if err != nil {
 			c.logger.Error().WithError(err).Log("failed to wait for barrier")
 			goto WAIT
 		}
