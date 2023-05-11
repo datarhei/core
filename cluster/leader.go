@@ -83,14 +83,14 @@ func (c *cluster) monitorLeadership() {
 
 				// shutdown any leader and emergency loop
 				if weAreLeaderCh != nil {
-					c.logger.Debug().Log("shutting down leader loop")
+					c.logger.Debug().Log("Shutting down leader loop")
 					close(weAreLeaderCh)
 					leaderLoop.Wait()
 					weAreLeaderCh = nil
 				}
 
 				if weAreEmergencyLeaderCh != nil {
-					c.logger.Debug().Log("shutting down emergency leader loop")
+					c.logger.Debug().Log("Shutting down emergency leader loop")
 					close(weAreEmergencyLeaderCh)
 					emergencyLeaderLoop.Wait()
 					weAreEmergencyLeaderCh = nil
@@ -103,7 +103,7 @@ func (c *cluster) monitorLeadership() {
 					c.followerLoop(ch)
 				}(weAreFollowerCh)
 
-				c.logger.Info().Log("cluster followship acquired")
+				c.logger.Info().Log("Cluster followship acquired")
 
 				c.leaderLock.Lock()
 				c.isRaftLeader = false
@@ -117,14 +117,14 @@ func (c *cluster) monitorLeadership() {
 
 				// shutdown any follower and emergency loop
 				if weAreFollowerCh != nil {
-					c.logger.Debug().Log("shutting down follower loop")
+					c.logger.Debug().Log("Shutting down follower loop")
 					close(weAreFollowerCh)
 					followerLoop.Wait()
 					weAreFollowerCh = nil
 				}
 
 				if weAreEmergencyLeaderCh != nil {
-					c.logger.Debug().Log("shutting down emergency leader loop")
+					c.logger.Debug().Log("Shutting down emergency leader loop")
 					close(weAreEmergencyLeaderCh)
 					emergencyLeaderLoop.Wait()
 					weAreEmergencyLeaderCh = nil
@@ -136,7 +136,7 @@ func (c *cluster) monitorLeadership() {
 					defer leaderLoop.Done()
 					c.leaderLoop(ch, false)
 				}(weAreLeaderCh)
-				c.logger.Info().Log("cluster leadership acquired")
+				c.logger.Info().Log("Cluster leadership acquired")
 
 				c.leaderLock.Lock()
 				c.isRaftLeader = true
@@ -150,14 +150,14 @@ func (c *cluster) monitorLeadership() {
 
 				// shutdown any follower and leader loop
 				if weAreFollowerCh != nil {
-					c.logger.Debug().Log("shutting down follower loop")
+					c.logger.Debug().Log("Shutting down follower loop")
 					close(weAreFollowerCh)
 					followerLoop.Wait()
 					weAreFollowerCh = nil
 				}
 
 				if weAreLeaderCh != nil {
-					c.logger.Debug().Log("shutting down leader loop")
+					c.logger.Debug().Log("Shutting down leader loop")
 					close(weAreLeaderCh)
 					leaderLoop.Wait()
 					weAreLeaderCh = nil
@@ -169,7 +169,7 @@ func (c *cluster) monitorLeadership() {
 					defer emergencyLeaderLoop.Done()
 					c.leaderLoop(ch, true)
 				}(weAreEmergencyLeaderCh)
-				c.logger.Info().Log("cluster emergency leadership acquired")
+				c.logger.Info().Log("Sluster emergency leadership acquired")
 
 				c.leaderLock.Lock()
 				c.isRaftLeader = false
@@ -192,15 +192,15 @@ func (c *cluster) leadershipTransfer() error {
 			c.logger.Error().WithError(err).WithFields(log.Fields{
 				"attempt":     i,
 				"retry_limit": retryCount,
-			}).Log("failed to transfer leadership attempt, will retry")
+			}).Log("Transfer leadership attempt, will retry")
 		} else {
 			c.logger.Info().WithFields(log.Fields{
 				"attempt":     i,
 				"retry_limit": retryCount,
-			}).Log("successfully transferred leadership")
+			}).Log("Successfully transferred leadership")
 
 			for {
-				c.logger.Debug().Log("waiting for losing leadership")
+				c.logger.Debug().Log("Waiting for losing leadership")
 
 				time.Sleep(50 * time.Millisecond)
 
@@ -216,6 +216,7 @@ func (c *cluster) leadershipTransfer() error {
 			return nil
 		}
 	}
+
 	return fmt.Errorf("failed to transfer leadership in %d attempts", retryCount)
 }
 
@@ -232,7 +233,7 @@ RECONCILE:
 	if !emergency {
 		err := c.raft.Barrier(time.Minute)
 		if err != nil {
-			c.logger.Error().WithError(err).Log("failed to wait for barrier")
+			c.logger.Error().WithError(err).Log("Wait for barrier")
 			goto WAIT
 		}
 	}
@@ -240,7 +241,7 @@ RECONCILE:
 	// Check if we need to handle initial leadership actions
 	if !establishedLeader {
 		if err := c.establishLeadership(context.TODO()); err != nil {
-			c.logger.Error().WithError(err).Log("failed to establish leadership")
+			c.logger.Error().WithError(err).Log("Establish leadership")
 			// Immediately revoke leadership since we didn't successfully
 			// establish leadership.
 			c.revokeLeadership()
@@ -251,7 +252,7 @@ RECONCILE:
 			// will try to acquire it again after
 			// 5 seconds.
 			if err := c.leadershipTransfer(); err != nil {
-				c.logger.Error().WithError(err).Log("failed to transfer leadership")
+				c.logger.Error().WithError(err).Log("Transfer leadership")
 				interval = time.After(5 * time.Second)
 				goto WAIT
 			}
@@ -285,7 +286,7 @@ WAIT:
 }
 
 func (c *cluster) establishLeadership(ctx context.Context) error {
-	c.logger.Debug().Log("establishing leadership")
+	c.logger.Debug().Log("Establishing leadership")
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
@@ -296,7 +297,7 @@ func (c *cluster) establishLeadership(ctx context.Context) error {
 }
 
 func (c *cluster) revokeLeadership() {
-	c.logger.Debug().Log("revoking leadership")
+	c.logger.Debug().Log("Revoking leadership")
 
 	c.cancelLeaderShip()
 }
@@ -361,7 +362,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
 					"nodeid":    v.nodeid,
-				}).Log("Adding process failed")
+				}).Log("Adding process")
 				break
 			}
 			err = c.proxy.ProcessStart(v.nodeid, v.config.ID)
@@ -369,7 +370,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
 					"nodeid":    v.nodeid,
-				}).Log("Starting process failed")
+				}).Log("Starting process")
 				break
 			}
 			c.logger.Info().WithFields(log.Fields{
@@ -382,7 +383,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
-				}).Log("Removing process failed")
+				}).Log("Removing process")
 				break
 			}
 			c.logger.Info().WithFields(log.Fields{
@@ -396,7 +397,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 					"processid":  v.config.ID,
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, adding process failed")
+				}).Log("Moving process, adding process")
 				break
 			}
 			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ID)
@@ -405,7 +406,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 					"processid":  v.config.ID,
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, removing process failed")
+				}).Log("Moving process, removing process")
 				break
 			}
 			err = c.proxy.ProcessStart(v.toNodeid, v.config.ID)
@@ -414,7 +415,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 					"processid":  v.config.ID,
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, starting process failed")
+				}).Log("Moving process, starting process")
 				break
 			}
 			c.logger.Info().WithFields(log.Fields{
@@ -428,7 +429,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
-				}).Log("Starting process failed")
+				}).Log("Starting process")
 				break
 			}
 			c.logger.Info().WithFields(log.Fields{
@@ -453,6 +454,12 @@ func (c *cluster) doSynchronize() {
 	have := c.proxy.ProcessList()
 	resources := c.proxy.Resources()
 
+	c.logger.Debug().WithFields(log.Fields{
+		"want":      want,
+		"have":      have,
+		"resources": resources,
+	}).Log("Synchronize")
+
 	opStack := synchronize(want, have, resources)
 
 	c.applyOpStack(opStack)
@@ -461,6 +468,11 @@ func (c *cluster) doSynchronize() {
 func (c *cluster) doRebalance() {
 	have := c.proxy.ProcessList()
 	resources := c.proxy.Resources()
+
+	c.logger.Debug().WithFields(log.Fields{
+		"have":      have,
+		"resources": resources,
+	}).Log("Rebalance")
 
 	opStack := rebalance(have, resources)
 

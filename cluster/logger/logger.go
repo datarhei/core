@@ -4,6 +4,7 @@ import (
 	"io"
 	golog "log"
 	"os"
+	"strings"
 
 	"github.com/datarhei/core/v16/log"
 
@@ -42,6 +43,10 @@ func (l *hclogger) Log(level hclog.Level, msg string, args ...interface{}) {
 		logger = logger.Warn()
 	case hclog.Error:
 		logger = logger.Error()
+	}
+
+	if len(msg) != 0 {
+		msg = strings.ToUpper(msg[:1]) + msg[1:]
 	}
 
 	logger.Log(msg)

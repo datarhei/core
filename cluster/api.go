@@ -72,7 +72,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 			rows := strings.Split(string(stack), "\n")
-			a.logger.Error().WithField("stack", rows).Log("recovered from a panic")
+			a.logger.Error().WithField("stack", rows).Log("Recovered from a panic")
 			return nil
 		},
 	}))
@@ -85,7 +85,10 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.ID).Log("got join request: %+v", r)
+		a.logger.Debug().WithFields(log.Fields{
+			"id":      r.ID,
+			"request": r,
+		}).Log("Join request: %+v", r)
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -93,7 +96,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, "")
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to join cluster")
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to join cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)
 		}
 
@@ -107,7 +110,10 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.ID).Log("got leave request: %+v", r)
+		a.logger.Debug().WithFields(log.Fields{
+			"id":      r.ID,
+			"request": r,
+		}).Log("Leave request: %+v", r)
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -115,7 +121,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.Leave(r.Origin, r.ID)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to leave cluster")
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to leave cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to leave cluster", "%s", err)
 		}
 
@@ -125,7 +131,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.GET("/v1/snaphot", func(c echo.Context) error {
 		data, err := a.cluster.Snapshot()
 		if err != nil {
-			a.logger.Debug().WithError(err).Log("unable to create snaphot")
+			a.logger.Debug().WithError(err).Log("Unable to create snaphot")
 			return httpapi.Err(http.StatusInternalServerError, "unable to create snapshot", "%s", err)
 		}
 
@@ -141,7 +147,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.Config.ID).Log("got add process request")
+		a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -149,7 +155,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.AddProcess(r.Origin, &r.Config)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("unable to add process")
+			a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("Unable to add process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to add process", "%s", err)
 		}
 
@@ -163,7 +169,7 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.ID).Log("got remove process request")
+		a.logger.Debug().WithField("id", r.ID).Log("Remove process request")
 
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
@@ -171,7 +177,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		err := a.cluster.RemoveProcess(r.Origin, r.ID)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("unable to remove process")
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to remove process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
 		}
 
@@ -187,10 +193,11 @@ func NewAPI(config APIConfig) (API, error) {
 }
 
 func (a *api) Start() error {
-	a.logger.Debug().Log("starting api at %s", a.address)
+	a.logger.Debug().WithField("address", a.address).Log("Starting api")
 	return a.router.Start(a.address)
 }
 
 func (a *api) Shutdown(ctx context.Context) error {
+	a.logger.Debug().WithField("address", a.address).Log("Shutting down api")
 	return a.router.Shutdown(ctx)
 }

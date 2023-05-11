@@ -158,7 +158,9 @@ func New(config ClusterConfig) (Cluster, error) {
 		c.logger = log.New("")
 	}
 
-	store, err := store.NewStore()
+	store, err := store.NewStore(store.Config{
+		Logger: c.logger.WithField("logname", "fsm"),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +209,7 @@ func New(config ClusterConfig) (Cluster, error) {
 		c.forwarder = forwarder
 	}
 
-	c.logger.Debug().Log("starting raft")
+	c.logger.Debug().Log("Starting raft")
 
 	peers := []raft.Peer{}
 
@@ -232,7 +234,7 @@ func New(config ClusterConfig) (Cluster, error) {
 		Store:               store,
 		LeadershipNotifyCh:  c.raftNotifyCh,
 		LeaderObservationCh: c.raftLeaderObservationCh,
-		Logger:              c.logger.WithComponent("raft"),
+		Logger:              c.logger.WithComponent("Raft"),
 	})
 	if err != nil {
 		c.Shutdown()
@@ -260,7 +262,7 @@ func New(config ClusterConfig) (Cluster, error) {
 					case <-ticker.C:
 						err := c.Join("", c.id, c.raftAddress, peerAddress)
 						if err != nil {
-							c.logger.Warn().WithError(err).Log("unable to join cluster")
+							c.logger.Warn().WithError(err).Log("Join cluster")
 							continue
 						}
 
@@ -322,7 +324,7 @@ func (c *cluster) CoreAPIAddress(raftAddress string) (string, error) {
 }
 
 func (c *cluster) Shutdown() error {
-	c.logger.Info().Log("shutting down cluster")
+	c.logger.Info().Log("Shutting down cluster")
 	c.shutdownLock.Lock()
 	defer c.shutdownLock.Unlock()
 
@@ -373,7 +375,7 @@ func (c *cluster) Leave(origin, id string) error {
 
 	c.logger.Debug().WithFields(log.Fields{
 		"nodeid": id,
-	}).Log("received leave request for node")
+	}).Log("Received leave request for server")
 
 	if !c.IsRaftLeader() {
 		// Tell the leader to remove us
@@ -386,14 +388,14 @@ func (c *cluster) Leave(origin, id string) error {
 		left := false
 		limit := time.Now().Add(c.raftRemoveGracePeriod)
 		for !left && time.Now().Before(limit) {
-			c.logger.Debug().Log("waiting for getting removed from the configuration")
+			c.logger.Debug().Log("Waiting for getting removed from the configuration")
 			// Sleep a while before we check.
 			time.Sleep(50 * time.Millisecond)
 
 			// Get the latest configuration.
 			servers, err := c.raft.Servers()
 			if err != nil {
-				c.logger.Error().WithError(err).Log("failed to get raft configuration")
+				c.logger.Error().WithError(err).Log("Raft configuration")
 				break
 			}
 
@@ -408,7 +410,7 @@ func (c *cluster) Leave(origin, id string) error {
 		}
 
 		if !left {
-			c.logger.Warn().Log("failed to leave raft configuration gracefully, timeout")
+			c.logger.Warn().Log("Failed to leave raft configuration gracefully, timeout")
 		}
 
 		return nil
@@ -417,7 +419,7 @@ func (c *cluster) Leave(origin, id string) error {
 	// Count the number of servers in the cluster
 	servers, err := c.raft.Servers()
 	if err != nil {
-		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		c.logger.Error().WithError(err).Log("Raft configuration")
 		return err
 	}
 
@@ -427,20 +429,20 @@ func (c *cluster) Leave(origin, id string) error {
 		// We're going to remove ourselves
 		if numPeers <= 1 {
 			// Don't do so if we're the only server in the cluster
-			c.logger.Debug().Log("we're the leader without any peers, not doing anything")
+			c.logger.Debug().Log("We're the leader without any peers, not doing anything")
 			return nil
 		}
 
 		// Transfer the leadership to another server
 		err := c.leadershipTransfer()
 		if err != nil {
-			c.logger.Warn().WithError(err).Log("failed to transfer leadership")
+			c.logger.Warn().WithError(err).Log("Transfer leadership")
 			return err
 		}
 
 		// Wait for new leader election
 		for {
-			c.logger.Debug().Log("waiting for new leader election")
+			c.logger.Debug().Log("Waiting for new leader election")
 
 			time.Sleep(50 * time.Millisecond)
 
@@ -463,14 +465,14 @@ func (c *cluster) Leave(origin, id string) error {
 		left := false
 		limit := time.Now().Add(c.raftRemoveGracePeriod)
 		for !left && time.Now().Before(limit) {
-			c.logger.Debug().Log("waiting for getting removed from the configuration")
+			c.logger.Debug().Log("Waiting for getting removed from the configuration")
 			// Sleep a while before we check.
 			time.Sleep(50 * time.Millisecond)
 
 			// Get the latest configuration.
 			servers, err := c.raft.Servers()
 			if err != nil {
-				c.logger.Error().WithError(err).Log("failed to get raft configuration")
+				c.logger.Error().WithError(err).Log("Raft configuration")
 				break
 			}
 
@@ -492,7 +494,7 @@ func (c *cluster) Leave(origin, id string) error {
 	if err != nil {
 		c.logger.Error().WithError(err).WithFields(log.Fields{
 			"nodeid": id,
-		}).Log("failed to remove node")
+		}).Log("Remove server")
 
 		return err
 	}
@@ -502,16 +504,14 @@ func (c *cluster) Leave(origin, id string) error {
 
 func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 	if !c.IsRaftLeader() {
-		c.logger.Debug().Log("not leader, forwarding to leader")
+		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Join(origin, id, raftAddress, peerAddress)
 	}
-
-	c.logger.Debug().Log("leader: joining %s", raftAddress)
 
 	c.logger.Debug().WithFields(log.Fields{
 		"nodeid":  id,
 		"address": raftAddress,
-	}).Log("received join request for remote node")
+	}).Log("Received join request for remote server")
 
 	// connect to the peer's API in order to find out if our version is compatible
 	address, err := c.CoreAPIAddress(raftAddress)
@@ -528,7 +528,7 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 
 	servers, err := c.raft.Servers()
 	if err != nil {
-		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		c.logger.Error().WithError(err).Log("Raft configuration")
 		return err
 	}
 
@@ -545,14 +545,14 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 				c.logger.Debug().WithFields(log.Fields{
 					"nodeid":  id,
 					"address": raftAddress,
-				}).Log("node is already member of cluster, ignoring join request")
+				}).Log("Server is already member of cluster, ignoring join request")
 			} else {
 				err := c.raft.RemoveServer(srv.ID)
 				if err != nil {
 					c.logger.Error().WithError(err).WithFields(log.Fields{
 						"nodeid":  id,
 						"address": raftAddress,
-					}).Log("error removing existing node")
+					}).Log("Removing existing node")
 					return fmt.Errorf("error removing existing node %s at %s: %w", id, raftAddress, err)
 				}
 			}
@@ -569,14 +569,14 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 	c.logger.Info().WithFields(log.Fields{
 		"nodeid":  id,
 		"address": raftAddress,
-	}).Log("node joined successfully")
+	}).Log("Joined successfully")
 
 	return nil
 }
 
 func (c *cluster) Snapshot() (io.ReadCloser, error) {
 	if !c.IsRaftLeader() {
-		c.logger.Debug().Log("not leader, forwarding to leader")
+		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Snapshot()
 	}
 
@@ -593,7 +593,7 @@ func (c *cluster) trackNodeChanges() {
 			// Get the latest configuration.
 			servers, err := c.raft.Servers()
 			if err != nil {
-				c.logger.Error().WithError(err).Log("failed to get raft configuration")
+				c.logger.Error().WithError(err).Log("Raft configuration")
 				continue
 			}
 
@@ -614,7 +614,7 @@ func (c *cluster) trackNodeChanges() {
 						c.logger.Warn().WithError(err).WithFields(log.Fields{
 							"id":      id,
 							"address": server.Address,
-						}).Log("Discovering core API address failed")
+						}).Log("Discovering core API address")
 						continue
 					}
 
@@ -624,7 +624,7 @@ func (c *cluster) trackNodeChanges() {
 						c.logger.Warn().WithError(err).WithFields(log.Fields{
 							"id":      id,
 							"address": server.Address,
-						}).Log("Connecting to core API failed")
+						}).Log("Connecting to core API")
 						continue
 					}
 
@@ -632,7 +632,7 @@ func (c *cluster) trackNodeChanges() {
 						c.logger.Warn().WithError(err).WithFields(log.Fields{
 							"id":      id,
 							"address": address,
-						}).Log("Adding node failed")
+						}).Log("Adding node")
 					}
 
 					c.nodes[id] = node
@@ -667,7 +667,7 @@ func (c *cluster) trackLeaderChanges() {
 		case leaderAddress := <-c.raftLeaderObservationCh:
 			c.logger.Debug().WithFields(log.Fields{
 				"address": leaderAddress,
-			}).Log("new leader observation")
+			}).Log("Leader observation")
 			if len(leaderAddress) != 0 {
 				leaderAddress, _ = c.ClusterAPIAddress(leaderAddress)
 			}
@@ -773,7 +773,7 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	servers, err := c.raft.Servers()
 	if err != nil {
-		c.logger.Error().WithError(err).Log("failed to get raft configuration")
+		c.logger.Error().WithError(err).Log("Raft configuration")
 		return ClusterAbout{}, err
 	}
 
@@ -808,14 +808,14 @@ func (c *cluster) sentinel() {
 				"state":        stats.State,
 				"last_contact": stats.LastContact.String(),
 				"num_peers":    stats.NumPeers,
-			}).Log("stats")
+			}).Log("Stats")
 
 			if stats.LastContact > 10*time.Second && !isEmergencyLeader {
-				c.logger.Warn().Log("force leadership due to lost contact to leader")
+				c.logger.Warn().Log("Force leadership due to lost contact to leader")
 				c.raftEmergencyNotifyCh <- true
 				isEmergencyLeader = true
 			} else if stats.LastContact <= 10*time.Second && isEmergencyLeader {
-				c.logger.Warn().Log("stop forced leadership due to contact to leader")
+				c.logger.Warn().Log("Stop forced leadership due to contact to leader")
 				c.raftEmergencyNotifyCh <- false
 				isEmergencyLeader = false
 			}

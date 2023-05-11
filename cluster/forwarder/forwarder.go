@@ -73,7 +73,7 @@ func (f *forwarder) SetLeader(address string) {
 		return
 	}
 
-	f.logger.Debug().Log("setting leader address to %s", address)
+	f.logger.Debug().Log("Setting leader address to %s", address)
 
 	f.client.Address = address
 }
@@ -93,7 +93,7 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 		RaftAddress: raftAddress,
 	}
 
-	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
+	f.logger.Debug().WithField("request", r).Log("Forwarding to leader")
 
 	f.lock.RLock()
 	client := f.client
@@ -119,7 +119,7 @@ func (f *forwarder) Leave(origin, id string) error {
 		ID:     id,
 	}
 
-	f.logger.Debug().WithField("request", r).Log("forwarding to leader")
+	f.logger.Debug().WithField("request", r).Log("Forwarding to leader")
 
 	f.lock.RLock()
 	client := f.client

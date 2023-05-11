@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/hashicorp/raft"
@@ -42,27 +43,44 @@ type CommandRemoveProcess struct {
 type store struct {
 	lock    sync.RWMutex
 	Process map[string]app.Config
+
+	logger log.Logger
 }
 
-func NewStore() (Store, error) {
-	return &store{
+type Config struct {
+	Logger log.Logger
+}
+
+func NewStore(config Config) (Store, error) {
+	s := &store{
 		Process: map[string]app.Config{},
-	}, nil
+		logger:  config.Logger,
+	}
+
+	if s.logger == nil {
+		s.logger = log.New("")
+	}
+
+	return s, nil
 }
 
-func (s *store) Apply(log *raft.Log) interface{} {
-	fmt.Printf("a log entry came in (index=%d, term=%d): %s\n", log.Index, log.Term, string(log.Data))
+func (s *store) Apply(entry *raft.Log) interface{} {
+	logger := s.logger.WithFields(log.Fields{
+		"index": entry.Index,
+		"term":  entry.Term,
+	})
+
+	logger.Debug().WithField("data", string(entry.Data)).Log("New entry")
 
 	c := Command{}
 
-	err := json.Unmarshal(log.Data, &c)
+	err := json.Unmarshal(entry.Data, &c)
 	if err != nil {
-		fmt.Printf("invalid log entry\n")
-		return nil
+		logger.Error().WithError(err).Log("Invalid entry")
+		return fmt.Errorf("invalid log entry")
 	}
 
-	fmt.Printf("op: %s\n", c.Operation)
-	fmt.Printf("op: %+v\n", c)
+	logger.Debug().WithField("operation", c.Operation).Log("")
 
 	switch c.Operation {
 	case OpAddProcess:
@@ -84,13 +102,13 @@ func (s *store) Apply(log *raft.Log) interface{} {
 	}
 
 	s.lock.RLock()
-	fmt.Printf("\n==> %+v\n\n", s.Process)
+	s.logger.Debug().WithField("processes", s.Process).Log("")
 	s.lock.RUnlock()
 	return nil
 }
 
 func (s *store) Snapshot() (raft.FSMSnapshot, error) {
-	fmt.Printf("a snapshot is requested\n")
+	s.logger.Debug().Log("Snapshot request")
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -106,7 +124,7 @@ func (s *store) Snapshot() (raft.FSMSnapshot, error) {
 }
 
 func (s *store) Restore(snapshot io.ReadCloser) error {
-	fmt.Printf("a snapshot is restored\n")
+	s.logger.Debug().Log("Snapshot restore")
 
 	defer snapshot.Close()
 

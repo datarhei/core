@@ -110,6 +110,12 @@ func New(config Config) (Raft, error) {
 		raftAddress:         config.Address,
 		leadershipNotifyCh:  config.LeadershipNotifyCh,
 		leaderObservationCh: config.LeaderObservationCh,
+		shutdownCh:          make(chan struct{}),
+		logger:              config.Logger,
+	}
+
+	if r.logger == nil {
+		r.logger = log.New("")
 	}
 
 	err := r.start(config.Store, config.Bootstrap, config.Recover, config.Peers, false)
@@ -319,7 +325,7 @@ func (r *raft) start(fsm hcraft.FSM, bootstrap, recover bool, peers []Peer, inme
 		return err
 	}
 
-	r.logger.Debug().Log("address: %s", addr)
+	r.logger.Debug().Log("Address: %s", addr)
 
 	transport, err := hcraft.NewTCPTransportWithLogger(r.raftAddress, addr, 3, 10*time.Second, raftlogger.New(r.logger, hclog.Debug).Named("raft-transport"))
 	if err != nil {
@@ -396,10 +402,10 @@ func (r *raft) start(fsm hcraft.FSM, bootstrap, recover bool, peers []Peer, inme
 			return fmt.Errorf("bootstrapping cluster: %w", err)
 		}
 
-		r.logger.Debug().Log("raft node bootstrapped")
+		r.logger.Debug().Log("Raft node bootstrapped")
 	} else {
 		// Recover cluster
-		fsm, err := store.NewStore()
+		fsm, err := store.NewStore(store.Config{})
 		if err != nil {
 			return err
 		}
@@ -428,7 +434,7 @@ func (r *raft) start(fsm hcraft.FSM, bootstrap, recover bool, peers []Peer, inme
 			return fmt.Errorf("recovering cluster: %w", err)
 		}
 
-		r.logger.Debug().Log("raft node recoverd")
+		r.logger.Debug().Log("Raft node recoverd")
 	}
 
 	// Set up a channel for reliable leader notifications.
@@ -446,7 +452,7 @@ func (r *raft) start(fsm hcraft.FSM, bootstrap, recover bool, peers []Peer, inme
 	go r.trackLeaderChanges()
 	go r.monitorLeadership()
 
-	r.logger.Debug().Log("raft started")
+	r.logger.Debug().Log("Raft started")
 
 	return nil
 }
@@ -490,7 +496,7 @@ func (r *raft) trackLeaderChanges() {
 				r.logger.Debug().WithFields(log.Fields{
 					"id":      leaderObs.LeaderID,
 					"address": leaderObs.LeaderAddr,
-				}).Log("new leader observation")
+				}).Log("New leader observation")
 
 				leaderAddress := string(leaderObs.LeaderAddr)
 
@@ -501,7 +507,7 @@ func (r *raft) trackLeaderChanges() {
 					}
 				}
 			} else {
-				r.logger.Debug().WithField("type", reflect.TypeOf(obs.Data)).Log("got unknown observation type from raft")
+				r.logger.Debug().WithField("type", reflect.TypeOf(obs.Data)).Log("Unknown observation type from raft")
 				continue
 			}
 		case <-r.shutdownCh:

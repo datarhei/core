@@ -193,7 +193,7 @@ func (p *proxy) Start() {
 
 	p.running = true
 
-	p.logger.Debug().Log("starting proxy")
+	p.logger.Debug().Log("Starting proxy")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	p.cancel = cancel
@@ -246,7 +246,7 @@ func (p *proxy) Stop() {
 
 	p.running = false
 
-	p.logger.Debug().Log("stopping proxy")
+	p.logger.Debug().Log("Stopping proxy")
 
 	p.cancel()
 	p.cancel = nil
