@@ -44,7 +44,7 @@ type Config struct {
 	ReconnectDelay uint64     `json:"reconnect_delay_seconds"` // seconds
 	Autostart      bool       `json:"autostart"`
 	StaleTimeout   uint64     `json:"stale_timeout_seconds"` // seconds
-	LimitCPU       float64    `json:"limit_cpu_usage"`       // percent
+	LimitCPU       float64    `json:"limit_cpu_usage"`       // percent 0-100
 	LimitMemory    uint64     `json:"limit_memory_bytes"`    // bytes
 	LimitWaitFor   uint64     `json:"limit_waitfor_seconds"` // seconds
 }

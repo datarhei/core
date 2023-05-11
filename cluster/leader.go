@@ -480,25 +480,20 @@ func (c *cluster) doRebalance() {
 }
 
 // normalizeProcessesAndResources normalizes the CPU and memory consumption of the processes and resources in-place.
+//
+// Deprecated: all values are absolute or already normed to 0-100*ncpu percent
 func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources map[string]proxy.NodeResources) {
 	maxNCPU := .0
-	maxMemTotal := .0
 
 	for _, r := range resources {
 		if r.NCPU > maxNCPU {
 			maxNCPU = r.NCPU
-		}
-		if r.MemTotal > maxMemTotal {
-			maxMemTotal = r.MemTotal
 		}
 	}
 
 	for id, r := range resources {
 		factor := maxNCPU / r.NCPU
 		r.CPU = 100 - (100-r.CPU)/factor
-
-		factor = maxMemTotal / r.MemTotal
-		r.Mem = 100 - (100-r.Mem)/factor
 
 		resources[id] = r
 	}
@@ -513,15 +508,11 @@ func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources m
 		factor := maxNCPU / r.NCPU
 		p.CPU = 100 - (100-p.CPU)/factor
 
-		factor = maxMemTotal / r.MemTotal
-		p.Mem = 100 - (100-p.Mem)/factor
-
 		processes[i] = p
 	}
 
 	for id, r := range resources {
 		r.NCPU = maxNCPU
-		r.MemTotal = maxMemTotal
 
 		resources[id] = r
 	}
@@ -530,8 +521,6 @@ func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources m
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
 func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
-	normalizeProcessesAndResources(have, resources)
-
 	// A map from the process ID to the process config of the processes
 	// we want to be running on the nodes.
 	wantMap := map[string]*app.Config{}
@@ -578,8 +567,6 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 
 	have = haveAfterRemove
 
-	createReferenceAffinityMap(have)
-
 	// A map from the process reference to the node it is running on
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
 
@@ -605,8 +592,8 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 		if len(config.Reference) != 0 {
 			for _, count := range haveReferenceAffinityMap[config.Reference] {
 				r := resources[count.nodeid]
-				cpu := config.LimitCPU / r.NCPU
-				mem := float64(config.LimitMemory) / r.MemTotal * 100
+				cpu := config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				mem := config.LimitMemory
 
 				if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
 					nodeid = count.nodeid
@@ -618,8 +605,8 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 		// Find the node with the most resources available
 		if len(nodeid) == 0 {
 			for id, r := range resources {
-				cpu := config.LimitCPU / r.NCPU
-				mem := float64(config.LimitMemory) / float64(r.MemTotal) * 100
+				cpu := config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				mem := config.LimitMemory
 
 				if len(nodeid) == 0 {
 					if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
@@ -629,18 +616,9 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 					continue
 				}
 
-				if r.CPU+r.Mem < resources[nodeid].CPU+resources[nodeid].Mem {
+				if r.CPU < resources[nodeid].CPU && r.Mem <= resources[nodeid].Mem {
 					nodeid = id
 				}
-				/*
-					if r.CPU < resources[nodeid].CPU && r.Mem < resources[nodeid].Mem {
-						nodeid = id
-					} else if r.Mem < resources[nodeid].Mem {
-						nodeid = id
-					} else if r.CPU < resources[nodeid].CPU {
-						nodeid = id
-					}
-				*/
 			}
 		}
 
@@ -653,8 +631,8 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 			// Adjust the resources
 			r, ok := resources[nodeid]
 			if ok {
-				r.CPU += config.LimitCPU / r.NCPU
-				r.Mem += float64(config.LimitMemory) / float64(r.MemTotal) * 100
+				r.CPU += config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				r.Mem += config.LimitMemory
 				resources[nodeid] = r
 			}
 		} else {
@@ -719,8 +697,6 @@ func createReferenceAffinityMap(processes []proxy.ProcessConfig) map[string][]re
 // rebalance returns a list of operations that will move running processes away from nodes
 // that are overloaded.
 func rebalance(have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
-	normalizeProcessesAndResources(have, resources)
-
 	// Group the processes by node
 	processNodeMap := map[string][]proxy.ProcessConfig{}
 

@@ -12,8 +12,8 @@ type ClusterNode struct {
 	LastContact int64   `json:"last_contact"` // unix timestamp
 	Latency     float64 `json:"latency_ms"`   // milliseconds
 	State       string  `json:"state"`
-	CPU         float64 `json:"cpu_used"` // percent
-	Mem         float64 `json:"mem_used"` // percent
+	CPU         float64 `json:"cpu_used"`                 // percent 0-100*npcu
+	Mem         uint64  `json:"mem_used" format:"uint64"` // bytes
 }
 
 type ClusterNodeFiles struct {

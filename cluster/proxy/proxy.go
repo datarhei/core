@@ -453,8 +453,8 @@ type ProcessConfig struct {
 	NodeID  string
 	Order   string
 	State   string
-	CPU     float64
-	Mem     float64
+	CPU     float64 // Current CPU load of this process, 0-100*ncpu
+	Mem     uint64  // Currently consumed memory of this process in bytes
 	Runtime time.Duration
 	Config  *app.Config
 }

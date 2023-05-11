@@ -9,106 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalize(t *testing.T) {
-	have := []proxy.ProcessConfig{
-		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
-			Runtime: 42,
-			Config: &app.Config{
-				ID: "foobar",
-			},
-		},
-	}
-
-	resources := map[string]proxy.NodeResources{
-		"node1": {
-			NCPU:     2,
-			CPU:      7,
-			Mem:      35,
-			MemTotal: 2 * 1024 * 1024 * 1024, // 2GB
-		},
-		"node2": {
-			NCPU:     1,
-			CPU:      75,
-			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024, // 4GB
-		},
-	}
-
-	normalizeProcessesAndResources(have, resources)
-
-	require.Equal(t, []proxy.ProcessConfig{
-		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     56,
-			Mem:     5,
-			Runtime: 42,
-			Config: &app.Config{
-				ID: "foobar",
-			},
-		},
-	}, have)
-
-	require.Equal(t, map[string]proxy.NodeResources{
-		"node1": {
-			NCPU:     2,
-			CPU:      7,
-			Mem:      67.5,
-			MemTotal: 4 * 1024 * 1024 * 1024,
-		},
-		"node2": {
-			NCPU:     2,
-			CPU:      87.5,
-			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
-		},
-	}, resources)
-
-	// test idempotency
-	normalizeProcessesAndResources(have, resources)
-
-	require.Equal(t, []proxy.ProcessConfig{
-		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     56,
-			Mem:     5,
-			Runtime: 42,
-			Config: &app.Config{
-				ID: "foobar",
-			},
-		},
-	}, have)
-
-	require.Equal(t, map[string]proxy.NodeResources{
-		"node1": {
-			NCPU:     2,
-			CPU:      7,
-			Mem:      67.5,
-			MemTotal: 4 * 1024 * 1024 * 1024,
-		},
-		"node2": {
-			NCPU:     2,
-			CPU:      87.5,
-			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
-		},
-	}, resources)
-}
-
 func TestSynchronizeAdd(t *testing.T) {
 	want := []app.Config{
 		{
 			ID:          "foobar",
 			LimitCPU:    10,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 50,
 		},
 	}
 
@@ -118,8 +24,7 @@ func TestSynchronizeAdd(t *testing.T) {
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
-			Mem:      65,
-			MemTotal: 4 * 1024 * 1024 * 1024,
+			Mem:      35,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -127,7 +32,6 @@ func TestSynchronizeAdd(t *testing.T) {
 			NCPU:     1,
 			CPU:      85,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -141,7 +45,7 @@ func TestSynchronizeAdd(t *testing.T) {
 			config: &app.Config{
 				ID:          "foobar",
 				LimitCPU:    10,
-				LimitMemory: 50 * 1024 * 1024,
+				LimitMemory: 50,
 			},
 		},
 	}, stack)
@@ -150,8 +54,7 @@ func TestSynchronizeAdd(t *testing.T) {
 		"node1": {
 			NCPU:     1,
 			CPU:      17,
-			Mem:      65 + (50. / (4. * 1024) * 100),
-			MemTotal: 4 * 1024 * 1024 * 1024,
+			Mem:      85,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -159,7 +62,6 @@ func TestSynchronizeAdd(t *testing.T) {
 			NCPU:     1,
 			CPU:      85,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -172,13 +74,13 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			ID:          "foobar",
 			Reference:   "barfoo",
 			LimitCPU:    10,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 20,
 		},
 		{
 			ID:          "foobar2",
 			Reference:   "barfoo",
 			LimitCPU:    10,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 30,
 		},
 	}
 
@@ -202,7 +104,6 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      1,
 			Mem:      1,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -210,7 +111,6 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      1,
 			Mem:      1,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -225,7 +125,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 				ID:          "foobar2",
 				Reference:   "barfoo",
 				LimitCPU:    10,
-				LimitMemory: 50 * 1024 * 1024,
+				LimitMemory: 30,
 			},
 		},
 	}, stack)
@@ -236,7 +136,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 		{
 			ID:          "foobar",
 			LimitCPU:    10,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 5,
 		},
 	}
 
@@ -247,7 +147,6 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			NCPU:     1,
 			CPU:      81,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -255,7 +154,6 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			NCPU:     1,
 			CPU:      79,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -269,7 +167,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			config: &app.Config{
 				ID:          "foobar",
 				LimitCPU:    10,
-				LimitMemory: 50 * 1024 * 1024,
+				LimitMemory: 5,
 			},
 		},
 	}, stack)
@@ -279,15 +177,13 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			NCPU:     1,
 			CPU:      81,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
 		"node2": {
 			NCPU:     1,
 			CPU:      89,
-			Mem:      72 + (50. / (4. * 1024) * 100),
-			MemTotal: 4 * 1024 * 1024 * 1024,
+			Mem:      77,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -299,7 +195,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 		{
 			ID:          "foobar",
 			LimitCPU:    30,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 5,
 		},
 	}
 
@@ -310,7 +206,6 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 			NCPU:     1,
 			CPU:      81,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -318,7 +213,6 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 			NCPU:     1,
 			CPU:      79,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -339,7 +233,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 		{
 			ID:          "foobar",
 			LimitCPU:    1,
-			LimitMemory: 2 * 1024 * 1024 * 1024,
+			LimitMemory: 50,
 		},
 	}
 
@@ -350,7 +244,6 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 			NCPU:     1,
 			CPU:      81,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -358,7 +251,6 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 			NCPU:     1,
 			CPU:      79,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -388,7 +280,6 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 			NCPU:     1,
 			CPU:      81,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -396,7 +287,6 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 			NCPU:     1,
 			CPU:      79,
 			Mem:      72,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -434,7 +324,6 @@ func TestSynchronizeRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      7,
 			Mem:      65,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -442,7 +331,6 @@ func TestSynchronizeRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      85,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -462,7 +350,6 @@ func TestSynchronizeRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      7,
 			Mem:      65,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -470,7 +357,6 @@ func TestSynchronizeRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      73,
 			Mem:      6,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -482,7 +368,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		{
 			ID:          "foobar1",
 			LimitCPU:    10,
-			LimitMemory: 50 * 1024 * 1024,
+			LimitMemory: 5,
 		},
 	}
 
@@ -505,7 +391,6 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      7,
 			Mem:      65,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -513,7 +398,6 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      85,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -531,7 +415,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			config: &app.Config{
 				ID:          "foobar1",
 				LimitCPU:    10,
-				LimitMemory: 50 * 1024 * 1024,
+				LimitMemory: 5,
 			},
 		},
 	}, stack)
@@ -540,8 +424,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		"node1": {
 			NCPU:     1,
 			CPU:      17,
-			Mem:      65 + (50. / (4. * 1024) * 100),
-			MemTotal: 4 * 1024 * 1024 * 1024,
+			Mem:      70,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -549,7 +432,6 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			NCPU:     1,
 			CPU:      73,
 			Mem:      6,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -587,7 +469,6 @@ func TestRebalanceNothingToDo(t *testing.T) {
 			NCPU:     1,
 			CPU:      42,
 			Mem:      35,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -595,7 +476,6 @@ func TestRebalanceNothingToDo(t *testing.T) {
 			NCPU:     1,
 			CPU:      37,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -648,7 +528,6 @@ func TestRebalanceOverload(t *testing.T) {
 			NCPU:     1,
 			CPU:      91,
 			Mem:      35,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -656,7 +535,6 @@ func TestRebalanceOverload(t *testing.T) {
 			NCPU:     1,
 			CPU:      15,
 			Mem:      11,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -681,7 +559,6 @@ func TestRebalanceOverload(t *testing.T) {
 			NCPU:     1,
 			CPU:      74,
 			Mem:      4,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -689,7 +566,6 @@ func TestRebalanceOverload(t *testing.T) {
 			NCPU:     1,
 			CPU:      32,
 			Mem:      42,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -738,7 +614,6 @@ func TestRebalanceSkip(t *testing.T) {
 			NCPU:     1,
 			CPU:      91,
 			Mem:      35,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -746,7 +621,6 @@ func TestRebalanceSkip(t *testing.T) {
 			NCPU:     1,
 			CPU:      15,
 			Mem:      92,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -779,7 +653,6 @@ func TestRebalanceSkip(t *testing.T) {
 			NCPU:     1,
 			CPU:      91,
 			Mem:      35,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -787,7 +660,6 @@ func TestRebalanceSkip(t *testing.T) {
 			NCPU:     1,
 			CPU:      15,
 			Mem:      92,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -862,7 +734,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      90,
 			Mem:      90,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -870,7 +741,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      1,
 			Mem:      1,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -878,7 +748,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      1,
 			Mem:      1,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -904,7 +773,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      89,
 			Mem:      89,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -912,7 +780,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      1,
 			Mem:      1,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},
@@ -920,7 +787,6 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			NCPU:     1,
 			CPU:      2,
 			Mem:      2,
-			MemTotal: 4 * 1024 * 1024 * 1024,
 			CPULimit: 90,
 			MemLimit: 90,
 		},

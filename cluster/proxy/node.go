@@ -51,12 +51,11 @@ type NodeFiles struct {
 }
 
 type NodeResources struct {
-	NCPU     float64
-	CPU      float64
-	CPULimit float64
-	Mem      float64
-	MemTotal float64
-	MemLimit float64
+	NCPU     float64 // Number of CPU on this node
+	CPU      float64 // Current CPU load, 0-100*ncpu
+	CPULimit float64 // Defined CPU load limit, 0-100*ncpu
+	Mem      uint64  // Currently used memory in bytes
+	MemLimit uint64  // Defined memory limit in bytes
 }
 
 type NodeState struct {
@@ -91,8 +90,8 @@ type node struct {
 	resources struct {
 		ncpu     float64
 		cpu      float64
-		mem      float64
-		memTotal float64
+		mem      uint64
+		memTotal uint64
 	}
 
 	state       nodeState
@@ -262,15 +261,14 @@ func (n *node) Connect() error {
 					n.stateLock.Lock()
 					n.resources.cpu = 100
 					n.resources.ncpu = 1
-					n.resources.mem = 100
-					n.resources.memTotal = 1
+					n.resources.mem = 0
 					n.stateLock.Unlock()
 				}
 
 				cpu_ncpu := .0
 				cpu_idle := .0
-				mem_total := .0
-				mem_free := .0
+				mem_total := uint64(0)
+				mem_free := uint64(0)
 
 				for _, x := range metrics.Metrics {
 					if x.Name == "cpu_idle" {
@@ -278,21 +276,21 @@ func (n *node) Connect() error {
 					} else if x.Name == "cpu_ncpu" {
 						cpu_ncpu = x.Values[0].Value
 					} else if x.Name == "mem_total" {
-						mem_total = x.Values[0].Value
+						mem_total = uint64(x.Values[0].Value)
 					} else if x.Name == "mem_free" {
-						mem_free = x.Values[0].Value
+						mem_free = uint64(x.Values[0].Value)
 					}
 				}
 
 				n.stateLock.Lock()
 				n.resources.ncpu = cpu_ncpu
-				n.resources.cpu = 100 - cpu_idle
+				n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
 				if mem_total != 0 {
-					n.resources.mem = (mem_total - mem_free) / mem_total * 100
+					n.resources.mem = mem_total - mem_free
 					n.resources.memTotal = mem_total
 				} else {
-					n.resources.mem = 100
-					n.resources.memTotal = 1
+					n.resources.mem = 0
+					n.resources.memTotal = 0
 				}
 				n.lastContact = time.Now()
 				n.stateLock.Unlock()
@@ -414,10 +412,9 @@ func (n *node) State() NodeState {
 		Resources: NodeResources{
 			NCPU:     n.resources.ncpu,
 			CPU:      n.resources.cpu,
-			CPULimit: 90,
+			CPULimit: 90 * n.resources.ncpu,
 			Mem:      n.resources.mem,
-			MemTotal: n.resources.memTotal,
-			MemLimit: 90,
+			MemLimit: uint64(float64(n.resources.memTotal) * 0.9),
 		},
 	}
 
@@ -629,15 +626,15 @@ func (n *node) ProcessList() ([]ProcessConfig, error) {
 			NodeID:  n.ID(),
 			Order:   p.State.Order,
 			State:   p.State.State,
-			Mem:     float64(p.State.Memory) / float64(n.resources.memTotal),
+			Mem:     p.State.Memory,
 			Runtime: time.Duration(p.State.Runtime) * time.Second,
 			Config:  p.Config.Marshal(),
 		}
 
 		if x, err := p.State.CPU.Float64(); err == nil {
-			process.CPU = x / n.resources.ncpu
+			process.CPU = x * n.resources.ncpu
 		} else {
-			process.CPU = 100
+			process.CPU = 100 * n.resources.ncpu
 		}
 
 		processes = append(processes, process)
