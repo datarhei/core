@@ -2,23 +2,28 @@ package cluster
 
 import (
 	"testing"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestSynchronizeAdd(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar",
-			LimitCPU:    10,
-			LimitMemory: 50,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar",
+				LimitCPU:    10,
+				LimitMemory: 50,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{}
+	have := []proxy.Process{}
 
 	resources := map[string]proxy.NodeResources{
 		"node1": {
@@ -69,22 +74,28 @@ func TestSynchronizeAdd(t *testing.T) {
 }
 
 func TestSynchronizeAddReferenceAffinity(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar",
-			Reference:   "barfoo",
-			LimitCPU:    10,
-			LimitMemory: 20,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
 		},
 		{
-			ID:          "foobar2",
-			Reference:   "barfoo",
-			LimitCPU:    10,
-			LimitMemory: 30,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{
+	have := []proxy.Process{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -132,15 +143,18 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 }
 
 func TestSynchronizeAddLimit(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar",
-			LimitCPU:    10,
-			LimitMemory: 5,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar",
+				LimitCPU:    10,
+				LimitMemory: 5,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{}
+	have := []proxy.Process{}
 
 	resources := map[string]proxy.NodeResources{
 		"node1": {
@@ -191,15 +205,18 @@ func TestSynchronizeAddLimit(t *testing.T) {
 }
 
 func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar",
-			LimitCPU:    30,
-			LimitMemory: 5,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar",
+				LimitCPU:    30,
+				LimitMemory: 5,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{}
+	have := []proxy.Process{}
 
 	resources := map[string]proxy.NodeResources{
 		"node1": {
@@ -229,15 +246,18 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 }
 
 func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar",
-			LimitCPU:    1,
-			LimitMemory: 50,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar",
+				LimitCPU:    1,
+				LimitMemory: 50,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{}
+	have := []proxy.Process{}
 
 	resources := map[string]proxy.NodeResources{
 		"node1": {
@@ -267,13 +287,16 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 }
 
 func TestSynchronizeAddNoLimits(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID: "foobar",
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID: "foobar",
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{}
+	have := []proxy.Process{}
 
 	resources := map[string]proxy.NodeResources{
 		"node1": {
@@ -303,9 +326,9 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 }
 
 func TestSynchronizeRemove(t *testing.T) {
-	want := []app.Config{}
+	want := []store.Process{}
 
-	have := []proxy.ProcessConfig{
+	have := []proxy.Process{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -364,15 +387,18 @@ func TestSynchronizeRemove(t *testing.T) {
 }
 
 func TestSynchronizeAddRemove(t *testing.T) {
-	want := []app.Config{
+	want := []store.Process{
 		{
-			ID:          "foobar1",
-			LimitCPU:    10,
-			LimitMemory: 5,
+			UpdatedAt: time.Now(),
+			Config: &app.Config{
+				ID:          "foobar1",
+				LimitCPU:    10,
+				LimitMemory: 5,
+			},
 		},
 	}
 
-	have := []proxy.ProcessConfig{
+	have := []proxy.Process{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -439,7 +465,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 }
 
 func TestRebalanceNothingToDo(t *testing.T) {
-	processes := []proxy.ProcessConfig{
+	processes := []proxy.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -487,7 +513,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 }
 
 func TestRebalanceOverload(t *testing.T) {
-	processes := []proxy.ProcessConfig{
+	processes := []proxy.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -573,7 +599,7 @@ func TestRebalanceOverload(t *testing.T) {
 }
 
 func TestRebalanceSkip(t *testing.T) {
-	processes := []proxy.ProcessConfig{
+	processes := []proxy.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -667,7 +693,7 @@ func TestRebalanceSkip(t *testing.T) {
 }
 
 func TestRebalanceReferenceAffinity(t *testing.T) {
-	processes := []proxy.ProcessConfig{
+	processes := []proxy.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -794,7 +820,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 }
 
 func TestCreateReferenceAffinityNodeMap(t *testing.T) {
-	processes := []proxy.ProcessConfig{
+	processes := []proxy.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",

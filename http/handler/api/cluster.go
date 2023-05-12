@@ -4,11 +4,14 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
+
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
 )
@@ -27,31 +30,33 @@ func NewCluster(cluster cluster.Cluster) *ClusterHandler {
 	}
 }
 
-// GetProxyNodes returns the list of proxy nodes in the cluster
+// GetNodes returns the list of proxy nodes in the cluster
 // @Summary List of proxy nodes in the cluster
 // @Description List of proxy nodes in the cluster
 // @Tags v16.?.?
-// @ID cluster-3-get-proxy-nodes
+// @ID cluster-3-get-nodes
 // @Produce json
 // @Success 200 {array} api.ClusterNode
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/proxy [get]
-func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
+// @Router /api/v3/cluster/node [get]
+func (h *ClusterHandler) GetNodes(c echo.Context) error {
 	nodes := h.proxy.ListNodes()
 
 	list := []api.ClusterNode{}
 
 	for _, node := range nodes {
-		state := node.State()
+		about := node.About()
 		n := api.ClusterNode{
-			Address:     node.Address(),
-			ID:          state.ID,
-			LastContact: state.LastContact.Unix(),
-			Latency:     state.Latency.Seconds() * 1000,
-			State:       state.State,
-			CPU:         state.Resources.CPU,
-			Mem:         state.Resources.Mem,
+			ID:          about.ID,
+			Name:        about.Name,
+			Address:     about.Address,
+			CreatedAt:   about.CreatedAt.Format(time.RFC3339),
+			Uptime:      int64(about.Uptime.Seconds()),
+			LastContact: about.LastContact.Unix(),
+			Latency:     about.Latency.Seconds() * 1000,
+			State:       about.State,
+			Resources:   api.ClusterNodeResources(about.Resources),
 		}
 
 		list = append(list, n)
@@ -60,18 +65,18 @@ func (h *ClusterHandler) GetProxyNodes(c echo.Context) error {
 	return c.JSON(http.StatusOK, list)
 }
 
-// GetProxyNode returns the proxy node with the given ID
+// GetNode returns the proxy node with the given ID
 // @Summary List a proxy node by its ID
 // @Description List a proxy node by its ID
 // @Tags v16.?.?
-// @ID cluster-3-get-proxy-node
+// @ID cluster-3-get-node
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNode
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/proxy/node/{id} [get]
-func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
+// @Router /api/v3/cluster/node/{id} [get]
+func (h *ClusterHandler) GetNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	peer, err := h.proxy.GetNode(id)
@@ -79,33 +84,35 @@ func (h *ClusterHandler) GetProxyNode(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
 
-	state := peer.State()
+	about := peer.About()
 
 	node := api.ClusterNode{
-		Address:     peer.Address(),
-		ID:          state.ID,
-		LastContact: state.LastContact.Unix(),
-		Latency:     state.Latency.Seconds() * 1000,
-		State:       state.State,
-		CPU:         state.Resources.CPU,
-		Mem:         state.Resources.Mem,
+		ID:          about.ID,
+		Name:        about.Name,
+		Address:     about.Address,
+		CreatedAt:   about.CreatedAt.Format(time.RFC3339),
+		Uptime:      int64(about.Uptime.Seconds()),
+		LastContact: about.LastContact.Unix(),
+		Latency:     about.Latency.Seconds() * 1000,
+		State:       about.State,
+		Resources:   api.ClusterNodeResources(about.Resources),
 	}
 
 	return c.JSON(http.StatusOK, node)
 }
 
-// GetProxyNodeFiles returns the files from the proxy node with the given ID
+// GetNodeFiles returns the files from the proxy node with the given ID
 // @Summary List the files of a proxy node by its ID
 // @Description List the files of a proxy node by its ID
 // @Tags v16.?.?
-// @ID cluster-3-get-proxy-node-files
+// @ID cluster-3-get-node-files
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNodeFiles
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/proxy/node/{id}/files [get]
-func (h *ClusterHandler) GetProxyNodeFiles(c echo.Context) error {
+// @Router /api/v3/cluster/node/{id}/files [get]
+func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	peer, err := h.proxy.GetNode(id)
@@ -153,7 +160,7 @@ func (h *ClusterHandler) About(c echo.Context) error {
 		Address:           state.Address,
 		ClusterAPIAddress: state.ClusterAPIAddress,
 		CoreAPIAddress:    state.CoreAPIAddress,
-		Nodes:             []api.ClusterServer{},
+		Server:            []api.ClusterServer{},
 		Stats: api.ClusterStats{
 			State:       state.Stats.State,
 			LastContact: state.Stats.LastContact.Seconds() * 1000,
@@ -162,7 +169,7 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	}
 
 	for _, n := range state.Nodes {
-		about.Nodes = append(about.Nodes, api.ClusterServer{
+		about.Server = append(about.Server, api.ClusterServer{
 			ID:      n.ID,
 			Address: n.Address,
 			Voter:   n.Voter,
@@ -171,6 +178,36 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, about)
+}
+
+// ListProcesses returns the list of processes in the cluster
+// @Summary List of processes in the cluster
+// @Description List of processes in the cluster
+// @Tags v16.?.?
+// @ID cluster-3-list-processes
+// @Produce json
+// @Success 200 {array} api.ClusterProcess
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process [get]
+func (h *ClusterHandler) ListProcesses(c echo.Context) error {
+	procs := h.proxy.ListProcesses()
+
+	processes := []api.ClusterProcess{}
+
+	for _, p := range procs {
+		processes = append(processes, api.ClusterProcess{
+			ProcessID: p.Config.ID,
+			NodeID:    p.NodeID,
+			Reference: p.Config.Reference,
+			Order:     p.Order,
+			State:     p.State,
+			CPU:       json.ToNumber(p.CPU),
+			Memory:    p.Mem,
+			Runtime:   int64(p.Runtime.Seconds()),
+		})
+	}
+
+	return c.JSON(http.StatusOK, processes)
 }
 
 // Add adds a new process to the cluster

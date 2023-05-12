@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 )
@@ -342,6 +343,12 @@ type processOpAdd struct {
 	config *app.Config
 }
 
+type processOpUpdate struct {
+	nodeid    string
+	processid string
+	config    *app.Config
+}
+
 type processOpReject struct {
 	processid string
 	err       error
@@ -377,6 +384,19 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"processid": v.config.ID,
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
+		case processOpUpdate:
+			err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config)
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.config.ID,
+					"nodeid":    v.nodeid,
+				}).Log("Updating process")
+				break
+			}
+			c.logger.Info().WithFields(log.Fields{
+				"processid": v.config.ID,
+				"nodeid":    v.nodeid,
+			}).Log("Updating process")
 		case processOpDelete:
 			err := c.proxy.ProcessDelete(v.nodeid, v.processid)
 			if err != nil {
@@ -451,7 +471,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 
 func (c *cluster) doSynchronize() {
 	want := c.store.ProcessList()
-	have := c.proxy.ProcessList()
+	have := c.proxy.ListProcesses()
 	resources := c.proxy.Resources()
 
 	c.logger.Debug().WithFields(log.Fields{
@@ -466,7 +486,7 @@ func (c *cluster) doSynchronize() {
 }
 
 func (c *cluster) doRebalance() {
-	have := c.proxy.ProcessList()
+	have := c.proxy.ListProcesses()
 	resources := c.proxy.Resources()
 
 	c.logger.Debug().WithFields(log.Fields{
@@ -482,7 +502,7 @@ func (c *cluster) doRebalance() {
 // normalizeProcessesAndResources normalizes the CPU and memory consumption of the processes and resources in-place.
 //
 // Deprecated: all values are absolute or already normed to 0-100*ncpu percent
-func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources map[string]proxy.NodeResources) {
+func normalizeProcessesAndResources(processes []proxy.Process, resources map[string]proxy.NodeResources) {
 	maxNCPU := .0
 
 	for _, r := range resources {
@@ -520,12 +540,12 @@ func normalizeProcessesAndResources(processes []proxy.ProcessConfig, resources m
 
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
-func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
+func synchronize(want []store.Process, have []proxy.Process, resources map[string]proxy.NodeResources) []interface{} {
 	// A map from the process ID to the process config of the processes
 	// we want to be running on the nodes.
-	wantMap := map[string]*app.Config{}
-	for _, config := range want {
-		wantMap[config.ID] = &config
+	wantMap := map[string]store.Process{}
+	for _, process := range want {
+		wantMap[process.Config.ID] = process
 	}
 
 	opStack := []interface{}{}
@@ -533,10 +553,10 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 	// Now we iterate through the processes we actually have running on the nodes
 	// and remove them from the wantMap. We also make sure that they are running.
 	// If a process is not on the wantMap, it will be deleted from the nodes.
-	haveAfterRemove := []proxy.ProcessConfig{}
+	haveAfterRemove := []proxy.Process{}
 
 	for _, p := range have {
-		if _, ok := wantMap[p.Config.ID]; !ok {
+		if wantP, ok := wantMap[p.Config.ID]; !ok {
 			opStack = append(opStack, processOpDelete{
 				nodeid:    p.NodeID,
 				processid: p.Config.ID,
@@ -551,6 +571,14 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 			}
 
 			continue
+		} else {
+			if wantP.UpdatedAt.After(p.UpdatedAt) {
+				opStack = append(opStack, processOpUpdate{
+					nodeid:    p.NodeID,
+					processid: p.Config.ID,
+					config:    wantP.Config,
+				})
+			}
 		}
 
 		delete(wantMap, p.Config.ID)
@@ -571,11 +599,11 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
 
 	// Now all remaining processes in the wantMap must be added to one of the nodes
-	for _, config := range wantMap {
+	for _, process := range wantMap {
 		// If a process doesn't have any limits defined, reject that process
-		if config.LimitCPU <= 0 || config.LimitMemory <= 0 {
+		if process.Config.LimitCPU <= 0 || process.Config.LimitMemory <= 0 {
 			opStack = append(opStack, processOpReject{
-				processid: config.ID,
+				processid: process.Config.ID,
 				err:       errNoLimitsDefined,
 			})
 
@@ -589,11 +617,11 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 
 		// Try to add the process to a node where other processes with the same
 		// reference currently reside.
-		if len(config.Reference) != 0 {
-			for _, count := range haveReferenceAffinityMap[config.Reference] {
+		if len(process.Config.Reference) != 0 {
+			for _, count := range haveReferenceAffinityMap[process.Config.Reference] {
 				r := resources[count.nodeid]
-				cpu := config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
-				mem := config.LimitMemory
+				cpu := process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				mem := process.Config.LimitMemory
 
 				if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
 					nodeid = count.nodeid
@@ -605,8 +633,8 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 		// Find the node with the most resources available
 		if len(nodeid) == 0 {
 			for id, r := range resources {
-				cpu := config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
-				mem := config.LimitMemory
+				cpu := process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				mem := process.Config.LimitMemory
 
 				if len(nodeid) == 0 {
 					if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
@@ -625,19 +653,19 @@ func synchronize(want []app.Config, have []proxy.ProcessConfig, resources map[st
 		if len(nodeid) != 0 {
 			opStack = append(opStack, processOpAdd{
 				nodeid: nodeid,
-				config: config,
+				config: process.Config,
 			})
 
 			// Adjust the resources
 			r, ok := resources[nodeid]
 			if ok {
-				r.CPU += config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
-				r.Mem += config.LimitMemory
+				r.CPU += process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				r.Mem += process.Config.LimitMemory
 				resources[nodeid] = r
 			}
 		} else {
 			opStack = append(opStack, processOpReject{
-				processid: config.ID,
+				processid: process.Config.ID,
 				err:       errNotEnoughResources,
 			})
 		}
@@ -651,7 +679,7 @@ type referenceAffinityNodeCount struct {
 	count  uint64
 }
 
-func createReferenceAffinityMap(processes []proxy.ProcessConfig) map[string][]referenceAffinityNodeCount {
+func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenceAffinityNodeCount {
 	referenceAffinityMap := map[string][]referenceAffinityNodeCount{}
 	for _, p := range processes {
 		if len(p.Config.Reference) == 0 {
@@ -696,9 +724,9 @@ func createReferenceAffinityMap(processes []proxy.ProcessConfig) map[string][]re
 
 // rebalance returns a list of operations that will move running processes away from nodes
 // that are overloaded.
-func rebalance(have []proxy.ProcessConfig, resources map[string]proxy.NodeResources) []interface{} {
+func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) []interface{} {
 	// Group the processes by node
-	processNodeMap := map[string][]proxy.ProcessConfig{}
+	processNodeMap := map[string][]proxy.Process{}
 
 	for _, p := range have {
 		processNodeMap[p.NodeID] = append(processNodeMap[p.NodeID], p)

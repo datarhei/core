@@ -219,6 +219,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.?.?"
+                ],
                 "summary": "List of nodes in the cluster",
                 "operationId": "cluster-3-get-cluster",
                 "responses": {
@@ -237,7 +240,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/cluster/proxy": {
+        "/api/v3/cluster/node": {
             "get": {
                 "security": [
                     {
@@ -248,8 +251,11 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.?.?"
+                ],
                 "summary": "List of proxy nodes in the cluster",
-                "operationId": "cluster-3-get-proxy-nodes",
+                "operationId": "cluster-3-get-nodes",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -269,7 +275,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/cluster/proxy/node/{id}": {
+        "/api/v3/cluster/node/{id}": {
             "get": {
                 "security": [
                     {
@@ -280,8 +286,11 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.?.?"
+                ],
                 "summary": "List a proxy node by its ID",
-                "operationId": "cluster-3-get-proxy-node",
+                "operationId": "cluster-3-get-node",
                 "parameters": [
                     {
                         "type": "string",
@@ -307,7 +316,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/cluster/proxy/node/{id}/files": {
+        "/api/v3/cluster/node/{id}/files": {
             "get": {
                 "security": [
                     {
@@ -318,8 +327,11 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "v16.?.?"
+                ],
                 "summary": "List the files of a proxy node by its ID",
-                "operationId": "cluster-3-get-proxy-node-files",
+                "operationId": "cluster-3-get-node-files",
                 "parameters": [
                     {
                         "type": "string",
@@ -334,6 +346,120 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.ClusterNodeFiles"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster",
+                "operationId": "cluster-3-list-processes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterProcess"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new FFmpeg process",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new process",
+                "operationId": "cluster-3-add-process",
+                "parameters": [
+                    {
+                        "description": "Process config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete a process by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete a process by its ID",
+                "operationId": "cluster-3-delete-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "404": {
@@ -2251,7 +2377,7 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "nodes": {
+                "server": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/api.ClusterServer"
@@ -2268,29 +2394,99 @@ const docTemplate = `{
                 "address": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
-                "last_ping": {
-                    "type": "integer"
-                },
-                "last_update": {
+                "last_contact": {
+                    "description": "unix timestamp",
                     "type": "integer"
                 },
                 "latency_ms": {
                     "description": "milliseconds",
                     "type": "number"
                 },
+                "name": {
+                    "type": "string"
+                },
+                "resources": {
+                    "$ref": "#/definitions/api.ClusterNodeResources"
+                },
                 "state": {
                     "type": "string"
+                },
+                "uptime_seconds": {
+                    "type": "integer"
                 }
             }
         },
         "api.ClusterNodeFiles": {
             "type": "object",
-            "additionalProperties": {
-                "type": "array",
-                "items": {
+            "properties": {
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "last_update": {
+                    "description": "unix timestamp",
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ClusterNodeResources": {
+            "type": "object",
+            "properties": {
+                "cpu_limit": {
+                    "description": "percent 0-100*npcu",
+                    "type": "number"
+                },
+                "cpu_used": {
+                    "description": "percent 0-100*npcu",
+                    "type": "number"
+                },
+                "memory_limit_bytes": {
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "type": "integer"
+                },
+                "ncpu": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ClusterProcess": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "memory_bytes": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "runtime_seconds": {
+                    "type": "integer"
+                },
+                "state": {
                     "type": "string"
                 }
             }

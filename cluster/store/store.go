@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
@@ -15,8 +16,13 @@ import (
 type Store interface {
 	raft.FSM
 
-	ProcessList() []app.Config
-	GetProcess(id string) (app.Config, error)
+	ProcessList() []Process
+	GetProcess(id string) (Process, error)
+}
+
+type Process struct {
+	UpdatedAt time.Time
+	Config    *app.Config
 }
 
 type operation string
@@ -42,7 +48,7 @@ type CommandRemoveProcess struct {
 // Implement a FSM
 type store struct {
 	lock    sync.RWMutex
-	Process map[string]app.Config
+	Process map[string]Process
 
 	logger log.Logger
 }
@@ -53,7 +59,7 @@ type Config struct {
 
 func NewStore(config Config) (Store, error) {
 	s := &store{
-		Process: map[string]app.Config{},
+		Process: map[string]Process{},
 		logger:  config.Logger,
 	}
 
@@ -89,7 +95,10 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		json.Unmarshal(b, &cmd)
 
 		s.lock.Lock()
-		s.Process[cmd.ID] = cmd.Config
+		s.Process[cmd.ID] = Process{
+			UpdatedAt: time.Now(),
+			Config:    &cmd.Config,
+		}
 		s.lock.Unlock()
 	case OpRemoveProcess:
 		b, _ := json.Marshal(c.Data)
@@ -139,29 +148,35 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	return nil
 }
 
-func (s *store) ProcessList() []app.Config {
+func (s *store) ProcessList() []Process {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	processes := []app.Config{}
+	processes := []Process{}
 
-	for _, cfg := range s.Process {
-		processes = append(processes, *cfg.Clone())
+	for _, p := range s.Process {
+		processes = append(processes, Process{
+			UpdatedAt: p.UpdatedAt,
+			Config:    p.Config.Clone(),
+		})
 	}
 
 	return processes
 }
 
-func (s *store) GetProcess(id string) (app.Config, error) {
+func (s *store) GetProcess(id string) (Process, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	cfg, ok := s.Process[id]
+	process, ok := s.Process[id]
 	if !ok {
-		return app.Config{}, fmt.Errorf("not found")
+		return Process{}, fmt.Errorf("not found")
 	}
 
-	return *cfg.Clone(), nil
+	return Process{
+		UpdatedAt: process.UpdatedAt,
+		Config:    process.Config.Clone(),
+	}, nil
 }
 
 type fsmSnapshot struct {

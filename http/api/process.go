@@ -258,7 +258,7 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.LastLog = state.LastLog
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
-	s.CPU = toNumber(state.CPU)
+	s.CPU = ToNumber(state.CPU)
 	s.Command = state.Command
 
 	s.Progress.Unmarshal(&state.Progress)

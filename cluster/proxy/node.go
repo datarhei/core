@@ -27,7 +27,7 @@ type Node interface {
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
 
-	ProcessList() ([]ProcessConfig, error)
+	ProcessList() ([]Process, error)
 	ProcessAdd(*app.Config) error
 	ProcessStart(id string) error
 	ProcessStop(id string) error
@@ -37,11 +37,10 @@ type Node interface {
 }
 
 type NodeReader interface {
-	ID() string
-	Address() string
 	IPs() []string
 	Files() NodeFiles
-	State() NodeState
+	About() NodeAbout
+	Version() NodeVersion
 }
 
 type NodeFiles struct {
@@ -58,12 +57,25 @@ type NodeResources struct {
 	MemLimit uint64  // Defined memory limit in bytes
 }
 
-type NodeState struct {
+type NodeAbout struct {
 	ID          string
+	Name        string
+	Address     string
 	State       string
+	CreatedAt   time.Time
+	Uptime      time.Duration
 	LastContact time.Time
 	Latency     time.Duration
 	Resources   NodeResources
+}
+
+type NodeVersion struct {
+	Number   string
+	Commit   string
+	Branch   string
+	Build    time.Time
+	Arch     string
+	Compiler string
 }
 
 type nodeState string
@@ -364,50 +376,34 @@ func (n *node) StopFiles() {
 	n.cancelFiles()
 }
 
-func (n *node) Address() string {
-	return n.address
-}
-
-func (n *node) IPs() []string {
-	return n.ips
-}
-
-func (n *node) ID() string {
+func (n *node) About() NodeAbout {
 	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return ""
+		n.peerLock.RUnlock()
+		return NodeAbout{}
 	}
 
-	return n.peer.ID()
-}
+	about := n.peer.About()
 
-func (n *node) Files() NodeFiles {
+	n.peerLock.RUnlock()
+
+	createdAt, err := time.Parse(time.RFC3339, about.CreatedAt)
+	if err != nil {
+		createdAt = time.Now()
+	}
+
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	state := NodeFiles{
-		ID:         n.ID(),
-		LastUpdate: n.lastUpdate,
-	}
-
-	if n.state != stateDisconnected && time.Since(n.lastUpdate) <= 2*time.Second {
-		state.Files = make([]string, len(n.filesList))
-		copy(state.Files, n.filesList)
-	}
-
-	return state
-}
-
-func (n *node) State() NodeState {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	state := NodeState{
-		ID:          n.ID(),
-		LastContact: n.lastContact,
+	state := NodeAbout{
+		ID:          about.ID,
+		Name:        about.Name,
+		Address:     n.address,
 		State:       n.state.String(),
+		CreatedAt:   createdAt,
+		Uptime:      time.Since(createdAt),
+		LastContact: n.lastContact,
 		Latency:     time.Duration(n.latency * float64(time.Second)),
 		Resources: NodeResources{
 			NCPU:     n.resources.ncpu,
@@ -416,6 +412,54 @@ func (n *node) State() NodeState {
 			Mem:      n.resources.mem,
 			MemLimit: uint64(float64(n.resources.memTotal) * 0.9),
 		},
+	}
+
+	return state
+}
+
+func (n *node) Version() NodeVersion {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return NodeVersion{}
+	}
+
+	about := n.peer.About()
+
+	build, err := time.Parse(time.RFC3339, about.Version.Build)
+	if err != nil {
+		build = time.Time{}
+	}
+
+	version := NodeVersion{
+		Number:   about.Version.Number,
+		Commit:   about.Version.Commit,
+		Branch:   about.Version.Branch,
+		Build:    build,
+		Arch:     about.Version.Arch,
+		Compiler: about.Version.Compiler,
+	}
+
+	return version
+}
+
+func (n *node) IPs() []string {
+	return n.ips
+}
+
+func (n *node) Files() NodeFiles {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	state := NodeFiles{
+		ID:         n.About().ID,
+		LastUpdate: n.lastUpdate,
+	}
+
+	if n.state != stateDisconnected && time.Since(n.lastUpdate) <= 2*time.Second {
+		state.Files = make([]string, len(n.filesList))
+		copy(state.Files, n.filesList)
 	}
 
 	return state
@@ -603,7 +647,7 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("unknown prefix")
 }
 
-func (n *node) ProcessList() ([]ProcessConfig, error) {
+func (n *node) ProcessList() ([]Process, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -619,16 +663,17 @@ func (n *node) ProcessList() ([]ProcessConfig, error) {
 		return nil, err
 	}
 
-	processes := []ProcessConfig{}
+	processes := []Process{}
 
 	for _, p := range list {
-		process := ProcessConfig{
-			NodeID:  n.ID(),
-			Order:   p.State.Order,
-			State:   p.State.State,
-			Mem:     p.State.Memory,
-			Runtime: time.Duration(p.State.Runtime) * time.Second,
-			Config:  p.Config.Marshal(),
+		process := Process{
+			NodeID:    n.About().ID,
+			Order:     p.State.Order,
+			State:     p.State.State,
+			Mem:       p.State.Memory,
+			Runtime:   time.Duration(p.State.Runtime) * time.Second,
+			UpdatedAt: time.Unix(p.UpdatedAt, 0),
+			Config:    p.Config.Marshal(),
 		}
 
 		if x, err := p.State.CPU.Float64(); err == nil {

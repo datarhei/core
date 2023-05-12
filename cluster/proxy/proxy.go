@@ -23,66 +23,18 @@ type Proxy interface {
 	ProxyReader
 	Reader() ProxyReader
 
-	ProxyProcessor
-	Processor() ProxyProcessor
-}
-
-type ProxyProcessor interface {
-	Resources() map[string]NodeResources
-
-	ProcessList() []ProcessConfig
 	ProcessAdd(nodeid string, config *app.Config) error
 	ProcessDelete(nodeid string, id string) error
 	ProcessStart(nodeid string, id string) error
-}
-
-type proxyProcessor struct {
-	proxy *proxy
-}
-
-func (p *proxyProcessor) Resources() map[string]NodeResources {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.Resources()
-}
-
-func (p *proxyProcessor) ProcessList() []ProcessConfig {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.ProcessList()
-}
-
-func (p *proxyProcessor) ProcessAdd(nodeid string, config *app.Config) error {
-	if p.proxy == nil {
-		return fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.ProcessAdd(nodeid, config)
-}
-
-func (p *proxyProcessor) ProcessDelete(nodeid string, id string) error {
-	if p.proxy == nil {
-		return fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.ProcessDelete(nodeid, id)
-}
-
-func (p *proxyProcessor) ProcessStart(nodeid string, id string) error {
-	if p.proxy == nil {
-		return fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.ProcessStart(nodeid, id)
+	ProcessUpdate(nodeid string, id string, config *app.Config) error
 }
 
 type ProxyReader interface {
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
+
+	Resources() map[string]NodeResources
+	ListProcesses() []Process
 
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
@@ -110,6 +62,22 @@ func (p *proxyReader) GetNode(id string) (NodeReader, error) {
 	}
 
 	return p.proxy.GetNode(id)
+}
+
+func (p *proxyReader) Resources() map[string]NodeResources {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.Resources()
+}
+
+func (p *proxyReader) ListProcesses() []Process {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.ListProcesses()
 }
 
 func (p *proxyReader) GetURL(path string) (string, error) {
@@ -264,12 +232,6 @@ func (p *proxy) Reader() ProxyReader {
 	}
 }
 
-func (p *proxy) Processor() ProxyProcessor {
-	return &proxyProcessor{
-		proxy: p,
-	}
-}
-
 func (p *proxy) Resources() map[string]NodeResources {
 	resources := map[string]NodeResources{}
 
@@ -277,15 +239,18 @@ func (p *proxy) Resources() map[string]NodeResources {
 	defer p.lock.RUnlock()
 
 	for _, node := range p.nodes {
-		resources[node.ID()] = node.State().Resources
+		about := node.About()
+		resources[about.ID] = about.Resources
 	}
 
 	return resources
 }
 
 func (p *proxy) AddNode(id string, node Node) (string, error) {
-	if id != node.ID() {
-		return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, node.ID())
+	about := node.About()
+
+	if id != about.ID {
+		return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, about.ID)
 	}
 
 	p.lock.Lock()
@@ -315,7 +280,8 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 	node.StartFiles(p.updates)
 
 	p.logger.Info().WithFields(log.Fields{
-		"address": node.Address(),
+		"address": about.Address,
+		"name":    about.Name,
 		"id":      id,
 	}).Log("Added node")
 
@@ -449,19 +415,20 @@ func (p *proxy) GetFile(path string) (io.ReadCloser, error) {
 	return data, nil
 }
 
-type ProcessConfig struct {
-	NodeID  string
-	Order   string
-	State   string
-	CPU     float64 // Current CPU load of this process, 0-100*ncpu
-	Mem     uint64  // Currently consumed memory of this process in bytes
-	Runtime time.Duration
-	Config  *app.Config
+type Process struct {
+	NodeID    string
+	Order     string
+	State     string
+	CPU       float64 // Current CPU load of this process, 0-100*ncpu
+	Mem       uint64  // Currently consumed memory of this process in bytes
+	Runtime   time.Duration
+	UpdatedAt time.Time
+	Config    *app.Config
 }
 
-func (p *proxy) ProcessList() []ProcessConfig {
-	processChan := make(chan ProcessConfig, 64)
-	processList := []ProcessConfig{}
+func (p *proxy) ListProcesses() []Process {
+	processChan := make(chan Process, 64)
+	processList := []Process{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -469,8 +436,8 @@ func (p *proxy) ProcessList() []ProcessConfig {
 	go func() {
 		defer wgList.Done()
 
-		for file := range processChan {
-			processList = append(processList, file)
+		for process := range processChan {
+			processList = append(processList, process)
 		}
 	}()
 
@@ -480,7 +447,7 @@ func (p *proxy) ProcessList() []ProcessConfig {
 	for _, node := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- ProcessConfig) {
+		go func(node Node, p chan<- Process) {
 			defer wg.Done()
 
 			processes, err := node.ProcessList()
@@ -558,4 +525,16 @@ func (p *proxy) ProcessStart(nodeid string, id string) error {
 	}
 
 	return nil
+}
+
+func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	_, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	return fmt.Errorf("not implemented")
 }

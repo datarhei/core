@@ -141,7 +141,6 @@ func New(config Config) (RestClient, error) {
 	u.Fragment = ""
 
 	r.address = u.String()
-	fmt.Printf("address: %s\n", r.address)
 
 	if r.client == nil {
 		r.client = &http.Client{
