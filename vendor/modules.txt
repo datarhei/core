@@ -27,8 +27,8 @@ github.com/99designs/gqlgen/plugin/servergen
 # github.com/KyleBanks/depth v1.2.1
 ## explicit
 github.com/KyleBanks/depth
-# github.com/Masterminds/semver/v3 v3.1.1
-## explicit; go 1.12
+# github.com/Masterminds/semver/v3 v3.2.1
+## explicit; go 1.18
 github.com/Masterminds/semver/v3
 # github.com/agnivade/levenshtein v1.1.1
 ## explicit; go 1.13
@@ -57,6 +57,10 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/datarhei/core-client-go/v16 v16.11.1-0.20230512155342-18a7ac72df3a
+## explicit; go 1.18
+github.com/datarhei/core-client-go/v16
+github.com/datarhei/core-client-go/v16/api
 # github.com/datarhei/gosrt v0.3.1
 ## explicit; go 1.16
 github.com/datarhei/gosrt

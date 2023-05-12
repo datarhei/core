@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/client"
-	httpapi "github.com/datarhei/core/v16/http/api"
+	client "github.com/datarhei/core-client-go/v16"
+	clientapi "github.com/datarhei/core-client-go/v16/api"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -172,20 +172,29 @@ func (n *node) Connect() error {
 		return fmt.Errorf("creating client failed (%s): %w", n.address, err)
 	}
 
-	config, err := peer.Config()
+	version, cfg, err := peer.Config()
 	if err != nil {
 		return err
 	}
 
-	if config.Config.RTMP.Enable {
+	if version != 3 {
+		return fmt.Errorf("unsupported core config version: %d", version)
+	}
+
+	config, ok := cfg.Config.(clientapi.ConfigV3)
+	if !ok {
+		return fmt.Errorf("failed to convert config to expected version")
+	}
+
+	if config.RTMP.Enable {
 		n.hasRTMP = true
 		n.rtmpAddress = "rtmp://"
 
 		isHostIP := net.ParseIP(host) != nil
 
-		address := config.Config.RTMP.Address
-		if n.secure && config.Config.RTMP.EnableTLS && !isHostIP {
-			address = config.Config.RTMP.AddressTLS
+		address := config.RTMP.Address
+		if n.secure && config.RTMP.EnableTLS && !isHostIP {
+			address = config.RTMP.AddressTLS
 			n.rtmpAddress = "rtmps://"
 		}
 
@@ -194,21 +203,21 @@ func (n *node) Connect() error {
 			n.hasRTMP = false
 		} else {
 			n.rtmpAddress += host + ":" + port
-			n.rtmpToken = config.Config.RTMP.Token
+			n.rtmpToken = config.RTMP.Token
 		}
 	}
 
-	if config.Config.SRT.Enable {
+	if config.SRT.Enable {
 		n.hasSRT = true
 		n.srtAddress = "srt://"
 
-		_, port, err := net.SplitHostPort(config.Config.SRT.Address)
+		_, port, err := net.SplitHostPort(config.SRT.Address)
 		if err != nil {
 			n.hasSRT = false
 		} else {
 			n.srtAddress += host + ":" + port
-			n.srtPassphrase = config.Config.SRT.Passphrase
-			n.srtToken = config.Config.SRT.Token
+			n.srtPassphrase = config.SRT.Passphrase
+			n.srtToken = config.SRT.Token
 		}
 	}
 
@@ -253,8 +262,8 @@ func (n *node) Connect() error {
 			select {
 			case <-ticker.C:
 				// Metrics
-				metrics, err := n.peer.Metrics(httpapi.MetricsQuery{
-					Metrics: []httpapi.MetricsQueryMetric{
+				metrics, err := n.peer.Metrics(clientapi.MetricsQuery{
+					Metrics: []clientapi.MetricsQueryMetric{
 						{
 							Name: "cpu_ncpu",
 						},
@@ -655,9 +664,11 @@ func (n *node) ProcessList() ([]Process, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	list, err := n.peer.ProcessList(nil, []string{
-		"state",
-		"config",
+	list, err := n.peer.ProcessList(client.ProcessListOptions{
+		Filter: []string{
+			"state",
+			"config",
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -671,16 +682,55 @@ func (n *node) ProcessList() ([]Process, error) {
 			Order:     p.State.Order,
 			State:     p.State.State,
 			Mem:       p.State.Memory,
+			CPU:       p.State.CPU * n.resources.ncpu,
 			Runtime:   time.Duration(p.State.Runtime) * time.Second,
 			UpdatedAt: time.Unix(p.UpdatedAt, 0),
-			Config:    p.Config.Marshal(),
 		}
 
-		if x, err := p.State.CPU.Float64(); err == nil {
-			process.CPU = x * n.resources.ncpu
-		} else {
-			process.CPU = 100 * n.resources.ncpu
+		cfg := &app.Config{
+			ID:             p.Config.ID,
+			Reference:      p.Config.Reference,
+			Input:          []app.ConfigIO{},
+			Output:         []app.ConfigIO{},
+			Options:        p.Config.Options,
+			Reconnect:      p.Config.Reconnect,
+			ReconnectDelay: p.Config.ReconnectDelay,
+			Autostart:      p.Config.Autostart,
+			StaleTimeout:   p.Config.StaleTimeout,
+			LimitCPU:       p.Config.Limits.CPU,
+			LimitMemory:    p.Config.Limits.Memory,
+			LimitWaitFor:   p.Config.Limits.WaitFor,
 		}
+
+		for _, d := range p.Config.Input {
+			cfg.Input = append(cfg.Input, app.ConfigIO{
+				ID:      d.ID,
+				Address: d.Address,
+				Options: d.Options,
+			})
+		}
+
+		for _, d := range p.Config.Output {
+			output := app.ConfigIO{
+				ID:      d.ID,
+				Address: d.Address,
+				Options: d.Options,
+				Cleanup: []app.ConfigIOCleanup{},
+			}
+
+			for _, c := range d.Cleanup {
+				output.Cleanup = append(output.Cleanup, app.ConfigIOCleanup{
+					Pattern:       c.Pattern,
+					MaxFiles:      c.MaxFiles,
+					MaxFileAge:    c.MaxFileAge,
+					PurgeOnDelete: c.PurgeOnDelete,
+				})
+			}
+
+			cfg.Output = append(cfg.Output, output)
+		}
+
+		process.Config = cfg
 
 		processes = append(processes, process)
 	}
@@ -696,8 +746,50 @@ func (n *node) ProcessAdd(config *app.Config) error {
 		return fmt.Errorf("not connected")
 	}
 
-	cfg := httpapi.ProcessConfig{}
-	cfg.Unmarshal(config)
+	cfg := clientapi.ProcessConfig{
+		ID:             config.ID,
+		Reference:      config.Reference,
+		Input:          []clientapi.ProcessConfigIO{},
+		Output:         []clientapi.ProcessConfigIO{},
+		Options:        config.Options,
+		Reconnect:      config.Reconnect,
+		ReconnectDelay: config.ReconnectDelay,
+		Autostart:      config.Autostart,
+		StaleTimeout:   config.StaleTimeout,
+		Limits: clientapi.ProcessConfigLimits{
+			CPU:     config.LimitCPU,
+			Memory:  config.LimitMemory,
+			WaitFor: config.LimitWaitFor,
+		},
+	}
+
+	for _, d := range config.Input {
+		cfg.Input = append(cfg.Input, clientapi.ProcessConfigIO{
+			ID:      d.ID,
+			Address: d.Address,
+			Options: d.Options,
+		})
+	}
+
+	for _, d := range config.Output {
+		output := clientapi.ProcessConfigIO{
+			ID:      d.ID,
+			Address: d.Address,
+			Options: d.Options,
+			Cleanup: []clientapi.ProcessConfigIOCleanup{},
+		}
+
+		for _, c := range d.Cleanup {
+			output.Cleanup = append(output.Cleanup, clientapi.ProcessConfigIOCleanup{
+				Pattern:       c.Pattern,
+				MaxFiles:      c.MaxFiles,
+				MaxFileAge:    c.MaxFileAge,
+				PurgeOnDelete: c.PurgeOnDelete,
+			})
+		}
+
+		cfg.Output = append(cfg.Output, output)
+	}
 
 	return n.peer.ProcessAdd(cfg)
 }

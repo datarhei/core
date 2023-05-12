@@ -4,9 +4,10 @@ go 1.18
 
 require (
 	github.com/99designs/gqlgen v0.17.20
-	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
+	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230512155342-18a7ac72df3a
 	github.com/datarhei/gosrt v0.3.1
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/go-playground/validator/v10 v10.11.1
@@ -34,6 +35,8 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.7.0
 )
+
+//replace github.com/datarhei/core-client-go/v16 => ../core-client-go
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
