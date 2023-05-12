@@ -1,6 +1,6 @@
 # Core
 
-### Core v16.12.0 > v16.?.?
+### Core v16.12.0 > v16.13.0
 
 -   Add updated_at field in process infos
 -   Add preserve process log history when updating a process

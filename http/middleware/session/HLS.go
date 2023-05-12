@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	urlpath "path"
 	"path/filepath"
 	"regexp"
@@ -415,7 +414,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 			// and has to be stopped.
 			file := u.Path
 			if !strings.HasPrefix(file, "/") {
-				dir := path.Dir(requestURL.Path)
+				dir := urlpath.Dir(requestURL.Path)
 				file = filepath.Join(dir, file)
 			}
 
