@@ -1,7 +1,6 @@
 package forwarder
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -20,7 +19,7 @@ type Forwarder interface {
 	Leave(origin, id string) error
 	Snapshot() (io.ReadCloser, error)
 	AddProcess(origin string, config *app.Config) error
-	UpdateProcess() error
+	UpdateProcess(origin, id string, config *app.Config) error
 	RemoveProcess(origin, id string) error
 }
 
@@ -153,8 +152,18 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 	return client.AddProcess(r)
 }
 
-func (f *forwarder) UpdateProcess() error {
-	return fmt.Errorf("not implemented")
+func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.UpdateProcessRequest{}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.UpdateProcess(r)
 }
 
 func (f *forwarder) RemoveProcess(origin, id string) error {

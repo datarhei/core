@@ -33,6 +33,12 @@ type RemoveProcessRequest struct {
 	ID     string `json:"id"`
 }
 
+type UpdateProcessRequest struct {
+	Origin string     `json:"origin"`
+	ID     string     `json:"id"`
+	Config app.Config `json:"config"`
+}
+
 type APIClient struct {
 	Address string
 	Client  *http.Client
@@ -93,6 +99,17 @@ func (c *APIClient) RemoveProcess(r RemoveProcessRequest) error {
 	}
 
 	_, err = c.call(http.MethodPost, "/process/"+r.ID, "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) UpdateProcess(r UpdateProcessRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/process/"+r.ID, "application/json", bytes.NewReader(data))
 
 	return err
 }

@@ -30,6 +30,7 @@ type operation string
 const (
 	OpAddProcess    operation = "addProcess"
 	OpRemoveProcess operation = "removeProcess"
+	OpUpdateProcess operation = "updateProcess"
 )
 
 type Command struct {
@@ -39,6 +40,11 @@ type Command struct {
 
 type CommandAddProcess struct {
 	app.Config
+}
+
+type CommandUpdateProcess struct {
+	ID     string
+	Config app.Config
 }
 
 type CommandRemoveProcess struct {
@@ -95,9 +101,12 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		json.Unmarshal(b, &cmd)
 
 		s.lock.Lock()
-		s.Process[cmd.ID] = Process{
-			UpdatedAt: time.Now(),
-			Config:    &cmd.Config,
+		_, ok := s.Process[cmd.ID]
+		if !ok {
+			s.Process[cmd.ID] = Process{
+				UpdatedAt: time.Now(),
+				Config:    &cmd.Config,
+			}
 		}
 		s.lock.Unlock()
 	case OpRemoveProcess:
@@ -107,6 +116,33 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 
 		s.lock.Lock()
 		delete(s.Process, cmd.ID)
+		s.lock.Unlock()
+	case OpUpdateProcess:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandUpdateProcess{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		_, ok := s.Process[cmd.ID]
+		if ok {
+			if cmd.ID == cmd.Config.ID {
+				s.Process[cmd.ID] = Process{
+					UpdatedAt: time.Now(),
+					Config:    &cmd.Config,
+				}
+			} else {
+				_, ok := s.Process[cmd.Config.ID]
+				if !ok {
+					delete(s.Process, cmd.ID)
+					s.Process[cmd.Config.ID] = Process{
+						UpdatedAt: time.Now(),
+						Config:    &cmd.Config,
+					}
+				} else {
+					return fmt.Errorf("the process with the ID %s already exists", cmd.Config.ID)
+				}
+			}
+		}
 		s.lock.Unlock()
 	}
 

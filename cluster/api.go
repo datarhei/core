@@ -147,11 +147,11 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
-
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
+
+		a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
 
 		err := a.cluster.AddProcess(r.Origin, &r.Config)
 		if err != nil {
@@ -163,22 +163,59 @@ func NewAPI(config APIConfig) (API, error) {
 	})
 
 	a.router.POST("/v1/process/:id", func(c echo.Context) error {
+		id := util.PathParam(c, "id")
+
 		r := client.RemoveProcessRequest{}
 
 		if err := util.ShouldBindJSON(c, &r); err != nil {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		a.logger.Debug().WithField("id", r.ID).Log("Remove process request")
-
 		if r.Origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
+
+		if id != r.ID {
+			return httpapi.Err(http.StatusBadRequest, "Invalid data", "the ID in the path and the request do not match")
+		}
+
+		a.logger.Debug().WithField("id", r.ID).Log("Remove process request")
 
 		err := a.cluster.RemoveProcess(r.Origin, r.ID)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to remove process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	})
+
+	a.router.PUT("/v1/process/:id", func(c echo.Context) error {
+		id := util.PathParam(c, "id")
+
+		r := client.UpdateProcessRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		if r.Origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		if id != r.ID {
+			return httpapi.Err(http.StatusBadRequest, "Invalid data", "the ID in the path and the request do not match")
+		}
+
+		a.logger.Debug().WithFields(log.Fields{
+			"old_id": r.ID,
+			"new_id": r.Config.ID,
+		}).Log("Update process request")
+
+		err := a.cluster.UpdateProcess(r.Origin, r.ID, &r.Config)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to update process")
+			return httpapi.Err(http.StatusInternalServerError, "unable to update process", "%s", err)
 		}
 
 		return c.JSON(http.StatusOK, "OK")
