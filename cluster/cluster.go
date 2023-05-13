@@ -61,6 +61,8 @@ type Cluster interface {
 
 	Shutdown() error
 
+	ListProcesses() []store.Process
+	GetProcess(id string) (store.Process, error)
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin, id string) error
 	UpdateProcess(origin, id string, config *app.Config) error
@@ -684,6 +686,14 @@ func (c *cluster) trackLeaderChanges() {
 			return
 		}
 	}
+}
+
+func (c *cluster) ListProcesses() []store.Process {
+	return c.store.ProcessList()
+}
+
+func (c *cluster) GetProcess(id string) (store.Process, error) {
+	return c.store.GetProcess(id)
 }
 
 func (c *cluster) AddProcess(origin string, config *app.Config) error {

@@ -660,15 +660,17 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 Cluster
 	if s.v3handler.cluster != nil {
 		v3.GET("/cluster", s.v3handler.cluster.About)
+		v3.GET("/cluster/process", s.v3handler.cluster.ListProcesses)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
+		v3.GET("/cluster/node/process", s.v3handler.cluster.ListNodeProcesses)
 		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
 		v3.GET("/cluster/node/:id/files", s.v3handler.cluster.GetNodeFiles)
-
-		v3.GET("/cluster/process", s.v3handler.cluster.ListProcesses)
+		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
 
 		if !s.readOnly {
 			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
+			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 		}
 	}

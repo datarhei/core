@@ -62,10 +62,6 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.HideBanner = true
 	a.router.HidePort = true
 
-	mwlog.NewWithConfig(mwlog.Config{
-		Logger: a.logger,
-	})
-
 	a.router.Use(mwlog.NewWithConfig(mwlog.Config{
 		Logger: a.logger,
 	}))

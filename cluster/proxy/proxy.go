@@ -531,10 +531,10 @@ func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config) erro
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	_, ok := p.nodes[nodeid]
+	node, ok := p.nodes[nodeid]
 	if !ok {
 		return fmt.Errorf("node not found")
 	}
 
-	return fmt.Errorf("not implemented")
+	return node.ProcessUpdate(id, config)
 }

@@ -21,6 +21,7 @@ type Store interface {
 }
 
 type Process struct {
+	CreatedAt time.Time
 	UpdatedAt time.Time
 	Config    *app.Config
 }
@@ -103,8 +104,10 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		s.lock.Lock()
 		_, ok := s.Process[cmd.ID]
 		if !ok {
+			now := time.Now()
 			s.Process[cmd.ID] = Process{
-				UpdatedAt: time.Now(),
+				CreatedAt: now,
+				UpdatedAt: now,
 				Config:    &cmd.Config,
 			}
 		}

@@ -32,6 +32,7 @@ type Node interface {
 	ProcessStart(id string) error
 	ProcessStop(id string) error
 	ProcessDelete(id string) error
+	ProcessUpdate(id string, config *app.Config) error
 
 	NodeReader
 }
@@ -746,8 +747,15 @@ func (n *node) ProcessAdd(config *app.Config) error {
 		return fmt.Errorf("not connected")
 	}
 
+	cfg := convertConfig(config)
+
+	return n.peer.ProcessAdd(cfg)
+}
+
+func convertConfig(config *app.Config) clientapi.ProcessConfig {
 	cfg := clientapi.ProcessConfig{
 		ID:             config.ID,
+		Type:           "ffmpeg",
 		Reference:      config.Reference,
 		Input:          []clientapi.ProcessConfigIO{},
 		Output:         []clientapi.ProcessConfigIO{},
@@ -791,7 +799,7 @@ func (n *node) ProcessAdd(config *app.Config) error {
 		cfg.Output = append(cfg.Output, output)
 	}
 
-	return n.peer.ProcessAdd(cfg)
+	return cfg
 }
 
 func (n *node) ProcessStart(id string) error {
@@ -825,4 +833,17 @@ func (n *node) ProcessDelete(id string) error {
 	}
 
 	return n.peer.ProcessDelete(id)
+}
+
+func (n *node) ProcessUpdate(id string, config *app.Config) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	cfg := convertConfig(config)
+
+	return n.peer.ProcessUpdate(id, cfg)
 }
