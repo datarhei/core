@@ -570,6 +570,7 @@ func (h *RestreamHandler) getProcess(id, user, group, filterString string) (api.
 		Reference: process.Reference,
 		Type:      "ffmpeg",
 		CreatedAt: process.CreatedAt,
+		UpdatedAt: process.UpdatedAt,
 	}
 
 	if wants["config"] {

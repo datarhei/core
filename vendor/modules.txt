@@ -77,7 +77,7 @@ github.com/datarhei/gosrt/internal/congestion
 github.com/datarhei/gosrt/internal/crypto
 github.com/datarhei/gosrt/internal/net
 github.com/datarhei/gosrt/internal/packet
-# github.com/datarhei/joy4 v0.0.0-20220914170649-23c70d207759
+# github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 ## explicit; go 1.14
 github.com/datarhei/joy4/av
 github.com/datarhei/joy4/av/avutil
@@ -293,7 +293,7 @@ github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/shirou/gopsutil/v3 v3.22.11
+# github.com/shirou/gopsutil/v3 v3.23.3
 ## explicit; go 1.15
 github.com/shirou/gopsutil/v3/cpu
 github.com/shirou/gopsutil/v3/disk
@@ -301,10 +301,13 @@ github.com/shirou/gopsutil/v3/internal/common
 github.com/shirou/gopsutil/v3/mem
 github.com/shirou/gopsutil/v3/net
 github.com/shirou/gopsutil/v3/process
+# github.com/shoenig/go-m1cpu v0.1.4
+## explicit; go 1.20
+github.com/shoenig/go-m1cpu
 # github.com/sirupsen/logrus v1.9.0
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/stretchr/testify v1.8.1
+# github.com/stretchr/testify v1.8.2
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -402,7 +405,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/publicsuffix
 golang.org/x/net/webdav
 golang.org/x/net/webdav/internal/xml
-# golang.org/x/sys v0.5.0
+# golang.org/x/sys v0.6.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs

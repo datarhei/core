@@ -33,6 +33,9 @@ type Parser interface {
 
 	// ReportHistory returns an array of previews logs
 	ReportHistory() []Report
+
+	// TransferReportHistory transfers the report history to another parser
+	TransferReportHistory(Parser) error
 }
 
 // Config is the config for the Parser implementation
@@ -356,7 +359,7 @@ func (p *parser) Parse(line string) uint64 {
 
 			if p.collector.IsCollectableIP(p.process.input[i].IP) {
 				p.collector.Activate("")
-				p.collector.Ingress("", int64(p.stats.input[i].diff.size)*1024)
+				p.collector.Ingress("", int64(p.stats.input[i].diff.size))
 			}
 		}
 	}
@@ -373,7 +376,7 @@ func (p *parser) Parse(line string) uint64 {
 
 			if p.collector.IsCollectableIP(p.process.output[i].IP) {
 				p.collector.Activate("")
-				p.collector.Egress("", int64(p.stats.output[i].diff.size)*1024)
+				p.collector.Egress("", int64(p.stats.output[i].diff.size))
 			}
 		}
 	}
@@ -410,7 +413,7 @@ func (p *parser) parseDefaultProgress(line string) error {
 
 	if matches = p.re.size.FindStringSubmatch(line); matches != nil {
 		if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
-			p.progress.ffmpeg.Size = x
+			p.progress.ffmpeg.Size = x * 1024
 		}
 	}
 
@@ -483,6 +486,26 @@ func (p *parser) parseFFmpegProgress(line string) error {
 
 	if len(progress.Output) != len(p.process.output) {
 		return fmt.Errorf("output length mismatch (have: %d, want: %d)", len(progress.Output), len(p.process.output))
+	}
+
+	if progress.Size == 0 {
+		progress.Size = progress.SizeKB * 1024
+	}
+
+	for i, io := range progress.Input {
+		if io.Size == 0 {
+			io.Size = io.SizeKB * 1024
+		}
+
+		progress.Input[i].Size = io.Size
+	}
+
+	for i, io := range progress.Output {
+		if io.Size == 0 {
+			io.Size = io.SizeKB * 1024
+		}
+
+		progress.Output[i].Size = io.Size
 	}
 
 	p.progress.ffmpeg = progress
@@ -746,4 +769,22 @@ func (p *parser) ReportHistory() []Report {
 	})
 
 	return history
+}
+
+func (p *parser) TransferReportHistory(dst Parser) error {
+	pp, ok := dst.(*parser)
+	if !ok {
+		return fmt.Errorf("the target parser is not of the required type")
+	}
+
+	p.logHistory.Do(func(l interface{}) {
+		if l == nil {
+			return
+		}
+
+		pp.logHistory.Value = l
+		pp.logHistory = pp.logHistory.Next()
+	})
+
+	return nil
 }

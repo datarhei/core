@@ -22,6 +22,9 @@ definitions:
         $ref: '#/definitions/api.AVstreamIO'
       looping:
         type: boolean
+      looping_runtime:
+        format: uint64
+        type: integer
       output:
         $ref: '#/definitions/api.AVstreamIO'
       queue:
@@ -771,6 +774,9 @@ definitions:
         $ref: '#/definitions/api.ProcessState'
       type:
         type: string
+      updated_at:
+        format: int64
+        type: integer
     type: object
   api.ProcessConfig:
     properties:
@@ -974,6 +980,10 @@ definitions:
         type: string
       coder:
         type: string
+      extradata_size_bytes:
+        description: bytes
+        format: uint64
+        type: integer
       format:
         type: string
       fps:
@@ -981,6 +991,8 @@ definitions:
       frame:
         format: uint64
         type: integer
+      framerate:
+        $ref: '#/definitions/api.ProgressIOFramerate'
       height:
         format: uint64
         type: integer
@@ -988,6 +1000,9 @@ definitions:
         type: string
       index:
         description: General
+        format: uint64
+        type: integer
+      keyframe:
         format: uint64
         type: integer
       layout:
@@ -1018,6 +1033,15 @@ definitions:
       width:
         format: uint64
         type: integer
+    type: object
+  api.ProgressIOFramerate:
+    properties:
+      avg:
+        type: number
+      max:
+        type: number
+      min:
+        type: number
     type: object
   api.RTMPChannel:
     properties:
@@ -1963,14 +1987,7 @@ definitions:
       access_key_id:
         type: string
       auth:
-        properties:
-          enable:
-            type: boolean
-          password:
-            type: string
-          username:
-            type: string
-        type: object
+        $ref: '#/definitions/value.S3StorageAuth'
       bucket:
         type: string
       endpoint:
@@ -1985,6 +2002,15 @@ definitions:
         type: string
       use_ssl:
         type: boolean
+    type: object
+  value.S3StorageAuth:
+    properties:
+      enable:
+        type: boolean
+      password:
+        type: string
+      username:
+        type: string
     type: object
 info:
   contact:

@@ -1,11 +1,23 @@
 # Core
 
-### Core v16.12.0 > v16.?.?
+### Core v16.12.0 > v16.13.0
 
+-   Add updated_at field in process infos
+-   Add preserve process log history when updating a process
+-   Add support for input framerate data from jsonstats patch
+-   Add number of keyframes and extradata size to process progress data
+-   Mod bumps FFmpeg to v5.1.3 (datarhei/core:tag bundles)
 -   Fix better naming for storage endpoint documentation
 -   Fix freeing up S3 mounts
 -   Fix URL validation if the path contains FFmpeg specific placeholders
 -   Fix purging default file from HTTP cache
+-   Fix parsing S3 storage definition from environment variable
+-   Fix checking length of CPU time array ([#10](https://github.com/datarhei/core/issues/10))
+-   Fix possible infinite loop with HLS session rewriter
+-   Fix not propagating process limits
+-   Fix URL validation if the path contains FFmpeg specific placeholders
+-   Fix RTMP DoS attack (thx Johannes Frank)
+-   Deprecate ENV names that do not correspond to JSON name
 
 ### Core v16.11.0 > v16.12.0
 

@@ -14,6 +14,7 @@ type Process struct {
 	Type      string         `json:"type" jsonschema:"enum=ffmpeg"`
 	Reference string         `json:"reference"`
 	CreatedAt int64          `json:"created_at" jsonschema:"minimum=0" format:"int64"`
+	UpdatedAt int64          `json:"updated_at" jsonschema:"minimum=0" format:"int64"`
 	Config    *ProcessConfig `json:"config,omitempty"`
 	State     *ProcessState  `json:"state,omitempty"`
 	Report    *ProcessReport `json:"report,omitempty"`

@@ -1,11 +1,11 @@
 package parse
 
 type statsData struct {
-	frame  uint64
-	packet uint64
-	size   uint64 // kbytes
-	dup    uint64
-	drop   uint64
+	frame  uint64 // counter
+	packet uint64 // counter
+	size   uint64 // bytes
+	dup    uint64 // counter
+	drop   uint64 // counter
 }
 
 type stats struct {

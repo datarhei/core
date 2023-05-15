@@ -390,6 +390,9 @@ func (r *restream) load() error {
 			Reconnect:      t.config.Reconnect,
 			ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 			StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+			LimitCPU:       t.config.LimitCPU,
+			LimitMemory:    t.config.LimitMemory,
+			LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
 			Command:        t.command,
 			Parser:         t.parser,
 			Logger:         t.logger,
@@ -514,6 +517,8 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		CreatedAt: time.Now().Unix(),
 	}
 
+	process.UpdatedAt = process.CreatedAt
+
 	if config.Autostart {
 		process.Order = "start"
 	}
@@ -554,6 +559,9 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+		LimitCPU:       t.config.LimitCPU,
+		LimitMemory:    t.config.LimitMemory,
+		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
 		Command:        t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
@@ -1036,6 +1044,10 @@ func (r *restream) UpdateProcess(id, user, group string, config *app.Config) err
 		return ErrUnknownProcess
 	}
 
+	// This would require a major version jump
+	//t.process.CreatedAt = task.process.CreatedAt
+	t.process.UpdatedAt = time.Now().Unix()
+	task.parser.TransferReportHistory(t.parser)
 	t.process.Order = task.process.Order
 
 	if tid != t.String() {
@@ -1402,6 +1414,9 @@ func (r *restream) reloadProcess(tid string) error {
 		Reconnect:      t.config.Reconnect,
 		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
+		LimitCPU:       t.config.LimitCPU,
+		LimitMemory:    t.config.LimitMemory,
+		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
 		Command:        t.command,
 		Parser:         t.parser,
 		Logger:         t.logger,
@@ -1447,8 +1462,8 @@ func (r *restream) GetProcessState(id, user, group string) (*app.State, error) {
 	state.State = status.State
 	state.States.Marshal(status.States)
 	state.Time = status.Time.Unix()
-	state.Memory = status.Memory
-	state.CPU = status.CPU
+	state.Memory = status.Memory.Current
+	state.CPU = status.CPU.Current
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
 	state.Reconnect = -1
 	state.Command = make([]string, len(task.command))

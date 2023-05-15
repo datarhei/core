@@ -2633,6 +2633,10 @@ const docTemplate = `{
                 "looping": {
                     "type": "boolean"
                 },
+                "looping_runtime": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "output": {
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
@@ -3754,6 +3758,10 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -4055,6 +4063,11 @@ const docTemplate = `{
                 "coder": {
                     "type": "string"
                 },
+                "extradata_size_bytes": {
+                    "description": "bytes",
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "format": {
                     "type": "string"
                 },
@@ -4065,6 +4078,9 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
+                "framerate": {
+                    "$ref": "#/definitions/api.ProgressIOFramerate"
+                },
                 "height": {
                     "type": "integer",
                     "format": "uint64"
@@ -4074,6 +4090,10 @@ const docTemplate = `{
                 },
                 "index": {
                     "description": "General",
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "keyframe": {
                     "type": "integer",
                     "format": "uint64"
                 },
@@ -4114,6 +4134,20 @@ const docTemplate = `{
                 "width": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProgressIOFramerate": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "min": {
+                    "type": "number"
                 }
             }
         },
@@ -5438,18 +5472,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "auth": {
-                    "type": "object",
-                    "properties": {
-                        "enable": {
-                            "type": "boolean"
-                        },
-                        "password": {
-                            "type": "string"
-                        },
-                        "username": {
-                            "type": "string"
-                        }
-                    }
+                    "$ref": "#/definitions/value.S3StorageAuth"
                 },
                 "bucket": {
                     "type": "string"
@@ -5471,6 +5494,20 @@ const docTemplate = `{
                 },
                 "use_ssl": {
                     "type": "boolean"
+                }
+            }
+        },
+        "value.S3StorageAuth": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         }
