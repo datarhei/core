@@ -1044,12 +1044,6 @@ func (r *restream) UpdateProcess(id, user, group string, config *app.Config) err
 		return ErrUnknownProcess
 	}
 
-	// This would require a major version jump
-	//t.process.CreatedAt = task.process.CreatedAt
-	t.process.UpdatedAt = time.Now().Unix()
-	task.parser.TransferReportHistory(t.parser)
-	t.process.Order = task.process.Order
-
 	if tid != t.String() {
 		_, ok := r.tasks[t.String()]
 		if ok {
@@ -1057,13 +1051,20 @@ func (r *restream) UpdateProcess(id, user, group string, config *app.Config) err
 		}
 	}
 
+	t.process.Order = task.process.Order
+
 	if err := r.stopProcess(tid); err != nil {
-		return err
+		return fmt.Errorf("stop process: %w", err)
 	}
 
 	if err := r.deleteProcess(tid); err != nil {
-		return err
+		return fmt.Errorf("delete process: %w", err)
 	}
+
+	// This would require a major version jump
+	//t.process.CreatedAt = task.process.CreatedAt
+	t.process.UpdatedAt = time.Now().Unix()
+	task.parser.TransferReportHistory(t.parser)
 
 	tid = t.String()
 
