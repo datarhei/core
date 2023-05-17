@@ -12,7 +12,7 @@
 // - Auth0 access token
 // - Basic auth
 //
-// The path prefix /api/login is treated specially in order to accomodate
+// The path prefix /api/login is treated specially in order to accommodate
 // different ways of identification (UserPass, Auth0). All other /api paths
 // only allow JWT as authentication method.
 //
@@ -202,11 +202,15 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				resource = "fs:" + resource
 			}
 
+			superuser := false
+
 			if identity != nil {
 				username = identity.Name()
+				superuser = identity.IsSuperuser()
 			}
 
 			c.Set("user", username)
+			c.Set("superuser", superuser)
 
 			if len(domain) == 0 {
 				domain = "$none"

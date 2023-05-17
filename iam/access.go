@@ -130,7 +130,7 @@ func (am *access) ListPolicies(name, domain, resource string, actions []string) 
 }
 
 func (am *access) HasDomain(name string) bool {
-	groups := am.adapter.getAllGroups()
+	groups := am.adapter.getAllDomains()
 
 	for _, g := range groups {
 		if g == name {
@@ -142,7 +142,7 @@ func (am *access) HasDomain(name string) bool {
 }
 
 func (am *access) ListDomains() []string {
-	return am.adapter.getAllGroups()
+	return am.adapter.getAllDomains()
 }
 
 func (am *access) Enforce(name, domain, resource, action string) (bool, string) {

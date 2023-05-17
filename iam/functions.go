@@ -17,22 +17,7 @@ func resourceMatch(request, domain, policy string) bool {
 	var match bool
 	var err error
 
-	if reqPrefix == "api" {
-		match, err = globMatch(polResource, reqResource, rune('/'))
-		if err != nil {
-			return false
-		}
-	} else if reqPrefix == "fs" {
-		match, err = globMatch(polResource, reqResource, rune('/'))
-		if err != nil {
-			return false
-		}
-	} else if reqPrefix == "rtmp" {
-		match, err = globMatch(polResource, reqResource, rune('/'))
-		if err != nil {
-			return false
-		}
-	} else if reqPrefix == "srt" {
+	if reqPrefix == "api" || reqPrefix == "fs" || reqPrefix == "rtmp" || reqPrefix == "srt" {
 		match, err = globMatch(polResource, reqResource, rune('/'))
 		if err != nil {
 			return false
@@ -83,17 +68,12 @@ func actionMatchFunc(args ...interface{}) (interface{}, error) {
 }
 
 func getPrefix(s string) (string, string) {
-	splits := strings.SplitN(s, ":", 2)
-
-	if len(splits) == 0 {
-		return "", ""
+	prefix, resource, found := strings.Cut(s, ":")
+	if !found {
+		return "", s
 	}
 
-	if len(splits) == 1 {
-		return "", splits[0]
-	}
-
-	return splits[0], splits[1]
+	return prefix, resource
 }
 
 func globMatch(pattern, name string, separators ...rune) (bool, error) {

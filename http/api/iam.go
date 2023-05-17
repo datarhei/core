@@ -119,7 +119,7 @@ type IAMAuth0Tenant struct {
 }
 
 type IAMPolicy struct {
-	Domain   string   `json:"group"`
+	Domain   string   `json:"domain"`
 	Resource string   `json:"resource"`
 	Actions  []string `json:"actions"`
 }

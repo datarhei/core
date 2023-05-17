@@ -77,8 +77,8 @@ func DefaultQuery(c echo.Context, name, defValue string) string {
 	return param
 }
 
-func DefaultContext(c echo.Context, name, defValue string) string {
-	value, ok := c.Get(name).(string)
+func DefaultContext[T any](c echo.Context, name string, defValue T) T {
+	value, ok := c.Get(name).(T)
 	if !ok {
 		return defValue
 	}

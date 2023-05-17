@@ -20,7 +20,7 @@ type adapter struct {
 	fs       fs.Filesystem
 	filePath string
 	logger   log.Logger
-	groups   []Group
+	domains  []Domain
 	lock     sync.Mutex
 }
 
@@ -56,7 +56,7 @@ func (a *adapter) LoadPolicy(model model.Model) error {
 
 func (a *adapter) loadPolicyFile(model model.Model) error {
 	if _, err := a.fs.Stat(a.filePath); os.IsNotExist(err) {
-		a.groups = []Group{}
+		a.domains = []Domain{}
 		return nil
 	}
 
@@ -65,18 +65,18 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		return err
 	}
 
-	groups := []Group{}
+	domains := []Domain{}
 
-	err = json.Unmarshal(data, &groups)
+	err = json.Unmarshal(data, &domains)
 	if err != nil {
 		return err
 	}
 
 	rule := [5]string{}
-	for _, group := range groups {
+	for _, domain := range domains {
 		rule[0] = "p"
-		rule[2] = group.Name
-		for name, roles := range group.Roles {
+		rule[2] = domain.Name
+		for name, roles := range domain.Roles {
 			rule[1] = "role:" + name
 			for _, role := range roles {
 				rule[3] = role.Resource
@@ -88,7 +88,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 			}
 		}
 
-		for _, policy := range group.Policies {
+		for _, policy := range domain.Policies {
 			rule[1] = policy.Username
 			rule[3] = policy.Resource
 			rule[4] = formatActions(policy.Actions)
@@ -99,9 +99,9 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		}
 
 		rule[0] = "g"
-		rule[3] = group.Name
+		rule[3] = domain.Name
 
-		for _, ug := range group.UserRoles {
+		for _, ug := range domain.UserRoles {
 			rule[1] = ug.Username
 			rule[2] = "role:" + ug.Role
 
@@ -111,7 +111,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		}
 	}
 
-	a.groups = groups
+	a.domains = domains
 
 	return nil
 }
@@ -121,7 +121,7 @@ func (a *adapter) importPolicy(model model.Model, rule []string) error {
 	copy(copiedRule, rule)
 
 	a.logger.Debug().WithFields(log.Fields{
-		"username": copiedRule[1],
+		"subject":  copiedRule[1],
 		"domain":   copiedRule[2],
 		"resource": copiedRule[3],
 		"actions":  copiedRule[4],
@@ -149,7 +149,7 @@ func (a *adapter) SavePolicy(model model.Model) error {
 }
 
 func (a *adapter) savePolicyFile() error {
-	jsondata, err := json.MarshalIndent(a.groups, "", "    ")
+	jsondata, err := json.MarshalIndent(a.domains, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 		actions = formatActions(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
-			"username": username,
+			"subject":  username,
 			"domain":   domain,
 			"resource": resource,
 			"actions":  actions,
@@ -222,47 +222,47 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 		domain = rule[2]
 
 		a.logger.Debug().WithFields(log.Fields{
-			"username": username,
-			"role":     role,
-			"domain":   domain,
+			"subject": username,
+			"role":    role,
+			"domain":  domain,
 		}).Log("adding role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}
 
-	var group *Group = nil
-	for i := range a.groups {
-		if a.groups[i].Name == domain {
-			group = &a.groups[i]
+	var dom *Domain = nil
+	for i := range a.domains {
+		if a.domains[i].Name == domain {
+			dom = &a.domains[i]
 			break
 		}
 	}
 
-	if group == nil {
-		g := Group{
+	if dom == nil {
+		g := Domain{
 			Name:      domain,
 			Roles:     map[string][]Role{},
 			UserRoles: []MapUserRole{},
-			Policies:  []GroupPolicy{},
+			Policies:  []DomainPolicy{},
 		}
 
-		a.groups = append(a.groups, g)
-		group = &a.groups[len(a.groups)-1]
+		a.domains = append(a.domains, g)
+		dom = &a.domains[len(a.domains)-1]
 	}
 
 	if ptype == "p" {
 		if strings.HasPrefix(username, "role:") {
-			if group.Roles == nil {
-				group.Roles = make(map[string][]Role)
+			if dom.Roles == nil {
+				dom.Roles = make(map[string][]Role)
 			}
 
 			role := strings.TrimPrefix(username, "role:")
-			group.Roles[role] = append(group.Roles[role], Role{
+			dom.Roles[role] = append(dom.Roles[role], Role{
 				Resource: resource,
 				Actions:  actions,
 			})
 		} else {
-			group.Policies = append(group.Policies, GroupPolicy{
+			dom.Policies = append(dom.Policies, DomainPolicy{
 				Username: username,
 				Role: Role{
 					Resource: resource,
@@ -271,7 +271,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 			})
 		}
 	} else {
-		group.UserRoles = append(group.UserRoles, MapUserRole{
+		dom.UserRoles = append(dom.UserRoles, MapUserRole{
 			Username: username,
 			Role:     strings.TrimPrefix(role, "role:"),
 		})
@@ -288,7 +288,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 	var actions string
 
 	if ptype == "p" {
-		if len(rule) != 4 {
+		if len(rule) < 4 {
 			return false, fmt.Errorf("invalid rule length. must be 'user/role, domain, resource, actions'")
 		}
 
@@ -297,6 +297,10 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		resource = rule[2]
 		actions = formatActions(rule[3])
 	} else if ptype == "g" {
+		if len(rule) < 3 {
+			return false, fmt.Errorf("invalid rule length. must be 'user, role, domain'")
+		}
+
 		username = rule[0]
 		role = rule[1]
 		domain = rule[2]
@@ -304,16 +308,16 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		return false, fmt.Errorf("unknown ptype: %s", ptype)
 	}
 
-	var group *Group = nil
-	for i := range a.groups {
-		if a.groups[i].Name == domain {
-			group = &a.groups[i]
+	var dom *Domain = nil
+	for i := range a.domains {
+		if a.domains[i].Name == domain {
+			dom = &a.domains[i]
 			break
 		}
 	}
 
-	if group == nil {
-		// if we can't find any group with that name, then the policy doesn't exist
+	if dom == nil {
+		// if we can't find any domain with that name, then the policy doesn't exist
 		return false, nil
 	}
 
@@ -325,7 +329,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		}
 
 		if isRole {
-			roles, ok := group.Roles[username]
+			roles, ok := dom.Roles[username]
 			if !ok {
 				// unknown role, policy doesn't exist
 				return false, nil
@@ -337,7 +341,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 				}
 			}
 		} else {
-			for _, p := range group.Policies {
+			for _, p := range dom.Policies {
 				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
 					return true, nil
 				}
@@ -345,7 +349,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		}
 	} else {
 		role = strings.TrimPrefix(role, "role:")
-		for _, user := range group.UserRoles {
+		for _, user := range dom.UserRoles {
 			if user.Username == username && user.Role == role {
 				return true, nil
 			}
@@ -407,7 +411,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		actions = formatActions(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
-			"username": username,
+			"subject":  username,
 			"domain":   domain,
 			"resource": resource,
 			"actions":  actions,
@@ -418,18 +422,18 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		domain = rule[2]
 
 		a.logger.Debug().WithFields(log.Fields{
-			"username": username,
-			"role":     role,
-			"domain":   domain,
+			"subject": username,
+			"role":    role,
+			"domain":  domain,
 		}).Log("adding role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}
 
-	var group *Group = nil
-	for i := range a.groups {
-		if a.groups[i].Name == domain {
-			group = &a.groups[i]
+	var dom *Domain = nil
+	for i := range a.domains {
+		if a.domains[i].Name == domain {
+			dom = &a.domains[i]
 			break
 		}
 	}
@@ -442,7 +446,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		}
 
 		if isRole {
-			roles := group.Roles[username]
+			roles := dom.Roles[username]
 
 			newRoles := []Role{}
 
@@ -454,11 +458,11 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 				newRoles = append(newRoles, role)
 			}
 
-			group.Roles[username] = newRoles
+			dom.Roles[username] = newRoles
 		} else {
-			policies := []GroupPolicy{}
+			policies := []DomainPolicy{}
 
-			for _, p := range group.Policies {
+			for _, p := range dom.Policies {
 				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
 					continue
 				}
@@ -466,14 +470,14 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 				policies = append(policies, p)
 			}
 
-			group.Policies = policies
+			dom.Policies = policies
 		}
 	} else {
 		role = strings.TrimPrefix(role, "role:")
 
 		users := []MapUserRole{}
 
-		for _, user := range group.UserRoles {
+		for _, user := range dom.UserRoles {
 			if user.Username == username && user.Role == role {
 				continue
 			}
@@ -481,22 +485,22 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			users = append(users, user)
 		}
 
-		group.UserRoles = users
+		dom.UserRoles = users
 	}
 
 	// Remove the group if there are no rules and policies
-	if len(group.Roles) == 0 && len(group.UserRoles) == 0 && len(group.Policies) == 0 {
-		groups := []Group{}
+	if len(dom.Roles) == 0 && len(dom.UserRoles) == 0 && len(dom.Policies) == 0 {
+		groups := []Domain{}
 
-		for _, g := range a.groups {
-			if g.Name == group.Name {
+		for _, g := range a.domains {
+			if g.Name == dom.Name {
 				continue
 			}
 
 			groups = append(groups, g)
 		}
 
-		a.groups = groups
+		a.domains = groups
 	}
 
 	return nil
@@ -507,25 +511,25 @@ func (a *adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 	return fmt.Errorf("not implemented")
 }
 
-func (a *adapter) getAllGroups() []string {
+func (a *adapter) getAllDomains() []string {
 	names := []string{}
 
-	for _, group := range a.groups {
-		if group.Name[0] == '$' {
+	for _, domain := range a.domains {
+		if domain.Name[0] == '$' {
 			continue
 		}
 
-		names = append(names, group.Name)
+		names = append(names, domain.Name)
 	}
 
 	return names
 }
 
-type Group struct {
+type Domain struct {
 	Name      string            `json:"name"`
 	Roles     map[string][]Role `json:"roles"`
 	UserRoles []MapUserRole     `json:"userroles"`
-	Policies  []GroupPolicy     `json:"policies"`
+	Policies  []DomainPolicy    `json:"policies"`
 }
 
 type Role struct {
@@ -538,7 +542,7 @@ type MapUserRole struct {
 	Role     string `json:"role"`
 }
 
-type GroupPolicy struct {
+type DomainPolicy struct {
 	Username string `json:"username"`
 	Role
 }

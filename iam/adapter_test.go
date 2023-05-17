@@ -18,18 +18,18 @@ func TestAddPolicy(t *testing.T) {
 	err = a.AddPolicy("p", "p", []string{"foobar", "group", "resource", "action"})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(a.groups))
+	require.Equal(t, 1, len(a.domains))
 
 	data, err := memfs.ReadFile("/policy.json")
 	require.NoError(t, err)
 
-	g := []Group{}
+	g := []Domain{}
 	err = json.Unmarshal(data, &g)
 	require.NoError(t, err)
 
 	require.Equal(t, "group", g[0].Name)
 	require.Equal(t, 1, len(g[0].Policies))
-	require.Equal(t, GroupPolicy{
+	require.Equal(t, DomainPolicy{
 		Username: "foobar",
 		Role: Role{
 			Resource: "resource",
@@ -62,24 +62,24 @@ func TestRemovePolicy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(a.groups))
-	require.Equal(t, 2, len(a.groups[0].Policies))
+	require.Equal(t, 1, len(a.domains))
+	require.Equal(t, 2, len(a.domains[0].Policies))
 
 	err = a.RemovePolicy("p", "p", []string{"foobar1", "group", "resource1", "action1"})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(a.groups))
-	require.Equal(t, 1, len(a.groups[0].Policies))
+	require.Equal(t, 1, len(a.domains))
+	require.Equal(t, 1, len(a.domains[0].Policies))
 
 	err = a.RemovePolicy("p", "p", []string{"foobar2", "group", "resource2", "action2"})
 	require.NoError(t, err)
 
-	require.Equal(t, 0, len(a.groups))
+	require.Equal(t, 0, len(a.domains))
 
 	data, err := memfs.ReadFile("/policy.json")
 	require.NoError(t, err)
 
-	g := []Group{}
+	g := []Domain{}
 	err = json.Unmarshal(data, &g)
 	require.NoError(t, err)
 
