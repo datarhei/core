@@ -507,7 +507,7 @@ definitions:
         items:
           type: string
         type: array
-      group:
+      domain:
         type: string
       resource:
         type: string
@@ -2646,6 +2646,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.IAMUser'
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2676,6 +2680,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2705,6 +2713,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2731,6 +2743,10 @@ paths:
         in: path
         name: name
         required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
         type: string
       - description: User definition
         in: body
@@ -2760,6 +2776,56 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Replace an existing user
+      tags:
+      - v16.?.?
+  /api/v3/iam/user/{name}/policy:
+    put:
+      consumes:
+      - application/json
+      description: Replace policies of an user
+      operationId: iam-3-update-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: Policy definitions
+        in: body
+        name: user
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.IAMPolicy'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace policies of an user
       tags:
       - v16.?.?
   /api/v3/log:

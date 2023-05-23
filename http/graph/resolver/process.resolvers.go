@@ -5,19 +5,25 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/restream"
 )
 
 // Processes is the resolver for the processes field.
-func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpattern *string, group *string) ([]*models.Process, error) {
+func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpattern *string, domainpattern *string) ([]*models.Process, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
-	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, user, *group)
+	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, "", *domainpattern)
 
 	procs := []*models.Process{}
 
 	for _, id := range ids {
-		p, err := r.getProcess(id, user, *group)
+		if !r.IAM.Enforce(user, id.Domain, "process:"+id.ID, "read") {
+			continue
+		}
+
+		p, err := r.getProcess(id)
 		if err != nil {
 			return nil, err
 		}
@@ -29,17 +35,35 @@ func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpat
 }
 
 // Process is the resolver for the process field.
-func (r *queryResolver) Process(ctx context.Context, id string, group *string) (*models.Process, error) {
+func (r *queryResolver) Process(ctx context.Context, id string, domain string) (*models.Process, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
 
-	return r.getProcess(id, user, *group)
+	if !r.IAM.Enforce(user, domain, "process:"+id, "read") {
+		return nil, fmt.Errorf("forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	return r.getProcess(tid)
 }
 
 // Probe is the resolver for the probe field.
-func (r *queryResolver) Probe(ctx context.Context, id string, group *string) (*models.Probe, error) {
+func (r *queryResolver) Probe(ctx context.Context, id string, domain string) (*models.Probe, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
 
-	probe := r.Restream.Probe(id, user, *group)
+	if !r.IAM.Enforce(user, domain, "process:"+id, "write") {
+		return nil, fmt.Errorf("forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	probe := r.Restream.Probe(tid)
 
 	p := &models.Probe{}
 	p.UnmarshalRestream(probe)

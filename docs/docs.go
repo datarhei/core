@@ -992,6 +992,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.IAMUser"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1039,6 +1045,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1081,6 +1093,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     },
                     {
                         "description": "User definition",
@@ -1141,6 +1159,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1148,6 +1172,83 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user/{name}/policy": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace policies of an user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace policies of an user",
+                "operationId": "iam-3-update-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Policy definitions",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -3363,7 +3464,7 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "group": {
+                "domain": {
                     "type": "string"
                 },
                 "resource": {

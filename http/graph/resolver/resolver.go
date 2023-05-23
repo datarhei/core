@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/restream"
@@ -20,25 +21,26 @@ type Resolver struct {
 	Restream  restream.Restreamer
 	Monitor   monitor.HistoryReader
 	LogBuffer log.BufferWriter
+	IAM       iam.IAM
 }
 
-func (r *queryResolver) getProcess(id, user, group string) (*models.Process, error) {
-	process, err := r.Restream.GetProcess(id, user, group)
+func (r *queryResolver) getProcess(id restream.TaskID) (*models.Process, error) {
+	process, err := r.Restream.GetProcess(id)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := r.Restream.GetProcessState(id, user, group)
+	state, err := r.Restream.GetProcessState(id)
 	if err != nil {
 		return nil, err
 	}
 
-	report, err := r.Restream.GetProcessLog(id, user, group)
+	report, err := r.Restream.GetProcessLog(id)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := r.Restream.GetProcessMetadata(id, user, group, "")
+	m, err := r.Restream.GetProcessMetadata(id, "")
 	if err != nil {
 		return nil, err
 	}

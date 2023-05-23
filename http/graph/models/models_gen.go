@@ -106,7 +106,7 @@ type ProbeIo struct {
 type Process struct {
 	ID        string                 `json:"id"`
 	Owner     string                 `json:"owner"`
-	Group     string                 `json:"group"`
+	Domain    string                 `json:"domain"`
 	Type      string                 `json:"type"`
 	Reference string                 `json:"reference"`
 	CreatedAt time.Time              `json:"created_at"`
@@ -119,7 +119,7 @@ type Process struct {
 type ProcessConfig struct {
 	ID                    string               `json:"id"`
 	Owner                 string               `json:"owner"`
-	Group                 string               `json:"group"`
+	Domain                string               `json:"domain"`
 	Type                  string               `json:"type"`
 	Reference             string               `json:"reference"`
 	Input                 []*ProcessConfigIo   `json:"input"`

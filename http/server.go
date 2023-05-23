@@ -119,7 +119,6 @@ type server struct {
 	v3handler struct {
 		log       *api.LogHandler
 		restream  *api.RestreamHandler
-		playout   *api.PlayoutHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
@@ -246,10 +245,7 @@ func NewServer(config Config) (Server, error) {
 	if config.Restream != nil {
 		s.v3handler.restream = api.NewRestream(
 			config.Restream,
-		)
-
-		s.v3handler.playout = api.NewPlayout(
-			config.Restream,
+			config.IAM,
 		)
 	}
 
@@ -326,6 +322,7 @@ func NewServer(config Config) (Server, error) {
 		Restream:  config.Restream,
 		Monitor:   config.Metrics,
 		LogBuffer: config.LogBuffer,
+		IAM:       config.IAM,
 	}, "/api/graph/query")
 
 	s.gzip.mimetypes = []string{
@@ -570,18 +567,16 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		}
 
 		// v3 Playout
-		if s.v3handler.playout != nil {
-			v3.GET("/process/:id/playout/:inputid/status", s.v3handler.playout.Status)
-			v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.playout.ReopenInput)
-			v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.playout.Keyframe)
-			v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.playout.EncodeErrorframe)
+		v3.GET("/process/:id/playout/:inputid/status", s.v3handler.restream.PlayoutStatus)
+		v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.restream.PlayoutReopenInput)
+		v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.restream.PlayoutKeyframe)
+		v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.restream.PlayoutEncodeErrorframe)
 
-			if !s.readOnly {
-				v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
-				v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
+		if !s.readOnly {
+			v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
+			v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
 
-				v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.playout.SetStream)
-			}
+			v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.restream.PlayoutSetStream)
 		}
 	}
 

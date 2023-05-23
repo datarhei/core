@@ -5,17 +5,17 @@ import (
 )
 
 type ConfigIOCleanup struct {
-	Pattern       string `json:"pattern"`
-	MaxFiles      uint   `json:"max_files"`
-	MaxFileAge    uint   `json:"max_file_age_seconds"`
-	PurgeOnDelete bool   `json:"purge_on_delete"`
+	Pattern       string
+	MaxFiles      uint
+	MaxFileAge    uint
+	PurgeOnDelete bool
 }
 
 type ConfigIO struct {
-	ID      string            `json:"id"`
-	Address string            `json:"address"`
-	Options []string          `json:"options"`
-	Cleanup []ConfigIOCleanup `json:"cleanup"`
+	ID      string
+	Address string
+	Options []string
+	Cleanup []ConfigIOCleanup
 }
 
 func (io ConfigIO) Clone() ConfigIO {
@@ -34,27 +34,29 @@ func (io ConfigIO) Clone() ConfigIO {
 }
 
 type Config struct {
-	ID             string     `json:"id"`
-	Reference      string     `json:"reference"`
-	Owner          string     `json:"owner"`
-	Group          string     `json:"group"`
-	FFVersion      string     `json:"ffversion"`
-	Input          []ConfigIO `json:"input"`
-	Output         []ConfigIO `json:"output"`
-	Options        []string   `json:"options"`
-	Reconnect      bool       `json:"reconnect"`
-	ReconnectDelay uint64     `json:"reconnect_delay_seconds"` // seconds
-	Autostart      bool       `json:"autostart"`
-	StaleTimeout   uint64     `json:"stale_timeout_seconds"` // seconds
-	LimitCPU       float64    `json:"limit_cpu_usage"`       // percent
-	LimitMemory    uint64     `json:"limit_memory_bytes"`    // bytes
-	LimitWaitFor   uint64     `json:"limit_waitfor_seconds"` // seconds
+	ID             string
+	Reference      string
+	Owner          string
+	Domain         string
+	FFVersion      string
+	Input          []ConfigIO
+	Output         []ConfigIO
+	Options        []string
+	Reconnect      bool
+	ReconnectDelay uint64 // seconds
+	Autostart      bool
+	StaleTimeout   uint64  // seconds
+	LimitCPU       float64 // percent
+	LimitMemory    uint64  // bytes
+	LimitWaitFor   uint64  // seconds
 }
 
 func (config *Config) Clone() *Config {
 	clone := &Config{
 		ID:             config.ID,
 		Reference:      config.Reference,
+		Owner:          config.Owner,
+		Domain:         config.Domain,
 		FFVersion:      config.FFVersion,
 		Reconnect:      config.Reconnect,
 		ReconnectDelay: config.ReconnectDelay,
@@ -104,19 +106,21 @@ func (config *Config) CreateCommand() []string {
 }
 
 type Process struct {
-	ID        string  `json:"id"`
-	Owner     string  `json:"owner"`
-	Group     string  `json:"group"`
-	Reference string  `json:"reference"`
-	Config    *Config `json:"config"`
-	CreatedAt int64   `json:"created_at"`
-	UpdatedAt int64   `json:"updated_at"`
-	Order     string  `json:"order"`
+	ID        string
+	Owner     string
+	Domain    string
+	Reference string
+	Config    *Config
+	CreatedAt int64
+	UpdatedAt int64
+	Order     string
 }
 
 func (process *Process) Clone() *Process {
 	clone := &Process{
 		ID:        process.ID,
+		Owner:     process.Owner,
+		Domain:    process.Domain,
 		Reference: process.Reference,
 		Config:    process.Config.Clone(),
 		CreatedAt: process.CreatedAt,

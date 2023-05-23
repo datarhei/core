@@ -62,7 +62,7 @@ type ProcessConfig struct {
 func (cfg *ProcessConfig) Marshal() *app.Config {
 	p := &app.Config{
 		ID:             cfg.ID,
-		Group:          cfg.Group,
+		Domain:         cfg.Group,
 		Reference:      cfg.Reference,
 		Options:        cfg.Options,
 		Reconnect:      cfg.Reconnect,
@@ -142,7 +142,7 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	}
 
 	cfg.ID = c.ID
-	cfg.Group = c.Group
+	cfg.Group = c.Domain
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"
 	cfg.Reconnect = c.Reconnect

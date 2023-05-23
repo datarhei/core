@@ -36,6 +36,7 @@ import (
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/rewrite"
 	restreamstore "github.com/datarhei/core/v16/restream/store"
+	restreamjsonstore "github.com/datarhei/core/v16/restream/store/json"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
@@ -718,7 +719,7 @@ func (a *api) start() error {
 		if err != nil {
 			return err
 		}
-		store, err = restreamstore.NewJSON(restreamstore.JSONConfig{
+		store, err = restreamjsonstore.New(restreamjsonstore.Config{
 			Filesystem: fs,
 			Filepath:   "/db.json",
 			Logger:     a.log.logger.core.WithComponent("ProcessStore"),

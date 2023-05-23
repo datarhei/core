@@ -20,7 +20,7 @@ import (
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
-	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/invopop/jsonschema"
 	"github.com/labstack/echo/v4"
@@ -39,7 +39,7 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
 	}
 
-	store, err := store.NewJSON(store.JSONConfig{
+	store, err := jsonstore.New(jsonstore.Config{
 		Filesystem: memfs,
 	})
 	if err != nil {
@@ -65,9 +65,6 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	iam.AddPolicy("$anon", "$none", "api:/**", []string{"ANY"})
-	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
 
 	rs, err := restream.New(restream.Config{
 		Store:  store,

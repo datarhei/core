@@ -8,7 +8,7 @@ import (
 	cfgvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -87,7 +87,7 @@ func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) e
 	logger.Info().Log("Found database")
 
 	// Load an existing DB
-	datastore, err := store.NewJSON(store.JSONConfig{
+	datastore, err := jsonstore.New(jsonstore.Config{
 		Filesystem: fs,
 		Filepath:   cfg.DB.Dir + "/db.json",
 	})

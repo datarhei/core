@@ -1,7 +1,11 @@
 extend type Query {
-	processes(idpattern: String, refpattern: String, group: String): [Process!]!
-	process(id: ID!, group: String): Process
-	probe(id: ID!, group: String): Probe!
+	processes(
+		idpattern: String
+		refpattern: String
+		domainpattern: String
+	): [Process!]!
+	process(id: ID!, domain: String!): Process
+	probe(id: ID!, domain: String!): Probe!
 }
 
 type ProcessConfigIO {
@@ -19,7 +23,7 @@ type ProcessConfigLimits {
 type ProcessConfig {
 	id: String!
 	owner: String!
-	group: String!
+	domain: String!
 	type: String!
 	reference: String!
 	input: [ProcessConfigIO!]!
@@ -71,7 +75,7 @@ type ProcessReport implements IProcessReportHistoryEntry {
 type Process {
 	id: String!
 	owner: String!
-	group: String!
+	domain: String!
 	type: String!
 	reference: String!
 	created_at: Time!
