@@ -14,26 +14,20 @@ func (u *IAMUser) Marshal(user iam.User, policies []iam.Policy) {
 	u.Superuser = user.Superuser
 	u.Auth = IAMUserAuth{
 		API: IAMUserAuthAPI{
-			Userpass: IAMUserAuthPassword{
-				Enable:   user.Auth.API.Userpass.Enable,
-				Password: user.Auth.API.Userpass.Password,
-			},
+			Password: user.Auth.API.Password,
 			Auth0: IAMUserAuthAPIAuth0{
-				Enable: false,
-				User:   "",
-				Tenant: IAMAuth0Tenant{},
+				User: user.Auth.API.Auth0.User,
+				Tenant: IAMAuth0Tenant{
+					Domain:   user.Auth.API.Auth0.Tenant.Domain,
+					Audience: user.Auth.API.Auth0.Tenant.Audience,
+					ClientID: user.Auth.API.Auth0.Tenant.ClientID,
+				},
 			},
 		},
 		Services: IAMUserAuthServices{
+			Basic: user.Auth.Services.Basic,
 			Token: user.Auth.Services.Token,
 		},
-	}
-
-	for _, basic := range user.Auth.Services.Basic {
-		u.Auth.Services.Basic = append(u.Auth.Services.Basic, IAMUserAuthPassword{
-			Enable:   basic.Enable,
-			Password: basic.Password,
-		})
 	}
 
 	for _, p := range policies {
@@ -51,13 +45,9 @@ func (u *IAMUser) Unmarshal() (iam.User, []iam.Policy) {
 		Superuser: u.Superuser,
 		Auth: iam.UserAuth{
 			API: iam.UserAuthAPI{
-				Userpass: iam.UserAuthPassword{
-					Enable:   u.Auth.API.Userpass.Enable,
-					Password: u.Auth.API.Userpass.Password,
-				},
+				Password: u.Auth.API.Password,
 				Auth0: iam.UserAuthAPIAuth0{
-					Enable: u.Auth.API.Auth0.Enable,
-					User:   u.Auth.API.Auth0.User,
+					User: u.Auth.API.Auth0.User,
 					Tenant: iam.Auth0Tenant{
 						Domain:   u.Auth.API.Auth0.Tenant.Domain,
 						Audience: u.Auth.API.Auth0.Tenant.Audience,
@@ -66,16 +56,10 @@ func (u *IAMUser) Unmarshal() (iam.User, []iam.Policy) {
 				},
 			},
 			Services: iam.UserAuthServices{
+				Basic: u.Auth.Services.Basic,
 				Token: u.Auth.Services.Token,
 			},
 		},
-	}
-
-	for _, basic := range u.Auth.Services.Basic {
-		iamuser.Auth.Services.Basic = append(iamuser.Auth.Services.Basic, iam.UserAuthPassword{
-			Enable:   basic.Enable,
-			Password: basic.Password,
-		})
 	}
 
 	iampolicies := []iam.Policy{}
@@ -98,24 +82,18 @@ type IAMUserAuth struct {
 }
 
 type IAMUserAuthAPI struct {
-	Userpass IAMUserAuthPassword `json:"userpass"`
+	Password string              `json:"userpass"`
 	Auth0    IAMUserAuthAPIAuth0 `json:"auth0"`
 }
 
 type IAMUserAuthAPIAuth0 struct {
-	Enable bool           `json:"enable"`
 	User   string         `json:"user"`
 	Tenant IAMAuth0Tenant `json:"tenant"`
 }
 
 type IAMUserAuthServices struct {
-	Basic []IAMUserAuthPassword `json:"basic"`
-	Token []string              `json:"token"`
-}
-
-type IAMUserAuthPassword struct {
-	Enable   bool   `json:"enable"`
-	Password string `json:"password"`
+	Basic []string `json:"basic"`
+	Token []string `json:"token"`
 }
 
 type IAMAuth0Tenant struct {

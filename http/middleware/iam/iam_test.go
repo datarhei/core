@@ -45,18 +45,10 @@ func getIAM() (iam.IAM, error) {
 		Name: "foobar",
 		Auth: iam.UserAuth{
 			API: iam.UserAuthAPI{
-				Userpass: iam.UserAuthPassword{
-					Enable:   true,
-					Password: "secret",
-				},
+				Password: "secret",
 			},
 			Services: iam.UserAuthServices{
-				Basic: []iam.UserAuthPassword{
-					{
-						Enable:   true,
-						Password: "secret",
-					},
-				},
+				Basic: []string{"secret"},
 			},
 		},
 	})

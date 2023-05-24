@@ -22,41 +22,6 @@ func TestUserName(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestUserAuth(t *testing.T) {
-	user := User{
-		Name: "foobar",
-	}
-
-	err := user.validate()
-	require.NoError(t, err)
-
-	user.Auth.API.Userpass.Enable = true
-	err = user.validate()
-	require.Error(t, err)
-
-	user.Auth.API.Userpass.Password = "secret"
-	err = user.validate()
-	require.NoError(t, err)
-
-	user.Auth.API.Auth0.Enable = true
-	err = user.validate()
-	require.Error(t, err)
-
-	user.Auth.API.Auth0.User = "auth0|123456"
-	err = user.validate()
-	require.NoError(t, err)
-
-	user.Auth.Services.Basic = append(user.Auth.Services.Basic, UserAuthPassword{
-		Enable: true,
-	})
-	err = user.validate()
-	require.Error(t, err)
-
-	user.Auth.Services.Basic[0].Password = "secret"
-	err = user.validate()
-	require.NoError(t, err)
-}
-
 func TestIdentity(t *testing.T) {
 	user := User{
 		Name: "foobar",
@@ -123,8 +88,7 @@ func TestIdentityAPIAuth(t *testing.T) {
 	require.False(t, ok)
 	require.Error(t, err)
 
-	identity.user.Auth.API.Userpass.Enable = true
-	identity.user.Auth.API.Userpass.Password = "secret"
+	identity.user.Auth.API.Password = "secret"
 
 	ok, err = identity.VerifyAPIPassword("secret")
 	require.False(t, ok)
@@ -136,14 +100,13 @@ func TestIdentityAPIAuth(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, err)
 
-	identity.user.Auth.API.Userpass.Enable = false
+	identity.user.Auth.API.Password = ""
 
 	ok, err = identity.VerifyAPIPassword("secret")
 	require.False(t, ok)
 	require.Error(t, err)
 
-	identity.user.Auth.API.Userpass.Enable = true
-	identity.user.Auth.API.Userpass.Password = "terces"
+	identity.user.Auth.API.Password = "terces"
 
 	ok, err = identity.VerifyAPIPassword("secret")
 	require.False(t, ok)
@@ -161,10 +124,7 @@ func TestIdentityServiceBasicAuth(t *testing.T) {
 	require.False(t, ok)
 	require.Error(t, err)
 
-	identity.user.Auth.Services.Basic = append(identity.user.Auth.Services.Basic, UserAuthPassword{
-		Enable:   true,
-		Password: "secret",
-	})
+	identity.user.Auth.Services.Basic = append(identity.user.Auth.Services.Basic, "secret")
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
@@ -176,14 +136,13 @@ func TestIdentityServiceBasicAuth(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, err)
 
-	identity.user.Auth.Services.Basic[0].Enable = false
+	identity.user.Auth.Services.Basic[0] = ""
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
 	require.NoError(t, err)
 
-	identity.user.Auth.Services.Basic[0].Enable = true
-	identity.user.Auth.Services.Basic[0].Password = "terces"
+	identity.user.Auth.Services.Basic[0] = "terces"
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
@@ -325,8 +284,7 @@ func TestCreateUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|123456",
+					User: "auth0|123456",
 					Tenant: Auth0Tenant{
 						Domain:   "example.com",
 						Audience: "https://api.example.com/",
@@ -344,8 +302,7 @@ func TestCreateUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|123456",
+					User: "auth0|123456",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",
@@ -383,8 +340,7 @@ func TestCreateUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|123456",
+					User: "auth0|123456",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",
@@ -402,8 +358,7 @@ func TestCreateUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|987654",
+					User: "auth0|987654",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",
@@ -544,8 +499,7 @@ func TestUpdateUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|123456",
+					User: "auth0|123456",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",
@@ -607,19 +561,11 @@ func TestRemoveUser(t *testing.T) {
 		Superuser: false,
 		Auth: UserAuth{
 			API: UserAuthAPI{
-				Userpass: UserAuthPassword{
-					Enable:   true,
-					Password: "apisecret",
-				},
-				Auth0: UserAuthAPIAuth0{},
+				Password: "apisecret",
+				Auth0:    UserAuthAPIAuth0{},
 			},
 			Services: UserAuthServices{
-				Basic: []UserAuthPassword{
-					{
-						Enable:   true,
-						Password: "secret",
-					},
-				},
+				Basic: []string{"secret"},
 				Token: []string{"tokensecret"},
 			},
 		},
@@ -706,8 +652,7 @@ func TestRemoveUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|123456",
+					User: "auth0|123456",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",
@@ -725,8 +670,7 @@ func TestRemoveUserAuth0(t *testing.T) {
 		Auth: UserAuth{
 			API: UserAuthAPI{
 				Auth0: UserAuthAPIAuth0{
-					Enable: true,
-					User:   "auth0|987654",
+					User: "auth0|987654",
 					Tenant: Auth0Tenant{
 						Domain:   "datarhei-demo.eu.auth0.com",
 						Audience: "https://datarhei-demo.eu.auth0.com/api/v2/",

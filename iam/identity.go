@@ -33,24 +33,18 @@ type UserAuth struct {
 }
 
 type UserAuthAPI struct {
-	Userpass UserAuthPassword `json:"userpass"`
+	Password string           `json:"password"`
 	Auth0    UserAuthAPIAuth0 `json:"auth0"`
 }
 
 type UserAuthAPIAuth0 struct {
-	Enable bool        `json:"enable"`
 	User   string      `json:"user"`
 	Tenant Auth0Tenant `json:"tenant"`
 }
 
 type UserAuthServices struct {
-	Basic []UserAuthPassword `json:"basic"`
-	Token []string           `json:"token"`
-}
-
-type UserAuthPassword struct {
-	Enable   bool   `json:"enable"`
-	Password string `json:"password"`
+	Basic []string `json:"basic"`
+	Token []string `json:"token"`
 }
 
 func (u *User) validate() error {
@@ -63,20 +57,6 @@ func (u *User) validate() error {
 	re := regexp.MustCompile(`[^` + chars + `]`)
 	if re.MatchString(u.Name) {
 		return fmt.Errorf("the name can only contain [%s]", chars)
-	}
-
-	if u.Auth.API.Userpass.Enable && len(u.Auth.API.Userpass.Password) == 0 {
-		return fmt.Errorf("a password for API login is required")
-	}
-
-	if u.Auth.API.Auth0.Enable && len(u.Auth.API.Auth0.User) == 0 {
-		return fmt.Errorf("a user for Auth0 login is required")
-	}
-
-	for i, basic := range u.Auth.Services.Basic {
-		if basic.Enable && len(basic.Password) == 0 {
-			return fmt.Errorf("a password for service basic auth nr. %d is required", i)
-		}
 	}
 
 	return nil
@@ -141,11 +121,11 @@ func (i *identity) VerifyAPIPassword(password string) (bool, error) {
 		return false, fmt.Errorf("invalid identity")
 	}
 
-	if !i.user.Auth.API.Userpass.Enable {
+	if len(i.user.Auth.API.Password) == 0 {
 		return false, fmt.Errorf("authentication method disabled")
 	}
 
-	return i.user.Auth.API.Userpass.Password == password, nil
+	return i.user.Auth.API.Password == password, nil
 }
 
 func (i *identity) VerifyAPIAuth0(jwt string) (bool, error) {
@@ -156,7 +136,7 @@ func (i *identity) VerifyAPIAuth0(jwt string) (bool, error) {
 		return false, fmt.Errorf("invalid identity")
 	}
 
-	if !i.user.Auth.API.Auth0.Enable {
+	if len(i.user.Auth.API.Auth0.User) == 0 {
 		return false, fmt.Errorf("authentication method disabled")
 	}
 
@@ -310,24 +290,17 @@ func (i *identity) VerifyServiceBasicAuth(password string) (bool, error) {
 		return false, fmt.Errorf("invalid identity")
 	}
 
-	valid := false
-
-	for _, basic := range i.user.Auth.Services.Basic {
-		if !basic.Enable {
+	for _, pw := range i.user.Auth.Services.Basic {
+		if len(pw) == 0 {
 			continue
 		}
 
-		if basic.Password == password {
-			valid = true
-			break
+		if pw == password {
+			return true, nil
 		}
 	}
 
-	if !valid {
-		return false, nil
-	}
-
-	return true, nil
+	return false, nil
 }
 
 func (i *identity) GetServiceBasicAuth() string {
@@ -338,12 +311,12 @@ func (i *identity) GetServiceBasicAuth() string {
 		return ""
 	}
 
-	for _, basic := range i.user.Auth.Services.Basic {
-		if !basic.Enable {
+	for _, password := range i.user.Auth.Services.Basic {
+		if len(password) == 0 {
 			continue
 		}
 
-		return basic.Password
+		return password
 	}
 
 	return ""
@@ -374,11 +347,15 @@ func (i *identity) GetServiceToken() string {
 		return ""
 	}
 
-	if len(i.user.Auth.Services.Token) == 0 {
-		return ""
+	for _, token := range i.user.Auth.Services.Token {
+		if len(token) == 0 {
+			continue
+		}
+
+		return i.Name() + ":" + token
 	}
 
-	return i.Name() + ":" + i.user.Auth.Services.Token[0]
+	return ""
 }
 
 func (i *identity) isValid() bool {
@@ -469,6 +446,7 @@ func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 	}
 
 	im.root = identity
+	im.autosave = true
 
 	return im, nil
 }
@@ -524,7 +502,7 @@ func (im *identityManager) create(u User) (*identity, error) {
 	u = u.clone()
 	identity := u.marshalIdentity()
 
-	if identity.user.Auth.API.Auth0.Enable {
+	if len(identity.user.Auth.API.Auth0.User) != 0 {
 		if _, ok := im.auth0UserIdentityMap[identity.user.Auth.API.Auth0.User]; ok {
 			return nil, fmt.Errorf("the Auth0 user has already an identity")
 		}
@@ -631,7 +609,7 @@ func (im *identityManager) delete(name string) error {
 	identity.valid = false
 	identity.lock.Unlock()
 
-	if !identity.user.Auth.API.Auth0.Enable {
+	if len(identity.user.Auth.API.Auth0.User) == 0 {
 		if im.autosave {
 			im.save(im.filePath)
 		}
@@ -664,7 +642,7 @@ func (im *identityManager) delete(name string) error {
 	// find out if the tenant's clientid is still used somewhere else
 	found = false
 	for _, i := range im.identities {
-		if !i.user.Auth.API.Auth0.Enable {
+		if len(i.user.Auth.API.Auth0.User) == 0 {
 			continue
 		}
 

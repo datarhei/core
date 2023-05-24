@@ -13,24 +13,24 @@ import (
 func getIdentityManager(enableBasic bool) iam.IdentityManager {
 	dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
 
-	im, _ := iam.NewIdentityManager(iam.IdentityConfig{
-		FS: dummyfs,
-		Superuser: iam.User{
-			Name:      "foobar",
-			Superuser: false,
-			Auth: iam.UserAuth{
-				API: iam.UserAuthAPI{},
-				Services: iam.UserAuthServices{
-					Basic: []iam.UserAuthPassword{
-						{
-							Enable:   enableBasic,
-							Password: "basicauthpassword",
-						},
-					},
-					Token: []string{"servicetoken"},
-				},
+	superuser := iam.User{
+		Name:      "foobar",
+		Superuser: false,
+		Auth: iam.UserAuth{
+			API: iam.UserAuthAPI{},
+			Services: iam.UserAuthServices{
+				Token: []string{"servicetoken"},
 			},
 		},
+	}
+
+	if enableBasic {
+		superuser.Auth.Services.Basic = []string{"basicauthpassword"}
+	}
+
+	im, _ := iam.NewIdentityManager(iam.IdentityConfig{
+		FS:        dummyfs,
+		Superuser: superuser,
 		JWTRealm:  "",
 		JWTSecret: "",
 		Logger:    nil,

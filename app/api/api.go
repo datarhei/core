@@ -389,13 +389,7 @@ func (a *api) start() error {
 			Superuser: true,
 			Auth: iam.UserAuth{
 				API: iam.UserAuthAPI{
-					Userpass: iam.UserAuthPassword{
-						Enable:   cfg.API.Auth.Enable,
-						Password: cfg.API.Auth.Password,
-					},
-					Auth0: iam.UserAuthAPIAuth0{
-						Enable: cfg.API.Auth.Auth0.Enable,
-					},
+					Auth0: iam.UserAuthAPIAuth0{},
 				},
 				Services: iam.UserAuthServices{
 					Token: []string{
@@ -406,6 +400,10 @@ func (a *api) start() error {
 			},
 		}
 
+		if cfg.API.Auth.Enable {
+			superuser.Auth.API.Password = cfg.API.Auth.Password
+		}
+
 		if cfg.API.Auth.Auth0.Enable {
 			superuser.Auth.API.Auth0.User = cfg.API.Auth.Auth0.Tenants[0].Users[0]
 			superuser.Auth.API.Auth0.Tenant = iam.Auth0Tenant{
@@ -413,126 +411,6 @@ func (a *api) start() error {
 				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
 				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
 			}
-		}
-
-		// Create policies and users in order to mimic the behaviour before IAM
-
-		policies := []iam.Policy{
-			{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "fs:/**",
-				Actions:  []string{"GET", "HEAD", "OPTIONS"},
-			},
-			{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "api:/api",
-				Actions:  []string{"GET", "HEAD", "OPTIONS"},
-			},
-			{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "api:/api/v3/widget/process/**",
-				Actions:  []string{"GET", "HEAD", "OPTIONS"},
-			},
-		}
-
-		users := []iam.User{}
-
-		if !cfg.Storage.Memory.Auth.Enable {
-			policies = append(policies, iam.Policy{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "fs:/memfs/**",
-				Actions:  []string{"ANY"},
-			})
-		} else {
-			if cfg.Storage.Memory.Auth.Username != superuser.Name {
-				users = append(users, iam.User{
-					Name: cfg.Storage.Memory.Auth.Username,
-					Auth: iam.UserAuth{
-						Services: iam.UserAuthServices{
-							Basic: []iam.UserAuthPassword{
-								{
-									Enable:   cfg.Storage.Memory.Auth.Enable,
-									Password: cfg.Storage.Memory.Auth.Password,
-								},
-							},
-						},
-					},
-				})
-			} else {
-				superuser.Auth.Services.Basic = append(superuser.Auth.Services.Basic, iam.UserAuthPassword{
-					Enable:   cfg.Storage.Memory.Auth.Enable,
-					Password: cfg.Storage.Memory.Auth.Password,
-				})
-			}
-
-			policies = append(policies, iam.Policy{
-				Name:     cfg.Storage.Memory.Auth.Username,
-				Domain:   "$none",
-				Resource: "fs:/memfs/**",
-				Actions:  []string{"ANY"},
-			})
-		}
-
-		for _, s := range cfg.Storage.S3 {
-			if !s.Auth.Enable {
-				policies = append(policies, iam.Policy{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "fs:" + s.Mountpoint + "/**",
-					Actions:  []string{"ANY"},
-				})
-			} else {
-				if s.Auth.Username != superuser.Name {
-					users = append(users, iam.User{
-						Name: s.Auth.Username,
-						Auth: iam.UserAuth{
-							Services: iam.UserAuthServices{
-								Basic: []iam.UserAuthPassword{
-									{
-										Enable:   s.Auth.Enable,
-										Password: s.Auth.Password,
-									},
-								},
-							},
-						},
-					})
-				} else {
-					superuser.Auth.Services.Basic = append(superuser.Auth.Services.Basic, iam.UserAuthPassword{
-						Enable:   s.Auth.Enable,
-						Password: s.Auth.Password,
-					})
-				}
-
-				policies = append(policies, iam.Policy{
-					Name:     s.Auth.Username,
-					Domain:   "$none",
-					Resource: "fs:" + s.Mountpoint + "/**",
-					Actions:  []string{"ANY"},
-				})
-
-			}
-		}
-
-		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-			policies = append(policies, iam.Policy{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "rtmp:/**",
-				Actions:  []string{"ANY"},
-			})
-		}
-
-		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-			policies = append(policies, iam.Policy{
-				Name:     "$anon",
-				Domain:   "$none",
-				Resource: "srt:**",
-				Actions:  []string{"ANY"},
-			})
 		}
 
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
@@ -547,7 +425,7 @@ func (a *api) start() error {
 			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
 		}
 
-		iam, err := iam.NewIAM(iam.Config{
+		manager, err := iam.NewIAM(iam.Config{
 			FS:        fs,
 			Superuser: superuser,
 			JWTRealm:  "datarhei-core",
@@ -558,24 +436,111 @@ func (a *api) start() error {
 			return fmt.Errorf("iam: %w", err)
 		}
 
-		for _, user := range users {
-			if _, err := iam.GetIdentity(user.Name); err == nil {
-				continue
+		// Check if there are already file created by IAM. If not, create policies
+		// and users based on the config in order to mimic the behaviour before IAM.
+		if len(fs.List("/", "/*.json")) == 0 {
+			policies := []iam.Policy{
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "fs:/**",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "api:/api",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "api:/api/v3/widget/process/**",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
 			}
 
-			err := iam.CreateIdentity(user)
-			if err != nil {
-				return fmt.Errorf("iam: %w", err)
+			users := map[string]iam.User{}
+
+			if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
+				users[cfg.Storage.Memory.Auth.Username] = iam.User{
+					Name: cfg.Storage.Memory.Auth.Username,
+					Auth: iam.UserAuth{
+						Services: iam.UserAuthServices{
+							Basic: []string{cfg.Storage.Memory.Auth.Password},
+						},
+					},
+				}
+
+				policies = append(policies, iam.Policy{
+					Name:     cfg.Storage.Memory.Auth.Username,
+					Domain:   "$none",
+					Resource: "fs:/memfs/**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			for _, s := range cfg.Storage.S3 {
+				if s.Auth.Enable && s.Auth.Username != superuser.Name {
+					user, ok := users[s.Auth.Username]
+					if !ok {
+						users[s.Auth.Username] = iam.User{
+							Name: s.Auth.Username,
+							Auth: iam.UserAuth{
+								Services: iam.UserAuthServices{
+									Basic: []string{s.Auth.Password},
+								},
+							},
+						}
+					} else {
+						user.Auth.Services.Basic = append(user.Auth.Services.Basic, s.Auth.Password)
+						users[s.Auth.Username] = user
+					}
+
+					policies = append(policies, iam.Policy{
+						Name:     s.Auth.Username,
+						Domain:   "$none",
+						Resource: "fs:" + s.Mountpoint + "/**",
+						Actions:  []string{"ANY"},
+					})
+				}
+			}
+
+			if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+				policies = append(policies, iam.Policy{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "rtmp:/**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+				policies = append(policies, iam.Policy{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "srt:**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			for _, user := range users {
+				if _, err := manager.GetIdentity(user.Name); err == nil {
+					continue
+				}
+
+				err := manager.CreateIdentity(user)
+				if err != nil {
+					return fmt.Errorf("iam: %w", err)
+				}
+			}
+
+			for _, policy := range policies {
+				manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
 			}
 		}
 
-		iam.SaveIdentities()
-
-		for _, policy := range policies {
-			iam.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
-		}
-
-		a.iam = iam
+		a.iam = manager
 	}
 
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
