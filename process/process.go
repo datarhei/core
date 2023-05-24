@@ -637,9 +637,6 @@ func (p *process) start() error {
 	// Start the reader
 	go p.reader()
 
-	// Wait for the process to finish
-	go p.waiter()
-
 	// Start the stale timeout if enabled
 	if p.stale.timeout != 0 {
 		var ctx context.Context
@@ -872,17 +869,19 @@ func (p *process) reader() {
 			p.stale.lock.Unlock()
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		p.logger.Debug().WithError(err).Log("")
+	}
+
+	// Wait for the process to finish
+	p.waiter()
 }
 
 // waiter waits for the process to finish. If enabled, the process will
 // be scheduled for a restart.
 func (p *process) waiter() {
-	if p.getState() == stateFinishing {
-		p.stop(false)
-	}
-
-	// The process exited normally, i.e. the return code is zero and no signal
-	// has been raised
+	// The process exited normally, i.e. the return code is zero and no signal has been raised
 	state := stateFinished
 
 	if err := p.cmd.Wait(); err != nil {
