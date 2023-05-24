@@ -51,9 +51,11 @@ func getIAM() (iam.IAM, error) {
 				},
 			},
 			Services: iam.UserAuthServices{
-				Basic: iam.UserAuthPassword{
-					Enable:   true,
-					Password: "secret",
+				Basic: []iam.UserAuthPassword{
+					{
+						Enable:   true,
+						Password: "secret",
+					},
 				},
 			},
 		},

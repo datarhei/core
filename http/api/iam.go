@@ -25,12 +25,15 @@ func (u *IAMUser) Marshal(user iam.User, policies []iam.Policy) {
 			},
 		},
 		Services: IAMUserAuthServices{
-			Basic: IAMUserAuthPassword{
-				Enable:   user.Auth.Services.Basic.Enable,
-				Password: user.Auth.Services.Basic.Password,
-			},
 			Token: user.Auth.Services.Token,
 		},
+	}
+
+	for _, basic := range user.Auth.Services.Basic {
+		u.Auth.Services.Basic = append(u.Auth.Services.Basic, IAMUserAuthPassword{
+			Enable:   basic.Enable,
+			Password: basic.Password,
+		})
 	}
 
 	for _, p := range policies {
@@ -63,13 +66,16 @@ func (u *IAMUser) Unmarshal() (iam.User, []iam.Policy) {
 				},
 			},
 			Services: iam.UserAuthServices{
-				Basic: iam.UserAuthPassword{
-					Enable:   u.Auth.Services.Basic.Enable,
-					Password: u.Auth.Services.Basic.Password,
-				},
 				Token: u.Auth.Services.Token,
 			},
 		},
+	}
+
+	for _, basic := range u.Auth.Services.Basic {
+		iamuser.Auth.Services.Basic = append(iamuser.Auth.Services.Basic, iam.UserAuthPassword{
+			Enable:   basic.Enable,
+			Password: basic.Password,
+		})
 	}
 
 	iampolicies := []iam.Policy{}
@@ -103,8 +109,8 @@ type IAMUserAuthAPIAuth0 struct {
 }
 
 type IAMUserAuthServices struct {
-	Basic IAMUserAuthPassword `json:"basic"`
-	Token []string            `json:"token"`
+	Basic []IAMUserAuthPassword `json:"basic"`
+	Token []string              `json:"token"`
 }
 
 type IAMUserAuthPassword struct {

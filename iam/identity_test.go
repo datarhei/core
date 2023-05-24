@@ -46,11 +46,13 @@ func TestUserAuth(t *testing.T) {
 	err = user.validate()
 	require.NoError(t, err)
 
-	user.Auth.Services.Basic.Enable = true
+	user.Auth.Services.Basic = append(user.Auth.Services.Basic, UserAuthPassword{
+		Enable: true,
+	})
 	err = user.validate()
 	require.Error(t, err)
 
-	user.Auth.Services.Basic.Password = "secret"
+	user.Auth.Services.Basic[0].Password = "secret"
 	err = user.validate()
 	require.NoError(t, err)
 }
@@ -159,8 +161,10 @@ func TestIdentityServiceBasicAuth(t *testing.T) {
 	require.False(t, ok)
 	require.Error(t, err)
 
-	identity.user.Auth.Services.Basic.Enable = true
-	identity.user.Auth.Services.Basic.Password = "secret"
+	identity.user.Auth.Services.Basic = append(identity.user.Auth.Services.Basic, UserAuthPassword{
+		Enable:   true,
+		Password: "secret",
+	})
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
@@ -172,14 +176,14 @@ func TestIdentityServiceBasicAuth(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, err)
 
-	identity.user.Auth.Services.Basic.Enable = false
+	identity.user.Auth.Services.Basic[0].Enable = false
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
-	require.Error(t, err)
+	require.NoError(t, err)
 
-	identity.user.Auth.Services.Basic.Enable = true
-	identity.user.Auth.Services.Basic.Password = "terces"
+	identity.user.Auth.Services.Basic[0].Enable = true
+	identity.user.Auth.Services.Basic[0].Password = "terces"
 
 	ok, err = identity.VerifyServiceBasicAuth("secret")
 	require.False(t, ok)
@@ -610,9 +614,11 @@ func TestRemoveUser(t *testing.T) {
 				Auth0: UserAuthAPIAuth0{},
 			},
 			Services: UserAuthServices{
-				Basic: UserAuthPassword{
-					Enable:   true,
-					Password: "secret",
+				Basic: []UserAuthPassword{
+					{
+						Enable:   true,
+						Password: "secret",
+					},
 				},
 				Token: []string{"tokensecret"},
 			},

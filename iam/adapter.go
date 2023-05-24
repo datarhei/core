@@ -125,7 +125,7 @@ func (a *adapter) importPolicy(model model.Model, rule []string) error {
 		"domain":   copiedRule[2],
 		"resource": copiedRule[3],
 		"actions":  copiedRule[4],
-	}).Log("imported policy")
+	}).Log("Imported policy")
 
 	ok, err := model.HasPolicyEx(copiedRule[0], copiedRule[0], copiedRule[1:])
 	if err != nil {
@@ -215,7 +215,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 			"domain":   domain,
 			"resource": resource,
 			"actions":  actions,
-		}).Log("adding policy")
+		}).Log("Adding policy")
 	} else if ptype == "g" {
 		username = rule[0]
 		role = rule[1]
@@ -225,7 +225,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 			"subject": username,
 			"role":    role,
 			"domain":  domain,
-		}).Log("adding role mapping")
+		}).Log("Adding role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}
@@ -415,7 +415,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			"domain":   domain,
 			"resource": resource,
 			"actions":  actions,
-		}).Log("removing policy")
+		}).Log("Removing policy")
 	} else if ptype == "g" {
 		username = rule[0]
 		role = rule[1]
@@ -425,7 +425,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			"subject": username,
 			"role":    role,
 			"domain":  domain,
-		}).Log("adding role mapping")
+		}).Log("Removing role mapping")
 	} else {
 		return fmt.Errorf("unknown ptype: %s", ptype)
 	}

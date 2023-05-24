@@ -21,9 +21,11 @@ func getIdentityManager(enableBasic bool) iam.IdentityManager {
 			Auth: iam.UserAuth{
 				API: iam.UserAuthAPI{},
 				Services: iam.UserAuthServices{
-					Basic: iam.UserAuthPassword{
-						Enable:   enableBasic,
-						Password: "basicauthpassword",
+					Basic: []iam.UserAuthPassword{
+						{
+							Enable:   enableBasic,
+							Password: "basicauthpassword",
+						},
 					},
 					Token: []string{"servicetoken"},
 				},

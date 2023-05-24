@@ -44,8 +44,8 @@ type UserAuthAPIAuth0 struct {
 }
 
 type UserAuthServices struct {
-	Basic UserAuthPassword `json:"basic"`
-	Token []string         `json:"token"`
+	Basic []UserAuthPassword `json:"basic"`
+	Token []string           `json:"token"`
 }
 
 type UserAuthPassword struct {
@@ -58,9 +58,11 @@ func (u *User) validate() error {
 		return fmt.Errorf("the name is required")
 	}
 
-	re := regexp.MustCompile(`[^A-Za-z0-9_-]`)
+	chars := `A-Za-z0-9:_-`
+
+	re := regexp.MustCompile(`[^` + chars + `]`)
 	if re.MatchString(u.Name) {
-		return fmt.Errorf("the name can only the contain [A-Za-z0-9_-]")
+		return fmt.Errorf("the name can only contain [%s]", chars)
 	}
 
 	if u.Auth.API.Userpass.Enable && len(u.Auth.API.Userpass.Password) == 0 {
@@ -71,8 +73,10 @@ func (u *User) validate() error {
 		return fmt.Errorf("a user for Auth0 login is required")
 	}
 
-	if u.Auth.Services.Basic.Enable && len(u.Auth.Services.Basic.Password) == 0 {
-		return fmt.Errorf("a password for service basic auth is required")
+	for i, basic := range u.Auth.Services.Basic {
+		if basic.Enable && len(basic.Password) == 0 {
+			return fmt.Errorf("a password for service basic auth nr. %d is required", i)
+		}
 	}
 
 	return nil
@@ -306,11 +310,24 @@ func (i *identity) VerifyServiceBasicAuth(password string) (bool, error) {
 		return false, fmt.Errorf("invalid identity")
 	}
 
-	if !i.user.Auth.Services.Basic.Enable {
-		return false, fmt.Errorf("authentication method disabled")
+	valid := false
+
+	for _, basic := range i.user.Auth.Services.Basic {
+		if !basic.Enable {
+			continue
+		}
+
+		if basic.Password == password {
+			valid = true
+			break
+		}
 	}
 
-	return i.user.Auth.Services.Basic.Password == password, nil
+	if !valid {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (i *identity) GetServiceBasicAuth() string {
@@ -321,11 +338,15 @@ func (i *identity) GetServiceBasicAuth() string {
 		return ""
 	}
 
-	if !i.user.Auth.Services.Basic.Enable {
-		return ""
+	for _, basic := range i.user.Auth.Services.Basic {
+		if !basic.Enable {
+			continue
+		}
+
+		return basic.Password
 	}
 
-	return i.user.Auth.Services.Basic.Password
+	return ""
 }
 
 func (i *identity) VerifyServiceToken(token string) (bool, error) {
@@ -528,6 +549,8 @@ func (im *identityManager) create(u User) (*identity, error) {
 
 	identity.valid = true
 
+	im.logger.Debug().WithField("name", identity.Name()).Log("Identity created")
+
 	return identity, nil
 }
 
@@ -572,6 +595,11 @@ func (im *identityManager) Update(name string, u User) error {
 	}
 
 	im.identities[identity.user.Name] = identity
+
+	im.logger.Debug().WithFields(log.Fields{
+		"oldname": name,
+		"newname": identity.Name(),
+	}).Log("Identity updated")
 
 	if im.autosave {
 		im.save(im.filePath)
@@ -764,6 +792,8 @@ func (im *identityManager) save(filePath string) error {
 	}
 
 	_, _, err = im.fs.WriteFileSafe(filePath, jsondata)
+
+	im.logger.Debug().WithField("path", filePath).Log("Identity file save")
 
 	return err
 }

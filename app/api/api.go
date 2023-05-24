@@ -398,10 +398,6 @@ func (a *api) start() error {
 					},
 				},
 				Services: iam.UserAuthServices{
-					Basic: iam.UserAuthPassword{
-						Enable:   cfg.Storage.Memory.Auth.Enable,
-						Password: cfg.Storage.Memory.Auth.Password,
-					},
 					Token: []string{
 						cfg.RTMP.Token,
 						cfg.SRT.Token,
@@ -417,6 +413,126 @@ func (a *api) start() error {
 				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
 				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
 			}
+		}
+
+		// Create policies and users in order to mimic the behaviour before IAM
+
+		policies := []iam.Policy{
+			{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "fs:/**",
+				Actions:  []string{"GET", "HEAD", "OPTIONS"},
+			},
+			{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "api:/api",
+				Actions:  []string{"GET", "HEAD", "OPTIONS"},
+			},
+			{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "api:/api/v3/widget/process/**",
+				Actions:  []string{"GET", "HEAD", "OPTIONS"},
+			},
+		}
+
+		users := []iam.User{}
+
+		if !cfg.Storage.Memory.Auth.Enable {
+			policies = append(policies, iam.Policy{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "fs:/memfs/**",
+				Actions:  []string{"ANY"},
+			})
+		} else {
+			if cfg.Storage.Memory.Auth.Username != superuser.Name {
+				users = append(users, iam.User{
+					Name: cfg.Storage.Memory.Auth.Username,
+					Auth: iam.UserAuth{
+						Services: iam.UserAuthServices{
+							Basic: []iam.UserAuthPassword{
+								{
+									Enable:   cfg.Storage.Memory.Auth.Enable,
+									Password: cfg.Storage.Memory.Auth.Password,
+								},
+							},
+						},
+					},
+				})
+			} else {
+				superuser.Auth.Services.Basic = append(superuser.Auth.Services.Basic, iam.UserAuthPassword{
+					Enable:   cfg.Storage.Memory.Auth.Enable,
+					Password: cfg.Storage.Memory.Auth.Password,
+				})
+			}
+
+			policies = append(policies, iam.Policy{
+				Name:     cfg.Storage.Memory.Auth.Username,
+				Domain:   "$none",
+				Resource: "fs:/memfs/**",
+				Actions:  []string{"ANY"},
+			})
+		}
+
+		for _, s := range cfg.Storage.S3 {
+			if !s.Auth.Enable {
+				policies = append(policies, iam.Policy{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "fs:" + s.Mountpoint + "/**",
+					Actions:  []string{"ANY"},
+				})
+			} else {
+				if s.Auth.Username != superuser.Name {
+					users = append(users, iam.User{
+						Name: s.Auth.Username,
+						Auth: iam.UserAuth{
+							Services: iam.UserAuthServices{
+								Basic: []iam.UserAuthPassword{
+									{
+										Enable:   s.Auth.Enable,
+										Password: s.Auth.Password,
+									},
+								},
+							},
+						},
+					})
+				} else {
+					superuser.Auth.Services.Basic = append(superuser.Auth.Services.Basic, iam.UserAuthPassword{
+						Enable:   s.Auth.Enable,
+						Password: s.Auth.Password,
+					})
+				}
+
+				policies = append(policies, iam.Policy{
+					Name:     s.Auth.Username,
+					Domain:   "$none",
+					Resource: "fs:" + s.Mountpoint + "/**",
+					Actions:  []string{"ANY"},
+				})
+
+			}
+		}
+
+		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+			policies = append(policies, iam.Policy{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "rtmp:/**",
+				Actions:  []string{"ANY"},
+			})
+		}
+
+		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+			policies = append(policies, iam.Policy{
+				Name:     "$anon",
+				Domain:   "$none",
+				Resource: "srt:**",
+				Actions:  []string{"ANY"},
+			})
 		}
 
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
@@ -442,24 +558,21 @@ func (a *api) start() error {
 			return fmt.Errorf("iam: %w", err)
 		}
 
-		// Create default policies for anonymous users in order to mimic the behaviour before IAM
+		for _, user := range users {
+			if _, err := iam.GetIdentity(user.Name); err == nil {
+				continue
+			}
 
-		iam.RemovePolicy("$anon", "$none", "", nil)
-
-		iam.AddPolicy("$anon", "$none", "fs:/**", []string{"GET", "HEAD", "OPTIONS"})
-		iam.AddPolicy("$anon", "$none", "api:/api", []string{"GET", "HEAD", "OPTIONS"})
-		iam.AddPolicy("$anon", "$none", "api:/api/v3/widget/process/**", []string{"GET", "HEAD", "OPTIONS"})
-
-		if !cfg.Storage.Memory.Auth.Enable {
-			iam.AddPolicy("$anon", "$none", "fs:/memfs/**", []string{"ANY"})
+			err := iam.CreateIdentity(user)
+			if err != nil {
+				return fmt.Errorf("iam: %w", err)
+			}
 		}
 
-		if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "rtmp:/**", []string{"ANY"})
-		}
+		iam.SaveIdentities()
 
-		if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-			iam.AddPolicy("$anon", "$none", "srt:**", []string{"ANY"})
+		for _, policy := range policies {
+			iam.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
 		}
 
 		a.iam = iam
