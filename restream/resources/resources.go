@@ -43,13 +43,21 @@ type Resources interface {
 }
 
 type Config struct {
-	MaxCPU    float64
-	MaxMemory float64
+	MaxCPU    float64 // percent 0-100
+	MaxMemory float64 // percent 0-100
 	PSUtil    psutil.Util
 	Logger    log.Logger
 }
 
 func New(config Config) (Resources, error) {
+	if config.MaxCPU <= 0 || config.MaxMemory <= 0 {
+		return nil, fmt.Errorf("both MaxCPU and MaxMemory have to be set")
+	}
+
+	if config.MaxCPU > 100 || config.MaxMemory > 100 {
+		return nil, fmt.Errorf("both MaxCPU and MaxMemory must have a range of 0-100")
+	}
+
 	r := &resources{
 		maxCPU: config.MaxCPU,
 		psutil: config.PSUtil,
@@ -104,7 +112,7 @@ func (r *resources) Start() {
 
 		r.stopOnce = sync.Once{}
 
-		r.logger.Debug().Log("Started")
+		r.logger.Info().Log("Started")
 	})
 }
 
@@ -114,7 +122,7 @@ func (r *resources) Stop() {
 
 		r.startOnce = sync.Once{}
 
-		r.logger.Debug().Log("Stopped")
+		r.logger.Info().Log("Stopped")
 	})
 }
 

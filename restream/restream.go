@@ -69,7 +69,7 @@ type Config struct {
 	Replace      replace.Replacer
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
-	MaxCPU       float64 // percent 0-100*ncpu
+	MaxCPU       float64 // percent 0-100
 	MaxMemory    float64 // percent 0-100
 	Logger       log.Logger
 }
@@ -167,10 +167,6 @@ func New(config Config) (Restreamer, error) {
 	r.maxProc = config.MaxProcesses
 
 	if config.MaxCPU > 0 || config.MaxMemory > 0 {
-		if config.MaxCPU <= 0 || config.MaxMemory <= 0 {
-			return nil, fmt.Errorf("both MaxCPU and MaxMemory have to be set")
-		}
-
 		resources, err := resources.New(resources.Config{
 			MaxCPU:    config.MaxCPU,
 			MaxMemory: config.MaxMemory,
