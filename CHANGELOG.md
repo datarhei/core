@@ -1,6 +1,6 @@
 # Core
 
-### Core v16.12.0 > v16.?.?
+### Core v16.12.0 > v16.13.0
 
 -   Add PUT /api/v3/fs endpoint for file operations
 -   Add GET /api/v3/process/:id/report query parameters for retrieving a specific report history entry
