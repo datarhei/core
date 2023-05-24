@@ -52,7 +52,7 @@ func (u *util) Process(pid int32) (psutil.Process, error) {
 
 func TestMemoryLimit(t *testing.T) {
 	r, err := New(Config{
-		MaxCPU:    0,
+		MaxCPU:    100,
 		MaxMemory: 150. / 200. * 100,
 		PSUtil:    &util{},
 		Logger:    nil,
@@ -90,7 +90,7 @@ func TestMemoryLimit(t *testing.T) {
 func TestCPULimit(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    50.,
-		MaxMemory: 0,
+		MaxMemory: 100,
 		PSUtil:    &util{},
 		Logger:    nil,
 	})
