@@ -1,7 +1,8 @@
 package iam
 
 import (
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -18,21 +19,21 @@ type IAM interface {
 	HasPolicy(name, domain, resource string, actions []string) bool
 	AddPolicy(name, domain, resource string, actions []string) bool
 	RemovePolicy(name, domain, resource string, actions []string) bool
-
-	ListPolicies(name, domain, resource string, actions []string) []Policy
+	ListPolicies(name, domain, resource string, actions []string) []access.Policy
+	ReloadPolicies() error
 
 	Validators() []string
 
-	CreateIdentity(u User) error
-	GetIdentity(name string) (User, error)
-	UpdateIdentity(name string, u User) error
+	CreateIdentity(u identity.User) error
+	GetIdentity(name string) (identity.User, error)
+	UpdateIdentity(name string, u identity.User) error
 	DeleteIdentity(name string) error
-	ListIdentities() []User
-	SaveIdentities() error
+	ListIdentities() []identity.User
+	ReloadIndentities() error
 
-	GetVerifier(name string) (IdentityVerifier, error)
-	GetVerfierFromAuth0(name string) (IdentityVerifier, error)
-	GetDefaultVerifier() IdentityVerifier
+	GetVerifier(name string) (identity.Verifier, error)
+	GetVerfierFromAuth0(name string) (identity.Verifier, error)
+	GetDefaultVerifier() identity.Verifier
 
 	CreateJWT(name string) (string, string, error)
 
@@ -40,23 +41,24 @@ type IAM interface {
 }
 
 type iam struct {
-	im IdentityManager
-	am AccessManager
+	im identity.Manager
+	am access.Manager
 
 	logger log.Logger
 }
 
 type Config struct {
-	FS        fs.Filesystem
-	Superuser User
-	JWTRealm  string
-	JWTSecret string
-	Logger    log.Logger
+	PolicyAdapter   access.Adapter
+	IdentityAdapter identity.Adapter
+	Superuser       identity.User
+	JWTRealm        string
+	JWTSecret       string
+	Logger          log.Logger
 }
 
 func NewIAM(config Config) (IAM, error) {
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        config.FS,
+	im, err := identity.New(identity.Config{
+		Adapter:   config.IdentityAdapter,
 		Superuser: config.Superuser,
 		JWTRealm:  config.JWTRealm,
 		JWTSecret: config.JWTSecret,
@@ -66,9 +68,9 @@ func NewIAM(config Config) (IAM, error) {
 		return nil, err
 	}
 
-	am, err := NewAccessManager(AccessConfig{
-		FS:     config.FS,
-		Logger: config.Logger,
+	am, err := access.New(access.Config{
+		Adapter: config.PolicyAdapter,
+		Logger:  config.Logger,
 	})
 	if err != nil {
 		return nil, err
@@ -138,15 +140,15 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 	return ok
 }
 
-func (i *iam) CreateIdentity(u User) error {
+func (i *iam) CreateIdentity(u identity.User) error {
 	return i.im.Create(u)
 }
 
-func (i *iam) GetIdentity(name string) (User, error) {
+func (i *iam) GetIdentity(name string) (identity.User, error) {
 	return i.im.Get(name)
 }
 
-func (i *iam) UpdateIdentity(name string, u User) error {
+func (i *iam) UpdateIdentity(name string, u identity.User) error {
 	return i.im.Update(name, u)
 }
 
@@ -154,23 +156,23 @@ func (i *iam) DeleteIdentity(name string) error {
 	return i.im.Delete(name)
 }
 
-func (i *iam) ListIdentities() []User {
+func (i *iam) ListIdentities() []identity.User {
 	return nil
 }
 
-func (i *iam) SaveIdentities() error {
-	return i.im.Save()
+func (i *iam) ReloadIndentities() error {
+	return i.im.Reload()
 }
 
-func (i *iam) GetVerifier(name string) (IdentityVerifier, error) {
+func (i *iam) GetVerifier(name string) (identity.Verifier, error) {
 	return i.im.GetVerifier(name)
 }
 
-func (i *iam) GetVerfierFromAuth0(name string) (IdentityVerifier, error) {
+func (i *iam) GetVerfierFromAuth0(name string) (identity.Verifier, error) {
 	return i.im.GetVerifierFromAuth0(name)
 }
 
-func (i *iam) GetDefaultVerifier() IdentityVerifier {
+func (i *iam) GetDefaultVerifier() identity.Verifier {
 	v, _ := i.im.GetDefaultVerifier()
 
 	return v
@@ -220,6 +222,10 @@ func (i *iam) RemovePolicy(name, domain, resource string, actions []string) bool
 	return i.am.RemovePolicy(name, domain, resource, actions)
 }
 
-func (i *iam) ListPolicies(name, domain, resource string, actions []string) []Policy {
+func (i *iam) ListPolicies(name, domain, resource string, actions []string) []access.Policy {
 	return i.am.ListPolicies(name, domain, resource, actions)
+}
+
+func (i *iam) ReloadPolicies() error {
+	return i.am.ReloadPolicies()
 }

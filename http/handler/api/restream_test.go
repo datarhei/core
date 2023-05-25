@@ -10,6 +10,8 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
 	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
@@ -33,9 +35,20 @@ func getDummyRestreamHandler() (*RestreamHandler, error) {
 		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
 	}
 
+	policyAdapter, err := access.NewJSONAdapter(memfs, "./policy.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identityAdapter, err := identity.NewJSONAdapter(memfs, "./users.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	iam, err := iam.NewIAM(iam.Config{
-		FS: memfs,
-		Superuser: iam.User{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser: identity.User{
 			Name: "foobar",
 		},
 		JWTRealm:  "",

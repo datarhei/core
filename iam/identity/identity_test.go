@@ -1,4 +1,4 @@
-package iam
+package identity
 
 import (
 	"testing"
@@ -6,6 +6,15 @@ import (
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/stretchr/testify/require"
 )
+
+func createAdapter() (Adapter, error) {
+	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, err
+	}
+
+	return NewJSONAdapter(dummyfs, "./users.json", nil)
+}
 
 func TestUserName(t *testing.T) {
 	user := User{}
@@ -39,11 +48,11 @@ func TestIdentity(t *testing.T) {
 	identity.user.Superuser = true
 	require.True(t, identity.IsSuperuser())
 
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -58,11 +67,11 @@ func TestIdentity(t *testing.T) {
 }
 
 func TestDefaultIdentity(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -186,11 +195,11 @@ func TestIdentityServiceTokenAuth(t *testing.T) {
 }
 
 func TestJWT(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -239,11 +248,11 @@ func TestJWT(t *testing.T) {
 }
 
 func TestCreateUser(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -263,11 +272,11 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestCreateUserAuth0(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -383,11 +392,13 @@ func TestCreateUserAuth0(t *testing.T) {
 }
 
 func TestLoadAndSave(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adptr, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	dummyfs := adptr.(*fileAdapter).fs
+
+	im, err := New(Config{
+		Adapter:   adptr,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -416,8 +427,8 @@ func TestLoadAndSave(t *testing.T) {
 	err = im.Save()
 	require.NoError(t, err)
 
-	im, err = NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err = New(Config{
+		Adapter:   adptr,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -432,11 +443,11 @@ func TestLoadAndSave(t *testing.T) {
 }
 
 func TestUpdateUser(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -480,11 +491,11 @@ func TestUpdateUser(t *testing.T) {
 }
 
 func TestUpdateUserAuth0(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -537,11 +548,11 @@ func TestUpdateUserAuth0(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -633,11 +644,11 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestRemoveUserAuth0(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	im, err := New(Config{
+		Adapter:   adapter,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -716,11 +727,13 @@ func TestRemoveUserAuth0(t *testing.T) {
 }
 
 func TestAutosave(t *testing.T) {
-	dummyfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	adptr, err := createAdapter()
 	require.NoError(t, err)
 
-	im, err := NewIdentityManager(IdentityConfig{
-		FS:        dummyfs,
+	dummyfs := adptr.(*fileAdapter).fs
+
+	im, err := New(Config{
+		Adapter:   adptr,
 		Superuser: User{Name: "foobar"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
@@ -738,8 +751,6 @@ func TestAutosave(t *testing.T) {
 	data, err := dummyfs.ReadFile("./users.json")
 	require.NoError(t, err)
 	require.Equal(t, []byte("[]"), data)
-
-	im.Autosave(true)
 
 	err = im.Create(User{Name: "foobaz"})
 	require.NoError(t, err)

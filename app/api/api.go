@@ -27,6 +27,8 @@ import (
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/math/rand"
@@ -390,14 +392,14 @@ func (a *api) start() error {
 	}
 
 	{
-		superuser := iam.User{
+		superuser := iamidentity.User{
 			Name:      cfg.API.Auth.Username,
 			Superuser: true,
-			Auth: iam.UserAuth{
-				API: iam.UserAuthAPI{
-					Auth0: iam.UserAuthAPIAuth0{},
+			Auth: iamidentity.UserAuth{
+				API: iamidentity.UserAuthAPI{
+					Auth0: iamidentity.UserAuthAPIAuth0{},
 				},
-				Services: iam.UserAuthServices{
+				Services: iamidentity.UserAuthServices{
 					Token: []string{
 						cfg.RTMP.Token,
 						cfg.SRT.Token,
@@ -412,7 +414,7 @@ func (a *api) start() error {
 
 		if cfg.API.Auth.Auth0.Enable {
 			superuser.Auth.API.Auth0.User = cfg.API.Auth.Auth0.Tenants[0].Users[0]
-			superuser.Auth.API.Auth0.Tenant = iam.Auth0Tenant{
+			superuser.Auth.API.Auth0.Tenant = iamidentity.Auth0Tenant{
 				Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
 				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
 				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
@@ -431,12 +433,23 @@ func (a *api) start() error {
 			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
 		}
 
+		policyAdapter, err := iamaccess.NewJSONAdapter(fs, "./policy.json", nil)
+		if err != nil {
+			return err
+		}
+
+		identityAdapter, err := iamidentity.NewJSONAdapter(fs, "./users.json", nil)
+		if err != nil {
+			return err
+		}
+
 		manager, err := iam.NewIAM(iam.Config{
-			FS:        fs,
-			Superuser: superuser,
-			JWTRealm:  "datarhei-core",
-			JWTSecret: secret,
-			Logger:    a.log.logger.core.WithComponent("IAM"),
+			PolicyAdapter:   policyAdapter,
+			IdentityAdapter: identityAdapter,
+			Superuser:       superuser,
+			JWTRealm:        "datarhei-core",
+			JWTSecret:       secret,
+			Logger:          a.log.logger.core.WithComponent("IAM"),
 		})
 		if err != nil {
 			return fmt.Errorf("iam: %w", err)
@@ -445,7 +458,7 @@ func (a *api) start() error {
 		// Check if there are already file created by IAM. If not, create policies
 		// and users based on the config in order to mimic the behaviour before IAM.
 		if len(fs.List("/", "/*.json")) == 0 {
-			policies := []iam.Policy{
+			policies := []iamaccess.Policy{
 				{
 					Name:     "$anon",
 					Domain:   "$none",
@@ -466,19 +479,19 @@ func (a *api) start() error {
 				},
 			}
 
-			users := map[string]iam.User{}
+			users := map[string]iamidentity.User{}
 
 			if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
-				users[cfg.Storage.Memory.Auth.Username] = iam.User{
+				users[cfg.Storage.Memory.Auth.Username] = iamidentity.User{
 					Name: cfg.Storage.Memory.Auth.Username,
-					Auth: iam.UserAuth{
-						Services: iam.UserAuthServices{
+					Auth: iamidentity.UserAuth{
+						Services: iamidentity.UserAuthServices{
 							Basic: []string{cfg.Storage.Memory.Auth.Password},
 						},
 					},
 				}
 
-				policies = append(policies, iam.Policy{
+				policies = append(policies, iamaccess.Policy{
 					Name:     cfg.Storage.Memory.Auth.Username,
 					Domain:   "$none",
 					Resource: "fs:/memfs/**",
@@ -490,10 +503,10 @@ func (a *api) start() error {
 				if s.Auth.Enable && s.Auth.Username != superuser.Name {
 					user, ok := users[s.Auth.Username]
 					if !ok {
-						users[s.Auth.Username] = iam.User{
+						users[s.Auth.Username] = iamidentity.User{
 							Name: s.Auth.Username,
-							Auth: iam.UserAuth{
-								Services: iam.UserAuthServices{
+							Auth: iamidentity.UserAuth{
+								Services: iamidentity.UserAuthServices{
 									Basic: []string{s.Auth.Password},
 								},
 							},
@@ -503,7 +516,7 @@ func (a *api) start() error {
 						users[s.Auth.Username] = user
 					}
 
-					policies = append(policies, iam.Policy{
+					policies = append(policies, iamaccess.Policy{
 						Name:     s.Auth.Username,
 						Domain:   "$none",
 						Resource: "fs:" + s.Mountpoint + "/**",
@@ -513,7 +526,7 @@ func (a *api) start() error {
 			}
 
 			if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-				policies = append(policies, iam.Policy{
+				policies = append(policies, iamaccess.Policy{
 					Name:     "$anon",
 					Domain:   "$none",
 					Resource: "rtmp:/**",
@@ -522,7 +535,7 @@ func (a *api) start() error {
 			}
 
 			if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-				policies = append(policies, iam.Policy{
+				policies = append(policies, iamaccess.Policy{
 					Name:     "$anon",
 					Domain:   "$none",
 					Resource: "srt:**",
@@ -737,7 +750,7 @@ func (a *api) start() error {
 			}
 			template += "/{name}"
 
-			var identity iam.IdentityVerifier = nil
+			var identity iamidentity.Verifier = nil
 
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()
@@ -763,7 +776,7 @@ func (a *api) start() error {
 				template += ",mode:publish"
 			}
 
-			var identity iam.IdentityVerifier = nil
+			var identity iamidentity.Verifier = nil
 
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()

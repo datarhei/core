@@ -1,4 +1,4 @@
-package iam
+package access
 
 import (
 	"encoding/json"
@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 
 	"github.com/casbin/casbin/v2/model"
+	"github.com/casbin/casbin/v2/persist"
 )
 
 // Adapter is the file adapter for Casbin.
@@ -24,7 +25,14 @@ type adapter struct {
 	lock     sync.Mutex
 }
 
-func newAdapter(fs fs.Filesystem, filePath string, logger log.Logger) (*adapter, error) {
+type Adapter interface {
+	persist.BatchAdapter
+
+	AllDomains() []string
+	HasDomain(string) bool
+}
+
+func NewJSONAdapter(fs fs.Filesystem, filePath string, logger log.Logger) (Adapter, error) {
 	a := &adapter{
 		fs:       fs,
 		filePath: filePath,
@@ -71,6 +79,8 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 	if err != nil {
 		return err
 	}
+
+	model.ClearPolicy()
 
 	rule := [5]string{}
 	for _, domain := range domains {
@@ -511,7 +521,10 @@ func (a *adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 	return fmt.Errorf("not implemented")
 }
 
-func (a *adapter) getAllDomains() []string {
+func (a *adapter) AllDomains() []string {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
 	names := []string{}
 
 	for _, domain := range a.domains {
@@ -523,6 +536,23 @@ func (a *adapter) getAllDomains() []string {
 	}
 
 	return names
+}
+
+func (a *adapter) HasDomain(name string) bool {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	for _, domain := range a.domains {
+		if domain.Name[0] == '$' {
+			continue
+		}
+
+		if domain.Name == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 type Domain struct {

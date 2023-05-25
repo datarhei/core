@@ -1,10 +1,8 @@
-package iam
+package access
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 
 	"github.com/casbin/casbin/v2"
@@ -18,43 +16,40 @@ type Policy struct {
 	Actions  []string
 }
 
-type AccessEnforcer interface {
+type Enforcer interface {
 	Enforce(name, domain, resource, action string) (bool, string)
 
 	HasDomain(name string) bool
 	ListDomains() []string
 }
 
-type AccessManager interface {
-	AccessEnforcer
+type Manager interface {
+	Enforcer
 
 	HasPolicy(name, domain, resource string, actions []string) bool
 	AddPolicy(name, domain, resource string, actions []string) bool
 	RemovePolicy(name, domain, resource string, actions []string) bool
 	ListPolicies(name, domain, resource string, actions []string) []Policy
+	ReloadPolicies() error
 }
 
 type access struct {
-	fs     fs.Filesystem
 	logger log.Logger
 
-	adapter  *adapter
+	adapter  Adapter
+	model    model.Model
 	enforcer *casbin.Enforcer
 }
 
-type AccessConfig struct {
-	FS     fs.Filesystem
-	Logger log.Logger
+type Config struct {
+	Adapter Adapter
+	Logger  log.Logger
 }
 
-func NewAccessManager(config AccessConfig) (AccessManager, error) {
+func New(config Config) (Manager, error) {
 	am := &access{
-		fs:     config.FS,
-		logger: config.Logger,
-	}
-
-	if am.fs == nil {
-		return nil, fmt.Errorf("a filesystem has to be provided")
+		adapter: config.Adapter,
+		logger:  config.Logger,
 	}
 
 	if am.logger == nil {
@@ -68,12 +63,7 @@ func NewAccessManager(config AccessConfig) (AccessManager, error) {
 	m.AddDef("e", "e", "some(where (p.eft == allow))")
 	m.AddDef("m", "m", `g(r.sub, p.sub, r.dom) && r.dom == p.dom && ResourceMatch(r.obj, r.dom, p.obj) && ActionMatch(r.act, p.act) || r.sub == "$superuser"`)
 
-	a, err := newAdapter(am.fs, "./policy.json", am.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	e, err := casbin.NewEnforcer(m, a)
+	e, err := casbin.NewEnforcer(m, am.adapter)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +72,7 @@ func NewAccessManager(config AccessConfig) (AccessManager, error) {
 	e.AddFunction("ActionMatch", actionMatchFunc)
 
 	am.enforcer = e
-	am.adapter = a
+	am.model = m
 
 	return am, nil
 }
@@ -129,20 +119,18 @@ func (am *access) ListPolicies(name, domain, resource string, actions []string) 
 	return policies
 }
 
+func (am *access) ReloadPolicies() error {
+	am.model.ClearPolicy()
+
+	return am.adapter.LoadPolicy(am.model)
+}
+
 func (am *access) HasDomain(name string) bool {
-	groups := am.adapter.getAllDomains()
-
-	for _, g := range groups {
-		if g == name {
-			return true
-		}
-	}
-
-	return false
+	return am.adapter.HasDomain(name)
 }
 
 func (am *access) ListDomains() []string {
-	return am.adapter.getAllDomains()
+	return am.adapter.AllDomains()
 }
 
 func (am *access) Enforce(name, domain, resource, action string) (bool, string) {

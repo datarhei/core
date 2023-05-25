@@ -6,6 +6,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/iam/identity"
 
 	"github.com/labstack/echo/v4"
 )
@@ -70,11 +71,6 @@ func (h *IAMHandler) AddUser(c echo.Context) error {
 		h.iam.AddPolicy(p.Name, p.Domain, p.Resource, p.Actions)
 	}
 
-	err = h.iam.SaveIdentities()
-	if err != nil {
-		return api.Err(http.StatusInternalServerError, "Internal server error", "%s", err)
-	}
-
 	return c.JSON(http.StatusOK, user)
 }
 
@@ -116,11 +112,6 @@ func (h *IAMHandler) RemoveUser(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 	}
 
-	err = h.iam.SaveIdentities()
-	if err != nil {
-		return api.Err(http.StatusInternalServerError, "Internal server error", "%s", err)
-	}
-
 	// Remove all policies of that user
 	h.iam.RemovePolicy(name, "", "", nil)
 
@@ -153,7 +144,7 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
 	}
 
-	var iamuser iam.User
+	var iamuser identity.User
 	var err error
 
 	if name != "$anon" {
@@ -162,7 +153,7 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 			return api.Err(http.StatusNotFound, "Not found", "%s", err)
 		}
 	} else {
-		iamuser = iam.User{
+		iamuser = identity.User{
 			Name: "$anon",
 		}
 	}
@@ -205,11 +196,6 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 		h.iam.AddPolicy(p.Name, p.Domain, p.Resource, p.Actions)
 	}
 
-	err = h.iam.SaveIdentities()
-	if err != nil {
-		return api.Err(http.StatusInternalServerError, "Internal server error", "%s", err)
-	}
-
 	return c.JSON(http.StatusOK, user)
 }
 
@@ -239,7 +225,7 @@ func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
 	}
 
-	var iamuser iam.User
+	var iamuser identity.User
 	var err error
 
 	if name != "$anon" {
@@ -248,7 +234,7 @@ func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
 			return api.Err(http.StatusNotFound, "Not found", "%s", err)
 		}
 	} else {
-		iamuser = iam.User{
+		iamuser = identity.User{
 			Name: "$anon",
 		}
 	}
@@ -300,7 +286,7 @@ func (h *IAMHandler) GetUser(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to access this user")
 	}
 
-	var iamuser iam.User
+	var iamuser identity.User
 	var err error
 
 	if name != "$anon" {
@@ -311,13 +297,13 @@ func (h *IAMHandler) GetUser(c echo.Context) error {
 
 		if !superuser && name != iamuser.Name {
 			if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-				iamuser = iam.User{
+				iamuser = identity.User{
 					Name: iamuser.Name,
 				}
 			}
 		}
 	} else {
-		iamuser = iam.User{
+		iamuser = identity.User{
 			Name: "$anon",
 		}
 	}

@@ -7,6 +7,8 @@ import (
 
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
@@ -39,9 +41,20 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
+	policyAdapter, err := iamaccess.NewJSONAdapter(dummyfs, "./policy.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identityAdapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	iam, err := iam.NewIAM(iam.Config{
-		FS: dummyfs,
-		Superuser: iam.User{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser: iamidentity.User{
 			Name: "foobar",
 		},
 		JWTRealm:  "",

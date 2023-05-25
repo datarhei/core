@@ -44,6 +44,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 
 	jwtgo "github.com/golang-jwt/jwt/v4"
@@ -117,7 +118,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				isAPISuperuser = true
 			}
 
-			var identity iam.IdentityVerifier = nil
+			var identity iamidentity.Verifier = nil
 			var err error
 
 			username := "$anon"
@@ -231,7 +232,7 @@ var ErrAuthRequired = errors.New("unauthorized")
 var ErrUnauthorized = errors.New("unauthorized")
 var ErrBadRequest = errors.New("bad request")
 
-func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityVerifier, error) {
+func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iamidentity.Verifier, error) {
 	basic := "basic"
 	auth := c.Request().Header.Get(echo.HeaderAuthorization)
 	l := len(basic)
@@ -290,7 +291,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iam.IdentityV
 	return identity, nil
 }
 
-func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iam.IdentityVerifier, error) {
+func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iamidentity.Verifier, error) {
 	// Look for an Auth header
 	values := c.Request().Header.Values("Authorization")
 	prefix := "Bearer "
@@ -356,7 +357,7 @@ func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iam.IdentityVerifie
 	return identity, nil
 }
 
-func (m *iammiddleware) findIdentityFromUserpass(c echo.Context) (iam.IdentityVerifier, error) {
+func (m *iammiddleware) findIdentityFromUserpass(c echo.Context) (iamidentity.Verifier, error) {
 	var login api.Login
 
 	if err := util.ShouldBindJSON(c, &login); err != nil {
@@ -383,7 +384,7 @@ func (m *iammiddleware) findIdentityFromUserpass(c echo.Context) (iam.IdentityVe
 	return identity, nil
 }
 
-func (m *iammiddleware) findIdentityFromAuth0(c echo.Context) (iam.IdentityVerifier, error) {
+func (m *iammiddleware) findIdentityFromAuth0(c echo.Context) (iamidentity.Verifier, error) {
 	// Look for an Auth header
 	values := c.Request().Header.Values("Authorization")
 	prefix := "Bearer "

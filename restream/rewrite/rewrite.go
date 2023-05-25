@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/datarhei/core/v16/iam"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/rtmp"
 	srturl "github.com/datarhei/core/v16/srt/url"
 )
@@ -25,7 +25,7 @@ type Config struct {
 
 // to a new identity, i.e. adjusting the credentials to the given identity.
 type Rewriter interface {
-	RewriteAddress(address string, identity iam.IdentityVerifier, mode Access) string
+	RewriteAddress(address string, identity iamidentity.Verifier, mode Access) string
 }
 
 type rewrite struct {
@@ -44,7 +44,7 @@ func New(config Config) (Rewriter, error) {
 	return r, nil
 }
 
-func (g *rewrite) RewriteAddress(address string, identity iam.IdentityVerifier, mode Access) string {
+func (g *rewrite) RewriteAddress(address string, identity iamidentity.Verifier, mode Access) string {
 	u, err := url.Parse(address)
 	if err != nil {
 		return address
@@ -104,7 +104,7 @@ func (g *rewrite) isLocal(u *url.URL) bool {
 	return host == base.Host
 }
 
-func (g *rewrite) httpURL(u *url.URL, mode Access, identity iam.IdentityVerifier) string {
+func (g *rewrite) httpURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
 	password := identity.GetServiceBasicAuth()
 
 	if len(password) == 0 {
@@ -116,7 +116,7 @@ func (g *rewrite) httpURL(u *url.URL, mode Access, identity iam.IdentityVerifier
 	return u.String()
 }
 
-func (g *rewrite) rtmpURL(u *url.URL, mode Access, identity iam.IdentityVerifier) string {
+func (g *rewrite) rtmpURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
 	token := identity.GetServiceToken()
 
 	// Remove the existing token from the path
@@ -131,7 +131,7 @@ func (g *rewrite) rtmpURL(u *url.URL, mode Access, identity iam.IdentityVerifier
 	return u.String()
 }
 
-func (g *rewrite) srtURL(u *url.URL, mode Access, identity iam.IdentityVerifier) string {
+func (g *rewrite) srtURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
 	token := identity.GetServiceToken()
 
 	q := u.Query()

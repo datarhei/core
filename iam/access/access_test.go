@@ -1,4 +1,4 @@
-package iam
+package access
 
 import (
 	"testing"
@@ -7,13 +7,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAccessManager(t *testing.T) {
+func createAdapter() (Adapter, error) {
 	memfs, err := fs.NewMemFilesystemFromDir("./fixtures", fs.MemConfig{})
+	if err != nil {
+		return nil, err
+	}
+
+	return NewJSONAdapter(memfs, "./policy.json", nil)
+}
+
+func TestAccessManager(t *testing.T) {
+	adapter, err := createAdapter()
 	require.NoError(t, err)
 
-	am, err := NewAccessManager(AccessConfig{
-		FS:     memfs,
-		Logger: nil,
+	am, err := New(Config{
+		Adapter: adapter,
+		Logger:  nil,
 	})
 	require.NoError(t, err)
 

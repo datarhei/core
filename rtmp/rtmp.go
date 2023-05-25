@@ -13,6 +13,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/iam"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 
@@ -467,7 +468,7 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 		return "$anon", nil
 	}
 
-	var identity iam.IdentityVerifier
+	var identity iamidentity.Verifier
 	var err error
 
 	var token string

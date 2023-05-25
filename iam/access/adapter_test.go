@@ -1,4 +1,4 @@
-package iam
+package access
 
 import (
 	"encoding/json"
@@ -12,8 +12,11 @@ func TestAddPolicy(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	a, err := newAdapter(memfs, "/policy.json", nil)
+	ai, err := NewJSONAdapter(memfs, "/policy.json", nil)
 	require.NoError(t, err)
+
+	a, ok := ai.(*adapter)
+	require.True(t, ok)
 
 	err = a.AddPolicy("p", "p", []string{"foobar", "group", "resource", "action"})
 	require.NoError(t, err)
@@ -53,8 +56,11 @@ func TestRemovePolicy(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	a, err := newAdapter(memfs, "/policy.json", nil)
+	ai, err := NewJSONAdapter(memfs, "/policy.json", nil)
 	require.NoError(t, err)
+
+	a, ok := ai.(*adapter)
+	require.True(t, ok)
 
 	err = a.AddPolicies("p", "p", [][]string{
 		{"foobar1", "group", "resource1", "action1"},

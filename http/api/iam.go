@@ -1,6 +1,9 @@
 package api
 
-import "github.com/datarhei/core/v16/iam"
+import (
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
+)
 
 type IAMUser struct {
 	Name      string      `json:"name"`
@@ -9,7 +12,7 @@ type IAMUser struct {
 	Policies  []IAMPolicy `json:"policies"`
 }
 
-func (u *IAMUser) Marshal(user iam.User, policies []iam.Policy) {
+func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 	u.Name = user.Name
 	u.Superuser = user.Superuser
 	u.Auth = IAMUserAuth{
@@ -39,33 +42,33 @@ func (u *IAMUser) Marshal(user iam.User, policies []iam.Policy) {
 	}
 }
 
-func (u *IAMUser) Unmarshal() (iam.User, []iam.Policy) {
-	iamuser := iam.User{
+func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
+	iamuser := identity.User{
 		Name:      u.Name,
 		Superuser: u.Superuser,
-		Auth: iam.UserAuth{
-			API: iam.UserAuthAPI{
+		Auth: identity.UserAuth{
+			API: identity.UserAuthAPI{
 				Password: u.Auth.API.Password,
-				Auth0: iam.UserAuthAPIAuth0{
+				Auth0: identity.UserAuthAPIAuth0{
 					User: u.Auth.API.Auth0.User,
-					Tenant: iam.Auth0Tenant{
+					Tenant: identity.Auth0Tenant{
 						Domain:   u.Auth.API.Auth0.Tenant.Domain,
 						Audience: u.Auth.API.Auth0.Tenant.Audience,
 						ClientID: u.Auth.API.Auth0.Tenant.ClientID,
 					},
 				},
 			},
-			Services: iam.UserAuthServices{
+			Services: identity.UserAuthServices{
 				Basic: u.Auth.Services.Basic,
 				Token: u.Auth.Services.Token,
 			},
 		},
 	}
 
-	iampolicies := []iam.Policy{}
+	iampolicies := []access.Policy{}
 
 	for _, p := range u.Policies {
-		iampolicies = append(iampolicies, iam.Policy{
+		iampolicies = append(iampolicies, access.Policy{
 			Name:     u.Name,
 			Domain:   p.Domain,
 			Resource: p.Resource,

@@ -1,15 +1,12 @@
-package iam
+package identity
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/iam/jwks"
-	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/google/uuid"
 
@@ -79,7 +76,7 @@ func (u *User) clone() User {
 	return user
 }
 
-type IdentityVerifier interface {
+type Verifier interface {
 	Name() string
 
 	VerifyJWT(jwt string) (bool, error)
@@ -369,21 +366,23 @@ func (i *identity) IsSuperuser() bool {
 	return i.user.Superuser
 }
 
-type IdentityManager interface {
+type Manager interface {
 	Create(identity User) error
 	Update(name string, identity User) error
 	Delete(name string) error
 
 	Get(name string) (User, error)
-	GetVerifier(name string) (IdentityVerifier, error)
-	GetVerifierFromAuth0(name string) (IdentityVerifier, error)
-	GetDefaultVerifier() (IdentityVerifier, error)
+	GetVerifier(name string) (Verifier, error)
+	GetVerifierFromAuth0(name string) (Verifier, error)
+	GetDefaultVerifier() (Verifier, error)
+
+	Reload() error // Reload users from adapter
+	Save() error   // Save users to adapter
+	List() []User  // List all users
 
 	Validators() []string
 	CreateJWT(name string) (string, string, error)
 
-	Save() error
-	Autosave(bool)
 	Close()
 }
 
@@ -395,8 +394,7 @@ type identityManager struct {
 
 	auth0UserIdentityMap map[string]string
 
-	fs       fs.Filesystem
-	filePath string
+	adapter  Adapter
 	autosave bool
 	logger   log.Logger
 
@@ -406,21 +404,20 @@ type identityManager struct {
 	lock sync.RWMutex
 }
 
-type IdentityConfig struct {
-	FS        fs.Filesystem
+type Config struct {
+	Adapter   Adapter
 	Superuser User
 	JWTRealm  string
 	JWTSecret string
 	Logger    log.Logger
 }
 
-func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
+func New(config Config) (Manager, error) {
 	im := &identityManager{
 		identities:           map[string]*identity{},
 		tenants:              map[string]*auth0Tenant{},
 		auth0UserIdentityMap: map[string]string{},
-		fs:                   config.FS,
-		filePath:             "./users.json",
+		adapter:              config.Adapter,
 		jwtRealm:             config.JWTRealm,
 		jwtSecret:            []byte(config.JWTSecret),
 		logger:               config.Logger,
@@ -430,13 +427,8 @@ func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 		im.logger = log.New("")
 	}
 
-	if im.fs == nil {
-		return nil, fmt.Errorf("no filesystem provided")
-	}
-
-	err := im.load(im.filePath)
-	if err != nil {
-		return nil, err
+	if im.adapter == nil {
+		return nil, fmt.Errorf("no adapter provided")
 	}
 
 	config.Superuser.Superuser = true
@@ -446,7 +438,13 @@ func NewIdentityManager(config IdentityConfig) (IdentityManager, error) {
 	}
 
 	im.root = identity
-	im.autosave = true
+
+	err = im.Reload()
+	if err != nil {
+		return nil, err
+	}
+
+	im.Save()
 
 	return im, nil
 }
@@ -455,7 +453,7 @@ func (im *identityManager) Close() {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	im.fs = nil
+	im.adapter = nil
 	im.auth0UserIdentityMap = map[string]string{}
 	im.identities = map[string]*identity{}
 	im.root = nil
@@ -465,6 +463,51 @@ func (im *identityManager) Close() {
 	}
 
 	im.tenants = map[string]*auth0Tenant{}
+}
+
+func (im *identityManager) Reload() error {
+	users, err := im.adapter.LoadIdentities()
+	if err != nil {
+		return fmt.Errorf("load users from adapter: %w", err)
+	}
+
+	im.lock.Lock()
+	defer im.lock.Unlock()
+
+	im.autosave = false
+	defer func() {
+		im.autosave = true
+	}()
+
+	names := []string{}
+
+	for name := range im.identities {
+		names = append(names, name)
+	}
+
+	for _, name := range names {
+		im.delete(name)
+	}
+
+	for _, u := range users {
+		if im.root != nil && u.Name == im.root.user.Name {
+			continue
+		}
+
+		_, ok := im.identities[u.Name]
+		if ok {
+			continue
+		}
+
+		identity, err := im.create(u)
+		if err != nil {
+			continue
+		}
+
+		im.identities[identity.user.Name] = identity
+	}
+
+	return nil
 }
 
 func (im *identityManager) Create(u User) error {
@@ -492,7 +535,7 @@ func (im *identityManager) Create(u User) error {
 	im.identities[identity.user.Name] = identity
 
 	if im.autosave {
-		im.save(im.filePath)
+		im.save()
 	}
 
 	return nil
@@ -580,7 +623,7 @@ func (im *identityManager) Update(name string, u User) error {
 	}).Log("Identity updated")
 
 	if im.autosave {
-		im.save(im.filePath)
+		im.save()
 	}
 
 	return nil
@@ -590,7 +633,12 @@ func (im *identityManager) Delete(name string) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	return im.delete(name)
+	err := im.delete(name)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (im *identityManager) delete(name string) error {
@@ -611,7 +659,7 @@ func (im *identityManager) delete(name string) error {
 
 	if len(identity.user.Auth.API.Auth0.User) == 0 {
 		if im.autosave {
-			im.save(im.filePath)
+			im.save()
 		}
 
 		return nil
@@ -633,7 +681,7 @@ func (im *identityManager) delete(name string) error {
 		delete(im.tenants, identity.user.Auth.API.Auth0.Tenant.key())
 
 		if im.autosave {
-			im.save(im.filePath)
+			im.save()
 		}
 
 		return nil
@@ -657,7 +705,9 @@ func (im *identityManager) delete(name string) error {
 	}
 
 	if im.autosave {
-		im.save(im.filePath)
+		if err := im.save(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -696,14 +746,14 @@ func (im *identityManager) Get(name string) (User, error) {
 	return user, nil
 }
 
-func (im *identityManager) GetVerifier(name string) (IdentityVerifier, error) {
+func (im *identityManager) GetVerifier(name string) (Verifier, error) {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
 	return im.getIdentity(name)
 }
 
-func (im *identityManager) GetVerifierFromAuth0(name string) (IdentityVerifier, error) {
+func (im *identityManager) GetVerifierFromAuth0(name string) (Verifier, error) {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
@@ -715,65 +765,38 @@ func (im *identityManager) GetVerifierFromAuth0(name string) (IdentityVerifier, 
 	return im.getIdentity(name)
 }
 
-func (im *identityManager) GetDefaultVerifier() (IdentityVerifier, error) {
+func (im *identityManager) GetDefaultVerifier() (Verifier, error) {
 	return im.root, nil
 }
 
-func (im *identityManager) load(filePath string) error {
-	if _, err := im.fs.Stat(filePath); os.IsNotExist(err) {
-		return nil
-	}
-
-	data, err := im.fs.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
+func (im *identityManager) List() []User {
+	im.lock.RLock()
+	defer im.lock.RUnlock()
 
 	users := []User{}
 
-	err = json.Unmarshal(data, &users)
-	if err != nil {
-		return err
+	for _, identity := range im.identities {
+		users = append(users, identity.user.clone())
 	}
 
-	for _, u := range users {
-		err = im.Create(u)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return users
 }
 
 func (im *identityManager) Save() error {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
-	return im.save(im.filePath)
+	return im.save()
 }
 
-func (im *identityManager) save(filePath string) error {
-	if filePath == "" {
-		return fmt.Errorf("invalid file path, file path cannot be empty")
-	}
-
+func (im *identityManager) save() error {
 	users := []User{}
 
 	for _, u := range im.identities {
 		users = append(users, u.user)
 	}
 
-	jsondata, err := json.MarshalIndent(users, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	_, _, err = im.fs.WriteFileSafe(filePath, jsondata)
-
-	im.logger.Debug().WithField("path", filePath).Log("Identity file save")
-
-	return err
+	return im.adapter.SaveIdentities(users)
 }
 
 func (im *identityManager) Autosave(auto bool) {

@@ -4,21 +4,26 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/datarhei/core/v16/iam"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/stretchr/testify/require"
 )
 
-func getIdentityManager(enableBasic bool) iam.IdentityManager {
+func getIdentityManager(enableBasic bool) (iamidentity.Manager, error) {
 	dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
 
-	superuser := iam.User{
+	adapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	superuser := iamidentity.User{
 		Name:      "foobar",
 		Superuser: false,
-		Auth: iam.UserAuth{
-			API: iam.UserAuthAPI{},
-			Services: iam.UserAuthServices{
+		Auth: iamidentity.UserAuth{
+			API: iamidentity.UserAuthAPI{},
+			Services: iamidentity.UserAuthServices{
 				Token: []string{"servicetoken"},
 			},
 		},
@@ -28,19 +33,20 @@ func getIdentityManager(enableBasic bool) iam.IdentityManager {
 		superuser.Auth.Services.Basic = []string{"basicauthpassword"}
 	}
 
-	im, _ := iam.NewIdentityManager(iam.IdentityConfig{
-		FS:        dummyfs,
+	im, err := iamidentity.New(iamidentity.Config{
+		Adapter:   adapter,
 		Superuser: superuser,
 		JWTRealm:  "",
 		JWTSecret: "",
 		Logger:    nil,
 	})
 
-	return im
+	return im, err
 }
 
 func TestRewriteHTTP(t *testing.T) {
-	im := getIdentityManager(false)
+	im, err := getIdentityManager(false)
+	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		HTTPBase: "http://localhost:8080/",
@@ -70,7 +76,8 @@ func TestRewriteHTTP(t *testing.T) {
 }
 
 func TestRewriteHTTPPassword(t *testing.T) {
-	im := getIdentityManager(true)
+	im, err := getIdentityManager(true)
+	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		HTTPBase: "http://localhost:8080/",
@@ -100,7 +107,8 @@ func TestRewriteHTTPPassword(t *testing.T) {
 }
 
 func TestRewriteRTMP(t *testing.T) {
-	im := getIdentityManager(false)
+	im, err := getIdentityManager(false)
+	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		RTMPBase: "rtmp://localhost:1935/live",
@@ -128,7 +136,8 @@ func TestRewriteRTMP(t *testing.T) {
 }
 
 func TestRewriteSRT(t *testing.T) {
-	im := getIdentityManager(false)
+	im, err := getIdentityManager(false)
+	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		SRTBase: "srt://localhost:6000/",

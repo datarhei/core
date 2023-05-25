@@ -14,6 +14,8 @@ import (
 	apihandler "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
@@ -28,9 +30,20 @@ func getIAM() (iam.IAM, error) {
 		return nil, err
 	}
 
+	policyAdapter, err := iamaccess.NewJSONAdapter(dummyfs, "./policy.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identityAdapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	i, err := iam.NewIAM(iam.Config{
-		FS: dummyfs,
-		Superuser: iam.User{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser: iamidentity.User{
 			Name: "admin",
 		},
 		JWTRealm:  "datarhei-core",
@@ -41,13 +54,13 @@ func getIAM() (iam.IAM, error) {
 		return nil, err
 	}
 
-	i.CreateIdentity(iam.User{
+	i.CreateIdentity(iamidentity.User{
 		Name: "foobar",
-		Auth: iam.UserAuth{
-			API: iam.UserAuthAPI{
+		Auth: iamidentity.UserAuth{
+			API: iamidentity.UserAuthAPI{
 				Password: "secret",
 			},
-			Services: iam.UserAuthServices{
+			Services: iamidentity.UserAuthServices{
 				Basic: []string{"secret"},
 			},
 		},
