@@ -157,7 +157,11 @@ func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
 		origin = f.id
 	}
 
-	r := apiclient.UpdateProcessRequest{}
+	r := apiclient.UpdateProcessRequest{
+		Origin: origin,
+		ID:     id,
+		Config: *config,
+	}
 
 	f.lock.RLock()
 	client := f.client
