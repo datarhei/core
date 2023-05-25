@@ -16,7 +16,7 @@ import (
 // The RestreamHandler type provides functions to interact with a Restreamer instance
 type RestreamHandler struct {
 	restream restream.Restreamer
-	iam      iam.IAM
+	iam      iam.Enforcer
 }
 
 // NewRestream return a new Restream type. You have to provide a valid Restreamer instance.

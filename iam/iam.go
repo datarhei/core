@@ -5,8 +5,12 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
-type IAM interface {
+type Enforcer interface {
 	Enforce(name, domain, resource, action string) bool
+}
+
+type IAM interface {
+	Enforcer
 
 	HasDomain(domain string) bool
 	ListDomains() []string
