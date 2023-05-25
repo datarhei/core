@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
+	github.com/casbin/casbin/v2 v2.60.0
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230512155342-18a7ac72df3a
 	github.com/datarhei/gosrt v0.3.1
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
@@ -39,6 +40,7 @@ require (
 //replace github.com/datarhei/core-client-go/v16 => ../core-client-go
 
 require (
+	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect

@@ -25,8 +25,8 @@ import (
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
-	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/math/rand"
@@ -36,7 +36,9 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/rewrite"
 	restreamstore "github.com/datarhei/core/v16/restream/store"
+	restreamjsonstore "github.com/datarhei/core/v16/restream/store/json"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
@@ -83,10 +85,10 @@ type api struct {
 	cache           cache.Cacher
 	mainserver      *gohttp.Server
 	sidecarserver   *gohttp.Server
-	httpjwt         jwt.JWT
 	update          update.Checker
 	replacer        replace.Replacer
 	cluster         cluster.Cluster
+	iam             iam.IAM
 
 	errorChan chan error
 
@@ -387,6 +389,166 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
+	{
+		superuser := iam.User{
+			Name:      cfg.API.Auth.Username,
+			Superuser: true,
+			Auth: iam.UserAuth{
+				API: iam.UserAuthAPI{
+					Auth0: iam.UserAuthAPIAuth0{},
+				},
+				Services: iam.UserAuthServices{
+					Token: []string{
+						cfg.RTMP.Token,
+						cfg.SRT.Token,
+					},
+				},
+			},
+		}
+
+		if cfg.API.Auth.Enable {
+			superuser.Auth.API.Password = cfg.API.Auth.Password
+		}
+
+		if cfg.API.Auth.Auth0.Enable {
+			superuser.Auth.API.Auth0.User = cfg.API.Auth.Auth0.Tenants[0].Users[0]
+			superuser.Auth.API.Auth0.Tenant = iam.Auth0Tenant{
+				Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
+				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
+				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
+			}
+		}
+
+		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+			Root: filepath.Join(cfg.DB.Dir, "iam"),
+		})
+		if err != nil {
+			return err
+		}
+
+		secret := rand.String(32)
+		if len(cfg.API.Auth.JWT.Secret) != 0 {
+			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
+		}
+
+		manager, err := iam.NewIAM(iam.Config{
+			FS:        fs,
+			Superuser: superuser,
+			JWTRealm:  "datarhei-core",
+			JWTSecret: secret,
+			Logger:    a.log.logger.core.WithComponent("IAM"),
+		})
+		if err != nil {
+			return fmt.Errorf("iam: %w", err)
+		}
+
+		// Check if there are already file created by IAM. If not, create policies
+		// and users based on the config in order to mimic the behaviour before IAM.
+		if len(fs.List("/", "/*.json")) == 0 {
+			policies := []iam.Policy{
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "fs:/**",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "api:/api",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
+				{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "api:/api/v3/widget/process/**",
+					Actions:  []string{"GET", "HEAD", "OPTIONS"},
+				},
+			}
+
+			users := map[string]iam.User{}
+
+			if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
+				users[cfg.Storage.Memory.Auth.Username] = iam.User{
+					Name: cfg.Storage.Memory.Auth.Username,
+					Auth: iam.UserAuth{
+						Services: iam.UserAuthServices{
+							Basic: []string{cfg.Storage.Memory.Auth.Password},
+						},
+					},
+				}
+
+				policies = append(policies, iam.Policy{
+					Name:     cfg.Storage.Memory.Auth.Username,
+					Domain:   "$none",
+					Resource: "fs:/memfs/**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			for _, s := range cfg.Storage.S3 {
+				if s.Auth.Enable && s.Auth.Username != superuser.Name {
+					user, ok := users[s.Auth.Username]
+					if !ok {
+						users[s.Auth.Username] = iam.User{
+							Name: s.Auth.Username,
+							Auth: iam.UserAuth{
+								Services: iam.UserAuthServices{
+									Basic: []string{s.Auth.Password},
+								},
+							},
+						}
+					} else {
+						user.Auth.Services.Basic = append(user.Auth.Services.Basic, s.Auth.Password)
+						users[s.Auth.Username] = user
+					}
+
+					policies = append(policies, iam.Policy{
+						Name:     s.Auth.Username,
+						Domain:   "$none",
+						Resource: "fs:" + s.Mountpoint + "/**",
+						Actions:  []string{"ANY"},
+					})
+				}
+			}
+
+			if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+				policies = append(policies, iam.Policy{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "rtmp:/**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+				policies = append(policies, iam.Policy{
+					Name:     "$anon",
+					Domain:   "$none",
+					Resource: "srt:**",
+					Actions:  []string{"ANY"},
+				})
+			}
+
+			for _, user := range users {
+				if _, err := manager.GetIdentity(user.Name); err == nil {
+					continue
+				}
+
+				err := manager.CreateIdentity(user)
+				if err != nil {
+					return fmt.Errorf("iam: %w", err)
+				}
+			}
+
+			for _, policy := range policies {
+				manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
+			}
+		}
+
+		a.iam = manager
+	}
+
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 		Root:   cfg.Storage.Disk.Dir,
 		Logger: a.log.logger.core.WithComponent("DiskFS"),
@@ -511,6 +673,35 @@ func (a *api) start() error {
 
 	a.ffmpeg = ffmpeg
 
+	var rw rewrite.Rewriter
+
+	{
+		baseAddress := func(address string) string {
+			var base string
+			host, port, _ := gonet.SplitHostPort(address)
+			if len(host) == 0 {
+				base = "localhost:" + port
+			} else {
+				base = address
+			}
+
+			return base
+		}
+
+		httpBase := baseAddress(cfg.Address)
+		rtmpBase := baseAddress(cfg.RTMP.Address) + cfg.RTMP.App
+		srtBase := baseAddress(cfg.SRT.Address)
+
+		rw, err = rewrite.New(rewrite.Config{
+			HTTPBase: "http://" + httpBase,
+			RTMPBase: "rtmp://" + rtmpBase,
+			SRTBase:  "srt://" + srtBase,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create url rewriter: %w", err)
+		}
+	}
+
 	a.replacer = replace.New()
 
 	{
@@ -546,8 +737,16 @@ func (a *api) start() error {
 			}
 			template += "/{name}"
 
-			if len(cfg.RTMP.Token) != 0 {
-				template += "?token=" + cfg.RTMP.Token
+			var identity iam.IdentityVerifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				template += "/" + identity.GetServiceToken()
 			}
 
 			return template
@@ -562,14 +761,22 @@ func (a *api) start() error {
 			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency={latency}&streamid={name}"
 			if section == "output" {
 				template += ",mode:publish"
+			}
+
+			var identity iam.IdentityVerifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
 			} else {
-				template += ",mode:request"
+				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
-			if len(cfg.SRT.Token) != 0 {
-				template += ",token:" + cfg.SRT.Token
+
+			if identity != nil {
+				template += ",token:" + identity.GetServiceToken()
 			}
+
 			if len(cfg.SRT.Passphrase) != 0 {
-				template += "&passphrase=" + cfg.SRT.Passphrase
+				template += "&passphrase=" + url.QueryEscape(cfg.SRT.Passphrase)
 			}
 
 			return template
@@ -596,7 +803,7 @@ func (a *api) start() error {
 		if err != nil {
 			return err
 		}
-		store, err = restreamstore.NewJSON(restreamstore.JSONConfig{
+		store, err = restreamjsonstore.New(restreamjsonstore.Config{
 			Filesystem: fs,
 			Filepath:   "/db.json",
 			Logger:     a.log.logger.core.WithComponent("ProcessStore"),
@@ -612,8 +819,10 @@ func (a *api) start() error {
 		Store:        store,
 		Filesystems:  filesystems,
 		Replace:      a.replacer,
+		Rewrite:      rw,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
+		IAM:          a.iam,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 
@@ -684,48 +893,6 @@ func (a *api) start() error {
 
 		a.cluster = cluster
 	}
-
-	var httpjwt jwt.JWT
-
-	if cfg.API.Auth.Enable {
-		secret := rand.String(32)
-		if len(cfg.API.Auth.JWT.Secret) != 0 {
-			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
-		}
-
-		var err error
-		httpjwt, err = jwt.New(jwt.Config{
-			Realm:         app.Name,
-			Secret:        secret,
-			SkipLocalhost: cfg.API.Auth.DisableLocalhost,
-		})
-
-		if err != nil {
-			return fmt.Errorf("unable to create JWT provider: %w", err)
-		}
-
-		if validator, err := jwt.NewLocalValidator(cfg.API.Auth.Username, cfg.API.Auth.Password); err == nil {
-			if err := httpjwt.AddValidator(app.Name, validator); err != nil {
-				return fmt.Errorf("unable to add local JWT validator: %w", err)
-			}
-		} else {
-			return fmt.Errorf("unable to create local JWT validator: %w", err)
-		}
-
-		if cfg.API.Auth.Auth0.Enable {
-			for _, t := range cfg.API.Auth.Auth0.Tenants {
-				if validator, err := jwt.NewAuth0Validator(t.Domain, t.Audience, t.ClientID, t.Users); err == nil {
-					if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
-						return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
-					}
-				} else {
-					return fmt.Errorf("unable to create Auth0 JWT validator: %w", err)
-				}
-			}
-		}
-	}
-
-	a.httpjwt = httpjwt
 
 	metrics, err := monitor.NewHistory(monitor.HistoryConfig{
 		Enable:    cfg.Metrics.Enable,
@@ -948,6 +1115,7 @@ func (a *api) start() error {
 			Token:     cfg.RTMP.Token,
 			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
+			IAM:       a.iam,
 		}
 
 		if a.cluster != nil {
@@ -980,6 +1148,7 @@ func (a *api) start() error {
 			Token:      cfg.SRT.Token,
 			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
 			Collector:  a.sessions.Collector("srt"),
+			IAM:        a.iam,
 		}
 
 		if a.cluster != nil {
@@ -1089,12 +1258,28 @@ func (a *api) start() error {
 		},
 		RTMP:     a.rtmpserver,
 		SRT:      a.srtserver,
-		JWT:      a.httpjwt,
 		Config:   a.config.store,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
 		Cluster:  a.cluster,
+		IAM:      a.iam,
+		IAMSkipper: func(ip string) bool {
+			if !cfg.API.Auth.Enable {
+				return true
+			} else {
+				isLocalhost := false
+				if ip == "127.0.0.1" || ip == "::1" {
+					isLocalhost = true
+				}
+
+				if isLocalhost && cfg.API.Auth.DisableLocalhost {
+					return true
+				}
+			}
+
+			return false
+		},
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)
@@ -1379,9 +1564,8 @@ func (a *api) stop() {
 		a.cluster.Shutdown()
 	}
 
-	// Stop JWT authentication
-	if a.httpjwt != nil {
-		a.httpjwt.ClearValidators()
+	if a.iam != nil {
+		a.iam.Close()
 	}
 
 	if a.update != nil {

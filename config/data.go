@@ -82,10 +82,10 @@ type Data struct {
 		} `json:"disk"`
 		Memory struct {
 			Auth struct {
-				Enable   bool   `json:"enable"`
-				Username string `json:"username"`
-				Password string `json:"password"`
-			} `json:"auth"`
+				Enable   bool   `json:"enable"`   // Deprecated, use IAM
+				Username string `json:"username"` // Deprecated, use IAM
+				Password string `json:"password"` // Deprecated, use IAM
+			} `json:"auth"` // Deprecated, use IAM
 			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
@@ -101,13 +101,13 @@ type Data struct {
 		Address    string `json:"address"`
 		AddressTLS string `json:"address_tls"`
 		App        string `json:"app"`
-		Token      string `json:"token"`
+		Token      string `json:"token"` // Deprecated, use IAM
 	} `json:"rtmp"`
 	SRT struct {
 		Enable     bool   `json:"enable"`
 		Address    string `json:"address"`
 		Passphrase string `json:"passphrase"`
-		Token      string `json:"token"`
+		Token      string `json:"token"` // Deprecated, use IAM
 		Log        struct {
 			Enable bool     `json:"enable"`
 			Topics []string `json:"topics"`

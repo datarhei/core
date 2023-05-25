@@ -16,10 +16,11 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
-	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/invopop/jsonschema"
 	"github.com/labstack/echo/v4"
@@ -38,7 +39,7 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
 	}
 
-	store, err := store.NewJSON(store.JSONConfig{
+	store, err := jsonstore.New(jsonstore.Config{
 		Filesystem: memfs,
 	})
 	if err != nil {
@@ -52,9 +53,23 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, err
 	}
 
+	iam, err := iam.NewIAM(iam.Config{
+		FS: memfs,
+		Superuser: iam.User{
+			Name: "foobar",
+		},
+		JWTRealm:  "",
+		JWTSecret: "",
+		Logger:    nil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	rs, err := restream.New(restream.Config{
 		Store:  store,
 		FFmpeg: ffmpeg,
+		IAM:    iam,
 	})
 	if err != nil {
 		return nil, err

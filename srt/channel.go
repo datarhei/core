@@ -44,12 +44,13 @@ func (c *client) ticker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	stats := &srt.Statistics{}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			stats := &srt.Statistics{}
 			c.conn.Stats(stats)
 
 			rxbytes := stats.Accumulated.ByteRecv

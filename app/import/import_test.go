@@ -1,13 +1,11 @@
 package main
 
 import (
-	gojson "encoding/json"
 	"os"
 	"testing"
 
-	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/stretchr/testify/require"
 )
@@ -42,37 +40,28 @@ func testV1Import(t *testing.T, v1Fixture, v4Fixture string, config importConfig
 	})
 	require.NoError(t, err)
 
+	store, err := jsonstore.New(jsonstore.Config{
+		Filesystem: diskfs,
+		Filepath:   v4Fixture,
+	})
+	require.NoError(t, err)
+
 	// Import v1 database
 	v4, err := importV1(diskfs, v1Fixture, config)
-	require.Equal(t, nil, err)
+	require.NoError(t, err)
 
 	// Reset variants
-	for n := range v4.Process {
-		v4.Process[n].CreatedAt = 0
+	for m, domain := range v4.Process {
+		for n := range domain {
+			v4.Process[m][n].Process.CreatedAt = 0
+		}
 	}
 
-	// Convert to JSON
-	datav4, err := gojson.MarshalIndent(&v4, "", "    ")
-	require.Equal(t, nil, err)
-
 	// Read the wanted result
-	wantdatav4, err := diskfs.ReadFile(v4Fixture)
-	require.Equal(t, nil, err)
+	wantv4, err := store.Load()
+	require.NoError(t, err)
 
-	var wantv4 store.StoreData
-
-	err = gojson.Unmarshal(wantdatav4, &wantv4)
-	require.Equal(t, nil, err, json.FormatError(wantdatav4, err))
-
-	// Convert to JSON
-	wantdatav4, err = gojson.MarshalIndent(&wantv4, "", "    ")
-	require.Equal(t, nil, err)
-
-	// Re-convert both to golang type
-	gojson.Unmarshal(wantdatav4, &wantv4)
-	gojson.Unmarshal(datav4, &v4)
-
-	require.Equal(t, wantv4, v4)
+	require.Equal(t, wantv4, v4, v4Fixture)
 }
 
 func TestV1Import(t *testing.T) {

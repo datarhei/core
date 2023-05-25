@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/monitor/metric"
 )
 
+// Metrics is the resolver for the metrics field.
 func (r *queryResolver) Metrics(ctx context.Context, query models.MetricsInput) (*models.Metrics, error) {
 	patterns := []metric.Pattern{}
 

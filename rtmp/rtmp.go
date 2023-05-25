@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
 
@@ -59,6 +60,8 @@ type Config struct {
 	TLSConfig *tls.Config
 
 	Proxy proxy.ProxyReader
+
+	IAM iam.IAM
 }
 
 // Server represents a RTMP server
@@ -94,6 +97,8 @@ type server struct {
 	lock     sync.RWMutex
 
 	proxy proxy.ProxyReader
+
+	iam iam.IAM
 }
 
 // New creates a new RTMP server according to the given config
@@ -107,11 +112,12 @@ func New(config Config) (Server, error) {
 	}
 
 	s := &server{
-		app:       config.App,
+		app:       filepath.Join("/", config.App),
 		token:     config.Token,
 		logger:    config.Logger,
 		collector: config.Collector,
 		proxy:     config.Proxy,
+		iam:       config.IAM,
 	}
 
 	if s.collector == nil {
@@ -189,81 +195,97 @@ func (s *server) Channels() []string {
 	return channels
 }
 
-func (s *server) log(who, action, path, message string, client net.Addr) {
+func (s *server) log(who, what, action, path, message string, client net.Addr) {
 	s.logger.Info().WithFields(log.Fields{
 		"who":    who,
+		"what":   what,
 		"action": action,
 		"path":   path,
 		"client": client.String(),
 	}).Log(message)
 }
 
-// getToken returns the path and the token found in the URL. If the token
-// was part of the path, the token is removed from the path. The token in
-// the query string takes precedence. The token in the path is assumed to
-// be the last path element.
-func getToken(u *url.URL) (string, string) {
+// GetToken returns the path without the token and the token found in the URL. If the token
+// was part of the path, the token is removed from the path. The token in the query string
+// takes precedence. The token in the path is assumed to be the last path element.
+func GetToken(u *url.URL) (string, string) {
 	q := u.Query()
-	token := q.Get("token")
-
-	if len(token) != 0 {
+	if q.Has("token") {
 		// The token was in the query. Return the unmomdified path and the token
-		return u.Path, token
+		return u.Path, q.Get("token")
 	}
 
-	pathElements := strings.Split(u.EscapedPath(), "/")
+	pathElements := splitPath(u.EscapedPath())
 	nPathElements := len(pathElements)
 
-	if nPathElements == 0 {
+	if nPathElements <= 1 {
 		return u.Path, ""
 	}
 
 	// Return the path without the token
-	return strings.Join(pathElements[:nPathElements-1], "/"), pathElements[nPathElements-1]
+	return "/" + strings.Join(pathElements[:nPathElements-1], "/"), pathElements[nPathElements-1]
+}
+
+func splitPath(path string) []string {
+	pathElements := strings.Split(filepath.Clean(path), "/")
+
+	if len(pathElements) == 0 {
+		return pathElements
+	}
+
+	if len(pathElements[0]) == 0 {
+		pathElements = pathElements[1:]
+	}
+
+	return pathElements
+}
+
+func removePathPrefix(path, prefix string) (string, string) {
+	prefix = filepath.Join("/", prefix)
+	return filepath.Join("/", strings.TrimPrefix(path, prefix+"/")), prefix
 }
 
 // handlePlay is called when a RTMP client wants to play a stream
 func (s *server) handlePlay(conn *rtmp.Conn) {
-	client := conn.NetConn().RemoteAddr()
-
 	defer conn.Close()
 
-	playPath := conn.URL.Path
+	remote := conn.NetConn().RemoteAddr()
+	playpath, token := GetToken(conn.URL)
 
-	// Check the token in the URL if one is required
-	if len(s.token) != 0 {
-		path, token := getToken(conn.URL)
+	playpath, _ = removePathPrefix(playpath, s.app)
 
-		if len(token) == 0 {
-			s.log("PLAY", "FORBIDDEN", path, "no streamkey provided", client)
-			return
-		}
+	identity, err := s.findIdentityFromStreamKey(token)
+	if err != nil {
+		s.logger.Debug().WithError(err).Log("invalid streamkey")
+		s.log(identity, "PLAY", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
+		return
+	}
 
-		if s.token != token {
-			s.log("PLAY", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
-			return
-		}
+	domain := s.findDomainFromPlaypath(playpath)
+	resource := "rtmp:" + playpath
 
-		playPath = path
+	if !s.iam.Enforce(identity, domain, resource, "PLAY") {
+		s.log(identity, "PLAY", "FORBIDDEN", playpath, "access denied", remote)
+		return
 	}
 
 	// Look for the stream
 	s.lock.RLock()
-	ch := s.channels[playPath]
+	ch := s.channels[playpath]
 	s.lock.RUnlock()
 
 	if ch == nil {
 		// Check in the cluster for that stream
 		url, err := s.proxy.GetURL("rtmp:" + conn.URL.Path)
 		if err != nil {
-			s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
+			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
 			return
 		}
 
 		src, err := avutil.Open(url)
 		if err != nil {
 			s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
-			s.log("PLAY", "NOTFOUND", conn.URL.Path, "", client)
+			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
 			return
 		}
 
@@ -273,13 +295,13 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		wg.Add(1)
 
 		go func() {
-			s.log("PLAY", "PROXYSTART", url, "", client)
+			s.log(identity, "PLAY", "PROXYSTART", url, "", remote)
 			wg.Done()
-			err := s.publish(c, playPath, client, true)
+			err := s.publish(c, playpath, remote, identity, true)
 			if err != nil {
 				s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
 			}
-			s.log("PLAY", "PROXYSTOP", url, "", client)
+			s.log(identity, "PLAY", "PROXYSTOP", url, "", remote)
 		}()
 
 		// Wait for the goroutine to start
@@ -310,7 +332,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		// Send the metadata to the client
 		conn.WriteHeader(ch.streams)
 
-		s.log("PLAY", "START", playPath, "", client)
+		s.log(identity, "PLAY", "START", conn.URL.Path, "", remote)
 
 		// Get a cursor and apply filters
 		cursor := ch.queue.Oldest()
@@ -337,64 +359,65 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 		ch.RemoveSubscriber(id)
 
-		s.log("PLAY", "STOP", playPath, "", client)
+		s.log(identity, "PLAY", "STOP", playpath, "", remote)
 	} else {
-		s.log("PLAY", "NOTFOUND", playPath, "", client)
+		s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 	}
 }
 
 // handlePublish is called when a RTMP client wants to publish a stream
 func (s *server) handlePublish(conn *rtmp.Conn) {
-	client := conn.NetConn().RemoteAddr()
-
 	defer conn.Close()
 
-	playPath := conn.URL.Path
+	remote := conn.NetConn().RemoteAddr()
+	playpath, token := GetToken(conn.URL)
 
-	if len(s.token) != 0 {
-		path, token := getToken(conn.URL)
+	playpath, app := removePathPrefix(playpath, s.app)
 
-		if len(token) == 0 {
-			s.log("PLAY", "FORBIDDEN", path, "no streamkey provided", client)
-			return
-		}
-
-		if s.token != token {
-			s.log("PLAY", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
-			return
-		}
-
-		playPath = path
-	}
-
-	// Check the app patch
-	if !strings.HasPrefix(playPath, s.app) {
-		s.log("PUBLISH", "FORBIDDEN", playPath, "invalid app", client)
+	identity, err := s.findIdentityFromStreamKey(token)
+	if err != nil {
+		s.logger.Debug().WithError(err).Log("invalid streamkey")
+		s.log(identity, "PUBLISH", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
 		return
 	}
 
-	err := s.publish(conn, playPath, client, false)
+	// Check the app patch
+	if app != s.app {
+		s.log(identity, "PUBLISH", "FORBIDDEN", playpath, "invalid app", remote)
+		return
+	}
+
+	domain := s.findDomainFromPlaypath(playpath)
+	resource := "rtmp:" + playpath
+
+	if !s.iam.Enforce(identity, domain, resource, "PUBLISH") {
+		s.log(identity, "PUBLISH", "FORBIDDEN", playpath, "access denied", remote)
+		return
+	}
+
+	err = s.publish(conn, playpath, remote, identity, false)
 	if err != nil {
-		s.logger.WithField("path", playPath).WithError(err).Log("")
+		s.logger.WithField("path", conn.URL.Path).WithError(err).Log("")
 	}
 }
 
-func (s *server) publish(src connection, playPath string, client net.Addr, isProxy bool) error {
+func (s *server) publish(src connection, playpath string, remote net.Addr, identity string, isProxy bool) error {
 	// Check the streams if it contains any valid/known streams
 	streams, _ := src.Streams()
 
 	if len(streams) == 0 {
-		s.log("PUBLISH", "INVALID", playPath, "no streams available", client)
+		s.log(identity, "PUBLISH", "INVALID", playpath, "no streams available", remote)
+		return fmt.Errorf("no streams are available")
 	}
 
 	s.lock.Lock()
 
-	ch := s.channels[playPath]
+	ch := s.channels[playpath]
 	if ch == nil {
-		reference := strings.TrimPrefix(strings.TrimSuffix(playPath, filepath.Ext(playPath)), s.app+"/")
+		reference := strings.TrimPrefix(strings.TrimSuffix(playpath, filepath.Ext(playpath)), s.app+"/")
 
 		// Create a new channel
-		ch = newChannel(src, playPath, reference, client, streams, isProxy, s.collector)
+		ch = newChannel(src, playpath, reference, remote, streams, isProxy, s.collector)
 
 		for _, stream := range streams {
 			typ := stream.Type()
@@ -407,7 +430,7 @@ func (s *server) publish(src connection, playPath string, client net.Addr, isPro
 			}
 		}
 
-		s.channels[playPath] = ch
+		s.channels[playpath] = ch
 	} else {
 		ch = nil
 	}
@@ -415,26 +438,75 @@ func (s *server) publish(src connection, playPath string, client net.Addr, isPro
 	s.lock.Unlock()
 
 	if ch == nil {
-		s.log("PUBLISH", "CONFLICT", playPath, "already publishing", client)
+		s.log(identity, "PUBLISH", "CONFLICT", playpath, "already publishing", remote)
 		return fmt.Errorf("already publishing")
 	}
 
-	s.log("PUBLISH", "START", playPath, "", client)
+	s.log(identity, "PUBLISH", "START", playpath, "", remote)
 
 	for _, stream := range streams {
-		s.log("PUBLISH", "STREAM", playPath, stream.Type().String(), client)
+		s.log(identity, "PUBLISH", "STREAM", playpath, stream.Type().String(), remote)
 	}
 
 	// Ingest the data, blocks until done
 	avutil.CopyPackets(ch.queue, src)
 
 	s.lock.Lock()
-	delete(s.channels, playPath)
+	delete(s.channels, playpath)
 	s.lock.Unlock()
 
 	ch.Close()
 
-	s.log("PUBLISH", "STOP", playPath, "", client)
+	s.log(identity, "PUBLISH", "STOP", playpath, "", remote)
 
 	return nil
+}
+
+func (s *server) findIdentityFromStreamKey(key string) (string, error) {
+	if len(key) == 0 {
+		return "$anon", nil
+	}
+
+	var identity iam.IdentityVerifier
+	var err error
+
+	var token string
+
+	elements := strings.Split(key, ":")
+	if len(elements) == 1 {
+		identity = s.iam.GetDefaultVerifier()
+		token = elements[0]
+	} else {
+		identity, err = s.iam.GetVerifier(elements[0])
+		token = elements[1]
+	}
+
+	if err != nil {
+		return "$anon", nil
+	}
+
+	if ok, err := identity.VerifyServiceToken(token); !ok {
+		return "$anon", fmt.Errorf("invalid token: %w", err)
+	}
+
+	return identity.Name(), nil
+}
+
+// findDomainFromPlaypath finds the domain in the path. The domain is
+// the first path element. If there's only one path element, it is not
+// considered the domain. It is assumed that the app is not part of
+// the provided path.
+func (s *server) findDomainFromPlaypath(path string) string {
+	elements := splitPath(path)
+	if len(elements) == 1 {
+		return "$none"
+	}
+
+	domain := elements[0]
+
+	if s.iam.HasDomain(domain) {
+		return domain
+	}
+
+	return "$none"
 }

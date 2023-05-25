@@ -41,10 +41,10 @@ import (
 	"github.com/datarhei/core/v16/http/graph/resolver"
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
-	"github.com/datarhei/core/v16/http/jwt"
 	httplog "github.com/datarhei/core/v16/http/log"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
@@ -58,6 +58,7 @@ import (
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
 	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
+	mwiam "github.com/datarhei/core/v16/http/middleware/iam"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
@@ -88,13 +89,14 @@ type Config struct {
 	Cors          CorsConfig
 	RTMP          rtmp.Server
 	SRT           srt.Server
-	JWT           jwt.JWT
 	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
 	Router        router.Router
 	ReadOnly      bool
 	Cluster       cluster.Cluster
+	IAM           iam.IAM
+	IAMSkipper    func(ip string) bool
 }
 
 type CorsConfig struct {
@@ -114,13 +116,12 @@ type server struct {
 		profiling  *handler.ProfilingHandler
 		ping       *handler.PingHandler
 		graph      *api.GraphHandler
-		jwt        jwt.JWT
+		jwt        *api.JWTHandler
 	}
 
 	v3handler struct {
 		log       *api.LogHandler
 		restream  *api.RestreamHandler
-		playout   *api.PlayoutHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
@@ -128,17 +129,17 @@ type server struct {
 		widget    *api.WidgetHandler
 		resources *api.MetricsHandler
 		cluster   *api.ClusterHandler
+		iam       *api.IAMHandler
 	}
 
 	middleware struct {
 		iplimit    echo.MiddlewareFunc
 		log        echo.MiddlewareFunc
-		accessJWT  echo.MiddlewareFunc
-		refreshJWT echo.MiddlewareFunc
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
 		hlsrewrite echo.MiddlewareFunc
+		iam        echo.MiddlewareFunc
 	}
 
 	gzip struct {
@@ -219,20 +220,33 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	if config.Logger == nil {
-		s.logger = log.New("HTTP")
+		s.logger = log.New("")
 	}
 
-	if config.JWT == nil {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			[]string{},
-		)
-	} else {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			config.JWT.Validators(),
-		)
+	mounts := []string{}
+
+	for _, fs := range s.filesystems {
+		mounts = append(mounts, fs.FS.Mountpoint)
 	}
+
+	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
+		Skipper: func(c echo.Context) bool {
+			return config.IAMSkipper(c.RealIP())
+		},
+		IAM:                  config.IAM,
+		Mounts:               mounts,
+		WaitAfterFailedLogin: true,
+		Logger:               s.logger.WithComponent("IAM"),
+	})
+
+	s.handler.about = api.NewAbout(
+		config.Restream,
+		func() []string { return config.IAM.Validators() },
+	)
+
+	s.handler.jwt = api.NewJWT(config.IAM)
+
+	s.v3handler.iam = api.NewIAM(config.IAM)
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
@@ -241,10 +255,7 @@ func NewServer(config Config) (Server, error) {
 	if config.Restream != nil {
 		s.v3handler.restream = api.NewRestream(
 			config.Restream,
-		)
-
-		s.v3handler.playout = api.NewPlayout(
-			config.Restream,
+			config.IAM,
 		)
 	}
 
@@ -282,12 +293,6 @@ func NewServer(config Config) (Server, error) {
 		s.v3handler.config = api.NewConfig(
 			config.Config,
 		)
-	}
-
-	if config.JWT != nil {
-		s.handler.jwt = config.JWT
-		s.middleware.accessJWT = config.JWT.AccessMiddleware()
-		s.middleware.refreshJWT = config.JWT.RefreshMiddleware()
 	}
 
 	if config.Sessions == nil {
@@ -331,6 +336,7 @@ func NewServer(config Config) (Server, error) {
 		Restream:  config.Restream,
 		Monitor:   config.Metrics,
 		LogBuffer: config.LogBuffer,
+		IAM:       config.IAM,
 	}, "/api/graph/query")
 
 	s.gzip.mimetypes = []string{
@@ -366,6 +372,8 @@ func NewServer(config Config) (Server, error) {
 	if s.middleware.cors != nil {
 		s.router.Use(s.middleware.cors)
 	}
+
+	s.router.Use(s.middleware.iam)
 
 	// Add static routes
 	if path, target := config.Router.StaticRoute(); len(target) != 0 {
@@ -429,14 +437,9 @@ func (s *server) setRoutes() {
 		api.Use(s.middleware.iplimit)
 	}
 
-	if s.middleware.accessJWT != nil {
-		// Enable JWT auth
-		api.Use(s.middleware.accessJWT)
-
-		// The login endpoint should not be blocked by auth
-		s.router.POST("/api/login", s.handler.jwt.LoginHandler)
-		s.router.GET("/api/login/refresh", s.handler.jwt.RefreshHandler, s.middleware.refreshJWT)
-	}
+	// The login endpoint should not be blocked by auth
+	s.router.POST("/api/login", s.handler.jwt.Login)
+	s.router.GET("/api/login/refresh", s.handler.jwt.Refresh)
 
 	api.GET("", s.handler.about.About)
 
@@ -488,23 +491,9 @@ func (s *server) setRoutes() {
 		fs.HEAD("", filesystem.handler.GetFile)
 
 		if filesystem.AllowWrite {
-			if filesystem.EnableAuth {
-				authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-					if username == filesystem.Username && password == filesystem.Password {
-						return true, nil
-					}
-
-					return false, nil
-				})
-
-				fs.POST("", filesystem.handler.PutFile, authmw)
-				fs.PUT("", filesystem.handler.PutFile, authmw)
-				fs.DELETE("", filesystem.handler.DeleteFile, authmw)
-			} else {
-				fs.POST("", filesystem.handler.PutFile)
-				fs.PUT("", filesystem.handler.PutFile)
-				fs.DELETE("", filesystem.handler.DeleteFile)
-			}
+			fs.POST("", filesystem.handler.PutFile)
+			fs.PUT("", filesystem.handler.PutFile)
+			fs.DELETE("", filesystem.handler.DeleteFile)
 		}
 	}
 
@@ -543,10 +532,6 @@ func (s *server) setRoutes() {
 	// APIv3 router group
 	v3 := api.Group("/v3")
 
-	if s.handler.jwt != nil {
-		v3.Use(s.middleware.accessJWT)
-	}
-
 	v3.Use(gzipMiddleware)
 
 	s.setRoutesV3(v3)
@@ -556,6 +541,15 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.widget != nil {
 		// The widget endpoint should not be blocked by auth
 		s.router.GET("/api/v3/widget/process/:id", s.v3handler.widget.Get)
+	}
+
+	// v3 IAM
+	if s.v3handler.iam != nil {
+		v3.POST("/iam/user", s.v3handler.iam.AddUser)
+		v3.GET("/iam/user/:name", s.v3handler.iam.GetUser)
+		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateUser)
+		v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateUserPolicies)
+		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveUser)
 	}
 
 	// v3 Restreamer
@@ -587,18 +581,16 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		}
 
 		// v3 Playout
-		if s.v3handler.playout != nil {
-			v3.GET("/process/:id/playout/:inputid/status", s.v3handler.playout.Status)
-			v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.playout.ReopenInput)
-			v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.playout.Keyframe)
-			v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.playout.EncodeErrorframe)
+		v3.GET("/process/:id/playout/:inputid/status", s.v3handler.restream.PlayoutStatus)
+		v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.restream.PlayoutReopenInput)
+		v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.restream.PlayoutKeyframe)
+		v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.restream.PlayoutEncodeErrorframe)
 
-			if !s.readOnly {
-				v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
-				v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
+		if !s.readOnly {
+			v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
+			v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
 
-				v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.playout.SetStream)
-			}
+			v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.restream.PlayoutSetStream)
 		}
 	}
 

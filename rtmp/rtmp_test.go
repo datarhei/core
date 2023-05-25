@@ -18,9 +18,37 @@ func TestToken(t *testing.T) {
 		u, err := url.Parse(d[0])
 		require.NoError(t, err)
 
-		path, token := getToken(u)
+		path, token := GetToken(u)
 
 		require.Equal(t, d[1], path, "url=%s", u.String())
 		require.Equal(t, d[2], token, "url=%s", u.String())
+	}
+}
+
+func TestSplitPath(t *testing.T) {
+	data := map[string][]string{
+		"/foo/bar":  {"foo", "bar"},
+		"foo/bar":   {"foo", "bar"},
+		"/foo/bar/": {"foo", "bar"},
+	}
+
+	for path, split := range data {
+		elms := splitPath(path)
+
+		require.ElementsMatch(t, split, elms, "%s", path)
+	}
+}
+
+func TestRemovePathPrefix(t *testing.T) {
+	data := [][]string{
+		{"/foo/bar", "/foo", "/bar"},
+		{"/foo/bar", "/fo", "/foo/bar"},
+		{"/foo/bar/abc", "/foo/bar", "/abc"},
+	}
+
+	for _, d := range data {
+		x, _ := removePathPrefix(d[0], d[1])
+
+		require.Equal(t, d[2], x, "path=%s prefix=%s", d[0], d[1])
 	}
 }

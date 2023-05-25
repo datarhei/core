@@ -13,6 +13,9 @@ import (
 
 type IProcessReportHistoryEntry interface {
 	IsIProcessReportHistoryEntry()
+	GetCreatedAt() time.Time
+	GetPrelude() []string
+	GetLog() []*ProcessReportLogEntry
 }
 
 type AVStream struct {
@@ -102,6 +105,8 @@ type ProbeIo struct {
 
 type Process struct {
 	ID        string                 `json:"id"`
+	Owner     string                 `json:"owner"`
+	Domain    string                 `json:"domain"`
 	Type      string                 `json:"type"`
 	Reference string                 `json:"reference"`
 	CreatedAt time.Time              `json:"created_at"`
@@ -113,6 +118,8 @@ type Process struct {
 
 type ProcessConfig struct {
 	ID                    string               `json:"id"`
+	Owner                 string               `json:"owner"`
+	Domain                string               `json:"domain"`
 	Type                  string               `json:"type"`
 	Reference             string               `json:"reference"`
 	Input                 []*ProcessConfigIo   `json:"input"`
@@ -145,6 +152,27 @@ type ProcessReport struct {
 }
 
 func (ProcessReport) IsIProcessReportHistoryEntry() {}
+func (this ProcessReport) GetCreatedAt() time.Time  { return this.CreatedAt }
+func (this ProcessReport) GetPrelude() []string {
+	if this.Prelude == nil {
+		return nil
+	}
+	interfaceSlice := make([]string, 0, len(this.Prelude))
+	for _, concrete := range this.Prelude {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this ProcessReport) GetLog() []*ProcessReportLogEntry {
+	if this.Log == nil {
+		return nil
+	}
+	interfaceSlice := make([]*ProcessReportLogEntry, 0, len(this.Log))
+	for _, concrete := range this.Log {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
 
 type ProcessReportHistoryEntry struct {
 	CreatedAt time.Time                `json:"created_at"`
@@ -153,6 +181,27 @@ type ProcessReportHistoryEntry struct {
 }
 
 func (ProcessReportHistoryEntry) IsIProcessReportHistoryEntry() {}
+func (this ProcessReportHistoryEntry) GetCreatedAt() time.Time  { return this.CreatedAt }
+func (this ProcessReportHistoryEntry) GetPrelude() []string {
+	if this.Prelude == nil {
+		return nil
+	}
+	interfaceSlice := make([]string, 0, len(this.Prelude))
+	for _, concrete := range this.Prelude {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this ProcessReportHistoryEntry) GetLog() []*ProcessReportLogEntry {
+	if this.Log == nil {
+		return nil
+	}
+	interfaceSlice := make([]*ProcessReportLogEntry, 0, len(this.Log))
+	for _, concrete := range this.Log {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
 
 type ProcessReportLogEntry struct {
 	Timestamp time.Time `json:"timestamp"`

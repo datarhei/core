@@ -93,7 +93,7 @@ type channel struct {
 	isProxy bool
 }
 
-func newChannel(conn connection, playPath string, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
+func newChannel(conn connection, playPath, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
 	ch := &channel{
 		path:       playPath,
 		reference:  reference,

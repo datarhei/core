@@ -17,10 +17,12 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/google/uuid"
 )
@@ -496,12 +498,12 @@ type importConfigAudio struct {
 	sampling string
 }
 
-func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData, error) {
+func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, error) {
 	if len(cfg.id) == 0 {
 		cfg.id = uuid.New().String()
 	}
 
-	r := store.NewStoreData()
+	r := store.NewData()
 
 	jsondata, err := fs.ReadFile(path)
 	if err != nil {
@@ -1187,10 +1189,20 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData,
 	config.Output = append(config.Output, output)
 
 	process.Config = config
-	r.Process[process.ID] = process
 
-	r.Metadata.Process["restreamer-ui:ingest:"+cfg.id] = make(map[string]interface{})
-	r.Metadata.Process["restreamer-ui:ingest:"+cfg.id]["restreamer-ui"] = ui
+	p := store.Process{
+		Process:  process,
+		Metadata: map[string]interface{}{},
+	}
+
+	if metadata, err := gojson.Marshal(ui); err == nil {
+		m := map[string]interface{}{}
+		gojson.Unmarshal(metadata, &m)
+		p.Metadata["restreamer-ui"] = m
+	}
+
+	r.Process[""] = map[string]store.Process{}
+	r.Process[""][process.ID] = p
 
 	// Snapshot
 
@@ -1240,9 +1252,13 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData,
 		snapshotConfig.Output = append(snapshotConfig.Output, snapshotOutput)
 
 		snapshotProcess.Config = snapshotConfig
-		r.Process[snapshotProcess.ID] = snapshotProcess
 
-		r.Metadata.Process["restreamer-ui:ingest:"+cfg.id+"_snapshot"] = nil
+		p := store.Process{
+			Process:  snapshotProcess,
+			Metadata: nil,
+		}
+
+		r.Process[""][snapshotProcess.ID] = p
 	}
 
 	// Optional publication
@@ -1401,10 +1417,19 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.StoreData,
 		config.Output = append(config.Output, output)
 
 		process.Config = config
-		r.Process[process.ID] = process
 
-		r.Metadata.Process[egressId] = make(map[string]interface{})
-		r.Metadata.Process[egressId]["restreamer-ui"] = egress
+		p := store.Process{
+			Process:  process,
+			Metadata: map[string]interface{}{},
+		}
+
+		if metadata, err := gojson.Marshal(egress); err == nil {
+			m := map[string]interface{}{}
+			gojson.Unmarshal(metadata, &m)
+			p.Metadata["restreamer-ui"] = m
+		}
+
+		r.Process[""][process.ID] = p
 	}
 
 	return r, nil
@@ -1419,7 +1444,7 @@ func probeInput(binary string, config app.Config) app.Probe {
 	}
 
 	dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
-	store, err := store.NewJSON(store.JSONConfig{
+	store, err := jsonstore.New(jsonstore.Config{
 		Filesystem: dummyfs,
 		Filepath:   "/",
 		Logger:     nil,
@@ -1428,17 +1453,32 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
+	iam, _ := iam.NewIAM(iam.Config{
+		FS: dummyfs,
+		Superuser: iam.User{
+			Name: "foobar",
+		},
+		JWTRealm:  "",
+		JWTSecret: "",
+		Logger:    nil,
+	})
+
+	iam.AddPolicy("$anon", "$none", "process:*", []string{"CREATE", "GET", "DELETE", "PROBE"})
+
 	rs, err := restream.New(restream.Config{
 		FFmpeg: ffmpeg,
 		Store:  store,
+		IAM:    iam,
 	})
 	if err != nil {
 		return app.Probe{}
 	}
 
 	rs.AddProcess(&config)
-	probe := rs.Probe(config.ID)
-	rs.DeleteProcess(config.ID)
+
+	id := restream.TaskID{ID: config.ID}
+	probe := rs.Probe(id)
+	rs.DeleteProcess(id)
 
 	return probe
 }

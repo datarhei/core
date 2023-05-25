@@ -16,19 +16,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// The PlayoutHandler type provides handlers for accessing the playout API of a process
-type PlayoutHandler struct {
-	restream restream.Restreamer
-}
-
-// NewPlayout returns a new Playout type. You have to provide a Restreamer instance.
-func NewPlayout(restream restream.Restreamer) *PlayoutHandler {
-	return &PlayoutHandler{
-		restream: restream,
-	}
-}
-
-// Status return the current playout status
+// PlayoutStatus return the current playout status
 // @Summary Get the current playout status
 // @Description Get the current playout status of an input of a process
 // @Tags v16.7.2
@@ -41,11 +29,22 @@ func NewPlayout(restream restream.Restreamer) *PlayoutHandler {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/status [get]
-func (h *PlayoutHandler) Status(c echo.Context) error {
+func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -82,7 +81,7 @@ func (h *PlayoutHandler) Status(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-// Keyframe returns the last keyframe
+// PlayoutKeyframe returns the last keyframe
 // @Summary Get the last keyframe
 // @Description Get the last keyframe of an input of a process. The extension of the name determines the return type.
 // @Tags v16.7.2
@@ -98,12 +97,23 @@ func (h *PlayoutHandler) Status(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/keyframe/{name} [get]
-func (h *PlayoutHandler) Keyframe(c echo.Context) error {
+func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	name := util.PathWildcardParam(c)
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -132,7 +142,7 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-// EncodeErrorframe encodes the errorframe
+// PlayoutEncodeErrorframe encodes the errorframe
 // @Summary Encode the errorframe
 // @Description Immediately encode the errorframe (if available and looping)
 // @Tags v16.7.2
@@ -146,11 +156,22 @@ func (h *PlayoutHandler) Keyframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/encode [get]
-func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
+func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -173,7 +194,7 @@ func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-// SetErrorframe sets an errorframe
+// PlayoutSetErrorframe sets an errorframe
 // @Summary Upload an error frame
 // @Description Upload an error frame which will be encoded immediately
 // @Tags v16.7.2
@@ -190,11 +211,22 @@ func (h *PlayoutHandler) EncodeErrorframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/{name} [post]
-func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
+func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -222,7 +254,7 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-// ReopenInput closes the current input stream
+// PlayoutReopenInput closes the current input stream
 // @Summary Close the current input stream
 // @Description Close the current input stream such that it will be automatically re-opened
 // @Tags v16.7.2
@@ -235,11 +267,22 @@ func (h *PlayoutHandler) SetErrorframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/reopen [get]
-func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
+func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -262,7 +305,7 @@ func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-// SetStream replaces the current stream
+// PlayoutSetStream replaces the current stream
 // @Summary Switch to a new stream
 // @Description Replace the current stream with the one from the given URL. The switch will only happen if the stream parameters match.
 // @Tags v16.7.2
@@ -278,11 +321,22 @@ func (h *PlayoutHandler) ReopenInput(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/stream [put]
-func (h *PlayoutHandler) SetStream(c echo.Context) error {
+func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
+	user := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
 
-	addr, err := h.restream.GetPlayout(id, inputid)
+	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
 	}
@@ -310,7 +364,7 @@ func (h *PlayoutHandler) SetStream(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-func (h *PlayoutHandler) request(method, addr, path, contentType string, data []byte) (*http.Response, error) {
+func (h *RestreamHandler) request(method, addr, path, contentType string, data []byte) (*http.Response, error) {
 	endpoint := "http://" + addr + path
 
 	body := bytes.NewBuffer(data)

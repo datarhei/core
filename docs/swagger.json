@@ -102,87 +102,6 @@
                 }
             }
         },
-        "/api/login": {
-            "post": {
-                "security": [
-                    {
-                        "Auth0KeyAuth": []
-                    }
-                ],
-                "description": "Retrieve valid JWT access and refresh tokens to use for accessing the API. Login either by username/password or Auth0 token",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Retrieve an access and a refresh token",
-                "operationId": "jwt-login",
-                "parameters": [
-                    {
-                        "description": "Login data",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.Login"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.JWT"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/login/refresh": {
-            "get": {
-                "security": [
-                    {
-                        "ApiRefreshKeyAuth": []
-                    }
-                ],
-                "description": "Retrieve a new access token by providing the refresh token",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Retrieve a new access token",
-                "operationId": "jwt-refresh",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.JWTRefresh"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
         "/api/swagger": {
             "get": {
                 "description": "Swagger UI for this API",
@@ -899,6 +818,308 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new user",
+                "operationId": "iam-3-add-user",
+                "parameters": [
+                    {
+                        "description": "User definition",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List aa user by its name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List an user by its name",
+                "operationId": "iam-3-get-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace an existing user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace an existing user",
+                "operationId": "iam-3-update-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "User definition",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete an user by its name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete an user by its name",
+                "operationId": "iam-3-delete-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user/{name}/policy": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace policies of an user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace policies of an user",
+                "operationId": "iam-3-update-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Policy definitions",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -3239,43 +3460,121 @@
                 }
             }
         },
-        "api.JWT": {
+        "api.IAMAuth0Tenant": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "audience": {
                     "type": "string"
                 },
-                "refresh_token": {
+                "client_id": {
+                    "type": "string"
+                },
+                "domain": {
                     "type": "string"
                 }
             }
         },
-        "api.JWTRefresh": {
+        "api.IAMPolicy": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "domain": {
                     "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUser": {
+            "type": "object",
+            "properties": {
+                "auth": {
+                    "$ref": "#/definitions/api.IAMUserAuth"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.IAMPolicy"
+                    }
+                },
+                "superuser": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.IAMUserAuth": {
+            "type": "object",
+            "properties": {
+                "api": {
+                    "$ref": "#/definitions/api.IAMUserAuthAPI"
+                },
+                "services": {
+                    "$ref": "#/definitions/api.IAMUserAuthServices"
+                }
+            }
+        },
+        "api.IAMUserAuthAPI": {
+            "type": "object",
+            "properties": {
+                "auth0": {
+                    "$ref": "#/definitions/api.IAMUserAuthAPIAuth0"
+                },
+                "userpass": {
+                    "$ref": "#/definitions/api.IAMUserAuthPassword"
+                }
+            }
+        },
+        "api.IAMUserAuthAPIAuth0": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "tenant": {
+                    "$ref": "#/definitions/api.IAMAuth0Tenant"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUserAuthPassword": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUserAuthServices": {
+            "type": "object",
+            "properties": {
+                "basic": {
+                    "$ref": "#/definitions/api.IAMUserAuthPassword"
+                },
+                "token": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
         "api.LogEvent": {
             "type": "object",
             "additionalProperties": true
-        },
-        "api.Login": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
         },
         "api.MetricsDescription": {
             "type": "object",
@@ -3595,6 +3894,9 @@
             "properties": {
                 "autostart": {
                     "type": "boolean"
+                },
+                "group": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "string"

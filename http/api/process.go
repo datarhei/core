@@ -45,6 +45,7 @@ type ProcessConfigLimits struct {
 // ProcessConfig represents the configuration of an ffmpeg process
 type ProcessConfig struct {
 	ID             string              `json:"id"`
+	Group          string              `json:"group"`
 	Type           string              `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
 	Reference      string              `json:"reference"`
 	Input          []ProcessConfigIO   `json:"input" validate:"required"`
@@ -61,6 +62,7 @@ type ProcessConfig struct {
 func (cfg *ProcessConfig) Marshal() *app.Config {
 	p := &app.Config{
 		ID:             cfg.ID,
+		Domain:         cfg.Group,
 		Reference:      cfg.Reference,
 		Options:        cfg.Options,
 		Reconnect:      cfg.Reconnect,
@@ -140,6 +142,7 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	}
 
 	cfg.ID = c.ID
+	cfg.Group = c.Domain
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"
 	cfg.Reconnect = c.Reconnect

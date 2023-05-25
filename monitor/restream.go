@@ -57,7 +57,7 @@ func (c *restreamCollector) Collect() metric.Metrics {
 		"starting":  0,
 	}
 
-	ids := c.r.GetProcessIDs("", "")
+	ids := c.r.GetProcessIDs("", "", "", "")
 
 	for _, id := range ids {
 		state, _ := c.r.GetProcessState(id)
@@ -72,31 +72,31 @@ func (c *restreamCollector) Collect() metric.Metrics {
 
 		states[state.State]++
 
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Frame), id, state.State, state.Order, "frame"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.FPS), id, state.State, state.Order, "fps"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Speed), id, state.State, state.Order, "speed"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Quantizer, id, state.State, state.Order, "q"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Size), id, state.State, state.Order, "size"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Time, id, state.State, state.Order, "time"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Drop), id, state.State, state.Order, "drop"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Dup), id, state.State, state.Order, "dup"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Packet), id, state.State, state.Order, "packet"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Bitrate, id, state.State, state.Order, "bitrate"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.CPU, id, state.State, state.Order, "cpu"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Memory), id, state.State, state.Order, "memory"))
-		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Duration, id, state.State, state.Order, "uptime"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Frame), id.String(), state.State, state.Order, "frame"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.FPS), id.String(), state.State, state.Order, "fps"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Speed), id.String(), state.State, state.Order, "speed"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Quantizer, id.String(), state.State, state.Order, "q"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Size), id.String(), state.State, state.Order, "size"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Time, id.String(), state.State, state.Order, "time"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Drop), id.String(), state.State, state.Order, "drop"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Dup), id.String(), state.State, state.Order, "dup"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Progress.Packet), id.String(), state.State, state.Order, "packet"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Progress.Bitrate, id.String(), state.State, state.Order, "bitrate"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.CPU, id.String(), state.State, state.Order, "cpu"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(state.Memory), id.String(), state.State, state.Order, "memory"))
+		metrics.Add(metric.NewValue(c.restreamProcessDescr, state.Duration, id.String(), state.State, state.Order, "uptime"))
 
 		if proc.Config != nil {
-			metrics.Add(metric.NewValue(c.restreamProcessDescr, proc.Config.LimitCPU, id, state.State, state.Order, "cpu_limit"))
-			metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(proc.Config.LimitMemory), id, state.State, state.Order, "memory_limit"))
+			metrics.Add(metric.NewValue(c.restreamProcessDescr, proc.Config.LimitCPU, id.String(), state.State, state.Order, "cpu_limit"))
+			metrics.Add(metric.NewValue(c.restreamProcessDescr, float64(proc.Config.LimitMemory), id.String(), state.State, state.Order, "memory_limit"))
 		}
 
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Failed), id, "failed"))
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Finished), id, "finished"))
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Finishing), id, "finishing"))
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Killed), id, "killed"))
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Running), id, "running"))
-		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Starting), id, "starting"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Failed), id.String(), "failed"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Finished), id.String(), "finished"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Finishing), id.String(), "finishing"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Killed), id.String(), "killed"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Running), id.String(), "running"))
+		metrics.Add(metric.NewValue(c.restreamProcessStatesDescr, float64(state.States.Starting), id.String(), "starting"))
 
 		for i := range state.Progress.Input {
 			io := &state.Progress.Input[i]
@@ -104,32 +104,32 @@ func (c *restreamCollector) Collect() metric.Metrics {
 			index := strconv.FormatUint(io.Index, 10)
 			stream := strconv.FormatUint(io.Stream, 10)
 
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Frame), id, "input", io.ID, io.Address, index, stream, io.Type, "frame"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.FPS), id, "input", io.ID, io.Address, index, stream, io.Type, "fps"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Packet), id, "input", io.ID, io.Address, index, stream, io.Type, "packet"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.PPS), id, "input", io.ID, io.Address, index, stream, io.Type, "pps"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Size), id, "input", io.ID, io.Address, index, stream, io.Type, "size"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Bitrate), id, "input", io.ID, io.Address, index, stream, io.Type, "bitrate"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Frame), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "frame"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.FPS), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "fps"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Packet), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "packet"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.PPS), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "pps"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Size), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "size"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Bitrate), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "bitrate"))
 
 			if io.AVstream != nil {
 				a := io.AVstream
 
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Queue), id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_queue"))
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Dup), id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_dup"))
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Drop), id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_drop"))
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Enc), id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_enc"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Queue), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_queue"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Dup), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_dup"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Drop), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_drop"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(a.Enc), id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_enc"))
 
 				value = 0
 				if a.Looping {
 					value = 1
 				}
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, value, id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_looping"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, value, id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_looping"))
 
 				value = 0
 				if a.Duplicating {
 					value = 1
 				}
-				metrics.Add(metric.NewValue(c.restreamProcessIODescr, value, id, "input", io.ID, io.Address, index, stream, io.Type, "avstream_duplicating"))
+				metrics.Add(metric.NewValue(c.restreamProcessIODescr, value, id.String(), "input", io.ID, io.Address, index, stream, io.Type, "avstream_duplicating"))
 			}
 		}
 
@@ -139,13 +139,13 @@ func (c *restreamCollector) Collect() metric.Metrics {
 			index := strconv.FormatUint(io.Index, 10)
 			stream := strconv.FormatUint(io.Stream, 10)
 
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Frame), id, "output", io.ID, io.Address, index, stream, io.Type, "frame"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.FPS), id, "output", io.ID, io.Address, index, stream, io.Type, "fps"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Packet), id, "output", io.ID, io.Address, index, stream, io.Type, "packet"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.PPS), id, "output", io.ID, io.Address, index, stream, io.Type, "pps"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Size), id, "output", io.ID, io.Address, index, stream, io.Type, "size"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Bitrate), id, "output", io.ID, io.Address, index, stream, io.Type, "bitrate"))
-			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Quantizer), id, "output", io.ID, io.Address, index, stream, io.Type, "q"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Frame), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "frame"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.FPS), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "fps"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Packet), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "packet"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.PPS), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "pps"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Size), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "size"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Bitrate), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "bitrate"))
+			metrics.Add(metric.NewValue(c.restreamProcessIODescr, float64(io.Quantizer), id.String(), "output", io.ID, io.Address, index, stream, io.Type, "q"))
 		}
 	}
 

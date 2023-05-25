@@ -10,6 +10,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
+// Log is the resolver for the log field.
 func (r *queryResolver) Log(ctx context.Context) ([]string, error) {
 	if r.LogBuffer == nil {
 		r.LogBuffer = log.NewBufferWriter(log.Lsilent, 1)
