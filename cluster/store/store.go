@@ -20,6 +20,8 @@ type Store interface {
 
 	ProcessList() []Process
 	GetProcess(id string) (Process, error)
+
+	UserList() Users
 }
 
 type Process struct {
@@ -41,10 +43,11 @@ type Policies struct {
 type operation string
 
 const (
-	OpAddProcess    operation = "addProcess"
-	OpRemoveProcess operation = "removeProcess"
-	OpUpdateProcess operation = "updateProcess"
-	OpAddIdentity   operation = "addIdentity"
+	OpAddProcess     operation = "addProcess"
+	OpRemoveProcess  operation = "removeProcess"
+	OpUpdateProcess  operation = "updateProcess"
+	OpAddIdentity    operation = "addIdentity"
+	OpRemoveIdentity operation = "removeIdentity"
 )
 
 type Command struct {
@@ -66,13 +69,22 @@ type CommandRemoveProcess struct {
 }
 
 type CommandAddIdentity struct {
-	Identity any
+	Identity identity.User
+}
+
+type CommandRemoveIdentity struct {
+	Name string
 }
 
 // Implement a FSM
 type store struct {
 	lock    sync.RWMutex
 	Process map[string]Process
+
+	Users struct {
+		UpdatedAt time.Time
+		Users     map[string]identity.User
+	}
 
 	logger log.Logger
 }
@@ -86,6 +98,8 @@ func NewStore(config Config) (Store, error) {
 		Process: map[string]Process{},
 		logger:  config.Logger,
 	}
+
+	s.Users.Users = map[string]identity.User{}
 
 	if s.logger == nil {
 		s.logger = log.New("")
@@ -164,6 +178,29 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 			}
 		}
 		s.lock.Unlock()
+	case OpAddIdentity:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandAddIdentity{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		_, ok := s.Users.Users[cmd.Identity.Name]
+		if !ok {
+			s.Users.UpdatedAt = time.Now()
+			s.Users.Users[cmd.Identity.Name] = cmd.Identity
+		}
+		s.lock.Unlock()
+	case OpRemoveIdentity:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandRemoveIdentity{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		delete(s.Users.Users, cmd.Name)
+		s.Users.UpdatedAt = time.Now()
+		s.lock.Unlock()
+	default:
+		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 	}
 
 	s.lock.RLock()
@@ -233,6 +270,21 @@ func (s *store) GetProcess(id string) (Process, error) {
 		UpdatedAt: process.UpdatedAt,
 		Config:    process.Config.Clone(),
 	}, nil
+}
+
+func (s *store) UserList() Users {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	u := Users{
+		UpdatedAt: s.Users.UpdatedAt,
+	}
+
+	for _, user := range s.Users.Users {
+		u.Users = append(u.Users, user)
+	}
+
+	return u
 }
 
 type fsmSnapshot struct {

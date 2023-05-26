@@ -378,22 +378,51 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
+// Add adds a new identity to the cluster
+// @Summary Add a new identiy
+// @Description Add a new identity
+// @Tags v16.?.?
+// @ID cluster-3-add-identity
+// @Accept json
+// @Produce json
+// @Param config body api.IAMUser true "Identity"
+// @Success 200 {object} api.IAMUser
+// @Failure 400 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/user [post]
 func (h *ClusterHandler) AddIdentity(c echo.Context) error {
-	process := api.ProcessConfig{
-		ID:        shortuuid.New(),
-		Type:      "ffmpeg",
-		Autostart: true,
-	}
+	user := api.IAMUser{}
 
-	if err := util.ShouldBindJSON(c, &process); err != nil {
+	if err := util.ShouldBindJSON(c, &user); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	config := process.Marshal()
+	identity, _ := user.Unmarshal()
 
-	if err := h.cluster.AddIdentity("", config); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+	if err := h.cluster.AddIdentity("", identity); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid identity", "%s", err.Error())
 	}
 
-	return c.JSON(http.StatusOK, process)
+	return c.JSON(http.StatusOK, user)
+}
+
+// Delete deletes the identity with the given name from the cluster
+// @Summary Delete an identity by its name
+// @Description Delete an identity by its name
+// @Tags v16.?.?
+// @ID cluster-3-delete-identity
+// @Produce json
+// @Param name path string true "Identity name"
+// @Success 200 {string} string
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/user/{name} [delete]
+func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
+	name := util.PathParam(c, "name")
+
+	if err := h.cluster.RemoveIdentity("", name); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid identity", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }

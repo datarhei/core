@@ -16,6 +16,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
@@ -67,7 +68,8 @@ type Cluster interface {
 	RemoveProcess(origin, id string) error
 	UpdateProcess(origin, id string, config *app.Config) error
 
-	AddIdentity(origin string, identity any) error
+	AddIdentity(origin string, identity iamidentity.User) error
+	RemoveIdentity(origin string, name string) error
 
 	ProxyReader() proxy.ProxyReader
 }
@@ -744,7 +746,7 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) AddIdentity(origin string, identity any) error {
+func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddIdentity(origin, identity)
 	}
@@ -753,6 +755,21 @@ func (c *cluster) AddIdentity(origin string, identity any) error {
 		Operation: store.OpAddIdentity,
 		Data: &store.CommandAddIdentity{
 			Identity: identity,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) RemoveIdentity(origin string, name string) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.RemoveIdentity(origin, name)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpAddIdentity,
+		Data: &store.CommandRemoveIdentity{
+			Name: name,
 		},
 	}
 

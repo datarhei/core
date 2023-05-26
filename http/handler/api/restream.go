@@ -41,6 +41,7 @@ func NewRestream(restream restream.Restreamer, iam iam.IAM) *RestreamHandler {
 // @Router /api/v3/process [post]
 func (h *RestreamHandler) Add(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
+	superuser := util.DefaultContext(c, "superuser", false)
 
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
@@ -53,8 +54,10 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+	if !superuser {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+			return api.Err(http.StatusForbidden, "Forbidden")
+		}
 	}
 
 	if process.Type != "ffmpeg" {
@@ -76,7 +79,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		Domain: config.Domain,
 	}
 
-	p, _ := h.getProcess(tid, config.Owner, "config")
+	p, _ := h.getProcess(tid, "config")
 
 	return c.JSON(http.StatusOK, p.Config)
 }
@@ -90,23 +93,27 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
 // @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
 // @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
-// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern."
-// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern."
+// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/process [get]
 func (h *RestreamHandler) GetAll(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
 	filter := util.DefaultQuery(c, "filter", "")
 	reference := util.DefaultQuery(c, "reference", "")
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
 	})
+	domain := util.DefaultQuery(c, "domain", "")
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
-	user := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "")
+	ownerpattern := util.DefaultContext(c, "ownerpattern", "")
+	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	preids := h.restream.GetProcessIDs(idpattern, refpattern, "", "")
+	preids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
 	ids := []restream.TaskID{}
 
 	for _, id := range preids {
@@ -121,7 +128,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 
 	if len(wantids) == 0 || len(reference) != 0 {
 		for _, id := range ids {
-			if p, err := h.getProcess(id, user, filter); err == nil {
+			if p, err := h.getProcess(id, filter); err == nil {
 				if len(reference) != 0 && p.Reference != reference {
 					continue
 				}
@@ -132,7 +139,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 		for _, id := range ids {
 			for _, wantid := range wantids {
 				if wantid == id.ID {
-					if p, err := h.getProcess(id, user, filter); err == nil {
+					if p, err := h.getProcess(id, filter); err == nil {
 						processes = append(processes, p)
 					}
 				}
@@ -156,9 +163,9 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [get]
 func (h *RestreamHandler) Get(c echo.Context) error {
+	user := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
 	filter := util.DefaultQuery(c, "filter", "")
-	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
@@ -170,7 +177,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 		Domain: domain,
 	}
 
-	p, err := h.getProcess(tid, user, filter)
+	p, err := h.getProcess(tid, filter)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
 	}
@@ -190,17 +197,20 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [delete]
 func (h *RestreamHandler) Delete(c echo.Context) error {
-	id := util.PathParam(c, "id")
 	user := util.DefaultContext(c, "user", "")
+	superuser := util.DefaultContext(c, "superuser", false)
+	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
-
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
-	}
 
 	tid := restream.TaskID{
 		ID:     id,
 		Domain: domain,
+	}
+
+	if !superuser {
+		if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+			return api.Err(http.StatusForbidden, "Forbidden")
+		}
 	}
 
 	if err := h.restream.StopProcess(tid); err != nil {
@@ -285,7 +295,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		Domain: config.Domain,
 	}
 
-	p, _ := h.getProcess(tid, config.Owner, "config")
+	p, _ := h.getProcess(tid, "config")
 
 	return c.JSON(http.StatusOK, p.Config)
 }
@@ -661,7 +671,7 @@ func (h *RestreamHandler) SetMetadata(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (h *RestreamHandler) getProcess(id restream.TaskID, user, filterString string) (api.Process, error) {
+func (h *RestreamHandler) getProcess(id restream.TaskID, filterString string) (api.Process, error) {
 	filter := strings.FieldsFunc(filterString, func(r rune) bool {
 		return r == rune(',')
 	})

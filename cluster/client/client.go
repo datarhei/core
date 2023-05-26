@@ -9,6 +9,7 @@ import (
 	"time"
 
 	httpapi "github.com/datarhei/core/v16/http/api"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -40,8 +41,13 @@ type UpdateProcessRequest struct {
 }
 
 type AddIdentityRequest struct {
-	Origin   string `json:"origin"`
-	Identity any    `json:"identity"`
+	Origin   string           `json:"origin"`
+	Identity iamidentity.User `json:"identity"`
+}
+
+type RemoveIdentityRequest struct {
+	Origin string `json:"origin"`
+	Name   string `json:"name"`
 }
 
 type APIClient struct {
@@ -126,6 +132,17 @@ func (c *APIClient) AddIdentity(r AddIdentityRequest) error {
 	}
 
 	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data))
+
+	return err
+}
+
+func (c *APIClient) RemoveIdentity(r RemoveIdentityRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/iam/user/:name", "application/json", bytes.NewReader(data))
 
 	return err
 }
