@@ -74,7 +74,7 @@ func NewAPI(config APIConfig) (API, error) {
 	}))
 	a.router.Logger.SetOutput(httplog.NewWrapper(a.logger))
 
-	a.router.POST("/v1/join", func(c echo.Context) error {
+	a.router.POST("/v1/server", func(c echo.Context) error {
 		r := client.JoinRequest{}
 
 		if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -86,11 +86,13 @@ func NewAPI(config APIConfig) (API, error) {
 			"request": r,
 		}).Log("Join request: %+v", r)
 
-		if r.Origin == a.id {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		err := a.cluster.Join(r.Origin, r.ID, r.RaftAddress, "")
+		err := a.cluster.Join(origin, r.ID, r.RaftAddress, "")
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to join cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)
@@ -99,25 +101,22 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
-	a.router.POST("/v1/leave", func(c echo.Context) error {
-		r := client.LeaveRequest{}
-
-		if err := util.ShouldBindJSON(c, &r); err != nil {
-			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
-		}
+	a.router.POST("/v1/server/:id", func(c echo.Context) error {
+		id := util.PathParam(c, "id")
 
 		a.logger.Debug().WithFields(log.Fields{
-			"id":      r.ID,
-			"request": r,
-		}).Log("Leave request: %+v", r)
+			"id": id,
+		}).Log("Leave request")
 
-		if r.Origin == a.id {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		err := a.cluster.Leave(r.Origin, r.ID)
+		err := a.cluster.Leave(origin, id)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to leave cluster")
+			a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to leave cluster")
 			return httpapi.Err(http.StatusInternalServerError, "unable to leave cluster", "%s", err)
 		}
 
@@ -143,13 +142,15 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		if r.Origin == a.id {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
 		a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
 
-		err := a.cluster.AddProcess(r.Origin, &r.Config)
+		err := a.cluster.AddProcess(origin, &r.Config)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("Unable to add process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to add process", "%s", err)
@@ -158,28 +159,20 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
-	a.router.POST("/v1/process/:id", func(c echo.Context) error {
+	a.router.DELETE("/v1/process/:id", func(c echo.Context) error {
 		id := util.PathParam(c, "id")
 
-		r := client.RemoveProcessRequest{}
+		origin := c.Request().Header.Get("X-Cluster-Origin")
 
-		if err := util.ShouldBindJSON(c, &r); err != nil {
-			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
-		}
-
-		if r.Origin == a.id {
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		if id != r.ID {
-			return httpapi.Err(http.StatusBadRequest, "Invalid data", "the ID in the path and the request do not match")
-		}
+		a.logger.Debug().WithField("id", id).Log("Remove process request")
 
-		a.logger.Debug().WithField("id", r.ID).Log("Remove process request")
-
-		err := a.cluster.RemoveProcess(r.Origin, r.ID)
+		err := a.cluster.RemoveProcess(origin, id)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to remove process")
+			a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to remove process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
 		}
 
@@ -195,7 +188,9 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		if r.Origin == a.id {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
@@ -208,7 +203,7 @@ func NewAPI(config APIConfig) (API, error) {
 			"new_id": r.Config.ID,
 		}).Log("Update process request")
 
-		err := a.cluster.UpdateProcess(r.Origin, r.ID, &r.Config)
+		err := a.cluster.UpdateProcess(origin, r.ID, &r.Config)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to update process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to update process", "%s", err)
@@ -224,13 +219,15 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 		}
 
-		if r.Origin == a.id {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
 		a.logger.Debug().WithField("identity", r.Identity).Log("Add identity request")
 
-		err := a.cluster.AddIdentity(r.Origin, r.Identity)
+		err := a.cluster.AddIdentity(origin, r.Identity)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("identity", r.Identity).Log("Unable to add identity")
 			return httpapi.Err(http.StatusInternalServerError, "unable to add identity", "%s", err)
@@ -239,28 +236,20 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
-	a.router.POST("/v1/iam/user/:name", func(c echo.Context) error {
+	a.router.DELETE("/v1/iam/user/:name", func(c echo.Context) error {
 		name := util.PathParam(c, "name")
 
-		r := client.RemoveIdentityRequest{}
+		origin := c.Request().Header.Get("X-Cluster-Origin")
 
-		if err := util.ShouldBindJSON(c, &r); err != nil {
-			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
-		}
-
-		if r.Origin == a.id {
+		if origin == a.id {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		if name != r.Name {
-			return httpapi.Err(http.StatusBadRequest, "Invalid data", "the name in the path and the request do not match")
-		}
+		a.logger.Debug().WithField("identity", name).Log("Remove identity request")
 
-		a.logger.Debug().WithField("identity", r.Name).Log("Remove identity request")
-
-		err := a.cluster.RemoveIdentity(r.Origin, r.Name)
+		err := a.cluster.RemoveIdentity(origin, name)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("identity", r.Name).Log("Unable to remove identity")
+			a.logger.Debug().WithError(err).WithField("identity", name).Log("Unable to remove identity")
 			return httpapi.Err(http.StatusInternalServerError, "unable to remove identity", "%s", err)
 		}
 

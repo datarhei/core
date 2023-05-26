@@ -93,7 +93,6 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 	}
 
 	r := apiclient.JoinRequest{
-		Origin:      origin,
 		ID:          id,
 		RaftAddress: raftAddress,
 	}
@@ -111,7 +110,7 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 		}
 	}
 
-	return client.Join(r)
+	return client.Join(origin, r)
 }
 
 func (f *forwarder) Leave(origin, id string) error {
@@ -119,18 +118,13 @@ func (f *forwarder) Leave(origin, id string) error {
 		origin = f.id
 	}
 
-	r := apiclient.LeaveRequest{
-		Origin: origin,
-		ID:     id,
-	}
-
-	f.logger.Debug().WithField("request", r).Log("Forwarding to leader")
+	f.logger.Debug().WithField("id", id).Log("Forwarding to leader")
 
 	f.lock.RLock()
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.Leave(r)
+	return client.Leave(origin, id)
 }
 
 func (f *forwarder) Snapshot() (io.ReadCloser, error) {
@@ -147,7 +141,6 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 	}
 
 	r := apiclient.AddProcessRequest{
-		Origin: origin,
 		Config: *config,
 	}
 
@@ -155,7 +148,7 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.AddProcess(r)
+	return client.AddProcess(origin, r)
 }
 
 func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
@@ -164,7 +157,6 @@ func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
 	}
 
 	r := apiclient.UpdateProcessRequest{
-		Origin: origin,
 		ID:     id,
 		Config: *config,
 	}
@@ -173,7 +165,7 @@ func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.UpdateProcess(r)
+	return client.UpdateProcess(origin, r)
 }
 
 func (f *forwarder) RemoveProcess(origin, id string) error {
@@ -181,16 +173,11 @@ func (f *forwarder) RemoveProcess(origin, id string) error {
 		origin = f.id
 	}
 
-	r := apiclient.RemoveProcessRequest{
-		Origin: origin,
-		ID:     id,
-	}
-
 	f.lock.RLock()
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.RemoveProcess(r)
+	return client.RemoveProcess(origin, id)
 }
 
 func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error {
@@ -199,7 +186,6 @@ func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error 
 	}
 
 	r := apiclient.AddIdentityRequest{
-		Origin:   origin,
 		Identity: identity,
 	}
 
@@ -207,7 +193,7 @@ func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error 
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.AddIdentity(r)
+	return client.AddIdentity(origin, r)
 }
 
 func (f *forwarder) RemoveIdentity(origin string, name string) error {
@@ -215,14 +201,9 @@ func (f *forwarder) RemoveIdentity(origin string, name string) error {
 		origin = f.id
 	}
 
-	r := apiclient.RemoveIdentityRequest{
-		Origin: origin,
-		Name:   name,
-	}
-
 	f.lock.RLock()
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.RemoveIdentity(r)
+	return client.RemoveIdentity(origin, name)
 }

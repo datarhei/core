@@ -14,40 +14,25 @@ import (
 )
 
 type JoinRequest struct {
-	Origin      string `json:"origin"`
 	ID          string `json:"id"`
 	RaftAddress string `json:"raft_address"`
 }
 
 type LeaveRequest struct {
-	Origin string `json:"origin"`
-	ID     string `json:"id"`
+	ID string `json:"id"`
 }
 
 type AddProcessRequest struct {
-	Origin string     `json:"origin"`
 	Config app.Config `json:"config"`
 }
 
-type RemoveProcessRequest struct {
-	Origin string `json:"origin"`
-	ID     string `json:"id"`
-}
-
 type UpdateProcessRequest struct {
-	Origin string     `json:"origin"`
 	ID     string     `json:"id"`
 	Config app.Config `json:"config"`
 }
 
 type AddIdentityRequest struct {
-	Origin   string           `json:"origin"`
 	Identity iamidentity.User `json:"identity"`
-}
-
-type RemoveIdentityRequest struct {
-	Origin string `json:"origin"`
-	Name   string `json:"name"`
 }
 
 type APIClient struct {
@@ -56,7 +41,7 @@ type APIClient struct {
 }
 
 func (c *APIClient) CoreAPIAddress() (string, error) {
-	data, err := c.call(http.MethodGet, "/core", "", nil)
+	data, err := c.call(http.MethodGet, "/core", "", nil, "")
 	if err != nil {
 		return "", err
 	}
@@ -70,88 +55,73 @@ func (c *APIClient) CoreAPIAddress() (string, error) {
 	return address, nil
 }
 
-func (c *APIClient) Join(r JoinRequest) error {
+func (c *APIClient) Join(origin string, r JoinRequest) error {
 	data, err := json.Marshal(&r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/join", "application/json", bytes.NewReader(data))
+	_, err = c.call(http.MethodPost, "/server", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
-func (c *APIClient) Leave(r LeaveRequest) error {
-	data, err := json.Marshal(&r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/leave", "application/json", bytes.NewReader(data))
+func (c *APIClient) Leave(origin string, id string) error {
+	_, err := c.call(http.MethodDelete, "/server/"+id, "application/json", nil, origin)
 
 	return err
 }
 
-func (c *APIClient) AddProcess(r AddProcessRequest) error {
+func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/process", "application/json", bytes.NewReader(data))
+	_, err = c.call(http.MethodPost, "/process", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
-func (c *APIClient) RemoveProcess(r RemoveProcessRequest) error {
+func (c *APIClient) RemoveProcess(origin string, id string) error {
+	_, err := c.call(http.MethodDelete, "/process/"+id, "application/json", nil, origin)
+
+	return err
+}
+
+func (c *APIClient) UpdateProcess(origin string, r UpdateProcessRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/process/"+r.ID, "application/json", bytes.NewReader(data))
+	_, err = c.call(http.MethodPut, "/process/"+r.ID, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
-func (c *APIClient) UpdateProcess(r UpdateProcessRequest) error {
+func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+r.ID, "application/json", bytes.NewReader(data))
+	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
-func (c *APIClient) AddIdentity(r AddIdentityRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data))
-
-	return err
-}
-
-func (c *APIClient) RemoveIdentity(r RemoveIdentityRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/iam/user/:name", "application/json", bytes.NewReader(data))
+func (c *APIClient) RemoveIdentity(origin string, name string) error {
+	_, err := c.call(http.MethodDelete, "/iam/user/"+name, "application/json", nil, origin)
 
 	return err
 }
 
 func (c *APIClient) Snapshot() (io.ReadCloser, error) {
-	return c.stream(http.MethodGet, "/snapshot", "", nil)
+	return c.stream(http.MethodGet, "/snapshot", "", nil, "")
 }
 
-func (c *APIClient) stream(method, path, contentType string, data io.Reader) (io.ReadCloser, error) {
+func (c *APIClient) stream(method, path, contentType string, data io.Reader, origin string) (io.ReadCloser, error) {
 	if len(c.Address) == 0 {
 		return nil, fmt.Errorf("no address defined")
 	}
@@ -162,6 +132,8 @@ func (c *APIClient) stream(method, path, contentType string, data io.Reader) (io
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Add("X-Cluster-Origin", origin)
 
 	if method == "POST" || method == "PUT" {
 		req.Header.Add("Content-Type", contentType)
@@ -187,8 +159,8 @@ func (c *APIClient) stream(method, path, contentType string, data io.Reader) (io
 	return body, nil
 }
 
-func (c *APIClient) call(method, path, contentType string, data io.Reader) ([]byte, error) {
-	body, err := c.stream(method, path, contentType, data)
+func (c *APIClient) call(method, path, contentType string, data io.Reader, origin string) ([]byte, error) {
+	body, err := c.stream(method, path, contentType, data, origin)
 	if err != nil {
 		return nil, err
 	}
