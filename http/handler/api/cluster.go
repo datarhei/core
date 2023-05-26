@@ -377,3 +377,23 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, "OK")
 }
+
+func (h *ClusterHandler) AddIdentity(c echo.Context) error {
+	process := api.ProcessConfig{
+		ID:        shortuuid.New(),
+		Type:      "ffmpeg",
+		Autostart: true,
+	}
+
+	if err := util.ShouldBindJSON(c, &process); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	config := process.Marshal()
+
+	if err := h.cluster.AddIdentity("", config); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, process)
+}

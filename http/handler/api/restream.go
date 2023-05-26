@@ -44,6 +44,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
+		Owner:     user,
 		Type:      "ffmpeg",
 		Autostart: true,
 	}
@@ -52,7 +53,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	if !h.iam.Enforce(user, process.Group, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -65,7 +66,6 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	config := process.Marshal()
-	config.Owner = user
 
 	if err := h.restream.AddProcess(config); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())

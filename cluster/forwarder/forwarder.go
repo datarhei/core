@@ -15,12 +15,16 @@ import (
 type Forwarder interface {
 	SetLeader(address string)
 	HasLeader() bool
+
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error
 	Snapshot() (io.ReadCloser, error)
+
 	AddProcess(origin string, config *app.Config) error
 	UpdateProcess(origin, id string, config *app.Config) error
 	RemoveProcess(origin, id string) error
+
+	AddIdentity(origin string, identity any) error
 }
 
 type forwarder struct {
@@ -185,4 +189,21 @@ func (f *forwarder) RemoveProcess(origin, id string) error {
 	f.lock.RUnlock()
 
 	return client.RemoveProcess(r)
+}
+
+func (f *forwarder) AddIdentity(origin string, identity any) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.AddIdentityRequest{
+		Origin:   origin,
+		Identity: identity,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.AddIdentity(r)
 }

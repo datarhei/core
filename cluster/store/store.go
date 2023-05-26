@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -26,12 +28,23 @@ type Process struct {
 	Config    *app.Config
 }
 
+type Users struct {
+	UpdatedAt time.Time
+	Users     []identity.User
+}
+
+type Policies struct {
+	UpdatedAt time.Time
+	Policies  []access.Policy
+}
+
 type operation string
 
 const (
 	OpAddProcess    operation = "addProcess"
 	OpRemoveProcess operation = "removeProcess"
 	OpUpdateProcess operation = "updateProcess"
+	OpAddIdentity   operation = "addIdentity"
 )
 
 type Command struct {
@@ -50,6 +63,10 @@ type CommandUpdateProcess struct {
 
 type CommandRemoveProcess struct {
 	ID string
+}
+
+type CommandAddIdentity struct {
+	Identity any
 }
 
 // Implement a FSM

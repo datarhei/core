@@ -56,6 +56,15 @@ func (u *User) validate() error {
 		return fmt.Errorf("the name can only contain [%s]", chars)
 	}
 
+	if len(u.Auth.API.Auth0.User) != 0 {
+		t, err := newAuth0Tenant(u.Auth.API.Auth0.Tenant)
+		if err != nil {
+			return fmt.Errorf("auth0: %w", err)
+		}
+
+		t.Cancel()
+	}
+
 	return nil
 }
 

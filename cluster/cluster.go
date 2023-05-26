@@ -67,6 +67,8 @@ type Cluster interface {
 	RemoveProcess(origin, id string) error
 	UpdateProcess(origin, id string, config *app.Config) error
 
+	AddIdentity(origin string, identity any) error
+
 	ProxyReader() proxy.ProxyReader
 }
 
@@ -736,6 +738,21 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 		Data: &store.CommandUpdateProcess{
 			ID:     id,
 			Config: *config,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) AddIdentity(origin string, identity any) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.AddIdentity(origin, identity)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpAddIdentity,
+		Data: &store.CommandAddIdentity{
+			Identity: identity,
 		},
 	}
 

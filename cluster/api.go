@@ -217,6 +217,28 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
+	a.router.POST("/v1/iam/user", func(c echo.Context) error {
+		r := client.AddIdentityRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		if r.Origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		a.logger.Debug().WithField("identity", r.Identity).Log("Add identity request")
+
+		err := a.cluster.AddIdentity(r.Origin, r.Identity)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithField("identity", r.Identity).Log("Unable to add identity")
+			return httpapi.Err(http.StatusInternalServerError, "unable to add identity", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	})
+
 	a.router.GET("/v1/core", func(c echo.Context) error {
 		address, _ := a.cluster.CoreAPIAddress("")
 		return c.JSON(http.StatusOK, address)
