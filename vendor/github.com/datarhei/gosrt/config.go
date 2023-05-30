@@ -625,9 +625,9 @@ func (c *Config) MarshalQuery() string {
 	return q.Encode()
 }
 
-// Validate validates a configuration or returns an error if a field
+// Validate validates a configuration, returns an error if a field
 // has an invalid value.
-func (c Config) Validate() error {
+func (c *Config) Validate() error {
 	if c.TransmissionType != "live" {
 		return fmt.Errorf("config: TransmissionType must be 'live'")
 	}

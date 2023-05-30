@@ -391,6 +391,68 @@ func (a *api) start() error {
 		a.sessions = sessions
 	}
 
+	if cfg.Cluster.Enable {
+		scheme := "http://"
+		address := cfg.Address
+
+		if cfg.TLS.Enable {
+			scheme = "https://"
+			address = cfg.TLS.Address
+		}
+
+		host, port, err := gonet.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("invalid core address: %s: %w", address, err)
+		}
+
+		if len(host) == 0 {
+			chost, _, err := gonet.SplitHostPort(cfg.Cluster.Address)
+			if err != nil {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			if len(chost) == 0 {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			host = chost
+		}
+
+		peers := []cluster.Peer{}
+
+		for _, p := range cfg.Cluster.Peers {
+			id, address, found := strings.Cut(p, "@")
+			if !found {
+				continue
+			}
+
+			peers = append(peers, cluster.Peer{
+				ID:      id,
+				Address: address,
+			})
+		}
+
+		cluster, err := cluster.New(cluster.ClusterConfig{
+			ID:              cfg.ID,
+			Name:            cfg.Name,
+			Path:            filepath.Join(cfg.DB.Dir, "cluster"),
+			Bootstrap:       cfg.Cluster.Bootstrap,
+			Recover:         cfg.Cluster.Recover,
+			Address:         cfg.Cluster.Address,
+			Peers:           peers,
+			CoreAPIAddress:  scheme + gonet.JoinHostPort(host, port),
+			CoreAPIUsername: cfg.API.Auth.Username,
+			CoreAPIPassword: cfg.API.Auth.Password,
+			IPLimiter:       a.sessionsLimiter,
+			Logger:          a.log.logger.core.WithComponent("Cluster"),
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create cluster: %w", err)
+		}
+
+		a.cluster = cluster
+	}
+
 	{
 		superuser := iamidentity.User{
 			Name:      cfg.API.Auth.Username,
@@ -421,141 +483,151 @@ func (a *api) start() error {
 			}
 		}
 
-		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
-			Root: filepath.Join(cfg.DB.Dir, "iam"),
-		})
-		if err != nil {
-			return err
-		}
-
 		secret := rand.String(32)
 		if len(cfg.API.Auth.JWT.Secret) != 0 {
 			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
 		}
 
-		policyAdapter, err := iamaccess.NewJSONAdapter(fs, "./policy.json", nil)
-		if err != nil {
-			return err
-		}
+		var manager iam.IAM = nil
 
-		identityAdapter, err := iamidentity.NewJSONAdapter(fs, "./users.json", nil)
-		if err != nil {
-			return err
-		}
-
-		manager, err := iam.NewIAM(iam.Config{
-			PolicyAdapter:   policyAdapter,
-			IdentityAdapter: identityAdapter,
-			Superuser:       superuser,
-			JWTRealm:        "datarhei-core",
-			JWTSecret:       secret,
-			Logger:          a.log.logger.core.WithComponent("IAM"),
-		})
-		if err != nil {
-			return fmt.Errorf("iam: %w", err)
-		}
-
-		// Check if there are already file created by IAM. If not, create policies
-		// and users based on the config in order to mimic the behaviour before IAM.
-		if len(fs.List("/", "/*.json")) == 0 {
-			policies := []iamaccess.Policy{
-				{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "fs:/**",
-					Actions:  []string{"GET", "HEAD", "OPTIONS"},
-				},
-				{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "api:/api",
-					Actions:  []string{"GET", "HEAD", "OPTIONS"},
-				},
-				{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "api:/api/v3/widget/process/**",
-					Actions:  []string{"GET", "HEAD", "OPTIONS"},
-				},
+		if a.cluster != nil {
+			var err error = nil
+			manager, err = a.cluster.IAM(superuser, "datarhei-core", secret)
+			if err != nil {
+				return err
+			}
+		} else {
+			fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+				Root: filepath.Join(cfg.DB.Dir, "iam"),
+			})
+			if err != nil {
+				return err
 			}
 
-			users := map[string]iamidentity.User{}
+			policyAdapter, err := iamaccess.NewJSONAdapter(fs, "./policy.json", nil)
+			if err != nil {
+				return err
+			}
 
-			if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
-				users[cfg.Storage.Memory.Auth.Username] = iamidentity.User{
-					Name: cfg.Storage.Memory.Auth.Username,
-					Auth: iamidentity.UserAuth{
-						Services: iamidentity.UserAuthServices{
-							Basic: []string{cfg.Storage.Memory.Auth.Password},
-						},
+			identityAdapter, err := iamidentity.NewJSONAdapter(fs, "./users.json", nil)
+			if err != nil {
+				return err
+			}
+
+			manager, err = iam.New(iam.Config{
+				PolicyAdapter:   policyAdapter,
+				IdentityAdapter: identityAdapter,
+				Superuser:       superuser,
+				JWTRealm:        "datarhei-core",
+				JWTSecret:       secret,
+				Logger:          a.log.logger.core.WithComponent("IAM"),
+			})
+			if err != nil {
+				return fmt.Errorf("iam: %w", err)
+			}
+
+			// Check if there are already file created by IAM. If not, create policies
+			// and users based on the config in order to mimic the behaviour before IAM.
+			if len(fs.List("/", "/*.json")) == 0 {
+				policies := []iamaccess.Policy{
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "fs:/**",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
+					},
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "api:/api",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
+					},
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "api:/api/v3/widget/process/**",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
 					},
 				}
 
-				policies = append(policies, iamaccess.Policy{
-					Name:     cfg.Storage.Memory.Auth.Username,
-					Domain:   "$none",
-					Resource: "fs:/memfs/**",
-					Actions:  []string{"ANY"},
-				})
-			}
+				users := map[string]iamidentity.User{}
 
-			for _, s := range cfg.Storage.S3 {
-				if s.Auth.Enable && s.Auth.Username != superuser.Name {
-					user, ok := users[s.Auth.Username]
-					if !ok {
-						users[s.Auth.Username] = iamidentity.User{
-							Name: s.Auth.Username,
-							Auth: iamidentity.UserAuth{
-								Services: iamidentity.UserAuthServices{
-									Basic: []string{s.Auth.Password},
-								},
+				if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
+					users[cfg.Storage.Memory.Auth.Username] = iamidentity.User{
+						Name: cfg.Storage.Memory.Auth.Username,
+						Auth: iamidentity.UserAuth{
+							Services: iamidentity.UserAuthServices{
+								Basic: []string{cfg.Storage.Memory.Auth.Password},
 							},
-						}
-					} else {
-						user.Auth.Services.Basic = append(user.Auth.Services.Basic, s.Auth.Password)
-						users[s.Auth.Username] = user
+						},
 					}
 
 					policies = append(policies, iamaccess.Policy{
-						Name:     s.Auth.Username,
+						Name:     cfg.Storage.Memory.Auth.Username,
 						Domain:   "$none",
-						Resource: "fs:" + s.Mountpoint + "/**",
+						Resource: "fs:/memfs/**",
 						Actions:  []string{"ANY"},
 					})
 				}
-			}
 
-			if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-				policies = append(policies, iamaccess.Policy{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "rtmp:/**",
-					Actions:  []string{"ANY"},
-				})
-			}
+				for _, s := range cfg.Storage.S3 {
+					if s.Auth.Enable && s.Auth.Username != superuser.Name {
+						user, ok := users[s.Auth.Username]
+						if !ok {
+							users[s.Auth.Username] = iamidentity.User{
+								Name: s.Auth.Username,
+								Auth: iamidentity.UserAuth{
+									Services: iamidentity.UserAuthServices{
+										Basic: []string{s.Auth.Password},
+									},
+								},
+							}
+						} else {
+							user.Auth.Services.Basic = append(user.Auth.Services.Basic, s.Auth.Password)
+							users[s.Auth.Username] = user
+						}
 
-			if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-				policies = append(policies, iamaccess.Policy{
-					Name:     "$anon",
-					Domain:   "$none",
-					Resource: "srt:**",
-					Actions:  []string{"ANY"},
-				})
-			}
-
-			for _, user := range users {
-				if _, err := manager.GetIdentity(user.Name); err == nil {
-					continue
+						policies = append(policies, iamaccess.Policy{
+							Name:     s.Auth.Username,
+							Domain:   "$none",
+							Resource: "fs:" + s.Mountpoint + "/**",
+							Actions:  []string{"ANY"},
+						})
+					}
 				}
 
-				err := manager.CreateIdentity(user)
-				if err != nil {
-					return fmt.Errorf("iam: %w", err)
+				if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+					policies = append(policies, iamaccess.Policy{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "rtmp:/**",
+						Actions:  []string{"ANY"},
+					})
 				}
-			}
 
-			for _, policy := range policies {
-				manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
+				if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+					policies = append(policies, iamaccess.Policy{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "srt:**",
+						Actions:  []string{"ANY"},
+					})
+				}
+
+				for _, user := range users {
+					if _, err := manager.GetIdentity(user.Name); err == nil {
+						continue
+					}
+
+					err := manager.CreateIdentity(user)
+					if err != nil {
+						return fmt.Errorf("iam: %w", err)
+					}
+				}
+
+				for _, policy := range policies {
+					manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
+				}
 			}
 		}
 
@@ -844,68 +916,6 @@ func (a *api) start() error {
 	}
 
 	a.restream = restream
-
-	if cfg.Cluster.Enable {
-		scheme := "http://"
-		address := cfg.Address
-
-		if cfg.TLS.Enable {
-			scheme = "https://"
-			address = cfg.TLS.Address
-		}
-
-		host, port, err := gonet.SplitHostPort(address)
-		if err != nil {
-			return fmt.Errorf("invalid core address: %s: %w", address, err)
-		}
-
-		if len(host) == 0 {
-			chost, _, err := gonet.SplitHostPort(cfg.Cluster.Address)
-			if err != nil {
-				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
-			}
-
-			if len(chost) == 0 {
-				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
-			}
-
-			host = chost
-		}
-
-		peers := []cluster.Peer{}
-
-		for _, p := range cfg.Cluster.Peers {
-			id, address, found := strings.Cut(p, "@")
-			if !found {
-				continue
-			}
-
-			peers = append(peers, cluster.Peer{
-				ID:      id,
-				Address: address,
-			})
-		}
-
-		cluster, err := cluster.New(cluster.ClusterConfig{
-			ID:              cfg.ID,
-			Name:            cfg.Name,
-			Path:            filepath.Join(cfg.DB.Dir, "cluster"),
-			Bootstrap:       cfg.Cluster.Bootstrap,
-			Recover:         cfg.Cluster.Recover,
-			Address:         cfg.Cluster.Address,
-			Peers:           peers,
-			CoreAPIAddress:  scheme + gonet.JoinHostPort(host, port),
-			CoreAPIUsername: cfg.API.Auth.Username,
-			CoreAPIPassword: cfg.API.Auth.Password,
-			IPLimiter:       a.sessionsLimiter,
-			Logger:          a.log.logger.core.WithComponent("Cluster"),
-		})
-		if err != nil {
-			return fmt.Errorf("unable to create cluster: %w", err)
-		}
-
-		a.cluster = cluster
-	}
 
 	metrics, err := monitor.NewHistory(monitor.HistoryConfig{
 		Enable:    cfg.Metrics.Enable,

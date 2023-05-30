@@ -18,10 +18,13 @@ import (
 type Store interface {
 	raft.FSM
 
+	OnApply(func(op Operation))
+
 	ProcessList() []Process
 	GetProcess(id string) (Process, error)
 
 	UserList() Users
+	PolicyList() Policies
 }
 
 type Process struct {
@@ -40,18 +43,19 @@ type Policies struct {
 	Policies  []access.Policy
 }
 
-type operation string
+type Operation string
 
 const (
-	OpAddProcess     operation = "addProcess"
-	OpRemoveProcess  operation = "removeProcess"
-	OpUpdateProcess  operation = "updateProcess"
-	OpAddIdentity    operation = "addIdentity"
-	OpRemoveIdentity operation = "removeIdentity"
+	OpAddProcess     Operation = "addProcess"
+	OpRemoveProcess  Operation = "removeProcess"
+	OpUpdateProcess  Operation = "updateProcess"
+	OpAddIdentity    Operation = "addIdentity"
+	OpRemoveIdentity Operation = "removeIdentity"
+	OpSetPolicies    Operation = "setPolicies"
 )
 
 type Command struct {
-	Operation operation
+	Operation Operation
 	Data      interface{}
 }
 
@@ -76,6 +80,11 @@ type CommandRemoveIdentity struct {
 	Name string
 }
 
+type CommandSetPolicies struct {
+	Name     string
+	Policies []access.Policy
+}
+
 // Implement a FSM
 type store struct {
 	lock    sync.RWMutex
@@ -85,6 +94,13 @@ type store struct {
 		UpdatedAt time.Time
 		Users     map[string]identity.User
 	}
+
+	Policies struct {
+		UpdatedAt time.Time
+		Policies  map[string][]access.Policy
+	}
+
+	callback func(op Operation)
 
 	logger log.Logger
 }
@@ -100,6 +116,7 @@ func NewStore(config Config) (Store, error) {
 	}
 
 	s.Users.Users = map[string]identity.User{}
+	s.Policies.Policies = map[string][]access.Policy{}
 
 	if s.logger == nil {
 		s.logger = log.New("")
@@ -198,10 +215,28 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		s.lock.Lock()
 		delete(s.Users.Users, cmd.Name)
 		s.Users.UpdatedAt = time.Now()
+		delete(s.Policies.Policies, cmd.Name)
+		s.Policies.UpdatedAt = time.Now()
+		s.lock.Unlock()
+	case OpSetPolicies:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandSetPolicies{}
+		json.Unmarshal(b, &cmd)
+
+		s.lock.Lock()
+		delete(s.Policies.Policies, cmd.Name)
+		s.Policies.Policies[cmd.Name] = cmd.Policies
+		s.Policies.UpdatedAt = time.Now()
 		s.lock.Unlock()
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 	}
+
+	s.lock.RLock()
+	if s.callback != nil {
+		s.callback(c.Operation)
+	}
+	s.lock.RUnlock()
 
 	s.lock.RLock()
 	s.logger.Debug().WithField("processes", s.Process).Log("")
@@ -209,11 +244,18 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	return nil
 }
 
+func (s *store) OnApply(fn func(op Operation)) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.callback = fn
+}
+
 func (s *store) Snapshot() (raft.FSMSnapshot, error) {
 	s.logger.Debug().Log("Snapshot request")
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	data, err := json.Marshal(s)
 	if err != nil {
@@ -285,6 +327,21 @@ func (s *store) UserList() Users {
 	}
 
 	return u
+}
+
+func (s *store) PolicyList() Policies {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	p := Policies{
+		UpdatedAt: s.Policies.UpdatedAt,
+	}
+
+	for _, policies := range s.Policies.Policies {
+		p.Policies = append(p.Policies, policies...)
+	}
+
+	return p
 }
 
 type fsmSnapshot struct {

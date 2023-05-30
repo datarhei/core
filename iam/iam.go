@@ -32,7 +32,7 @@ type IAM interface {
 	ReloadIndentities() error
 
 	GetVerifier(name string) (identity.Verifier, error)
-	GetVerfierFromAuth0(name string) (identity.Verifier, error)
+	GetVerifierFromAuth0(name string) (identity.Verifier, error)
 	GetDefaultVerifier() identity.Verifier
 
 	CreateJWT(name string) (string, string, error)
@@ -56,7 +56,7 @@ type Config struct {
 	Logger          log.Logger
 }
 
-func NewIAM(config Config) (IAM, error) {
+func New(config Config) (IAM, error) {
 	im, err := identity.New(identity.Config{
 		Adapter:   config.IdentityAdapter,
 		Superuser: config.Superuser,
@@ -168,7 +168,7 @@ func (i *iam) GetVerifier(name string) (identity.Verifier, error) {
 	return i.im.GetVerifier(name)
 }
 
-func (i *iam) GetVerfierFromAuth0(name string) (identity.Verifier, error) {
+func (i *iam) GetVerifierFromAuth0(name string) (identity.Verifier, error) {
 	return i.im.GetVerifierFromAuth0(name)
 }
 

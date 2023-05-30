@@ -9,6 +9,7 @@ import (
 	"time"
 
 	httpapi "github.com/datarhei/core/v16/http/api"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream/app"
 )
@@ -33,6 +34,11 @@ type UpdateProcessRequest struct {
 
 type AddIdentityRequest struct {
 	Identity iamidentity.User `json:"identity"`
+}
+
+type SetPoliciesRequest struct {
+	Name     string             `json:"name"`
+	Policies []iamaccess.Policy `json:"policies"`
 }
 
 type APIClient struct {
@@ -107,6 +113,17 @@ func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
 	}
 
 	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) SetPolicies(origin, name string, r SetPoliciesRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/iam/user/"+name+"/policies", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

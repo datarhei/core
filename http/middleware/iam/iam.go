@@ -125,6 +125,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			resource := c.Request().URL.Path
 			var domain string
 
+			if resource == "/ping" {
+				return next(c)
+			}
+
 			if resource == "/api" || strings.HasPrefix(resource, "/api/") {
 				if resource == "/api/login" {
 					identity, err = mw.findIdentityFromUserpass(c)
@@ -421,7 +425,7 @@ func (m *iammiddleware) findIdentityFromAuth0(c echo.Context) (iamidentity.Verif
 		}
 	}
 
-	identity, err := m.iam.GetVerfierFromAuth0(subject)
+	identity, err := m.iam.GetVerifierFromAuth0(subject)
 	if err != nil {
 		m.logger.Debug().WithFields(log.Fields{
 			"path":   c.Request().URL.Path,

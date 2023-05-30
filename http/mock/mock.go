@@ -65,7 +65,7 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, err
 	}
 
-	iam, err := iam.NewIAM(iam.Config{
+	iam, err := iam.New(iam.Config{
 		PolicyAdapter:   policyAdapter,
 		IdentityAdapter: identityAdapter,
 		Superuser: iamidentity.User{

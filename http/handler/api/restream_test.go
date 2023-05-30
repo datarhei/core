@@ -45,7 +45,7 @@ func getDummyRestreamHandler() (*RestreamHandler, error) {
 		return nil, err
 	}
 
-	iam, err := iam.NewIAM(iam.Config{
+	iam, err := iam.New(iam.Config{
 		PolicyAdapter:   policyAdapter,
 		IdentityAdapter: identityAdapter,
 		Superuser: identity.User{

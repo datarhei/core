@@ -13,9 +13,12 @@ import (
 
 	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/forwarder"
+	clusteriam "github.com/datarhei/core/v16/cluster/iam"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
+	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
@@ -68,7 +71,10 @@ type Cluster interface {
 	RemoveProcess(origin, id string) error
 	UpdateProcess(origin, id string, config *app.Config) error
 
+	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
+	ListIdentities() store.Users
 	AddIdentity(origin string, identity iamidentity.User) error
+	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 
 	ProxyReader() proxy.ProxyReader
@@ -746,6 +752,36 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
+func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error) {
+	policyAdapter, err := clusteriam.NewPolicyAdapter(c.store)
+	if err != nil {
+		return nil, fmt.Errorf("cluster policy adapter: %w", err)
+	}
+
+	identityAdapter, err := clusteriam.NewIdentityAdapter(c.store)
+	if err != nil {
+		return nil, fmt.Errorf("cluster identitry adapter: %w", err)
+	}
+
+	iam, err := clusteriam.New(iam.Config{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser:       superuser,
+		JWTRealm:        jwtRealm,
+		JWTSecret:       jwtSecret,
+		Logger:          c.logger.WithField("logname", "iam"),
+	}, c.store)
+	if err != nil {
+		return nil, fmt.Errorf("cluster iam: %w", err)
+	}
+
+	return iam, nil
+}
+
+func (c *cluster) ListIdentities() store.Users {
+	return c.store.UserList()
+}
+
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddIdentity(origin, identity)
@@ -761,13 +797,29 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 	return c.applyCommand(cmd)
 }
 
+func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.SetPolicies(origin, name, policies)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpSetPolicies,
+		Data: &store.CommandSetPolicies{
+			Name:     name,
+			Policies: policies,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
 func (c *cluster) RemoveIdentity(origin string, name string) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveIdentity(origin, name)
 	}
 
 	cmd := &store.Command{
-		Operation: store.OpAddIdentity,
+		Operation: store.OpRemoveIdentity,
 		Data: &store.CommandRemoveIdentity{
 			Name: name,
 		},

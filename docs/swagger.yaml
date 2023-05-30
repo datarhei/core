@@ -403,6 +403,7 @@ definitions:
           enable_tls:
             type: boolean
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       service:
@@ -455,6 +456,7 @@ definitions:
           passphrase:
             type: string
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       storage:
@@ -502,12 +504,16 @@ definitions:
           memory:
             properties:
               auth:
+                description: Deprecated, use IAM
                 properties:
                   enable:
+                    description: Deprecated, use IAM
                     type: boolean
                   password:
+                    description: Deprecated, use IAM
                     type: string
                   username:
+                    description: Deprecated, use IAM
                     type: string
                 type: object
               max_size_mbytes:
@@ -640,28 +646,21 @@ definitions:
       auth0:
         $ref: '#/definitions/api.IAMUserAuthAPIAuth0'
       userpass:
-        $ref: '#/definitions/api.IAMUserAuthPassword'
+        type: string
     type: object
   api.IAMUserAuthAPIAuth0:
     properties:
-      enable:
-        type: boolean
       tenant:
         $ref: '#/definitions/api.IAMAuth0Tenant'
       user:
         type: string
     type: object
-  api.IAMUserAuthPassword:
-    properties:
-      enable:
-        type: boolean
-      password:
-        type: string
-    type: object
   api.IAMUserAuthServices:
     properties:
       basic:
-        $ref: '#/definitions/api.IAMUserAuthPassword'
+        items:
+          type: string
+        type: array
       token:
         items:
           type: string
@@ -885,7 +884,7 @@ definitions:
     properties:
       autostart:
         type: boolean
-      group:
+      domain:
         type: string
       id:
         type: string
@@ -903,6 +902,8 @@ definitions:
         items:
           $ref: '#/definitions/api.ProcessConfigIO'
         type: array
+      owner:
+        type: string
       reconnect:
         type: boolean
       reconnect_delay_seconds:
@@ -1759,6 +1760,7 @@ definitions:
           enable_tls:
             type: boolean
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       service:
@@ -1811,6 +1813,7 @@ definitions:
           passphrase:
             type: string
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       storage:
@@ -1858,12 +1861,16 @@ definitions:
           memory:
             properties:
               auth:
+                description: Deprecated, use IAM
                 properties:
                   enable:
+                    description: Deprecated, use IAM
                     type: boolean
                   password:
+                    description: Deprecated, use IAM
                     type: string
                   username:
+                    description: Deprecated, use IAM
                     type: string
                 type: object
               max_size_mbytes:
@@ -2105,7 +2112,9 @@ definitions:
       access_key_id:
         type: string
       auth:
-        $ref: '#/definitions/value.S3StorageAuth'
+        allOf:
+        - $ref: '#/definitions/value.S3StorageAuth'
+        description: Deprecated, use IAM
       bucket:
         type: string
       endpoint:
@@ -2124,10 +2133,13 @@ definitions:
   value.S3StorageAuth:
     properties:
       enable:
+        description: Deprecated, use IAM
         type: boolean
       password:
+        description: Deprecated, use IAM
         type: string
       username:
+        description: Deprecated, use IAM
         type: string
     type: object
 info:
@@ -2226,6 +2238,111 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of nodes in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user:
+    post:
+      consumes:
+      - application/json
+      description: Add a new identity
+      operationId: cluster-3-add-identity
+      parameters:
+      - description: Identity
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new identiy
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user/{name}:
+    delete:
+      description: Delete an identity by its name
+      operationId: cluster-3-delete-identity
+      parameters:
+      - description: Identity name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an identity by its name
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user/{name}/policy:
+    put:
+      consumes:
+      - application/json
+      description: Replace policies of an user
+      operationId: cluster-3-update-user-policies
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: Policy definitions
+        in: body
+        name: user
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.IAMPolicy'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace policies of an user
       tags:
       - v16.?.?
   /api/v3/cluster/node:
@@ -2811,7 +2928,7 @@ paths:
       consumes:
       - application/json
       description: Replace policies of an user
-      operationId: iam-3-update-user
+      operationId: iam-3-update-user-policies
       parameters:
       - description: Username
         in: path
@@ -3009,14 +3126,24 @@ paths:
         name: id
         type: string
       - description: Glob pattern for process IDs. If empty all IDs will be returned.
-          Intersected with results from refpattern.
+          Intersected with results from other pattern matches.
         in: query
         name: idpattern
         type: string
       - description: Glob pattern for process references. If empty all IDs will be
-          returned. Intersected with results from idpattern.
+          returned. Intersected with results from other pattern matches.
         in: query
         name: refpattern
+        type: string
+      - description: Glob pattern for process owners. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: ownerpattern
+        type: string
+      - description: Glob pattern for process domain. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: domainpattern
         type: string
       produces:
       - application/json

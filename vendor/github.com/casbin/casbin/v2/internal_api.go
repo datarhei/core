@@ -64,13 +64,15 @@ func (e *Enforcer) addPolicyWithoutNotify(sec string, ptype string, rule []strin
 	return true, nil
 }
 
-// addPolicies adds rules to the current policy.
-func (e *Enforcer) addPoliciesWithoutNotify(sec string, ptype string, rules [][]string) (bool, error) {
+// addPoliciesWithoutNotify adds rules to the current policy without notify
+// If autoRemoveRepeat == true, existing rules are automatically filtered
+// Otherwise, false is returned directly
+func (e *Enforcer) addPoliciesWithoutNotify(sec string, ptype string, rules [][]string, autoRemoveRepeat bool) (bool, error) {
 	if e.dispatcher != nil && e.autoNotifyDispatcher {
 		return true, e.dispatcher.AddPolicies(sec, ptype, rules)
 	}
 
-	if e.model.HasPolicies(sec, ptype, rules) {
+	if !autoRemoveRepeat && e.model.HasPolicies(sec, ptype, rules) {
 		return false, nil
 	}
 
@@ -225,7 +227,7 @@ func (e *Enforcer) removePoliciesWithoutNotify(sec string, ptype string, rules [
 // removeFilteredPolicy removes rules based on field filters from the current policy.
 func (e *Enforcer) removeFilteredPolicyWithoutNotify(sec string, ptype string, fieldIndex int, fieldValues []string) (bool, error) {
 	if len(fieldValues) == 0 {
-		return false, Err.INVALID_FIELDVAULES_PARAMETER
+		return false, Err.ErrInvalidFieldValuesParameter
 	}
 
 	if e.dispatcher != nil && e.autoNotifyDispatcher {
@@ -321,8 +323,10 @@ func (e *Enforcer) addPolicy(sec string, ptype string, rule []string) (bool, err
 }
 
 // addPolicies adds rules to the current policy.
-func (e *Enforcer) addPolicies(sec string, ptype string, rules [][]string) (bool, error) {
-	ok, err := e.addPoliciesWithoutNotify(sec, ptype, rules)
+// If autoRemoveRepeat == true, existing rules are automatically filtered
+// Otherwise, false is returned directly
+func (e *Enforcer) addPolicies(sec string, ptype string, rules [][]string, autoRemoveRepeat bool) (bool, error) {
+	ok, err := e.addPoliciesWithoutNotify(sec, ptype, rules, autoRemoveRepeat)
 	if !ok || err != nil {
 		return ok, err
 	}

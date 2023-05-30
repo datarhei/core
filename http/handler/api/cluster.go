@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -11,6 +12,9 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream"
 
 	"github.com/labstack/echo/v4"
@@ -21,14 +25,26 @@ import (
 type ClusterHandler struct {
 	cluster cluster.Cluster
 	proxy   proxy.ProxyReader
+	iam     iam.IAM
 }
 
 // NewCluster return a new ClusterHandler type. You have to provide a cluster.
-func NewCluster(cluster cluster.Cluster) *ClusterHandler {
-	return &ClusterHandler{
+func NewCluster(cluster cluster.Cluster, iam iam.IAM) (*ClusterHandler, error) {
+	h := &ClusterHandler{
 		cluster: cluster,
 		proxy:   cluster.ProxyReader(),
+		iam:     iam,
 	}
+
+	if h.cluster == nil {
+		return nil, fmt.Errorf("no cluster provided")
+	}
+
+	if h.iam == nil {
+		return nil, fmt.Errorf("no IAM provided")
+	}
+
+	return h, nil
 }
 
 // GetNodes returns the list of proxy nodes in the cluster
@@ -397,13 +413,103 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	identity, _ := user.Unmarshal()
+	identity, policies := user.Unmarshal()
 
 	if err := h.cluster.AddIdentity("", identity); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid identity", "%s", err.Error())
 	}
 
+	if err := h.cluster.SetPolicies("", identity.Name, policies); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid policies", "%s", err.Error())
+	}
+
 	return c.JSON(http.StatusOK, user)
+}
+
+// UpdateIdentityPolicies replaces existing user policies
+// @Summary Replace policies of an user
+// @Description Replace policies of an user
+// @Tags v16.?.?
+// @ID cluster-3-update-user-policies
+// @Accept json
+// @Produce json
+// @Param name path string true "Username"
+// @Param domain query string false "Domain of the acting user"
+// @Param user body []api.IAMPolicy true "Policy definitions"
+// @Success 200 {array} api.IAMPolicy
+// @Failure 400 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/user/{name}/policy [put]
+func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	superuser := util.DefaultContext(c, "superuser", false)
+	domain := util.DefaultQuery(c, "domain", "$none")
+	name := util.PathParam(c, "name")
+
+	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
+	}
+
+	var iamuser identity.User
+	var err error
+
+	if name != "$anon" {
+		iamuser, err = h.iam.GetIdentity(name)
+		if err != nil {
+			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+		}
+	} else {
+		iamuser = identity.User{
+			Name: "$anon",
+		}
+	}
+
+	policies := []api.IAMPolicy{}
+
+	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	for _, p := range policies {
+		err := c.Validate(p)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+	}
+
+	accessPolicies := []access.Policy{}
+
+	for _, p := range policies {
+		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
+			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+		}
+
+		accessPolicies = append(accessPolicies, access.Policy{
+			Name:     name,
+			Domain:   p.Domain,
+			Resource: p.Resource,
+			Actions:  p.Actions,
+		})
+	}
+
+	if !superuser && iamuser.Superuser {
+		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can modify superusers")
+	}
+
+	err = h.cluster.SetPolicies("", name, accessPolicies)
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "set policies: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, policies)
+}
+
+func (h *ClusterHandler) ListIdentities(c echo.Context) error {
+	identities := h.cluster.ListIdentities()
+
+	return c.JSON(http.StatusOK, identities)
 }
 
 // Delete deletes the identity with the given name from the cluster

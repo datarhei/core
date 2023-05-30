@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/casbin/casbin/v2/persist/cache"
 )
@@ -25,7 +26,7 @@ import (
 // CachedEnforcer wraps Enforcer and provides decision cache
 type CachedEnforcer struct {
 	*Enforcer
-	expireTime  uint
+	expireTime  time.Duration
 	cache       cache.Cache
 	enableCache int32
 	locker      *sync.RWMutex
@@ -45,8 +46,7 @@ func NewCachedEnforcer(params ...interface{}) (*CachedEnforcer, error) {
 	}
 
 	e.enableCache = 1
-	cache := cache.DefaultCache(make(map[string]bool))
-	e.cache = &cache
+	e.cache, _ = cache.NewDefaultCache()
 	e.locker = new(sync.RWMutex)
 	return e, nil
 }
@@ -132,7 +132,7 @@ func (e *CachedEnforcer) getCachedResult(key string) (res bool, err error) {
 	return e.cache.Get(key)
 }
 
-func (e *CachedEnforcer) SetExpireTime(expireTime uint) {
+func (e *CachedEnforcer) SetExpireTime(expireTime time.Duration) {
 	e.expireTime = expireTime
 }
 
@@ -147,6 +147,17 @@ func (e *CachedEnforcer) setCachedResult(key string, res bool, extra ...interfac
 }
 
 func (e *CachedEnforcer) getKey(params ...interface{}) (string, bool) {
+	return GetCacheKey(params...)
+}
+
+// InvalidateCache deletes all the existing cached decisions.
+func (e *CachedEnforcer) InvalidateCache() error {
+	e.locker.Lock()
+	defer e.locker.Unlock()
+	return e.cache.Clear()
+}
+
+func GetCacheKey(params ...interface{}) (string, bool) {
 	key := strings.Builder{}
 	for _, param := range params {
 		switch typedParam := param.(type) {
@@ -160,11 +171,4 @@ func (e *CachedEnforcer) getKey(params ...interface{}) (string, bool) {
 		key.WriteString("$$")
 	}
 	return key.String(), true
-}
-
-// InvalidateCache deletes all the existing cached decisions.
-func (e *CachedEnforcer) InvalidateCache() error {
-	e.locker.Lock()
-	defer e.locker.Unlock()
-	return e.cache.Clear()
 }

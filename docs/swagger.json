@@ -152,6 +152,170 @@
                 }
             }
         },
+        "/api/v3/cluster/iam/user": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new identity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new identiy",
+                "operationId": "cluster-3-add-identity",
+                "parameters": [
+                    {
+                        "description": "Identity",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user/{name}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete an identity by its name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete an identity by its name",
+                "operationId": "cluster-3-delete-identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Identity name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user/{name}/policy": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace policies of an user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace policies of an user",
+                "operationId": "cluster-3-update-user-policies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Policy definitions",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/node": {
             "get": {
                 "security": [
@@ -1068,7 +1232,7 @@
                     "v16.?.?"
                 ],
                 "summary": "Replace policies of an user",
-                "operationId": "iam-3-update-user",
+                "operationId": "iam-3-update-user-policies",
                 "parameters": [
                     {
                         "type": "string",
@@ -1363,14 +1527,26 @@
                     },
                     {
                         "type": "string",
-                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern.",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "idpattern",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern.",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "refpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "ownerpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "domainpattern",
                         "in": "query"
                     }
                 ],
@@ -3170,6 +3346,7 @@
                             "type": "boolean"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -3248,6 +3425,7 @@
                             "type": "string"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -3319,15 +3497,19 @@
                             "type": "object",
                             "properties": {
                                 "auth": {
+                                    "description": "Deprecated, use IAM",
                                     "type": "object",
                                     "properties": {
                                         "enable": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "boolean"
                                         },
                                         "password": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         },
                                         "username": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         }
                                     }
@@ -3529,16 +3711,13 @@
                     "$ref": "#/definitions/api.IAMUserAuthAPIAuth0"
                 },
                 "userpass": {
-                    "$ref": "#/definitions/api.IAMUserAuthPassword"
+                    "type": "string"
                 }
             }
         },
         "api.IAMUserAuthAPIAuth0": {
             "type": "object",
             "properties": {
-                "enable": {
-                    "type": "boolean"
-                },
                 "tenant": {
                     "$ref": "#/definitions/api.IAMAuth0Tenant"
                 },
@@ -3547,22 +3726,14 @@
                 }
             }
         },
-        "api.IAMUserAuthPassword": {
-            "type": "object",
-            "properties": {
-                "enable": {
-                    "type": "boolean"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
         "api.IAMUserAuthServices": {
             "type": "object",
             "properties": {
                 "basic": {
-                    "$ref": "#/definitions/api.IAMUserAuthPassword"
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "token": {
                     "type": "array",
@@ -3895,7 +4066,7 @@
                 "autostart": {
                     "type": "boolean"
                 },
-                "group": {
+                "domain": {
                     "type": "string"
                 },
                 "id": {
@@ -3921,6 +4092,9 @@
                     "items": {
                         "$ref": "#/definitions/api.ProcessConfigIO"
                     }
+                },
+                "owner": {
+                    "type": "string"
                 },
                 "reconnect": {
                     "type": "boolean"
@@ -5086,6 +5260,7 @@
                             "type": "boolean"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -5164,6 +5339,7 @@
                             "type": "string"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -5235,15 +5411,19 @@
                             "type": "object",
                             "properties": {
                                 "auth": {
+                                    "description": "Deprecated, use IAM",
                                     "type": "object",
                                     "properties": {
                                         "enable": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "boolean"
                                         },
                                         "password": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         },
                                         "username": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         }
                                     }
@@ -5615,7 +5795,12 @@
                     "type": "string"
                 },
                 "auth": {
-                    "$ref": "#/definitions/value.S3StorageAuth"
+                    "description": "Deprecated, use IAM",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/value.S3StorageAuth"
+                        }
+                    ]
                 },
                 "bucket": {
                     "type": "string"
@@ -5644,12 +5829,15 @@
             "type": "object",
             "properties": {
                 "enable": {
+                    "description": "Deprecated, use IAM",
                     "type": "boolean"
                 },
                 "password": {
+                    "description": "Deprecated, use IAM",
                     "type": "string"
                 },
                 "username": {
+                    "description": "Deprecated, use IAM",
                     "type": "string"
                 }
             }

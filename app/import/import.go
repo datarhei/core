@@ -18,6 +18,8 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
@@ -1453,9 +1455,20 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
-	iam, _ := iam.NewIAM(iam.Config{
-		FS: dummyfs,
-		Superuser: iam.User{
+	policyAdapter, err := iamaccess.NewJSONAdapter(dummyfs, "./policy.json", nil)
+	if err != nil {
+		return app.Probe{}
+	}
+
+	identityAdapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
+	if err != nil {
+		return app.Probe{}
+	}
+
+	iam, _ := iam.New(iam.Config{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser: iamidentity.User{
 			Name: "foobar",
 		},
 		JWTRealm:  "",

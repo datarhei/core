@@ -40,7 +40,7 @@ func getIAM() (iam.IAM, error) {
 		return nil, err
 	}
 
-	i, err := iam.NewIAM(iam.Config{
+	i, err := iam.New(iam.Config{
 		PolicyAdapter:   policyAdapter,
 		IdentityAdapter: identityAdapter,
 		Superuser: iamidentity.User{

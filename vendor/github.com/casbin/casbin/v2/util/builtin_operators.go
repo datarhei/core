@@ -34,13 +34,13 @@ var (
 // validate the variadic parameter size and type as string
 func validateVariadicArgs(expectedLen int, args ...interface{}) error {
 	if len(args) != expectedLen {
-		return fmt.Errorf("Expected %d arguments, but got %d", expectedLen, len(args))
+		return fmt.Errorf("expected %d arguments, but got %d", expectedLen, len(args))
 	}
 
 	for _, p := range args {
 		_, ok := p.(string)
 		if !ok {
-			return errors.New("Argument must be a string")
+			return errors.New("argument must be a string")
 		}
 	}
 
@@ -272,15 +272,24 @@ func KeyMatch4Func(args ...interface{}) (interface{}, error) {
 	return bool(KeyMatch4(name1, name2)), nil
 }
 
-// KeyMatch determines whether key1 matches the pattern of key2 and ignores the parameters in key2.
-// For example, "/foo/bar?status=1&type=2" matches "/foo/bar"
+// KeyMatch5 determines whether key1 matches the pattern of key2 (similar to RESTful path), key2 can contain a *
+// For example, 
+// - "/foo/bar?status=1&type=2" matches "/foo/bar"
+// - "/parent/child1" and "/parent/child1" matches "/parent/*"
+// - "/parent/child1?status=1" matches "/parent/*"
 func KeyMatch5(key1 string, key2 string) bool {
 	i := strings.Index(key1, "?")
-	if i == -1 {
-		return key1 == key2
+
+	if i != -1 {
+		key1 = key1[:i]
 	}
 
-	return key1[:i] == key2
+	key2 = strings.Replace(key2, "/*", "/.*", -1)
+
+	re := regexp.MustCompile(`\{[^/]+\}`)
+	key2 = re.ReplaceAllString(key2, "$1[^/]+$2")
+
+	return RegexMatch(key1, "^"+key2+"$")
 }
 
 // KeyMatch5Func is the wrapper for KeyMatch5.

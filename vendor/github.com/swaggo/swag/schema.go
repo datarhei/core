@@ -3,9 +3,6 @@ package swag
 import (
 	"errors"
 	"fmt"
-	"go/ast"
-	"strings"
-
 	"github.com/go-openapi/spec"
 )
 
@@ -133,56 +130,34 @@ func TransToValidCollectionFormat(format string) string {
 	return ""
 }
 
-// TypeDocName get alias from comment '// @name ', otherwise the original type name to display in doc.
-func TypeDocName(pkgName string, spec *ast.TypeSpec) string {
-	if spec != nil && !ignoreNameOverride(pkgName) {
-		if spec.Comment != nil {
-			for _, comment := range spec.Comment.List {
-				texts := strings.Split(strings.TrimSpace(strings.TrimLeft(comment.Text, "/")), " ")
-				if len(texts) > 1 && strings.ToLower(texts[0]) == "@name" {
-					return texts[1]
-				}
-			}
-		}
-
-		if spec.Name != nil {
-			return fullTypeName(strings.Split(pkgName, ".")[0], spec.Name.Name)
-		}
-	}
-
-	if ignoreNameOverride(pkgName) {
-		return pkgName[1:]
-	}
-
-	return pkgName
-}
-
 func ignoreNameOverride(name string) bool {
 	return len(name) != 0 && name[0] == IgnoreNameOverridePrefix
 }
 
-// TypeDocNameFuncScoped get alias from comment '// @name ', otherwise the original type name to display in doc.
-func TypeDocNameFuncScoped(pkgName string, spec *ast.TypeSpec, fnName string) string {
-	if spec != nil && !ignoreNameOverride(pkgName) {
-		if spec.Comment != nil {
-			for _, comment := range spec.Comment.List {
-				texts := strings.Split(strings.TrimSpace(strings.TrimLeft(comment.Text, "/")), " ")
-				if len(texts) > 1 && strings.ToLower(texts[0]) == "@name" {
-					return texts[1]
-				}
-			}
-		}
-
-		if spec.Name != nil {
-			return fullTypeNameFunctionScoped(strings.Split(pkgName, ".")[0], fnName, spec.Name.Name)
-		}
+// IsComplexSchema whether a schema is complex and should be a ref schema
+func IsComplexSchema(schema *spec.Schema) bool {
+	// a enum type should be complex
+	if len(schema.Enum) > 0 {
+		return true
 	}
 
-	if ignoreNameOverride(pkgName) {
-		return pkgName[1:]
+	// a deep array type is complex, how to determine deep? here more than 2 ,for example: [][]object,[][][]int
+	if len(schema.Type) > 2 {
+		return true
 	}
 
-	return pkgName
+	//Object included, such as Object or []Object
+	for _, st := range schema.Type {
+		if st == OBJECT {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRefSchema whether a schema is a reference schema.
+func IsRefSchema(schema *spec.Schema) bool {
+	return schema.Ref.Ref.GetURL() != nil
 }
 
 // RefSchema build a reference schema.
@@ -238,4 +213,81 @@ func BuildCustomSchema(types []string) (*spec.Schema, error) {
 
 		return PrimitiveSchema(types[0]), nil
 	}
+}
+
+// MergeSchema merge schemas
+func MergeSchema(dst *spec.Schema, src *spec.Schema) *spec.Schema {
+	if len(src.Type) > 0 {
+		dst.Type = src.Type
+	}
+	if len(src.Properties) > 0 {
+		dst.Properties = src.Properties
+	}
+	if src.Items != nil {
+		dst.Items = src.Items
+	}
+	if src.AdditionalProperties != nil {
+		dst.AdditionalProperties = src.AdditionalProperties
+	}
+	if len(src.Description) > 0 {
+		dst.Description = src.Description
+	}
+	if src.Nullable {
+		dst.Nullable = src.Nullable
+	}
+	if len(src.Format) > 0 {
+		dst.Format = src.Format
+	}
+	if src.Default != nil {
+		dst.Default = src.Default
+	}
+	if src.Example != nil {
+		dst.Example = src.Example
+	}
+	if len(src.Extensions) > 0 {
+		dst.Extensions = src.Extensions
+	}
+	if src.Maximum != nil {
+		dst.Maximum = src.Maximum
+	}
+	if src.Minimum != nil {
+		dst.Minimum = src.Minimum
+	}
+	if src.ExclusiveMaximum {
+		dst.ExclusiveMaximum = src.ExclusiveMaximum
+	}
+	if src.ExclusiveMinimum {
+		dst.ExclusiveMinimum = src.ExclusiveMinimum
+	}
+	if src.MaxLength != nil {
+		dst.MaxLength = src.MaxLength
+	}
+	if src.MinLength != nil {
+		dst.MinLength = src.MinLength
+	}
+	if len(src.Pattern) > 0 {
+		dst.Pattern = src.Pattern
+	}
+	if src.MaxItems != nil {
+		dst.MaxItems = src.MaxItems
+	}
+	if src.MinItems != nil {
+		dst.MinItems = src.MinItems
+	}
+	if src.UniqueItems {
+		dst.UniqueItems = src.UniqueItems
+	}
+	if src.MultipleOf != nil {
+		dst.MultipleOf = src.MultipleOf
+	}
+	if len(src.Enum) > 0 {
+		dst.Enum = src.Enum
+	}
+	if len(src.Extensions) > 0 {
+		dst.Extensions = src.Extensions
+	}
+	if len(src.ExtraProps) > 0 {
+		dst.ExtraProps = src.ExtraProps
+	}
+	return dst
 }

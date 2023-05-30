@@ -46,7 +46,7 @@ type UserAuthServices struct {
 
 func (u *User) validate() error {
 	if len(u.Name) == 0 {
-		return fmt.Errorf("the name is required")
+		return fmt.Errorf("a name is required")
 	}
 
 	chars := `A-Za-z0-9:_-`
@@ -505,6 +505,10 @@ func (im *identityManager) Reload() error {
 
 		_, ok := im.identities[u.Name]
 		if ok {
+			continue
+		}
+
+		if err := u.validate(); err != nil {
 			continue
 		}
 

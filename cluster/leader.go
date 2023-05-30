@@ -170,7 +170,7 @@ func (c *cluster) monitorLeadership() {
 					defer emergencyLeaderLoop.Done()
 					c.leaderLoop(ch, true)
 				}(weAreEmergencyLeaderCh)
-				c.logger.Info().Log("Sluster emergency leadership acquired")
+				c.logger.Info().Log("Cluster emergency leadership acquired")
 
 				c.leaderLock.Lock()
 				c.isRaftLeader = false

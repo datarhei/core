@@ -321,7 +321,11 @@ func NewServer(config Config) (Server, error) {
 	})
 
 	if config.Cluster != nil {
-		s.v3handler.cluster = api.NewCluster(config.Cluster)
+		handler, err := api.NewCluster(config.Cluster, config.IAM)
+		if err != nil {
+			return nil, fmt.Errorf("cluster handler: %w", err)
+		}
+		s.v3handler.cluster = handler
 	}
 
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
@@ -653,6 +657,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.cluster != nil {
 		v3.GET("/cluster", s.v3handler.cluster.About)
 		v3.GET("/cluster/process", s.v3handler.cluster.ListProcesses)
+		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
 		v3.GET("/cluster/node/process", s.v3handler.cluster.ListNodeProcesses)
@@ -666,6 +671,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 
 			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
+			v3.PUT("/cluster/iam/user/:name/policies", s.v3handler.cluster.UpdateIdentityPolicies)
 			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.RemoveIdentity)
 		}
 	}

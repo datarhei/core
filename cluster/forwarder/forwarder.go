@@ -7,6 +7,7 @@ import (
 	"time"
 
 	apiclient "github.com/datarhei/core/v16/cluster/client"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
@@ -26,6 +27,7 @@ type Forwarder interface {
 	RemoveProcess(origin, id string) error
 
 	AddIdentity(origin string, identity iamidentity.User) error
+	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 }
 
@@ -194,6 +196,23 @@ func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error 
 	f.lock.RUnlock()
 
 	return client.AddIdentity(origin, r)
+}
+
+func (f *forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.SetPoliciesRequest{
+		Name:     name,
+		Policies: policies,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.SetPolicies(origin, name, r)
 }
 
 func (f *forwarder) RemoveIdentity(origin string, name string) error {

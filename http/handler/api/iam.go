@@ -203,7 +203,7 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 // @Summary Replace policies of an user
 // @Description Replace policies of an user
 // @Tags v16.?.?
-// @ID iam-3-update-user
+// @ID iam-3-update-user-policies
 // @Accept json
 // @Produce json
 // @Param name path string true "Username"
@@ -241,8 +241,15 @@ func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
 
 	policies := []api.IAMPolicy{}
 
-	if err := util.ShouldBindJSON(c, &policies); err != nil {
+	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	for _, p := range policies {
+		err := c.Validate(p)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
 	}
 
 	for _, p := range policies {
