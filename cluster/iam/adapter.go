@@ -2,6 +2,7 @@ package iam
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/datarhei/core/v16/cluster/store"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
@@ -11,12 +12,15 @@ import (
 )
 
 type policyAdapter struct {
-	store store.Store
+	store   store.Store
+	domains map[string]struct{}
+	lock    sync.RWMutex
 }
 
 func NewPolicyAdapter(store store.Store) (iamaccess.Adapter, error) {
 	a := &policyAdapter{
-		store: store,
+		store:   store,
+		domains: map[string]struct{}{},
 	}
 
 	return a, nil
@@ -26,6 +30,7 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 	policies := a.store.PolicyList()
 
 	rules := [][]string{}
+	domains := map[string]struct{}{}
 
 	for _, p := range policies.Policies {
 		rule := []string{
@@ -35,11 +40,16 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 			strings.Join(p.Actions, "|"),
 		}
 
+		domains[p.Domain] = struct{}{}
+
 		rules = append(rules, rule)
 	}
 
-	model.ClearPolicy()
 	model.AddPolicies("p", "p", rules)
+
+	a.lock.Lock()
+	a.domains = domains
+	a.lock.Unlock()
 
 	return nil
 }
@@ -69,11 +79,27 @@ func (a *policyAdapter) RemoveFilteredPolicy(sec string, ptype string, fieldInde
 }
 
 func (a *policyAdapter) AllDomains() []string {
-	return nil
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	n := len(a.domains)
+	domains := make([]string, n)
+
+	for domain := range a.domains {
+		domains[n-1] = domain
+		n--
+	}
+
+	return domains
 }
 
 func (a *policyAdapter) HasDomain(name string) bool {
-	return false
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	_, ok := a.domains[name]
+
+	return ok
 }
 
 type identityAdapter struct {

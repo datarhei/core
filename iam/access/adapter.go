@@ -80,8 +80,6 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		return err
 	}
 
-	model.ClearPolicy()
-
 	rule := [5]string{}
 	for _, domain := range domains {
 		rule[0] = "p"

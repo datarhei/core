@@ -152,7 +152,182 @@
                 }
             }
         },
+        "/api/v3/cluster/db/policies": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of policies in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of policies in the cluster",
+                "operationId": "cluster-3-db-list-policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster",
+                "operationId": "cluster-3-db-list-processes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.Process"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/user": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in the cluster",
+                "operationId": "cluster-3-db-list-identities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMUser"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/policies": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of policies IAM",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of policies in IAM",
+                "operationId": "cluster-3-iam-list-policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/policies/reload": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Reload policies",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Reload policies",
+                "operationId": "cluster-3-iam-reload-policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/iam/user": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in IAM",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in IAM",
+                "operationId": "cluster-3-iam-list-identities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMUser"
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -191,6 +366,38 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user/reload": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Reload identities",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Reload identities",
+                "operationId": "cluster-3-iam-reload-identities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -351,35 +558,6 @@
                 }
             }
         },
-        "/api/v3/cluster/node/process": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "List of processes in the cluster",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.?.?"
-                ],
-                "summary": "List of processes in the cluster",
-                "operationId": "cluster-3-list-node-processes",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.ClusterProcess"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/v3/cluster/node/{id}": {
             "get": {
                 "security": [
@@ -462,6 +640,97 @@
                 }
             }
         },
+        "/api/v3/cluster/node/{id}/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster on a node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster on a node",
+                "operationId": "cluster-3-list-node-processes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterProcess"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/version": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List a proxy node by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List a proxy node by its ID",
+                "operationId": "cluster-3-get-node-version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/process": {
             "get": {
                 "security": [
@@ -477,14 +746,14 @@
                     "v16.?.?"
                 ],
                 "summary": "List of processes in the cluster",
-                "operationId": "cluster-3-list-processes",
+                "operationId": "cluster-3-list-all-node-processes",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.Process"
+                                "$ref": "#/definitions/api.ClusterProcess"
                             }
                         }
                     }

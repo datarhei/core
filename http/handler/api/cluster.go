@@ -47,6 +47,74 @@ func NewCluster(cluster cluster.Cluster, iam iam.IAM) (*ClusterHandler, error) {
 	return h, nil
 }
 
+// GetCluster returns the list of nodes in the cluster
+// @Summary List of nodes in the cluster
+// @Description List of nodes in the cluster
+// @Tags v16.?.?
+// @ID cluster-3-get-cluster
+// @Produce json
+// @Success 200 {object} api.ClusterAbout
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster [get]
+func (h *ClusterHandler) About(c echo.Context) error {
+	state, _ := h.cluster.About()
+
+	about := api.ClusterAbout{
+		ID:                state.ID,
+		Address:           state.Address,
+		ClusterAPIAddress: state.ClusterAPIAddress,
+		CoreAPIAddress:    state.CoreAPIAddress,
+		Server:            []api.ClusterServer{},
+		Stats: api.ClusterStats{
+			State:       state.Stats.State,
+			LastContact: state.Stats.LastContact.Seconds() * 1000,
+			NumPeers:    state.Stats.NumPeers,
+		},
+	}
+
+	for _, n := range state.Nodes {
+		about.Server = append(about.Server, api.ClusterServer{
+			ID:      n.ID,
+			Address: n.Address,
+			Voter:   n.Voter,
+			Leader:  n.Leader,
+		})
+	}
+
+	return c.JSON(http.StatusOK, about)
+}
+
+// ListAllNodeProcesses returns the list of processes running on all nodes of the cluster
+// @Summary List of processes in the cluster
+// @Description List of processes in the cluster
+// @Tags v16.?.?
+// @ID cluster-3-list-all-node-processes
+// @Produce json
+// @Success 200 {array} api.ClusterProcess
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process [get]
+func (h *ClusterHandler) ListAllNodeProcesses(c echo.Context) error {
+	procs := h.proxy.ListProcesses()
+
+	processes := []api.ClusterProcess{}
+
+	for _, p := range procs {
+		processes = append(processes, api.ClusterProcess{
+			ProcessID: p.Config.ID,
+			NodeID:    p.NodeID,
+			Reference: p.Config.Reference,
+			Order:     p.Order,
+			State:     p.State,
+			CPU:       json.ToNumber(p.CPU),
+			Memory:    p.Mem,
+			Runtime:   int64(p.Runtime.Seconds()),
+		})
+	}
+
+	return c.JSON(http.StatusOK, processes)
+}
+
 // GetNodes returns the list of proxy nodes in the cluster
 // @Summary List of proxy nodes in the cluster
 // @Description List of proxy nodes in the cluster
@@ -122,13 +190,13 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 // @Summary List a proxy node by its ID
 // @Description List a proxy node by its ID
 // @Tags v16.?.?
-// @ID cluster-3-get-node
+// @ID cluster-3-get-node-version
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNode
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/node/{id} [get]
+// @Router /api/v3/cluster/node/{id}/version [get]
 func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
@@ -192,8 +260,9 @@ func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 // @Param id path string true "Node ID"
 // @Success 200 {array} api.ClusterProcess
 // @Failure 404 {object} api.Error
+// @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/node/:id/process [get]
+// @Router /api/v3/cluster/node/{id}/process [get]
 func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
@@ -225,53 +294,15 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	return c.JSON(http.StatusOK, processes)
 }
 
-// GetCluster returns the list of nodes in the cluster
-// @Summary List of nodes in the cluster
-// @Description List of nodes in the cluster
-// @Tags v16.?.?
-// @ID cluster-3-get-cluster
-// @Produce json
-// @Success 200 {object} api.ClusterAbout
-// @Failure 404 {object} api.Error
-// @Security ApiKeyAuth
-// @Router /api/v3/cluster [get]
-func (h *ClusterHandler) About(c echo.Context) error {
-	state, _ := h.cluster.About()
-
-	about := api.ClusterAbout{
-		ID:                state.ID,
-		Address:           state.Address,
-		ClusterAPIAddress: state.ClusterAPIAddress,
-		CoreAPIAddress:    state.CoreAPIAddress,
-		Server:            []api.ClusterServer{},
-		Stats: api.ClusterStats{
-			State:       state.Stats.State,
-			LastContact: state.Stats.LastContact.Seconds() * 1000,
-			NumPeers:    state.Stats.NumPeers,
-		},
-	}
-
-	for _, n := range state.Nodes {
-		about.Server = append(about.Server, api.ClusterServer{
-			ID:      n.ID,
-			Address: n.Address,
-			Voter:   n.Voter,
-			Leader:  n.Leader,
-		})
-	}
-
-	return c.JSON(http.StatusOK, about)
-}
-
 // ListStoreProcesses returns the list of processes stored in the DB of the cluster
 // @Summary List of processes in the cluster
 // @Description List of processes in the cluster
 // @Tags v16.?.?
-// @ID cluster-3-list-processes
+// @ID cluster-3-db-list-processes
 // @Produce json
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/process [get]
+// @Router /api/v3/cluster/db/process [get]
 func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	procs := h.cluster.ListProcesses()
 
@@ -518,10 +549,102 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	return c.JSON(http.StatusOK, policies)
 }
 
-func (h *ClusterHandler) ListIdentities(c echo.Context) error {
+// ListStoreIdentities returns the list of identities stored in the DB of the cluster
+// @Summary List of identities in the cluster
+// @Description List of identities in the cluster
+// @Tags v16.?.?
+// @ID cluster-3-db-list-identities
+// @Produce json
+// @Success 200 {array} api.IAMUser
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/user [get]
+func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
 	identities := h.cluster.ListIdentities()
 
 	return c.JSON(http.StatusOK, identities)
+}
+
+// ListIdentities returns the list of identities stored in IAM
+// @Summary List of identities in IAM
+// @Description List of identities in IAM
+// @Tags v16.?.?
+// @ID cluster-3-iam-list-identities
+// @Produce json
+// @Success 200 {array} api.IAMUser
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/user [get]
+func (h *ClusterHandler) ListIdentities(c echo.Context) error {
+	identities := h.iam.ListIdentities()
+
+	return c.JSON(http.StatusOK, identities)
+}
+
+// ReloadIdentities reloads the identities from the cluster store to IAM
+// @Summary Reload identities
+// @Description Reload identities
+// @Tags v16.?.?
+// @ID cluster-3-iam-reload-identities
+// @Produce json
+// @Success 200 {string} string
+// @Success 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/user/reload [get]
+func (h *ClusterHandler) ReloadIdentities(c echo.Context) error {
+	err := h.iam.ReloadIndentities()
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "reload identities: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// ListStorePolicies returns the list of policies stored in the DB of the cluster
+// @Summary List of policies in the cluster
+// @Description List of policies in the cluster
+// @Tags v16.?.?
+// @ID cluster-3-db-list-policies
+// @Produce json
+// @Success 200 {array} api.IAMPolicy
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/policies [get]
+func (h *ClusterHandler) ListStorePolicies(c echo.Context) error {
+	policies := h.cluster.ListPolicies()
+
+	return c.JSON(http.StatusOK, policies)
+}
+
+// ListPolicies returns the list of policies stored in IAM
+// @Summary List of policies in IAM
+// @Description List of policies IAM
+// @Tags v16.?.?
+// @ID cluster-3-iam-list-policies
+// @Produce json
+// @Success 200 {array} api.IAMPolicy
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/policies [get]
+func (h *ClusterHandler) ListPolicies(c echo.Context) error {
+	policies := h.iam.ListPolicies("", "", "", nil)
+
+	return c.JSON(http.StatusOK, policies)
+}
+
+// ReloadPolicies reloads the policies from the cluster store to IAM
+// @Summary Reload policies
+// @Description Reload policies
+// @Tags v16.?.?
+// @ID cluster-3-iam-reload-policies
+// @Produce json
+// @Success 200 {string} string
+// @Success 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/iam/policies/reload [get]
+func (h *ClusterHandler) ReloadPolicies(c echo.Context) error {
+	err := h.iam.ReloadPolicies()
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "reload policies: %w", err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // Delete deletes the identity with the given name from the cluster

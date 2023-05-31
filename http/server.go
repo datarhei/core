@@ -656,8 +656,15 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 Cluster
 	if s.v3handler.cluster != nil {
 		v3.GET("/cluster", s.v3handler.cluster.About)
-		v3.GET("/cluster/process", s.v3handler.cluster.ListStoreProcesses)
+
+		v3.GET("/cluster/db/process", s.v3handler.cluster.ListStoreProcesses)
+		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
+		v3.GET("/cluster/db/user", s.v3handler.cluster.ListStoreIdentities)
+
 		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
+		v3.GET("/cluster/iam/policies", s.v3handler.cluster.ListPolicies)
+
+		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodeProcesses)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
 		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
@@ -670,9 +677,11 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 
+			v3.GET("/cluster/iam/user/reload", s.v3handler.cluster.ReloadIdentities)
 			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
 			v3.PUT("/cluster/iam/user/:name/policies", s.v3handler.cluster.UpdateIdentityPolicies)
 			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.RemoveIdentity)
+			v3.GET("/cluster/iam/policies/reload", s.v3handler.cluster.ReloadPolicies)
 		}
 	}
 

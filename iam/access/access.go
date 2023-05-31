@@ -120,9 +120,9 @@ func (am *access) ListPolicies(name, domain, resource string, actions []string) 
 }
 
 func (am *access) ReloadPolicies() error {
-	am.model.ClearPolicy()
+	am.enforcer.ClearPolicy()
 
-	return am.adapter.LoadPolicy(am.model)
+	return am.enforcer.LoadPolicy()
 }
 
 func (am *access) HasDomain(name string) bool {

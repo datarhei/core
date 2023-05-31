@@ -73,6 +73,7 @@ type Cluster interface {
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
 	ListIdentities() store.Users
+	ListPolicies() store.Policies
 	AddIdentity(origin string, identity iamidentity.User) error
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
@@ -780,6 +781,10 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 
 func (c *cluster) ListIdentities() store.Users {
 	return c.store.UserList()
+}
+
+func (c *cluster) ListPolicies() store.Policies {
+	return c.store.PolicyList()
 }
 
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
