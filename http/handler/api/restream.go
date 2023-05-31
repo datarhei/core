@@ -37,21 +37,26 @@ func NewRestream(restream restream.Restreamer, iam iam.IAM) *RestreamHandler {
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process [post]
 func (h *RestreamHandler) Add(c echo.Context) error {
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
-		Owner:     user,
+		Owner:     ctxuser,
 		Type:      "ffmpeg",
 		Autostart: true,
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
 	if !superuser {
@@ -90,6 +95,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Tags v16.7.2
 // @ID process-3-get-all
 // @Produce json
+// @Param domain query string false "Domain to act on"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
 // @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
 // @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
@@ -101,7 +107,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/process [get]
 func (h *RestreamHandler) GetAll(c echo.Context) error {
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	filter := util.DefaultQuery(c, "filter", "")
 	reference := util.DefaultQuery(c, "reference", "")
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
@@ -117,7 +123,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 	ids := []restream.TaskID{}
 
 	for _, id := range preids {
-		if !h.iam.Enforce(user, domain, "process:"+id.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process:"+id.ID, "read") {
 			continue
 		}
 
@@ -157,18 +163,20 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 // @ID process-3-get
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [get]
 func (h *RestreamHandler) Get(c echo.Context) error {
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
 	filter := util.DefaultQuery(c, "filter", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -192,12 +200,14 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 // @ID process-3-delete
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {string} string
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [delete]
 func (h *RestreamHandler) Delete(c echo.Context) error {
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -208,7 +218,7 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+		if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
 			return api.Err(http.StatusForbidden, "Forbidden")
 		}
 	}
@@ -232,24 +242,28 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [put]
 func (h *RestreamHandler) Update(c echo.Context) error {
-	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
+	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
+	id := util.PathParam(c, "id")
 
 	process := api.ProcessConfig{
 		ID:        id,
+		Owner:     ctxuser,
 		Type:      "ffmpeg",
 		Autostart: true,
 	}
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -270,12 +284,17 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	config := process.Marshal()
-	config.Owner = user
-
-	if !h.iam.Enforce(user, config.Domain, "process:"+config.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
+
+	if !superuser {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+			return api.Err(http.StatusForbidden, "Forbidden")
+		}
+	}
+
+	config := process.Marshal()
 
 	tid = restream.TaskID{
 		ID:     id,
@@ -308,18 +327,20 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Param command body api.Command true "Process command"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/command [put]
 func (h *RestreamHandler) Command(c echo.Context) error {
 	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -361,17 +382,19 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 // @ID process-3-get-config
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/config [get]
 func (h *RestreamHandler) GetConfig(c echo.Context) error {
 	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -398,17 +421,19 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 // @ID process-3-get-state
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.ProcessState
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/state [get]
 func (h *RestreamHandler) GetState(c echo.Context) error {
 	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -435,17 +460,19 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 // @ID process-3-get-report
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.ProcessReport
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
 func (h *RestreamHandler) GetReport(c echo.Context) error {
 	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -472,15 +499,17 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 // @ID process-3-probe
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.Probe
+// @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/probe [get]
 func (h *RestreamHandler) Probe(c echo.Context) error {
 	id := util.PathParam(c, "id")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -542,18 +571,20 @@ func (h *RestreamHandler) ReloadSkills(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
+// @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.Metadata
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [get]
 func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -578,19 +609,21 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
+// @Param domain query string false "Domain to act on"
 // @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
 // @Success 200 {object} api.Metadata
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [put]
 func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
-	user := util.DefaultContext(c, "user", "")
+	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 

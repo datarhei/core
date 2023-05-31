@@ -223,6 +223,13 @@ func (r *raft) Apply(data []byte) error {
 		return fmt.Errorf("applying command failed: %w", err)
 	}
 
+	res := future.Response()
+	if res != nil {
+		if err, ok := res.(store.StoreError); ok {
+			return err
+		}
+	}
+
 	return nil
 }
 

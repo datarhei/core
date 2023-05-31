@@ -27,6 +27,7 @@ type Forwarder interface {
 	RemoveProcess(origin, id string) error
 
 	AddIdentity(origin string, identity iamidentity.User) error
+	UpdateIdentity(origin, name string, identity iamidentity.User) error
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 }
@@ -196,6 +197,23 @@ func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error 
 	f.lock.RUnlock()
 
 	return client.AddIdentity(origin, r)
+}
+
+func (f *forwarder) UpdateIdentity(origin, name string, identity iamidentity.User) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.UpdateIdentityRequest{
+		Name:     name,
+		Identity: identity,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.UpdateIdentity(origin, name, r)
 }
 
 func (f *forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy) error {

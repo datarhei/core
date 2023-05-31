@@ -150,12 +150,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.ClusterAbout"
                         }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.Error"
-                        }
                     }
                 }
             }
@@ -247,6 +241,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/db/user/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in the cluster",
+                "operationId": "cluster-3-db-list-identity",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/iam/policies": {
             "get": {
                 "security": [
@@ -276,22 +308,22 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v3/cluster/iam/policies/reload": {
+        "/api/v3/cluster/iam/reload": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Reload policies",
+                "description": "Reload identities and policies",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Reload policies",
-                "operationId": "cluster-3-iam-reload-policies",
+                "summary": "Reload identities and policies",
+                "operationId": "cluster-3-iam-reload",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -377,31 +409,118 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
                     }
                 }
             }
         },
-        "/api/v3/cluster/iam/user/reload": {
+        "/api/v3/cluster/iam/user/{name}": {
             "get": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Reload identities",
+                "description": "Identity in IAM",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Reload identities",
-                "operationId": "cluster-3-iam-reload-identities",
+                "summary": "Identity in IAM",
+                "operationId": "cluster-3-iam-list-identity",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace an existing user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace an existing user",
+                "operationId": "cluster-3-update-identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "User definition",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "500": {
@@ -411,9 +530,7 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/api/v3/cluster/iam/user/{name}": {
+            },
             "delete": {
                 "security": [
                     {
@@ -443,6 +560,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -512,6 +635,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -671,6 +800,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -727,7 +862,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.ClusterNode"
+                            "$ref": "#/definitions/api.Version"
                         }
                     },
                     "404": {
@@ -755,6 +890,14 @@ const docTemplate = `{
                 ],
                 "summary": "List of processes in the cluster",
                 "operationId": "cluster-3-list-all-node-processes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -805,6 +948,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -862,6 +1011,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.Error"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -901,8 +1056,14 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -930,7 +1091,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_datarhei_core_v16_http_api.Config"
+                            "$ref": "#/definitions/api.GetConfig"
                         }
                     }
                 }
@@ -1786,6 +1947,12 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
                         "name": "filter",
                         "in": "query"
@@ -1880,6 +2047,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
                     }
                 }
             }
@@ -1910,6 +2083,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output",
                         "name": "filter",
                         "in": "query"
@@ -1920,6 +2099,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.Process"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -1957,6 +2142,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Process config",
                         "name": "config",
                         "in": "body",
@@ -1975,6 +2166,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2009,6 +2206,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2016,6 +2219,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -2055,6 +2264,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Process command",
                         "name": "command",
                         "in": "body",
@@ -2073,6 +2288,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2109,6 +2330,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2120,6 +2347,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2163,6 +2396,12 @@ const docTemplate = `{
                         "name": "key",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2172,6 +2411,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2215,6 +2460,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Arbitrary JSON data. The null value will remove the key and its contents",
                         "name": "data",
                         "in": "body",
@@ -2229,6 +2480,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2635,6 +2892,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2642,6 +2905,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.Probe"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -2670,6 +2939,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2681,6 +2956,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2717,6 +2998,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2728,6 +3015,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -3900,6 +4193,29 @@ const docTemplate = `{
                 }
             }
         },
+        "api.GetConfig": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/api.ConfigData"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "loaded_at": {
+                    "type": "string"
+                },
+                "overrides": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "api.GraphQuery": {
             "type": "object",
             "properties": {
@@ -3943,6 +4259,9 @@ const docTemplate = `{
                     }
                 },
                 "domain": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "resource": {
@@ -6019,29 +6338,6 @@ const docTemplate = `{
                 },
                 "uptime": {
                     "type": "integer"
-                }
-            }
-        },
-        "github_com_datarhei_core_v16_http_api.Config": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "$ref": "#/definitions/api.ConfigData"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "loaded_at": {
-                    "type": "string"
-                },
-                "overrides": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },

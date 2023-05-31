@@ -106,6 +106,7 @@ type IAMAuth0Tenant struct {
 }
 
 type IAMPolicy struct {
+	Name     string   `json:"name,omitempty"`
 	Domain   string   `json:"domain"`
 	Resource string   `json:"resource"`
 	Actions  []string `json:"actions"`

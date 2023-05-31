@@ -157,7 +157,7 @@ func (i *iam) DeleteIdentity(name string) error {
 }
 
 func (i *iam) ListIdentities() []identity.User {
-	return nil
+	return i.im.List()
 }
 
 func (i *iam) ReloadIndentities() error {

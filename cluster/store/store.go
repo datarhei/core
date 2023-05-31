@@ -24,7 +24,19 @@ type Store interface {
 	GetProcess(id string) (Process, error)
 
 	UserList() Users
+	GetUser(name string) Users
 	PolicyList() Policies
+	PolicyUserList(nam string) Policies
+}
+
+type StoreError string
+
+func NewStoreError(format string, a ...any) StoreError {
+	return StoreError(fmt.Sprintf(format, a...))
+}
+
+func (se StoreError) Error() string {
+	return string(se)
 }
 
 type Process struct {
@@ -50,6 +62,7 @@ const (
 	OpRemoveProcess  Operation = "removeProcess"
 	OpUpdateProcess  Operation = "updateProcess"
 	OpAddIdentity    Operation = "addIdentity"
+	OpUpdateIdentity Operation = "updateIdentity"
 	OpRemoveIdentity Operation = "removeIdentity"
 	OpSetPolicies    Operation = "setPolicies"
 )
@@ -73,6 +86,11 @@ type CommandRemoveProcess struct {
 }
 
 type CommandAddIdentity struct {
+	Identity identity.User
+}
+
+type CommandUpdateIdentity struct {
+	Name     string
 	Identity identity.User
 }
 
@@ -138,7 +156,7 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	err := json.Unmarshal(entry.Data, &c)
 	if err != nil {
 		logger.Error().WithError(err).Log("Invalid entry")
-		return fmt.Errorf("invalid log entry")
+		return NewStoreError("invalid log entry, index: %d, term: %d", entry.Index, entry.Term)
 	}
 
 	logger.Debug().WithField("operation", c.Operation).Log("")
@@ -149,87 +167,51 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		cmd := CommandAddProcess{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		_, ok := s.Process[cmd.ID]
-		if !ok {
-			now := time.Now()
-			s.Process[cmd.ID] = Process{
-				CreatedAt: now,
-				UpdatedAt: now,
-				Config:    &cmd.Config,
-			}
-		}
-		s.lock.Unlock()
+		err = s.addProcess(cmd)
 	case OpRemoveProcess:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandRemoveProcess{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		delete(s.Process, cmd.ID)
-		s.lock.Unlock()
+		err = s.removeProcess(cmd)
 	case OpUpdateProcess:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandUpdateProcess{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		_, ok := s.Process[cmd.ID]
-		if ok {
-			if cmd.ID == cmd.Config.ID {
-				s.Process[cmd.ID] = Process{
-					UpdatedAt: time.Now(),
-					Config:    &cmd.Config,
-				}
-			} else {
-				_, ok := s.Process[cmd.Config.ID]
-				if !ok {
-					delete(s.Process, cmd.ID)
-					s.Process[cmd.Config.ID] = Process{
-						UpdatedAt: time.Now(),
-						Config:    &cmd.Config,
-					}
-				} else {
-					return fmt.Errorf("the process with the ID %s already exists", cmd.Config.ID)
-				}
-			}
-		}
-		s.lock.Unlock()
+		err = s.updateProcess(cmd)
 	case OpAddIdentity:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandAddIdentity{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		_, ok := s.Users.Users[cmd.Identity.Name]
-		if !ok {
-			s.Users.UpdatedAt = time.Now()
-			s.Users.Users[cmd.Identity.Name] = cmd.Identity
-		}
-		s.lock.Unlock()
+		err = s.addIdentity(cmd)
+	case OpUpdateIdentity:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandUpdateIdentity{}
+		json.Unmarshal(b, &cmd)
+
+		err = s.updateIdentity(cmd)
 	case OpRemoveIdentity:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandRemoveIdentity{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		delete(s.Users.Users, cmd.Name)
-		s.Users.UpdatedAt = time.Now()
-		delete(s.Policies.Policies, cmd.Name)
-		s.Policies.UpdatedAt = time.Now()
-		s.lock.Unlock()
+		err = s.removeIdentity(cmd)
 	case OpSetPolicies:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandSetPolicies{}
 		json.Unmarshal(b, &cmd)
 
-		s.lock.Lock()
-		delete(s.Policies.Policies, cmd.Name)
-		s.Policies.Policies[cmd.Name] = cmd.Policies
-		s.Policies.UpdatedAt = time.Now()
-		s.lock.Unlock()
+		err = s.setPolicies(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
+		return nil
+	}
+
+	if err != nil {
+		logger.Debug().WithError(err).WithField("operation", c.Operation).Log("")
+		return err
 	}
 
 	s.lock.RLock()
@@ -238,9 +220,123 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	}
 	s.lock.RUnlock()
 
-	s.lock.RLock()
-	s.logger.Debug().WithField("processes", s.Process).Log("")
-	s.lock.RUnlock()
+	return nil
+}
+
+func (s *store) addProcess(cmd CommandAddProcess) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	_, ok := s.Process[cmd.ID]
+	if ok {
+		return NewStoreError("the process with the ID '%s' already exists", cmd.ID)
+	}
+
+	now := time.Now()
+	s.Process[cmd.ID] = Process{
+		CreatedAt: now,
+		UpdatedAt: now,
+		Config:    &cmd.Config,
+	}
+
+	return nil
+}
+
+func (s *store) removeProcess(cmd CommandRemoveProcess) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	delete(s.Process, cmd.ID)
+
+	return nil
+}
+
+func (s *store) updateProcess(cmd CommandUpdateProcess) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	_, ok := s.Process[cmd.ID]
+	if ok {
+		if cmd.ID == cmd.Config.ID {
+			s.Process[cmd.ID] = Process{
+				UpdatedAt: time.Now(),
+				Config:    &cmd.Config,
+			}
+		} else {
+			_, ok := s.Process[cmd.Config.ID]
+			if !ok {
+				delete(s.Process, cmd.ID)
+				s.Process[cmd.Config.ID] = Process{
+					UpdatedAt: time.Now(),
+					Config:    &cmd.Config,
+				}
+			} else {
+				return NewStoreError("the process with the ID %s already exists", cmd.Config.ID)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *store) addIdentity(cmd CommandAddIdentity) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	_, ok := s.Users.Users[cmd.Identity.Name]
+	if ok {
+		return NewStoreError("the identity with the name '%s' already exists", cmd.Identity.Name)
+	}
+
+	s.Users.UpdatedAt = time.Now()
+	s.Users.Users[cmd.Identity.Name] = cmd.Identity
+
+	return nil
+}
+
+func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	_, ok := s.Users.Users[cmd.Name]
+	if ok {
+		if cmd.Name == cmd.Identity.Name {
+			s.Users.UpdatedAt = time.Now()
+			s.Users.Users[cmd.Identity.Name] = cmd.Identity
+		} else {
+			_, ok := s.Users.Users[cmd.Identity.Name]
+			if !ok {
+				s.Users.UpdatedAt = time.Now()
+				s.Users.Users[cmd.Identity.Name] = cmd.Identity
+			} else {
+				return NewStoreError("the identity with the name '%s' already exists", cmd.Identity.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	delete(s.Users.Users, cmd.Name)
+	s.Users.UpdatedAt = time.Now()
+	delete(s.Policies.Policies, cmd.Name)
+	s.Policies.UpdatedAt = time.Now()
+
+	return nil
+}
+
+func (s *store) setPolicies(cmd CommandSetPolicies) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	delete(s.Policies.Policies, cmd.Name)
+	s.Policies.Policies[cmd.Name] = cmd.Policies
+	s.Policies.UpdatedAt = time.Now()
+
 	return nil
 }
 
@@ -329,6 +425,21 @@ func (s *store) UserList() Users {
 	return u
 }
 
+func (s *store) GetUser(name string) Users {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	u := Users{
+		UpdatedAt: s.Users.UpdatedAt,
+	}
+
+	if user, ok := s.Users.Users[name]; ok {
+		u.Users = append(u.Users, user)
+	}
+
+	return u
+}
+
 func (s *store) PolicyList() Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -340,6 +451,19 @@ func (s *store) PolicyList() Policies {
 	for _, policies := range s.Policies.Policies {
 		p.Policies = append(p.Policies, policies...)
 	}
+
+	return p
+}
+
+func (s *store) PolicyUserList(name string) Policies {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	p := Policies{
+		UpdatedAt: s.Policies.UpdatedAt,
+	}
+
+	p.Policies = append(p.Policies, s.Policies.Policies[name]...)
 
 	return p
 }

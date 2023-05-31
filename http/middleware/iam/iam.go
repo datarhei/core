@@ -20,7 +20,7 @@
 // an anonmyous user. If the Skipper function returns true for the request and the
 // API is accessed, the username will be the one of the IAM superuser.
 //
-// The domain is provided as query parameter "group" for all API requests or the
+// The domain is provided as query parameter "domain" for all API requests or the
 // first path element after a mountpoint for filesystem requests.
 //
 // If the domain can't be detected, the domain "$none" will be used.
@@ -179,7 +179,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					username = config.IAM.GetDefaultVerifier().Name()
 				}
 
-				domain = c.QueryParam("group")
+				domain = c.QueryParam("domain")
 				resource = "api:" + resource
 			} else {
 				identity, err = mw.findIdentityFromBasicAuth(c)

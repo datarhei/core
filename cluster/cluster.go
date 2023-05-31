@@ -72,9 +72,12 @@ type Cluster interface {
 	UpdateProcess(origin, id string, config *app.Config) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
-	ListIdentities() store.Users
-	ListPolicies() store.Policies
+	ListIdentities() (time.Time, []iamidentity.User)
+	ListIdentity(name string) (time.Time, iamidentity.User, error)
+	ListPolicies() (time.Time, []iamaccess.Policy)
+	ListUserPolicies(name string) (time.Time, []iamaccess.Policy)
 	AddIdentity(origin string, identity iamidentity.User) error
+	UpdateIdentity(origin, name string, identity iamidentity.User) error
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 
@@ -779,12 +782,32 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 	return iam, nil
 }
 
-func (c *cluster) ListIdentities() store.Users {
-	return c.store.UserList()
+func (c *cluster) ListIdentities() (time.Time, []iamidentity.User) {
+	users := c.store.UserList()
+
+	return users.UpdatedAt, users.Users
 }
 
-func (c *cluster) ListPolicies() store.Policies {
-	return c.store.PolicyList()
+func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error) {
+	user := c.store.GetUser(name)
+
+	if len(user.Users) == 0 {
+		return time.Time{}, iamidentity.User{}, fmt.Errorf("not found")
+	}
+
+	return user.UpdatedAt, user.Users[0], nil
+}
+
+func (c *cluster) ListPolicies() (time.Time, []iamaccess.Policy) {
+	policies := c.store.PolicyList()
+
+	return policies.UpdatedAt, policies.Policies
+}
+
+func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) {
+	policies := c.store.PolicyUserList(name)
+
+	return policies.UpdatedAt, policies.Policies
 }
 
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
@@ -795,6 +818,22 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 	cmd := &store.Command{
 		Operation: store.OpAddIdentity,
 		Data: &store.CommandAddIdentity{
+			Identity: identity,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.UpdateIdentity(origin, name, identity)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpUpdateIdentity,
+		Data: &store.CommandUpdateIdentity{
+			Name:     name,
 			Identity: identity,
 		},
 	}
@@ -841,7 +880,7 @@ func (c *cluster) applyCommand(cmd *store.Command) error {
 
 	err = c.raft.Apply(b)
 	if err != nil {
-		return fmt.Errorf("applying command failed: %w", err)
+		return fmt.Errorf("apply command: %w", err)
 	}
 
 	return nil

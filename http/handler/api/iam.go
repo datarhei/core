@@ -21,7 +21,7 @@ func NewIAM(iam iam.IAM) *IAMHandler {
 	}
 }
 
-// AddUser adds a new user
+// AddIdentity adds a new user
 // @Summary Add a new user
 // @Description Add a new user
 // @Tags v16.?.?
@@ -35,7 +35,7 @@ func NewIAM(iam iam.IAM) *IAMHandler {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user [post]
-func (h *IAMHandler) AddUser(c echo.Context) error {
+func (h *IAMHandler) AddIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
@@ -74,7 +74,7 @@ func (h *IAMHandler) AddUser(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-// RemoveUser deletes the user with the given name
+// RemoveIdentity deletes the user with the given name
 // @Summary Delete an user by its name
 // @Description Delete an user by its name
 // @Tags v16.?.?
@@ -87,7 +87,7 @@ func (h *IAMHandler) AddUser(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user/{name} [delete]
-func (h *IAMHandler) RemoveUser(c echo.Context) error {
+func (h *IAMHandler) RemoveIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
@@ -118,7 +118,7 @@ func (h *IAMHandler) RemoveUser(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// UpdateUser replaces an existing user
+// UpdateIdentity replaces an existing user
 // @Summary Replace an existing user
 // @Description Replace an existing user.
 // @Tags v16.?.?
@@ -134,7 +134,7 @@ func (h *IAMHandler) RemoveUser(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user/{name} [put]
-func (h *IAMHandler) UpdateUser(c echo.Context) error {
+func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
@@ -199,7 +199,7 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-// UpdateUserPolicies replaces existing user policies
+// UpdateIdentityPolicies replaces existing user policies
 // @Summary Replace policies of an user
 // @Description Replace policies of an user
 // @Tags v16.?.?
@@ -215,7 +215,7 @@ func (h *IAMHandler) UpdateUser(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user/{name}/policy [put]
-func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
+func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
@@ -271,7 +271,7 @@ func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
 	return c.JSON(http.StatusOK, policies)
 }
 
-// GetUser returns the user with the given name
+// GetIdentity returns the user with the given name
 // @Summary List an user by its name
 // @Description List aa user by its name
 // @Tags v16.?.?
@@ -283,9 +283,8 @@ func (h *IAMHandler) UpdateUserPolicies(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user/{name} [get]
-func (h *IAMHandler) GetUser(c echo.Context) error {
+func (h *IAMHandler) GetIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
 	name := util.PathParam(c, "name")
 
@@ -302,7 +301,7 @@ func (h *IAMHandler) GetUser(c echo.Context) error {
 			return api.Err(http.StatusNotFound, "Not found", "%s", err)
 		}
 
-		if !superuser && name != iamuser.Name {
+		if ctxuser != iamuser.Name {
 			if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
 				iamuser = identity.User{
 					Name: iamuser.Name,

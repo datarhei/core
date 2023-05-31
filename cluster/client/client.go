@@ -36,6 +36,11 @@ type AddIdentityRequest struct {
 	Identity iamidentity.User `json:"identity"`
 }
 
+type UpdateIdentityRequest struct {
+	Name     string           `json:"name"`
+	Identity iamidentity.User `json:"identity"`
+}
+
 type SetPoliciesRequest struct {
 	Name     string             `json:"name"`
 	Policies []iamaccess.Policy `json:"policies"`
@@ -113,6 +118,17 @@ func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
 	}
 
 	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) UpdateIdentity(origin, name string, r UpdateIdentityRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/iam/user/"+name, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

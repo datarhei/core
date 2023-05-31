@@ -549,11 +549,11 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 	// v3 IAM
 	if s.v3handler.iam != nil {
-		v3.POST("/iam/user", s.v3handler.iam.AddUser)
-		v3.GET("/iam/user/:name", s.v3handler.iam.GetUser)
-		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateUser)
-		v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateUserPolicies)
-		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveUser)
+		v3.POST("/iam/user", s.v3handler.iam.AddIdentity)
+		v3.GET("/iam/user/:name", s.v3handler.iam.GetIdentity)
+		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateIdentity)
+		v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateIdentityPolicies)
+		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveIdentity)
 	}
 
 	// v3 Restreamer
@@ -658,10 +658,12 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster", s.v3handler.cluster.About)
 
 		v3.GET("/cluster/db/process", s.v3handler.cluster.ListStoreProcesses)
-		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
 		v3.GET("/cluster/db/user", s.v3handler.cluster.ListStoreIdentities)
+		v3.GET("/cluster/db/user/:name", s.v3handler.cluster.ListStoreIdentity)
+		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
 
 		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
+		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.ListIdentity)
 		v3.GET("/cluster/iam/policies", s.v3handler.cluster.ListPolicies)
 
 		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodeProcesses)
@@ -677,11 +679,11 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 
-			v3.GET("/cluster/iam/user/reload", s.v3handler.cluster.ReloadIdentities)
+			v3.GET("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
 			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
-			v3.PUT("/cluster/iam/user/:name/policies", s.v3handler.cluster.UpdateIdentityPolicies)
+			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.UpdateIdentity)
+			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.UpdateIdentityPolicies)
 			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.RemoveIdentity)
-			v3.GET("/cluster/iam/policies/reload", s.v3handler.cluster.ReloadPolicies)
 		}
 	}
 

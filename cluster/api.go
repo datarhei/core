@@ -236,7 +236,41 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
+	a.router.PUT("/v1/iam/user/:name", func(c echo.Context) error {
+		name := util.PathParam(c, "name")
+
+		r := client.UpdateIdentityRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		a.logger.Debug().WithFields(log.Fields{
+			"name":     name,
+			"identity": r.Identity,
+		}).Log("Update identity request")
+
+		err := a.cluster.UpdateIdentity(origin, name, r.Identity)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithFields(log.Fields{
+				"name":     name,
+				"identity": r.Identity,
+			}).Log("Unable to add identity")
+			return httpapi.Err(http.StatusInternalServerError, "unable to update identity", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	})
+
 	a.router.PUT("/v1/iam/user/:name/policies", func(c echo.Context) error {
+		name := util.PathParam(c, "name")
+
 		r := client.SetPoliciesRequest{}
 
 		if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -251,7 +285,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 		a.logger.Debug().WithField("policies", r.Policies).Log("Set policiesrequest")
 
-		err = a.cluster.SetPolicies(origin, r.Name, r.Policies)
+		err = a.cluster.SetPolicies(origin, name, r.Policies)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("policies", r.Policies).Log("Unable to set policies")
 			return httpapi.Err(http.StatusInternalServerError, "unable to add identity", "%s", err)
