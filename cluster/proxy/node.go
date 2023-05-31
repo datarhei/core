@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +23,8 @@ type Node interface {
 	StartFiles(updates chan<- NodeFiles) error
 	StopFiles()
 
-	GetURL(path string) (string, error)
-	GetFile(path string) (io.ReadCloser, error)
+	GetURL(prefix, path string) (*url.URL, error)
+	GetFile(prefix, path string) (io.ReadCloser, error)
 
 	ProcessAdd(*app.Config) error
 	ProcessStart(id string) error
@@ -120,15 +119,12 @@ type node struct {
 	runningLock sync.Mutex
 	running     bool
 
-	host          string
-	secure        bool
-	hasRTMP       bool
-	rtmpAddress   string
-	rtmpToken     string
-	hasSRT        bool
-	srtAddress    string
-	srtPassphrase string
-	srtToken      string
+	secure      bool
+	httpAddress *url.URL
+	hasRTMP     bool
+	rtmpAddress *url.URL
+	hasSRT      bool
+	srtAddress  *url.URL
 }
 
 func NewNode(address string) Node {
@@ -189,43 +185,41 @@ func (n *node) Connect() error {
 		return fmt.Errorf("failed to convert config to expected version")
 	}
 
+	n.httpAddress = u
+
 	if config.RTMP.Enable {
 		n.hasRTMP = true
-		n.rtmpAddress = "rtmp://"
+		n.rtmpAddress = &url.URL{}
+		n.rtmpAddress.Scheme = "rtmp:"
 
 		isHostIP := net.ParseIP(host) != nil
 
 		address := config.RTMP.Address
 		if n.secure && config.RTMP.EnableTLS && !isHostIP {
 			address = config.RTMP.AddressTLS
-			n.rtmpAddress = "rtmps://"
+			n.rtmpAddress.Scheme = "rtmps:"
 		}
 
-		_, port, err := net.SplitHostPort(address)
-		if err != nil {
-			n.hasRTMP = false
-		} else {
-			n.rtmpAddress += host + ":" + port
-			n.rtmpToken = config.RTMP.Token
-		}
+		n.rtmpAddress.Host = address
 	}
 
 	if config.SRT.Enable {
 		n.hasSRT = true
-		n.srtAddress = "srt://"
+		n.srtAddress = &url.URL{}
+		n.srtAddress.Scheme = "srt:"
+		n.srtAddress.Host = config.SRT.Address
 
-		_, port, err := net.SplitHostPort(config.SRT.Address)
-		if err != nil {
-			n.hasSRT = false
-		} else {
-			n.srtAddress += host + ":" + port
-			n.srtPassphrase = config.SRT.Passphrase
-			n.srtToken = config.SRT.Token
+		v := url.Values{}
+
+		v.Set("mode", "caller")
+		if len(config.SRT.Passphrase) != 0 {
+			v.Set("passphrase", config.SRT.Passphrase)
 		}
+
+		n.srtAddress.RawQuery = v.Encode()
 	}
 
 	n.ips = addrs
-	n.host = host
 
 	n.peer = peer
 
@@ -627,46 +621,57 @@ func (n *node) files() {
 	n.stateLock.Unlock()
 }
 
-func (n *node) GetURL(path string) (string, error) {
-	prefix, path, found := strings.Cut(path, ":")
-	if !found {
-		return "", fmt.Errorf("no prefix provided")
+func cloneURL(src *url.URL) *url.URL {
+	dst := &url.URL{
+		Scheme:      src.Scheme,
+		Opaque:      src.Opaque,
+		User:        nil,
+		Host:        src.Host,
+		Path:        src.Path,
+		RawPath:     src.RawPath,
+		OmitHost:    src.OmitHost,
+		ForceQuery:  src.ForceQuery,
+		RawQuery:    src.RawQuery,
+		Fragment:    src.Fragment,
+		RawFragment: src.RawFragment,
 	}
 
-	u := ""
+	if src.User != nil {
+		username := src.User.Username()
+		password, ok := src.User.Password()
+
+		if ok {
+			dst.User = url.UserPassword(username, password)
+		} else {
+			dst.User = url.User(username)
+		}
+	}
+
+	return dst
+}
+
+func (n *node) GetURL(prefix, path string) (*url.URL, error) {
+	var u *url.URL
 
 	if prefix == "mem" {
-		u = n.address + "/" + filepath.Join("memfs", path)
+		u = cloneURL(n.httpAddress)
+		u.JoinPath("memfs", path)
 	} else if prefix == "disk" {
-		u = n.address + path
+		u = cloneURL(n.httpAddress)
+		u.JoinPath(path)
 	} else if prefix == "rtmp" {
-		u = n.rtmpAddress + path
-		if len(n.rtmpToken) != 0 {
-			u += "?token=" + url.QueryEscape(n.rtmpToken)
-		}
+		u = cloneURL(n.rtmpAddress)
+		u.JoinPath(path)
 	} else if prefix == "srt" {
-		u = n.srtAddress + "?mode=caller"
-		if len(n.srtPassphrase) != 0 {
-			u += "&passphrase=" + url.QueryEscape(n.srtPassphrase)
-		}
-		streamid := "#!:m=request,r=" + path
-		if len(n.srtToken) != 0 {
-			streamid += ",token=" + n.srtToken
-		}
-		u += "&streamid=" + url.QueryEscape(streamid)
+		u = cloneURL(n.srtAddress)
 	} else {
-		return "", fmt.Errorf("unknown prefix")
+		return nil, fmt.Errorf("unknown prefix")
 	}
 
 	return u, nil
 }
 
-func (n *node) GetFile(path string) (io.ReadCloser, error) {
-	prefix, path, found := strings.Cut(path, ":")
-	if !found {
-		return nil, fmt.Errorf("no prefix provided")
-	}
-
+func (n *node) GetFile(prefix, path string) (io.ReadCloser, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -674,13 +679,7 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	if prefix == "mem" {
-		return n.peer.MemFSGetFile(path)
-	} else if prefix == "disk" {
-		return n.peer.DiskFSGetFile(path)
-	}
-
-	return nil, fmt.Errorf("unknown prefix")
+	return n.peer.FilesystemGetFile(prefix, path)
 }
 
 func (n *node) ProcessList() ([]Process, error) {

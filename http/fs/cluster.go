@@ -41,7 +41,7 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	data, err := fs.proxy.GetFile(fs.name + ":" + path)
+	data, err := fs.proxy.GetFile(fs.name, path)
 	if err != nil {
 		return nil
 	}

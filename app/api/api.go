@@ -799,15 +799,60 @@ func (a *api) start() error {
 		}, nil)
 
 		a.replacer.RegisterTemplateFunc("memfs", func(config *restreamapp.Config, section string) string {
-			return a.memfs.Metadata("base")
+			u, _ := url.Parse(a.memfs.Metadata("base"))
+
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			}
+
+			return u.String()
 		}, nil)
 
 		a.replacer.RegisterTemplateFunc("fs:mem", func(config *restreamapp.Config, section string) string {
-			return a.memfs.Metadata("base")
+			u, _ := url.Parse(a.memfs.Metadata("base"))
+
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			}
+
+			return u.String()
 		}, nil)
 
 		for name, s3 := range a.s3fs {
-			a.replacer.RegisterTemplate("fs:"+name, s3.Metadata("base"), nil)
+			s3 := s3
+			a.replacer.RegisterTemplateFunc("fs:"+name, func(config *restreamapp.Config, section string) string {
+				u, _ := url.Parse(s3.Metadata("base"))
+
+				var identity iamidentity.Verifier = nil
+
+				if len(config.Owner) == 0 {
+					identity = a.iam.GetDefaultVerifier()
+				} else {
+					identity, _ = a.iam.GetVerifier(config.Owner)
+				}
+
+				if identity != nil {
+					u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+				}
+
+				return u.String()
+			}, nil)
 		}
 
 		a.replacer.RegisterTemplateFunc("rtmp", func(config *restreamapp.Config, section string) string {

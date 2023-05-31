@@ -401,23 +401,26 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 
 	if ch == nil {
 		// Check in the cluster for the stream and proxy it
-		srturl, err := s.proxy.GetURL("srt:" + si.Resource)
+		srturl, err := s.proxy.GetURL("srt", si.Resource)
 		if err != nil {
 			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
 
+		peerurl := srturl.String()
+
 		config := srt.DefaultConfig()
+		config.StreamId = streamId
 		config.Latency = 200 * time.Millisecond // This might be a value obtained from the cluster
-		host, err := config.UnmarshalURL(srturl)
+		host, err := config.UnmarshalURL(peerurl)
 		if err != nil {
-			s.logger.Error().WithField("address", srturl).WithError(err).Log("Parsing proxy address failed")
+			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Parsing proxy address failed")
 			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
 		src, err := srt.Dial("srt", host, config)
 		if err != nil {
-			s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
+			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Proxying address failed")
 			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
@@ -426,13 +429,13 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		wg.Add(1)
 
 		go func() {
-			s.log("SUBSCRIBE", "PROXYSTART", srturl, "", client)
+			s.log("SUBSCRIBE", "PROXYSTART", peerurl, "", client)
 			wg.Done()
 			err := s.publish(src, true)
 			if err != nil {
 				s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
 			}
-			s.log("SUBSCRIBE", "PROXYPUBLISHSTOP", srturl, "", client)
+			s.log("SUBSCRIBE", "PROXYPUBLISHSTOP", peerurl, "", client)
 		}()
 
 		// Wait for the goroutine to start

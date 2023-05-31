@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"sync"
 	"time"
 
@@ -36,8 +37,8 @@ type ProxyReader interface {
 	Resources() map[string]NodeResources
 	ListProcesses() []Process
 
-	GetURL(path string) (string, error)
-	GetFile(path string) (io.ReadCloser, error)
+	GetURL(prefix, path string) (*url.URL, error)
+	GetFile(prefix, path string) (io.ReadCloser, error)
 }
 
 func NewNullProxyReader() ProxyReader {
@@ -80,20 +81,20 @@ func (p *proxyReader) ListProcesses() []Process {
 	return p.proxy.ListProcesses()
 }
 
-func (p *proxyReader) GetURL(path string) (string, error) {
-	if p.proxy == nil {
-		return "", fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.GetURL(path)
-}
-
-func (p *proxyReader) GetFile(path string) (io.ReadCloser, error) {
+func (p *proxyReader) GetURL(prefix, path string) (*url.URL, error) {
 	if p.proxy == nil {
 		return nil, fmt.Errorf("no proxy provided")
 	}
 
-	return p.proxy.GetFile(path)
+	return p.proxy.GetURL(prefix, path)
+}
+
+func (p *proxyReader) GetFile(prefix, path string) (io.ReadCloser, error) {
+	if p.proxy == nil {
+		return nil, fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.GetFile(prefix, path)
 }
 
 type ProxyConfig struct {
@@ -337,78 +338,88 @@ func (p *proxy) GetNode(id string) (NodeReader, error) {
 	return node, nil
 }
 
-func (c *proxy) GetURL(path string) (string, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	id, ok := c.fileid[path]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Not found")
-		return "", fmt.Errorf("file not found")
-	}
-
-	ts, ok := c.idupdate[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("No age information found")
-		return "", fmt.Errorf("file not found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		c.logger.Debug().WithField("path", path).Log("File too old")
-		return "", fmt.Errorf("file not found")
-	}
-
-	node, ok := c.nodes[id]
-	if !ok {
-		c.logger.Debug().WithField("path", path).Log("Unknown node")
-		return "", fmt.Errorf("file not found")
-	}
-
-	url, err := node.GetURL(path)
-	if err != nil {
-		c.logger.Debug().WithField("path", path).Log("Invalid path")
-		return "", fmt.Errorf("file not found")
-	}
-
-	c.logger.Debug().WithField("url", url).Log("File cluster url")
-
-	return url, nil
-}
-
-func (p *proxy) GetFile(path string) (io.ReadCloser, error) {
+func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	id, ok := p.fileid[path]
+	logger := p.logger.WithFields(log.Fields{
+		"path":   path,
+		"prefix": prefix,
+	})
+
+	id, ok := p.fileid[prefix+":"+path]
 	if !ok {
-		p.logger.Debug().WithField("path", path).Log("Not found")
+		logger.Debug().Log("Not found")
 		return nil, fmt.Errorf("file not found")
 	}
 
 	ts, ok := p.idupdate[id]
 	if !ok {
-		p.logger.Debug().WithField("path", path).Log("No age information found")
+		logger.Debug().Log("No age information found")
 		return nil, fmt.Errorf("file not found")
 	}
 
 	if time.Since(ts) > 2*time.Second {
-		p.logger.Debug().WithField("path", path).Log("File too old")
+		logger.Debug().Log("File too old")
 		return nil, fmt.Errorf("file not found")
 	}
 
 	node, ok := p.nodes[id]
 	if !ok {
-		p.logger.Debug().WithField("path", path).Log("Unknown node")
+		logger.Debug().Log("Unknown node")
 		return nil, fmt.Errorf("file not found")
 	}
 
-	data, err := node.GetFile(path)
+	url, err := node.GetURL(prefix, path)
 	if err != nil {
-		p.logger.Debug().WithField("path", path).Log("Invalid path")
+		logger.Debug().Log("Invalid path")
 		return nil, fmt.Errorf("file not found")
 	}
 
-	p.logger.Debug().WithField("path", path).Log("File cluster path")
+	logger.Debug().WithField("url", url).Log("File cluster url")
+
+	return url, nil
+}
+
+func (p *proxy) GetFile(prefix, path string) (io.ReadCloser, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	logger := p.logger.WithFields(log.Fields{
+		"path":   path,
+		"prefix": prefix,
+	})
+
+	id, ok := p.fileid[prefix+":"+path]
+	if !ok {
+		logger.Debug().Log("Not found")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	ts, ok := p.idupdate[id]
+	if !ok {
+		logger.Debug().Log("No age information found")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	if time.Since(ts) > 2*time.Second {
+		logger.Debug().Log("File too old")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	node, ok := p.nodes[id]
+	if !ok {
+		logger.Debug().Log("Unknown node")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	data, err := node.GetFile(prefix, path)
+	if err != nil {
+		logger.Debug().Log("Invalid path")
+		return nil, fmt.Errorf("file not found")
+	}
+
+	logger.Debug().Log("File cluster path")
 
 	return data, nil
 }

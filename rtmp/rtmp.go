@@ -277,13 +277,16 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	if ch == nil {
 		// Check in the cluster for that stream
-		url, err := s.proxy.GetURL("rtmp:" + conn.URL.Path)
+		url, err := s.proxy.GetURL("rtmp", conn.URL.Path)
 		if err != nil {
 			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
 			return
 		}
 
-		src, err := avutil.Open(url)
+		url.JoinPath(token)
+		peerurl := url.String()
+
+		src, err := avutil.Open(peerurl)
 		if err != nil {
 			s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
 			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
@@ -296,13 +299,13 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		wg.Add(1)
 
 		go func() {
-			s.log(identity, "PLAY", "PROXYSTART", url, "", remote)
+			s.log(identity, "PLAY", "PROXYSTART", peerurl, "", remote)
 			wg.Done()
 			err := s.publish(c, playpath, remote, identity, true)
 			if err != nil {
 				s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
 			}
-			s.log(identity, "PLAY", "PROXYSTOP", url, "", remote)
+			s.log(identity, "PLAY", "PROXYSTOP", peerurl, "", remote)
 		}()
 
 		// Wait for the goroutine to start
