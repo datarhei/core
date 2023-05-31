@@ -125,7 +125,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			resource := c.Request().URL.Path
 			var domain string
 
-			if resource == "/ping" {
+			if resource == "/ping" || resource == "/profiling" {
 				return next(c)
 			}
 

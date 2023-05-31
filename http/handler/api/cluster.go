@@ -183,6 +183,48 @@ func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 	return c.JSON(http.StatusOK, files)
 }
 
+// ListNodeProcesses returns the list of processes running on a node of the cluster
+// @Summary List of processes in the cluster on a node
+// @Description List of processes in the cluster on a node
+// @Tags v16.?.?
+// @ID cluster-3-list-node-processes
+// @Produce json
+// @Param id path string true "Node ID"
+// @Success 200 {array} api.ClusterProcess
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/node/:id/process [get]
+func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	peer, err := h.proxy.GetNode(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+	}
+
+	procs, err := peer.ProcessList()
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "Node not connected: %s", err)
+	}
+
+	processes := []api.ClusterProcess{}
+
+	for _, p := range procs {
+		processes = append(processes, api.ClusterProcess{
+			ProcessID: p.Config.ID,
+			NodeID:    p.NodeID,
+			Reference: p.Config.Reference,
+			Order:     p.Order,
+			State:     p.State,
+			CPU:       json.ToNumber(p.CPU),
+			Memory:    p.Mem,
+			Runtime:   int64(p.Runtime.Seconds()),
+		})
+	}
+
+	return c.JSON(http.StatusOK, processes)
+}
+
 // GetCluster returns the list of nodes in the cluster
 // @Summary List of nodes in the cluster
 // @Description List of nodes in the cluster
@@ -221,36 +263,6 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	return c.JSON(http.StatusOK, about)
 }
 
-// ListNodeProcesses returns the list of processes running on the nodes of the cluster
-// @Summary List of processes in the cluster
-// @Description List of processes in the cluster
-// @Tags v16.?.?
-// @ID cluster-3-list-node-processes
-// @Produce json
-// @Success 200 {array} api.ClusterProcess
-// @Security ApiKeyAuth
-// @Router /api/v3/cluster/node/process [get]
-func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
-	procs := h.proxy.ListProcesses()
-
-	processes := []api.ClusterProcess{}
-
-	for _, p := range procs {
-		processes = append(processes, api.ClusterProcess{
-			ProcessID: p.Config.ID,
-			NodeID:    p.NodeID,
-			Reference: p.Config.Reference,
-			Order:     p.Order,
-			State:     p.State,
-			CPU:       json.ToNumber(p.CPU),
-			Memory:    p.Mem,
-			Runtime:   int64(p.Runtime.Seconds()),
-		})
-	}
-
-	return c.JSON(http.StatusOK, processes)
-}
-
 // ListStoreProcesses returns the list of processes stored in the DB of the cluster
 // @Summary List of processes in the cluster
 // @Description List of processes in the cluster
@@ -260,7 +272,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [get]
-func (h *ClusterHandler) ListProcesses(c echo.Context) error {
+func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	procs := h.cluster.ListProcesses()
 
 	processes := []api.Process{}

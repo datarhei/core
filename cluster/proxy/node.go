@@ -27,7 +27,6 @@ type Node interface {
 	GetURL(path string) (string, error)
 	GetFile(path string) (io.ReadCloser, error)
 
-	ProcessList() ([]Process, error)
 	ProcessAdd(*app.Config) error
 	ProcessStart(id string) error
 	ProcessStop(id string) error
@@ -39,9 +38,11 @@ type Node interface {
 
 type NodeReader interface {
 	IPs() []string
-	Files() NodeFiles
 	About() NodeAbout
 	Version() NodeVersion
+
+	Files() NodeFiles
+	ProcessList() ([]Process, error)
 }
 
 type NodeFiles struct {
@@ -96,7 +97,8 @@ type node struct {
 
 	peer       client.RestClient
 	peerLock   sync.RWMutex
-	cancelPing context.CancelFunc
+	peerWg     sync.WaitGroup
+	disconnect context.CancelFunc
 
 	lastContact time.Time
 
@@ -228,17 +230,20 @@ func (n *node) Connect() error {
 	n.peer = peer
 
 	ctx, cancel := context.WithCancel(context.Background())
-	n.cancelPing = cancel
+	n.disconnect = cancel
+
+	n.peerWg.Add(2)
 
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
+		defer n.peerWg.Done()
 
 		for {
 			select {
 			case <-ticker.C:
 				// Ping
-				ok, latency := n.peer.Ping()
+				ok, latency := n.Ping()
 
 				n.stateLock.Lock()
 				if !ok {
@@ -258,6 +263,7 @@ func (n *node) Connect() error {
 	go func(ctx context.Context) {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
+		defer n.peerWg.Done()
 
 		for {
 			select {
@@ -265,26 +271,22 @@ func (n *node) Connect() error {
 				// Metrics
 				metrics, err := n.peer.Metrics(clientapi.MetricsQuery{
 					Metrics: []clientapi.MetricsQueryMetric{
-						{
-							Name: "cpu_ncpu",
-						},
-						{
-							Name: "cpu_idle",
-						},
-						{
-							Name: "mem_total",
-						},
-						{
-							Name: "mem_free",
-						},
+						{Name: "cpu_ncpu"},
+						{Name: "cpu_idle"},
+						{Name: "mem_total"},
+						{Name: "mem_free"},
 					},
 				})
+
 				if err != nil {
 					n.stateLock.Lock()
 					n.resources.cpu = 100
 					n.resources.ncpu = 1
 					n.resources.mem = 0
+					n.resources.memTotal = 0
 					n.stateLock.Unlock()
+
+					continue
 				}
 
 				cpu_ncpu := .0
@@ -325,16 +327,52 @@ func (n *node) Connect() error {
 	return nil
 }
 
-func (n *node) Disconnect() {
-	n.peerLock.Lock()
-	defer n.peerLock.Unlock()
+func (n *node) Ping() (bool, time.Duration) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
 
-	if n.cancelPing != nil {
-		n.cancelPing()
-		n.cancelPing = nil
+	if n.peer == nil {
+		return false, 0
 	}
 
+	return n.peer.Ping()
+}
+
+func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return clientapi.MetricsResponse{}, fmt.Errorf("not connected")
+	}
+
+	return n.peer.Metrics(query)
+}
+
+func (n *node) AboutPeer() (clientapi.About, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return clientapi.About{}, fmt.Errorf("not connected")
+	}
+
+	return n.peer.About(), nil
+}
+
+func (n *node) Disconnect() {
+	n.peerLock.Lock()
+	if n.disconnect != nil {
+		n.disconnect()
+		n.disconnect = nil
+	}
+	n.peerLock.Unlock()
+
+	n.peerWg.Wait()
+
+	n.peerLock.Lock()
 	n.peer = nil
+	n.peerLock.Unlock()
 }
 
 func (n *node) StartFiles(updates chan<- NodeFiles) error {
@@ -387,16 +425,10 @@ func (n *node) StopFiles() {
 }
 
 func (n *node) About() NodeAbout {
-	n.peerLock.RLock()
-
-	if n.peer == nil {
-		n.peerLock.RUnlock()
+	about, err := n.AboutPeer()
+	if err != nil {
 		return NodeAbout{}
 	}
-
-	about := n.peer.About()
-
-	n.peerLock.RUnlock()
 
 	createdAt, err := time.Parse(time.RFC3339, about.CreatedAt)
 	if err != nil {
@@ -428,14 +460,10 @@ func (n *node) About() NodeAbout {
 }
 
 func (n *node) Version() NodeVersion {
-	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
-
-	if n.peer == nil {
+	about, err := n.AboutPeer()
+	if err != nil {
 		return NodeVersion{}
 	}
-
-	about := n.peer.About()
 
 	build, err := time.Parse(time.RFC3339, about.Version.Build)
 	if err != nil {
@@ -459,11 +487,13 @@ func (n *node) IPs() []string {
 }
 
 func (n *node) Files() NodeFiles {
+	id := n.About().ID
+
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
 	state := NodeFiles{
-		ID:         n.About().ID,
+		ID:         id,
 		LastUpdate: n.lastUpdate,
 	}
 
@@ -486,10 +516,6 @@ func (n *node) files() {
 		defer wgList.Done()
 
 		for file := range filesChan {
-			if len(file) == 0 {
-				return
-			}
-
 			filesList = append(filesList, file)
 		}
 	}()
@@ -587,7 +613,7 @@ func (n *node) files() {
 
 	wg.Wait()
 
-	filesChan <- ""
+	close(filesChan)
 
 	wgList.Wait()
 
@@ -658,6 +684,8 @@ func (n *node) GetFile(path string) (io.ReadCloser, error) {
 }
 
 func (n *node) ProcessList() ([]Process, error) {
+	id := n.About().ID
+
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -679,7 +707,7 @@ func (n *node) ProcessList() ([]Process, error) {
 
 	for _, p := range list {
 		process := Process{
-			NodeID:    n.About().ID,
+			NodeID:    id,
 			Order:     p.State.Order,
 			State:     p.State.State,
 			Mem:       p.State.Memory,

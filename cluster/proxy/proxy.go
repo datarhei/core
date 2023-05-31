@@ -266,8 +266,6 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 		for _, ip := range ips {
 			p.limiter.RemoveBlock(ip)
 		}
-
-		return id, nil
 	}
 
 	ips := node.IPs()
