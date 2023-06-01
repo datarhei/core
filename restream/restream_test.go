@@ -302,6 +302,35 @@ func TestUpdateProcess(t *testing.T) {
 	require.NotEqual(t, updatedAt, process.UpdatedAt)
 }
 
+func TestUpdateSameHashProcess(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	config := getDummyProcess()
+	require.NotNil(t, config)
+	tid := TaskID{ID: config.ID}
+
+	err = rs.AddProcess(config)
+	require.Equal(t, nil, err)
+
+	process, err := rs.GetProcess(tid)
+	require.NoError(t, err)
+
+	createdAt := process.CreatedAt
+	updatedAt := process.UpdatedAt
+
+	time.Sleep(2 * time.Second)
+
+	err = rs.UpdateProcess(tid, config)
+	require.NoError(t, err)
+
+	process, err = rs.GetProcess(tid)
+	require.NoError(t, err)
+
+	require.Equal(t, createdAt, process.CreatedAt)
+	require.Equal(t, updatedAt, process.UpdatedAt)
+}
+
 func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)

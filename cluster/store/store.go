@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,12 +74,12 @@ type Command struct {
 }
 
 type CommandAddProcess struct {
-	app.Config
+	Config *app.Config
 }
 
 type CommandUpdateProcess struct {
 	ID     string
-	Config app.Config
+	Config *app.Config
 }
 
 type CommandRemoveProcess struct {
@@ -227,16 +228,16 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, ok := s.Process[cmd.ID]
+	_, ok := s.Process[cmd.Config.ID]
 	if ok {
-		return NewStoreError("the process with the ID '%s' already exists", cmd.ID)
+		return NewStoreError("the process with the ID '%s' already exists", cmd.Config.ID)
 	}
 
 	now := time.Now()
-	s.Process[cmd.ID] = Process{
+	s.Process[cmd.Config.ID] = Process{
 		CreatedAt: now,
 		UpdatedAt: now,
-		Config:    &cmd.Config,
+		Config:    cmd.Config,
 	}
 
 	return nil
@@ -255,24 +256,33 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, ok := s.Process[cmd.ID]
-	if ok {
-		if cmd.ID == cmd.Config.ID {
-			s.Process[cmd.ID] = Process{
-				UpdatedAt: time.Now(),
-				Config:    &cmd.Config,
-			}
-		} else {
-			_, ok := s.Process[cmd.Config.ID]
-			if !ok {
-				delete(s.Process, cmd.ID)
-				s.Process[cmd.Config.ID] = Process{
-					UpdatedAt: time.Now(),
-					Config:    &cmd.Config,
-				}
-			} else {
-				return NewStoreError("the process with the ID %s already exists", cmd.Config.ID)
-			}
+	p, ok := s.Process[cmd.ID]
+	if !ok {
+		return NewStoreError("the process with the ID '%s' doesn't exists", cmd.ID)
+	}
+
+	currentHash := p.Config.Hash()
+	replaceHash := cmd.Config.Hash()
+
+	if bytes.Equal(currentHash, replaceHash) {
+		return nil
+	}
+
+	if cmd.ID == cmd.Config.ID {
+		s.Process[cmd.ID] = Process{
+			UpdatedAt: time.Now(),
+			Config:    cmd.Config,
+		}
+	} else {
+		_, ok := s.Process[cmd.Config.ID]
+		if ok {
+			return NewStoreError("the process with the ID '%s' already exists", cmd.Config.ID)
+		}
+
+		delete(s.Process, cmd.ID)
+		s.Process[cmd.Config.ID] = Process{
+			UpdatedAt: time.Now(),
+			Config:    cmd.Config,
 		}
 	}
 

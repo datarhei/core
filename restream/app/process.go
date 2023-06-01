@@ -1,6 +1,11 @@
 package app
 
 import (
+	"bytes"
+	"crypto/md5"
+	"strconv"
+	"strings"
+
 	"github.com/datarhei/core/v16/process"
 )
 
@@ -11,6 +16,17 @@ type ConfigIOCleanup struct {
 	PurgeOnDelete bool
 }
 
+func (c *ConfigIOCleanup) HashString() string {
+	b := strings.Builder{}
+
+	b.WriteString(c.Pattern)
+	b.WriteString(strconv.FormatUint(uint64(c.MaxFiles), 10))
+	b.WriteString(strconv.FormatUint(uint64(c.MaxFileAge), 10))
+	b.WriteString(strconv.FormatBool(c.PurgeOnDelete))
+
+	return b.String()
+}
+
 type ConfigIO struct {
 	ID      string
 	Address string
@@ -18,7 +34,7 @@ type ConfigIO struct {
 	Cleanup []ConfigIOCleanup
 }
 
-func (io ConfigIO) Clone() ConfigIO {
+func (io *ConfigIO) Clone() ConfigIO {
 	clone := ConfigIO{
 		ID:      io.ID,
 		Address: io.Address,
@@ -31,6 +47,20 @@ func (io ConfigIO) Clone() ConfigIO {
 	copy(clone.Cleanup, io.Cleanup)
 
 	return clone
+}
+
+func (io *ConfigIO) HashString() string {
+	b := strings.Builder{}
+
+	b.WriteString(io.ID)
+	b.WriteString(io.Address)
+	b.WriteString(strings.Join(io.Options, ","))
+
+	for _, x := range io.Cleanup {
+		b.WriteString(x.HashString())
+	}
+
+	return b.String()
 }
 
 type Config struct {
@@ -111,6 +141,39 @@ func (config *Config) CreateCommand() []string {
 	}
 
 	return command
+}
+
+func (config *Config) Hash() []byte {
+	b := bytes.Buffer{}
+
+	b.WriteString(config.ID)
+	b.WriteString(config.Reference)
+	b.WriteString(config.Owner)
+	b.WriteString(config.Domain)
+	b.WriteString(config.FFVersion)
+	b.WriteString(config.Scheduler)
+	b.WriteString(strings.Join(config.Options, ","))
+	b.WriteString(strings.Join(config.LogPatterns, ","))
+	b.WriteString(strconv.FormatBool(config.Reconnect))
+	b.WriteString(strconv.FormatBool(config.Autostart))
+	b.WriteString(strconv.FormatUint(config.ReconnectDelay, 10))
+	b.WriteString(strconv.FormatUint(config.StaleTimeout, 10))
+	b.WriteString(strconv.FormatUint(config.Timeout, 10))
+	b.WriteString(strconv.FormatUint(config.LimitMemory, 10))
+	b.WriteString(strconv.FormatUint(config.LimitWaitFor, 10))
+	b.WriteString(strconv.FormatFloat(config.LimitCPU, 'f', -1, 64))
+
+	for _, x := range config.Input {
+		b.WriteString(x.HashString())
+	}
+
+	for _, x := range config.Output {
+		b.WriteString(x.HashString())
+	}
+
+	sum := md5.Sum(b.Bytes())
+
+	return sum[:]
 }
 
 type Process struct {

@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -439,9 +438,10 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 
 		if workingrate < 0 {
 			workingrate = limit
-		} else {
-			workingrate = math.Min(workingrate/pcpu*limit, 1)
 		}
+		// else {
+		//	workingrate = math.Min(workingrate/pcpu*limit, 1)
+		//}
 
 		workingrate = lim
 

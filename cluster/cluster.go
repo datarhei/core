@@ -718,7 +718,7 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 	cmd := &store.Command{
 		Operation: store.OpAddProcess,
 		Data: &store.CommandAddProcess{
-			Config: *config,
+			Config: config,
 		},
 	}
 
@@ -749,7 +749,7 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 		Operation: store.OpUpdateProcess,
 		Data: &store.CommandUpdateProcess{
 			ID:     id,
-			Config: *config,
+			Config: config,
 		},
 	}
 
