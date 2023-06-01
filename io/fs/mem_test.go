@@ -7,25 +7,16 @@ import (
 )
 
 func TestMemFromDir(t *testing.T) {
-	mem, err := NewMemFilesystemFromDir(".", MemConfig{})
+	mem, err := NewMemFilesystemFromDir("./fixtures", MemConfig{})
 	require.NoError(t, err)
 
 	names := []string{}
-	for _, f := range mem.List("/", ListOptions{Pattern: "/*.go"}) {
+	for _, f := range mem.List("/", ListOptions{Pattern: "/*.txt"}) {
 		names = append(names, f.Name())
 	}
 
 	require.ElementsMatch(t, []string{
-		"/disk.go",
-		"/fs_test.go",
-		"/fs.go",
-		"/mem_test.go",
-		"/mem.go",
-		"/readonly_test.go",
-		"/readonly.go",
-		"/s3.go",
-		"/sized_test.go",
-		"/sized.go",
-		"/sizer.go",
+		"/a.txt",
+		"/b.txt",
 	}, names)
 }

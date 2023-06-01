@@ -53,7 +53,7 @@ func TestWidget(t *testing.T) {
 	err = rs.AddProcess(process.Marshal())
 	require.NoError(t, err)
 
-	response := mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+	response := mock.Request(t, http.StatusOK, router, "GET", "/"+process.ID, nil)
 
 	mock.Validate(t, &api.WidgetProcess{}, response.Data)
 }

@@ -5,145 +5,22 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/iam"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/session"
+	"github.com/datarhei/core/v16/srt/url"
 	srt "github.com/datarhei/gosrt"
 )
 
 // ErrServerClosed is returned by ListenAndServe if the server
 // has been closed regularly with the Close() function.
 var ErrServerClosed = srt.ErrServerClosed
-
-type client struct {
-	conn      srt.Conn
-	id        string
-	createdAt time.Time
-
-	txbytes uint64
-	rxbytes uint64
-
-	collector session.Collector
-
-	cancel context.CancelFunc
-}
-
-func newClient(conn srt.Conn, id string, collector session.Collector) *client {
-	c := &client{
-		conn:      conn,
-		id:        id,
-		createdAt: time.Now(),
-
-		collector: collector,
-	}
-
-	var ctx context.Context
-	ctx, c.cancel = context.WithCancel(context.Background())
-
-	go c.ticker(ctx)
-
-	return c
-}
-
-func (c *client) ticker(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	stats := &srt.Statistics{}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			c.conn.Stats(stats)
-
-			rxbytes := stats.Accumulated.ByteRecv
-			txbytes := stats.Accumulated.ByteSent
-
-			c.collector.Ingress(c.id, int64(rxbytes-c.rxbytes))
-			c.collector.Egress(c.id, int64(txbytes-c.txbytes))
-
-			c.txbytes = txbytes
-			c.rxbytes = rxbytes
-		}
-	}
-}
-
-func (c *client) Close() {
-	c.cancel()
-}
-
-// channel represents a stream that is sent to the server
-type channel struct {
-	pubsub    srt.PubSub
-	collector session.Collector
-	path      string
-
-	publisher  *client
-	subscriber map[string]*client
-	lock       sync.RWMutex
-}
-
-func newChannel(conn srt.Conn, resource string, collector session.Collector) *channel {
-	ch := &channel{
-		pubsub:     srt.NewPubSub(srt.PubSubConfig{}),
-		path:       resource,
-		publisher:  newClient(conn, resource, collector),
-		subscriber: make(map[string]*client),
-		collector:  collector,
-	}
-
-	addr := conn.RemoteAddr().String()
-	ip, _, _ := net.SplitHostPort(addr)
-
-	if collector.IsCollectableIP(ip) {
-		collector.RegisterAndActivate(resource, resource, "publish:"+resource, addr)
-	}
-
-	return ch
-}
-
-func (ch *channel) Close() {
-	if ch.publisher == nil {
-		return
-	}
-
-	ch.publisher.Close()
-	ch.publisher = nil
-}
-
-func (ch *channel) AddSubscriber(conn srt.Conn, resource string) string {
-	addr := conn.RemoteAddr().String()
-	ip, _, _ := net.SplitHostPort(addr)
-
-	client := newClient(conn, addr, ch.collector)
-
-	if ch.collector.IsCollectableIP(ip) {
-		ch.collector.RegisterAndActivate(addr, resource, "play:"+resource, addr)
-	}
-
-	ch.lock.Lock()
-	ch.subscriber[addr] = client
-	ch.lock.Unlock()
-
-	return addr
-}
-
-func (ch *channel) RemoveSubscriber(id string) {
-	ch.lock.Lock()
-	defer ch.lock.Unlock()
-
-	client := ch.subscriber[id]
-	if client != nil {
-		delete(ch.subscriber, id)
-		client.Close()
-	}
-}
 
 // Config for a new SRT server
 type Config struct {
@@ -164,6 +41,10 @@ type Config struct {
 	Collector session.Collector
 
 	SRTLogTopics []string
+
+	Proxy proxy.ProxyReader
+
+	IAM iam.IAM
 }
 
 // Server represents a SRT server
@@ -175,7 +56,7 @@ type Server interface {
 	Close()
 
 	// Channels return a list of currently publishing streams
-	Channels() Channels
+	Channels() []Channel
 }
 
 // server implements the Server interface
@@ -188,8 +69,8 @@ type server struct {
 
 	server srt.Server
 
-	// Map of publishing channels and a lock to serialize
-	// access to the map.
+	// Map of publishing channels and a lock to serialize access to the map. The map
+	// index is the name of the resource.
 	channels map[string]*channel
 	lock     sync.RWMutex
 
@@ -197,8 +78,12 @@ type server struct {
 
 	srtlogger       srt.Logger
 	srtloggerCancel context.CancelFunc
-	srtlog          map[string]*ring.Ring
+	srtlog          map[string]*ring.Ring // Per logtopic a dedicated ring buffer
 	srtlogLock      sync.RWMutex
+
+	proxy proxy.ProxyReader
+
+	iam iam.IAM
 }
 
 func New(config Config) (Server, error) {
@@ -207,11 +92,17 @@ func New(config Config) (Server, error) {
 		token:      config.Token,
 		passphrase: config.Passphrase,
 		collector:  config.Collector,
+		iam:        config.IAM,
 		logger:     config.Logger,
+		proxy:      config.Proxy,
 	}
 
 	if s.collector == nil {
 		s.collector = session.NewNullCollector()
+	}
+
+	if s.proxy == nil {
+		s.proxy = proxy.NewNullProxyReader()
 	}
 
 	if s.logger == nil {
@@ -265,52 +156,61 @@ type Connection struct {
 	Stats srt.Statistics
 }
 
-type Channels struct {
-	Publisher   map[string]uint32
-	Subscriber  map[string][]uint32
-	Connections map[uint32]Connection
-	Log         map[string][]Log
+type Channel struct {
+	Name        string                // Resource
+	SocketId    uint32                // Socketid
+	Subscriber  []uint32              // List of subscribed sockedids
+	Connections map[uint32]Connection // Map from socketid to connection
+	Log         map[string][]Log      // Map of topic to log entries
 }
 
-func (s *server) Channels() Channels {
-	st := Channels{
-		Publisher:   map[string]uint32{},
-		Subscriber:  map[string][]uint32{},
-		Connections: map[uint32]Connection{},
-		Log:         map[string][]Log{},
-	}
+func (s *server) Channels() []Channel {
+	channels := []Channel{}
+
+	socket2channel := map[uint32]int{}
 
 	s.lock.RLock()
 	for id, ch := range s.channels {
 		socketId := ch.publisher.conn.SocketId()
-		st.Publisher[id] = socketId
+		channel := Channel{
+			Name:        id,
+			SocketId:    socketId,
+			Subscriber:  []uint32{},
+			Connections: map[uint32]Connection{},
+			Log:         map[string][]Log{},
+		}
+
+		socket2channel[socketId] = len(channels)
 
 		stats := &srt.Statistics{}
 		ch.publisher.conn.Stats(stats)
 
-		st.Connections[socketId] = Connection{
+		channel.Connections[socketId] = Connection{
 			Stats: *stats,
 			Log:   map[string][]Log{},
 		}
 
 		for _, c := range ch.subscriber {
 			socketId := c.conn.SocketId()
-			st.Subscriber[id] = append(st.Subscriber[id], socketId)
+			channel.Subscriber = append(channel.Subscriber, socketId)
 
 			stats := &srt.Statistics{}
 			c.conn.Stats(stats)
 
-			st.Connections[socketId] = Connection{
+			channel.Connections[socketId] = Connection{
 				Stats: *stats,
 				Log:   map[string][]Log{},
 			}
+
+			socket2channel[socketId] = len(channels)
 		}
+
+		channels = append(channels, channel)
 	}
 	s.lock.RUnlock()
 
 	s.srtlogLock.RLock()
 	for topic, buf := range s.srtlog {
-
 		buf.Do(func(l interface{}) {
 			if l == nil {
 				return
@@ -323,18 +223,32 @@ func (s *server) Channels() Channels {
 				Message:   strings.Split(ll.Message, "\n"),
 			}
 
-			if ll.SocketId != 0 {
-				if _, ok := st.Connections[ll.SocketId]; ok {
-					st.Connections[ll.SocketId].Log[topic] = append(st.Connections[ll.SocketId].Log[topic], log)
-				}
-			} else {
-				st.Log[topic] = append(st.Log[topic], log)
+			if ll.SocketId == 0 {
+				return
 			}
+
+			ch, ok := socket2channel[ll.SocketId]
+			if !ok {
+				return
+			}
+
+			channel := channels[ch]
+
+			conn, ok := channel.Connections[ll.SocketId]
+			if !ok {
+				return
+			}
+
+			conn.Log[topic] = append(conn.Log[topic], log)
+
+			channel.Connections[ll.SocketId] = conn
+
+			channels[ch] = channel
 		})
 	}
 	s.srtlogLock.RUnlock()
 
-	return st
+	return channels
 }
 
 func (s *server) srtlogListener(ctx context.Context) {
@@ -363,165 +277,64 @@ func (s *server) log(handler, action, resource, message string, client net.Addr)
 	}).Log(message)
 }
 
-type streamInfo struct {
-	mode     string
-	resource string
-	token    string
-}
-
-func parseStreamId(streamid string) (streamInfo, error) {
-	si := streamInfo{}
-
-	if strings.HasPrefix(streamid, "#!:") {
-		return parseOldStreamId(streamid)
-	}
-
-	re := regexp.MustCompile(`,(token|mode):(.+)`)
-
-	results := map[string]string{}
-
-	idEnd := -1
-	value := streamid
-	key := ""
-
-	for {
-		matches := re.FindStringSubmatchIndex(value)
-		if matches == nil {
-			break
-		}
-
-		if idEnd < 0 {
-			idEnd = matches[2] - 1
-		}
-
-		if len(key) != 0 {
-			results[key] = value[:matches[2]-1]
-		}
-
-		key = value[matches[2]:matches[3]]
-		value = value[matches[4]:matches[5]]
-
-		results[key] = value
-	}
-
-	if idEnd < 0 {
-		idEnd = len(streamid)
-	}
-
-	si.resource = streamid[:idEnd]
-	if token, ok := results["token"]; ok {
-		si.token = token
-	}
-
-	if mode, ok := results["mode"]; ok {
-		si.mode = mode
-	} else {
-		si.mode = "request"
-	}
-
-	return si, nil
-}
-
-func parseOldStreamId(streamid string) (streamInfo, error) {
-	si := streamInfo{}
-
-	if !strings.HasPrefix(streamid, "#!:") {
-		return si, fmt.Errorf("unknown streamid format")
-	}
-
-	streamid = strings.TrimPrefix(streamid, "#!:")
-
-	kvs := strings.Split(streamid, ",")
-
-	splitFn := func(s, sep string) (string, string, error) {
-		splitted := strings.SplitN(s, sep, 2)
-
-		if len(splitted) != 2 {
-			return "", "", fmt.Errorf("invalid key/value pair")
-		}
-
-		return splitted[0], splitted[1], nil
-	}
-
-	for _, kv := range kvs {
-		key, value, err := splitFn(kv, "=")
-		if err != nil {
-			continue
-		}
-
-		switch key {
-		case "m":
-			si.mode = value
-		case "r":
-			si.resource = value
-		case "token":
-			si.token = value
-		default:
-		}
-	}
-
-	return si, nil
-}
-
 func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	mode := srt.REJECT
 	client := req.RemoteAddr()
 	streamId := req.StreamId()
 
-	si, err := parseStreamId(streamId)
+	si, err := url.ParseStreamId(streamId)
 	if err != nil {
 		s.log("CONNECT", "INVALID", "", err.Error(), client)
 		return srt.REJECT
 	}
 
-	if len(si.resource) == 0 {
+	if len(si.Resource) == 0 {
 		s.log("CONNECT", "INVALID", "", "stream resource not provided", client)
 		return srt.REJECT
 	}
 
-	if si.mode == "publish" {
+	if si.Mode == "publish" {
 		mode = srt.PUBLISH
-	} else if si.mode == "request" {
+	} else if si.Mode == "request" {
 		mode = srt.SUBSCRIBE
 	} else {
-		s.log("CONNECT", "INVALID", si.resource, "invalid connection mode", client)
+		s.log("CONNECT", "INVALID", si.Resource, "invalid connection mode", client)
 		return srt.REJECT
 	}
 
 	if len(s.passphrase) != 0 {
 		if !req.IsEncrypted() {
-			s.log("CONNECT", "FORBIDDEN", si.resource, "connection has to be encrypted", client)
+			s.log("CONNECT", "FORBIDDEN", si.Resource, "connection has to be encrypted", client)
 			return srt.REJECT
 		}
 
 		if err := req.SetPassphrase(s.passphrase); err != nil {
-			s.log("CONNECT", "FORBIDDEN", si.resource, err.Error(), client)
+			s.log("CONNECT", "FORBIDDEN", si.Resource, err.Error(), client)
 			return srt.REJECT
 		}
 	} else {
 		if req.IsEncrypted() {
-			s.log("CONNECT", "INVALID", si.resource, "connection must not be encrypted", client)
+			s.log("CONNECT", "INVALID", si.Resource, "connection must not be encrypted", client)
 			return srt.REJECT
 		}
 	}
 
-	// Check the token
-	if len(s.token) != 0 && s.token != si.token {
-		s.log("CONNECT", "FORBIDDEN", si.resource, "invalid token ("+si.token+")", client)
+	identity, err := s.findIdentityFromToken(si.Token)
+	if err != nil {
+		s.logger.Debug().WithError(err).Log("invalid token")
+		s.log("PUBLISH", "FORBIDDEN", si.Resource, "invalid token", client)
 		return srt.REJECT
 	}
 
-	s.lock.RLock()
-	ch := s.channels[si.resource]
-	s.lock.RUnlock()
-
-	if mode == srt.PUBLISH && ch != nil {
-		s.log("CONNECT", "CONFLICT", si.resource, "already publishing", client)
-		return srt.REJECT
+	domain := s.findDomainFromPlaypath(si.Resource)
+	resource := "srt:" + si.Resource
+	action := "PLAY"
+	if mode == srt.PUBLISH {
+		action = "PUBLISH"
 	}
 
-	if mode == srt.SUBSCRIBE && ch == nil {
-		s.log("CONNECT", "NOTFOUND", si.resource, "no publisher for this resource found", client)
+	if !s.iam.Enforce(identity, domain, resource, action) {
+		s.log("PUBLISH", "FORBIDDEN", si.Resource, "access denied", client)
 		return srt.REJECT
 	}
 
@@ -529,69 +342,181 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 }
 
 func (s *server) handlePublish(conn srt.Conn) {
+	s.publish(conn, false)
+}
+
+func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	streamId := conn.StreamId()
 	client := conn.RemoteAddr()
 
-	si, _ := parseStreamId(streamId)
+	si, _ := url.ParseStreamId(streamId)
 
 	// Look for the stream
 	s.lock.Lock()
-	ch := s.channels[si.resource]
+	ch := s.channels[si.Resource]
 	if ch == nil {
-		ch = newChannel(conn, si.resource, s.collector)
-		s.channels[si.resource] = ch
+		ch = newChannel(conn, si.Resource, isProxy, s.collector)
+		s.channels[si.Resource] = ch
 	} else {
 		ch = nil
 	}
 	s.lock.Unlock()
 
 	if ch == nil {
-		s.log("PUBLISH", "CONFLICT", si.resource, "already publishing", client)
+		s.log("PUBLISH", "CONFLICT", si.Resource, "already publishing", client)
 		conn.Close()
-		return
+		return fmt.Errorf("already publishing this resource")
 	}
 
-	s.log("PUBLISH", "START", si.resource, "", client)
+	s.log("PUBLISH", "START", si.Resource, "", client)
 
+	// Blocks until connection closes
 	ch.pubsub.Publish(conn)
 
 	s.lock.Lock()
-	delete(s.channels, si.resource)
+	delete(s.channels, si.Resource)
 	s.lock.Unlock()
 
 	ch.Close()
 
-	s.log("PUBLISH", "STOP", si.resource, "", client)
+	s.log("PUBLISH", "STOP", si.Resource, "", client)
 
 	conn.Close()
+
+	return nil
 }
 
 func (s *server) handleSubscribe(conn srt.Conn) {
+	defer conn.Close()
+
 	streamId := conn.StreamId()
 	client := conn.RemoteAddr()
 
-	si, _ := parseStreamId(streamId)
+	si, _ := url.ParseStreamId(streamId)
 
-	// Look for the stream
+	// Look for the stream locally
 	s.lock.RLock()
-	ch := s.channels[si.resource]
+	ch := s.channels[si.Resource]
 	s.lock.RUnlock()
 
 	if ch == nil {
-		s.log("SUBSCRIBE", "NOTFOUND", si.resource, "no publisher for this resource found", client)
-		conn.Close()
-		return
+		// Check in the cluster for the stream and proxy it
+		srturl, err := s.proxy.GetURL("srt", si.Resource)
+		if err != nil {
+			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			return
+		}
+
+		peerurl := srturl.String()
+
+		config := srt.DefaultConfig()
+		config.StreamId = streamId
+		config.Latency = 200 * time.Millisecond // This might be a value obtained from the cluster
+		host, err := config.UnmarshalURL(peerurl)
+		if err != nil {
+			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Parsing proxy address failed")
+			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			return
+		}
+		src, err := srt.Dial("srt", host, config)
+		if err != nil {
+			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Proxying address failed")
+			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			return
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		go func() {
+			s.log("SUBSCRIBE", "PROXYSTART", peerurl, "", client)
+			wg.Done()
+			err := s.publish(src, true)
+			if err != nil {
+				s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
+			}
+			s.log("SUBSCRIBE", "PROXYPUBLISHSTOP", peerurl, "", client)
+		}()
+
+		// Wait for the goroutine to start
+		wg.Wait()
+
+		// Wait for channel to become available
+		ticker := time.NewTicker(200 * time.Millisecond)
+		tickerStart := time.Now()
+
+		for range ticker.C {
+			s.lock.RLock()
+			ch = s.channels[si.Resource]
+			s.lock.RUnlock()
+
+			if ch != nil {
+				break
+			}
+
+			if time.Since(tickerStart) > 2*time.Second {
+				break
+			}
+		}
+
+		ticker.Stop()
 	}
 
-	s.log("SUBSCRIBE", "START", si.resource, "", client)
+	if ch != nil {
+		s.log("SUBSCRIBE", "START", si.Resource, "", client)
 
-	id := ch.AddSubscriber(conn, si.resource)
+		id := ch.AddSubscriber(conn, si.Resource)
 
-	ch.pubsub.Subscribe(conn)
+		// Blocks until connection closes
+		ch.pubsub.Subscribe(conn)
 
-	s.log("SUBSCRIBE", "STOP", si.resource, "", client)
+		s.log("SUBSCRIBE", "STOP", si.Resource, "", client)
 
-	ch.RemoveSubscriber(id)
+		ch.RemoveSubscriber(id)
+	}
+}
 
-	conn.Close()
+func (s *server) findIdentityFromToken(key string) (string, error) {
+	if len(key) == 0 {
+		return "$anon", nil
+	}
+
+	var identity iamidentity.Verifier
+	var err error
+
+	var token string
+
+	elements := strings.Split(key, ":")
+	if len(elements) == 1 {
+		identity = s.iam.GetDefaultVerifier()
+		token = elements[0]
+	} else {
+		identity, err = s.iam.GetVerifier(elements[0])
+		token = elements[1]
+	}
+
+	if err != nil {
+		return "$anon", nil
+	}
+
+	if ok, err := identity.VerifyServiceToken(token); !ok {
+		return "$anon", fmt.Errorf("invalid token: %w", err)
+	}
+
+	return identity.Name(), nil
+}
+
+func (s *server) findDomainFromPlaypath(path string) string {
+	elements := strings.Split(path, "/")
+	if len(elements) == 1 {
+		return "$none"
+	}
+
+	domain := elements[0]
+
+	if s.iam.HasDomain(domain) {
+		return domain
+	}
+
+	return "$none"
 }

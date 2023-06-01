@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
@@ -40,9 +41,10 @@ import (
 	"github.com/datarhei/core/v16/http/graph/resolver"
 	"github.com/datarhei/core/v16/http/handler"
 	api "github.com/datarhei/core/v16/http/handler/api"
-	"github.com/datarhei/core/v16/http/jwt"
+	httplog "github.com/datarhei/core/v16/http/log"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/http/validator"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
@@ -56,6 +58,7 @@ import (
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
 	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
 	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
+	mwiam "github.com/datarhei/core/v16/http/middleware/iam"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
@@ -82,17 +85,19 @@ type Config struct {
 	Prometheus    prometheus.Reader
 	MimeTypesFile string
 	Filesystems   []fs.FS
-	IPLimiter     net.IPLimiter
+	IPLimiter     net.IPLimitValidator
 	Profiling     bool
 	Cors          CorsConfig
 	RTMP          rtmp.Server
 	SRT           srt.Server
-	JWT           jwt.JWT
 	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
 	Router        router.Router
 	ReadOnly      bool
+	Cluster       cluster.Cluster
+	IAM           iam.IAM
+	IAMSkipper    func(ip string) bool
 }
 
 type CorsConfig struct {
@@ -112,31 +117,31 @@ type server struct {
 		profiling  *handler.ProfilingHandler
 		ping       *handler.PingHandler
 		graph      *api.GraphHandler
-		jwt        jwt.JWT
+		jwt        *api.JWTHandler
 	}
 
 	v3handler struct {
 		log       *api.LogHandler
 		events    *api.EventsHandler
 		restream  *api.RestreamHandler
-		playout   *api.PlayoutHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
 		session   *api.SessionHandler
 		widget    *api.WidgetHandler
 		resources *api.MetricsHandler
+		cluster   *api.ClusterHandler
+		iam       *api.IAMHandler
 	}
 
 	middleware struct {
 		iplimit    echo.MiddlewareFunc
 		log        echo.MiddlewareFunc
-		accessJWT  echo.MiddlewareFunc
-		refreshJWT echo.MiddlewareFunc
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		session    echo.MiddlewareFunc
 		hlsrewrite echo.MiddlewareFunc
+		iam        echo.MiddlewareFunc
 	}
 
 	gzip struct {
@@ -173,33 +178,39 @@ func NewServer(config Config) (Server, error) {
 		"/api": {"*"},
 	}
 
-	for _, fs := range config.Filesystems {
-		if _, ok := s.filesystems[fs.Name]; ok {
-			return nil, fmt.Errorf("the filesystem name '%s' is already in use", fs.Name)
+	for _, httpfs := range config.Filesystems {
+		if _, ok := s.filesystems[httpfs.Name]; ok {
+			return nil, fmt.Errorf("the filesystem name '%s' is already in use", httpfs.Name)
 		}
 
-		if !strings.HasPrefix(fs.Mountpoint, "/") {
-			fs.Mountpoint = "/" + fs.Mountpoint
+		if !strings.HasPrefix(httpfs.Mountpoint, "/") {
+			httpfs.Mountpoint = "/" + httpfs.Mountpoint
 		}
 
-		if !strings.HasSuffix(fs.Mountpoint, "/") {
-			fs.Mountpoint = strings.TrimSuffix(fs.Mountpoint, "/")
+		if !strings.HasSuffix(httpfs.Mountpoint, "/") {
+			httpfs.Mountpoint = strings.TrimSuffix(httpfs.Mountpoint, "/")
 		}
 
-		if _, ok := corsPrefixes[fs.Mountpoint]; ok {
-			return nil, fmt.Errorf("the mount point '%s' is already in use (%s)", fs.Mountpoint, fs.Name)
+		if _, ok := corsPrefixes[httpfs.Mountpoint]; ok {
+			return nil, fmt.Errorf("the mount point '%s' is already in use (%s)", httpfs.Mountpoint, httpfs.Name)
 		}
 
-		corsPrefixes[fs.Mountpoint] = config.Cors.Origins
+		corsPrefixes[httpfs.Mountpoint] = config.Cors.Origins
+
+		if config.Cluster != nil {
+			if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
+				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
+			}
+		}
 
 		filesystem := &filesystem{
-			FS:      fs,
-			handler: handler.NewFS(fs),
+			FS:      httpfs,
+			handler: handler.NewFS(httpfs),
 		}
 
-		if fs.Filesystem.Type() == "disk" {
+		if httpfs.Filesystem.Type() == "disk" {
 			filesystem.middleware = mwhlsrewrite.NewHLSRewriteWithConfig(mwhlsrewrite.HLSRewriteConfig{
-				PathPrefix: fs.Filesystem.Metadata("base"),
+				PathPrefix: httpfs.Filesystem.Metadata("base"),
 			})
 		}
 
@@ -211,20 +222,33 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	if config.Logger == nil {
-		s.logger = log.New("HTTP")
+		s.logger = log.New("")
 	}
 
-	if config.JWT == nil {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			[]string{},
-		)
-	} else {
-		s.handler.about = api.NewAbout(
-			config.Restream,
-			config.JWT.Validators(),
-		)
+	mounts := []string{}
+
+	for _, fs := range s.filesystems {
+		mounts = append(mounts, fs.FS.Mountpoint)
 	}
+
+	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
+		Skipper: func(c echo.Context) bool {
+			return config.IAMSkipper(c.RealIP())
+		},
+		IAM:                  config.IAM,
+		Mounts:               mounts,
+		WaitAfterFailedLogin: true,
+		Logger:               s.logger.WithComponent("IAM"),
+	})
+
+	s.handler.about = api.NewAbout(
+		config.Restream,
+		func() []string { return config.IAM.Validators() },
+	)
+
+	s.handler.jwt = api.NewJWT(config.IAM)
+
+	s.v3handler.iam = api.NewIAM(config.IAM)
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
@@ -237,10 +261,7 @@ func NewServer(config Config) (Server, error) {
 	if config.Restream != nil {
 		s.v3handler.restream = api.NewRestream(
 			config.Restream,
-		)
-
-		s.v3handler.playout = api.NewPlayout(
-			config.Restream,
+			config.IAM,
 		)
 	}
 
@@ -280,12 +301,6 @@ func NewServer(config Config) (Server, error) {
 		)
 	}
 
-	if config.JWT != nil {
-		s.handler.jwt = config.JWT
-		s.middleware.accessJWT = config.JWT.AccessMiddleware()
-		s.middleware.refreshJWT = config.JWT.RefreshMiddleware()
-	}
-
 	if config.Sessions == nil {
 		config.Sessions, _ = session.New(session.Config{})
 	}
@@ -311,6 +326,14 @@ func NewServer(config Config) (Server, error) {
 		Metrics: config.Metrics,
 	})
 
+	if config.Cluster != nil {
+		handler, err := api.NewCluster(config.Cluster, config.IAM)
+		if err != nil {
+			return nil, fmt.Errorf("cluster handler: %w", err)
+		}
+		s.v3handler.cluster = handler
+	}
+
 	if middleware, err := mwcors.NewWithConfig(mwcors.Config{
 		Prefixes: corsPrefixes,
 	}); err != nil {
@@ -323,6 +346,7 @@ func NewServer(config Config) (Server, error) {
 		Restream:  config.Restream,
 		Monitor:   config.Metrics,
 		LogBuffer: config.LogBuffer,
+		IAM:       config.IAM,
 	}, "/api/graph/query")
 
 	s.gzip.mimetypes = []string{
@@ -353,11 +377,13 @@ func NewServer(config Config) (Server, error) {
 	s.router.HideBanner = true
 	s.router.HidePort = true
 
-	s.router.Logger.SetOutput(newLogwrapper(s.logger))
+	s.router.Logger.SetOutput(httplog.NewWrapper(s.logger))
 
 	if s.middleware.cors != nil {
 		s.router.Use(s.middleware.cors)
 	}
+
+	s.router.Use(s.middleware.iam)
 
 	// Add static routes
 	if path, target := config.Router.StaticRoute(); len(target) != 0 {
@@ -421,14 +447,9 @@ func (s *server) setRoutes() {
 		api.Use(s.middleware.iplimit)
 	}
 
-	if s.middleware.accessJWT != nil {
-		// Enable JWT auth
-		api.Use(s.middleware.accessJWT)
-
-		// The login endpoint should not be blocked by auth
-		s.router.POST("/api/login", s.handler.jwt.LoginHandler)
-		s.router.GET("/api/login/refresh", s.handler.jwt.RefreshHandler, s.middleware.refreshJWT)
-	}
+	// The login endpoint should not be blocked by auth
+	s.router.POST("/api/login", s.handler.jwt.Login)
+	s.router.GET("/api/login/refresh", s.handler.jwt.Refresh)
 
 	api.GET("", s.handler.about.About)
 
@@ -480,23 +501,9 @@ func (s *server) setRoutes() {
 		fs.HEAD("", filesystem.handler.GetFile)
 
 		if filesystem.AllowWrite {
-			if filesystem.EnableAuth {
-				authmw := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-					if username == filesystem.Username && password == filesystem.Password {
-						return true, nil
-					}
-
-					return false, nil
-				})
-
-				fs.POST("", filesystem.handler.PutFile, authmw)
-				fs.PUT("", filesystem.handler.PutFile, authmw)
-				fs.DELETE("", filesystem.handler.DeleteFile, authmw)
-			} else {
-				fs.POST("", filesystem.handler.PutFile)
-				fs.PUT("", filesystem.handler.PutFile)
-				fs.DELETE("", filesystem.handler.DeleteFile)
-			}
+			fs.POST("", filesystem.handler.PutFile)
+			fs.PUT("", filesystem.handler.PutFile)
+			fs.DELETE("", filesystem.handler.DeleteFile)
 		}
 	}
 
@@ -535,10 +542,6 @@ func (s *server) setRoutes() {
 	// APIv3 router group
 	v3 := api.Group("/v3")
 
-	if s.handler.jwt != nil {
-		v3.Use(s.middleware.accessJWT)
-	}
-
 	v3.Use(gzipMiddleware)
 
 	s.setRoutesV3(v3)
@@ -548,6 +551,15 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.widget != nil {
 		// The widget endpoint should not be blocked by auth
 		s.router.GET("/api/v3/widget/process/:id", s.v3handler.widget.Get)
+	}
+
+	// v3 IAM
+	if s.v3handler.iam != nil {
+		v3.POST("/iam/user", s.v3handler.iam.AddIdentity)
+		v3.GET("/iam/user/:name", s.v3handler.iam.GetIdentity)
+		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateIdentity)
+		v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateIdentityPolicies)
+		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveIdentity)
 	}
 
 	// v3 Restreamer
@@ -579,18 +591,16 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		}
 
 		// v3 Playout
-		if s.v3handler.playout != nil {
-			v3.GET("/process/:id/playout/:inputid/status", s.v3handler.playout.Status)
-			v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.playout.ReopenInput)
-			v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.playout.Keyframe)
-			v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.playout.EncodeErrorframe)
+		v3.GET("/process/:id/playout/:inputid/status", s.v3handler.restream.PlayoutStatus)
+		v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.restream.PlayoutReopenInput)
+		v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.restream.PlayoutKeyframe)
+		v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.restream.PlayoutEncodeErrorframe)
 
-			if !s.readOnly {
-				v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
-				v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.playout.SetErrorframe)
+		if !s.readOnly {
+			v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
+			v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
 
-				v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.playout.SetStream)
-			}
+			v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.restream.PlayoutSetStream)
 		}
 
 		// v3 Report
@@ -652,6 +662,40 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.session != nil {
 		v3.GET("/session", s.v3handler.session.Summary)
 		v3.GET("/session/active", s.v3handler.session.Active)
+	}
+
+	// v3 Cluster
+	if s.v3handler.cluster != nil {
+		v3.GET("/cluster", s.v3handler.cluster.About)
+
+		v3.GET("/cluster/db/process", s.v3handler.cluster.ListStoreProcesses)
+		v3.GET("/cluster/db/user", s.v3handler.cluster.ListStoreIdentities)
+		v3.GET("/cluster/db/user/:name", s.v3handler.cluster.ListStoreIdentity)
+		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
+
+		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
+		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.ListIdentity)
+		v3.GET("/cluster/iam/policies", s.v3handler.cluster.ListPolicies)
+
+		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodeProcesses)
+
+		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
+		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
+		v3.GET("/cluster/node/:id/files", s.v3handler.cluster.GetNodeFiles)
+		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.ListNodeProcesses)
+		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
+
+		if !s.readOnly {
+			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
+			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
+			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
+
+			v3.GET("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
+			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
+			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.UpdateIdentity)
+			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.UpdateIdentityPolicies)
+			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.RemoveIdentity)
+		}
 	}
 
 	// v3 Log

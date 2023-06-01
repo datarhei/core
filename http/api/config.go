@@ -19,8 +19,8 @@ type ConfigData struct {
 	config.Data
 }
 
-// Config is the config returned by the API
-type Config struct {
+// GetConfig is the config returned by the API
+type GetConfig struct {
 	CreatedAt time.Time `json:"created_at"`
 	LoadedAt  time.Time `json:"loaded_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -117,7 +117,7 @@ func (rscfg *SetConfig) MergeTo(cfg *config.Config) {
 }
 
 // Unmarshal converts a config.Config to a Config.
-func (c *Config) Unmarshal(cfg *config.Config) {
+func (c *GetConfig) Unmarshal(cfg *config.Config) {
 	if cfg == nil {
 		return
 	}

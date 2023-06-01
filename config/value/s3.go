@@ -13,7 +13,7 @@ import (
 type S3Storage struct {
 	Name            string        `json:"name"`
 	Mountpoint      string        `json:"mountpoint"`
-	Auth            S3StorageAuth `json:"auth"`
+	Auth            S3StorageAuth `json:"auth"` // Deprecated, use IAM
 	Endpoint        string        `json:"endpoint"`
 	AccessKeyID     string        `json:"access_key_id"`
 	SecretAccessKey string        `json:"secret_access_key"`
@@ -23,9 +23,9 @@ type S3Storage struct {
 }
 
 type S3StorageAuth struct {
-	Enable   bool   `json:"enable"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Enable   bool   `json:"enable"`   // Deprecated, use IAM
+	Username string `json:"username"` // Deprecated, use IAM
+	Password string `json:"password"` // Deprecated, use IAM
 }
 
 func (t *S3Storage) String() string {

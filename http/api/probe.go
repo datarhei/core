@@ -45,10 +45,10 @@ func (i *ProbeIO) Unmarshal(io *app.ProbeIO) {
 	i.Type = io.Type
 	i.Codec = io.Codec
 	i.Coder = io.Coder
-	i.Bitrate = toNumber(io.Bitrate)
-	i.Duration = toNumber(io.Duration)
+	i.Bitrate = ToNumber(io.Bitrate)
+	i.Duration = ToNumber(io.Duration)
 
-	i.FPS = toNumber(io.FPS)
+	i.FPS = ToNumber(io.FPS)
 	i.Pixfmt = io.Pixfmt
 	i.Width = io.Width
 	i.Height = io.Height

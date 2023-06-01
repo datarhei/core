@@ -106,6 +106,7 @@ func (d *Config) Clone() *Config {
 	data.Service = d.Service
 	data.Router = d.Router
 	data.Resources = d.Resources
+	data.Cluster = d.Cluster
 
 	data.Log.Topics = copy.Slice(d.Log.Topics)
 
@@ -134,6 +135,8 @@ func (d *Config) Clone() *Config {
 
 	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
+
+	data.Cluster.Peers = copy.Slice(d.Cluster.Peers)
 
 	data.vars.Transfer(&d.vars)
 
@@ -278,6 +281,14 @@ func (d *Config) init() {
 	// Resources
 	d.vars.Register(value.NewFloat(&d.Resources.MaxCPUUsage, 0), "resources.max_cpu_usage", "CORE_RESOURCES_MAX_CPU_USAGE", nil, "Maximum system CPU usage in percent, from 0 (no limit) to 100", false, false)
 	d.vars.Register(value.NewFloat(&d.Resources.MaxMemoryUsage, 0), "resources.max_memory_usage", "CORE_RESOURCES_MAX_MEMORY_USAGE", nil, "Maximum system usage in percent, from 0 (no limit) to 100", false, false)
+
+	// Cluster
+	d.vars.Register(value.NewBool(&d.Cluster.Enable, false), "cluster.enable", "CORE_CLUSTER_ENABLE", nil, "Enable cluster mode", false, false)
+	d.vars.Register(value.NewBool(&d.Cluster.Bootstrap, false), "cluster.bootstrap", "CORE_CLUSTER_BOOTSTRAP", nil, "Bootstrap a cluster", false, false)
+	d.vars.Register(value.NewBool(&d.Cluster.Recover, false), "cluster.recover", "CORE_CLUSTER_RECOVER", nil, "Recover a cluster", false, false)
+	d.vars.Register(value.NewBool(&d.Cluster.Debug, false), "cluster.debug", "CORE_CLUSTER_DEBUG", nil, "Switch to debug mode, not for production", false, false)
+	d.vars.Register(value.NewClusterAddress(&d.Cluster.Address, "127.0.0.1:8000"), "cluster.address", "CORE_CLUSTER_ADDRESS", nil, "Raft listen address", false, true)
+	d.vars.Register(value.NewClusterPeerList(&d.Cluster.Peers, []string{""}, ","), "cluster.peers", "CORE_CLUSTER_PEERS", nil, "Raft address of a cores that are part of the cluster", false, true)
 }
 
 // Validate validates the current state of the Config for completeness and sanity. Errors are
@@ -466,6 +477,13 @@ func (d *Config) Validate(resetLogs bool) {
 
 		if d.Resources.MaxMemoryUsage <= 0 {
 			d.vars.Log("error", "resources.max_memory_usage", "must be greater than 0 and smaller or equal to 100")
+		}
+	}
+
+	// If cluster mode is enabled, we can't join and bootstrap at the same time
+	if d.Cluster.Enable {
+		if len(d.Cluster.Address) == 0 {
+			d.vars.Log("error", "cluster.address", "must be provided")
 		}
 	}
 }

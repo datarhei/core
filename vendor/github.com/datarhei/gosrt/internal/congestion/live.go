@@ -117,6 +117,10 @@ func (s *liveSend) Push(p packet.Packet) {
 
 	// give to the packet a sequence number
 	p.Header().PacketSequenceNumber = s.nextSequenceNumber
+	p.Header().PacketPositionFlag = packet.SinglePacket
+	p.Header().OrderFlag = false
+	p.Header().MessageNumber = 1
+
 	s.nextSequenceNumber = s.nextSequenceNumber.Inc()
 
 	pktLen := p.Len()

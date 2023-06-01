@@ -11,10 +11,23 @@ import (
 
 	"github.com/datarhei/core/v16/http/graph/models"
 	"github.com/datarhei/core/v16/playout"
+	"github.com/datarhei/core/v16/restream"
 )
 
-func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, input string) (*models.RawAVstream, error) {
-	addr, err := r.Restream.GetPlayout(id, input)
+// PlayoutStatus is the resolver for the playoutStatus field.
+func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, domain string, input string) (*models.RawAVstream, error) {
+	user, _ := ctx.Value("user").(string)
+
+	if !r.IAM.Enforce(user, domain, "process:"+id, "read") {
+		return nil, fmt.Errorf("forbidden")
+	}
+
+	tid := restream.TaskID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	addr, err := r.Restream.GetPlayout(tid, input)
 	if err != nil {
 		return nil, fmt.Errorf("unknown process or input: %w", err)
 	}

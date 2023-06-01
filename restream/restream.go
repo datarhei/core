@@ -16,6 +16,7 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg/probe"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/glob"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
@@ -25,39 +26,43 @@ import (
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/resources"
+	"github.com/datarhei/core/v16/restream/rewrite"
 	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/Masterminds/semver/v3"
 )
 
 // The Restreamer interface
 type Restreamer interface {
-	ID() string                                                                                                    // ID of this instance
-	Name() string                                                                                                  // Arbitrary name of this instance
-	CreatedAt() time.Time                                                                                          // Time of when this instance has been created
-	Start()                                                                                                        // Start all processes that have a "start" order
-	Stop()                                                                                                         // Stop all running process but keep their "start" order
+	ID() string           // ID of this instance
+	Name() string         // Arbitrary name of this instance
+	CreatedAt() time.Time // Time of when this instance has been created
+	Start()               // Start all processes that have a "start" order
+	Stop()                // Stop all running process but keep their "start" order
+
+	Skills() skills.Skills                          // Get the ffmpeg skills
+	ReloadSkills() error                            // Reload the ffmpeg skills
+	SetMetadata(key string, data interface{}) error // Set general metadata
+	GetMetadata(key string) (interface{}, error)    // Get previously set general metadata
+
 	AddProcess(config *app.Config) error                                                                           // Add a new process
-	GetProcessIDs(idpattern, refpattern string) []string                                                           // Get a list of process IDs based on patterns for ID and reference
-	DeleteProcess(id string) error                                                                                 // Delete a process
-	UpdateProcess(id string, config *app.Config) error                                                             // Update a process
-	StartProcess(id string) error                                                                                  // Start a process
-	StopProcess(id string) error                                                                                   // Stop a process
-	RestartProcess(id string) error                                                                                // Restart a process
-	ReloadProcess(id string) error                                                                                 // Reload a process
-	GetProcess(id string) (*app.Process, error)                                                                    // Get a process
-	GetProcessState(id string) (*app.State, error)                                                                 // Get the state of a process
-	GetProcessLog(id string) (*app.Log, error)                                                                     // Get the logs of a process
+	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []TaskID                              // Get a list of process IDs based on patterns for ID and reference
+	DeleteProcess(id TaskID) error                                                                                 // Delete a process
+	UpdateProcess(id TaskID, config *app.Config) error                                                             // Update a process
+	StartProcess(id TaskID) error                                                                                  // Start a process
+	StopProcess(id TaskID) error                                                                                   // Stop a process
+	RestartProcess(id TaskID) error                                                                                // Restart a process
+	ReloadProcess(id TaskID) error                                                                                 // Reload a process
+	GetProcess(id TaskID) (*app.Process, error)                                                                    // Get a process
+	GetProcessState(id TaskID) (*app.State, error)                                                                 // Get the state of a process
+	GetProcessLog(id TaskID) (*app.Log, error)                                                                     // Get the logs of a process
 	SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.LogHistorySearchResult // Search the log history of all processes
-	GetPlayout(id, inputid string) (string, error)                                                                 // Get the URL of the playout API for a process
-	Probe(id string) app.Probe                                                                                     // Probe a process
-	ProbeWithTimeout(id string, timeout time.Duration) app.Probe                                                   // Probe a process with specific timeout
-	Skills() skills.Skills                                                                                         // Get the ffmpeg skills
-	ReloadSkills() error                                                                                           // Reload the ffmpeg skills
-	SetProcessMetadata(id, key string, data interface{}) error                                                     // Set metatdata to a process
-	GetProcessMetadata(id, key string) (interface{}, error)                                                        // Get previously set metadata from a process
-	SetMetadata(key string, data interface{}) error                                                                // Set general metadata
-	GetMetadata(key string) (interface{}, error)                                                                   // Get previously set general metadata
+	GetPlayout(id TaskID, inputid string) (string, error)                                                          // Get the URL of the playout API for a process
+	Probe(id TaskID) app.Probe                                                                                     // Probe a process
+	ProbeWithTimeout(id TaskID, timeout time.Duration) app.Probe                                                   // Probe a process with specific timeout
+	SetProcessMetadata(id TaskID, key string, data interface{}) error                                              // Set metatdata to a process
+	GetProcessMetadata(id TaskID, key string) (interface{}, error)                                                 // Get previously set metadata from a process
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -67,16 +72,20 @@ type Config struct {
 	Store        store.Store
 	Filesystems  []fs.Filesystem
 	Replace      replace.Replacer
+	Rewrite      rewrite.Rewriter
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
 	MaxCPU       float64 // percent 0-100
 	MaxMemory    float64 // percent 0-100
 	Logger       log.Logger
+	IAM          iam.IAM
 }
 
 type task struct {
 	valid     bool
 	id        string // ID of the task/process
+	owner     string
+	domain    string
 	reference string
 	process   *app.Process
 	config    *app.Config
@@ -87,6 +96,34 @@ type task struct {
 	logger    log.Logger
 	usesDisk  bool // Whether this task uses the disk
 	metadata  map[string]interface{}
+}
+
+func (t *task) ID() TaskID {
+	return TaskID{
+		ID:     t.id,
+		Domain: t.domain,
+	}
+}
+
+func (t *task) String() string {
+	return t.ID().String()
+}
+
+type TaskID struct {
+	ID     string
+	Domain string
+}
+
+func (t TaskID) String() string {
+	return t.ID + "@" + t.Domain
+}
+
+func (t TaskID) Equals(b TaskID) bool {
+	if t.ID == b.ID && t.Domain == b.Domain {
+		return true
+	}
+
+	return false
 }
 
 type restream struct {
@@ -101,9 +138,10 @@ type restream struct {
 		list []rfs.Filesystem
 	}
 	replace  replace.Replacer
-	tasks    map[string]*task
+	rewrite  rewrite.Rewriter
+	tasks    map[TaskID]*task       // domain:processid
+	metadata map[string]interface{} // global metadata
 	logger   log.Logger
-	metadata map[string]interface{}
 
 	resources       resources.Resources
 	enableSoftLimit bool
@@ -114,6 +152,8 @@ type restream struct {
 
 	startOnce sync.Once
 	stopOnce  sync.Once
+
+	iam iam.IAM
 }
 
 // New returns a new instance that implements the Restreamer interface
@@ -124,16 +164,22 @@ func New(config Config) (Restreamer, error) {
 		createdAt: time.Now(),
 		store:     config.Store,
 		replace:   config.Replace,
+		rewrite:   config.Rewrite,
 		logger:    config.Logger,
+		iam:       config.IAM,
 	}
 
 	if r.logger == nil {
 		r.logger = log.New("")
 	}
 
+	if r.iam == nil {
+		return nil, fmt.Errorf("missing IAM")
+	}
+
 	if r.store == nil {
 		dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
-		s, err := store.NewJSON(store.JSONConfig{
+		s, err := jsonstore.New(jsonstore.Config{
 			Filesystem: dummyfs,
 		})
 		if err != nil {
@@ -230,8 +276,7 @@ func (r *restream) Stop() {
 		r.lock.Lock()
 		defer r.lock.Unlock()
 
-		// Stop the currently running processes without
-		// altering their order such that on a subsequent
+		// Stop the currently running processes without altering their order such that on a subsequent
 		// Start() they will get restarted.
 		for id, t := range r.tasks {
 			if t.ffmpeg != nil {
@@ -340,7 +385,7 @@ func (r *restream) load() error {
 		return err
 	}
 
-	tasks := make(map[string]*task)
+	tasks := make(map[TaskID]*task)
 
 	skills := r.ffmpeg.Skills()
 	ffversion := skills.FFmpeg.Version
@@ -349,36 +394,33 @@ func (r *restream) load() error {
 		ffversion = fmt.Sprintf("%d.%d.0", v.Major(), v.Minor())
 	}
 
-	for id, process := range data.Process {
-		if len(process.Config.FFVersion) == 0 {
-			process.Config.FFVersion = "^" + ffversion
+	for _, domain := range data.Process {
+		for _, p := range domain {
+			if len(p.Process.Config.FFVersion) == 0 {
+				p.Process.Config.FFVersion = "^" + ffversion
+			}
+
+			t := &task{
+				id:        p.Process.ID,
+				owner:     p.Process.Owner,
+				domain:    p.Process.Domain,
+				reference: p.Process.Reference,
+				process:   p.Process,
+				config:    p.Process.Config.Clone(),
+				logger: r.logger.WithFields(log.Fields{
+					"id":     p.Process.ID,
+					"owner":  p.Process.Owner,
+					"domain": p.Process.Domain,
+				}),
+			}
+
+			t.metadata = p.Metadata
+
+			// Replace all placeholders in the config
+			resolveStaticPlaceholders(t.config, r.replace)
+
+			tasks[t.ID()] = t
 		}
-
-		t := &task{
-			id:        id,
-			reference: process.Reference,
-			process:   process,
-			config:    process.Config.Clone(),
-			logger: r.logger.WithFields(log.Fields{
-				"id":        process.ID,
-				"reference": process.Reference,
-			},
-			),
-		}
-
-		// Replace all placeholders in the config
-		resolveStaticPlaceholders(t.config, r.replace)
-
-		tasks[id] = t
-	}
-
-	for id, userdata := range data.Metadata.Process {
-		t, ok := tasks[id]
-		if !ok {
-			continue
-		}
-
-		t.metadata = userdata
 	}
 
 	// Now that all tasks are defined and all placeholders are
@@ -391,22 +433,21 @@ func (r *restream) load() error {
 		if c, err := semver.NewConstraint(t.config.FFVersion); err == nil {
 			if v, err := semver.NewVersion(skills.FFmpeg.Version); err == nil {
 				if !c.Check(v) {
-					r.logger.Warn().WithFields(log.Fields{
-						"id":         t.id,
+					t.logger.Warn().WithFields(log.Fields{
 						"constraint": t.config.FFVersion,
 						"version":    skills.FFmpeg.Version,
 					}).WithError(fmt.Errorf("available FFmpeg version doesn't fit constraint; you have to update this process to adjust the constraint")).Log("")
 				}
 			} else {
-				r.logger.Warn().WithField("id", t.id).WithError(err).Log("")
+				t.logger.Warn().WithError(err).Log("")
 			}
 		} else {
-			r.logger.Warn().WithField("id", t.id).WithError(err).Log("")
+			t.logger.Warn().WithError(err).Log("")
 		}
 
 		err := r.resolveAddresses(tasks, t.config)
 		if err != nil {
-			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
+			t.logger.Warn().WithError(err).Log("Ignoring")
 			continue
 		}
 
@@ -417,18 +458,18 @@ func (r *restream) load() error {
 
 		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
-			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
+			t.logger.Warn().WithError(err).Log("Ignoring")
 			continue
 		}
 
 		err = r.setPlayoutPorts(t)
 		if err != nil {
-			r.logger.Warn().WithField("id", t.id).WithError(err).Log("Ignoring")
+			t.logger.Warn().WithError(err).Log("Ignoring")
 			continue
 		}
 
 		t.command = t.config.CreateCommand()
-		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
+		t.parser = r.ffmpeg.NewProcessParser(t.logger, t.String(), t.reference, t.config.LogPatterns)
 
 		limitMode := "hard"
 		if r.enableSoftLimit {
@@ -470,19 +511,29 @@ func (r *restream) load() error {
 	}
 
 	r.tasks = tasks
-	r.metadata = data.Metadata.System
+	r.metadata = data.Metadata
 
 	return nil
 }
 
 func (r *restream) save() {
-	data := store.NewStoreData()
+	data := store.NewData()
 
-	for id, t := range r.tasks {
-		data.Process[id] = t.process
-		data.Metadata.System = r.metadata
-		data.Metadata.Process[id] = t.metadata
+	for tid, t := range r.tasks {
+		domain := data.Process[tid.Domain]
+		if domain == nil {
+			domain = map[string]store.Process{}
+		}
+
+		domain[tid.ID] = store.Process{
+			Process:  t.process.Clone(),
+			Metadata: t.metadata,
+		}
+
+		data.Process[tid.Domain] = domain
 	}
+
+	data.Metadata = r.metadata
 
 	r.store.Store(data)
 }
@@ -500,7 +551,9 @@ func (r *restream) CreatedAt() time.Time {
 }
 
 var ErrUnknownProcess = errors.New("unknown process")
+var ErrUnknownProcessGroup = errors.New("unknown process group")
 var ErrProcessExists = errors.New("process already exists")
+var ErrForbidden = errors.New("forbidden")
 
 func (r *restream) AddProcess(config *app.Config) error {
 	r.lock.RLock()
@@ -514,20 +567,22 @@ func (r *restream) AddProcess(config *app.Config) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	_, ok := r.tasks[t.id]
+	tid := t.ID()
+
+	_, ok := r.tasks[tid]
 	if ok {
 		return ErrProcessExists
 	}
 
-	r.tasks[t.id] = t
+	r.tasks[tid] = t
 
 	// set filesystem cleanup rules
-	r.setCleanup(t.id, t.config)
+	r.setCleanup(tid, t.config)
 
 	if t.process.Order == "start" {
-		err := r.startProcess(t.id)
+		err := r.startProcess(tid)
 		if err != nil {
-			delete(r.tasks, t.id)
+			delete(r.tasks, tid)
 			return err
 		}
 	}
@@ -553,6 +608,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	process := &app.Process{
 		ID:        config.ID,
+		Domain:    config.Domain,
 		Reference: config.Reference,
 		Config:    config.Clone(),
 		Order:     "stop",
@@ -567,14 +623,15 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	t := &task{
 		id:        config.ID,
+		domain:    config.Domain,
 		reference: process.Reference,
 		process:   process,
 		config:    process.Config.Clone(),
 		logger: r.logger.WithFields(log.Fields{
 			"id":        process.ID,
 			"reference": process.Reference,
-		},
-		),
+			"domain":    process.Domain,
+		}),
 	}
 
 	resolveStaticPlaceholders(t.config, r.replace)
@@ -602,7 +659,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	}
 
 	t.command = t.config.CreateCommand()
-	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
+	t.parser = r.ffmpeg.NewProcessParser(t.logger, t.String(), t.reference, t.config.LogPatterns)
 
 	limitMode := "hard"
 	if r.enableSoftLimit {
@@ -664,11 +721,12 @@ func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
 	}
 }
 
-func (r *restream) setCleanup(id string, config *app.Config) {
-	rePrefix := regexp.MustCompile(`^(.+):`)
+func (r *restream) setCleanup(id TaskID, config *app.Config) {
+	rePrefix := regexp.MustCompile(`^([a-z]+):`)
 
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {
+			// TODO: strings.Cut(c.Pattern, ":")
 			matches := rePrefix.FindStringSubmatch(c.Pattern)
 			if matches == nil {
 				continue
@@ -695,7 +753,7 @@ func (r *restream) setCleanup(id string, config *app.Config) {
 					PurgeOnDelete: c.PurgeOnDelete,
 				}
 
-				fs.SetCleanup(id, []rfs.Pattern{
+				fs.SetCleanup(id.String(), []rfs.Pattern{
 					pattern,
 				})
 
@@ -705,9 +763,9 @@ func (r *restream) setCleanup(id string, config *app.Config) {
 	}
 }
 
-func (r *restream) unsetCleanup(id string) {
+func (r *restream) unsetCleanup(id TaskID) {
 	for _, fs := range r.fs.list {
-		fs.UnsetCleanup(id)
+		fs.UnsetCleanup(id.String())
 	}
 }
 
@@ -965,7 +1023,7 @@ func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (strin
 }
 
 // resolveAddresses replaces the addresse reference from each input in a config with the actual address.
-func (r *restream) resolveAddresses(tasks map[string]*task, config *app.Config) error {
+func (r *restream) resolveAddresses(tasks map[TaskID]*task, config *app.Config) error {
 	for i, input := range config.Input {
 		// Resolve any references
 		address, err := r.resolveAddress(tasks, config.ID, input.Address)
@@ -982,56 +1040,159 @@ func (r *restream) resolveAddresses(tasks map[string]*task, config *app.Config) 
 }
 
 // resolveAddress replaces the address reference with the actual address.
-func (r *restream) resolveAddress(tasks map[string]*task, id, address string) (string, error) {
-	re := regexp.MustCompile(`^#(.+):output=(.+)`)
-
-	if len(address) == 0 {
-		return address, fmt.Errorf("empty address")
+func (r *restream) resolveAddress(tasks map[TaskID]*task, id, address string) (string, error) {
+	matches, err := parseAddressReference(address)
+	if err != nil {
+		return address, err
 	}
 
-	if address[0] != '#' {
+	// Address is not a reference
+	if _, ok := matches["address"]; ok {
 		return address, nil
 	}
 
-	matches := re.FindStringSubmatch(address)
-	if matches == nil {
-		return address, fmt.Errorf("invalid format (%s)", address)
+	if matches["id"] == id {
+		return address, fmt.Errorf("self-reference is not allowed (%s)", address)
 	}
 
-	if matches[1] == id {
-		return address, fmt.Errorf("self-reference not possible (%s)", address)
-	}
+	var t *task = nil
 
-	task, ok := tasks[matches[1]]
-	if !ok {
-		return address, fmt.Errorf("unknown process '%s' (%s)", matches[1], address)
-	}
-
-	for _, x := range task.config.Output {
-		if x.ID == matches[2] {
-			return x.Address, nil
+	for _, tsk := range tasks {
+		if tsk.id == matches["id"] && tsk.domain == matches["domain"] {
+			t = tsk
+			break
 		}
 	}
 
-	return address, fmt.Errorf("the process '%s' has no outputs with the ID '%s' (%s)", matches[1], matches[2], address)
+	if t == nil {
+		return address, fmt.Errorf("unknown process '%s' in domain '%s' (%s)", matches["id"], matches["domain"], address)
+	}
+
+	identity, _ := r.iam.GetVerifier(t.config.Owner)
+
+	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
+
+	for _, x := range t.config.Output {
+		if x.ID != matches["output"] {
+			continue
+		}
+
+		// Check for non-tee output
+		if !strings.Contains(x.Address, "|") && !strings.HasPrefix(x.Address, "[") {
+			return r.rewrite.RewriteAddress(x.Address, identity, rewrite.READ), nil
+		}
+
+		// Split tee output in its individual addresses
+
+		addresses := strings.Split(x.Address, "|")
+		if len(addresses) == 0 {
+			return x.Address, nil
+		}
+
+		// Remove tee options
+		for i, a := range addresses {
+			addresses[i] = teeOptions.ReplaceAllString(a, "")
+		}
+
+		if len(matches["source"]) == 0 {
+			return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+		}
+
+		for _, a := range addresses {
+			u, err := url.Parse(a)
+			if err != nil {
+				// Ignore invalid addresses
+				continue
+			}
+
+			if matches["source"] == "hls" {
+				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.RawPath, ".m3u8") {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			} else if matches["source"] == "rtmp" {
+				if u.Scheme == "rtmp" {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			} else if matches["source"] == "srt" {
+				if u.Scheme == "srt" {
+					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+				}
+			}
+		}
+
+		// If none of the sources matched, return the first address
+		return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+	}
+
+	return address, fmt.Errorf("the process '%s' in group '%s' has no outputs with the ID '%s' (%s)", matches["id"], matches["group"], matches["output"], address)
 }
 
-func (r *restream) UpdateProcess(id string, config *app.Config) error {
+func parseAddressReference(address string) (map[string]string, error) {
+	if len(address) == 0 {
+		return nil, fmt.Errorf("empty address")
+	}
+
+	if address[0] != '#' {
+		return map[string]string{
+			"address": address,
+		}, nil
+	}
+
+	re := regexp.MustCompile(`:(output|domain|source)=(.+)`)
+
+	results := map[string]string{}
+
+	idEnd := -1
+	value := address
+	key := ""
+
+	for {
+		matches := re.FindStringSubmatchIndex(value)
+		if matches == nil {
+			break
+		}
+
+		if idEnd < 0 {
+			idEnd = matches[2] - 1
+		}
+
+		if len(key) != 0 {
+			results[key] = value[:matches[2]-1]
+		}
+
+		key = value[matches[2]:matches[3]]
+		value = value[matches[4]:matches[5]]
+
+		results[key] = value
+	}
+
+	if idEnd < 0 {
+		return nil, fmt.Errorf("invalid format (%s)", address)
+	}
+
+	results["id"] = address[1:idEnd]
+
+	return results, nil
+}
+
+func (r *restream) UpdateProcess(id TaskID, config *app.Config) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
-	t, err := r.createTask(config)
-	if err != nil {
-		return err
-	}
 
 	task, ok := r.tasks[id]
 	if !ok {
 		return ErrUnknownProcess
 	}
 
-	if id != t.id {
-		_, ok := r.tasks[t.id]
+	t, err := r.createTask(config)
+	if err != nil {
+		return err
+	}
+
+	tid := t.ID()
+
+	if !tid.Equals(id) {
+		_, ok := r.tasks[tid]
 		if ok {
 			return ErrProcessExists
 		}
@@ -1040,11 +1201,11 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	t.process.Order = task.process.Order
 
 	if err := r.stopProcess(id); err != nil {
-		return err
+		return fmt.Errorf("stop process: %w", err)
 	}
 
 	if err := r.deleteProcess(id); err != nil {
-		return err
+		return fmt.Errorf("delete process: %w", err)
 	}
 
 	// This would require a major version jump
@@ -1052,13 +1213,13 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	t.process.UpdatedAt = time.Now().Unix()
 	task.parser.TransferReportHistory(t.parser)
 
-	r.tasks[t.id] = t
+	r.tasks[tid] = t
 
 	// set filesystem cleanup rules
-	r.setCleanup(t.id, t.config)
+	r.setCleanup(tid, t.config)
 
 	if t.process.Order == "start" {
-		r.startProcess(t.id)
+		r.startProcess(tid)
 	}
 
 	r.save()
@@ -1066,73 +1227,79 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	return nil
 }
 
-func (r *restream) GetProcessIDs(idpattern, refpattern string) []string {
+func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []TaskID {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	if len(idpattern) == 0 && len(refpattern) == 0 {
-		ids := make([]string, len(r.tasks))
-		i := 0
+	ids := []TaskID{}
 
-		for id := range r.tasks {
-			ids[i] = id
-			i++
-		}
-
-		return ids
-	}
-
-	idmap := map[string]int{}
-	count := 0
-
-	if len(idpattern) != 0 {
-		for id := range r.tasks {
-			match, err := glob.Match(idpattern, id)
+	for _, t := range r.tasks {
+		count := 0
+		matches := 0
+		if len(idpattern) != 0 {
+			count++
+			match, err := glob.Match(idpattern, t.id)
 			if err != nil {
 				return nil
 			}
 
-			if !match {
-				continue
+			if match {
+				matches++
 			}
-
-			idmap[id]++
 		}
 
-		count++
-	}
-
-	if len(refpattern) != 0 {
-		for _, t := range r.tasks {
+		if len(refpattern) != 0 {
+			count++
 			match, err := glob.Match(refpattern, t.reference)
 			if err != nil {
 				return nil
 			}
 
-			if !match {
-				continue
+			if match {
+				matches++
 			}
-
-			idmap[t.id]++
 		}
 
-		count++
-	}
+		if len(ownerpattern) != 0 {
+			count++
+			match, err := glob.Match(ownerpattern, t.owner)
+			if err != nil {
+				return nil
+			}
 
-	ids := []string{}
+			if match {
+				matches++
+			}
+		}
 
-	for id, n := range idmap {
-		if n != count {
+		if len(domainpattern) != 0 {
+			count++
+			match, err := glob.Match(domainpattern, t.domain)
+			if err != nil {
+				return nil
+			}
+
+			if match {
+				matches++
+			}
+		}
+
+		if count != matches {
 			continue
 		}
 
-		ids = append(ids, id)
+		tid := TaskID{
+			ID:     t.id,
+			Domain: t.domain,
+		}
+
+		ids = append(ids, tid)
 	}
 
 	return ids
 }
 
-func (r *restream) GetProcess(id string) (*app.Process, error) {
+func (r *restream) GetProcess(id TaskID) (*app.Process, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
@@ -1146,7 +1313,7 @@ func (r *restream) GetProcess(id string) (*app.Process, error) {
 	return process, nil
 }
 
-func (r *restream) DeleteProcess(id string) error {
+func (r *restream) DeleteProcess(id TaskID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -1160,25 +1327,25 @@ func (r *restream) DeleteProcess(id string) error {
 	return nil
 }
 
-func (r *restream) deleteProcess(id string) error {
-	task, ok := r.tasks[id]
+func (r *restream) deleteProcess(tid TaskID) error {
+	task, ok := r.tasks[tid]
 	if !ok {
 		return ErrUnknownProcess
 	}
 
 	if task.process.Order != "stop" {
-		return fmt.Errorf("the process with the ID '%s' is still running", id)
+		return fmt.Errorf("the process with the ID '%s' is still running", tid)
 	}
 
 	r.unsetPlayoutPorts(task)
-	r.unsetCleanup(id)
+	r.unsetCleanup(tid)
 
-	delete(r.tasks, id)
+	delete(r.tasks, tid)
 
 	return nil
 }
 
-func (r *restream) StartProcess(id string) error {
+func (r *restream) StartProcess(id TaskID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -1192,8 +1359,8 @@ func (r *restream) StartProcess(id string) error {
 	return nil
 }
 
-func (r *restream) startProcess(id string) error {
-	task, ok := r.tasks[id]
+func (r *restream) startProcess(tid TaskID) error {
+	task, ok := r.tasks[tid]
 	if !ok {
 		return ErrUnknownProcess
 	}
@@ -1223,7 +1390,7 @@ func (r *restream) startProcess(id string) error {
 	return nil
 }
 
-func (r *restream) StopProcess(id string) error {
+func (r *restream) StopProcess(id TaskID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -1237,8 +1404,8 @@ func (r *restream) StopProcess(id string) error {
 	return nil
 }
 
-func (r *restream) stopProcess(id string) error {
-	task, ok := r.tasks[id]
+func (r *restream) stopProcess(tid TaskID) error {
+	task, ok := r.tasks[tid]
 	if !ok {
 		return ErrUnknownProcess
 	}
@@ -1262,15 +1429,15 @@ func (r *restream) stopProcess(id string) error {
 	return nil
 }
 
-func (r *restream) RestartProcess(id string) error {
+func (r *restream) RestartProcess(id TaskID) error {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	return r.restartProcess(id)
 }
 
-func (r *restream) restartProcess(id string) error {
-	task, ok := r.tasks[id]
+func (r *restream) restartProcess(tid TaskID) error {
+	task, ok := r.tasks[tid]
 	if !ok {
 		return ErrUnknownProcess
 	}
@@ -1291,7 +1458,7 @@ func (r *restream) restartProcess(id string) error {
 	return nil
 }
 
-func (r *restream) ReloadProcess(id string) error {
+func (r *restream) ReloadProcess(id TaskID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -1305,8 +1472,8 @@ func (r *restream) ReloadProcess(id string) error {
 	return nil
 }
 
-func (r *restream) reloadProcess(id string) error {
-	t, ok := r.tasks[id]
+func (r *restream) reloadProcess(tid TaskID) error {
+	t, ok := r.tasks[tid]
 	if !ok {
 		return ErrUnknownProcess
 	}
@@ -1342,10 +1509,10 @@ func (r *restream) reloadProcess(id string) error {
 	order := "stop"
 	if t.process.Order == "start" {
 		order = "start"
-		r.stopProcess(id)
+		r.stopProcess(tid)
 	}
 
-	parser := r.ffmpeg.NewProcessParser(t.logger, t.id, t.reference, t.config.LogPatterns)
+	parser := r.ffmpeg.NewProcessParser(t.logger, t.String(), t.reference, t.config.LogPatterns)
 	t.parser.TransferReportHistory(parser)
 	t.parser = parser
 
@@ -1388,13 +1555,13 @@ func (r *restream) reloadProcess(id string) error {
 	t.valid = true
 
 	if order == "start" {
-		r.startProcess(id)
+		r.startProcess(tid)
 	}
 
 	return nil
 }
 
-func (r *restream) GetProcessState(id string) (*app.State, error) {
+func (r *restream) GetProcessState(id TaskID) (*app.State, error) {
 	state := &app.State{}
 
 	r.lock.RLock()
@@ -1554,20 +1721,20 @@ func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress)
 	}
 }
 
-func (r *restream) GetProcessLog(id string) (*app.Log, error) {
+func (r *restream) GetProcessLog(id TaskID) (*app.Log, error) {
+	log := &app.Log{}
+
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return &app.Log{}, ErrUnknownProcess
+		return log, ErrUnknownProcess
 	}
 
 	if !task.valid {
-		return &app.Log{}, nil
+		return log, nil
 	}
-
-	log := &app.Log{}
 
 	current := task.parser.Report()
 
@@ -1646,7 +1813,7 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 
 	result := []app.LogHistorySearchResult{}
 
-	ids := r.GetProcessIDs(idpattern, refpattern)
+	ids := r.GetProcessIDs(idpattern, refpattern, "", "")
 
 	for _, id := range ids {
 		task, ok := r.tasks[id]
@@ -1670,14 +1837,14 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 	return result
 }
 
-func (r *restream) Probe(id string) app.Probe {
+func (r *restream) Probe(id TaskID) app.Probe {
 	return r.ProbeWithTimeout(id, 20*time.Second)
 }
 
-func (r *restream) ProbeWithTimeout(id string, timeout time.Duration) app.Probe {
-	r.lock.RLock()
-
+func (r *restream) ProbeWithTimeout(id TaskID, timeout time.Duration) app.Probe {
 	appprobe := app.Probe{}
+
+	r.lock.RLock()
 
 	task, ok := r.tasks[id]
 	if !ok {
@@ -1773,7 +1940,7 @@ func (r *restream) ReloadSkills() error {
 	return r.ffmpeg.ReloadSkills()
 }
 
-func (r *restream) GetPlayout(id, inputid string) (string, error) {
+func (r *restream) GetPlayout(id TaskID, inputid string) (string, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
@@ -1796,13 +1963,13 @@ func (r *restream) GetPlayout(id, inputid string) (string, error) {
 
 var ErrMetadataKeyNotFound = errors.New("unknown key")
 
-func (r *restream) SetProcessMetadata(id, key string, data interface{}) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
+func (r *restream) SetProcessMetadata(id TaskID, key string, data interface{}) error {
 	if len(key) == 0 {
 		return fmt.Errorf("a key for storing the data has to be provided")
 	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
 	task, ok := r.tasks[id]
 	if !ok {
@@ -1828,7 +1995,7 @@ func (r *restream) SetProcessMetadata(id, key string, data interface{}) error {
 	return nil
 }
 
-func (r *restream) GetProcessMetadata(id, key string) (interface{}, error) {
+func (r *restream) GetProcessMetadata(id TaskID, key string) (interface{}, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
@@ -1900,7 +2067,9 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 	vars := map[string]string{
 		"processid": config.ID,
+		"owner":     config.Owner,
 		"reference": config.Reference,
+		"group":     config.Domain,
 	}
 
 	for i, option := range config.Options {

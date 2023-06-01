@@ -15,11 +15,11 @@ import (
 // about the API version and build infos.
 type AboutHandler struct {
 	restream restream.Restreamer
-	auths    []string
+	auths    func() []string
 }
 
 // NewAbout returns a new About type
-func NewAbout(restream restream.Restreamer, auths []string) *AboutHandler {
+func NewAbout(restream restream.Restreamer, auths func() []string) *AboutHandler {
 	return &AboutHandler{
 		restream: restream,
 		auths:    auths,
@@ -35,12 +35,24 @@ func NewAbout(restream restream.Restreamer, auths []string) *AboutHandler {
 // @Security ApiKeyAuth
 // @Router /api [get]
 func (p *AboutHandler) About(c echo.Context) error {
+	user, _ := c.Get("user").(string)
+
+	if user == "$anon" {
+		return c.JSON(http.StatusOK, api.MinimalAbout{
+			App:   app.Name,
+			Auths: p.auths(),
+			Version: api.VersionMinimal{
+				Number: app.Version.MajorString(),
+			},
+		})
+	}
+
 	createdAt := p.restream.CreatedAt()
 
 	about := api.About{
 		App:       app.Name,
 		Name:      p.restream.Name(),
-		Auths:     p.auths,
+		Auths:     p.auths(),
 		ID:        p.restream.ID(),
 		CreatedAt: createdAt.Format(time.RFC3339),
 		Uptime:    uint64(time.Since(createdAt).Seconds()),

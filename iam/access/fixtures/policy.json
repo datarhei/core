@@ -1,0 +1,26 @@
+[
+    {
+        "name": "$none",
+        "roles": {},
+        "userroles": [],
+        "policies": [
+            {
+                "username": "ingo",
+                "resource": "rtmp:/bla-*",
+                "actions": "play|publish"
+            }
+        ]
+    },
+    {
+        "name": "igelcamp",
+        "roles": null,
+        "userroles": null,
+        "policies": [
+            {
+                "username": "ingo",
+                "resource": "rtmp:/igelcamp/**",
+                "actions": "publish"
+            }
+        ]
+    }
+]

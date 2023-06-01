@@ -160,6 +160,8 @@ func NewMemFilesystemFromDir(dir string, config MemConfig) (Filesystem, error) {
 		return nil, err
 	}
 
+	dir = filepath.Clean(dir)
+
 	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -185,7 +187,7 @@ func NewMemFilesystemFromDir(dir string, config MemConfig) (Filesystem, error) {
 
 		defer file.Close()
 
-		_, _, err = mem.WriteFileReader(path, file)
+		_, _, err = mem.WriteFileReader(strings.TrimPrefix(path, dir), file)
 		if err != nil {
 			return fmt.Errorf("can't copy %s", path)
 		}

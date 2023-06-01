@@ -27,14 +27,56 @@ func NewSRT(srt srt.Server) *SRTHandler {
 // @Tags v16.9.0
 // @ID srt-3-list-channels
 // @Produce json
-// @Success 200 {array} api.SRTChannels
+// @Success 200 {array} []api.SRTChannel
 // @Security ApiKeyAuth
 // @Router /api/v3/srt [get]
 func (srth *SRTHandler) ListChannels(c echo.Context) error {
 	channels := srth.srt.Channels()
 
-	srtchannels := api.SRTChannels{}
-	srtchannels.Unmarshal(&channels)
+	srtchannels := []api.SRTChannel{}
+
+	for _, channel := range channels {
+		srtchannels = append(srtchannels, srth.unmarshalChannel(channel))
+	}
 
 	return c.JSON(http.StatusOK, srtchannels)
+}
+
+// Unmarshal converts the SRT channels into API representation
+func (srth *SRTHandler) unmarshalChannel(ss srt.Channel) api.SRTChannel {
+	s := api.SRTChannel{
+		Name:        ss.Name,
+		SocketId:    ss.SocketId,
+		Connections: map[uint32]api.SRTConnection{},
+		Log:         make(map[string][]api.SRTLog),
+	}
+
+	s.Subscriber = make([]uint32, len(ss.Subscriber))
+	copy(s.Subscriber, ss.Subscriber)
+
+	for k, v := range ss.Connections {
+		c := s.Connections[k]
+		c.Log = make(map[string][]api.SRTLog)
+		c.Stats.Unmarshal(&v.Stats)
+
+		for lk, lv := range ss.Log {
+			s.Log[lk] = make([]api.SRTLog, len(lv))
+			for i, l := range lv {
+				s.Log[lk][i].Timestamp = l.Timestamp.UnixMilli()
+				s.Log[lk][i].Message = l.Message
+			}
+		}
+
+		s.Connections[k] = c
+	}
+
+	for k, v := range ss.Log {
+		s.Log[k] = make([]api.SRTLog, len(v))
+		for i, l := range v {
+			s.Log[k][i].Timestamp = l.Timestamp.UnixMilli()
+			s.Log[k][i].Message = l.Message
+		}
+	}
+
+	return s
 }

@@ -56,12 +56,8 @@ type Fields map[string]interface{}
 //
 // The context is a string that represents who wrote the message.
 type Logger interface {
-	// WithOutput adds an output to the Logger. The messages are written to the
-	// provided writer if the log level of the message is more or equally critical
-	// than level. Pass true for useColoe if colored output is desired. If the
-	// writer doesn't support colored output, it will be automatically disabled.
-	// The returned value implements the LoggerOutput interface which allows to
-	// change the log level at any later point in time.
+	// WithOutput sets an output to the Logger. The messages are written to the
+	// provided writer.
 	WithOutput(w Writer) Logger
 
 	// With returns a new Logger with the given context. The context may

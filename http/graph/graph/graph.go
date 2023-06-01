@@ -127,8 +127,10 @@ type ComplexityRoot struct {
 	Process struct {
 		Config    func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
+		Domain    func(childComplexity int) int
 		ID        func(childComplexity int) int
 		Metadata  func(childComplexity int) int
+		Owner     func(childComplexity int) int
 		Reference func(childComplexity int) int
 		Report    func(childComplexity int) int
 		State     func(childComplexity int) int
@@ -137,11 +139,13 @@ type ComplexityRoot struct {
 
 	ProcessConfig struct {
 		Autostart             func(childComplexity int) int
+		Domain                func(childComplexity int) int
 		ID                    func(childComplexity int) int
 		Input                 func(childComplexity int) int
 		Limits                func(childComplexity int) int
 		Options               func(childComplexity int) int
 		Output                func(childComplexity int) int
+		Owner                 func(childComplexity int) int
 		Reconnect             func(childComplexity int) int
 		ReconnectDelaySeconds func(childComplexity int) int
 		Reference             func(childComplexity int) int
@@ -236,10 +240,10 @@ type ComplexityRoot struct {
 		Log           func(childComplexity int) int
 		Metrics       func(childComplexity int, query models.MetricsInput) int
 		Ping          func(childComplexity int) int
-		PlayoutStatus func(childComplexity int, id string, input string) int
-		Probe         func(childComplexity int, id string) int
-		Process       func(childComplexity int, id string) int
-		Processes     func(childComplexity int) int
+		PlayoutStatus func(childComplexity int, id string, domain string, input string) int
+		Probe         func(childComplexity int, id string, domain string) int
+		Process       func(childComplexity int, id string, domain string) int
+		Processes     func(childComplexity int, idpattern *string, refpattern *string, domainpattern *string) int
 	}
 
 	RawAVstream struct {
@@ -283,10 +287,10 @@ type QueryResolver interface {
 	About(ctx context.Context) (*models.About, error)
 	Log(ctx context.Context) ([]string, error)
 	Metrics(ctx context.Context, query models.MetricsInput) (*models.Metrics, error)
-	PlayoutStatus(ctx context.Context, id string, input string) (*models.RawAVstream, error)
-	Processes(ctx context.Context) ([]*models.Process, error)
-	Process(ctx context.Context, id string) (*models.Process, error)
-	Probe(ctx context.Context, id string) (*models.Probe, error)
+	PlayoutStatus(ctx context.Context, id string, domain string, input string) (*models.RawAVstream, error)
+	Processes(ctx context.Context, idpattern *string, refpattern *string, domainpattern *string) ([]*models.Process, error)
+	Process(ctx context.Context, id string, domain string) (*models.Process, error)
+	Probe(ctx context.Context, id string, domain string) (*models.Probe, error)
 }
 
 type executableSchema struct {
@@ -675,6 +679,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Process.CreatedAt(childComplexity), true
 
+	case "Process.domain":
+		if e.complexity.Process.Domain == nil {
+			break
+		}
+
+		return e.complexity.Process.Domain(childComplexity), true
+
 	case "Process.id":
 		if e.complexity.Process.ID == nil {
 			break
@@ -688,6 +699,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Process.Metadata(childComplexity), true
+
+	case "Process.owner":
+		if e.complexity.Process.Owner == nil {
+			break
+		}
+
+		return e.complexity.Process.Owner(childComplexity), true
 
 	case "Process.reference":
 		if e.complexity.Process.Reference == nil {
@@ -724,6 +742,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ProcessConfig.Autostart(childComplexity), true
 
+	case "ProcessConfig.domain":
+		if e.complexity.ProcessConfig.Domain == nil {
+			break
+		}
+
+		return e.complexity.ProcessConfig.Domain(childComplexity), true
+
 	case "ProcessConfig.id":
 		if e.complexity.ProcessConfig.ID == nil {
 			break
@@ -758,6 +783,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ProcessConfig.Output(childComplexity), true
+
+	case "ProcessConfig.owner":
+		if e.complexity.ProcessConfig.Owner == nil {
+			break
+		}
+
+		return e.complexity.ProcessConfig.Owner(childComplexity), true
 
 	case "ProcessConfig.reconnect":
 		if e.complexity.ProcessConfig.Reconnect == nil {
@@ -1243,7 +1275,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.PlayoutStatus(childComplexity, args["id"].(string), args["input"].(string)), true
+		return e.complexity.Query.PlayoutStatus(childComplexity, args["id"].(string), args["domain"].(string), args["input"].(string)), true
 
 	case "Query.probe":
 		if e.complexity.Query.Probe == nil {
@@ -1255,7 +1287,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Probe(childComplexity, args["id"].(string)), true
+		return e.complexity.Query.Probe(childComplexity, args["id"].(string), args["domain"].(string)), true
 
 	case "Query.process":
 		if e.complexity.Query.Process == nil {
@@ -1267,14 +1299,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Process(childComplexity, args["id"].(string)), true
+		return e.complexity.Query.Process(childComplexity, args["id"].(string), args["domain"].(string)), true
 
 	case "Query.processes":
 		if e.complexity.Query.Processes == nil {
 			break
 		}
 
-		return e.complexity.Query.Processes(childComplexity), true
+		args, err := ec.field_Query_processes_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Processes(childComplexity, args["idpattern"].(*string), args["refpattern"].(*string), args["domainpattern"].(*string)), true
 
 	case "RawAVstream.aqueue":
 		if e.complexity.RawAVstream.Aqueue == nil {
@@ -1561,7 +1598,7 @@ type Metric {
 }
 `, BuiltIn: false},
 	{Name: "../playout.graphqls", Input: `extend type Query {
-	playoutStatus(id: ID!, input: ID!): RawAVstream
+	playoutStatus(id: ID!, domain: String!, input: ID!): RawAVstream
 }
 
 type RawAVstreamIO {
@@ -1597,9 +1634,13 @@ type RawAVstream {
 }
 `, BuiltIn: false},
 	{Name: "../process.graphqls", Input: `extend type Query {
-	processes: [Process!]!
-	process(id: ID!): Process
-	probe(id: ID!): Probe!
+	processes(
+		idpattern: String
+		refpattern: String
+		domainpattern: String
+	): [Process!]!
+	process(id: ID!, domain: String!): Process
+	probe(id: ID!, domain: String!): Probe!
 }
 
 type ProcessConfigIO {
@@ -1616,6 +1657,8 @@ type ProcessConfigLimits {
 
 type ProcessConfig {
 	id: String!
+	owner: String!
+	domain: String!
 	type: String!
 	reference: String!
 	input: [ProcessConfigIO!]!
@@ -1666,6 +1709,8 @@ type ProcessReport implements IProcessReportHistoryEntry {
 
 type Process {
 	id: String!
+	owner: String!
+	domain: String!
 	type: String!
 	reference: String!
 	created_at: Time!
@@ -1841,14 +1886,23 @@ func (ec *executionContext) field_Query_playoutStatus_args(ctx context.Context, 
 	}
 	args["id"] = arg0
 	var arg1 string
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg1, err = ec.unmarshalNID2string(ctx, tmp)
+	if tmp, ok := rawArgs["domain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("domain"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["input"] = arg1
+	args["domain"] = arg1
+	var arg2 string
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg2, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg2
 	return args, nil
 }
 
@@ -1864,6 +1918,15 @@ func (ec *executionContext) field_Query_probe_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["id"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["domain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("domain"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["domain"] = arg1
 	return args, nil
 }
 
@@ -1879,6 +1942,48 @@ func (ec *executionContext) field_Query_process_args(ctx context.Context, rawArg
 		}
 	}
 	args["id"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["domain"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("domain"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["domain"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_processes_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["idpattern"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("idpattern"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["idpattern"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["refpattern"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("refpattern"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["refpattern"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["domainpattern"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("domainpattern"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["domainpattern"] = arg2
 	return args, nil
 }
 
@@ -4275,6 +4380,94 @@ func (ec *executionContext) fieldContext_Process_id(ctx context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Process_owner(ctx context.Context, field graphql.CollectedField, obj *models.Process) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Process_owner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Owner, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Process_owner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Process",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Process_domain(ctx context.Context, field graphql.CollectedField, obj *models.Process) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Process_domain(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Domain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Process_domain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Process",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Process_type(ctx context.Context, field graphql.CollectedField, obj *models.Process) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Process_type(ctx, field)
 	if err != nil {
@@ -4448,6 +4641,10 @@ func (ec *executionContext) fieldContext_Process_config(ctx context.Context, fie
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_ProcessConfig_id(ctx, field)
+			case "owner":
+				return ec.fieldContext_ProcessConfig_owner(ctx, field)
+			case "domain":
+				return ec.fieldContext_ProcessConfig_domain(ctx, field)
 			case "type":
 				return ec.fieldContext_ProcessConfig_type(ctx, field)
 			case "reference":
@@ -4666,6 +4863,94 @@ func (ec *executionContext) _ProcessConfig_id(ctx context.Context, field graphql
 }
 
 func (ec *executionContext) fieldContext_ProcessConfig_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProcessConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProcessConfig_owner(ctx context.Context, field graphql.CollectedField, obj *models.ProcessConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProcessConfig_owner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Owner, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProcessConfig_owner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProcessConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProcessConfig_domain(ctx context.Context, field graphql.CollectedField, obj *models.ProcessConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProcessConfig_domain(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Domain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProcessConfig_domain(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ProcessConfig",
 		Field:      field,
@@ -8071,7 +8356,7 @@ func (ec *executionContext) _Query_playoutStatus(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().PlayoutStatus(rctx, fc.Args["id"].(string), fc.Args["input"].(string))
+		return ec.resolvers.Query().PlayoutStatus(rctx, fc.Args["id"].(string), fc.Args["domain"].(string), fc.Args["input"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8155,7 +8440,7 @@ func (ec *executionContext) _Query_processes(ctx context.Context, field graphql.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Processes(rctx)
+		return ec.resolvers.Query().Processes(rctx, fc.Args["idpattern"].(*string), fc.Args["refpattern"].(*string), fc.Args["domainpattern"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8182,6 +8467,10 @@ func (ec *executionContext) fieldContext_Query_processes(ctx context.Context, fi
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Process_id(ctx, field)
+			case "owner":
+				return ec.fieldContext_Process_owner(ctx, field)
+			case "domain":
+				return ec.fieldContext_Process_domain(ctx, field)
 			case "type":
 				return ec.fieldContext_Process_type(ctx, field)
 			case "reference":
@@ -8200,6 +8489,17 @@ func (ec *executionContext) fieldContext_Query_processes(ctx context.Context, fi
 			return nil, fmt.Errorf("no field named %q was found under type Process", field.Name)
 		},
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_processes_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
 	return fc, nil
 }
 
@@ -8217,7 +8517,7 @@ func (ec *executionContext) _Query_process(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Process(rctx, fc.Args["id"].(string))
+		return ec.resolvers.Query().Process(rctx, fc.Args["id"].(string), fc.Args["domain"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8241,6 +8541,10 @@ func (ec *executionContext) fieldContext_Query_process(ctx context.Context, fiel
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Process_id(ctx, field)
+			case "owner":
+				return ec.fieldContext_Process_owner(ctx, field)
+			case "domain":
+				return ec.fieldContext_Process_domain(ctx, field)
 			case "type":
 				return ec.fieldContext_Process_type(ctx, field)
 			case "reference":
@@ -8287,7 +8591,7 @@ func (ec *executionContext) _Query_probe(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Probe(rctx, fc.Args["id"].(string))
+		return ec.resolvers.Query().Probe(rctx, fc.Args["id"].(string), fc.Args["domain"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -11282,7 +11586,12 @@ func (ec *executionContext) unmarshalInputMetricInput(ctx context.Context, obj i
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"name", "labels"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "name":
 			var err error
@@ -11313,7 +11622,12 @@ func (ec *executionContext) unmarshalInputMetricsInput(ctx context.Context, obj 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"timerange_seconds", "interval_seconds", "metrics"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "timerange_seconds":
 			var err error
@@ -11941,6 +12255,20 @@ func (ec *executionContext) _Process(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "owner":
+
+			out.Values[i] = ec._Process_owner(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "domain":
+
+			out.Values[i] = ec._Process_domain(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "type":
 
 			out.Values[i] = ec._Process_type(ctx, field, obj)
@@ -12011,6 +12339,20 @@ func (ec *executionContext) _ProcessConfig(ctx context.Context, sel ast.Selectio
 		case "id":
 
 			out.Values[i] = ec._ProcessConfig_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "owner":
+
+			out.Values[i] = ec._ProcessConfig_owner(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "domain":
+
+			out.Values[i] = ec._ProcessConfig_domain(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

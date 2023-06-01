@@ -45,6 +45,8 @@ type ProcessConfigLimits struct {
 // ProcessConfig represents the configuration of an ffmpeg process
 type ProcessConfig struct {
 	ID             string              `json:"id"`
+	Owner          string              `json:"owner"`
+	Domain         string              `json:"domain"`
 	Type           string              `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
 	Reference      string              `json:"reference"`
 	Input          []ProcessConfigIO   `json:"input" validate:"required"`
@@ -64,6 +66,8 @@ type ProcessConfig struct {
 func (cfg *ProcessConfig) Marshal() *app.Config {
 	p := &app.Config{
 		ID:             cfg.ID,
+		Owner:          cfg.Owner,
+		Domain:         cfg.Domain,
 		Reference:      cfg.Reference,
 		Options:        cfg.Options,
 		Reconnect:      cfg.Reconnect,
@@ -148,6 +152,8 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	}
 
 	cfg.ID = c.ID
+	cfg.Owner = c.Owner
+	cfg.Domain = c.Domain
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"
 	cfg.Reconnect = c.Reconnect
@@ -227,17 +233,17 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.LastLog = state.LastLog
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
-	s.CPU = toNumber(state.CPU)
+	s.CPU = ToNumber(state.CPU)
 	s.Resources.CPU = ProcessUsageCPU{
-		NCPU:    toNumber(state.Resources.CPU.NCPU),
-		Current: toNumber(state.Resources.CPU.Current),
-		Average: toNumber(state.Resources.CPU.Average),
-		Max:     toNumber(state.Resources.CPU.Max),
-		Limit:   toNumber(state.Resources.CPU.Limit),
+		NCPU:    ToNumber(state.Resources.CPU.NCPU),
+		Current: ToNumber(state.Resources.CPU.Current),
+		Average: ToNumber(state.Resources.CPU.Average),
+		Max:     ToNumber(state.Resources.CPU.Max),
+		Limit:   ToNumber(state.Resources.CPU.Limit),
 	}
 	s.Resources.Memory = ProcessUsageMemory{
 		Current: state.Resources.Memory.Current,
-		Average: toNumber(state.Resources.Memory.Average),
+		Average: ToNumber(state.Resources.Memory.Average),
 		Max:     state.Resources.Memory.Max,
 		Limit:   state.Resources.Memory.Limit,
 	}

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/go-openapi/jsonreference"
 	"github.com/go-openapi/spec"
 )
 
@@ -44,7 +43,7 @@ func newTagBaseFieldParser(p *Parser, field *ast.Field) FieldParser {
 
 func (ps *tagBaseFieldParser) ShouldSkip() bool {
 	// Skip non-exported fields.
-	if !ast.IsExported(ps.field.Names[0].Name) {
+	if ps.field.Names != nil && !ast.IsExported(ps.field.Names[0].Name) {
 		return true
 	}
 
@@ -68,13 +67,23 @@ func (ps *tagBaseFieldParser) ShouldSkip() bool {
 
 func (ps *tagBaseFieldParser) FieldName() (string, error) {
 	var name string
+
 	if ps.field.Tag != nil {
 		// json:"tag,hoge"
 		name = strings.TrimSpace(strings.Split(ps.tag.Get(jsonTag), ",")[0])
-
 		if name != "" {
 			return name, nil
 		}
+
+		// use "form" tag over json tag
+		name = ps.FormName()
+		if name != "" {
+			return name, nil
+		}
+	}
+
+	if ps.field.Names == nil {
+		return "", nil
 	}
 
 	switch ps.p.PropNamingStrategy {
@@ -85,6 +94,13 @@ func (ps *tagBaseFieldParser) FieldName() (string, error) {
 	default:
 		return toLowerCamelCase(ps.field.Names[0].Name), nil
 	}
+}
+
+func (ps *tagBaseFieldParser) FormName() string {
+	if ps.field.Tag != nil {
+		return strings.TrimSpace(strings.Split(ps.tag.Get(formTag), ",")[0])
+	}
+	return ""
 }
 
 func toSnakeCase(in string) string {
@@ -207,12 +223,30 @@ func splitNotWrapped(s string, sep rune) []string {
 	return result
 }
 
+// ComplementSchema complement schema with field properties
 func (ps *tagBaseFieldParser) ComplementSchema(schema *spec.Schema) error {
 	types := ps.p.GetSchemaTypePath(schema, 2)
 	if len(types) == 0 {
 		return fmt.Errorf("invalid type for field: %s", ps.field.Names[0])
 	}
 
+	if IsRefSchema(schema) {
+		var newSchema = spec.Schema{}
+		err := ps.complementSchema(&newSchema, types)
+		if err != nil {
+			return err
+		}
+		if !reflect.ValueOf(newSchema).IsZero() {
+			*schema = *(newSchema.WithAllOf(*schema))
+		}
+		return nil
+	}
+
+	return ps.complementSchema(schema, types)
+}
+
+// complementSchema complement schema with field properties
+func (ps *tagBaseFieldParser) complementSchema(schema *spec.Schema, types []string) error {
 	if ps.field.Tag == nil {
 		if ps.field.Doc != nil {
 			schema.Description = strings.TrimSpace(ps.field.Doc.Text())
@@ -353,19 +387,6 @@ func (ps *tagBaseFieldParser) ComplementSchema(schema *spec.Schema) error {
 
 	schema.ReadOnly = ps.tag.Get(readOnlyTag) == "true"
 
-	if !reflect.ValueOf(schema.Ref).IsZero() && schema.ReadOnly {
-		schema.AllOf = []spec.Schema{*spec.RefSchema(schema.Ref.String())}
-		schema.Ref = spec.Ref{
-			Ref: jsonreference.Ref{
-				HasFullURL:      false,
-				HasURLPathOnly:  false,
-				HasFragmentOnly: false,
-				HasFileScheme:   false,
-				HasFullFilePath: false,
-			},
-		} // clear out existing ref
-	}
-
 	defaultTagValue := ps.tag.Get(defaultTag)
 	if defaultTagValue != "" {
 		value, err := defineType(field.schemaType, defaultTagValue)
@@ -405,13 +426,13 @@ func (ps *tagBaseFieldParser) ComplementSchema(schema *spec.Schema) error {
 			if schema.Items.Schema.Extensions == nil {
 				schema.Items.Schema.Extensions = map[string]interface{}{}
 			}
-			schema.Items.Schema.Extensions["x-enum-varnames"] = field.enumVarNames
+			schema.Items.Schema.Extensions[enumVarNamesExtension] = field.enumVarNames
 		} else {
 			// Add to top level schema
 			if schema.Extensions == nil {
 				schema.Extensions = map[string]interface{}{}
 			}
-			schema.Extensions["x-enum-varnames"] = field.enumVarNames
+			schema.Extensions[enumVarNamesExtension] = field.enumVarNames
 		}
 	}
 

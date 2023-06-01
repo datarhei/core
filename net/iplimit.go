@@ -3,70 +3,168 @@ package net
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
+	"sync"
 )
 
-// The IPLimiter interface allows to check whether a certain IP
-// is allowed.
-type IPLimiter interface {
+// The IPLimitValidator interface allows to check whether a certain IP is allowed.
+type IPLimitValidator interface {
 	// Tests whether the IP is allowed in respect to the underlying implementation
 	IsAllowed(ip string) bool
+}
+
+type IPLimiter interface {
+	// AddAllow adds a CIDR block to the allow list. If only an IP is provided
+	// a CIDR will be generated.
+	AddAllow(cidr string) error
+
+	// RemoveAllow removes a CIDR block from the allow list. If only an IP is provided
+	// a CIDR will be generated.
+	RemoveAllow(cidr string) error
+
+	// AddBlock adds a CIDR block to the block list. If only an IP is provided
+	// a CIDR will be generated.
+	AddBlock(cidr string) error
+
+	// RemoveBlock removes a CIDR block from the block list. If only an IP is provided
+	// a CIDR will be generated.
+	RemoveBlock(cidr string) error
+
+	IPLimitValidator
 }
 
 // IPLimit implements the IPLimiter interface by having an allow and block list
 // of CIDR ranges.
 type iplimit struct {
-	// Array of allowed IP ranges
-	allowlist []*net.IPNet
+	// allowList is an array of allowed IP ranges
+	allowlist map[string]*net.IPNet
 
-	// Array of blocked IP ranges
-	blocklist []*net.IPNet
+	// blocklist is an array of blocked IP ranges
+	blocklist map[string]*net.IPNet
+
+	// lock is synchronizing the acces to the allow and block lists
+	lock sync.RWMutex
 }
 
 // NewIPLimiter creates a new IPLimiter with the given IP ranges for the
 // allowed and blocked IPs. Empty strings are ignored. Returns an error
 // if an invalid IP range has been found.
 func NewIPLimiter(blocklist, allowlist []string) (IPLimiter, error) {
-	ipl := &iplimit{}
+	ipl := &iplimit{
+		allowlist: make(map[string]*net.IPNet),
+		blocklist: make(map[string]*net.IPNet),
+	}
 
 	for _, ipblock := range blocklist {
-		ipblock = strings.TrimSpace(ipblock)
-		if len(ipblock) == 0 {
-			continue
-		}
-
-		_, cidr, err := net.ParseCIDR(ipblock)
+		err := ipl.AddBlock(ipblock)
 		if err != nil {
-			return nil, fmt.Errorf("the IP block %s in the block list is invalid", ipblock)
+			return nil, fmt.Errorf("block list: %w", err)
 		}
-
-		ipl.blocklist = append(ipl.blocklist, cidr)
 	}
 
 	for _, ipblock := range allowlist {
-		ipblock = strings.TrimSpace(ipblock)
-		if len(ipblock) == 0 {
-			continue
-		}
-
-		_, cidr, err := net.ParseCIDR(ipblock)
+		err := ipl.AddAllow(ipblock)
 		if err != nil {
-			return nil, fmt.Errorf("the IP block %s in the allow list is invalid", ipblock)
+			return nil, fmt.Errorf("allow list: %w", err)
 		}
-
-		ipl.allowlist = append(ipl.allowlist, cidr)
 	}
 
 	return ipl, nil
 }
 
-// IsAllowed checks whether the provided IP is allowed according
-// to the IP ranges in the allow- and blocklists.
+func (ipl *iplimit) validate(ipblock string) (*net.IPNet, error) {
+	ipblock = strings.TrimSpace(ipblock)
+	if len(ipblock) == 0 {
+		return nil, fmt.Errorf("invalid IP block")
+	}
+
+	_, cidr, err := net.ParseCIDR(ipblock)
+	if err != nil {
+		addr, err := netip.ParseAddr(ipblock)
+		if err != nil {
+			return nil, fmt.Errorf("invalid IP block: %w", err)
+		}
+
+		if addr.Is4() {
+			ipblock = addr.String() + "/32"
+		} else {
+			ipblock = addr.String() + "/128"
+		}
+
+		_, cidr, err = net.ParseCIDR(ipblock)
+		if err != nil {
+			return nil, fmt.Errorf("invalid IP block: %w", err)
+		}
+	}
+
+	return cidr, nil
+}
+
+func (ipl *iplimit) AddAllow(ipblock string) error {
+	cidr, err := ipl.validate(ipblock)
+	if err != nil {
+		return err
+	}
+
+	ipl.lock.Lock()
+	defer ipl.lock.Unlock()
+
+	ipl.allowlist[cidr.String()] = cidr
+
+	return nil
+}
+
+func (ipl *iplimit) RemoveAllow(ipblock string) error {
+	cidr, err := ipl.validate(ipblock)
+	if err != nil {
+		return err
+	}
+
+	ipl.lock.Lock()
+	defer ipl.lock.Unlock()
+
+	delete(ipl.allowlist, cidr.String())
+
+	return nil
+}
+
+func (ipl *iplimit) AddBlock(ipblock string) error {
+	cidr, err := ipl.validate(ipblock)
+	if err != nil {
+		return err
+	}
+
+	ipl.lock.Lock()
+	defer ipl.lock.Unlock()
+
+	ipl.blocklist[cidr.String()] = cidr
+
+	return nil
+}
+
+func (ipl *iplimit) RemoveBlock(ipblock string) error {
+	cidr, err := ipl.validate(ipblock)
+	if err != nil {
+		return err
+	}
+
+	ipl.lock.Lock()
+	defer ipl.lock.Unlock()
+
+	delete(ipl.blocklist, cidr.String())
+
+	return nil
+}
+
 func (ipl *iplimit) IsAllowed(ip string) bool {
 	parsedIP := net.ParseIP(ip)
 	if parsedIP == nil {
 		return false
 	}
+
+	ipl.lock.RLock()
+	defer ipl.lock.RUnlock()
 
 	for _, r := range ipl.blocklist {
 		if r.Contains(parsedIP) {
@@ -87,12 +185,8 @@ func (ipl *iplimit) IsAllowed(ip string) bool {
 	return false
 }
 
-type nulliplimiter struct{}
-
 func NewNullIPLimiter() IPLimiter {
-	return &nulliplimiter{}
-}
+	ipl, _ := NewIPLimiter(nil, nil)
 
-func (ipl *nulliplimiter) IsAllowed(ip string) bool {
-	return true
+	return ipl
 }

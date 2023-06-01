@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
@@ -10,9 +11,13 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
 )
 
 type Response struct {
@@ -27,7 +32,40 @@ func getDummyRestreamHandler() (*RestreamHandler, error) {
 		return nil, err
 	}
 
-	handler := NewRestream(rs)
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
+	}
+
+	policyAdapter, err := access.NewJSONAdapter(memfs, "./policy.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identityAdapter, err := identity.NewJSONAdapter(memfs, "./users.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	iam, err := iam.New(iam.Config{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser: identity.User{
+			Name: "foobar",
+		},
+		JWTRealm:  "",
+		JWTSecret: "",
+		Logger:    nil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	iam.AddPolicy("$anon", "$none", "api:/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", "process:**", []string{"ANY"})
+
+	handler := NewRestream(rs, iam)
 
 	return handler, nil
 }

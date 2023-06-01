@@ -32,13 +32,13 @@ func NewConfig(store cfgstore.Store) *ConfigHandler {
 // @Tags v16.7.2
 // @ID config-3-get
 // @Produce json
-// @Success 200 {object} api.Config
+// @Success 200 {object} api.GetConfig
 // @Security ApiKeyAuth
 // @Router /api/v3/config [get]
 func (p *ConfigHandler) Get(c echo.Context) error {
 	cfg := p.store.GetActive()
 
-	apicfg := api.Config{}
+	apicfg := api.GetConfig{}
 	apicfg.Unmarshal(cfg)
 
 	return c.JSON(http.StatusOK, apicfg)

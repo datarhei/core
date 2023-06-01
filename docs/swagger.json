@@ -102,27 +102,290 @@
                 }
             }
         },
-        "/api/login": {
-            "post": {
+        "/api/swagger": {
+            "get": {
+                "description": "Swagger UI for this API",
+                "produces": [
+                    "text/html"
+                ],
+                "summary": "Swagger UI for this API",
+                "operationId": "swagger",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster": {
+            "get": {
                 "security": [
                     {
-                        "Auth0KeyAuth": []
+                        "ApiKeyAuth": []
                     }
                 ],
-                "description": "Retrieve valid JWT access and refresh tokens to use for accessing the API. Login either by username/password or Auth0 token",
+                "description": "List of nodes in the cluster",
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Retrieve an access and a refresh token",
-                "operationId": "jwt-login",
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of nodes in the cluster",
+                "operationId": "cluster-3-get-cluster",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterAbout"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/policies": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of policies in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of policies in the cluster",
+                "operationId": "cluster-3-db-list-policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster",
+                "operationId": "cluster-3-db-list-processes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.Process"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/user": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in the cluster",
+                "operationId": "cluster-3-db-list-identities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMUser"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/user/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in the cluster",
+                "operationId": "cluster-3-db-list-identity",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/policies": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of policies IAM",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of policies in IAM",
+                "operationId": "cluster-3-iam-list-policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/reload": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Reload identities and policies",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Reload identities and policies",
+                "operationId": "cluster-3-iam-reload",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of identities in IAM",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of identities in IAM",
+                "operationId": "cluster-3-iam-list-identities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMUser"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new identity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new identiy",
+                "operationId": "cluster-3-add-identity",
                 "parameters": [
                     {
-                        "description": "Login data",
-                        "name": "data",
+                        "description": "Identity",
+                        "name": "config",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.Login"
+                            "$ref": "#/definitions/api.IAMUser"
                         }
                     }
                 ],
@@ -130,7 +393,108 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.JWT"
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Identity in IAM",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Identity in IAM",
+                "operationId": "cluster-3-iam-list-identity",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace an existing user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace an existing user",
+                "operationId": "cluster-3-update-identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "User definition",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
                         }
                     },
                     "400": {
@@ -145,6 +509,12 @@
                             "$ref": "#/definitions/api.Error"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -152,26 +522,125 @@
                         }
                     }
                 }
-            }
-        },
-        "/api/login/refresh": {
-            "get": {
+            },
+            "delete": {
                 "security": [
                     {
-                        "ApiRefreshKeyAuth": []
+                        "ApiKeyAuth": []
                     }
                 ],
-                "description": "Retrieve a new access token by providing the refresh token",
+                "description": "Delete an identity by its name",
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Retrieve a new access token",
-                "operationId": "jwt-refresh",
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete an identity by its name",
+                "operationId": "cluster-3-delete-identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Identity name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.JWTRefresh"
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/iam/user/{name}/policy": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace policies of an user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace policies of an user",
+                "operationId": "cluster-3-update-user-policies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Policy definitions",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "500": {
@@ -183,19 +652,412 @@
                 }
             }
         },
-        "/api/swagger": {
+        "/api/v3/cluster/node": {
             "get": {
-                "description": "Swagger UI for this API",
-                "produces": [
-                    "text/html"
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
                 ],
-                "summary": "Swagger UI for this API",
-                "operationId": "swagger",
+                "description": "List of proxy nodes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of proxy nodes in the cluster",
+                "operationId": "cluster-3-get-nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterNode"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List a proxy node by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List a proxy node by its ID",
+                "operationId": "cluster-3-get-node",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/files": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List the files of a proxy node by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List the files of a proxy node by its ID",
+                "operationId": "cluster-3-get-node-files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNodeFiles"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster on a node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster on a node",
+                "operationId": "cluster-3-list-node-processes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterProcess"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/version": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List a proxy node by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List a proxy node by its ID",
+                "operationId": "cluster-3-get-node-version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Version"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of processes in the cluster",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List of processes in the cluster",
+                "operationId": "cluster-3-list-all-node-processes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterProcess"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new FFmpeg process",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new process",
+                "operationId": "cluster-3-add-process",
+                "parameters": [
+                    {
+                        "description": "Process config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace an existing process.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace an existing process",
+                "operationId": "cluster-3-update-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Process config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete a process by its ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete a process by its ID",
+                "operationId": "cluster-3-delete-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -221,7 +1083,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_datarhei_core_v16_http_api.Config"
+                            "$ref": "#/definitions/api.GetConfig"
                         }
                     }
                 }
@@ -737,6 +1599,308 @@
                 }
             }
         },
+        "/api/v3/iam/user": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add a new user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new user",
+                "operationId": "iam-3-add-user",
+                "parameters": [
+                    {
+                        "description": "User definition",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List aa user by its name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List an user by its name",
+                "operationId": "iam-3-get-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace an existing user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace an existing user",
+                "operationId": "iam-3-update-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "User definition",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.IAMUser"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete an user by its name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Delete an user by its name",
+                "operationId": "iam-3-delete-user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/iam/user/{name}/policy": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Replace policies of an user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Replace policies of an user",
+                "operationId": "iam-3-update-user-policies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Policy definitions",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.IAMPolicy"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/log": {
             "get": {
                 "security": [
@@ -955,6 +2119,12 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
                         "name": "filter",
                         "in": "query"
@@ -973,14 +2143,26 @@
                     },
                     {
                         "type": "string",
-                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from refpattern.",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "idpattern",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from idpattern.",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "refpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "ownerpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "domainpattern",
                         "in": "query"
                     }
                 ],
@@ -1037,6 +2219,12 @@
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
                     }
                 }
             }
@@ -1067,6 +2255,12 @@
                     },
                     {
                         "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output",
                         "name": "filter",
                         "in": "query"
@@ -1077,6 +2271,12 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.Process"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -1114,6 +2314,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Process config",
                         "name": "config",
                         "in": "body",
@@ -1132,6 +2338,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1166,6 +2378,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1173,6 +2391,12 @@
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -1212,6 +2436,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Process command",
                         "name": "command",
                         "in": "body",
@@ -1230,6 +2460,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1266,6 +2502,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1277,6 +2519,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1320,6 +2568,12 @@
                         "name": "key",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1329,6 +2583,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1372,6 +2632,12 @@
                         "required": true
                     },
                     {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
                         "description": "Arbitrary JSON data. The null value will remove the key and its contents",
                         "name": "data",
                         "in": "body",
@@ -1386,6 +2652,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1792,6 +3064,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1799,6 +3077,12 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.Probe"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     }
                 }
@@ -1839,6 +3123,12 @@
                         "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
                         "name": "exited_at",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1850,6 +3140,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -1886,6 +3182,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1897,6 +3199,12 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -2148,7 +3456,10 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.SRTChannels"
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/api.SRTChannel"
+                                }
                             }
                         }
                     }
@@ -2348,6 +3659,166 @@
                 }
             }
         },
+        "api.ClusterAbout": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "cluster_api_address": {
+                    "type": "string"
+                },
+                "core_api_address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "server": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterServer"
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/api.ClusterStats"
+                }
+            }
+        },
+        "api.ClusterNode": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_contact": {
+                    "description": "unix timestamp",
+                    "type": "integer"
+                },
+                "latency_ms": {
+                    "description": "milliseconds",
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resources": {
+                    "$ref": "#/definitions/api.ClusterNodeResources"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "uptime_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ClusterNodeFiles": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "last_update": {
+                    "description": "unix timestamp",
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ClusterNodeResources": {
+            "type": "object",
+            "properties": {
+                "cpu_limit": {
+                    "description": "percent 0-100*npcu",
+                    "type": "number"
+                },
+                "cpu_used": {
+                    "description": "percent 0-100*npcu",
+                    "type": "number"
+                },
+                "memory_limit_bytes": {
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "type": "integer"
+                },
+                "ncpu": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ClusterProcess": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "memory_bytes": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "runtime_seconds": {
+                    "type": "integer"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterServer": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "leader": {
+                    "type": "boolean"
+                },
+                "voter": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.ClusterStats": {
+            "type": "object",
+            "properties": {
+                "last_contact_ms": {
+                    "type": "number"
+                },
+                "num_peers": {
+                    "type": "integer"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
         "api.Command": {
             "type": "object",
             "required": [
@@ -2453,6 +3924,32 @@
                             }
                         },
                         "read_only": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "cluster": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "bootstrap": {
+                            "type": "boolean"
+                        },
+                        "debug": {
+                            "type": "boolean"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "peers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recover": {
                             "type": "boolean"
                         }
                     }
@@ -2689,6 +4186,7 @@
                             "type": "boolean"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -2767,6 +4265,7 @@
                             "type": "string"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -2838,15 +4337,19 @@
                             "type": "object",
                             "properties": {
                                 "auth": {
+                                    "description": "Deprecated, use IAM",
                                     "type": "object",
                                     "properties": {
                                         "enable": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "boolean"
                                         },
                                         "password": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         },
                                         "username": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         }
                                     }
@@ -3034,6 +4537,29 @@
                 }
             }
         },
+        "api.GetConfig": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/api.ConfigData"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "loaded_at": {
+                    "type": "string"
+                },
+                "overrides": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "api.GraphQuery": {
             "type": "object",
             "properties": {
@@ -3053,43 +4579,113 @@
                 }
             }
         },
-        "api.JWT": {
+        "api.IAMAuth0Tenant": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "audience": {
                     "type": "string"
                 },
-                "refresh_token": {
+                "client_id": {
+                    "type": "string"
+                },
+                "domain": {
                     "type": "string"
                 }
             }
         },
-        "api.JWTRefresh": {
+        "api.IAMPolicy": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "domain": {
                     "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUser": {
+            "type": "object",
+            "properties": {
+                "auth": {
+                    "$ref": "#/definitions/api.IAMUserAuth"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.IAMPolicy"
+                    }
+                },
+                "superuser": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.IAMUserAuth": {
+            "type": "object",
+            "properties": {
+                "api": {
+                    "$ref": "#/definitions/api.IAMUserAuthAPI"
+                },
+                "services": {
+                    "$ref": "#/definitions/api.IAMUserAuthServices"
+                }
+            }
+        },
+        "api.IAMUserAuthAPI": {
+            "type": "object",
+            "properties": {
+                "auth0": {
+                    "$ref": "#/definitions/api.IAMUserAuthAPIAuth0"
+                },
+                "userpass": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUserAuthAPIAuth0": {
+            "type": "object",
+            "properties": {
+                "tenant": {
+                    "$ref": "#/definitions/api.IAMAuth0Tenant"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.IAMUserAuthServices": {
+            "type": "object",
+            "properties": {
+                "basic": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "token": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
         "api.LogEvent": {
             "type": "object",
             "additionalProperties": true
-        },
-        "api.Login": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
         },
         "api.MetricsDescription": {
             "type": "object",
@@ -3410,6 +5006,9 @@
                 "autostart": {
                     "type": "boolean"
                 },
+                "domain": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3439,6 +5038,9 @@
                     "items": {
                         "$ref": "#/definitions/api.ProcessConfigIO"
                     }
+                },
+                "owner": {
+                    "type": "string"
                 },
                 "reconnect": {
                     "type": "boolean"
@@ -3920,7 +5522,7 @@
                 }
             }
         },
-        "api.SRTChannels": {
+        "api.SRTChannel": {
             "type": "object",
             "properties": {
                 "connections": {
@@ -3938,19 +5540,16 @@
                         }
                     }
                 },
-                "publisher": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
+                "name": {
+                    "type": "string"
+                },
+                "socketid": {
+                    "type": "integer"
                 },
                 "subscriber": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        }
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
                     }
                 }
             }
@@ -4491,6 +6090,32 @@
                         }
                     }
                 },
+                "cluster": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "bootstrap": {
+                            "type": "boolean"
+                        },
+                        "debug": {
+                            "type": "boolean"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "peers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recover": {
+                            "type": "boolean"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -4723,6 +6348,7 @@
                             "type": "boolean"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -4801,6 +6427,7 @@
                             "type": "string"
                         },
                         "token": {
+                            "description": "Deprecated, use IAM",
                             "type": "string"
                         }
                     }
@@ -4872,15 +6499,19 @@
                             "type": "object",
                             "properties": {
                                 "auth": {
+                                    "description": "Deprecated, use IAM",
                                     "type": "object",
                                     "properties": {
                                         "enable": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "boolean"
                                         },
                                         "password": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         },
                                         "username": {
+                                            "description": "Deprecated, use IAM",
                                             "type": "string"
                                         }
                                     }
@@ -5202,29 +6833,6 @@
                 }
             }
         },
-        "github_com_datarhei_core_v16_http_api.Config": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "$ref": "#/definitions/api.ConfigData"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "loaded_at": {
-                    "type": "string"
-                },
-                "overrides": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "value.Auth0Tenant": {
             "type": "object",
             "properties": {
@@ -5252,7 +6860,12 @@
                     "type": "string"
                 },
                 "auth": {
-                    "$ref": "#/definitions/value.S3StorageAuth"
+                    "description": "Deprecated, use IAM",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/value.S3StorageAuth"
+                        }
+                    ]
                 },
                 "bucket": {
                     "type": "string"
@@ -5281,12 +6894,15 @@
             "type": "object",
             "properties": {
                 "enable": {
+                    "description": "Deprecated, use IAM",
                     "type": "boolean"
                 },
                 "password": {
+                    "description": "Deprecated, use IAM",
                     "type": "string"
                 },
                 "username": {
+                    "description": "Deprecated, use IAM",
                     "type": "string"
                 }
             }

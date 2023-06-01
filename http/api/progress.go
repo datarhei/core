@@ -118,12 +118,12 @@ func (progress *Progress) Unmarshal(p *app.Progress) {
 	progress.Output = make([]ProgressIO, len(p.Output))
 	progress.Frame = p.Frame
 	progress.Packet = p.Packet
-	progress.FPS = toNumber(p.FPS)
-	progress.Quantizer = toNumber(p.Quantizer)
+	progress.FPS = ToNumber(p.FPS)
+	progress.Quantizer = ToNumber(p.Quantizer)
 	progress.Size = p.Size / 1024
-	progress.Time = toNumber(p.Time)
-	progress.Bitrate = toNumber(p.Bitrate / 1024)
-	progress.Speed = toNumber(p.Speed)
+	progress.Time = ToNumber(p.Time)
+	progress.Bitrate = ToNumber(p.Bitrate / 1024)
+	progress.Speed = ToNumber(p.Speed)
 	progress.Drop = p.Drop
 	progress.Dup = p.Dup
 

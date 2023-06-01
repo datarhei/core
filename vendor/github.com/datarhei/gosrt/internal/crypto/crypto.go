@@ -23,10 +23,10 @@ type Crypto interface {
 
 	// UnmarshalMK unwraps the key with the passphrase in a Key Material Extension Message. If the passphrase
 	// is wrong an error is returned.
-	UnmarshalKM(km *packet.CIFKM, passphrase string) error
+	UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string) error
 
 	// MarshalKM wraps the key with the passphrase and the odd/even SEK for a Key Material Extension Message.
-	MarshalKM(km *packet.CIFKM, passphrase string, key packet.PacketEncryption) error
+	MarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string, key packet.PacketEncryption) error
 
 	// EncryptOrDecryptPayload encrypts or decrypts the data of a packet with an even or odd SEK and
 	// the sequence number.
@@ -64,15 +64,17 @@ func New(keyLength int) (Crypto, error) {
 		return nil, fmt.Errorf("crypto: can't generate salt: %w", err)
 	}
 
-	c.evenSEK = make([]byte, c.keyLength)
-	if err := c.GenerateSEK(packet.EvenKeyEncrypted); err != nil {
+	sek, err := c.generateSEK(c.keyLength)
+	if err != nil {
 		return nil, err
 	}
+	c.evenSEK = sek
 
-	c.oddSEK = make([]byte, c.keyLength)
-	if err := c.GenerateSEK(packet.OddKeyEncrypted); err != nil {
+	sek, err = c.generateSEK(c.keyLength)
+	if err != nil {
 		return nil, err
 	}
+	c.oddSEK = sek
 
 	return c, nil
 }
@@ -82,17 +84,29 @@ func (c *crypto) GenerateSEK(key packet.PacketEncryption) error {
 		return fmt.Errorf("crypto: unknown key type")
 	}
 
+	sek, err := c.generateSEK(c.keyLength)
+	if err != nil {
+		return err
+	}
+
 	if key == packet.EvenKeyEncrypted {
-		if err := c.prng(c.evenSEK); err != nil {
-			return fmt.Errorf("crypto: can't generate even key: %w", err)
-		}
+		c.evenSEK = sek
 	} else if key == packet.OddKeyEncrypted {
-		if err := c.prng(c.oddSEK); err != nil {
-			return fmt.Errorf("crypto: can't generate odd key: %w", err)
-		}
+		c.oddSEK = sek
 	}
 
 	return nil
+}
+
+func (c *crypto) generateSEK(keyLength int) ([]byte, error) {
+	sek := make([]byte, keyLength)
+
+	err := c.prng(sek)
+	if err != nil {
+		return nil, fmt.Errorf("crypto: can't generate SEK: %w", err)
+	}
+
+	return sek, nil
 }
 
 // ErrInvalidKey is returned when the packet encryption is invalid
@@ -101,7 +115,7 @@ var ErrInvalidKey = errors.New("crypto: invalid key for encryption. Must be even
 // ErrInvalidWrap is returned when the packet encryption indicates a different length of the wrapped key
 var ErrInvalidWrap = errors.New("crypto: the unwrapped key has the wrong length")
 
-func (c *crypto) UnmarshalKM(km *packet.CIFKM, passphrase string) error {
+func (c *crypto) UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string) error {
 	if km.KeyBasedEncryption == packet.UnencryptedPacket || !km.KeyBasedEncryption.IsValid() {
 		return ErrInvalidKey
 	}
@@ -110,7 +124,7 @@ func (c *crypto) UnmarshalKM(km *packet.CIFKM, passphrase string) error {
 		copy(c.salt, km.Salt)
 	}
 
-	kek := c.calculateKEK(passphrase)
+	kek := c.calculateKEK(passphrase, c.salt, c.keyLength)
 
 	unwrap, err := keywrap.Unwrap(kek, km.Wrap)
 	if err != nil {
@@ -138,7 +152,7 @@ func (c *crypto) UnmarshalKM(km *packet.CIFKM, passphrase string) error {
 	return nil
 }
 
-func (c *crypto) MarshalKM(km *packet.CIFKM, passphrase string, key packet.PacketEncryption) error {
+func (c *crypto) MarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string, key packet.PacketEncryption) error {
 	if key == packet.UnencryptedPacket || !key.IsValid() {
 		return ErrInvalidKey
 	}
@@ -176,7 +190,7 @@ func (c *crypto) MarshalKM(km *packet.CIFKM, passphrase string, key packet.Packe
 		copy(w[c.keyLength:], c.oddSEK)
 	}
 
-	kek := c.calculateKEK(passphrase)
+	kek := c.calculateKEK(passphrase, c.salt, c.keyLength)
 
 	wrap, err := keywrap.Wrap(kek, w)
 	if err != nil {
@@ -240,9 +254,9 @@ func (c *crypto) EncryptOrDecryptPayload(data []byte, key packet.PacketEncryptio
 }
 
 // calculateKEK calculates a KEK based on the passphrase.
-func (c *crypto) calculateKEK(passphrase string) []byte {
+func (c *crypto) calculateKEK(passphrase string, salt []byte, keyLength int) []byte {
 	// 6.1.4.  Key Encrypting Key (KEK)
-	return pbkdf2.Key([]byte(passphrase), c.salt[8:], 2048, c.keyLength, sha1.New)
+	return pbkdf2.Key([]byte(passphrase), salt[8:], 2048, keyLength, sha1.New)
 }
 
 // prng generates a random sequence of byte into the given slice p.

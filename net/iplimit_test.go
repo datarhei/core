@@ -12,10 +12,10 @@ func TestIPLimiterNew(t *testing.T) {
 	_, err = NewIPLimiter([]string{}, []string{})
 	require.Nil(t, err)
 
-	_, err = NewIPLimiter([]string{"::1/128", "127.0.0.1/32", ""}, []string{})
+	_, err = NewIPLimiter([]string{"::1/128", "127.0.0.1/32"}, []string{})
 	require.Nil(t, err)
 
-	_, err = NewIPLimiter([]string{}, []string{"::1/128", "127.0.0.1/32", ""})
+	_, err = NewIPLimiter([]string{}, []string{"::1/128", "127.0.0.1/32"})
 	require.Nil(t, err)
 }
 
@@ -26,10 +26,10 @@ func TestIPLimiterError(t *testing.T) {
 	require.Nil(t, err)
 
 	_, err = NewIPLimiter([]string{"::1"}, []string{})
-	require.NotNil(t, err, "Should not accept invalid IP")
+	require.Nil(t, err, "Should accept IP")
 
 	_, err = NewIPLimiter([]string{}, []string{"::1"})
-	require.NotNil(t, err, "Should not accept invalid IP")
+	require.Nil(t, err, "Should accept IP")
 }
 
 func TestIPLimiterInvalidIPs(t *testing.T) {
@@ -56,10 +56,4 @@ func TestIPLimiterBlocklist(t *testing.T) {
 
 	require.True(t, limiter.IsAllowed("127.0.0.1"), "Allowed IP should be allowed")
 	require.False(t, limiter.IsAllowed("::1"), "Unallowed IP shouldn't be allowed")
-}
-
-func TestNullIPLimiter(t *testing.T) {
-	limiter := NewNullIPLimiter()
-
-	require.True(t, limiter.IsAllowed("foobar"))
 }

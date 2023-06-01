@@ -12,7 +12,7 @@ import (
 type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
-	Limiter net.IPLimiter
+	Limiter net.IPLimitValidator
 }
 
 var DefaultConfig = Config{

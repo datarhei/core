@@ -17,16 +17,23 @@ import (
 //go:embed models.gotpl
 var modelTemplate string
 
-type BuildMutateHook = func(b *ModelBuild) *ModelBuild
+type (
+	BuildMutateHook = func(b *ModelBuild) *ModelBuild
+	FieldMutateHook = func(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error)
+)
 
-type FieldMutateHook = func(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error)
-
-// defaultFieldMutateHook is the default hook for the Plugin which applies the GoTagFieldHook.
-func defaultFieldMutateHook(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error) {
+// DefaultFieldMutateHook is the default hook for the Plugin which applies the GoFieldHook and GoTagFieldHook.
+func DefaultFieldMutateHook(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error) {
+	var err error
+	f, err = GoFieldHook(td, fd, f)
+	if err != nil {
+		return f, err
+	}
 	return GoTagFieldHook(td, fd, f)
 }
 
-func defaultBuildMutateHook(b *ModelBuild) *ModelBuild {
+// DefaultBuildMutateHook is the default hook for the Plugin which mutate ModelBuild.
+func DefaultBuildMutateHook(b *ModelBuild) *ModelBuild {
 	return b
 }
 
@@ -57,9 +64,10 @@ type Field struct {
 	// Name is the field's name as it appears in the schema
 	Name string
 	// GoName is the field's name as it appears in the generated Go code
-	GoName string
-	Type   types.Type
-	Tag    string
+	GoName    string
+	Type      types.Type
+	Tag       string
+	Omittable bool
 }
 
 type Enum struct {
@@ -75,8 +83,8 @@ type EnumValue struct {
 
 func New() plugin.Plugin {
 	return &Plugin{
-		MutateHook: defaultBuildMutateHook,
-		FieldHook:  defaultFieldMutateHook,
+		MutateHook: DefaultBuildMutateHook,
+		FieldHook:  DefaultFieldMutateHook,
 	}
 }
 
@@ -92,7 +100,6 @@ func (m *Plugin) Name() string {
 }
 
 func (m *Plugin) MutateConfig(cfg *config.Config) error {
-
 	b := &ModelBuild{
 		PackageName: cfg.Model.Package,
 	}
@@ -298,6 +305,8 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 	binder := cfg.NewBinder()
 	fields := make([]*Field, 0)
 
+	var omittableType types.Type
+
 	for _, field := range schemaType.Fields {
 		var typ types.Type
 		fieldDef := cfg.Schema.Types[field.Type.Name()]
@@ -365,7 +374,8 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 			GoName:      name,
 			Type:        typ,
 			Description: field.Description,
-			Tag:         `json:"` + field.Name + `"`,
+			Tag:         getStructTagFromField(field),
+			Omittable:   cfg.NullableInputOmittable && schemaType.Kind == ast.InputObject && !field.Type.NonNull,
 		}
 
 		if m.FieldHook != nil {
@@ -376,14 +386,42 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 			f = mf
 		}
 
+		if f.Omittable {
+			if schemaType.Kind != ast.InputObject || field.Type.NonNull {
+				return nil, fmt.Errorf("generror: field %v.%v: omittable is only applicable to nullable input fields", schemaType.Name, field.Name)
+			}
+
+			var err error
+
+			if omittableType == nil {
+				omittableType, err = binder.FindTypeFromName("github.com/99designs/gqlgen/graphql.Omittable")
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			f.Type, err = binder.InstantiateType(omittableType, []types.Type{f.Type})
+			if err != nil {
+				return nil, fmt.Errorf("generror: field %v.%v: %w", schemaType.Name, field.Name, err)
+			}
+		}
+
 		fields = append(fields, f)
 	}
 
 	return fields, nil
 }
 
-// GoTagFieldHook applies the goTag directive to the generated Field f. When applying the Tag to the field, the field
-// name is used when no value argument is present.
+func getStructTagFromField(field *ast.FieldDefinition) string {
+	if !field.Type.NonNull {
+		return `json:"` + field.Name + `,omitempty"`
+	}
+	return `json:"` + field.Name + `"`
+}
+
+// GoTagFieldHook prepends the goTag directive to the generated Field f.
+// When applying the Tag to the field, the field
+// name is used if no value argument is present.
 func GoTagFieldHook(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error) {
 	args := make([]string, 0)
 	for _, goTag := range fd.Directives.ForNames("goTag") {
@@ -406,9 +444,117 @@ func GoTagFieldHook(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Fie
 	}
 
 	if len(args) > 0 {
-		f.Tag = f.Tag + " " + strings.Join(args, " ")
+		f.Tag = removeDuplicateTags(f.Tag + " " + strings.Join(args, " "))
 	}
 
+	return f, nil
+}
+
+// splitTagsBySpace split tags by space, except when space is inside quotes
+func splitTagsBySpace(tagsString string) []string {
+	var tags []string
+	var currentTag string
+	inQuotes := false
+
+	for _, c := range tagsString {
+		if c == '"' {
+			inQuotes = !inQuotes
+		}
+		if c == ' ' && !inQuotes {
+			tags = append(tags, currentTag)
+			currentTag = ""
+		} else {
+			currentTag += string(c)
+		}
+	}
+	tags = append(tags, currentTag)
+
+	return tags
+}
+
+// containsInvalidSpace checks if the tagsString contains invalid space
+func containsInvalidSpace(valuesString string) bool {
+	// get rid of quotes
+	valuesString = strings.ReplaceAll(valuesString, "\"", "")
+	if strings.Contains(valuesString, ",") {
+		// split by comma,
+		values := strings.Split(valuesString, ",")
+		for _, value := range values {
+			if strings.TrimSpace(value) != value {
+				return true
+			}
+		}
+		return false
+	}
+	if strings.Contains(valuesString, ";") {
+		// split by semicolon, which is common in gorm
+		values := strings.Split(valuesString, ";")
+		for _, value := range values {
+			if strings.TrimSpace(value) != value {
+				return true
+			}
+		}
+		return false
+	}
+	// single value
+	if strings.TrimSpace(valuesString) != valuesString {
+		return true
+	}
+	return false
+}
+
+func removeDuplicateTags(t string) string {
+	processed := make(map[string]bool)
+	tt := splitTagsBySpace(t)
+	returnTags := ""
+
+	// iterate backwards through tags so appended goTag directives are prioritized
+	for i := len(tt) - 1; i >= 0; i-- {
+		ti := tt[i]
+		// check if ti contains ":", and not contains any empty space. if not, tag is in wrong format
+		// correct example: json:"name"
+		if !strings.Contains(ti, ":") {
+			panic(fmt.Errorf("wrong format of tags: %s. goTag directive should be in format: @goTag(key: \"something\", value:\"value\"), ", t))
+		}
+
+		kv := strings.Split(ti, ":")
+		if len(kv) == 0 || processed[kv[0]] {
+			continue
+		}
+
+		processed[kv[0]] = true
+		if len(returnTags) > 0 {
+			returnTags = " " + returnTags
+		}
+
+		isContained := containsInvalidSpace(kv[1])
+		if isContained {
+			panic(fmt.Errorf("tag value should not contain any leading or trailing spaces: %s", kv[1]))
+		}
+
+		returnTags = kv[0] + ":" + kv[1] + returnTags
+	}
+
+	return returnTags
+}
+
+// GoFieldHook applies the goField directive to the generated Field f.
+func GoFieldHook(td *ast.Definition, fd *ast.FieldDefinition, f *Field) (*Field, error) {
+	args := make([]string, 0)
+	_ = args
+	for _, goField := range fd.Directives.ForNames("goField") {
+		if arg := goField.Arguments.ForName("name"); arg != nil {
+			if k, err := arg.Value.Value(nil); err == nil {
+				f.GoName = k.(string)
+			}
+		}
+
+		if arg := goField.Arguments.ForName("omittable"); arg != nil {
+			if k, err := arg.Value.Value(nil); err == nil {
+				f.Omittable = k.(bool)
+			}
+		}
+	}
 	return f, nil
 }
 

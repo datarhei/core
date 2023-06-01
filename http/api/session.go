@@ -43,8 +43,8 @@ func (s *Session) Unmarshal(sess session.Session) {
 	s.Extra = sess.Extra
 	s.RxBytes = sess.RxBytes
 	s.TxBytes = sess.TxBytes
-	s.RxBitrate = toNumber(sess.RxBitrate / 1024)
-	s.TxBitrate = toNumber(sess.TxBitrate / 1024)
+	s.RxBitrate = ToNumber(sess.RxBitrate / 1024)
+	s.TxBitrate = ToNumber(sess.TxBitrate / 1024)
 }
 
 // SessionSummaryActive represents the currently active sessions
@@ -81,12 +81,12 @@ type SessionsActive map[string][]Session
 // Unmarshal creates a new SessionSummary from a session.Summary
 func (summary *SessionSummary) Unmarshal(sum session.Summary) {
 	summary.Active.MaxSessions = sum.MaxSessions
-	summary.Active.MaxRxBitrate = toNumber(sum.MaxRxBitrate / 1024 / 1024)
-	summary.Active.MaxTxBitrate = toNumber(sum.MaxTxBitrate / 1024 / 1024)
+	summary.Active.MaxRxBitrate = ToNumber(sum.MaxRxBitrate / 1024 / 1024)
+	summary.Active.MaxTxBitrate = ToNumber(sum.MaxTxBitrate / 1024 / 1024)
 
 	summary.Active.Sessions = sum.CurrentSessions
-	summary.Active.RxBitrate = toNumber(sum.CurrentRxBitrate / 1024 / 1024)
-	summary.Active.TxBitrate = toNumber(sum.CurrentTxBitrate / 1024 / 1024)
+	summary.Active.RxBitrate = ToNumber(sum.CurrentRxBitrate / 1024 / 1024)
+	summary.Active.TxBitrate = ToNumber(sum.CurrentTxBitrate / 1024 / 1024)
 
 	summary.Active.SessionList = make([]Session, len(sum.Active))
 

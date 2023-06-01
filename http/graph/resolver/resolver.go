@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/graph/models"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/restream"
@@ -20,9 +21,10 @@ type Resolver struct {
 	Restream  restream.Restreamer
 	Monitor   monitor.HistoryReader
 	LogBuffer log.BufferWriter
+	IAM       iam.IAM
 }
 
-func (r *queryResolver) getProcess(id string) (*models.Process, error) {
+func (r *queryResolver) getProcess(id restream.TaskID) (*models.Process, error) {
 	process, err := r.Restream.GetProcess(id)
 	if err != nil {
 		return nil, err
@@ -86,3 +88,5 @@ func (r *queryResolver) playoutRequest(method, addr, path, contentType string, d
 
 	return data, nil
 }
+
+type GraphKey string

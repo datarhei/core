@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/config"
 	configstore "github.com/datarhei/core/v16/config/store"
 	configvars "github.com/datarhei/core/v16/config/vars"
@@ -24,8 +25,10 @@ import (
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
-	"github.com/datarhei/core/v16/http/jwt"
 	"github.com/datarhei/core/v16/http/router"
+	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
+	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/math/rand"
@@ -36,7 +39,9 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/datarhei/core/v16/restream/rewrite"
 	restreamstore "github.com/datarhei/core/v16/restream/store"
+	restreamjsonstore "github.com/datarhei/core/v16/restream/store/json"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
@@ -70,23 +75,25 @@ type API interface {
 }
 
 type api struct {
-	restream      restream.Restreamer
-	ffmpeg        ffmpeg.FFmpeg
-	diskfs        fs.Filesystem
-	memfs         fs.Filesystem
-	s3fs          map[string]fs.Filesystem
-	rtmpserver    rtmp.Server
-	srtserver     srt.Server
-	metrics       monitor.HistoryMonitor
-	prom          prometheus.Metrics
-	service       service.Service
-	sessions      session.Registry
-	cache         cache.Cacher
-	mainserver    *gohttp.Server
-	sidecarserver *gohttp.Server
-	httpjwt       jwt.JWT
-	update        update.Checker
-	replacer      replace.Replacer
+	restream        restream.Restreamer
+	ffmpeg          ffmpeg.FFmpeg
+	diskfs          fs.Filesystem
+	memfs           fs.Filesystem
+	s3fs            map[string]fs.Filesystem
+	rtmpserver      rtmp.Server
+	srtserver       srt.Server
+	metrics         monitor.HistoryMonitor
+	prom            prometheus.Metrics
+	service         service.Service
+	sessions        session.Registry
+	sessionsLimiter net.IPLimiter
+	cache           cache.Cacher
+	mainserver      *gohttp.Server
+	sidecarserver   *gohttp.Server
+	update          update.Checker
+	replacer        replace.Replacer
+	cluster         cluster.Cluster
+	iam             iam.IAM
 
 	errorChan chan error
 
@@ -341,6 +348,8 @@ func (a *api) start() error {
 			return fmt.Errorf("incorret IP ranges for the statistics provided: %w", err)
 		}
 
+		a.sessionsLimiter = iplimiter
+
 		config := session.CollectorConfig{
 			MaxTxBitrate:    cfg.Sessions.MaxBitrate * 1024 * 1024,
 			MaxSessions:     cfg.Sessions.MaxSessions,
@@ -403,6 +412,249 @@ func (a *api) start() error {
 	} else {
 		sessions, _ := session.New(session.Config{})
 		a.sessions = sessions
+	}
+
+	if cfg.Cluster.Enable {
+		scheme := "http://"
+		address := cfg.Address
+
+		if cfg.TLS.Enable {
+			scheme = "https://"
+			address = cfg.TLS.Address
+		}
+
+		host, port, err := gonet.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("invalid core address: %s: %w", address, err)
+		}
+
+		if len(host) == 0 {
+			chost, _, err := gonet.SplitHostPort(cfg.Cluster.Address)
+			if err != nil {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			if len(chost) == 0 {
+				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
+			}
+
+			host = chost
+		}
+
+		peers := []cluster.Peer{}
+
+		for _, p := range cfg.Cluster.Peers {
+			id, address, found := strings.Cut(p, "@")
+			if !found {
+				continue
+			}
+
+			peers = append(peers, cluster.Peer{
+				ID:      id,
+				Address: address,
+			})
+		}
+
+		cluster, err := cluster.New(cluster.ClusterConfig{
+			ID:              cfg.ID,
+			Name:            cfg.Name,
+			Path:            filepath.Join(cfg.DB.Dir, "cluster"),
+			Bootstrap:       cfg.Cluster.Bootstrap,
+			Recover:         cfg.Cluster.Recover,
+			Address:         cfg.Cluster.Address,
+			Peers:           peers,
+			CoreAPIAddress:  scheme + gonet.JoinHostPort(host, port),
+			CoreAPIUsername: cfg.API.Auth.Username,
+			CoreAPIPassword: cfg.API.Auth.Password,
+			IPLimiter:       a.sessionsLimiter,
+			Logger:          a.log.logger.core.WithComponent("Cluster"),
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create cluster: %w", err)
+		}
+
+		a.cluster = cluster
+	}
+
+	{
+		superuser := iamidentity.User{
+			Name:      cfg.API.Auth.Username,
+			Superuser: true,
+			Auth: iamidentity.UserAuth{
+				API: iamidentity.UserAuthAPI{
+					Auth0: iamidentity.UserAuthAPIAuth0{},
+				},
+				Services: iamidentity.UserAuthServices{
+					Token: []string{
+						cfg.RTMP.Token,
+						cfg.SRT.Token,
+					},
+				},
+			},
+		}
+
+		if cfg.API.Auth.Enable {
+			superuser.Auth.API.Password = cfg.API.Auth.Password
+		}
+
+		if cfg.API.Auth.Auth0.Enable {
+			superuser.Auth.API.Auth0.User = cfg.API.Auth.Auth0.Tenants[0].Users[0]
+			superuser.Auth.API.Auth0.Tenant = iamidentity.Auth0Tenant{
+				Domain:   cfg.API.Auth.Auth0.Tenants[0].Domain,
+				Audience: cfg.API.Auth.Auth0.Tenants[0].Audience,
+				ClientID: cfg.API.Auth.Auth0.Tenants[0].ClientID,
+			}
+		}
+
+		secret := rand.String(32)
+		if len(cfg.API.Auth.JWT.Secret) != 0 {
+			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
+		}
+
+		var manager iam.IAM = nil
+
+		if a.cluster != nil {
+			var err error = nil
+			manager, err = a.cluster.IAM(superuser, "datarhei-core", secret)
+			if err != nil {
+				return err
+			}
+		} else {
+			rfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+				Root: filepath.Join(cfg.DB.Dir, "iam"),
+			})
+			if err != nil {
+				return err
+			}
+
+			policyAdapter, err := iamaccess.NewJSONAdapter(rfs, "./policy.json", nil)
+			if err != nil {
+				return err
+			}
+
+			identityAdapter, err := iamidentity.NewJSONAdapter(rfs, "./users.json", nil)
+			if err != nil {
+				return err
+			}
+
+			manager, err = iam.New(iam.Config{
+				PolicyAdapter:   policyAdapter,
+				IdentityAdapter: identityAdapter,
+				Superuser:       superuser,
+				JWTRealm:        "datarhei-core",
+				JWTSecret:       secret,
+				Logger:          a.log.logger.core.WithComponent("IAM"),
+			})
+			if err != nil {
+				return fmt.Errorf("iam: %w", err)
+			}
+
+			// Check if there are already file created by IAM. If not, create policies
+			// and users based on the config in order to mimic the behaviour before IAM.
+			if len(rfs.List("/", fs.ListOptions{Pattern: "/*.json"})) == 0 {
+				policies := []iamaccess.Policy{
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "fs:/**",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
+					},
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "api:/api",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
+					},
+					{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "api:/api/v3/widget/process/**",
+						Actions:  []string{"GET", "HEAD", "OPTIONS"},
+					},
+				}
+
+				users := map[string]iamidentity.User{}
+
+				if cfg.Storage.Memory.Auth.Enable && cfg.Storage.Memory.Auth.Username != superuser.Name {
+					users[cfg.Storage.Memory.Auth.Username] = iamidentity.User{
+						Name: cfg.Storage.Memory.Auth.Username,
+						Auth: iamidentity.UserAuth{
+							Services: iamidentity.UserAuthServices{
+								Basic: []string{cfg.Storage.Memory.Auth.Password},
+							},
+						},
+					}
+
+					policies = append(policies, iamaccess.Policy{
+						Name:     cfg.Storage.Memory.Auth.Username,
+						Domain:   "$none",
+						Resource: "fs:/memfs/**",
+						Actions:  []string{"ANY"},
+					})
+				}
+
+				for _, s := range cfg.Storage.S3 {
+					if s.Auth.Enable && s.Auth.Username != superuser.Name {
+						user, ok := users[s.Auth.Username]
+						if !ok {
+							users[s.Auth.Username] = iamidentity.User{
+								Name: s.Auth.Username,
+								Auth: iamidentity.UserAuth{
+									Services: iamidentity.UserAuthServices{
+										Basic: []string{s.Auth.Password},
+									},
+								},
+							}
+						} else {
+							user.Auth.Services.Basic = append(user.Auth.Services.Basic, s.Auth.Password)
+							users[s.Auth.Username] = user
+						}
+
+						policies = append(policies, iamaccess.Policy{
+							Name:     s.Auth.Username,
+							Domain:   "$none",
+							Resource: "fs:" + s.Mountpoint + "/**",
+							Actions:  []string{"ANY"},
+						})
+					}
+				}
+
+				if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
+					policies = append(policies, iamaccess.Policy{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "rtmp:/**",
+						Actions:  []string{"ANY"},
+					})
+				}
+
+				if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
+					policies = append(policies, iamaccess.Policy{
+						Name:     "$anon",
+						Domain:   "$none",
+						Resource: "srt:**",
+						Actions:  []string{"ANY"},
+					})
+				}
+
+				for _, user := range users {
+					if _, err := manager.GetIdentity(user.Name); err == nil {
+						continue
+					}
+
+					err := manager.CreateIdentity(user)
+					if err != nil {
+						return fmt.Errorf("iam: %w", err)
+					}
+				}
+
+				for _, policy := range policies {
+					manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
+				}
+			}
+		}
+
+		a.iam = manager
 	}
 
 	diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
@@ -539,6 +791,35 @@ func (a *api) start() error {
 
 	a.ffmpeg = ffmpeg
 
+	var rw rewrite.Rewriter
+
+	{
+		baseAddress := func(address string) string {
+			var base string
+			host, port, _ := gonet.SplitHostPort(address)
+			if len(host) == 0 {
+				base = "localhost:" + port
+			} else {
+				base = address
+			}
+
+			return base
+		}
+
+		httpBase := baseAddress(cfg.Address)
+		rtmpBase := baseAddress(cfg.RTMP.Address) + cfg.RTMP.App
+		srtBase := baseAddress(cfg.SRT.Address)
+
+		rw, err = rewrite.New(rewrite.Config{
+			HTTPBase: "http://" + httpBase,
+			RTMPBase: "rtmp://" + rtmpBase,
+			SRTBase:  "srt://" + srtBase,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create url rewriter: %w", err)
+		}
+	}
+
 	a.replacer = replace.New()
 
 	{
@@ -568,20 +849,63 @@ func (a *api) start() error {
 		}, nil)
 
 		a.replacer.RegisterReplaceFunc("memfs", func(params map[string]string, config *restreamapp.Config, section string) string {
-			return a.memfs.Metadata("base")
+			u, _ := url.Parse(a.memfs.Metadata("base"))
+
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			}
+
+			return u.String()
 		}, nil)
 
 		a.replacer.RegisterReplaceFunc("fs:mem", func(params map[string]string, config *restreamapp.Config, section string) string {
-			return a.memfs.Metadata("base")
+			u, _ := url.Parse(a.memfs.Metadata("base"))
+
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			}
+
+			return u.String()
 		}, nil)
 
 		for name, s3 := range a.s3fs {
+			s3 := s3
 			a.replacer.RegisterReplaceFunc("fs:"+name, func(params map[string]string, config *restreamapp.Config, section string) string {
-				return s3.Metadata("base")
+				u, _ := url.Parse(s3.Metadata("base"))
+
+				var identity iamidentity.Verifier = nil
+
+				if len(config.Owner) == 0 {
+					identity = a.iam.GetDefaultVerifier()
+				} else {
+					identity, _ = a.iam.GetVerifier(config.Owner)
+				}
+
+				if identity != nil {
+					u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+				}
+
+				return u.String()
 			}, nil)
 		}
 
-		a.replacer.RegisterReplaceFunc("rtmp", func(params map[string]string, bla *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("rtmp", func(params map[string]string, config *restreamapp.Config, section string) string {
 			host, port, _ := gonet.SplitHostPort(cfg.RTMP.Address)
 			if len(host) == 0 {
 				host = "localhost"
@@ -593,8 +917,16 @@ func (a *api) start() error {
 			}
 			template += "/" + params["name"]
 
-			if len(cfg.RTMP.Token) != 0 {
-				template += "?token=" + cfg.RTMP.Token
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
+			} else {
+				identity, _ = a.iam.GetVerifier(config.Owner)
+			}
+
+			if identity != nil {
+				template += "/" + identity.GetServiceToken()
 			}
 
 			return template
@@ -602,7 +934,7 @@ func (a *api) start() error {
 			"name": "",
 		})
 
-		a.replacer.RegisterReplaceFunc("srt", func(params map[string]string, bla *restreamapp.Config, section string) string {
+		a.replacer.RegisterReplaceFunc("srt", func(params map[string]string, config *restreamapp.Config, section string) string {
 			host, port, _ = gonet.SplitHostPort(cfg.SRT.Address)
 			if len(host) == 0 {
 				host = "localhost"
@@ -611,14 +943,22 @@ func (a *api) start() error {
 			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency=" + params["latency"] + "&streamid=" + params["name"]
 			if section == "output" {
 				template += ",mode:publish"
+			}
+
+			var identity iamidentity.Verifier = nil
+
+			if len(config.Owner) == 0 {
+				identity = a.iam.GetDefaultVerifier()
 			} else {
-				template += ",mode:request"
+				identity, _ = a.iam.GetVerifier(config.Owner)
 			}
-			if len(cfg.SRT.Token) != 0 {
-				template += ",token:" + cfg.SRT.Token
+
+			if identity != nil {
+				template += ",token:" + identity.GetServiceToken()
 			}
+
 			if len(cfg.SRT.Passphrase) != 0 {
-				template += "&passphrase=" + cfg.SRT.Passphrase
+				template += "&passphrase=" + url.QueryEscape(cfg.SRT.Passphrase)
 			}
 
 			return template
@@ -646,7 +986,7 @@ func (a *api) start() error {
 		if err != nil {
 			return err
 		}
-		store, err = restreamstore.NewJSON(restreamstore.JSONConfig{
+		store, err = restreamjsonstore.New(restreamjsonstore.Config{
 			Filesystem: fs,
 			Filepath:   "/db.json",
 			Logger:     a.log.logger.core.WithComponent("ProcessStore"),
@@ -662,10 +1002,12 @@ func (a *api) start() error {
 		Store:        store,
 		Filesystems:  filesystems,
 		Replace:      a.replacer,
+		Rewrite:      rw,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
 		MaxCPU:       cfg.Resources.MaxCPUUsage,
 		MaxMemory:    cfg.Resources.MaxMemoryUsage,
+		IAM:          a.iam,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 
@@ -674,48 +1016,6 @@ func (a *api) start() error {
 	}
 
 	a.restream = restream
-
-	var httpjwt jwt.JWT
-
-	if cfg.API.Auth.Enable {
-		secret := rand.String(32)
-		if len(cfg.API.Auth.JWT.Secret) != 0 {
-			secret = cfg.API.Auth.Username + cfg.API.Auth.Password + cfg.API.Auth.JWT.Secret
-		}
-
-		var err error
-		httpjwt, err = jwt.New(jwt.Config{
-			Realm:         app.Name,
-			Secret:        secret,
-			SkipLocalhost: cfg.API.Auth.DisableLocalhost,
-		})
-
-		if err != nil {
-			return fmt.Errorf("unable to create JWT provider: %w", err)
-		}
-
-		if validator, err := jwt.NewLocalValidator(cfg.API.Auth.Username, cfg.API.Auth.Password); err == nil {
-			if err := httpjwt.AddValidator(app.Name, validator); err != nil {
-				return fmt.Errorf("unable to add local JWT validator: %w", err)
-			}
-		} else {
-			return fmt.Errorf("unable to create local JWT validator: %w", err)
-		}
-
-		if cfg.API.Auth.Auth0.Enable {
-			for _, t := range cfg.API.Auth.Auth0.Tenants {
-				if validator, err := jwt.NewAuth0Validator(t.Domain, t.Audience, t.ClientID, t.Users); err == nil {
-					if err := httpjwt.AddValidator("https://"+t.Domain+"/", validator); err != nil {
-						return fmt.Errorf("unable to add Auth0 JWT validator: %w", err)
-					}
-				} else {
-					return fmt.Errorf("unable to create Auth0 JWT validator: %w", err)
-				}
-			}
-		}
-	}
-
-	a.httpjwt = httpjwt
 
 	metrics, err := monitor.NewHistory(monitor.HistoryConfig{
 		Enable:    cfg.Metrics.Enable,
@@ -835,7 +1135,7 @@ func (a *api) start() error {
 			}
 
 			certmagic.Default.Storage = &certmagic.FileStorage{
-				Path: cfg.DB.Dir + "/cert",
+				Path: filepath.Join(cfg.DB.Dir, "cert"),
 			}
 			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
 			certmagic.Default.Logger = zap.NewNop()
@@ -938,6 +1238,11 @@ func (a *api) start() error {
 			Token:     cfg.RTMP.Token,
 			Logger:    a.log.logger.rtmp,
 			Collector: a.sessions.Collector("rtmp"),
+			IAM:       a.iam,
+		}
+
+		if a.cluster != nil {
+			config.Proxy = a.cluster.ProxyReader()
 		}
 
 		if cfg.RTMP.EnableTLS {
@@ -966,6 +1271,11 @@ func (a *api) start() error {
 			Token:      cfg.SRT.Token,
 			Logger:     a.log.logger.core.WithComponent("SRT").WithField("address", cfg.SRT.Address),
 			Collector:  a.sessions.Collector("srt"),
+			IAM:        a.iam,
+		}
+
+		if a.cluster != nil {
+			config.Proxy = a.cluster.ProxyReader()
 		}
 
 		if cfg.SRT.Log.Enable {
@@ -986,7 +1296,7 @@ func (a *api) start() error {
 		logcontext = "HTTPS"
 	}
 
-	var iplimiter net.IPLimiter
+	var iplimiter net.IPLimitValidator
 
 	if cfg.TLS.Enable {
 		limiter, err := net.NewIPLimiter(cfg.API.Access.HTTPS.Block, cfg.API.Access.HTTPS.Allow)
@@ -1072,11 +1382,28 @@ func (a *api) start() error {
 		},
 		RTMP:     a.rtmpserver,
 		SRT:      a.srtserver,
-		JWT:      a.httpjwt,
 		Config:   a.config.store,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,
+		Cluster:  a.cluster,
+		IAM:      a.iam,
+		IAMSkipper: func(ip string) bool {
+			if !cfg.API.Auth.Enable {
+				return true
+			} else {
+				isLocalhost := false
+				if ip == "127.0.0.1" || ip == "::1" {
+					isLocalhost = true
+				}
+
+				if isLocalhost && cfg.API.Auth.DisableLocalhost {
+					return true
+				}
+			}
+
+			return false
+		},
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)
@@ -1371,9 +1698,13 @@ func (a *api) stop() {
 		return
 	}
 
-	// Stop JWT authentication
-	if a.httpjwt != nil {
-		a.httpjwt.ClearValidators()
+	if a.cluster != nil {
+		a.cluster.Leave("", "")
+		a.cluster.Shutdown()
+	}
+
+	if a.iam != nil {
+		a.iam.Close()
 	}
 
 	if a.update != nil {

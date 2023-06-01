@@ -11,7 +11,7 @@ import (
 	"github.com/datarhei/core/v16/io/file"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/restream/store"
+	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/Masterminds/semver/v3"
 	_ "github.com/joho/godotenv/autoload"
@@ -120,7 +120,7 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 	logger.Info().WithField("backup", backupFilepath).Log("Backup created")
 
 	// Load the existing DB
-	datastore, err := store.NewJSON(store.JSONConfig{
+	datastore, err := jsonstore.New(jsonstore.Config{
 		Filepath: cfg.DB.Dir + "/db.json",
 	})
 	if err != nil {
@@ -135,31 +135,33 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 
 	logger.Info().Log("Migrating processes ...")
 
-	// Migrate the processes to version 5
+	// Migrate the processes to FFmpeg version 5
 	// Only this happens:
 	// - for RTSP inputs, replace -stimeout with -timeout
 
 	reRTSP := regexp.MustCompile(`^rtsps?://`)
-	for id, p := range data.Process {
-		logger.Info().WithField("processid", p.ID).Log("")
+	for name, domain := range data.Process {
+		for id, p := range domain {
+			logger.Info().WithField("processid", p.Process.ID).Log("")
 
-		for index, input := range p.Config.Input {
-			if !reRTSP.MatchString(input.Address) {
-				continue
-			}
-
-			for i, o := range input.Options {
-				if o != "-stimeout" {
+			for index, input := range p.Process.Config.Input {
+				if !reRTSP.MatchString(input.Address) {
 					continue
 				}
 
-				input.Options[i] = "-timeout"
-			}
+				for i, o := range input.Options {
+					if o != "-stimeout" {
+						continue
+					}
 
-			p.Config.Input[index] = input
+					input.Options[i] = "-timeout"
+				}
+
+				p.Process.Config.Input[index] = input
+			}
+			p.Process.Config.FFVersion = version.String()
+			data.Process[name][id] = p
 		}
-		p.Config.FFVersion = version.String()
-		data.Process[id] = p
 	}
 
 	logger.Info().Log("Migrating processes done")

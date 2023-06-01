@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func toNumber(f float64) json.Number {
+func ToNumber(f float64) json.Number {
 	var s string
 
 	if f == float64(int64(f)) {

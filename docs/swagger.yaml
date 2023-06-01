@@ -65,6 +65,112 @@ definitions:
       version:
         $ref: '#/definitions/api.Version'
     type: object
+  api.ClusterAbout:
+    properties:
+      address:
+        type: string
+      cluster_api_address:
+        type: string
+      core_api_address:
+        type: string
+      id:
+        type: string
+      server:
+        items:
+          $ref: '#/definitions/api.ClusterServer'
+        type: array
+      stats:
+        $ref: '#/definitions/api.ClusterStats'
+    type: object
+  api.ClusterNode:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      last_contact:
+        description: unix timestamp
+        type: integer
+      latency_ms:
+        description: milliseconds
+        type: number
+      name:
+        type: string
+      resources:
+        $ref: '#/definitions/api.ClusterNodeResources'
+      state:
+        type: string
+      uptime_seconds:
+        type: integer
+    type: object
+  api.ClusterNodeFiles:
+    properties:
+      files:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
+      last_update:
+        description: unix timestamp
+        type: integer
+    type: object
+  api.ClusterNodeResources:
+    properties:
+      cpu_limit:
+        description: percent 0-100*npcu
+        type: number
+      cpu_used:
+        description: percent 0-100*npcu
+        type: number
+      memory_limit_bytes:
+        type: integer
+      memory_used_bytes:
+        type: integer
+      ncpu:
+        type: number
+    type: object
+  api.ClusterProcess:
+    properties:
+      cpu:
+        type: number
+      id:
+        type: string
+      memory_bytes:
+        type: integer
+      node_id:
+        type: string
+      order:
+        type: string
+      reference:
+        type: string
+      runtime_seconds:
+        type: integer
+      state:
+        type: string
+    type: object
+  api.ClusterServer:
+    properties:
+      address:
+        type: string
+      id:
+        type: string
+      leader:
+        type: boolean
+      voter:
+        type: boolean
+    type: object
+  api.ClusterStats:
+    properties:
+      last_contact_ms:
+        type: number
+      num_peers:
+        type: integer
+      state:
+        type: string
+    type: object
   api.Command:
     properties:
       command:
@@ -134,6 +240,23 @@ definitions:
                 type: string
             type: object
           read_only:
+            type: boolean
+        type: object
+      cluster:
+        properties:
+          address:
+            type: string
+          bootstrap:
+            type: boolean
+          debug:
+            type: boolean
+          enable:
+            type: boolean
+          peers:
+            items:
+              type: string
+            type: array
+          recover:
             type: boolean
         type: object
       created_at:
@@ -293,6 +416,7 @@ definitions:
           enable_tls:
             type: boolean
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       service:
@@ -345,6 +469,7 @@ definitions:
           passphrase:
             type: string
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       storage:
@@ -392,12 +517,16 @@ definitions:
           memory:
             properties:
               auth:
+                description: Deprecated, use IAM
                 properties:
                   enable:
+                    description: Deprecated, use IAM
                     type: boolean
                   password:
+                    description: Deprecated, use IAM
                     type: string
                   username:
+                    description: Deprecated, use IAM
                     type: string
                 type: object
               max_size_mbytes:
@@ -521,6 +650,21 @@ definitions:
     required:
     - operation
     type: object
+  api.GetConfig:
+    properties:
+      config:
+        $ref: '#/definitions/api.ConfigData'
+      created_at:
+        type: string
+      loaded_at:
+        type: string
+      overrides:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
   api.GraphQuery:
     properties:
       query:
@@ -534,30 +678,75 @@ definitions:
         items: {}
         type: array
     type: object
-  api.JWT:
+  api.IAMAuth0Tenant:
     properties:
-      access_token:
+      audience:
         type: string
-      refresh_token:
+      client_id:
+        type: string
+      domain:
         type: string
     type: object
-  api.JWTRefresh:
+  api.IAMPolicy:
     properties:
-      access_token:
+      actions:
+        items:
+          type: string
+        type: array
+      domain:
         type: string
+      name:
+        type: string
+      resource:
+        type: string
+    type: object
+  api.IAMUser:
+    properties:
+      auth:
+        $ref: '#/definitions/api.IAMUserAuth'
+      name:
+        type: string
+      policies:
+        items:
+          $ref: '#/definitions/api.IAMPolicy'
+        type: array
+      superuser:
+        type: boolean
+    type: object
+  api.IAMUserAuth:
+    properties:
+      api:
+        $ref: '#/definitions/api.IAMUserAuthAPI'
+      services:
+        $ref: '#/definitions/api.IAMUserAuthServices'
+    type: object
+  api.IAMUserAuthAPI:
+    properties:
+      auth0:
+        $ref: '#/definitions/api.IAMUserAuthAPIAuth0'
+      userpass:
+        type: string
+    type: object
+  api.IAMUserAuthAPIAuth0:
+    properties:
+      tenant:
+        $ref: '#/definitions/api.IAMAuth0Tenant'
+      user:
+        type: string
+    type: object
+  api.IAMUserAuthServices:
+    properties:
+      basic:
+        items:
+          type: string
+        type: array
+      token:
+        items:
+          type: string
+        type: array
     type: object
   api.LogEvent:
     additionalProperties: true
-    type: object
-  api.Login:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
     type: object
   api.MetricsDescription:
     properties:
@@ -774,6 +963,8 @@ definitions:
     properties:
       autostart:
         type: boolean
+      domain:
+        type: string
       id:
         type: string
       input:
@@ -794,6 +985,8 @@ definitions:
         items:
           $ref: '#/definitions/api.ProcessConfigIO'
         type: array
+      owner:
+        type: string
       reconnect:
         type: boolean
       reconnect_delay_seconds:
@@ -1126,7 +1319,7 @@ definitions:
       name:
         type: string
     type: object
-  api.SRTChannels:
+  api.SRTChannel:
     properties:
       connections:
         additionalProperties:
@@ -1138,16 +1331,14 @@ definitions:
             $ref: '#/definitions/api.SRTLog'
           type: array
         type: object
-      publisher:
-        additionalProperties:
-          type: integer
-        type: object
+      name:
+        type: string
+      socketid:
+        type: integer
       subscriber:
-        additionalProperties:
-          items:
-            type: integer
-          type: array
-        type: object
+        items:
+          type: integer
+        type: array
     type: object
   api.SRTConnection:
     properties:
@@ -1575,6 +1766,23 @@ definitions:
           read_only:
             type: boolean
         type: object
+      cluster:
+        properties:
+          address:
+            type: string
+          bootstrap:
+            type: boolean
+          debug:
+            type: boolean
+          enable:
+            type: boolean
+          peers:
+            items:
+              type: string
+            type: array
+          recover:
+            type: boolean
+        type: object
       created_at:
         description: When this config has been persisted
         type: string
@@ -1732,6 +1940,7 @@ definitions:
           enable_tls:
             type: boolean
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       service:
@@ -1784,6 +1993,7 @@ definitions:
           passphrase:
             type: string
           token:
+            description: Deprecated, use IAM
             type: string
         type: object
       storage:
@@ -1831,12 +2041,16 @@ definitions:
           memory:
             properties:
               auth:
+                description: Deprecated, use IAM
                 properties:
                   enable:
+                    description: Deprecated, use IAM
                     type: boolean
                   password:
+                    description: Deprecated, use IAM
                     type: string
                   username:
+                    description: Deprecated, use IAM
                     type: string
                 type: object
               max_size_mbytes:
@@ -2045,21 +2259,6 @@ definitions:
       uptime:
         type: integer
     type: object
-  github_com_datarhei_core_v16_http_api.Config:
-    properties:
-      config:
-        $ref: '#/definitions/api.ConfigData'
-      created_at:
-        type: string
-      loaded_at:
-        type: string
-      overrides:
-        items:
-          type: string
-        type: array
-      updated_at:
-        type: string
-    type: object
   value.Auth0Tenant:
     properties:
       audience:
@@ -2078,7 +2277,9 @@ definitions:
       access_key_id:
         type: string
       auth:
-        $ref: '#/definitions/value.S3StorageAuth'
+        allOf:
+        - $ref: '#/definitions/value.S3StorageAuth'
+        description: Deprecated, use IAM
       bucket:
         type: string
       endpoint:
@@ -2097,10 +2298,13 @@ definitions:
   value.S3StorageAuth:
     properties:
       enable:
+        description: Deprecated, use IAM
         type: boolean
       password:
+        description: Deprecated, use IAM
         type: string
       username:
+        description: Deprecated, use IAM
         type: string
     type: object
 info:
@@ -2169,58 +2373,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Query the GraphAPI
-  /api/login:
-    post:
-      description: Retrieve valid JWT access and refresh tokens to use for accessing
-        the API. Login either by username/password or Auth0 token
-      operationId: jwt-login
-      parameters:
-      - description: Login data
-        in: body
-        name: data
-        required: true
-        schema:
-          $ref: '#/definitions/api.Login'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.JWT'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.Error'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.Error'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - Auth0KeyAuth: []
-      summary: Retrieve an access and a refresh token
-  /api/login/refresh:
-    get:
-      description: Retrieve a new access token by providing the refresh token
-      operationId: jwt-refresh
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.JWTRefresh'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.Error'
-      security:
-      - ApiRefreshKeyAuth: []
-      summary: Retrieve a new access token
   /api/swagger:
     get:
       description: Swagger UI for this API
@@ -2233,6 +2385,606 @@ paths:
           schema:
             type: string
       summary: Swagger UI for this API
+  /api/v3/cluster:
+    get:
+      description: List of nodes in the cluster
+      operationId: cluster-3-get-cluster
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterAbout'
+      security:
+      - ApiKeyAuth: []
+      summary: List of nodes in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/policies:
+    get:
+      description: List of policies in the cluster
+      operationId: cluster-3-db-list-policies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of policies in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/process:
+    get:
+      description: List of processes in the cluster
+      operationId: cluster-3-db-list-processes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Process'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of processes in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/user:
+    get:
+      description: List of identities in the cluster
+      operationId: cluster-3-db-list-identities
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMUser'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of identities in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/user/{name}:
+    get:
+      description: List of identities in the cluster
+      operationId: cluster-3-db-list-identity
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List of identities in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/policies:
+    get:
+      description: List of policies IAM
+      operationId: cluster-3-iam-list-policies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of policies in IAM
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/reload:
+    get:
+      description: Reload identities and policies
+      operationId: cluster-3-iam-reload
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Reload identities and policies
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user:
+    get:
+      description: List of identities in IAM
+      operationId: cluster-3-iam-list-identities
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMUser'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of identities in IAM
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add a new identity
+      operationId: cluster-3-add-identity
+      parameters:
+      - description: Identity
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new identiy
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user/{name}:
+    delete:
+      description: Delete an identity by its name
+      operationId: cluster-3-delete-identity
+      parameters:
+      - description: Identity name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an identity by its name
+      tags:
+      - v16.?.?
+    get:
+      description: Identity in IAM
+      operationId: cluster-3-iam-list-identity
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Identity in IAM
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing user.
+      operationId: cluster-3-update-identity
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: User definition
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an existing user
+      tags:
+      - v16.?.?
+  /api/v3/cluster/iam/user/{name}/policy:
+    put:
+      consumes:
+      - application/json
+      description: Replace policies of an user
+      operationId: cluster-3-update-user-policies
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: Policy definitions
+        in: body
+        name: user
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.IAMPolicy'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace policies of an user
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node:
+    get:
+      description: List of proxy nodes in the cluster
+      operationId: cluster-3-get-nodes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClusterNode'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List of proxy nodes in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}:
+    get:
+      description: List a proxy node by its ID
+      operationId: cluster-3-get-node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterNode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List a proxy node by its ID
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/files:
+    get:
+      description: List the files of a proxy node by its ID
+      operationId: cluster-3-get-node-files
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterNodeFiles'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List the files of a proxy node by its ID
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/process:
+    get:
+      description: List of processes in the cluster on a node
+      operationId: cluster-3-list-node-processes
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClusterProcess'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List of processes in the cluster on a node
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/version:
+    get:
+      description: List a proxy node by its ID
+      operationId: cluster-3-get-node-version
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Version'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List a proxy node by its ID
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process:
+    get:
+      description: List of processes in the cluster
+      operationId: cluster-3-list-all-node-processes
+      parameters:
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClusterProcess'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of processes in the cluster
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add a new FFmpeg process
+      operationId: cluster-3-add-process
+      parameters:
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ProcessConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessConfig'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new process
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process/{id}:
+    delete:
+      description: Delete a process by its ID
+      operationId: cluster-3-delete-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a process by its ID
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing process.
+      operationId: cluster-3-update-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ProcessConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessConfig'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an existing process
+      tags:
+      - v16.?.?
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration
@@ -2243,7 +2995,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_datarhei_core_v16_http_api.Config'
+            $ref: '#/definitions/api.GetConfig'
       security:
       - ApiKeyAuth: []
       summary: Retrieve the currently active Restreamer configuration
@@ -2581,6 +3333,201 @@ paths:
       summary: Add a file to a filesystem
       tags:
       - v16.7.2
+  /api/v3/iam/user:
+    post:
+      consumes:
+      - application/json
+      description: Add a new user
+      operationId: iam-3-add-user
+      parameters:
+      - description: User definition
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new user
+      tags:
+      - v16.?.?
+  /api/v3/iam/user/{name}:
+    delete:
+      description: Delete an user by its name
+      operationId: iam-3-delete-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an user by its name
+      tags:
+      - v16.?.?
+    get:
+      description: List aa user by its name
+      operationId: iam-3-get-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List an user by its name
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing user.
+      operationId: iam-3-update-user
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: User definition
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/api.IAMUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.IAMUser'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an existing user
+      tags:
+      - v16.?.?
+  /api/v3/iam/user/{name}/policy:
+    put:
+      consumes:
+      - application/json
+      description: Replace policies of an user
+      operationId: iam-3-update-user-policies
+      parameters:
+      - description: Username
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
+      - description: Policy definitions
+        in: body
+        name: user
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.IAMPolicy'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMPolicy'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace policies of an user
+      tags:
+      - v16.?.?
   /api/v3/log:
     get:
       description: Get the last log lines of the Restreamer application
@@ -2717,6 +3664,10 @@ paths:
         listed processes.
       operationId: process-3-get-all
       parameters:
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
           output.
@@ -2734,14 +3685,24 @@ paths:
         name: id
         type: string
       - description: Glob pattern for process IDs. If empty all IDs will be returned.
-          Intersected with results from refpattern.
+          Intersected with results from other pattern matches.
         in: query
         name: idpattern
         type: string
       - description: Glob pattern for process references. If empty all IDs will be
-          returned. Intersected with results from idpattern.
+          returned. Intersected with results from other pattern matches.
         in: query
         name: refpattern
+        type: string
+      - description: Glob pattern for process owners. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: ownerpattern
+        type: string
+      - description: Glob pattern for process domain. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: domainpattern
         type: string
       produces:
       - application/json
@@ -2780,6 +3741,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new process
@@ -2795,6 +3760,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2802,6 +3771,10 @@ paths:
           description: OK
           schema:
             type: string
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
           schema:
@@ -2821,6 +3794,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       - description: Comma separated list of fields (config, state, report, metadata)
           to be part of the output. If empty, all fields will be part of the output
         in: query
@@ -2833,6 +3810,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.Process'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
           schema:
@@ -2853,6 +3834,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       - description: Process config
         in: body
         name: config
@@ -2868,6 +3853,10 @@ paths:
             $ref: '#/definitions/api.ProcessConfig'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -2891,6 +3880,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       - description: Process command
         in: body
         name: command
@@ -2906,6 +3899,10 @@ paths:
             type: string
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -2928,6 +3925,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2937,6 +3938,10 @@ paths:
             $ref: '#/definitions/api.ProcessConfig'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -2964,6 +3969,10 @@ paths:
         name: key
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -2972,6 +3981,10 @@ paths:
           schema: {}
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -2999,6 +4012,10 @@ paths:
         name: key
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       - description: Arbitrary JSON data. The null value will remove the key and its
           contents
         in: body
@@ -3013,6 +4030,10 @@ paths:
           schema: {}
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -3281,6 +4302,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3288,6 +4313,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.Probe'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Probe a process
@@ -3315,6 +4344,10 @@ paths:
         in: query
         name: exited_at
         type: integer
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3324,6 +4357,10 @@ paths:
             $ref: '#/definitions/api.ProcessReport'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -3345,6 +4382,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3354,6 +4395,10 @@ paths:
             $ref: '#/definitions/api.ProcessState'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -3518,7 +4563,9 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.SRTChannels'
+              items:
+                $ref: '#/definitions/api.SRTChannel'
+              type: array
             type: array
       security:
       - ApiKeyAuth: []

@@ -3,9 +3,14 @@
 package m1cpu
 
 // #cgo LDFLAGS: -framework CoreFoundation -framework IOKit
+// #include <AvailabilityMacros.h>
 // #include <CoreFoundation/CoreFoundation.h>
 // #include <IOKit/IOKitLib.h>
 // #include <sys/sysctl.h>
+//
+// #if !defined(MAC_OS_VERSION_12_0) || MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_12_0
+// #define kIOMainPortDefault kIOMasterPortDefault
+// #endif
 //
 // #define HzToGHz(hz) ((hz) / 1000000000.0)
 //

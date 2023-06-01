@@ -46,6 +46,12 @@ type ConnRequest interface {
 	// is a copy and can be used at will.
 	RemoteAddr() net.Addr
 
+	// Version returns the handshake version of the incoming request. Currently
+	// known versions are 4 and 5. With version 4 the StreamId will always be
+	// empty and IsEncrypted will always return false. An incoming version 4
+	// connection will always be publishing.
+	Version() uint32
+
 	// StreamId returns the streamid of the requesting connection. Use this
 	// to decide what to do with the connection.
 	StreamId() string
@@ -77,6 +83,10 @@ func (req *connRequest) RemoteAddr() net.Addr {
 	return addr
 }
 
+func (req *connRequest) Version() uint32 {
+	return req.handshake.Version
+}
+
 func (req *connRequest) StreamId() string {
 	return req.handshake.StreamId
 }
@@ -86,12 +96,14 @@ func (req *connRequest) IsEncrypted() bool {
 }
 
 func (req *connRequest) SetPassphrase(passphrase string) error {
-	if req.crypto == nil {
-		return fmt.Errorf("listen: request without encryption")
-	}
+	if req.handshake.Version == 5 {
+		if req.crypto == nil {
+			return fmt.Errorf("listen: request without encryption")
+		}
 
-	if err := req.crypto.UnmarshalKM(req.handshake.SRTKM, passphrase); err != nil {
-		return err
+		if err := req.crypto.UnmarshalKM(req.handshake.SRTKM, passphrase); err != nil {
+			return err
+		}
 	}
 
 	req.passphrase = passphrase
@@ -312,23 +324,27 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 		// Create a new socket ID
 		socketId := uint32(time.Since(ln.start).Microseconds())
 
-		// Select the largest TSBPD delay advertised by the listener, but at least 120ms
+		// Select the largest TSBPD delay advertised by the caller, but at least 120ms
 		recvTsbpdDelay := uint16(ln.config.ReceiverLatency.Milliseconds())
 		sendTsbpdDelay := uint16(ln.config.PeerLatency.Milliseconds())
 
-		if request.handshake.SendTSBPDDelay > recvTsbpdDelay {
-			recvTsbpdDelay = request.handshake.SendTSBPDDelay
+		if request.handshake.Version == 5 {
+			if request.handshake.SRTHS.SendTSBPDDelay > recvTsbpdDelay {
+				recvTsbpdDelay = request.handshake.SRTHS.SendTSBPDDelay
+			}
+
+			if request.handshake.SRTHS.RecvTSBPDDelay > sendTsbpdDelay {
+				sendTsbpdDelay = request.handshake.SRTHS.RecvTSBPDDelay
+			}
+
+			ln.config.StreamId = request.handshake.StreamId
 		}
 
-		if request.handshake.RecvTSBPDDelay > sendTsbpdDelay {
-			sendTsbpdDelay = request.handshake.RecvTSBPDDelay
-		}
-
-		ln.config.StreamId = request.handshake.StreamId
 		ln.config.Passphrase = request.passphrase
 
 		// Create a new connection
 		conn := newSRTConn(srtConnConfig{
+			version:                     request.handshake.Version,
 			localAddr:                   ln.addr,
 			remoteAddr:                  request.addr,
 			config:                      ln.config,
@@ -351,24 +367,26 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 		request.handshake.SRTSocketId = socketId
 		request.handshake.SynCookie = 0
 
-		//  3.2.1.1.1.  Handshake Extension Message Flags
-		request.handshake.SRTVersion = 0x00010402
-		request.handshake.SRTFlags.TSBPDSND = true
-		request.handshake.SRTFlags.TSBPDRCV = true
-		request.handshake.SRTFlags.CRYPT = true
-		request.handshake.SRTFlags.TLPKTDROP = true
-		request.handshake.SRTFlags.PERIODICNAK = true
-		request.handshake.SRTFlags.REXMITFLG = true
-		request.handshake.SRTFlags.STREAM = false
-		request.handshake.SRTFlags.PACKET_FILTER = false
-		request.handshake.RecvTSBPDDelay = recvTsbpdDelay
-		request.handshake.SendTSBPDDelay = sendTsbpdDelay
+		if request.handshake.Version == 5 {
+			//  3.2.1.1.1.  Handshake Extension Message Flags
+			request.handshake.SRTHS.SRTVersion = SRT_VERSION
+			request.handshake.SRTHS.SRTFlags.TSBPDSND = true
+			request.handshake.SRTHS.SRTFlags.TSBPDRCV = true
+			request.handshake.SRTHS.SRTFlags.CRYPT = true
+			request.handshake.SRTHS.SRTFlags.TLPKTDROP = true
+			request.handshake.SRTHS.SRTFlags.PERIODICNAK = true
+			request.handshake.SRTHS.SRTFlags.REXMITFLG = true
+			request.handshake.SRTHS.SRTFlags.STREAM = false
+			request.handshake.SRTHS.SRTFlags.PACKET_FILTER = false
+			request.handshake.SRTHS.RecvTSBPDDelay = recvTsbpdDelay
+			request.handshake.SRTHS.SendTSBPDDelay = sendTsbpdDelay
+		}
 
 		ln.accept(request)
 
 		// Add the connection to the list of known connections
 		ln.lock.Lock()
-		ln.conns[conn.socketId] = conn
+		ln.conns[socketId] = conn
 		ln.lock.Unlock()
 
 		return conn, mode, nil
@@ -574,7 +592,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		//cif.initialPacketSequenceNumber = newCircular(0, MAX_SEQUENCENUMBER)
 		//cif.maxTransmissionUnitSize = 0
 		//cif.maxFlowWindowSize = 0
-		cif.SRTSocketId = 0
+		//cif.SRTSocketId = 0
 		cif.SynCookie = ln.syncookie.Get(p.Header().Addr.String())
 
 		p.MarshalCIF(cif)
@@ -588,56 +606,6 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		if !ln.syncookie.Verify(cif.SynCookie, p.Header().Addr.String()) {
 			cif.HandshakeType = packet.REJ_ROGUE
 			ln.log("handshake:recv:error", func() string { return "invalid SYN cookie" })
-			p.MarshalCIF(cif)
-			ln.log("handshake:send:dump", func() string { return p.Dump() })
-			ln.log("handshake:send:cif", func() string { return cif.String() })
-			ln.send(p)
-
-			return
-		}
-
-		// We only support HSv5
-		if cif.Version != 5 {
-			cif.HandshakeType = packet.REJ_ROGUE
-			ln.log("handshake:recv:error", func() string { return "only HSv5 is supported" })
-			p.MarshalCIF(cif)
-			ln.log("handshake:send:dump", func() string { return p.Dump() })
-			ln.log("handshake:send:cif", func() string { return cif.String() })
-			ln.send(p)
-
-			return
-		}
-
-		// Check if the peer version is sufficient
-		if cif.SRTVersion < ln.config.MinVersion {
-			cif.HandshakeType = packet.REJ_VERSION
-			ln.log("handshake:recv:error", func() string {
-				return fmt.Sprintf("peer version insufficient (%#06x), expecting at least %#06x", cif.SRTVersion, ln.config.MinVersion)
-			})
-			p.MarshalCIF(cif)
-			ln.log("handshake:send:dump", func() string { return p.Dump() })
-			ln.log("handshake:send:cif", func() string { return cif.String() })
-			ln.send(p)
-
-			return
-		}
-
-		// Check the required SRT flags
-		if !cif.SRTFlags.TSBPDSND || !cif.SRTFlags.TSBPDRCV || !cif.SRTFlags.TLPKTDROP || !cif.SRTFlags.PERIODICNAK || !cif.SRTFlags.REXMITFLG {
-			cif.HandshakeType = packet.REJ_ROGUE
-			ln.log("handshake:recv:error", func() string { return "not all required flags are set" })
-			p.MarshalCIF(cif)
-			ln.log("handshake:send:dump", func() string { return p.Dump() })
-			ln.log("handshake:send:cif", func() string { return cif.String() })
-			ln.send(p)
-
-			return
-		}
-
-		// We only support live streaming
-		if cif.SRTFlags.STREAM {
-			cif.HandshakeType = packet.REJ_MESSAGEAPI
-			ln.log("handshake:recv:error", func() string { return "only live streaming is supported" })
 			p.MarshalCIF(cif)
 			ln.log("handshake:send:dump", func() string { return p.Dump() })
 			ln.log("handshake:send:cif", func() string { return cif.String() })
@@ -671,6 +639,68 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 				ln.log("handshake:send:cif", func() string { return cif.String() })
 				ln.send(p)
 			}
+		}
+
+		// We only support HSv4 and HSv5
+		if cif.Version == 4 {
+			// Check if the type (encryption field + extension field) has the value 2
+			if cif.EncryptionField != 0 || cif.ExtensionField != 2 {
+				cif.HandshakeType = packet.REJ_ROGUE
+				ln.log("handshake:recv:error", func() string { return "invalid type, expecting a value of 2 (UDT_DGRAM)" })
+				p.MarshalCIF(cif)
+				ln.log("handshake:send:dump", func() string { return p.Dump() })
+				ln.log("handshake:send:cif", func() string { return cif.String() })
+				ln.send(p)
+
+				return
+			}
+		} else if cif.Version == 5 {
+			// Check if the peer version is sufficient
+			if cif.SRTHS.SRTVersion < ln.config.MinVersion {
+				cif.HandshakeType = packet.REJ_VERSION
+				ln.log("handshake:recv:error", func() string {
+					return fmt.Sprintf("peer version insufficient (%#06x), expecting at least %#06x", cif.SRTHS.SRTVersion, ln.config.MinVersion)
+				})
+				p.MarshalCIF(cif)
+				ln.log("handshake:send:dump", func() string { return p.Dump() })
+				ln.log("handshake:send:cif", func() string { return cif.String() })
+				ln.send(p)
+
+				return
+			}
+
+			// Check the required SRT flags
+			if !cif.SRTHS.SRTFlags.TSBPDSND || !cif.SRTHS.SRTFlags.TSBPDRCV || !cif.SRTHS.SRTFlags.TLPKTDROP || !cif.SRTHS.SRTFlags.PERIODICNAK || !cif.SRTHS.SRTFlags.REXMITFLG {
+				cif.HandshakeType = packet.REJ_ROGUE
+				ln.log("handshake:recv:error", func() string { return "not all required flags are set" })
+				p.MarshalCIF(cif)
+				ln.log("handshake:send:dump", func() string { return p.Dump() })
+				ln.log("handshake:send:cif", func() string { return cif.String() })
+				ln.send(p)
+
+				return
+			}
+
+			// We only support live streaming
+			if cif.SRTHS.SRTFlags.STREAM {
+				cif.HandshakeType = packet.REJ_MESSAGEAPI
+				ln.log("handshake:recv:error", func() string { return "only live streaming is supported" })
+				p.MarshalCIF(cif)
+				ln.log("handshake:send:dump", func() string { return p.Dump() })
+				ln.log("handshake:send:cif", func() string { return cif.String() })
+				ln.send(p)
+
+				return
+			}
+		} else {
+			cif.HandshakeType = packet.REJ_ROGUE
+			ln.log("handshake:recv:error", func() string { return fmt.Sprintf("only HSv4 and HSv5 are supported (got HSv%d)", cif.Version) })
+			p.MarshalCIF(cif)
+			ln.log("handshake:send:dump", func() string { return p.Dump() })
+			ln.log("handshake:send:cif", func() string { return cif.String() })
+			ln.send(p)
+
+			return
 		}
 
 		// Fill up a connection request with all relevant data and put it into the backlog
