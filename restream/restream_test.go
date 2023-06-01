@@ -385,6 +385,41 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestUpdateProcessMetadataTransfer(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	p := getDummyProcess()
+	require.NotNil(t, p)
+	p.ID = "process1"
+
+	tid1 := TaskID{ID: p.ID}
+
+	err = rs.AddProcess(p)
+	require.Equal(t, nil, err)
+
+	err = rs.SetProcessMetadata(tid1, "foo", "bar")
+	require.Equal(t, nil, err)
+
+	p = getDummyProcess()
+	require.NotNil(t, p)
+
+	p.ID = "process2"
+	err = rs.UpdateProcess(tid1, p)
+	require.NoError(t, err)
+
+	tid2 := TaskID{ID: p.ID}
+
+	_, err = rs.GetProcess(tid2)
+	require.NoError(t, err)
+
+	metadata, err := rs.GetProcessMetadata(tid2, "")
+	require.NoError(t, err)
+	require.Equal(t, map[string]interface{}{
+		"foo": "bar",
+	}, metadata)
+}
+
 func TestGetProcess(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)

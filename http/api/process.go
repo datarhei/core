@@ -44,26 +44,27 @@ type ProcessConfigLimits struct {
 
 // ProcessConfig represents the configuration of an ffmpeg process
 type ProcessConfig struct {
-	ID             string              `json:"id"`
-	Owner          string              `json:"owner"`
-	Domain         string              `json:"domain"`
-	Type           string              `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
-	Reference      string              `json:"reference"`
-	Input          []ProcessConfigIO   `json:"input" validate:"required"`
-	Output         []ProcessConfigIO   `json:"output" validate:"required"`
-	Options        []string            `json:"options"`
-	Reconnect      bool                `json:"reconnect"`
-	ReconnectDelay uint64              `json:"reconnect_delay_seconds" format:"uint64"`
-	Autostart      bool                `json:"autostart"`
-	StaleTimeout   uint64              `json:"stale_timeout_seconds" format:"uint64"`
-	Timeout        uint64              `json:"runtime_duration_seconds" format:"uint64"`
-	Scheduler      string              `json:"scheduler"`
-	LogPatterns    []string            `json:"log_patterns"`
-	Limits         ProcessConfigLimits `json:"limits"`
+	ID             string                 `json:"id"`
+	Owner          string                 `json:"owner"`
+	Domain         string                 `json:"domain"`
+	Type           string                 `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
+	Reference      string                 `json:"reference"`
+	Input          []ProcessConfigIO      `json:"input" validate:"required"`
+	Output         []ProcessConfigIO      `json:"output" validate:"required"`
+	Options        []string               `json:"options"`
+	Reconnect      bool                   `json:"reconnect"`
+	ReconnectDelay uint64                 `json:"reconnect_delay_seconds" format:"uint64"`
+	Autostart      bool                   `json:"autostart"`
+	StaleTimeout   uint64                 `json:"stale_timeout_seconds" format:"uint64"`
+	Timeout        uint64                 `json:"runtime_duration_seconds" format:"uint64"`
+	Scheduler      string                 `json:"scheduler"`
+	LogPatterns    []string               `json:"log_patterns"`
+	Limits         ProcessConfigLimits    `json:"limits"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Marshal converts a process config in API representation to a restreamer process config
-func (cfg *ProcessConfig) Marshal() *app.Config {
+func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 	p := &app.Config{
 		ID:             cfg.ID,
 		Owner:          cfg.Owner,
@@ -116,7 +117,7 @@ func (cfg *ProcessConfig) Marshal() *app.Config {
 	p.LogPatterns = make([]string, len(cfg.LogPatterns))
 	copy(p.LogPatterns, cfg.LogPatterns)
 
-	return p
+	return p, cfg.Metadata
 }
 
 func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {

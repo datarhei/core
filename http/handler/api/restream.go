@@ -76,7 +76,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
 	}
 
-	config := process.Marshal()
+	config, metadata := process.Marshal()
 
 	if err := h.restream.AddProcess(config); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
@@ -85,6 +85,10 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	tid := restream.TaskID{
 		ID:     config.ID,
 		Domain: config.Domain,
+	}
+
+	for key, data := range metadata {
+		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
 	p, _ := h.getProcess(tid, "config")
@@ -297,7 +301,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		}
 	}
 
-	config := process.Marshal()
+	config, metadata := process.Marshal()
 
 	tid = restream.TaskID{
 		ID:     id,
@@ -315,6 +319,10 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 	tid = restream.TaskID{
 		ID:     config.ID,
 		Domain: config.Domain,
+	}
+
+	for key, data := range metadata {
+		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
 	p, _ := h.getProcess(tid, "config")

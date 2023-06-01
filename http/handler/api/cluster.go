@@ -404,7 +404,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
 	}
 
-	config := process.Marshal()
+	config, _ := process.Marshal()
 
 	if err := h.cluster.AddProcess("", config); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
@@ -468,7 +468,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		}
 	}
 
-	config := process.Marshal()
+	config, _ := process.Marshal()
 
 	if err := h.cluster.UpdateProcess("", id, config); err != nil {
 		if err == restream.ErrUnknownProcess {

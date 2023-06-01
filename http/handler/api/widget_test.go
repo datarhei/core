@@ -50,7 +50,9 @@ func TestWidget(t *testing.T) {
 	err = json.Unmarshal(data, &process)
 	require.NoError(t, err)
 
-	err = rs.AddProcess(process.Marshal())
+	config, _ := process.Marshal()
+
+	err = rs.AddProcess(config)
 	require.NoError(t, err)
 
 	response := mock.Request(t, http.StatusOK, router, "GET", "/"+process.ID, nil)

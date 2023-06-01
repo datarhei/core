@@ -1220,7 +1220,12 @@ func (r *restream) UpdateProcess(id TaskID, config *app.Config) error {
 	// This would require a major version jump
 	//t.process.CreatedAt = task.process.CreatedAt
 	t.process.UpdatedAt = time.Now().Unix()
+
+	// Transfer the report history to the new process
 	task.parser.TransferReportHistory(t.parser)
+
+	// Transfer the metadata to the new process
+	t.metadata = task.metadata
 
 	r.tasks[tid] = t
 

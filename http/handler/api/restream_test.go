@@ -129,6 +129,39 @@ func TestAddProcess(t *testing.T) {
 	mock.Validate(t, &api.ProcessConfig{}, response.Data)
 }
 
+func TestAddProcessWithMetadata(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := bytes.Buffer{}
+	_, err = data.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	process := api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(t, err)
+
+	process.Metadata = map[string]interface{}{
+		"foo": "bar",
+	}
+
+	encoded, err := json.Marshal(&process)
+	require.NoError(t, err)
+
+	data.Reset()
+	_, err = data.Write(encoded)
+	require.NoError(t, err)
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", &data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	response = mock.Request(t, http.StatusOK, router, "GET", "/"+process.ID+"/metadata", nil)
+	require.Equal(t, map[string]interface{}{
+		"foo": "bar",
+	}, response.Data)
+}
+
 func TestUpdateProcessInvalid(t *testing.T) {
 	router, err := getDummyRestreamRouter()
 	require.NoError(t, err)
@@ -171,26 +204,71 @@ func TestUpdateReplaceProcess(t *testing.T) {
 
 	mock.Validate(t, &api.ProcessConfig{}, response.Data)
 
-	update := bytes.Buffer{}
-	_, err = update.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
-	require.NoError(t, err)
+	data = mock.Read(t, "./fixtures/addProcess.json")
 
-	proc := api.ProcessConfig{}
-	err = json.Unmarshal(update.Bytes(), &proc)
-	require.NoError(t, err)
-
-	encoded, err := json.Marshal(&proc)
-	require.NoError(t, err)
-
-	update.Reset()
-	_, err = update.Write(encoded)
-	require.NoError(t, err)
-
-	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", &update)
+	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", data)
 
 	mock.Validate(t, &api.ProcessConfig{}, response.Data)
 
 	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+}
+
+func TestUpdateReplaceProcessWithMetadata(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := bytes.Buffer{}
+	_, err = data.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	process := api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(t, err)
+
+	process.Metadata = map[string]interface{}{
+		"foo": "bar",
+	}
+
+	encoded, err := json.Marshal(&process)
+	require.NoError(t, err)
+
+	data.Reset()
+	_, err = data.Write(encoded)
+	require.NoError(t, err)
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", &data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	data.Reset()
+	_, err = data.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	process = api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(t, err)
+
+	process.Metadata = map[string]interface{}{
+		"foo": "baz",
+	}
+
+	encoded, err = json.Marshal(&process)
+	require.NoError(t, err)
+
+	data.Reset()
+	_, err = data.Write(encoded)
+	require.NoError(t, err)
+
+	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", &data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	mock.Request(t, http.StatusOK, router, "GET", "/test", nil)
+
+	response = mock.Request(t, http.StatusOK, router, "GET", "/"+process.ID+"/metadata", nil)
+	require.Equal(t, map[string]interface{}{
+		"foo": "baz",
+	}, response.Data)
 }
 
 func TestUpdateNewProcess(t *testing.T) {
@@ -226,6 +304,67 @@ func TestUpdateNewProcess(t *testing.T) {
 
 	mock.Request(t, http.StatusNotFound, router, "GET", "/test", nil)
 	mock.Request(t, http.StatusOK, router, "GET", "/test2", nil)
+}
+
+func TestUpdateNewProcessWithMetadata(t *testing.T) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(t, err)
+
+	data := bytes.Buffer{}
+	_, err = data.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	process := api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(t, err)
+
+	process.Metadata = map[string]interface{}{
+		"foo": "bar",
+	}
+
+	encoded, err := json.Marshal(&process)
+	require.NoError(t, err)
+
+	data.Reset()
+	_, err = data.Write(encoded)
+	require.NoError(t, err)
+
+	response := mock.Request(t, http.StatusOK, router, "POST", "/", &data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	data.Reset()
+	_, err = data.ReadFrom(mock.Read(t, "./fixtures/addProcess.json"))
+	require.NoError(t, err)
+
+	process = api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(t, err)
+
+	process.ID = "test2"
+	process.Metadata = map[string]interface{}{
+		"bar": "foo",
+	}
+
+	encoded, err = json.Marshal(&process)
+	require.NoError(t, err)
+
+	data.Reset()
+	_, err = data.Write(encoded)
+	require.NoError(t, err)
+
+	response = mock.Request(t, http.StatusOK, router, "PUT", "/test", &data)
+
+	mock.Validate(t, &api.ProcessConfig{}, response.Data)
+
+	mock.Request(t, http.StatusNotFound, router, "GET", "/test", nil)
+	mock.Request(t, http.StatusOK, router, "GET", "/test2", nil)
+
+	response = mock.Request(t, http.StatusOK, router, "GET", "/"+process.ID+"/metadata", nil)
+	require.Equal(t, map[string]interface{}{
+		"foo": "bar",
+		"bar": "foo",
+	}, response.Data)
 }
 
 func TestUpdateNonExistentProcess(t *testing.T) {
