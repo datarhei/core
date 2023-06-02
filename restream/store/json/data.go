@@ -83,6 +83,9 @@ type ProcessConfig struct {
 	ReconnectDelay uint64            `json:"reconnect_delay_seconds"` // seconds
 	Autostart      bool              `json:"autostart"`
 	StaleTimeout   uint64            `json:"stale_timeout_seconds"` // seconds
+	Timeout        uint64            `json:"timeout"`               // seconds
+	Scheduler      string            `json:"scheduler"`             // crontab pattern or RFC3339 timestamp
+	LogPatterns    []string          `json:"log_patterns"`          // will we interpreted as regualr expressions
 	LimitCPU       float64           `json:"limit_cpu_usage"`       // percent
 	LimitMemory    uint64            `json:"limit_memory_bytes"`    // bytes
 	LimitWaitFor   uint64            `json:"limit_waitfor_seconds"` // seconds
@@ -98,12 +101,17 @@ func (p *ProcessConfig) Marshal(a *app.Config) {
 	p.ReconnectDelay = a.ReconnectDelay
 	p.Autostart = a.Autostart
 	p.StaleTimeout = a.StaleTimeout
+	p.Timeout = a.Timeout
+	p.Scheduler = a.Scheduler
 	p.LimitCPU = a.LimitCPU
 	p.LimitMemory = a.LimitMemory
 	p.LimitWaitFor = a.LimitWaitFor
 
 	p.Options = make([]string, len(a.Options))
 	copy(p.Options, a.Options)
+
+	p.LogPatterns = make([]string, len(a.LogPatterns))
+	copy(p.LogPatterns, a.LogPatterns)
 
 	p.Input = make([]ProcessConfigIO, len(a.Input))
 	for x, input := range a.Input {
@@ -130,6 +138,8 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 		ReconnectDelay: p.ReconnectDelay,
 		Autostart:      p.Autostart,
 		StaleTimeout:   p.StaleTimeout,
+		Timeout:        p.Timeout,
+		Scheduler:      p.Scheduler,
 		LimitCPU:       p.LimitCPU,
 		LimitMemory:    p.LimitMemory,
 		LimitWaitFor:   p.LimitWaitFor,
@@ -137,6 +147,9 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 
 	a.Options = make([]string, len(p.Options))
 	copy(a.Options, p.Options)
+
+	a.LogPatterns = make([]string, len(p.LogPatterns))
+	copy(a.LogPatterns, p.LogPatterns)
 
 	a.Input = make([]app.ConfigIO, len(p.Input))
 	for x, input := range p.Input {
