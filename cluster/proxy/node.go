@@ -26,11 +26,11 @@ type Node interface {
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string) (io.ReadCloser, error)
 
-	ProcessAdd(*app.Config) error
+	ProcessAdd(config *app.Config, metadata map[string]interface{}) error
 	ProcessStart(id string) error
 	ProcessStop(id string) error
 	ProcessDelete(id string) error
-	ProcessUpdate(id string, config *app.Config) error
+	ProcessUpdate(id string, config *app.Config, metadata map[string]interface{}) error
 
 	NodeReader
 }
@@ -696,6 +696,7 @@ func (n *node) ProcessList() ([]Process, error) {
 		Filter: []string{
 			"state",
 			"config",
+			"metadata",
 		},
 	})
 	if err != nil {
@@ -713,6 +714,7 @@ func (n *node) ProcessList() ([]Process, error) {
 			CPU:       p.State.CPU * n.resources.ncpu,
 			Runtime:   time.Duration(p.State.Runtime) * time.Second,
 			UpdatedAt: time.Unix(p.UpdatedAt, 0),
+			Metadata:  p.Metadata,
 		}
 
 		cfg := &app.Config{
@@ -726,7 +728,7 @@ func (n *node) ProcessList() ([]Process, error) {
 			Autostart:      p.Config.Autostart,
 			StaleTimeout:   p.Config.StaleTimeout,
 			LimitCPU:       p.Config.Limits.CPU,
-			LimitMemory:    p.Config.Limits.Memory,
+			LimitMemory:    p.Config.Limits.Memory * 1024 * 1024,
 			LimitWaitFor:   p.Config.Limits.WaitFor,
 		}
 
@@ -766,7 +768,7 @@ func (n *node) ProcessList() ([]Process, error) {
 	return processes, nil
 }
 
-func (n *node) ProcessAdd(config *app.Config) error {
+func (n *node) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -774,12 +776,12 @@ func (n *node) ProcessAdd(config *app.Config) error {
 		return fmt.Errorf("not connected")
 	}
 
-	cfg := convertConfig(config)
+	cfg := convertConfig(config, metadata)
 
 	return n.peer.ProcessAdd(cfg)
 }
 
-func convertConfig(config *app.Config) clientapi.ProcessConfig {
+func convertConfig(config *app.Config, metadata map[string]interface{}) clientapi.ProcessConfig {
 	cfg := clientapi.ProcessConfig{
 		ID:             config.ID,
 		Type:           "ffmpeg",
@@ -793,9 +795,10 @@ func convertConfig(config *app.Config) clientapi.ProcessConfig {
 		StaleTimeout:   config.StaleTimeout,
 		Limits: clientapi.ProcessConfigLimits{
 			CPU:     config.LimitCPU,
-			Memory:  config.LimitMemory,
+			Memory:  config.LimitMemory / 1024 / 1024,
 			WaitFor: config.LimitWaitFor,
 		},
+		Metadata: metadata,
 	}
 
 	for _, d := range config.Input {
@@ -862,7 +865,7 @@ func (n *node) ProcessDelete(id string) error {
 	return n.peer.ProcessDelete(id)
 }
 
-func (n *node) ProcessUpdate(id string, config *app.Config) error {
+func (n *node) ProcessUpdate(id string, config *app.Config, metadata map[string]interface{}) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -870,7 +873,7 @@ func (n *node) ProcessUpdate(id string, config *app.Config) error {
 		return fmt.Errorf("not connected")
 	}
 
-	cfg := convertConfig(config)
+	cfg := convertConfig(config, metadata)
 
 	return n.peer.ProcessUpdate(id, cfg)
 }

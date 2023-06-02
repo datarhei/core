@@ -2,15 +2,15 @@ package api
 
 // Process represents all information on a process
 type Process struct {
-	ID        string         `json:"id" jsonschema:"minLength=1"`
-	Type      string         `json:"type" jsonschema:"enum=ffmpeg"`
-	Reference string         `json:"reference"`
-	CreatedAt int64          `json:"created_at" jsonschema:"minimum=0" format:"int64"`
-	UpdatedAt int64          `json:"updated_at" jsonschema:"minimum=0" format:"int64"`
-	Config    *ProcessConfig `json:"config,omitempty"`
-	State     *ProcessState  `json:"state,omitempty"`
-	Report    *ProcessReport `json:"report,omitempty"`
-	Metadata  Metadata       `json:"metadata,omitempty"`
+	ID        string                 `json:"id" jsonschema:"minLength=1"`
+	Type      string                 `json:"type" jsonschema:"enum=ffmpeg"`
+	Reference string                 `json:"reference"`
+	CreatedAt int64                  `json:"created_at" jsonschema:"minimum=0" format:"int64"`
+	UpdatedAt int64                  `json:"updated_at" jsonschema:"minimum=0" format:"int64"`
+	Config    *ProcessConfig         `json:"config,omitempty"`
+	State     *ProcessState          `json:"state,omitempty"`
+	Report    *ProcessReport         `json:"report,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ProcessConfigIO represents an input or output of an ffmpeg process config
@@ -36,30 +36,35 @@ type ProcessConfigLimits struct {
 
 // ProcessConfig represents the configuration of an ffmpeg process
 type ProcessConfig struct {
-	ID             string              `json:"id"`
-	Type           string              `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
-	Reference      string              `json:"reference"`
-	Input          []ProcessConfigIO   `json:"input" validate:"required"`
-	Output         []ProcessConfigIO   `json:"output" validate:"required"`
-	Options        []string            `json:"options"`
-	Reconnect      bool                `json:"reconnect"`
-	ReconnectDelay uint64              `json:"reconnect_delay_seconds" format:"uint64"`
-	Autostart      bool                `json:"autostart"`
-	StaleTimeout   uint64              `json:"stale_timeout_seconds" format:"uint64"`
-	Limits         ProcessConfigLimits `json:"limits"`
+	ID             string                 `json:"id"`
+	Type           string                 `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
+	Reference      string                 `json:"reference"`
+	Input          []ProcessConfigIO      `json:"input" validate:"required"`
+	Output         []ProcessConfigIO      `json:"output" validate:"required"`
+	Options        []string               `json:"options"`
+	Reconnect      bool                   `json:"reconnect"`
+	ReconnectDelay uint64                 `json:"reconnect_delay_seconds" format:"uint64"`
+	Autostart      bool                   `json:"autostart"`
+	StaleTimeout   uint64                 `json:"stale_timeout_seconds" format:"uint64"`
+	Timeout        uint64                 `json:"runtime_duration_seconds" format:"uint64"`
+	Scheduler      string                 `json:"scheduler"`
+	LogPatterns    []string               `json:"log_patterns"`
+	Limits         ProcessConfigLimits    `json:"limits"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ProcessState represents the current state of an ffmpeg process
 type ProcessState struct {
-	Order     string    `json:"order" jsonschema:"enum=start,enum=stop"`
-	State     string    `json:"exec" jsonschema:"enum=finished,enum=starting,enum=running,enum=finishing,enum=killed,enum=failed"`
-	Runtime   int64     `json:"runtime_seconds" jsonschema:"minimum=0" format:"int64"`
-	Reconnect int64     `json:"reconnect_seconds" format:"int64"`
-	LastLog   string    `json:"last_logline"`
-	Progress  *Progress `json:"progress"`
-	Memory    uint64    `json:"memory_bytes" format:"uint64"`
-	CPU       float64   `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"`
-	Command   []string  `json:"command"`
+	Order     string       `json:"order" jsonschema:"enum=start,enum=stop"`
+	State     string       `json:"exec" jsonschema:"enum=finished,enum=starting,enum=running,enum=finishing,enum=killed,enum=failed"`
+	Runtime   int64        `json:"runtime_seconds" jsonschema:"minimum=0" format:"int64"`
+	Reconnect int64        `json:"reconnect_seconds" format:"int64"`
+	LastLog   string       `json:"last_logline"`
+	Progress  *Progress    `json:"progress"`
+	Memory    uint64       `json:"memory_bytes" format:"uint64"`
+	CPU       float64      `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"`
+	Resources ProcessUsage `json:"resources"`
+	Command   []string     `json:"command"`
 }
 
 type ProcessUsageCPU struct {

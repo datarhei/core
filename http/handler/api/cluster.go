@@ -345,6 +345,7 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 			Reference: p.Config.Reference,
 			CreatedAt: 0,
 			UpdatedAt: p.UpdatedAt.Unix(),
+			Metadata:  p.Metadata,
 		}
 
 		config := &api.ProcessConfig{}
@@ -404,10 +405,14 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
 	}
 
-	config, _ := process.Marshal()
+	config, metadata := process.Marshal()
 
 	if err := h.cluster.AddProcess("", config); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+	}
+
+	for key, value := range metadata {
+		h.cluster.SetProcessMetadata("", config.ID, key, value)
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -468,7 +473,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		}
 	}
 
-	config, _ := process.Marshal()
+	config, metadata := process.Marshal()
 
 	if err := h.cluster.UpdateProcess("", id, config); err != nil {
 		if err == restream.ErrUnknownProcess {
@@ -478,7 +483,59 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
 	}
 
+	for key, value := range metadata {
+		h.cluster.SetProcessMetadata("", id, key, value)
+	}
+
 	return c.JSON(http.StatusOK, process)
+}
+
+// SetProcessMetadata stores metadata with a process
+// @Summary Add JSON metadata with a process under the given key
+// @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
+// @Tags v16.?.?
+// @ID cluster-3-set-process-metadata
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param key path string true "Key for data store"
+// @Param domain query string false "Domain to act on"
+// @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
+// @Success 200 {object} api.Metadata
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/metadata/{key} [put]
+func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	key := util.PathParam(c, "key")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	if len(key) == 0 {
+		return api.Err(http.StatusBadRequest, "Invalid key", "The key must not be of length 0")
+	}
+
+	var data api.Metadata
+
+	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+	/*
+		tid := restream.TaskID{
+			ID:     id,
+			Domain: domain,
+		}
+	*/
+	if err := h.cluster.SetProcessMetadata("", id, key, data); err != nil {
+		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+	}
+
+	return c.JSON(http.StatusOK, data)
 }
 
 // Delete deletes the process with the given ID from the cluster

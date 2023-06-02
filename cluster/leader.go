@@ -331,6 +331,7 @@ type processOpMove struct {
 	fromNodeid string
 	toNodeid   string
 	config     *app.Config
+	metadata   map[string]interface{}
 }
 
 type processOpStart struct {
@@ -339,14 +340,16 @@ type processOpStart struct {
 }
 
 type processOpAdd struct {
-	nodeid string
-	config *app.Config
+	nodeid   string
+	config   *app.Config
+	metadata map[string]interface{}
 }
 
 type processOpUpdate struct {
 	nodeid    string
 	processid string
 	config    *app.Config
+	metadata  map[string]interface{}
 }
 
 type processOpReject struct {
@@ -364,7 +367,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 	for _, op := range stack {
 		switch v := op.(type) {
 		case processOpAdd:
-			err := c.proxy.ProcessAdd(v.nodeid, v.config)
+			err := c.proxy.ProcessAdd(v.nodeid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
@@ -385,7 +388,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
 		case processOpUpdate:
-			err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config)
+			err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
@@ -411,7 +414,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"nodeid":    v.nodeid,
 			}).Log("Removing process")
 		case processOpMove:
-			err := c.proxy.ProcessAdd(v.toNodeid, v.config)
+			err := c.proxy.ProcessAdd(v.toNodeid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -538,6 +541,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 					nodeid:    p.NodeID,
 					processid: p.Config.ID,
 					config:    wantP.Config,
+					metadata:  wantP.Metadata,
 				})
 			}
 		}
@@ -581,7 +585,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		if len(process.Config.Reference) != 0 {
 			for _, count := range haveReferenceAffinityMap[process.Config.Reference] {
 				r := resources[count.nodeid]
-				cpu := process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				cpu := process.Config.LimitCPU
 				mem := process.Config.LimitMemory
 
 				if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
@@ -594,7 +598,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		// Find the node with the most resources available
 		if len(nodeid) == 0 {
 			for id, r := range resources {
-				cpu := process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				cpu := process.Config.LimitCPU
 				mem := process.Config.LimitMemory
 
 				if len(nodeid) == 0 {
@@ -613,14 +617,15 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 
 		if len(nodeid) != 0 {
 			opStack = append(opStack, processOpAdd{
-				nodeid: nodeid,
-				config: process.Config,
+				nodeid:   nodeid,
+				config:   process.Config,
+				metadata: process.Metadata,
 			})
 
 			// Adjust the resources
 			r, ok := resources[nodeid]
 			if ok {
-				r.CPU += process.Config.LimitCPU * r.NCPU // TODO: in the vod branch this changed if system-wide limits are given
+				r.CPU += process.Config.LimitCPU
 				r.Mem += process.Config.LimitMemory
 				resources[nodeid] = r
 			}
@@ -785,6 +790,7 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 				fromNodeid: overloadedNodeid,
 				toNodeid:   availableNodeid,
 				config:     p.Config,
+				metadata:   p.Metadata,
 			})
 
 			// Adjust the process

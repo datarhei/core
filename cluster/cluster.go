@@ -70,6 +70,7 @@ type Cluster interface {
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin, id string) error
 	UpdateProcess(origin, id string, config *app.Config) error
+	SetProcessMetadata(origin, id, key string, data interface{}) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
 	ListIdentities() (time.Time, []iamidentity.User)
@@ -750,6 +751,23 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 		Data: &store.CommandUpdateProcess{
 			ID:     id,
 			Config: config,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) SetProcessMetadata(origin, id, key string, data interface{}) error {
+	if !c.IsRaftLeader() {
+		return c.forwarder.SetProcessMetadata(origin, id, key, data)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpSetProcessMetadata,
+		Data: &store.CommandSetProcessMetadata{
+			ID:   id,
+			Key:  key,
+			Data: data,
 		},
 	}
 

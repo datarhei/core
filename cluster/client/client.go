@@ -32,6 +32,12 @@ type UpdateProcessRequest struct {
 	Config app.Config `json:"config"`
 }
 
+type SetProcessMetadataRequest struct {
+	ID       string      `json:"id"`
+	Key      string      `json:"key"`
+	Metadata interface{} `json:"metadata"`
+}
+
 type AddIdentityRequest struct {
 	Identity iamidentity.User `json:"identity"`
 }
@@ -107,6 +113,17 @@ func (c *APIClient) UpdateProcess(origin string, r UpdateProcessRequest) error {
 	}
 
 	_, err = c.call(http.MethodPut, "/process/"+r.ID, "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) SetProcessMetadata(origin string, r SetProcessMetadataRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/process/"+r.ID+"/metadata/"+r.Key, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

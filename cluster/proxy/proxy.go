@@ -24,10 +24,10 @@ type Proxy interface {
 	ProxyReader
 	Reader() ProxyReader
 
-	ProcessAdd(nodeid string, config *app.Config) error
+	ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error
 	ProcessDelete(nodeid string, id string) error
 	ProcessStart(nodeid string, id string) error
-	ProcessUpdate(nodeid string, id string, config *app.Config) error
+	ProcessUpdate(nodeid string, id string, config *app.Config, metadata map[string]interface{}) error
 }
 
 type ProxyReader interface {
@@ -433,6 +433,7 @@ type Process struct {
 	Runtime   time.Duration
 	UpdatedAt time.Time
 	Config    *app.Config
+	Metadata  map[string]interface{}
 }
 
 func (p *proxy) ListProcesses() []Process {
@@ -480,7 +481,7 @@ func (p *proxy) ListProcesses() []Process {
 	return processList
 }
 
-func (p *proxy) ProcessAdd(nodeid string, config *app.Config) error {
+func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -489,7 +490,7 @@ func (p *proxy) ProcessAdd(nodeid string, config *app.Config) error {
 		return fmt.Errorf("node not found")
 	}
 
-	err := node.ProcessAdd(config)
+	err := node.ProcessAdd(config, metadata)
 	if err != nil {
 		return err
 	}
@@ -536,7 +537,7 @@ func (p *proxy) ProcessStart(nodeid string, id string) error {
 	return nil
 }
 
-func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config) error {
+func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config, metadata map[string]interface{}) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -545,5 +546,5 @@ func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config) erro
 		return fmt.Errorf("node not found")
 	}
 
-	return node.ProcessUpdate(id, config)
+	return node.ProcessUpdate(id, config, metadata)
 }

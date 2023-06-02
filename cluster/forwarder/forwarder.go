@@ -24,6 +24,7 @@ type Forwarder interface {
 
 	AddProcess(origin string, config *app.Config) error
 	UpdateProcess(origin, id string, config *app.Config) error
+	SetProcessMetadata(origin, id, key string, data interface{}) error
 	RemoveProcess(origin, id string) error
 
 	AddIdentity(origin string, identity iamidentity.User) error
@@ -169,6 +170,24 @@ func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
 	f.lock.RUnlock()
 
 	return client.UpdateProcess(origin, r)
+}
+
+func (f *forwarder) SetProcessMetadata(origin, id, key string, data interface{}) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.SetProcessMetadataRequest{
+		ID:       id,
+		Key:      key,
+		Metadata: data,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.SetProcessMetadata(origin, r)
 }
 
 func (f *forwarder) RemoveProcess(origin, id string) error {

@@ -446,6 +446,18 @@ type ConfigV3 struct {
 		Routes          map[string]string `json:"routes"`
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
+	Resources struct {
+		MaxCPUUsage    float64 `json:"max_cpu_usage"`
+		MaxMemoryUsage float64 `json:"max_memory_usage"`
+	} `json:"resources"`
+	Cluster struct {
+		Enable    bool     `json:"enable"`
+		Bootstrap bool     `json:"bootstrap"`
+		Recover   bool     `json:"recover"`
+		Debug     bool     `json:"debug"`
+		Address   string   `json:"address"`
+		Peers     []string `json:"peers"`
+	} `json:"cluster"`
 }
 
 type Config struct {

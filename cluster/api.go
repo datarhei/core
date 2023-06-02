@@ -212,6 +212,31 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, "OK")
 	})
 
+	a.router.PUT("/v1/process/:id/metadata/:key", func(c echo.Context) error {
+		id := util.PathParam(c, "id")
+		key := util.PathParam(c, "key")
+
+		r := client.SetProcessMetadataRequest{}
+
+		if err := util.ShouldBindJSON(c, &r); err != nil {
+			return httpapi.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
+			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		err := a.cluster.SetProcessMetadata(origin, id, key, r.Metadata)
+		if err != nil {
+			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to update metadata")
+			return httpapi.Err(http.StatusInternalServerError, "unable to update metadata", "%s", err)
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	})
+
 	a.router.POST("/v1/iam/user", func(c echo.Context) error {
 		r := client.AddIdentityRequest{}
 

@@ -44,6 +44,7 @@ type Process struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Config    *app.Config
+	Metadata  map[string]interface{}
 }
 
 type Users struct {
@@ -59,13 +60,14 @@ type Policies struct {
 type Operation string
 
 const (
-	OpAddProcess     Operation = "addProcess"
-	OpRemoveProcess  Operation = "removeProcess"
-	OpUpdateProcess  Operation = "updateProcess"
-	OpAddIdentity    Operation = "addIdentity"
-	OpUpdateIdentity Operation = "updateIdentity"
-	OpRemoveIdentity Operation = "removeIdentity"
-	OpSetPolicies    Operation = "setPolicies"
+	OpAddProcess         Operation = "addProcess"
+	OpRemoveProcess      Operation = "removeProcess"
+	OpUpdateProcess      Operation = "updateProcess"
+	OpSetProcessMetadata Operation = "setProcessMetadata"
+	OpAddIdentity        Operation = "addIdentity"
+	OpUpdateIdentity     Operation = "updateIdentity"
+	OpRemoveIdentity     Operation = "removeIdentity"
+	OpSetPolicies        Operation = "setPolicies"
 )
 
 type Command struct {
@@ -84,6 +86,12 @@ type CommandUpdateProcess struct {
 
 type CommandRemoveProcess struct {
 	ID string
+}
+
+type CommandSetProcessMetadata struct {
+	ID   string
+	Key  string
+	Data interface{}
 }
 
 type CommandAddIdentity struct {
@@ -181,6 +189,12 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		json.Unmarshal(b, &cmd)
 
 		err = s.updateProcess(cmd)
+	case OpSetProcessMetadata:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandSetProcessMetadata{}
+		json.Unmarshal(b, &cmd)
+
+		err = s.setProcessMetadata(cmd)
 	case OpAddIdentity:
 		b, _ := json.Marshal(c.Data)
 		cmd := CommandAddIdentity{}
@@ -238,6 +252,7 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 		CreatedAt: now,
 		UpdatedAt: now,
 		Config:    cmd.Config,
+		Metadata:  map[string]interface{}{},
 	}
 
 	return nil
@@ -285,6 +300,31 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 			Config:    cmd.Config,
 		}
 	}
+
+	return nil
+}
+
+func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	p, ok := s.Process[cmd.ID]
+	if !ok {
+		return NewStoreError("the process with the ID '%s' doesn't exists", cmd.ID)
+	}
+
+	if p.Metadata == nil {
+		p.Metadata = map[string]interface{}{}
+	}
+
+	if cmd.Data == nil {
+		delete(p.Metadata, cmd.Key)
+	} else {
+		p.Metadata[cmd.Key] = cmd.Data
+	}
+	p.UpdatedAt = time.Now()
+
+	s.Process[cmd.ID] = p
 
 	return nil
 }
@@ -386,6 +426,15 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 		return err
 	}
 
+	for id, p := range s.Process {
+		if p.Metadata != nil {
+			continue
+		}
+
+		p.Metadata = map[string]interface{}{}
+		s.Process[id] = p
+	}
+
 	return nil
 }
 
@@ -397,8 +446,10 @@ func (s *store) ProcessList() []Process {
 
 	for _, p := range s.Process {
 		processes = append(processes, Process{
+			CreatedAt: p.CreatedAt,
 			UpdatedAt: p.UpdatedAt,
 			Config:    p.Config.Clone(),
+			Metadata:  p.Metadata,
 		})
 	}
 
@@ -415,8 +466,10 @@ func (s *store) GetProcess(id string) (Process, error) {
 	}
 
 	return Process{
+		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,
 		Config:    process.Config.Clone(),
+		Metadata:  process.Metadata,
 	}, nil
 }
 
