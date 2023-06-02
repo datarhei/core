@@ -597,6 +597,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 			"-err_detect",
 			"ignore_err",
 		},
+		LogPatterns: []string{},
 	}
 
 	// UI Settings
@@ -854,6 +855,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 				ReconnectDelay: 10,
 				Autostart:      false,
 				StaleTimeout:   0,
+				LogPatterns:    []string{},
 			}
 
 			probe := probeInput(cfg.binary, config)
@@ -1231,6 +1233,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 				"-err_detect",
 				"ignore_err",
 			},
+			LogPatterns: []string{},
 		}
 
 		snapshotInput := app.ConfigIO{
@@ -1402,6 +1405,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 				"-err_detect",
 				"ignore_err",
 			},
+			LogPatterns: []string{},
 		}
 
 		config.Input = append(config.Input, app.ConfigIO{
