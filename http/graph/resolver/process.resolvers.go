@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/datarhei/core/v16/http/graph/models"
-	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 // Processes is the resolver for the processes field.
@@ -42,7 +42,7 @@ func (r *queryResolver) Process(ctx context.Context, id string, domain string) (
 		return nil, fmt.Errorf("forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -58,7 +58,7 @@ func (r *queryResolver) Probe(ctx context.Context, id string, domain string) (*m
 		return nil, fmt.Errorf("forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}

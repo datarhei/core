@@ -1,6 +1,8 @@
 package json
 
-import "github.com/datarhei/core/v16/restream/app"
+import (
+	"github.com/datarhei/core/v16/restream/app"
+)
 
 type ProcessConfigIOCleanup struct {
 	Pattern       string `json:"pattern"`

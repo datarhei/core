@@ -134,7 +134,7 @@ func TestAddProcess(t *testing.T) {
 	process := getDummyProcess()
 	require.NotNil(t, process)
 
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	_, err = rs.GetProcess(tid)
 	require.Equal(t, ErrUnknownProcess, err)
@@ -156,7 +156,7 @@ func TestAutostartProcess(t *testing.T) {
 	process := getDummyProcess()
 	process.Autostart = true
 
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
@@ -239,7 +239,7 @@ func TestRemoveProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	err = rs.AddProcess(process)
 	require.Equal(t, nil, err, "Failed to add process (%s)", err)
@@ -258,12 +258,12 @@ func TestUpdateProcess(t *testing.T) {
 	process1 := getDummyProcess()
 	require.NotNil(t, process1)
 	process1.ID = "process1"
-	tid1 := TaskID{ID: process1.ID}
+	tid1 := app.ProcessID{ID: process1.ID}
 
 	process2 := getDummyProcess()
 	require.NotNil(t, process2)
 	process2.ID = "process2"
-	tid2 := TaskID{ID: process2.ID}
+	tid2 := app.ProcessID{ID: process2.ID}
 
 	err = rs.AddProcess(process1)
 	require.Equal(t, nil, err)
@@ -282,7 +282,7 @@ func TestUpdateProcess(t *testing.T) {
 	process3 := getDummyProcess()
 	require.NotNil(t, process3)
 	process3.ID = "process2"
-	tid3 := TaskID{ID: process3.ID}
+	tid3 := app.ProcessID{ID: process3.ID}
 
 	err = rs.UpdateProcess(tid1, process3)
 	require.Error(t, err)
@@ -308,7 +308,7 @@ func TestUpdateSameHashProcess(t *testing.T) {
 
 	config := getDummyProcess()
 	require.NotNil(t, config)
-	tid := TaskID{ID: config.ID}
+	tid := app.ProcessID{ID: config.ID}
 
 	err = rs.AddProcess(config)
 	require.Equal(t, nil, err)
@@ -339,7 +339,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 	require.NotNil(t, p)
 	p.ID = "process1"
 
-	tid1 := TaskID{ID: p.ID}
+	tid1 := app.ProcessID{ID: p.ID}
 
 	err = rs.AddProcess(p)
 	require.Equal(t, nil, err)
@@ -363,7 +363,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 	err = rs.UpdateProcess(tid1, p)
 	require.NoError(t, err)
 
-	tid2 := TaskID{ID: p.ID}
+	tid2 := app.ProcessID{ID: p.ID}
 
 	_, err = rs.GetProcess(tid2)
 	require.NoError(t, err)
@@ -393,7 +393,7 @@ func TestUpdateProcessMetadataTransfer(t *testing.T) {
 	require.NotNil(t, p)
 	p.ID = "process1"
 
-	tid1 := TaskID{ID: p.ID}
+	tid1 := app.ProcessID{ID: p.ID}
 
 	err = rs.AddProcess(p)
 	require.Equal(t, nil, err)
@@ -408,7 +408,7 @@ func TestUpdateProcessMetadataTransfer(t *testing.T) {
 	err = rs.UpdateProcess(tid1, p)
 	require.NoError(t, err)
 
-	tid2 := TaskID{ID: p.ID}
+	tid2 := app.ProcessID{ID: p.ID}
 
 	_, err = rs.GetProcess(tid2)
 	require.NoError(t, err)
@@ -427,19 +427,19 @@ func TestGetProcess(t *testing.T) {
 	process1 := getDummyProcess()
 	process1.ID = "foo_aaa_1"
 	process1.Reference = "foo_aaa_1"
-	tid1 := TaskID{ID: process1.ID}
+	tid1 := app.ProcessID{ID: process1.ID}
 	process2 := getDummyProcess()
 	process2.ID = "bar_bbb_2"
 	process2.Reference = "bar_bbb_2"
-	tid2 := TaskID{ID: process2.ID}
+	tid2 := app.ProcessID{ID: process2.ID}
 	process3 := getDummyProcess()
 	process3.ID = "foo_ccc_3"
 	process3.Reference = "foo_ccc_3"
-	tid3 := TaskID{ID: process3.ID}
+	tid3 := app.ProcessID{ID: process3.ID}
 	process4 := getDummyProcess()
 	process4.ID = "bar_ddd_4"
 	process4.Reference = "bar_ddd_4"
-	tid4 := TaskID{ID: process4.ID}
+	tid4 := app.ProcessID{ID: process4.ID}
 
 	rs.AddProcess(process1)
 	rs.AddProcess(process2)
@@ -460,31 +460,31 @@ func TestGetProcess(t *testing.T) {
 
 	list := rs.GetProcessIDs("", "", "", "")
 	require.Len(t, list, 4)
-	require.ElementsMatch(t, []TaskID{{ID: "foo_aaa_1"}, {ID: "bar_bbb_2"}, {ID: "foo_ccc_3"}, {ID: "bar_ddd_4"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "bar_bbb_2"}, {ID: "foo_ccc_3"}, {ID: "bar_ddd_4"}}, list)
 
 	list = rs.GetProcessIDs("foo_*", "", "", "")
 	require.Len(t, list, 2)
-	require.ElementsMatch(t, []TaskID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
 
 	list = rs.GetProcessIDs("bar_*", "", "", "")
 	require.Len(t, list, 2)
-	require.ElementsMatch(t, []TaskID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
 
 	list = rs.GetProcessIDs("*_bbb_*", "", "", "")
 	require.Len(t, list, 1)
-	require.ElementsMatch(t, []TaskID{{ID: "bar_bbb_2"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}}, list)
 
 	list = rs.GetProcessIDs("", "foo_*", "", "")
 	require.Len(t, list, 2)
-	require.ElementsMatch(t, []TaskID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
 
 	list = rs.GetProcessIDs("", "bar_*", "", "")
 	require.Len(t, list, 2)
-	require.ElementsMatch(t, []TaskID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
 
 	list = rs.GetProcessIDs("", "*_bbb_*", "", "")
 	require.Len(t, list, 1)
-	require.ElementsMatch(t, []TaskID{{ID: "bar_bbb_2"}}, list)
+	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}}, list)
 }
 
 func TestStartProcess(t *testing.T) {
@@ -492,11 +492,11 @@ func TestStartProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
-	err = rs.StartProcess(TaskID{ID: "foobar"})
+	err = rs.StartProcess(app.ProcessID{ID: "foobar"})
 	require.NotEqual(t, nil, err, "shouldn't be able to start non-existing process")
 
 	err = rs.StartProcess(tid)
@@ -519,12 +519,12 @@ func TestStopProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 	rs.StartProcess(tid)
 
-	err = rs.StopProcess(TaskID{ID: "foobar"})
+	err = rs.StopProcess(app.ProcessID{ID: "foobar"})
 	require.NotEqual(t, nil, err, "shouldn't be able to stop non-existing process")
 
 	err = rs.StopProcess(tid)
@@ -545,11 +545,11 @@ func TestRestartProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
-	err = rs.RestartProcess(TaskID{ID: "foobar"})
+	err = rs.RestartProcess(app.ProcessID{ID: "foobar"})
 	require.NotEqual(t, nil, err, "shouldn't be able to restart non-existing process")
 
 	err = rs.RestartProcess(tid)
@@ -571,11 +571,11 @@ func TestReloadProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
-	err = rs.ReloadProcess(TaskID{ID: "foobar"})
+	err = rs.ReloadProcess(app.ProcessID{ID: "foobar"})
 	require.NotEqual(t, nil, err, "shouldn't be able to reload non-existing process")
 
 	err = rs.ReloadProcess(tid)
@@ -605,7 +605,7 @@ func TestParseProcessPattern(t *testing.T) {
 	process := getDummyProcess()
 	process.LogPatterns = []string{"libx264"}
 
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 	rs.StartProcess(tid)
@@ -626,7 +626,7 @@ func TestProbeProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
@@ -640,7 +640,7 @@ func TestProcessMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
@@ -665,11 +665,11 @@ func TestLog(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetProcessLog(TaskID{ID: "foobar"})
+	_, err = rs.GetProcessLog(app.ProcessID{ID: "foobar"})
 	require.Error(t, err)
 
 	log, err := rs.GetProcessLog(tid)
@@ -704,7 +704,7 @@ func TestLogTransfer(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	err = rs.AddProcess(process)
 	require.NoError(t, err)
@@ -730,13 +730,13 @@ func TestPlayoutNoRange(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetPlayout(TaskID{ID: "foobar"}, process.Input[0].ID)
+	_, err = rs.GetPlayout(app.ProcessID{ID: "foobar"}, process.Input[0].ID)
 	require.Equal(t, ErrUnknownProcess, err)
 
 	_, err = rs.GetPlayout(tid, "foobar")
@@ -754,13 +754,13 @@ func TestPlayoutRange(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	process.Input[0].Address = "playout:" + process.Input[0].Address
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetPlayout(TaskID{ID: "foobar"}, process.Input[0].ID)
+	_, err = rs.GetPlayout(app.ProcessID{ID: "foobar"}, process.Input[0].ID)
 	require.Equal(t, ErrUnknownProcess, err)
 
 	_, err = rs.GetPlayout(tid, "foobar")
@@ -869,9 +869,9 @@ func TestTeeAddressReference(t *testing.T) {
 
 	r := rs.(*restream)
 
-	require.Equal(t, "http://example.com/live.m3u8", r.tasks[TaskID{ID: "process2"}].config.Input[0].Address)
-	require.Equal(t, "http://example.com/live.m3u8", r.tasks[TaskID{ID: "process3"}].config.Input[0].Address)
-	require.Equal(t, "rtmp://example.com/live.stream?token=123", r.tasks[TaskID{ID: "process4"}].config.Input[0].Address)
+	require.Equal(t, "http://example.com/live.m3u8", r.tasks[app.ProcessID{ID: "process2"}].config.Input[0].Address)
+	require.Equal(t, "http://example.com/live.m3u8", r.tasks[app.ProcessID{ID: "process3"}].config.Input[0].Address)
+	require.Equal(t, "rtmp://example.com/live.stream?token=123", r.tasks[app.ProcessID{ID: "process4"}].config.Input[0].Address)
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -1449,7 +1449,7 @@ func TestProcessReplacer(t *testing.T) {
 		LogPatterns:    []string{},
 	}
 
-	task, ok := rs.tasks[TaskID{ID: "314159265359"}]
+	task, ok := rs.tasks[app.ProcessID{ID: "314159265359"}]
 	require.True(t, ok)
 
 	require.Equal(t, process, task.config)
@@ -1466,7 +1466,7 @@ func TestProcessLogPattern(t *testing.T) {
 	process.Autostart = false
 	process.Reconnect = true
 
-	tid := TaskID{ID: process.ID}
+	tid := app.ProcessID{ID: process.ID}
 
 	err = rs.AddProcess(process)
 	require.NoError(t, err)
@@ -1500,7 +1500,7 @@ func TestProcessLimit(t *testing.T) {
 
 	rs := rsi.(*restream)
 
-	task, ok := rs.tasks[TaskID{ID: process.ID}]
+	task, ok := rs.tasks[app.ProcessID{ID: process.ID}]
 	require.True(t, ok)
 
 	status := task.ffmpeg.Status()

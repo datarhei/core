@@ -23,9 +23,9 @@ type Forwarder interface {
 	Snapshot() (io.ReadCloser, error)
 
 	AddProcess(origin string, config *app.Config) error
-	UpdateProcess(origin, id string, config *app.Config) error
-	SetProcessMetadata(origin, id, key string, data interface{}) error
-	RemoveProcess(origin, id string) error
+	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
+	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
+	RemoveProcess(origin string, id app.ProcessID) error
 
 	AddIdentity(origin string, identity iamidentity.User) error
 	UpdateIdentity(origin, name string, identity iamidentity.User) error
@@ -155,7 +155,7 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 	return client.AddProcess(origin, r)
 }
 
-func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
+func (f *forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
 	if origin == "" {
 		origin = f.id
 	}
@@ -172,7 +172,7 @@ func (f *forwarder) UpdateProcess(origin, id string, config *app.Config) error {
 	return client.UpdateProcess(origin, r)
 }
 
-func (f *forwarder) SetProcessMetadata(origin, id, key string, data interface{}) error {
+func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
 	if origin == "" {
 		origin = f.id
 	}
@@ -190,7 +190,7 @@ func (f *forwarder) SetProcessMetadata(origin, id, key string, data interface{})
 	return client.SetProcessMetadata(origin, r)
 }
 
-func (f *forwarder) RemoveProcess(origin, id string) error {
+func (f *forwarder) RemoveProcess(origin string, id app.ProcessID) error {
 	if origin == "" {
 		origin = f.id
 	}

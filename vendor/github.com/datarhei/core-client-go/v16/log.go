@@ -2,6 +2,7 @@ package coreclient
 
 import (
 	"encoding/json"
+	"net/url"
 
 	"github.com/datarhei/core-client-go/v16/api"
 )
@@ -9,7 +10,10 @@ import (
 func (r *restclient) Log() ([]api.LogEvent, error) {
 	var log []api.LogEvent
 
-	data, err := r.call("GET", "/v3/log?format=raw", "", nil)
+	query := &url.Values{}
+	query.Set("format", "raw")
+
+	data, err := r.call("GET", "/v3/log", query, "", nil)
 	if err != nil {
 		return log, err
 	}

@@ -176,6 +176,13 @@ func (config *Config) Hash() []byte {
 	return sum[:]
 }
 
+func (c *Config) ProcessID() ProcessID {
+	return ProcessID{
+		ID:     c.ID,
+		Domain: c.Domain,
+	}
+}
+
 type Process struct {
 	ID        string
 	Owner     string
@@ -200,6 +207,13 @@ func (process *Process) Clone() *Process {
 	}
 
 	return clone
+}
+
+func (process *Process) ProcessID() ProcessID {
+	return ProcessID{
+		ID:     process.ID,
+		Domain: process.Domain,
+	}
 }
 
 type ProcessStates struct {
@@ -253,4 +267,47 @@ type ProcessUsageMemory struct {
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU
 	Memory ProcessUsageMemory
+}
+
+type ProcessID struct {
+	ID     string
+	Domain string
+}
+
+func NewProcessID(id, domain string) ProcessID {
+	return ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+}
+
+func ParseProcessID(pid string) ProcessID {
+	p := ProcessID{}
+
+	p.Parse(pid)
+
+	return p
+}
+
+func (p ProcessID) String() string {
+	return p.ID + "@" + p.Domain
+}
+
+func (p ProcessID) Equals(b ProcessID) bool {
+	if p.ID == b.ID && p.Domain == b.Domain {
+		return true
+	}
+
+	return false
+}
+
+func (p *ProcessID) Parse(pid string) {
+	i := strings.LastIndex(pid, "@")
+	if i == -1 {
+		p.ID = pid
+		p.Domain = ""
+	}
+
+	p.ID = pid[:i]
+	p.Domain = pid[i+1:]
 }

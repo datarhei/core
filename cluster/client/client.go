@@ -28,14 +28,14 @@ type AddProcessRequest struct {
 }
 
 type UpdateProcessRequest struct {
-	ID     string     `json:"id"`
-	Config app.Config `json:"config"`
+	ID     app.ProcessID `json:"id"`
+	Config app.Config    `json:"config"`
 }
 
 type SetProcessMetadataRequest struct {
-	ID       string      `json:"id"`
-	Key      string      `json:"key"`
-	Metadata interface{} `json:"metadata"`
+	ID       app.ProcessID `json:"id"`
+	Key      string        `json:"key"`
+	Metadata interface{}   `json:"metadata"`
 }
 
 type AddIdentityRequest struct {
@@ -100,8 +100,8 @@ func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
 	return err
 }
 
-func (c *APIClient) RemoveProcess(origin string, id string) error {
-	_, err := c.call(http.MethodDelete, "/process/"+id, "application/json", nil, origin)
+func (c *APIClient) RemoveProcess(origin string, id app.ProcessID) error {
+	_, err := c.call(http.MethodDelete, "/process/"+id.ID+"?domain="+id.Domain, "application/json", nil, origin)
 
 	return err
 }
@@ -112,7 +112,7 @@ func (c *APIClient) UpdateProcess(origin string, r UpdateProcessRequest) error {
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+r.ID, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/process/"+r.ID.ID+"?domain="+r.ID.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -123,7 +123,7 @@ func (c *APIClient) SetProcessMetadata(origin string, r SetProcessMetadataReques
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+r.ID+"/metadata/"+r.Key, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/process/"+r.ID.ID+"/metadata/"+r.Key+"?domain="+r.ID.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

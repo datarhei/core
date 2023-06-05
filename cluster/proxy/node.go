@@ -11,9 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/restream/app"
+
 	client "github.com/datarhei/core-client-go/v16"
 	clientapi "github.com/datarhei/core-client-go/v16/api"
-	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Node interface {
@@ -27,10 +28,10 @@ type Node interface {
 	GetFile(prefix, path string) (io.ReadCloser, error)
 
 	ProcessAdd(config *app.Config, metadata map[string]interface{}) error
-	ProcessStart(id string) error
-	ProcessStop(id string) error
-	ProcessDelete(id string) error
-	ProcessUpdate(id string, config *app.Config, metadata map[string]interface{}) error
+	ProcessStart(id app.ProcessID) error
+	ProcessStop(id app.ProcessID) error
+	ProcessDelete(id app.ProcessID) error
+	ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 
 	NodeReader
 }
@@ -51,11 +52,12 @@ type NodeFiles struct {
 }
 
 type NodeResources struct {
-	NCPU     float64 // Number of CPU on this node
-	CPU      float64 // Current CPU load, 0-100*ncpu
-	CPULimit float64 // Defined CPU load limit, 0-100*ncpu
-	Mem      uint64  // Currently used memory in bytes
-	MemLimit uint64  // Defined memory limit in bytes
+	IsThrottling bool    // Whether this core is currently throttling
+	NCPU         float64 // Number of CPU on this node
+	CPU          float64 // Current CPU load, 0-100*ncpu
+	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
+	Mem          uint64  // Currently used memory in bytes
+	MemLimit     uint64  // Defined memory limit in bytes
 }
 
 type NodeAbout struct {
@@ -719,6 +721,8 @@ func (n *node) ProcessList() ([]Process, error) {
 
 		cfg := &app.Config{
 			ID:             p.Config.ID,
+			Owner:          p.Config.Owner,
+			Domain:         p.Config.Domain,
 			Reference:      p.Config.Reference,
 			Input:          []app.ConfigIO{},
 			Output:         []app.ConfigIO{},
@@ -727,6 +731,9 @@ func (n *node) ProcessList() ([]Process, error) {
 			ReconnectDelay: p.Config.ReconnectDelay,
 			Autostart:      p.Config.Autostart,
 			StaleTimeout:   p.Config.StaleTimeout,
+			Timeout:        p.Config.Timeout,
+			Scheduler:      p.Config.Scheduler,
+			LogPatterns:    p.Config.LogPatterns,
 			LimitCPU:       p.Config.Limits.CPU,
 			LimitMemory:    p.Config.Limits.Memory * 1024 * 1024,
 			LimitWaitFor:   p.Config.Limits.WaitFor,
@@ -784,6 +791,8 @@ func (n *node) ProcessAdd(config *app.Config, metadata map[string]interface{}) e
 func convertConfig(config *app.Config, metadata map[string]interface{}) clientapi.ProcessConfig {
 	cfg := clientapi.ProcessConfig{
 		ID:             config.ID,
+		Owner:          config.Owner,
+		Domain:         config.Domain,
 		Type:           "ffmpeg",
 		Reference:      config.Reference,
 		Input:          []clientapi.ProcessConfigIO{},
@@ -793,6 +802,9 @@ func convertConfig(config *app.Config, metadata map[string]interface{}) clientap
 		ReconnectDelay: config.ReconnectDelay,
 		Autostart:      config.Autostart,
 		StaleTimeout:   config.StaleTimeout,
+		Timeout:        config.Timeout,
+		Scheduler:      config.Scheduler,
+		LogPatterns:    config.LogPatterns,
 		Limits: clientapi.ProcessConfigLimits{
 			CPU:     config.LimitCPU,
 			Memory:  config.LimitMemory / 1024 / 1024,
@@ -832,7 +844,7 @@ func convertConfig(config *app.Config, metadata map[string]interface{}) clientap
 	return cfg
 }
 
-func (n *node) ProcessStart(id string) error {
+func (n *node) ProcessStart(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -840,10 +852,10 @@ func (n *node) ProcessStart(id string) error {
 		return fmt.Errorf("not connected")
 	}
 
-	return n.peer.ProcessCommand(id, "start")
+	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "start")
 }
 
-func (n *node) ProcessStop(id string) error {
+func (n *node) ProcessStop(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -851,10 +863,10 @@ func (n *node) ProcessStop(id string) error {
 		return fmt.Errorf("not connected")
 	}
 
-	return n.peer.ProcessCommand(id, "stop")
+	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "stop")
 }
 
-func (n *node) ProcessDelete(id string) error {
+func (n *node) ProcessDelete(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -862,10 +874,10 @@ func (n *node) ProcessDelete(id string) error {
 		return fmt.Errorf("not connected")
 	}
 
-	return n.peer.ProcessDelete(id)
+	return n.peer.ProcessDelete(client.NewProcessID(id.ID, id.Domain))
 }
 
-func (n *node) ProcessUpdate(id string, config *app.Config, metadata map[string]interface{}) error {
+func (n *node) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -875,5 +887,5 @@ func (n *node) ProcessUpdate(id string, config *app.Config, metadata map[string]
 
 	cfg := convertConfig(config, metadata)
 
-	return n.peer.ProcessUpdate(id, cfg)
+	return n.peer.ProcessUpdate(client.NewProcessID(id.ID, id.Domain), cfg)
 }

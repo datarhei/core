@@ -22,7 +22,7 @@ type Store interface {
 	OnApply(func(op Operation))
 
 	ProcessList() []Process
-	GetProcess(id string) (Process, error)
+	GetProcess(id app.ProcessID) (Process, error)
 
 	UserList() Users
 	GetUser(name string) Users
@@ -80,16 +80,16 @@ type CommandAddProcess struct {
 }
 
 type CommandUpdateProcess struct {
-	ID     string
+	ID     app.ProcessID
 	Config *app.Config
 }
 
 type CommandRemoveProcess struct {
-	ID string
+	ID app.ProcessID
 }
 
 type CommandSetProcessMetadata struct {
-	ID   string
+	ID   app.ProcessID
 	Key  string
 	Data interface{}
 }
@@ -242,13 +242,15 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, ok := s.Process[cmd.Config.ID]
+	id := cmd.Config.ProcessID().String()
+
+	_, ok := s.Process[id]
 	if ok {
-		return NewStoreError("the process with the ID '%s' already exists", cmd.Config.ID)
+		return NewStoreError("the process with the ID '%s' already exists", id)
 	}
 
 	now := time.Now()
-	s.Process[cmd.Config.ID] = Process{
+	s.Process[id] = Process{
 		CreatedAt: now,
 		UpdatedAt: now,
 		Config:    cmd.Config,
@@ -262,7 +264,14 @@ func (s *store) removeProcess(cmd CommandRemoveProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	delete(s.Process, cmd.ID)
+	id := cmd.ID.String()
+
+	_, ok := s.Process[id]
+	if !ok {
+		return NewStoreError("the process with the ID '%s' doesn't exist", id)
+	}
+
+	delete(s.Process, id)
 
 	return nil
 }
@@ -271,9 +280,12 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	p, ok := s.Process[cmd.ID]
+	srcid := cmd.ID.String()
+	dstid := cmd.Config.ProcessID().String()
+
+	p, ok := s.Process[srcid]
 	if !ok {
-		return NewStoreError("the process with the ID '%s' doesn't exists", cmd.ID)
+		return NewStoreError("the process with the ID '%s' doesn't exists", srcid)
 	}
 
 	currentHash := p.Config.Hash()
@@ -283,19 +295,19 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return nil
 	}
 
-	if cmd.ID == cmd.Config.ID {
-		s.Process[cmd.ID] = Process{
+	if srcid == dstid {
+		s.Process[srcid] = Process{
 			UpdatedAt: time.Now(),
 			Config:    cmd.Config,
 		}
 	} else {
-		_, ok := s.Process[cmd.Config.ID]
+		_, ok := s.Process[dstid]
 		if ok {
-			return NewStoreError("the process with the ID '%s' already exists", cmd.Config.ID)
+			return NewStoreError("the process with the ID '%s' already exists", dstid)
 		}
 
-		delete(s.Process, cmd.ID)
-		s.Process[cmd.Config.ID] = Process{
+		delete(s.Process, srcid)
+		s.Process[dstid] = Process{
 			UpdatedAt: time.Now(),
 			Config:    cmd.Config,
 		}
@@ -308,7 +320,9 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	p, ok := s.Process[cmd.ID]
+	id := cmd.ID.String()
+
+	p, ok := s.Process[id]
 	if !ok {
 		return NewStoreError("the process with the ID '%s' doesn't exists", cmd.ID)
 	}
@@ -324,7 +338,7 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 	}
 	p.UpdatedAt = time.Now()
 
-	s.Process[cmd.ID] = p
+	s.Process[id] = p
 
 	return nil
 }
@@ -456,11 +470,11 @@ func (s *store) ProcessList() []Process {
 	return processes
 }
 
-func (s *store) GetProcess(id string) (Process, error) {
+func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	process, ok := s.Process[id]
+	process, ok := s.Process[id.String()]
 	if !ok {
 		return Process{}, fmt.Errorf("not found")
 	}

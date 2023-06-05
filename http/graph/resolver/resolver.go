@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 // This file will not be regenerated automatically.
@@ -24,7 +25,7 @@ type Resolver struct {
 	IAM       iam.IAM
 }
 
-func (r *queryResolver) getProcess(id restream.TaskID) (*models.Process, error) {
+func (r *queryResolver) getProcess(id app.ProcessID) (*models.Process, error) {
 	process, err := r.Restream.GetProcess(id)
 	if err != nil {
 		return nil, err

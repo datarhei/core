@@ -125,7 +125,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			resource := c.Request().URL.Path
 			var domain string
 
-			if resource == "/ping" || resource == "/profiling" {
+			c.Set("user", username)
+			c.Set("superuser", false)
+
+			if resource == "/ping" {
 				return next(c)
 			}
 
@@ -151,7 +154,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				} else {
 					identity, err = mw.findIdentityFromJWT(c)
 					if err != nil {
-						return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
 					}
 
 					if identity != nil {
@@ -222,6 +225,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			}
 
 			action := c.Request().Method
+
+			if username == "$anon" && resource == "api:/api" {
+				return next(c)
+			}
 
 			if !config.IAM.Enforce(username, domain, resource, action) {
 				return api.Err(http.StatusForbidden, "Forbidden", "access denied")

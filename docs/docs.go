@@ -1071,6 +1071,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/process/{id}/metadata/{key}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add JSON metadata with a process under the given key",
+                "operationId": "cluster-3-set-process-metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Key for data store",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Arbitrary JSON data. The null value will remove the key and its contents",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {}
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/config": {
             "get": {
                 "security": [
@@ -3773,6 +3844,9 @@ const docTemplate = `{
                 "cpu": {
                     "type": "number"
                 },
+                "domain": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3783,6 +3857,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "order": {
+                    "type": "string"
+                },
+                "owner": {
                     "type": "string"
                 },
                 "reference": {
@@ -4982,10 +5059,16 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
+                "domain": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
                 "metadata": {},
+                "owner": {
+                    "type": "string"
+                },
                 "reference": {
                     "type": "string"
                 },
@@ -5034,6 +5117,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "options": {
                     "type": "array",

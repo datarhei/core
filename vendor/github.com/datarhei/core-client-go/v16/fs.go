@@ -23,12 +23,12 @@ const (
 func (r *restclient) FilesystemList(name, pattern, sort, order string) ([]api.FileInfo, error) {
 	var files []api.FileInfo
 
-	values := url.Values{}
-	values.Set("glob", pattern)
-	values.Set("sort", sort)
-	values.Set("order", order)
+	query := &url.Values{}
+	query.Set("glob", pattern)
+	query.Set("sort", sort)
+	query.Set("order", order)
 
-	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(name)+"?"+values.Encode(), "", nil)
+	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(name), query, "", nil)
 	if err != nil {
 		return files, err
 	}
@@ -43,7 +43,7 @@ func (r *restclient) FilesystemHasFile(name, path string) bool {
 		path = "/" + path
 	}
 
-	_, err := r.call("HEAD", "/v3/fs/"+url.PathEscape(name)+path, "", nil)
+	_, err := r.call("HEAD", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
 
 	return err == nil
 }
@@ -53,7 +53,7 @@ func (r *restclient) FilesystemGetFile(name, path string) (io.ReadCloser, error)
 		path = "/" + path
 	}
 
-	return r.stream("GET", "/v3/fs/"+url.PathEscape(name)+path, "", nil)
+	return r.stream("GET", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
 }
 
 func (r *restclient) FilesystemDeleteFile(name, path string) error {
@@ -61,7 +61,7 @@ func (r *restclient) FilesystemDeleteFile(name, path string) error {
 		path = "/" + path
 	}
 
-	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(name)+path, "", nil)
+	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
 
 	return err
 }
@@ -71,7 +71,7 @@ func (r *restclient) FilesystemAddFile(name, path string, data io.Reader) error 
 		path = "/" + path
 	}
 
-	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(name)+path, "application/data", data)
+	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(name)+path, nil, "application/data", data)
 
 	return err
 }

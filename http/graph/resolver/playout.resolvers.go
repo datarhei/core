@@ -11,7 +11,7 @@ import (
 
 	"github.com/datarhei/core/v16/http/graph/models"
 	"github.com/datarhei/core/v16/playout"
-	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 // PlayoutStatus is the resolver for the playoutStatus field.
@@ -22,7 +22,7 @@ func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, domain str
 		return nil, fmt.Errorf("forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}

@@ -9,7 +9,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/casbin/casbin/v2 v2.69.1
-	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230602102832-3d80767a2208
+	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230605095314-42546fbbbece
 	github.com/datarhei/gosrt v0.4.1
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
@@ -30,7 +30,7 @@ require (
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.15.1
 	github.com/shirou/gopsutil/v3 v3.23.4
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/echo-swagger v1.4.0
 	github.com/swaggo/swag v1.16.1
 	github.com/vektah/gqlparser/v2 v2.5.1

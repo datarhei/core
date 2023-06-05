@@ -11,7 +11,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/playout"
-	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 )
@@ -39,7 +39,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -108,7 +108,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -166,7 +166,7 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -221,7 +221,7 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -277,7 +277,7 @@ func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -331,7 +331,7 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}

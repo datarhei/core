@@ -1493,7 +1493,7 @@ func probeInput(binary string, config app.Config) app.Probe {
 
 	rs.AddProcess(&config)
 
-	id := restream.TaskID{ID: config.ID}
+	id := config.ProcessID()
 	probe := rs.Probe(id)
 	rs.DeleteProcess(id)
 

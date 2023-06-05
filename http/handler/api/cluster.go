@@ -16,6 +16,7 @@ import (
 	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
@@ -108,7 +109,9 @@ func (h *ClusterHandler) ListAllNodeProcesses(c echo.Context) error {
 		}
 
 		processes = append(processes, api.ClusterProcess{
-			ProcessID: p.Config.ID,
+			ID:        p.Config.ID,
+			Owner:     p.Config.Owner,
+			Domain:    p.Config.Domain,
 			NodeID:    p.NodeID,
 			Reference: p.Config.Reference,
 			Order:     p.Order,
@@ -303,7 +306,9 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 		}
 
 		processes = append(processes, api.ClusterProcess{
-			ProcessID: p.Config.ID,
+			ID:        p.Config.ID,
+			Owner:     p.Config.Owner,
+			Domain:    p.Config.Domain,
 			NodeID:    p.NodeID,
 			Reference: p.Config.Reference,
 			Order:     p.Order,
@@ -341,9 +346,11 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 
 		process := api.Process{
 			ID:        p.Config.ID,
+			Owner:     p.Config.Owner,
+			Domain:    p.Config.Domain,
 			Type:      "ffmpeg",
 			Reference: p.Config.Reference,
-			CreatedAt: 0,
+			CreatedAt: p.CreatedAt.Unix(),
 			UpdatedAt: p.UpdatedAt.Unix(),
 			Metadata:  p.Metadata,
 		}
@@ -412,7 +419,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 	}
 
 	for key, value := range metadata {
-		h.cluster.SetProcessMetadata("", config.ID, key, value)
+		h.cluster.SetProcessMetadata("", config.ProcessID(), key, value)
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -436,7 +443,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
 
 	process := api.ProcessConfig{
@@ -451,7 +458,9 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	current, err := h.cluster.GetProcess(id)
+	pid := process.ProcessID()
+
+	current, err := h.cluster.GetProcess(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Process not found", "%s", id)
 	}
@@ -475,7 +484,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	if err := h.cluster.UpdateProcess("", id, config); err != nil {
+	if err := h.cluster.UpdateProcess("", pid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
 			return api.Err(http.StatusNotFound, "Process not found", "%s", id)
 		}
@@ -483,8 +492,10 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
 	}
 
+	pid = process.ProcessID()
+
 	for key, value := range metadata {
-		h.cluster.SetProcessMetadata("", id, key, value)
+		h.cluster.SetProcessMetadata("", pid, key, value)
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -525,13 +536,13 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
-	/*
-		tid := restream.TaskID{
-			ID:     id,
-			Domain: domain,
-		}
-	*/
-	if err := h.cluster.SetProcessMetadata("", id, key, data); err != nil {
+
+	pid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	if err := h.cluster.SetProcessMetadata("", pid, key, data); err != nil {
 		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
 	}
 
@@ -546,21 +557,26 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Success 200 {string} string
+// @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
-// @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [delete]
 func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to delete process")
+		return api.Err(http.StatusForbidden, "", "Not allowed to delete this process")
 	}
 
-	if err := h.cluster.RemoveProcess("", id); err != nil {
-		return api.Err(http.StatusInternalServerError, "Process can't be deleted", "%s", err)
+	pid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	if err := h.cluster.RemoveProcess("", pid); err != nil {
+		return api.Err(http.StatusBadRequest, "", "%s", err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")

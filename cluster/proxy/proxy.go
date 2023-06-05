@@ -25,9 +25,9 @@ type Proxy interface {
 	Reader() ProxyReader
 
 	ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error
-	ProcessDelete(nodeid string, id string) error
-	ProcessStart(nodeid string, id string) error
-	ProcessUpdate(nodeid string, id string, config *app.Config, metadata map[string]interface{}) error
+	ProcessDelete(nodeid string, id app.ProcessID) error
+	ProcessStart(nodeid string, id app.ProcessID) error
+	ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 }
 
 type ProxyReader interface {
@@ -495,7 +495,7 @@ func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[strin
 		return err
 	}
 
-	err = node.ProcessStart(config.ID)
+	err = node.ProcessStart(config.ProcessID())
 	if err != nil {
 		return err
 	}
@@ -503,7 +503,7 @@ func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[strin
 	return nil
 }
 
-func (p *proxy) ProcessDelete(nodeid string, id string) error {
+func (p *proxy) ProcessDelete(nodeid string, id app.ProcessID) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -520,7 +520,7 @@ func (p *proxy) ProcessDelete(nodeid string, id string) error {
 	return nil
 }
 
-func (p *proxy) ProcessStart(nodeid string, id string) error {
+func (p *proxy) ProcessStart(nodeid string, id app.ProcessID) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -537,7 +537,7 @@ func (p *proxy) ProcessStart(nodeid string, id string) error {
 	return nil
 }
 
-func (p *proxy) ProcessUpdate(nodeid string, id string, config *app.Config, metadata map[string]interface{}) error {
+func (p *proxy) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 

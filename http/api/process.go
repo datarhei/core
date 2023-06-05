@@ -11,10 +11,12 @@ import (
 // Process represents all information on a process
 type Process struct {
 	ID        string         `json:"id" jsonschema:"minLength=1"`
+	Owner     string         `json:"owner"`
+	Domain    string         `json:"domain"`
 	Type      string         `json:"type" jsonschema:"enum=ffmpeg"`
 	Reference string         `json:"reference"`
-	CreatedAt int64          `json:"created_at" jsonschema:"minimum=0" format:"int64"`
-	UpdatedAt int64          `json:"updated_at" jsonschema:"minimum=0" format:"int64"`
+	CreatedAt int64          `json:"created_at" format:"int64"`
+	UpdatedAt int64          `json:"updated_at" format:"int64"`
 	Config    *ProcessConfig `json:"config,omitempty"`
 	State     *ProcessState  `json:"state,omitempty"`
 	Report    *ProcessReport `json:"report,omitempty"`
@@ -205,6 +207,13 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 	cfg.LogPatterns = make([]string, len(c.LogPatterns))
 	copy(cfg.LogPatterns, c.LogPatterns)
+}
+
+func (p *ProcessConfig) ProcessID() app.ProcessID {
+	return app.ProcessID{
+		ID:     p.ID,
+		Domain: p.Domain,
+	}
 }
 
 // ProcessState represents the current state of an ffmpeg process

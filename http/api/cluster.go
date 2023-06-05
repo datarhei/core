@@ -15,11 +15,12 @@ type ClusterNode struct {
 }
 
 type ClusterNodeResources struct {
-	NCPU     float64 `json:"ncpu"`
-	CPU      float64 `json:"cpu_used"`  // percent 0-100*npcu
-	CPULimit float64 `json:"cpu_limit"` // percent 0-100*npcu
-	Mem      uint64  `json:"memory_used_bytes"`
-	MemLimit uint64  `json:"memory_limit_bytes"`
+	IsThrottling bool    `json:"is_throttling"`
+	NCPU         float64 `json:"ncpu"`
+	CPU          float64 `json:"cpu_used"`  // percent 0-100*npcu
+	CPULimit     float64 `json:"cpu_limit"` // percent 0-100*npcu
+	Mem          uint64  `json:"memory_used_bytes"`
+	MemLimit     uint64  `json:"memory_limit_bytes"`
 }
 
 type ClusterNodeFiles struct {
@@ -35,7 +36,9 @@ type ClusterServer struct {
 }
 
 type ClusterProcess struct {
-	ProcessID string      `json:"id"`
+	ID        string      `json:"id"`
+	Owner     string      `json:"owner"`
+	Domain    string      `json:"domain"`
 	NodeID    string      `json:"node_id"`
 	Reference string      `json:"reference"`
 	Order     string      `json:"order"`

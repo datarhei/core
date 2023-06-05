@@ -74,18 +74,18 @@ type RestClient interface {
 	MetricsList() ([]api.MetricsDescription, error)              // GET /v3/metrics
 	Metrics(query api.MetricsQuery) (api.MetricsResponse, error) // POST /v3/metrics
 
-	ProcessList(opts ProcessListOptions) ([]api.Process, error)     // GET /v3/process
-	ProcessAdd(p api.ProcessConfig) error                           // POST /v3/process
-	Process(id string, filter []string) (api.Process, error)        // GET /v3/process/{id}
-	ProcessUpdate(id string, p api.ProcessConfig) error             // PUT /v3/process/{id}
-	ProcessDelete(id string) error                                  // DELETE /v3/process/{id}
-	ProcessCommand(id, command string) error                        // PUT /v3/process/{id}/command
-	ProcessProbe(id string) (api.Probe, error)                      // GET /v3/process/{id}/probe
-	ProcessConfig(id string) (api.ProcessConfig, error)             // GET /v3/process/{id}/config
-	ProcessReport(id string) (api.ProcessReport, error)             // GET /v3/process/{id}/report
-	ProcessState(id string) (api.ProcessState, error)               // GET /v3/process/{id}/state
-	ProcessMetadata(id, key string) (api.Metadata, error)           // GET /v3/process/{id}/metadata/{key}
-	ProcessMetadataSet(id, key string, metadata api.Metadata) error // PUT /v3/process/{id}/metadata/{key}
+	ProcessList(opts ProcessListOptions) ([]api.Process, error)               // GET /v3/process
+	ProcessAdd(p api.ProcessConfig) error                                     // POST /v3/process
+	Process(id ProcessID, filter []string) (api.Process, error)               // GET /v3/process/{id}
+	ProcessUpdate(id ProcessID, p api.ProcessConfig) error                    // PUT /v3/process/{id}
+	ProcessDelete(id ProcessID) error                                         // DELETE /v3/process/{id}
+	ProcessCommand(id ProcessID, command string) error                        // PUT /v3/process/{id}/command
+	ProcessProbe(id ProcessID) (api.Probe, error)                             // GET /v3/process/{id}/probe
+	ProcessConfig(id ProcessID) (api.ProcessConfig, error)                    // GET /v3/process/{id}/config
+	ProcessReport(id ProcessID) (api.ProcessReport, error)                    // GET /v3/process/{id}/report
+	ProcessState(id ProcessID) (api.ProcessState, error)                      // GET /v3/process/{id}/state
+	ProcessMetadata(id ProcessID, key string) (api.Metadata, error)           // GET /v3/process/{id}/metadata/{key}
+	ProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error // PUT /v3/process/{id}/metadata/{key}
 
 	RTMPChannels() ([]api.RTMPChannel, error) // GET /v3/rtmp
 	SRTChannels() ([]api.SRTChannel, error)   // GET /v3/srt
@@ -96,7 +96,7 @@ type RestClient interface {
 	Skills() (api.Skills, error) // GET /v3/skills
 	SkillsReload() error         // GET /v3/skills/reload
 
-	WidgetProcess(id string) (api.WidgetProcess, error) // GET /v3/widget/process/{id}
+	WidgetProcess(id ProcessID) (api.WidgetProcess, error) // GET /v3/widget/process/{id}
 }
 
 // Config is the configuration for a new REST API client.
@@ -451,12 +451,17 @@ func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
 	return resp.StatusCode, resp.Body, nil
 }
 
-func (r *restclient) stream(method, path, contentType string, data io.Reader) (io.ReadCloser, error) {
+func (r *restclient) stream(method, path string, query *url.Values, contentType string, data io.Reader) (io.ReadCloser, error) {
 	if err := r.checkVersion(method, r.prefix+path); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(method, r.address+r.prefix+path, data)
+	u := r.address + r.prefix + path
+	if query != nil {
+		u += "?" + query.Encode()
+	}
+
+	req, err := http.NewRequest(method, u, data)
 	if err != nil {
 		return nil, err
 	}
@@ -516,8 +521,8 @@ func (r *restclient) stream(method, path, contentType string, data io.Reader) (i
 	return body, nil
 }
 
-func (r *restclient) call(method, path, contentType string, data io.Reader) ([]byte, error) {
-	body, err := r.stream(method, path, contentType, data)
+func (r *restclient) call(method, path string, query *url.Values, contentType string, data io.Reader) ([]byte, error) {
+	body, err := r.stream(method, path, query, contentType, data)
 	if err != nil {
 		return nil, err
 	}

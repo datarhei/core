@@ -66,11 +66,11 @@ type Cluster interface {
 	Shutdown() error
 
 	ListProcesses() []store.Process
-	GetProcess(id string) (store.Process, error)
+	GetProcess(id app.ProcessID) (store.Process, error)
 	AddProcess(origin string, config *app.Config) error
-	RemoveProcess(origin, id string) error
-	UpdateProcess(origin, id string, config *app.Config) error
-	SetProcessMetadata(origin, id, key string, data interface{}) error
+	RemoveProcess(origin string, id app.ProcessID) error
+	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
+	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
 	ListIdentities() (time.Time, []iamidentity.User)
@@ -707,7 +707,7 @@ func (c *cluster) ListProcesses() []store.Process {
 	return c.store.ProcessList()
 }
 
-func (c *cluster) GetProcess(id string) (store.Process, error) {
+func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
 	return c.store.GetProcess(id)
 }
 
@@ -726,7 +726,7 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) RemoveProcess(origin, id string) error {
+func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveProcess(origin, id)
 	}
@@ -741,7 +741,7 @@ func (c *cluster) RemoveProcess(origin, id string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
+func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateProcess(origin, id, config)
 	}
@@ -757,7 +757,7 @@ func (c *cluster) UpdateProcess(origin, id string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) SetProcessMetadata(origin, id, key string, data interface{}) error {
+func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetProcessMetadata(origin, id, key, data)
 	}

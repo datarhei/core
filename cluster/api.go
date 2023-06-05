@@ -13,6 +13,7 @@ import (
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -161,6 +162,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.DELETE("/v1/process/:id", func(c echo.Context) error {
 		id := util.PathParam(c, "id")
+		domain := util.DefaultQuery(c, "domain", "")
 
 		origin := c.Request().Header.Get("X-Cluster-Origin")
 
@@ -168,11 +170,13 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		a.logger.Debug().WithField("id", id).Log("Remove process request")
+		pid := app.ProcessID{ID: id, Domain: domain}
 
-		err := a.cluster.RemoveProcess(origin, id)
+		a.logger.Debug().WithField("id", pid).Log("Remove process request")
+
+		err := a.cluster.RemoveProcess(origin, pid)
 		if err != nil {
-			a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to remove process")
+			a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to remove process")
 			return httpapi.Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
 		}
 
@@ -181,6 +185,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.PUT("/v1/process/:id", func(c echo.Context) error {
 		id := util.PathParam(c, "id")
+		domain := util.DefaultQuery(c, "domain", "")
 
 		r := client.UpdateProcessRequest{}
 
@@ -194,13 +199,15 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		if id != r.ID {
+		pid := app.ProcessID{ID: id, Domain: domain}
+
+		if !pid.Equals(r.ID) {
 			return httpapi.Err(http.StatusBadRequest, "Invalid data", "the ID in the path and the request do not match")
 		}
 
 		a.logger.Debug().WithFields(log.Fields{
 			"old_id": r.ID,
-			"new_id": r.Config.ID,
+			"new_id": r.Config.ProcessID(),
 		}).Log("Update process request")
 
 		err := a.cluster.UpdateProcess(origin, r.ID, &r.Config)
@@ -215,6 +222,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.PUT("/v1/process/:id/metadata/:key", func(c echo.Context) error {
 		id := util.PathParam(c, "id")
 		key := util.PathParam(c, "key")
+		domain := util.DefaultQuery(c, "domain", "")
 
 		r := client.SetProcessMetadataRequest{}
 
@@ -228,7 +236,9 @@ func NewAPI(config APIConfig) (API, error) {
 			return httpapi.Err(http.StatusLoopDetected, "", "breaking circuit")
 		}
 
-		err := a.cluster.SetProcessMetadata(origin, id, key, r.Metadata)
+		pid := app.ProcessID{ID: id, Domain: domain}
+
+		err := a.cluster.SetProcessMetadata(origin, pid, key, r.Metadata)
 		if err != nil {
 			a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to update metadata")
 			return httpapi.Err(http.StatusInternalServerError, "unable to update metadata", "%s", err)

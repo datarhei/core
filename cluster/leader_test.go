@@ -242,7 +242,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 
 	require.Equal(t, []interface{}{
 		processOpReject{
-			processid: "foobar",
+			processid: app.ProcessID{ID: "foobar"},
 			err:       errNotEnoughResources,
 		},
 	}, stack)
@@ -283,7 +283,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 
 	require.Equal(t, []interface{}{
 		processOpReject{
-			processid: "foobar",
+			processid: app.ProcessID{ID: "foobar"},
 			err:       errNotEnoughResources,
 		},
 	}, stack)
@@ -322,7 +322,7 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 
 	require.Equal(t, []interface{}{
 		processOpReject{
-			processid: "foobar",
+			processid: app.ProcessID{ID: "foobar"},
 			err:       errNoLimitsDefined,
 		},
 	}, stack)
@@ -367,7 +367,7 @@ func TestSynchronizeRemove(t *testing.T) {
 	require.Equal(t, []interface{}{
 		processOpDelete{
 			nodeid:    "node2",
-			processid: "foobar",
+			processid: app.ProcessID{ID: "foobar"},
 		},
 	}, stack)
 
@@ -437,7 +437,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 	require.Equal(t, []interface{}{
 		processOpDelete{
 			nodeid:    "node2",
-			processid: "foobar2",
+			processid: app.ProcessID{ID: "foobar2"},
 		},
 		processOpAdd{
 			nodeid: "node1",
@@ -662,17 +662,17 @@ func TestRebalanceSkip(t *testing.T) {
 	require.ElementsMatch(t, []interface{}{
 		processOpSkip{
 			nodeid:    "node1",
-			processid: "foobar3",
+			processid: app.ProcessID{ID: "foobar3"},
 			err:       errNotEnoughResourcesForRebalancing,
 		},
 		processOpSkip{
 			nodeid:    "node1",
-			processid: "foobar1",
+			processid: app.ProcessID{ID: "foobar1"},
 			err:       errNotEnoughResourcesForRebalancing,
 		},
 		processOpSkip{
 			nodeid:    "node2",
-			processid: "foobar2",
+			processid: app.ProcessID{ID: "foobar2"},
 			err:       errNotEnoughResourcesForRebalancing,
 		},
 	}, opStack)

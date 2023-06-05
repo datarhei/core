@@ -7,6 +7,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/session"
 
 	"github.com/labstack/echo/v4"
@@ -49,7 +50,7 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "Unknown process ID")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}

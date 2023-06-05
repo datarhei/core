@@ -7,10 +7,13 @@ import (
 	"github.com/datarhei/core-client-go/v16/api"
 )
 
-func (r *restclient) WidgetProcess(id string) (api.WidgetProcess, error) {
+func (r *restclient) WidgetProcess(id ProcessID) (api.WidgetProcess, error) {
 	var w api.WidgetProcess
 
-	data, err := r.call("GET", "/v3/widget/process"+url.PathEscape(id), "", nil)
+	query := &url.Values{}
+	query.Set("domain", id.Domain)
+
+	data, err := r.call("GET", "/v3/widget/process"+url.PathEscape(id.ID), query, "", nil)
 	if err != nil {
 		return w, err
 	}

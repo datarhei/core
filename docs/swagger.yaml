@@ -136,6 +136,8 @@ definitions:
     properties:
       cpu:
         type: number
+      domain:
+        type: string
       id:
         type: string
       memory_bytes:
@@ -143,6 +145,8 @@ definitions:
       node_id:
         type: string
       order:
+        type: string
+      owner:
         type: string
       reference:
         type: string
@@ -944,9 +948,13 @@ definitions:
       created_at:
         format: int64
         type: integer
+      domain:
+        type: string
       id:
         type: string
       metadata: {}
+      owner:
+        type: string
       reference:
         type: string
       report:
@@ -977,6 +985,9 @@ definitions:
         items:
           type: string
         type: array
+      metadata:
+        additionalProperties: true
+        type: object
       options:
         items:
           type: string
@@ -2983,6 +2994,56 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Replace an existing process
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process/{id}/metadata/{key}:
+    put:
+      description: Add arbitrary JSON metadata under the given key. If the key exists,
+        all already stored metadata with this key will be overwritten. If the key
+        doesn't exist, it will be created.
+      operationId: cluster-3-set-process-metadata
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Key for data store
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Arbitrary JSON data. The null value will remove the key and its
+          contents
+        in: body
+        name: data
+        required: true
+        schema: {}
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema: {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add JSON metadata with a process under the given key
       tags:
       - v16.?.?
   /api/v3/config:

@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/restream"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
@@ -82,7 +83,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     config.ID,
 		Domain: config.Domain,
 	}
@@ -127,7 +128,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
 	preids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
-	ids := []restream.TaskID{}
+	ids := []app.ProcessID{}
 
 	for _, id := range preids {
 		if !h.iam.Enforce(ctxuser, domain, "process:"+id.ID, "read") {
@@ -187,7 +188,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -219,7 +220,7 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -274,7 +275,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -303,7 +304,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	tid = restream.TaskID{
+	tid = app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -316,7 +317,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
 	}
 
-	tid = restream.TaskID{
+	tid = app.ProcessID{
 		ID:     config.ID,
 		Domain: config.Domain,
 	}
@@ -361,7 +362,7 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -409,7 +410,7 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -448,7 +449,7 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -510,7 +511,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -653,7 +654,7 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -728,7 +729,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -777,7 +778,7 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
 	}
 
-	tid := restream.TaskID{
+	tid := app.ProcessID{
 		ID:     id,
 		Domain: domain,
 	}
@@ -844,7 +845,7 @@ func (h *RestreamHandler) SetMetadata(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (h *RestreamHandler) getProcess(id restream.TaskID, filterString string) (api.Process, error) {
+func (h *RestreamHandler) getProcess(id app.ProcessID, filterString string) (api.Process, error) {
 	filter := strings.FieldsFunc(filterString, func(r rune) bool {
 		return r == rune(',')
 	})
@@ -875,6 +876,8 @@ func (h *RestreamHandler) getProcess(id restream.TaskID, filterString string) (a
 
 	info := api.Process{
 		ID:        process.ID,
+		Owner:     process.Owner,
+		Domain:    process.Domain,
 		Reference: process.Reference,
 		Type:      "ffmpeg",
 		CreatedAt: process.CreatedAt,

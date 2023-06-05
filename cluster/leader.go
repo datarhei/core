@@ -289,6 +289,8 @@ WAIT:
 func (c *cluster) establishLeadership(ctx context.Context) error {
 	c.logger.Debug().Log("Establishing leadership")
 
+	// creating a map of which process runs where
+
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
 
@@ -324,7 +326,7 @@ var errNoLimitsDefined = errors.New("no process limits are defined")
 
 type processOpDelete struct {
 	nodeid    string
-	processid string
+	processid app.ProcessID
 }
 
 type processOpMove struct {
@@ -336,7 +338,7 @@ type processOpMove struct {
 
 type processOpStart struct {
 	nodeid    string
-	processid string
+	processid app.ProcessID
 }
 
 type processOpAdd struct {
@@ -347,19 +349,19 @@ type processOpAdd struct {
 
 type processOpUpdate struct {
 	nodeid    string
-	processid string
+	processid app.ProcessID
 	config    *app.Config
 	metadata  map[string]interface{}
 }
 
 type processOpReject struct {
-	processid string
+	processid app.ProcessID
 	err       error
 }
 
 type processOpSkip struct {
 	nodeid    string
-	processid string
+	processid app.ProcessID
 	err       error
 }
 
@@ -370,12 +372,12 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 			err := c.proxy.ProcessAdd(v.nodeid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.config.ID,
+					"processid": v.config.ProcessID(),
 					"nodeid":    v.nodeid,
 				}).Log("Adding process")
 				break
 			}
-			err = c.proxy.ProcessStart(v.nodeid, v.config.ID)
+			err = c.proxy.ProcessStart(v.nodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
@@ -423,7 +425,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Moving process, adding process")
 				break
 			}
-			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ID)
+			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -432,7 +434,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Moving process, removing process")
 				break
 			}
-			err = c.proxy.ProcessStart(v.toNodeid, v.config.ID)
+			err = c.proxy.ProcessStart(v.toNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -509,7 +511,8 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 	// we want to be running on the nodes.
 	wantMap := map[string]store.Process{}
 	for _, process := range want {
-		wantMap[process.Config.ID] = process
+		pid := process.Config.ProcessID().String()
+		wantMap[pid] = process
 	}
 
 	opStack := []interface{}{}
@@ -520,10 +523,11 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 	haveAfterRemove := []proxy.Process{}
 
 	for _, p := range have {
-		if wantP, ok := wantMap[p.Config.ID]; !ok {
+		pid := p.Config.ProcessID().String()
+		if wantP, ok := wantMap[pid]; !ok {
 			opStack = append(opStack, processOpDelete{
 				nodeid:    p.NodeID,
-				processid: p.Config.ID,
+				processid: p.Config.ProcessID(),
 			})
 
 			// Adjust the resources
@@ -539,19 +543,19 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 			if wantP.UpdatedAt.After(p.UpdatedAt) {
 				opStack = append(opStack, processOpUpdate{
 					nodeid:    p.NodeID,
-					processid: p.Config.ID,
+					processid: p.Config.ProcessID(),
 					config:    wantP.Config,
 					metadata:  wantP.Metadata,
 				})
 			}
 		}
 
-		delete(wantMap, p.Config.ID)
+		delete(wantMap, pid)
 
 		if p.Order != "start" {
 			opStack = append(opStack, processOpStart{
 				nodeid:    p.NodeID,
-				processid: p.Config.ID,
+				processid: p.Config.ProcessID(),
 			})
 		}
 
@@ -568,7 +572,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		// If a process doesn't have any limits defined, reject that process
 		if process.Config.LimitCPU <= 0 || process.Config.LimitMemory <= 0 {
 			opStack = append(opStack, processOpReject{
-				processid: process.Config.ID,
+				processid: process.Config.ProcessID(),
 				err:       errNoLimitsDefined,
 			})
 
@@ -631,7 +635,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 			}
 		} else {
 			opStack = append(opStack, processOpReject{
-				processid: process.Config.ID,
+				processid: process.Config.ProcessID(),
 				err:       errNotEnoughResources,
 			})
 		}
@@ -780,7 +784,7 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 				// There's no other node with enough resources to take over this process
 				opStack = append(opStack, processOpSkip{
 					nodeid:    overloadedNodeid,
-					processid: p.Config.ID,
+					processid: p.Config.ProcessID(),
 					err:       errNotEnoughResourcesForRebalancing,
 				})
 				continue
