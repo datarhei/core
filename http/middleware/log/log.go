@@ -38,7 +38,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c echo.Context) (err error) {
 			if config.Skipper(c) {
 				return next(c)
 			}
@@ -67,37 +67,43 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			path := req.URL.Path
 			raw := req.URL.RawQuery
 
-			defer func() {
-				res.Writer = writer
-				req.Body = reader
+			if err = next(c); err != nil {
+				c.Error(err)
+			}
 
-				latency := time.Since(start)
+			res.Writer = writer
+			req.Body = reader
 
-				if raw != "" {
-					path = path + "?" + raw
-				}
+			latency := time.Since(start)
 
-				logger := config.Logger.WithFields(log.Fields{
-					"client":        c.RealIP(),
-					"method":        req.Method,
-					"path":          path,
-					"proto":         req.Proto,
-					"status":        res.Status,
-					"status_text":   http.StatusText(res.Status),
-					"tx_size_bytes": w.size,
-					"rx_size_bytes": r.size,
-					"latency_ms":    latency.Milliseconds(),
-					"user_agent":    req.Header.Get("User-Agent"),
-				})
+			if raw != "" {
+				path = path + "?" + raw
+			}
 
-				if res.Status >= 400 {
-					logger.Warn().Log("")
-				}
+			logger := config.Logger.WithFields(log.Fields{
+				"client":        c.RealIP(),
+				"method":        req.Method,
+				"path":          path,
+				"proto":         req.Proto,
+				"status":        res.Status,
+				"status_text":   http.StatusText(res.Status),
+				"tx_size_bytes": w.size,
+				"rx_size_bytes": r.size,
+				"latency_ms":    latency.Milliseconds(),
+				"user_agent":    req.Header.Get("User-Agent"),
+			})
 
-				logger.Debug().Log("")
-			}()
+			if res.Status >= 500 {
+				logger = logger.Error()
+			} else if res.Status >= 400 {
+				logger = logger.Warn()
+			} else {
+				logger = logger.Debug()
+			}
 
-			return next(c)
+			logger.Log("")
+
+			return
 		}
 	}
 }
