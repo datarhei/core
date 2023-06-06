@@ -14,18 +14,16 @@ type resources struct {
 	psutil psutil.Util
 
 	ncpu      float64
-	maxCPU    float64
-	maxMemory uint64
+	maxCPU    float64 // percent 0-100*ncpu
+	maxMemory uint64  // bytes
 
-	limitCPUCh    chan bool
-	isCPULimiting bool
-
-	limitMemoryCh    chan bool
+	isUnlimited      bool
+	isCPULimiting    bool
 	isMemoryLimiting bool
 
 	cancelObserver context.CancelFunc
 
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	startOnce sync.Once
 	stopOnce  sync.Once
 
@@ -36,8 +34,14 @@ type Resources interface {
 	Start()
 	Stop()
 
-	LimitCPU() <-chan bool
-	LimitMemory() <-chan bool
+	// HasLimits returns whether any limits have been set
+	HasLimits() bool
+
+	// Limits returns the CPU (percent 0-100) and memory (bytes) limits
+	Limits() (float64, uint64)
+
+	// ShouldLimit returns whether cpu and/or memory is currently limited
+	ShouldLimit() (bool, bool)
 
 	Request(cpu float64, memory uint64) error
 }
@@ -50,8 +54,12 @@ type Config struct {
 }
 
 func New(config Config) (Resources, error) {
-	if config.MaxCPU <= 0 || config.MaxMemory <= 0 {
-		return nil, fmt.Errorf("both MaxCPU and MaxMemory have to be set")
+	if config.MaxCPU <= 0 {
+		config.MaxCPU = 100
+	}
+
+	if config.MaxMemory <= 0 {
+		config.MaxMemory = 100
 	}
 
 	if config.MaxCPU > 100 || config.MaxMemory > 100 {
@@ -62,6 +70,10 @@ func New(config Config) (Resources, error) {
 		maxCPU: config.MaxCPU,
 		psutil: config.PSUtil,
 		logger: config.Logger,
+	}
+
+	if config.MaxCPU == 1000 && config.MaxMemory == 1000 {
+		r.isUnlimited = true
 	}
 
 	if r.logger == nil {
@@ -86,9 +98,6 @@ func New(config Config) (Resources, error) {
 
 	r.maxCPU *= r.ncpu
 	r.maxMemory = uint64(float64(vmstat.Total) * config.MaxMemory / 100)
-
-	r.limitCPUCh = make(chan bool, 10)
-	r.limitMemoryCh = make(chan bool, 10)
 
 	r.logger = r.logger.WithFields(log.Fields{
 		"ncpu":       r.ncpu,
@@ -124,14 +133,6 @@ func (r *resources) Stop() {
 
 		r.logger.Info().Log("Stopped")
 	})
-}
-
-func (r *resources) LimitCPU() <-chan bool {
-	return r.limitCPUCh
-}
-
-func (r *resources) LimitMemory() <-chan bool {
-	return r.limitMemoryCh
 }
 
 func (r *resources) observe(ctx context.Context, interval time.Duration) {
@@ -201,10 +202,6 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 				}).Log("Limiting CPU")
 
 				r.isCPULimiting = doCPULimit
-				select {
-				case r.limitCPUCh <- doCPULimit:
-				default:
-				}
 			}
 
 			if r.isMemoryLimiting != doMemoryLimit {
@@ -213,19 +210,30 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 				}).Log("Limiting memory")
 
 				r.isMemoryLimiting = doMemoryLimit
-				select {
-				case r.limitMemoryCh <- doMemoryLimit:
-				default:
-				}
 			}
 			r.lock.Unlock()
 		}
 	}
 }
 
+func (r *resources) HasLimits() bool {
+	return r.isUnlimited
+}
+
+func (r *resources) Limits() (float64, uint64) {
+	return r.maxCPU / r.ncpu, r.maxMemory
+}
+
+func (r *resources) ShouldLimit() (bool, bool) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.isCPULimiting, r.isMemoryLimiting
+}
+
 func (r *resources) Request(cpu float64, memory uint64) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	logger := r.logger.WithFields(log.Fields{
 		"req_cpu":    cpu,

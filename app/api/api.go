@@ -36,6 +36,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
 	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -92,6 +93,7 @@ type api struct {
 	sidecarserver   *gohttp.Server
 	update          update.Checker
 	replacer        replace.Replacer
+	resources       resources.Resources
 	cluster         cluster.Cluster
 	iam             iam.IAM
 
@@ -297,6 +299,16 @@ func (a *api) start() error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
+	if a.errorChan == nil {
+		a.errorChan = make(chan error, 1)
+	}
+
+	if a.state == "running" {
+		return fmt.Errorf("already running")
+	}
+
+	a.state = "starting"
+
 	cfg := a.config.store.GetActive()
 
 	if cfg.Debug.AutoMaxProcs {
@@ -311,15 +323,18 @@ func (a *api) start() error {
 		a.undoMaxprocs = undoMaxprocs
 	}
 
-	if a.errorChan == nil {
-		a.errorChan = make(chan error, 1)
+	resources, err := resources.New(resources.Config{
+		MaxCPU:    cfg.Resources.MaxCPUUsage,
+		MaxMemory: cfg.Resources.MaxMemoryUsage,
+		Logger:    a.log.logger.core.WithComponent("Resources"),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize resource manager: %w", err)
 	}
 
-	if a.state == "running" {
-		return fmt.Errorf("already running")
-	}
+	resources.Start()
 
-	a.state = "starting"
+	a.resources = resources
 
 	if cfg.Sessions.Enable {
 		sessionConfig := session.Config{
@@ -1005,8 +1020,7 @@ func (a *api) start() error {
 		Rewrite:      rw,
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
-		MaxCPU:       cfg.Resources.MaxCPUUsage,
-		MaxMemory:    cfg.Resources.MaxMemoryUsage,
+		Resources:    a.resources,
 		IAM:          a.iam,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
@@ -1027,8 +1041,8 @@ func (a *api) start() error {
 	}
 
 	metrics.Register(monitor.NewUptimeCollector())
-	metrics.Register(monitor.NewCPUCollector(cfg.Resources.MaxCPUUsage))
-	metrics.Register(monitor.NewMemCollector(cfg.Resources.MaxMemoryUsage))
+	metrics.Register(monitor.NewCPUCollector(a.resources))
+	metrics.Register(monitor.NewMemCollector(a.resources))
 	metrics.Register(monitor.NewNetCollector())
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base")))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))
@@ -1798,6 +1812,11 @@ func (a *api) stop() {
 		}
 
 		a.sidecarserver = nil
+	}
+
+	// Stop resource observer
+	if a.resources != nil {
+		a.resources.Stop()
 	}
 
 	// Stop the GC ticker

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/psutil"
-	"github.com/stretchr/testify/require"
 
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/net"
+	"github.com/stretchr/testify/require"
 )
 
 type util struct{}
@@ -72,9 +72,19 @@ func TestMemoryLimit(t *testing.T) {
 		timer := time.NewTimer(10 * time.Second)
 		defer timer.Stop()
 
-		select {
-		case limit = <-r.LimitMemory():
-		case <-timer.C:
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				_, limit = r.ShouldLimit()
+				if limit {
+					return
+				}
+			case <-timer.C:
+				return
+			}
 		}
 	}()
 
@@ -109,9 +119,19 @@ func TestCPULimit(t *testing.T) {
 		timer := time.NewTimer(10 * time.Second)
 		defer timer.Stop()
 
-		select {
-		case limit = <-r.LimitCPU():
-		case <-timer.C:
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				limit, _ = r.ShouldLimit()
+				if limit {
+					return
+				}
+			case <-timer.C:
+				return
+			}
 		}
 	}()
 

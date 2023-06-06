@@ -104,11 +104,12 @@ type node struct {
 	lastContact time.Time
 
 	resources struct {
-		ncpu     float64
-		cpu      float64
-		cpuLimit float64
-		mem      uint64
-		memLimit uint64
+		throttling bool
+		ncpu       float64
+		cpu        float64
+		cpuLimit   float64
+		mem        uint64
+		memLimit   uint64
 	}
 
 	state       nodeState
@@ -271,14 +272,17 @@ func (n *node) Connect() error {
 						{Name: "cpu_ncpu"},
 						{Name: "cpu_idle"},
 						{Name: "cpu_limit"},
+						{Name: "cpu_throttling"},
 						{Name: "mem_total"},
 						{Name: "mem_free"},
 						{Name: "mem_limit"},
+						{Name: "mem_throttling"},
 					},
 				})
 
 				if err != nil {
 					n.stateLock.Lock()
+					n.resources.throttling = true
 					n.resources.cpu = 100
 					n.resources.ncpu = 1
 					n.resources.cpuLimit = 0
@@ -296,6 +300,7 @@ func (n *node) Connect() error {
 				mem_total := uint64(0)
 				mem_free := uint64(0)
 				mem_limit := uint64(0)
+				throttling := .0
 
 				for _, x := range metrics.Metrics {
 					if x.Name == "cpu_idle" {
@@ -304,16 +309,25 @@ func (n *node) Connect() error {
 						cpu_ncpu = x.Values[0].Value
 					} else if x.Name == "cpu_limit" {
 						cpu_limit = x.Values[0].Value
+					} else if x.Name == "cpu_throttling" {
+						throttling += x.Values[0].Value
 					} else if x.Name == "mem_total" {
 						mem_total = uint64(x.Values[0].Value)
 					} else if x.Name == "mem_free" {
 						mem_free = uint64(x.Values[0].Value)
 					} else if x.Name == "mem_limit" {
 						mem_limit = uint64(x.Values[0].Value)
+					} else if x.Name == "mem_throttling" {
+						throttling += x.Values[0].Value
 					}
 				}
 
 				n.stateLock.Lock()
+				if throttling > 0 {
+					n.resources.throttling = true
+				} else {
+					n.resources.throttling = false
+				}
 				n.resources.ncpu = cpu_ncpu
 				n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
 				n.resources.cpuLimit = cpu_limit * cpu_ncpu
@@ -463,11 +477,12 @@ func (n *node) About() NodeAbout {
 		LastContact: n.lastContact,
 		Latency:     time.Duration(n.latency * float64(time.Second)),
 		Resources: NodeResources{
-			NCPU:     n.resources.ncpu,
-			CPU:      n.resources.cpu,
-			CPULimit: n.resources.cpuLimit,
-			Mem:      n.resources.mem,
-			MemLimit: n.resources.memLimit,
+			IsThrottling: n.resources.throttling,
+			NCPU:         n.resources.ncpu,
+			CPU:          n.resources.cpu,
+			CPULimit:     n.resources.cpuLimit,
+			Mem:          n.resources.mem,
+			MemLimit:     n.resources.memLimit,
 		},
 	}
 

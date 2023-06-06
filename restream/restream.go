@@ -23,10 +23,10 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/net/url"
 	"github.com/datarhei/core/v16/process"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
-	"github.com/datarhei/core/v16/restream/resources"
 	"github.com/datarhei/core/v16/restream/rewrite"
 	"github.com/datarhei/core/v16/restream/store"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
@@ -76,8 +76,7 @@ type Config struct {
 	Rewrite      rewrite.Rewriter
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
-	MaxCPU       float64 // percent 0-100
-	MaxMemory    float64 // percent 0-100
+	Resources    resources.Resources
 	Logger       log.Logger
 	IAM          iam.IAM
 }
@@ -195,21 +194,12 @@ func New(config Config) (Restreamer, error) {
 	}
 
 	r.maxProc = config.MaxProcesses
-
-	if config.MaxCPU > 0 || config.MaxMemory > 0 {
-		resources, err := resources.New(resources.Config{
-			MaxCPU:    config.MaxCPU,
-			MaxMemory: config.MaxMemory,
-			Logger:    r.logger.WithComponent("Resources"),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize resource manager: %w", err)
-		}
-		r.resources = resources
-		r.enableSoftLimit = true
-
-		r.logger.Debug().Log("Enabling resource manager")
+	r.resources = config.Resources
+	if r.resources == nil {
+		return nil, fmt.Errorf("a resource manager must be provided")
 	}
+
+	r.enableSoftLimit = r.resources.HasLimits()
 
 	if err := r.load(); err != nil {
 		return nil, fmt.Errorf("failed to load data from DB: %w", err)
@@ -231,7 +221,7 @@ func (r *restream) Start() {
 		r.cancelObserver = cancel
 
 		if r.enableSoftLimit {
-			go r.resourceObserver(ctx, r.resources)
+			go r.resourceObserver(ctx, r.resources, time.Second)
 		}
 
 		for id, t := range r.tasks {
@@ -321,9 +311,9 @@ func (r *restream) filesystemObserver(ctx context.Context, fs fs.Filesystem, int
 	}
 }
 
-func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources) {
-	rsc.Start()
-	defer rsc.Stop()
+func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	limitCPU, limitMemory := false, false
 
@@ -331,34 +321,39 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 		select {
 		case <-ctx.Done():
 			return
-		case limitCPU = <-rsc.LimitCPU():
-			r.lock.Lock()
-			for id, t := range r.tasks {
-				if !t.valid {
-					continue
-				}
+		case <-ticker.C:
+			cpu, memory := rsc.ShouldLimit()
 
-				r.logger.Debug().WithFields(log.Fields{
-					"limit_cpu": limitCPU,
-					"id":        id,
-				}).Log("Limiting process CPU consumption")
-				t.ffmpeg.Limit(limitCPU, limitMemory)
+			hasChanges := false
+
+			if cpu != limitCPU {
+				limitCPU = cpu
+				hasChanges = true
 			}
-			r.lock.Unlock()
-		case limitMemory = <-rsc.LimitMemory():
-			r.lock.Lock()
+
+			if memory != limitMemory {
+				limitMemory = memory
+				hasChanges = true
+			}
+
+			if !hasChanges {
+				break
+			}
+
+			r.lock.RLock()
 			for id, t := range r.tasks {
 				if !t.valid {
 					continue
 				}
 
 				r.logger.Debug().WithFields(log.Fields{
+					"limit_cpu":    limitCPU,
 					"limit_memory": limitMemory,
 					"id":           id,
-				}).Log("Limiting process memory consumption")
+				}).Log("Limiting process CPU and memory consumption")
 				t.ffmpeg.Limit(limitCPU, limitMemory)
 			}
-			r.lock.Unlock()
+			r.lock.RUnlock()
 		}
 	}
 }

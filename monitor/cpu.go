@@ -3,28 +3,26 @@ package monitor
 import (
 	"github.com/datarhei/core/v16/monitor/metric"
 	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
 )
 
 type cpuCollector struct {
-	ncpuDescr   *metric.Description
-	systemDescr *metric.Description
-	userDescr   *metric.Description
-	idleDescr   *metric.Description
-	otherDescr  *metric.Description
-	limitDescr  *metric.Description
+	ncpuDescr     *metric.Description
+	systemDescr   *metric.Description
+	userDescr     *metric.Description
+	idleDescr     *metric.Description
+	otherDescr    *metric.Description
+	limitDescr    *metric.Description
+	throttleDescr *metric.Description
 
-	ncpu  float64
-	limit float64
+	ncpu      float64
+	resources resources.Resources
 }
 
-func NewCPUCollector(limit float64) metric.Collector {
+func NewCPUCollector(rsc resources.Resources) metric.Collector {
 	c := &cpuCollector{
-		ncpu:  1,
-		limit: limit,
-	}
-
-	if limit <= 0 || limit > 100 {
-		c.limit = 100
+		ncpu:      1,
+		resources: rsc,
 	}
 
 	c.ncpuDescr = metric.NewDesc("cpu_ncpu", "Number of logical CPUs in the system", nil)
@@ -33,6 +31,7 @@ func NewCPUCollector(limit float64) metric.Collector {
 	c.idleDescr = metric.NewDesc("cpu_idle", "Percentage of idle CPU", nil)
 	c.otherDescr = metric.NewDesc("cpu_other", "Percentage of CPU used for other subsystems", nil)
 	c.limitDescr = metric.NewDesc("cpu_limit", "Percentage of CPU to be consumed", nil)
+	c.throttleDescr = metric.NewDesc("cpu_throttling", "Whether the CPU is currently throttled", nil)
 
 	if ncpu, err := psutil.CPUCounts(true); err == nil {
 		c.ncpu = ncpu
@@ -55,6 +54,7 @@ func (c *cpuCollector) Describe() []*metric.Description {
 		c.idleDescr,
 		c.otherDescr,
 		c.limitDescr,
+		c.throttleDescr,
 	}
 }
 
@@ -62,7 +62,18 @@ func (c *cpuCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
 	metrics.Add(metric.NewValue(c.ncpuDescr, c.ncpu))
-	metrics.Add(metric.NewValue(c.limitDescr, c.limit))
+
+	limit, _ := c.resources.Limits()
+
+	metrics.Add(metric.NewValue(c.limitDescr, limit))
+
+	cpu, _ := c.resources.ShouldLimit()
+	throttling := .0
+	if cpu {
+		throttling = 1
+	}
+
+	metrics.Add(metric.NewValue(c.throttleDescr, throttling))
 
 	stat, err := psutil.CPUPercent()
 	if err != nil {
