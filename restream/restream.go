@@ -196,7 +196,12 @@ func New(config Config) (Restreamer, error) {
 	r.maxProc = config.MaxProcesses
 	r.resources = config.Resources
 	if r.resources == nil {
-		return nil, fmt.Errorf("a resource manager must be provided")
+		rsc, err := resources.New(resources.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dummy resource manager: %w", err)
+		}
+
+		r.resources = rsc
 	}
 
 	r.enableSoftLimit = r.resources.HasLimits()
