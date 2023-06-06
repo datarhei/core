@@ -1654,9 +1654,6 @@ func (a *api) start() error {
 		debug.SetMemoryLimit(math.MaxInt64)
 	}
 
-	//p, _ := psutil.NewProcess(int32(os.Getpid()), false)
-	//a.process = p
-
 	// Start the restream processes
 	restream.Start()
 
@@ -1699,7 +1696,7 @@ func (a *api) stop() {
 	}
 
 	if a.cluster != nil {
-		a.cluster.Leave("", "")
+		// Hard shutdown without gracefully leaving the cluster
 		a.cluster.Shutdown()
 	}
 

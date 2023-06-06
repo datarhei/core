@@ -30,7 +30,7 @@ type ClusterNodeFiles struct {
 
 type ClusterServer struct {
 	ID      string `json:"id"`
-	Address string `json:"address"`
+	Address string `json:"address"` // raft address
 	Voter   bool   `json:"voter"`
 	Leader  bool   `json:"leader"`
 }

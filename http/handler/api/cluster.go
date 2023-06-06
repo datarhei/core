@@ -85,6 +85,27 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	return c.JSON(http.StatusOK, about)
 }
 
+// Leave the cluster gracefully
+// @Summary Leave the cluster gracefully
+// @Description Leave the cluster gracefully
+// @Tags v16.?.?
+// @ID cluster-3-leave
+// @Produce json
+// @Success 200 {string} string
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/leave [put]
+func (h *ClusterHandler) Leave(c echo.Context) error {
+	err := h.cluster.Leave("", "")
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "Failed to leave cluster gracefully: %s", err)
+	}
+
+	h.cluster.Shutdown()
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // ListAllNodeProcesses returns the list of processes running on all nodes of the cluster
 // @Summary List of processes in the cluster
 // @Description List of processes in the cluster

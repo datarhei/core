@@ -686,12 +686,14 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
 
 		if !s.readOnly {
+			v3.PUT("/cluster/leave", s.v3handler.cluster.Leave)
+
 			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.SetProcessMetadata)
 
-			v3.GET("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
+			v3.PUT("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
 			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
 			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.UpdateIdentity)
 			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.UpdateIdentityPolicies)

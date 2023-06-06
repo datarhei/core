@@ -660,6 +660,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/leave": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Leave the cluster gracefully",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Leave the cluster gracefully",
+                "operationId": "cluster-3-leave",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/node": {
             "get": {
                 "security": [
@@ -1056,14 +1088,14 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -3827,6 +3859,9 @@ const docTemplate = `{
                     "description": "percent 0-100*npcu",
                     "type": "number"
                 },
+                "is_throttling": {
+                    "type": "boolean"
+                },
                 "memory_limit_bytes": {
                     "type": "integer"
                 },
@@ -3877,6 +3912,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "address": {
+                    "description": "raft address",
                     "type": "string"
                 },
                 "id": {
