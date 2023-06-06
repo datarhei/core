@@ -96,11 +96,7 @@ func (h *ClusterHandler) About(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/leave [put]
 func (h *ClusterHandler) Leave(c echo.Context) error {
-	err := h.cluster.Leave("", "")
-	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "Failed to leave cluster gracefully: %s", err)
-	}
-
+	h.cluster.Leave("", "")
 	h.cluster.Shutdown()
 
 	return c.JSON(http.StatusOK, "OK")
