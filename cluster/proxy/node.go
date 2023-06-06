@@ -106,8 +106,9 @@ type node struct {
 	resources struct {
 		ncpu     float64
 		cpu      float64
+		cpuLimit float64
 		mem      uint64
-		memTotal uint64
+		memLimit uint64
 	}
 
 	state       nodeState
@@ -269,8 +270,10 @@ func (n *node) Connect() error {
 					Metrics: []clientapi.MetricsQueryMetric{
 						{Name: "cpu_ncpu"},
 						{Name: "cpu_idle"},
+						{Name: "cpu_limit"},
 						{Name: "mem_total"},
 						{Name: "mem_free"},
+						{Name: "mem_limit"},
 					},
 				})
 
@@ -278,8 +281,10 @@ func (n *node) Connect() error {
 					n.stateLock.Lock()
 					n.resources.cpu = 100
 					n.resources.ncpu = 1
+					n.resources.cpuLimit = 0
 					n.resources.mem = 0
-					n.resources.memTotal = 0
+					n.resources.memLimit = 0
+					n.state = stateDisconnected
 					n.stateLock.Unlock()
 
 					continue
@@ -287,30 +292,37 @@ func (n *node) Connect() error {
 
 				cpu_ncpu := .0
 				cpu_idle := .0
+				cpu_limit := .0
 				mem_total := uint64(0)
 				mem_free := uint64(0)
+				mem_limit := uint64(0)
 
 				for _, x := range metrics.Metrics {
 					if x.Name == "cpu_idle" {
 						cpu_idle = x.Values[0].Value
 					} else if x.Name == "cpu_ncpu" {
 						cpu_ncpu = x.Values[0].Value
+					} else if x.Name == "cpu_limit" {
+						cpu_limit = x.Values[0].Value
 					} else if x.Name == "mem_total" {
 						mem_total = uint64(x.Values[0].Value)
 					} else if x.Name == "mem_free" {
 						mem_free = uint64(x.Values[0].Value)
+					} else if x.Name == "mem_limit" {
+						mem_limit = uint64(x.Values[0].Value)
 					}
 				}
 
 				n.stateLock.Lock()
 				n.resources.ncpu = cpu_ncpu
 				n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
+				n.resources.cpuLimit = cpu_limit * cpu_ncpu
 				if mem_total != 0 {
 					n.resources.mem = mem_total - mem_free
-					n.resources.memTotal = mem_total
+					n.resources.memLimit = mem_limit
 				} else {
 					n.resources.mem = 0
-					n.resources.memTotal = 0
+					n.resources.memLimit = 0
 				}
 				n.lastContact = time.Now()
 				n.stateLock.Unlock()
@@ -423,7 +435,9 @@ func (n *node) StopFiles() {
 func (n *node) About() NodeAbout {
 	about, err := n.AboutPeer()
 	if err != nil {
-		return NodeAbout{}
+		return NodeAbout{
+			State: stateDisconnected.String(),
+		}
 	}
 
 	createdAt, err := time.Parse(time.RFC3339, about.CreatedAt)
@@ -434,11 +448,16 @@ func (n *node) About() NodeAbout {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	state := NodeAbout{
+	state := n.state
+	if time.Since(n.lastContact) > 3*time.Second {
+		state = stateDisconnected
+	}
+
+	nodeAbout := NodeAbout{
 		ID:          about.ID,
 		Name:        about.Name,
 		Address:     n.address,
-		State:       n.state.String(),
+		State:       state.String(),
 		CreatedAt:   createdAt,
 		Uptime:      time.Since(createdAt),
 		LastContact: n.lastContact,
@@ -446,13 +465,13 @@ func (n *node) About() NodeAbout {
 		Resources: NodeResources{
 			NCPU:     n.resources.ncpu,
 			CPU:      n.resources.cpu,
-			CPULimit: 90 * n.resources.ncpu,
+			CPULimit: n.resources.cpuLimit,
 			Mem:      n.resources.mem,
-			MemLimit: uint64(float64(n.resources.memTotal) * 0.9),
+			MemLimit: n.resources.memLimit,
 		},
 	}
 
-	return state
+	return nodeAbout
 }
 
 func (n *node) Version() NodeVersion {

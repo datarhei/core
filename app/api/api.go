@@ -1027,8 +1027,8 @@ func (a *api) start() error {
 	}
 
 	metrics.Register(monitor.NewUptimeCollector())
-	metrics.Register(monitor.NewCPUCollector())
-	metrics.Register(monitor.NewMemCollector())
+	metrics.Register(monitor.NewCPUCollector(cfg.Resources.MaxCPUUsage))
+	metrics.Register(monitor.NewMemCollector(cfg.Resources.MaxMemoryUsage))
 	metrics.Register(monitor.NewNetCollector())
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base")))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))

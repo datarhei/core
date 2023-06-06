@@ -10,15 +10,16 @@ type memCollector struct {
 	core      string
 	collector metric.Reader
 
-	memLimitDesc *prometheus.Desc
+	memTotalDesc *prometheus.Desc
 	memFreeDesc  *prometheus.Desc
+	memLimitDesc *prometheus.Desc
 }
 
 func NewMemCollector(core string, c metric.Reader) prometheus.Collector {
 	return &memCollector{
 		core:      core,
 		collector: c,
-		memLimitDesc: prometheus.NewDesc(
+		memTotalDesc: prometheus.NewDesc(
 			"mem_total_bytes",
 			"Total available memory in bytes",
 			[]string{"core"}, nil),
@@ -26,25 +27,27 @@ func NewMemCollector(core string, c metric.Reader) prometheus.Collector {
 			"mem_free_bytes",
 			"Free memory in bytes",
 			[]string{"core"}, nil),
+		memLimitDesc: prometheus.NewDesc(
+			"mem_limit_bytes",
+			"Configured memory limit in bytes",
+			[]string{"core"}, nil),
 	}
 }
 
 func (c *memCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.memLimitDesc
 	ch <- c.memFreeDesc
+	ch <- c.memLimitDesc
 }
 
 func (c *memCollector) Collect(ch chan<- prometheus.Metric) {
 	metrics := c.collector.Collect([]metric.Pattern{
 		metric.NewPattern("mem_total"),
 		metric.NewPattern("mem_free"),
+		metric.NewPattern("mem_limit"),
 	})
 
-	for _, m := range metrics.Values("mem_total") {
-		ch <- prometheus.MustNewConstMetric(c.memLimitDesc, prometheus.GaugeValue, m.Val(), c.core)
-	}
-
-	for _, m := range metrics.Values("mem_free") {
-		ch <- prometheus.MustNewConstMetric(c.memFreeDesc, prometheus.GaugeValue, m.Val(), c.core)
-	}
+	ch <- prometheus.MustNewConstMetric(c.memTotalDesc, prometheus.GaugeValue, metrics.Value("mem_total").Val(), c.core)
+	ch <- prometheus.MustNewConstMetric(c.memFreeDesc, prometheus.GaugeValue, metrics.Value("mem_free").Val(), c.core)
+	ch <- prometheus.MustNewConstMetric(c.memLimitDesc, prometheus.GaugeValue, metrics.Value("mem_limit").Val(), c.core)
 }

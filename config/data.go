@@ -169,15 +169,15 @@ type Data struct {
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
 	Resources struct {
-		MaxCPUUsage    float64 `json:"max_cpu_usage"`
-		MaxMemoryUsage float64 `json:"max_memory_usage"`
+		MaxCPUUsage    float64 `json:"max_cpu_usage"`    // percent 0-100
+		MaxMemoryUsage float64 `json:"max_memory_usage"` // percent 0-100
 	} `json:"resources"`
 	Cluster struct {
 		Enable    bool     `json:"enable"`
 		Bootstrap bool     `json:"bootstrap"`
 		Recover   bool     `json:"recover"`
 		Debug     bool     `json:"debug"`
-		Address   string   `json:"address"`
+		Address   string   `json:"address"` // ip:port
 		Peers     []string `json:"peers"`
 	} `json:"cluster"`
 }

@@ -91,11 +91,9 @@ func NewAPI(config APIConfig) (API, error) {
 	}))
 	a.router.Logger.SetOutput(httplog.NewWrapper(a.logger))
 
-	swagHandler := echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI"))
-
 	// Swagger API documentation router group
 	doc := a.router.Group("/v1/swagger/*")
-	doc.GET("", swagHandler)
+	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
 	a.router.POST("/v1/server", a.AddServer)
 	a.router.DELETE("/v1/server/:id", a.RemoveServer)

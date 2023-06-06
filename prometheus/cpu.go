@@ -14,6 +14,7 @@ type cpuCollector struct {
 	cpuUserTimeDesc   *prometheus.Desc
 	cpuIdleTimeDesc   *prometheus.Desc
 	cpuOtherTimeDesc  *prometheus.Desc
+	cpuLimitDesc      *prometheus.Desc
 }
 
 func NewCPUCollector(core string, c metric.Reader) prometheus.Collector {
@@ -36,6 +37,10 @@ func NewCPUCollector(core string, c metric.Reader) prometheus.Collector {
 			"cpu_other_time_percent",
 			"CPU other time in percent",
 			[]string{"core"}, nil),
+		cpuLimitDesc: prometheus.NewDesc(
+			"cpu_limit_percent",
+			"Configured CPU limit in percent",
+			[]string{"core"}, nil),
 	}
 }
 
@@ -44,6 +49,7 @@ func (c *cpuCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.cpuUserTimeDesc
 	ch <- c.cpuIdleTimeDesc
 	ch <- c.cpuOtherTimeDesc
+	ch <- c.cpuLimitDesc
 }
 
 func (c *cpuCollector) Collect(ch chan<- prometheus.Metric) {
@@ -52,10 +58,12 @@ func (c *cpuCollector) Collect(ch chan<- prometheus.Metric) {
 		metric.NewPattern("cpu_user"),
 		metric.NewPattern("cpu_idle"),
 		metric.NewPattern("cpu_other"),
+		metric.NewPattern("cpu_limit"),
 	})
 
 	ch <- prometheus.MustNewConstMetric(c.cpuSystemTimeDesc, prometheus.GaugeValue, metrics.Value("cpu_system").Val(), c.core)
 	ch <- prometheus.MustNewConstMetric(c.cpuUserTimeDesc, prometheus.GaugeValue, metrics.Value("cpu_user").Val(), c.core)
 	ch <- prometheus.MustNewConstMetric(c.cpuIdleTimeDesc, prometheus.GaugeValue, metrics.Value("cpu_idle").Val(), c.core)
 	ch <- prometheus.MustNewConstMetric(c.cpuOtherTimeDesc, prometheus.GaugeValue, metrics.Value("cpu_other").Val(), c.core)
+	ch <- prometheus.MustNewConstMetric(c.cpuLimitDesc, prometheus.GaugeValue, metrics.Value("cpu_limit").Val(), c.core)
 }

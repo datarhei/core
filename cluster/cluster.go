@@ -79,6 +79,9 @@ type ClusterConfig struct {
 	Address   string // Listen address for the raft protocol
 	Peers     []Peer // Address of a member of a cluster to join
 
+	SyncInterval       time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
+	NodeRecoverTimeout time.Duration // Timeout for a node to recover before rebalancing the processes
+
 	CoreAPIAddress  string // Address of the core API
 	CoreAPIUsername string // Username for the core API
 	CoreAPIPassword string // Password for the core API
