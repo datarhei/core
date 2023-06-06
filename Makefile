@@ -23,7 +23,8 @@ build_linux:
 
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:
-	swag init -g http/server.go
+	swag init -g http/server.go -o ./docs --exclude ./cluster
+	swag init -g cluster/api.go -o ./cluster/docs --exclude ./http --instanceName ClusterAPI
 
 ## gqlgen: Regenerate GraphQL server from schema
 gqlgen:

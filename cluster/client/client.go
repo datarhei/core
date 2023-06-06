@@ -19,23 +19,16 @@ type JoinRequest struct {
 	RaftAddress string `json:"raft_address"`
 }
 
-type LeaveRequest struct {
-	ID string `json:"id"`
-}
-
 type AddProcessRequest struct {
 	Config app.Config `json:"config"`
 }
 
 type UpdateProcessRequest struct {
-	ID     app.ProcessID `json:"id"`
-	Config app.Config    `json:"config"`
+	Config app.Config `json:"config"`
 }
 
 type SetProcessMetadataRequest struct {
-	ID       app.ProcessID `json:"id"`
-	Key      string        `json:"key"`
-	Metadata interface{}   `json:"metadata"`
+	Metadata interface{} `json:"metadata"`
 }
 
 type AddIdentityRequest struct {
@@ -43,12 +36,10 @@ type AddIdentityRequest struct {
 }
 
 type UpdateIdentityRequest struct {
-	Name     string           `json:"name"`
 	Identity iamidentity.User `json:"identity"`
 }
 
 type SetPoliciesRequest struct {
-	Name     string             `json:"name"`
 	Policies []iamaccess.Policy `json:"policies"`
 }
 
@@ -106,24 +97,24 @@ func (c *APIClient) RemoveProcess(origin string, id app.ProcessID) error {
 	return err
 }
 
-func (c *APIClient) UpdateProcess(origin string, r UpdateProcessRequest) error {
+func (c *APIClient) UpdateProcess(origin string, id app.ProcessID, r UpdateProcessRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+r.ID.ID+"?domain="+r.ID.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/process/"+id.ID+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
-func (c *APIClient) SetProcessMetadata(origin string, r SetProcessMetadataRequest) error {
+func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key string, r SetProcessMetadataRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+r.ID.ID+"/metadata/"+r.Key+"?domain="+r.ID.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/process/"+id.ID+"/metadata/"+key+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

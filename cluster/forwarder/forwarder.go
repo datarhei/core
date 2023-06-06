@@ -161,7 +161,6 @@ func (f *forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.C
 	}
 
 	r := apiclient.UpdateProcessRequest{
-		ID:     id,
 		Config: *config,
 	}
 
@@ -169,7 +168,7 @@ func (f *forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.C
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.UpdateProcess(origin, r)
+	return client.UpdateProcess(origin, id, r)
 }
 
 func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
@@ -178,8 +177,6 @@ func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key stri
 	}
 
 	r := apiclient.SetProcessMetadataRequest{
-		ID:       id,
-		Key:      key,
 		Metadata: data,
 	}
 
@@ -187,7 +184,7 @@ func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key stri
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.SetProcessMetadata(origin, r)
+	return client.SetProcessMetadata(origin, id, key, r)
 }
 
 func (f *forwarder) RemoveProcess(origin string, id app.ProcessID) error {
@@ -224,7 +221,6 @@ func (f *forwarder) UpdateIdentity(origin, name string, identity iamidentity.Use
 	}
 
 	r := apiclient.UpdateIdentityRequest{
-		Name:     name,
 		Identity: identity,
 	}
 
@@ -241,7 +237,6 @@ func (f *forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy
 	}
 
 	r := apiclient.SetPoliciesRequest{
-		Name:     name,
 		Policies: policies,
 	}
 

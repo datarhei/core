@@ -25,26 +25,6 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 )
 
-/*
-	/api/v3:
-		GET /cluster/store/node - list all nodes that are stored in the FSM - Cluster.Store.ListNodes()
-		POST /cluster/store/node - add a node to the FSM - Cluster.Store.AddNode()
-		DELETE /cluster/store/node/:id - remove a node from the FSM - Cluster.Store.RemoveNode()
-
-		GET /cluster/store/process - list all process configs that are stored in the FSM - Cluster.Store.ListProcesses()
-		POST /cluster/store/process - add a process config to the FSM - Cluster.Store.AddProcess()
-		PUT /cluster/store/process/:id - update a process config in the FSM - Cluster.Store.UpdateProcess()
-		DELETE /cluster/store/process/:id - remove a process config from the FSM - Cluster.Store.RemoveProcess()
-
-		** for the processes, the leader will decide where to actually run them. the process configs will
-		also be added to the regular process DB of each core.
-
-		POST /cluster/join - join the cluster - Cluster.Join()
-		DELETE /cluster/:id - leave the cluster - Cluster.Leave()
-
-		** all these endpoints will forward the request to the leader.
-*/
-
 type Cluster interface {
 	// Address returns the raft address of this node
 	Address() string

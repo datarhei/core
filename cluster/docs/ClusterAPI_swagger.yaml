@@ -1,0 +1,625 @@
+basePath: /
+definitions:
+  access.Policy:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      domain:
+        type: string
+      name:
+        type: string
+      resource:
+        type: string
+    type: object
+  app.Config:
+    properties:
+      autostart:
+        type: boolean
+      domain:
+        type: string
+      ffversion:
+        type: string
+      id:
+        type: string
+      input:
+        items:
+          $ref: '#/definitions/app.ConfigIO'
+        type: array
+      limitCPU:
+        description: percent
+        type: number
+      limitMemory:
+        description: bytes
+        type: integer
+      limitWaitFor:
+        description: seconds
+        type: integer
+      logPatterns:
+        description: will we interpreted as regualr expressions
+        items:
+          type: string
+        type: array
+      options:
+        items:
+          type: string
+        type: array
+      output:
+        items:
+          $ref: '#/definitions/app.ConfigIO'
+        type: array
+      owner:
+        type: string
+      reconnect:
+        type: boolean
+      reconnectDelay:
+        description: seconds
+        type: integer
+      reference:
+        type: string
+      scheduler:
+        description: crontab pattern or RFC3339 timestamp
+        type: string
+      staleTimeout:
+        description: seconds
+        type: integer
+      timeout:
+        description: seconds
+        type: integer
+    type: object
+  app.ConfigIO:
+    properties:
+      address:
+        type: string
+      cleanup:
+        items:
+          $ref: '#/definitions/app.ConfigIOCleanup'
+        type: array
+      id:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+    type: object
+  app.ConfigIOCleanup:
+    properties:
+      maxFileAge:
+        type: integer
+      maxFiles:
+        type: integer
+      pattern:
+        type: string
+      purgeOnDelete:
+        type: boolean
+    type: object
+  client.AddIdentityRequest:
+    properties:
+      identity:
+        $ref: '#/definitions/identity.User'
+    type: object
+  client.AddProcessRequest:
+    properties:
+      config:
+        $ref: '#/definitions/app.Config'
+    type: object
+  client.JoinRequest:
+    properties:
+      id:
+        type: string
+      raft_address:
+        type: string
+    type: object
+  client.SetPoliciesRequest:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/access.Policy'
+        type: array
+    type: object
+  client.SetProcessMetadataRequest:
+    properties:
+      metadata: {}
+    type: object
+  client.UpdateIdentityRequest:
+    properties:
+      identity:
+        $ref: '#/definitions/identity.User'
+    type: object
+  client.UpdateProcessRequest:
+    properties:
+      config:
+        $ref: '#/definitions/app.Config'
+    type: object
+  cluster.Error:
+    properties:
+      code:
+        format: int
+        type: integer
+      details:
+        items:
+          type: string
+        type: array
+      message:
+        type: string
+    type: object
+  identity.Auth0Tenant:
+    properties:
+      audience:
+        type: string
+      client_id:
+        type: string
+      domain:
+        type: string
+    type: object
+  identity.User:
+    properties:
+      auth:
+        $ref: '#/definitions/identity.UserAuth'
+      name:
+        type: string
+      superuser:
+        type: boolean
+    type: object
+  identity.UserAuth:
+    properties:
+      api:
+        $ref: '#/definitions/identity.UserAuthAPI'
+      services:
+        $ref: '#/definitions/identity.UserAuthServices'
+    type: object
+  identity.UserAuthAPI:
+    properties:
+      auth0:
+        $ref: '#/definitions/identity.UserAuthAPIAuth0'
+      password:
+        type: string
+    type: object
+  identity.UserAuthAPIAuth0:
+    properties:
+      tenant:
+        $ref: '#/definitions/identity.Auth0Tenant'
+      user:
+        type: string
+    type: object
+  identity.UserAuthServices:
+    properties:
+      basic:
+        items:
+          type: string
+        type: array
+      token:
+        items:
+          type: string
+        type: array
+    type: object
+info:
+  contact:
+    email: hello@datarhei.com
+    name: datarhei Core Support
+    url: https://www.datarhei.com
+  description: Internal REST API for the datarhei Core cluster
+  license:
+    name: Apache 2.0
+    url: https://github.com/datarhei/core/v16/blob/main/LICENSE
+  title: datarhei Core Cluster API
+  version: "1.0"
+paths:
+  /v1/core:
+    get:
+      description: Core API address and login of this node
+      operationId: cluster-1-core-api-address
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            items:
+              $ref: '#/definitions/cluster.Error'
+            type: array
+      summary: Core API address and login
+      tags:
+      - v1.0.0
+  /v1/iam/user:
+    post:
+      consumes:
+      - application/json
+      description: Add an identity to the cluster DB
+      operationId: cluster-1-add-identity
+      parameters:
+      - description: Identity config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/client.AddIdentityRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add an identity
+      tags:
+      - v1.0.0
+  /v1/iam/user/{name}:
+    delete:
+      description: Remove an identity from the cluster DB
+      operationId: cluster-1-remove-identity
+      parameters:
+      - description: Identity name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove an identity
+      tags:
+      - v1.0.0
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing identity in the cluster DB
+      operationId: cluster-1-update-identity
+      parameters:
+      - description: Process ID
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Identity config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/client.UpdateIdentityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Replace an existing identity
+      tags:
+      - v1.0.0
+  /v1/iam/user/{name}/policies:
+    put:
+      description: Set policies for an identity in the cluster DB. Any existing policies
+        will be replaced.
+      operationId: cluster-3-set-identity-policies
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Policies for that user
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetPoliciesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Set identity policies
+      tags:
+      - v1.0.0
+  /v1/process:
+    post:
+      consumes:
+      - application/json
+      description: Add a process to the cluster DB
+      operationId: cluster-1-add-process
+      parameters:
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/client.AddProcessRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add a process
+      tags:
+      - v1.0.0
+  /v1/process/{id}:
+    delete:
+      description: Remove a process from the cluster DB
+      operationId: cluster-1-remove-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove a process
+      tags:
+      - v1.0.0
+    put:
+      consumes:
+      - application/json
+      description: Replace an existing process in the cluster DB
+      operationId: cluster-1-update-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/client.UpdateProcessRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Replace an existing process
+      tags:
+      - v1.0.0
+  /v1/process/{id}/metadata/{key}:
+    put:
+      description: Add arbitrary JSON metadata under the given key. If the key exists,
+        all already stored metadata with this key will be overwritten. If the key
+        doesn't exist, it will be created.
+      operationId: cluster-3-set-process-metadata
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Key for data store
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Arbitrary JSON data. The null value will remove the key and its
+          contents
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetProcessMetadataRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add JSON metadata with a process under the given key
+      tags:
+      - v1.0.0
+  /v1/server:
+    post:
+      consumes:
+      - application/json
+      description: Add a new server to the cluster
+      operationId: cluster-1-add-server
+      parameters:
+      - description: Server ID and address
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/client.JoinRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add a new server
+      tags:
+      - v1.0.0
+  /v1/server/{id}:
+    delete:
+      description: Remove a server from the cluster
+      operationId: cluster-1-remove-server
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove a server
+      tags:
+      - v1.0.0
+  /v1/snapshot:
+    get:
+      description: Current snapshot of the clusterDB
+      operationId: cluster-1-snapshot
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "500":
+          description: Internal Server Error
+          schema:
+            items:
+              $ref: '#/definitions/cluster.Error'
+            type: array
+      summary: Cluster DB snapshot
+      tags:
+      - v1.0.0
+swagger: "2.0"
