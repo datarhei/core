@@ -241,7 +241,7 @@ RECONCILE:
 
 	// Check if we need to handle initial leadership actions
 	if !establishedLeader {
-		if err := c.establishLeadership(context.TODO()); err != nil {
+		if err := c.establishLeadership(context.TODO(), emergency); err != nil {
 			c.logger.Error().WithError(err).Log("Establish leadership")
 			// Immediately revoke leadership since we didn't successfully
 			// establish leadership.
@@ -286,15 +286,13 @@ WAIT:
 	}
 }
 
-func (c *cluster) establishLeadership(ctx context.Context) error {
-	c.logger.Debug().Log("Establishing leadership")
-
-	// creating a map of which process runs where
+func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error {
+	c.logger.Debug().WithField("emergency", emergency).Log("Establishing leadership")
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
 
-	go c.startRebalance(ctx, c.syncInterval)
+	go c.startSynchronizeAndRebalance(ctx, c.syncInterval, emergency)
 
 	return nil
 }
@@ -305,7 +303,26 @@ func (c *cluster) revokeLeadership() {
 	c.cancelLeaderShip()
 }
 
-func (c *cluster) startRebalance(ctx context.Context, interval time.Duration) {
+// startSynchronizeAndRebalance synchronizes and rebalances the processes in a given interval. Synchronizing
+// takes care that all processes in the cluster DB are running on one node. It writes the process->node mapping
+// to the cluster DB such that when a new leader gets elected it knows where which process should be running.
+// This is checked against the actual state. If a node is not reachable, the leader still knows which processes
+// should be running on that node. For a certain duration (nodeRecoverTimeout) this is tolerated in case the
+// node comes back. If not, the processes will be distributed to the remaining nodes. The actual observed state
+// is stored back into the cluster DB.
+//
+// It follows the rebalancing which takes care that processes are taken from overloaded nodes. In each iteration
+// only one process is taken away from a node. If a node is not reachable, its processes will be not part of the
+// rebalancing and no attempt will be made to move processes from and to that node.
+//
+// All this happens if there's a leader. If there's no leader election possible, the node goes into the
+// emergency leadership mode after a certain duration (emergencyLeaderTimeout). The synchronization phase will
+// happen based on the last known list of processes from the cluster DB. Until nodeRecoverTimeout is reached,
+// process that would run on unreachable nodes will not be moved to the node. Rebalancing will be disabled.
+//
+// The goal of synchronizing and rebalancing is to make as little moves as possible and to be tolerant for
+// a while if a node is not reachable.
+func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval time.Duration, emergency bool) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -314,8 +331,11 @@ func (c *cluster) startRebalance(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			c.doSynchronize()
-			c.doRebalance()
+			c.doSynchronize(emergency)
+
+			if !emergency {
+				c.doRebalance(emergency)
+			}
 		}
 	}
 }
@@ -377,6 +397,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Adding process")
 				break
 			}
+
 			err = c.proxy.ProcessStart(v.nodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
@@ -398,6 +419,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Updating process")
 				break
 			}
+
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.config.ID,
 				"nodeid":    v.nodeid,
@@ -411,6 +433,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Removing process")
 				break
 			}
+
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
@@ -425,6 +448,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Moving process, adding process")
 				break
 			}
+
 			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
@@ -434,6 +458,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Moving process, removing process")
 				break
 			}
+
 			err = c.proxy.ProcessStart(v.toNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
@@ -443,6 +468,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Moving process, starting process")
 				break
 			}
+
 			c.logger.Info().WithFields(log.Fields{
 				"processid":  v.config.ID,
 				"fromnodeid": v.fromNodeid,
@@ -457,6 +483,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				}).Log("Starting process")
 				break
 			}
+
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
@@ -474,39 +501,73 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 	}
 }
 
-func (c *cluster) doSynchronize() {
+func (c *cluster) doSynchronize(emergency bool) {
+	wish := c.store.GetProcessNodeMap()
 	want := c.store.ProcessList()
 	have := c.proxy.ListProcesses()
-	resources := c.proxy.Resources()
+	nodes := c.proxy.ListNodes()
+
+	nodesMap := map[string]proxy.NodeAbout{}
+
+	for _, node := range nodes {
+		about := node.About()
+		nodesMap[about.ID] = about
+	}
 
 	c.logger.Debug().WithFields(log.Fields{
-		"want":      want,
-		"have":      have,
-		"resources": resources,
+		"want":  want,
+		"have":  have,
+		"nodes": nodesMap,
 	}).Log("Synchronize")
 
-	opStack := synchronize(want, have, resources)
+	opStack, _, reality := synchronize(wish, want, have, nodesMap, c.nodeRecoverTimeout)
+
+	if !emergency {
+		cmd := &store.Command{
+			Operation: store.OpSetProcessNodeMap,
+			Data: store.CommandSetProcessNodeMap{
+				Map: reality,
+			},
+		}
+
+		c.applyCommand(cmd)
+	}
 
 	c.applyOpStack(opStack)
 }
 
-func (c *cluster) doRebalance() {
+func (c *cluster) doRebalance(emergency bool) {
 	have := c.proxy.ListProcesses()
-	resources := c.proxy.Resources()
+	nodes := c.proxy.ListNodes()
+
+	nodesMap := map[string]proxy.NodeAbout{}
+
+	for _, node := range nodes {
+		about := node.About()
+		nodesMap[about.ID] = about
+	}
 
 	c.logger.Debug().WithFields(log.Fields{
-		"have":      have,
-		"resources": resources,
+		"have":  have,
+		"nodes": nodes,
 	}).Log("Rebalance")
 
-	opStack := rebalance(have, resources)
+	opStack, _ := rebalance(have, nodesMap)
 
 	c.applyOpStack(opStack)
 }
 
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
-func synchronize(want []store.Process, have []proxy.Process, resources map[string]proxy.NodeResources) []interface{} {
+func synchronize(wish map[string]string, want []store.Process, have []proxy.Process, nodes map[string]proxy.NodeAbout, nodeRecoverTimeout time.Duration) ([]interface{}, map[string]proxy.NodeResources, map[string]string) {
+	resources := map[string]proxy.NodeResources{}
+	for nodeid, about := range nodes {
+		resources[nodeid] = about.Resources
+	}
+
+	// A map same as wish, but reflecting the actual situation.
+	reality := map[string]string{}
+
 	// A map from the process ID to the process config of the processes
 	// we want to be running on the nodes.
 	wantMap := map[string]store.Process{}
@@ -519,31 +580,32 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 
 	// Now we iterate through the processes we actually have running on the nodes
 	// and remove them from the wantMap. We also make sure that they are running.
-	// If a process is not on the wantMap, it will be deleted from the nodes.
+	// If a process cannot be found on the wantMap, it will be deleted from the nodes.
 	haveAfterRemove := []proxy.Process{}
 
-	for _, p := range have {
-		pid := p.Config.ProcessID().String()
+	for _, haveP := range have {
+		pid := haveP.Config.ProcessID().String()
 		if wantP, ok := wantMap[pid]; !ok {
+			// The process is not on the wantMap. Delete it and adjust the resources.
 			opStack = append(opStack, processOpDelete{
-				nodeid:    p.NodeID,
-				processid: p.Config.ProcessID(),
+				nodeid:    haveP.NodeID,
+				processid: haveP.Config.ProcessID(),
 			})
 
-			// Adjust the resources
-			r, ok := resources[p.NodeID]
+			r, ok := resources[haveP.NodeID]
 			if ok {
-				r.CPU -= p.CPU
-				r.Mem -= p.Mem
-				resources[p.NodeID] = r
+				r.CPU -= haveP.CPU
+				r.Mem -= haveP.Mem
+				resources[haveP.NodeID] = r
 			}
 
 			continue
 		} else {
-			if wantP.UpdatedAt.After(p.UpdatedAt) {
+			// The process is on the wantMap. Update the process if the configuration differ.
+			if !wantP.Config.Equal(haveP.Config) {
 				opStack = append(opStack, processOpUpdate{
-					nodeid:    p.NodeID,
-					processid: p.Config.ProcessID(),
+					nodeid:    haveP.NodeID,
+					processid: haveP.Config.ProcessID(),
 					config:    wantP.Config,
 					metadata:  wantP.Metadata,
 				})
@@ -551,24 +613,44 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		}
 
 		delete(wantMap, pid)
+		reality[pid] = haveP.NodeID
 
-		if p.Order != "start" {
+		if haveP.Order != "start" {
 			opStack = append(opStack, processOpStart{
-				nodeid:    p.NodeID,
-				processid: p.Config.ProcessID(),
+				nodeid:    haveP.NodeID,
+				processid: haveP.Config.ProcessID(),
 			})
 		}
 
-		haveAfterRemove = append(haveAfterRemove, p)
+		haveAfterRemove = append(haveAfterRemove, haveP)
 	}
 
 	have = haveAfterRemove
 
-	// A map from the process reference to the node it is running on
+	// In case a node didn't respond, some PID are still on the wantMap, that would run on
+	// the currently not responding nodes. We use the wish map to assign them to the node.
+	// If the node is unavailable for too long, keep these processes on the wantMap, otherwise
+	// remove them and hope that they will reappear during the nodeRecoverTimeout.
+	for pid := range wantMap {
+		// Check if this PID is be assigned to a node.
+		if nodeid, ok := wish[pid]; ok {
+			// Check for how long the node hasn't been contacted, or if it still exists.
+			if node, ok := nodes[nodeid]; ok {
+				if time.Since(node.LastContact) <= nodeRecoverTimeout {
+					reality[pid] = nodeid
+					delete(wantMap, pid)
+				}
+			}
+		}
+	}
+
+	// The wantMap now contains only those processes that need to be installed on a node.
+
+	// A map from the process reference to the node it is running on.
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
 
-	// Now all remaining processes in the wantMap must be added to one of the nodes
-	for _, process := range wantMap {
+	// Now all remaining processes in the wantMap must be added to one of the nodes.
+	for pid, process := range wantMap {
 		// If a process doesn't have any limits defined, reject that process
 		if process.Config.LimitCPU <= 0 || process.Config.LimitMemory <= 0 {
 			opStack = append(opStack, processOpReject{
@@ -580,19 +662,19 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		}
 
 		// Check if there are already processes with the same reference, and if so
-		// chose this node. Then check the node if it has enough resources left. If
+		// choose this node. Then check the node if it has enough resources left. If
 		// not, then select a node with the most available resources.
 		nodeid := ""
 
 		// Try to add the process to a node where other processes with the same
 		// reference currently reside.
 		if len(process.Config.Reference) != 0 {
-			for _, count := range haveReferenceAffinityMap[process.Config.Reference] {
+			for _, count := range haveReferenceAffinityMap[process.Config.Reference+"@"+process.Config.Domain] {
 				r := resources[count.nodeid]
 				cpu := process.Config.LimitCPU
 				mem := process.Config.LimitMemory
 
-				if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
+				if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit && !r.IsThrottling {
 					nodeid = count.nodeid
 					break
 				}
@@ -606,7 +688,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 				mem := process.Config.LimitMemory
 
 				if len(nodeid) == 0 {
-					if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit {
+					if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit && !r.IsThrottling {
 						nodeid = id
 					}
 
@@ -633,6 +715,8 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 				r.Mem += process.Config.LimitMemory
 				resources[nodeid] = r
 			}
+
+			reality[pid] = nodeid
 		} else {
 			opStack = append(opStack, processOpReject{
 				processid: process.Config.ProcessID(),
@@ -641,7 +725,7 @@ func synchronize(want []store.Process, have []proxy.Process, resources map[strin
 		}
 	}
 
-	return opStack
+	return opStack, resources, reality
 }
 
 type referenceAffinityNodeCount struct {
@@ -649,6 +733,8 @@ type referenceAffinityNodeCount struct {
 	count  uint64
 }
 
+// createReferenceAffinityMap returns a map of references (per domain) to an array of nodes this reference
+// is found on and their count. The array is sorted by the count, the highest first.
 func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenceAffinityNodeCount {
 	referenceAffinityMap := map[string][]referenceAffinityNodeCount{}
 	for _, p := range processes {
@@ -656,11 +742,13 @@ func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenc
 			continue
 		}
 
+		ref := p.Config.Reference + "@" + p.Config.Domain
+
 		// Here we count how often a reference is present on a node. When
 		// moving processes to a different node, the node with the highest
 		// count of same references will be the first candidate.
 		found := false
-		arr := referenceAffinityMap[p.Config.Reference]
+		arr := referenceAffinityMap[ref]
 		for i, count := range arr {
 			if count.nodeid == p.NodeID {
 				count.count++
@@ -677,7 +765,7 @@ func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenc
 			})
 		}
 
-		referenceAffinityMap[p.Config.Reference] = arr
+		referenceAffinityMap[ref] = arr
 	}
 
 	// Sort every reference count in decreasing order for each reference
@@ -692,32 +780,15 @@ func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenc
 	return referenceAffinityMap
 }
 
-// rebalance returns a list of operations that will move running processes away from nodes
-// that are overloaded.
-func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) []interface{} {
-	// Group the processes by node
-	processNodeMap := map[string][]proxy.Process{}
-
-	for _, p := range have {
-		processNodeMap[p.NodeID] = append(processNodeMap[p.NodeID], p)
+// rebalance returns a list of operations that will move running processes away from nodes that are overloaded.
+func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interface{}, map[string]proxy.NodeResources) {
+	resources := map[string]proxy.NodeResources{}
+	for nodeid, about := range nodes {
+		resources[nodeid] = about.Resources
 	}
 
-	// Sort the processes by their runtime (if they are running) for each node
-	for nodeid, processes := range processNodeMap {
-		sort.SliceStable(processes, func(a, b int) bool {
-			if processes[a].State == "running" {
-				if processes[b].State != "running" {
-					return false
-				}
-
-				return processes[a].Runtime < processes[b].Runtime
-			}
-
-			return false
-		})
-
-		processNodeMap[nodeid] = processes
-	}
+	// Group the processes by node and sort them
+	nodeProcessMap := createNodeProcessMap(have)
 
 	// A map from the process reference to the nodes it is running on
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
@@ -725,15 +796,17 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 	opStack := []interface{}{}
 
 	// Check if any of the nodes is overloaded
-	for id, r := range resources {
+	for id, node := range nodes {
+		r := node.Resources
+
 		// Check if node is overloaded
-		if r.CPU < r.CPULimit && r.Mem < r.MemLimit {
+		if r.CPU < r.CPULimit && r.Mem < r.MemLimit && !r.IsThrottling {
 			continue
 		}
 
 		// Move processes from this noed to another node with enough free resources.
 		// The processes are ordered ascending by their runtime.
-		processes := processNodeMap[id]
+		processes := nodeProcessMap[id]
 		if len(processes) == 0 {
 			// If there are no processes on that node, we can't do anything
 			continue
@@ -752,13 +825,13 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 			// Try to move the process to a node where other processes with the same
 			// reference currently reside.
 			if len(p.Config.Reference) != 0 {
-				for _, count := range haveReferenceAffinityMap[p.Config.Reference] {
+				for _, count := range haveReferenceAffinityMap[p.Config.Reference+"@"+p.Config.Domain] {
 					if count.nodeid == overloadedNodeid {
 						continue
 					}
 
 					r := resources[count.nodeid]
-					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit {
+					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit && !r.IsThrottling {
 						availableNodeid = count.nodeid
 						break
 					}
@@ -767,13 +840,15 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 
 			// Find another node with enough resources available
 			if len(availableNodeid) == 0 {
-				for id, r := range resources {
+				for id, node := range nodes {
 					if id == overloadedNodeid {
 						// Skip the overloaded node
 						continue
 					}
 
-					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit {
+					r := node.Resources
+
+					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit && !r.IsThrottling {
 						availableNodeid = id
 						break
 					}
@@ -812,12 +887,40 @@ func rebalance(have []proxy.Process, resources map[string]proxy.NodeResources) [
 			r.Mem -= p.Mem
 			resources[overloadedNodeid] = r
 
-			// If this node is not anymore overloaded, stop moving processes around
-			if r.CPU < r.CPULimit && r.Mem < r.MemLimit {
-				break
-			}
+			// Move only one process at a time
+			break
 		}
 	}
 
-	return opStack
+	return opStack, resources
+}
+
+// createNodeProcessMap takes a list of processes and groups them by the nodeid they
+// are running on. Each group gets sorted by their preference to be moved somewhere
+// else, decreasing.
+func createNodeProcessMap(processes []proxy.Process) map[string][]proxy.Process {
+	nodeProcessMap := map[string][]proxy.Process{}
+
+	for _, p := range processes {
+		nodeProcessMap[p.NodeID] = append(nodeProcessMap[p.NodeID], p)
+	}
+
+	// Sort the processes by their runtime (if they are running) for each node
+	for nodeid, processes := range nodeProcessMap {
+		sort.SliceStable(processes, func(a, b int) bool {
+			if processes[a].State == "running" {
+				if processes[b].State != "running" {
+					return false
+				}
+
+				return processes[a].Runtime < processes[b].Runtime
+			}
+
+			return false
+		})
+
+		nodeProcessMap[nodeid] = processes
+	}
+
+	return nodeProcessMap
 }

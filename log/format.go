@@ -96,15 +96,25 @@ func (f *consoleFormatter) String(e *Event) string {
 		value := e.Data[key]
 
 		switch val := value.(type) {
+		case bool:
+			if val {
+				v = "true"
+			} else {
+				v = "false"
+			}
 		case string:
 			v = f.quote(val)
 		case error:
 			v = f.quote(val.Error())
 		default:
-			if jsonvalue, err := json.Marshal(value); err == nil {
-				v = string(jsonvalue)
+			if str, ok := val.(fmt.Stringer); ok {
+				v = f.quote(str.String())
 			} else {
-				v = f.quote(err.Error())
+				if jsonvalue, err := json.Marshal(value); err == nil {
+					v = string(jsonvalue)
+				} else {
+					v = f.quote(err.Error())
+				}
 			}
 		}
 

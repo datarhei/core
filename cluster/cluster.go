@@ -80,8 +80,9 @@ type ClusterConfig struct {
 	Address   string // Listen address for the raft protocol
 	Peers     []Peer // Address of a member of a cluster to join
 
-	SyncInterval       time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
-	NodeRecoverTimeout time.Duration // Timeout for a node to recover before rebalancing the processes
+	SyncInterval           time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
+	NodeRecoverTimeout     time.Duration // Timeout for a node to recover before rebalancing the processes
+	EmergencyLeaderTimeout time.Duration // Timeout for establishing the emergency leadership after lost contact to raft leader
 
 	CoreAPIAddress  string // Address of the core API
 	CoreAPIUsername string // Username for the core API
@@ -113,8 +114,9 @@ type cluster struct {
 	shutdownCh   chan struct{}
 	shutdownLock sync.Mutex
 
-	syncInterval       time.Duration
-	nodeRecoverTimeout time.Duration
+	syncInterval           time.Duration
+	nodeRecoverTimeout     time.Duration
+	emergencyLeaderTimeout time.Duration
 
 	forwarder forwarder.Forwarder
 	api       API
@@ -143,8 +145,9 @@ func New(config ClusterConfig) (Cluster, error) {
 
 		shutdownCh: make(chan struct{}),
 
-		syncInterval:       config.SyncInterval,
-		nodeRecoverTimeout: config.NodeRecoverTimeout,
+		syncInterval:           config.SyncInterval,
+		nodeRecoverTimeout:     config.NodeRecoverTimeout,
+		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
 
 		nodes: map[string]proxy.Node{},
 	}
@@ -971,15 +974,15 @@ func (c *cluster) sentinel() {
 
 			c.logger.Debug().WithFields(log.Fields{
 				"state":        stats.State,
-				"last_contact": stats.LastContact.String(),
+				"last_contact": stats.LastContact,
 				"num_peers":    stats.NumPeers,
 			}).Log("Stats")
 
-			if stats.LastContact > 10*time.Second && !isEmergencyLeader {
+			if stats.LastContact > c.emergencyLeaderTimeout && !isEmergencyLeader {
 				c.logger.Warn().Log("Force leadership due to lost contact to leader")
 				c.raftEmergencyNotifyCh <- true
 				isEmergencyLeader = true
-			} else if stats.LastContact <= 10*time.Second && isEmergencyLeader {
+			} else if stats.LastContact <= c.emergencyLeaderTimeout && isEmergencyLeader {
 				c.logger.Warn().Log("Stop forced leadership due to contact to leader")
 				c.raftEmergencyNotifyCh <- false
 				isEmergencyLeader = false

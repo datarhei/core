@@ -12,6 +12,8 @@ import (
 )
 
 func TestSynchronizeAdd(t *testing.T) {
+	wish := map[string]string{}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -25,24 +27,30 @@ func TestSynchronizeAdd(t *testing.T) {
 
 	have := []proxy.Process{}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      7,
-			Mem:      35,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      7,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      85,
-			Mem:      11,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      85,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpAdd{
@@ -54,6 +62,10 @@ func TestSynchronizeAdd(t *testing.T) {
 			},
 		},
 	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar@": "node1",
+	}, reality)
 
 	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
@@ -74,6 +86,10 @@ func TestSynchronizeAdd(t *testing.T) {
 }
 
 func TestSynchronizeAddReferenceAffinity(t *testing.T) {
+	wish := map[string]string{
+		"foobar@": "node2",
+	}
+
 	now := time.Now()
 
 	want := []store.Process{
@@ -107,30 +123,38 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
-				ID:        "foobar",
-				Reference: "barfoo",
+				ID:          "foobar",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
 			},
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      1,
-			Mem:      1,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      1,
-			Mem:      1,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpAdd{
@@ -143,9 +167,16 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			},
 		},
 	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar@":  "node2",
+		"foobar2@": "node2",
+	}, reality)
 }
 
 func TestSynchronizeAddLimit(t *testing.T) {
+	wish := map[string]string{}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -159,24 +190,30 @@ func TestSynchronizeAddLimit(t *testing.T) {
 
 	have := []proxy.Process{}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      81,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      81,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      79,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      79,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpAdd{
@@ -188,6 +225,10 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			},
 		},
 	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar@": "node2",
+	}, reality)
 
 	require.Equal(t, map[string]proxy.NodeResources{
 		"node1": {
@@ -208,6 +249,8 @@ func TestSynchronizeAddLimit(t *testing.T) {
 }
 
 func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
+	wish := map[string]string{}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -221,24 +264,30 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 
 	have := []proxy.Process{}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      81,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      81,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      79,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      79,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, _, _ := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpReject{
@@ -249,6 +298,8 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 }
 
 func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
+	wish := map[string]string{}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -262,24 +313,30 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 
 	have := []proxy.Process{}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      81,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      81,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      79,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      79,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, _, _ := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpReject{
@@ -290,6 +347,8 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 }
 
 func TestSynchronizeAddNoLimits(t *testing.T) {
+	wish := map[string]string{}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -301,24 +360,30 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 
 	have := []proxy.Process{}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      81,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      81,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      79,
-			Mem:      72,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      79,
+				Mem:      72,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, _, _ := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpReject{
@@ -329,6 +394,10 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 }
 
 func TestSynchronizeRemove(t *testing.T) {
+	wish := map[string]string{
+		"foobar@": "node2",
+	}
+
 	want := []store.Process{}
 
 	have := []proxy.Process{
@@ -345,24 +414,30 @@ func TestSynchronizeRemove(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      7,
-			Mem:      65,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      7,
+				Mem:      65,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      85,
-			Mem:      11,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      85,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpDelete{
@@ -387,9 +462,15 @@ func TestSynchronizeRemove(t *testing.T) {
 			MemLimit: 90,
 		},
 	}, resources)
+
+	require.Equal(t, map[string]string{}, reality)
 }
 
 func TestSynchronizeAddRemove(t *testing.T) {
+	wish := map[string]string{
+		"foobar2@": "node2",
+	}
+
 	want := []store.Process{
 		{
 			UpdatedAt: time.Now(),
@@ -415,24 +496,30 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      7,
-			Mem:      35,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      7,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      85,
-			Mem:      65,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      85,
+				Mem:      65,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	stack := synchronize(want, have, resources)
+	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
 		processOpDelete{
@@ -465,6 +552,10 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			MemLimit: 90,
 		},
 	}, resources)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node1",
+	}, reality)
 }
 
 func TestRebalanceNothingToDo(t *testing.T) {
@@ -493,24 +584,30 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      42,
-			Mem:      35,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      42,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      37,
-			Mem:      11,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      37,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	opStack := rebalance(processes, resources)
+	opStack, _ := rebalance(processes, nodes)
 
 	require.Empty(t, opStack)
 }
@@ -552,24 +649,30 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      91,
-			Mem:      35,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      91,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      15,
-			Mem:      11,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      15,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	opStack := rebalance(processes, resources)
+	opStack, resources := rebalance(processes, nodes)
 
 	require.NotEmpty(t, opStack)
 
@@ -638,24 +741,30 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      91,
-			Mem:      35,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      91,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      15,
-			Mem:      92,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      15,
+				Mem:      92,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	opStack := rebalance(processes, resources)
+	opStack, resources := rebalance(processes, nodes)
 
 	require.NotEmpty(t, opStack)
 
@@ -758,31 +867,40 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{
+	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			NCPU:     1,
-			CPU:      90,
-			Mem:      90,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      90,
+				Mem:      90,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node2": {
-			NCPU:     1,
-			CPU:      1,
-			Mem:      1,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 		"node3": {
-			NCPU:     1,
-			CPU:      1,
-			Mem:      1,
-			CPULimit: 90,
-			MemLimit: 90,
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
 		},
 	}
 
-	opStack := rebalance(processes, resources)
+	opStack, resources := rebalance(processes, nodes)
 
 	require.NotEmpty(t, opStack)
 
@@ -820,6 +938,164 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			MemLimit: 90,
 		},
 	}, resources)
+}
+
+func TestCreateNodeProcessMap(t *testing.T) {
+	processes := []proxy.Process{
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 1,
+			Config: &app.Config{
+				ID:        "foobar2",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 67,
+			Config: &app.Config{
+				ID:        "foobar3",
+				Reference: "ref3",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar3",
+				Reference: "ref2",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 41,
+			Config: &app.Config{
+				ID:        "foobar4",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node3",
+			Order:   "start",
+			State:   "running",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 42,
+			Config: &app.Config{
+				ID:        "foobar5",
+				Reference: "ref1",
+			},
+		},
+	}
+
+	nodeProcessMap := createNodeProcessMap(processes)
+
+	require.Equal(t, map[string][]proxy.Process{
+		"node1": {
+			{
+				NodeID:  "node1",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 1,
+				Config: &app.Config{
+					ID:        "foobar2",
+					Reference: "ref1",
+				},
+			},
+			{
+				NodeID:  "node1",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 42,
+				Config: &app.Config{
+					ID: "foobar1",
+				},
+			},
+		},
+		"node2": {
+			{
+				NodeID:  "node2",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 42,
+				Config: &app.Config{
+					ID:        "foobar3",
+					Reference: "ref2",
+				},
+			},
+			{
+				NodeID:  "node2",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 67,
+				Config: &app.Config{
+					ID:        "foobar3",
+					Reference: "ref3",
+				},
+			},
+		},
+		"node3": {
+			{
+				NodeID:  "node3",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 41,
+				Config: &app.Config{
+					ID:        "foobar4",
+					Reference: "ref1",
+				},
+			},
+			{
+				NodeID:  "node3",
+				Order:   "start",
+				State:   "running",
+				CPU:     1,
+				Mem:     1,
+				Runtime: 42,
+				Config: &app.Config{
+					ID:        "foobar5",
+					Reference: "ref1",
+				},
+			},
+		},
+	}, nodeProcessMap)
 }
 
 func TestCreateReferenceAffinityNodeMap(t *testing.T) {
@@ -900,7 +1176,7 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 	affinityMap := createReferenceAffinityMap(processes)
 
 	require.Equal(t, map[string][]referenceAffinityNodeCount{
-		"ref1": {
+		"ref1@": {
 			{
 				nodeid: "node3",
 				count:  2,
@@ -910,13 +1186,13 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 				count:  1,
 			},
 		},
-		"ref2": {
+		"ref2@": {
 			{
 				nodeid: "node2",
 				count:  1,
 			},
 		},
-		"ref3": {
+		"ref3@": {
 			{
 				nodeid: "node2",
 				count:  1,

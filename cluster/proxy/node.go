@@ -41,6 +41,7 @@ type NodeReader interface {
 	IPs() []string
 	About() NodeAbout
 	Version() NodeVersion
+	Resources() NodeResources
 
 	Files() NodeFiles
 	ProcessList() ([]Process, error)
@@ -493,6 +494,22 @@ func (n *node) About() NodeAbout {
 	}
 
 	return nodeAbout
+}
+
+func (n *node) Resources() NodeResources {
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
+	r := NodeResources{
+		IsThrottling: n.resources.throttling,
+		NCPU:         n.resources.ncpu,
+		CPU:          n.resources.cpu,
+		CPULimit:     n.resources.cpuLimit,
+		Mem:          n.resources.mem,
+		MemLimit:     n.resources.memLimit,
+	}
+
+	return r
 }
 
 func (n *node) Version() NodeVersion {

@@ -1,7 +1,6 @@
 package restream
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1177,17 +1176,14 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 		return err
 	}
 
-	currentHash := task.config.Hash()
-	replaceHash := t.config.Hash()
-
 	// If the new config has the same hash as the current config, do nothing.
-	if bytes.Equal(currentHash, replaceHash) {
+	if task.config.Equal(t.config) {
 		return nil
 	}
 
 	tid := t.ID()
 
-	if !tid.Equals(id) {
+	if !tid.Equal(id) {
 		_, ok := r.tasks[tid]
 		if ok {
 			return ErrProcessExists

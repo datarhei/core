@@ -239,9 +239,8 @@ func (p *proxy) Resources() map[string]NodeResources {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	for _, node := range p.nodes {
-		about := node.About()
-		resources[about.ID] = about.Resources
+	for id, node := range p.nodes {
+		resources[id] = node.Resources()
 	}
 
 	return resources

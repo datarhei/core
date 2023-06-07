@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ type Store interface {
 
 	ProcessList() []Process
 	GetProcess(id app.ProcessID) (Process, error)
+	GetProcessNodeMap() map[string]string
 
 	UserList() Users
 	GetUser(name string) Users
@@ -68,6 +68,7 @@ const (
 	OpUpdateIdentity     Operation = "updateIdentity"
 	OpRemoveIdentity     Operation = "removeIdentity"
 	OpSetPolicies        Operation = "setPolicies"
+	OpSetProcessNodeMap  Operation = "setProcessNodeMap"
 )
 
 type Command struct {
@@ -112,10 +113,19 @@ type CommandSetPolicies struct {
 	Policies []access.Policy
 }
 
+type CommandSetProcessNodeMap struct {
+	Map map[string]string
+}
+
 // Implement a FSM
 type store struct {
-	lock    sync.RWMutex
-	Process map[string]Process
+	lock     sync.RWMutex
+	callback func(op Operation)
+
+	logger log.Logger
+
+	Process        map[string]Process
+	ProcessNodeMap map[string]string
 
 	Users struct {
 		UpdatedAt time.Time
@@ -126,10 +136,6 @@ type store struct {
 		UpdatedAt time.Time
 		Policies  map[string][]access.Policy
 	}
-
-	callback func(op Operation)
-
-	logger log.Logger
 }
 
 type Config struct {
@@ -138,8 +144,9 @@ type Config struct {
 
 func NewStore(config Config) (Store, error) {
 	s := &store{
-		Process: map[string]Process{},
-		logger:  config.Logger,
+		Process:        map[string]Process{},
+		ProcessNodeMap: map[string]string{},
+		logger:         config.Logger,
 	}
 
 	s.Users.Users = map[string]identity.User{}
@@ -219,6 +226,12 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 		json.Unmarshal(b, &cmd)
 
 		err = s.setPolicies(cmd)
+	case OpSetProcessNodeMap:
+		b, _ := json.Marshal(c.Data)
+		cmd := CommandSetProcessNodeMap{}
+		json.Unmarshal(b, &cmd)
+
+		err = s.setProcessNodeMap(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		return nil
@@ -243,6 +256,10 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 	defer s.lock.Unlock()
 
 	id := cmd.Config.ProcessID().String()
+
+	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
+		return NewStoreError("the process with the ID '%s' must have limits defined", id)
+	}
 
 	_, ok := s.Process[id]
 	if ok {
@@ -283,15 +300,16 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	srcid := cmd.ID.String()
 	dstid := cmd.Config.ProcessID().String()
 
+	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
+		return NewStoreError("the process with the ID '%s' must have limits defined", dstid)
+	}
+
 	p, ok := s.Process[srcid]
 	if !ok {
 		return NewStoreError("the process with the ID '%s' doesn't exists", srcid)
 	}
 
-	currentHash := p.Config.Hash()
-	replaceHash := cmd.Config.Hash()
-
-	if bytes.Equal(currentHash, replaceHash) {
+	if p.Config.Equal(cmd.Config) {
 		return nil
 	}
 
@@ -400,6 +418,15 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	delete(s.Policies.Policies, cmd.Name)
 	s.Policies.Policies[cmd.Name] = cmd.Policies
 	s.Policies.UpdatedAt = time.Now()
+
+	return nil
+}
+
+func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.ProcessNodeMap = cmd.Map
 
 	return nil
 }
@@ -543,6 +570,19 @@ func (s *store) PolicyUserList(name string) Policies {
 	p.Policies = append(p.Policies, s.Policies.Policies[name]...)
 
 	return p
+}
+
+func (s *store) GetProcessNodeMap() map[string]string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := map[string]string{}
+
+	for key, value := range s.ProcessNodeMap {
+		m[key] = value
+	}
+
+	return m
 }
 
 type fsmSnapshot struct {

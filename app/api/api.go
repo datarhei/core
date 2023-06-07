@@ -471,20 +471,21 @@ func (a *api) start() error {
 		}
 
 		cluster, err := cluster.New(cluster.ClusterConfig{
-			ID:                 cfg.ID,
-			Name:               cfg.Name,
-			Path:               filepath.Join(cfg.DB.Dir, "cluster"),
-			Bootstrap:          cfg.Cluster.Bootstrap,
-			Recover:            cfg.Cluster.Recover,
-			Address:            cfg.Cluster.Address,
-			Peers:              peers,
-			SyncInterval:       time.Duration(cfg.Cluster.SyncInterval) * time.Second,
-			NodeRecoverTimeout: time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
-			CoreAPIAddress:     scheme + gonet.JoinHostPort(host, port),
-			CoreAPIUsername:    cfg.API.Auth.Username,
-			CoreAPIPassword:    cfg.API.Auth.Password,
-			IPLimiter:          a.sessionsLimiter,
-			Logger:             a.log.logger.core.WithComponent("Cluster"),
+			ID:                     cfg.ID,
+			Name:                   cfg.Name,
+			Path:                   filepath.Join(cfg.DB.Dir, "cluster"),
+			Bootstrap:              cfg.Cluster.Bootstrap,
+			Recover:                cfg.Cluster.Recover,
+			Address:                cfg.Cluster.Address,
+			Peers:                  peers,
+			SyncInterval:           time.Duration(cfg.Cluster.SyncInterval) * time.Second,
+			NodeRecoverTimeout:     time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
+			EmergencyLeaderTimeout: time.Duration(cfg.Cluster.EmergencyLeaderTimeout) * time.Second,
+			CoreAPIAddress:         scheme + gonet.JoinHostPort(host, port),
+			CoreAPIUsername:        cfg.API.Auth.Username,
+			CoreAPIPassword:        cfg.API.Auth.Password,
+			IPLimiter:              a.sessionsLimiter,
+			Logger:                 a.log.logger.core.WithComponent("Cluster"),
 		})
 		if err != nil {
 			return fmt.Errorf("unable to create cluster: %w", err)

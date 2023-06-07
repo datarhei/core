@@ -176,6 +176,10 @@ func (config *Config) Hash() []byte {
 	return sum[:]
 }
 
+func (c *Config) Equal(a *Config) bool {
+	return bytes.Equal(c.Hash(), a.Hash())
+}
+
 func (c *Config) ProcessID() ProcessID {
 	return ProcessID{
 		ID:     c.ID,
@@ -293,7 +297,7 @@ func (p ProcessID) String() string {
 	return p.ID + "@" + p.Domain
 }
 
-func (p ProcessID) Equals(b ProcessID) bool {
+func (p ProcessID) Equal(b ProcessID) bool {
 	if p.ID == b.ID && p.Domain == b.Domain {
 		return true
 	}
