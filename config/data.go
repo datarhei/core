@@ -173,12 +173,14 @@ type Data struct {
 		MaxMemoryUsage float64 `json:"max_memory_usage"` // percent 0-100
 	} `json:"resources"`
 	Cluster struct {
-		Enable    bool     `json:"enable"`
-		Bootstrap bool     `json:"bootstrap"`
-		Recover   bool     `json:"recover"`
-		Debug     bool     `json:"debug"`
-		Address   string   `json:"address"` // ip:port
-		Peers     []string `json:"peers"`
+		Enable             bool     `json:"enable"`
+		Bootstrap          bool     `json:"bootstrap"`
+		Recover            bool     `json:"recover"`
+		Debug              bool     `json:"debug"`
+		Address            string   `json:"address"` // ip:port
+		Peers              []string `json:"peers"`
+		SyncInterval       int64    `json:"sync_interval" format:"int64"`        // seconds
+		NodeRecoverTimeout int64    `json:"node_recover_timeout" format:"int64"` // seconds
 	} `json:"cluster"`
 }
 

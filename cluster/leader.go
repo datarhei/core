@@ -294,7 +294,7 @@ func (c *cluster) establishLeadership(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
 
-	go c.startRebalance(ctx)
+	go c.startRebalance(ctx, c.syncInterval)
 
 	return nil
 }
@@ -305,8 +305,8 @@ func (c *cluster) revokeLeadership() {
 	c.cancelLeaderShip()
 }
 
-func (c *cluster) startRebalance(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+func (c *cluster) startRebalance(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

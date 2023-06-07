@@ -113,6 +113,9 @@ type cluster struct {
 	shutdownCh   chan struct{}
 	shutdownLock sync.Mutex
 
+	syncInterval       time.Duration
+	nodeRecoverTimeout time.Duration
+
 	forwarder forwarder.Forwarder
 	api       API
 	proxy     proxy.Proxy
@@ -139,6 +142,9 @@ func New(config ClusterConfig) (Cluster, error) {
 		raftRemoveGracePeriod: 5 * time.Second,
 
 		shutdownCh: make(chan struct{}),
+
+		syncInterval:       config.SyncInterval,
+		nodeRecoverTimeout: config.NodeRecoverTimeout,
 
 		nodes: map[string]proxy.Node{},
 	}
