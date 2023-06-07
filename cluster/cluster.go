@@ -14,6 +14,7 @@ import (
 	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/forwarder"
 	clusteriam "github.com/datarhei/core/v16/cluster/iam"
+	clusteriamadapter "github.com/datarhei/core/v16/cluster/iam/adapter"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
@@ -758,12 +759,12 @@ func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string
 }
 
 func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error) {
-	policyAdapter, err := clusteriam.NewPolicyAdapter(c.store)
+	policyAdapter, err := clusteriamadapter.NewPolicyAdapter(c.store)
 	if err != nil {
 		return nil, fmt.Errorf("cluster policy adapter: %w", err)
 	}
 
-	identityAdapter, err := clusteriam.NewIdentityAdapter(c.store)
+	identityAdapter, err := clusteriamadapter.NewIdentityAdapter(c.store)
 	if err != nil {
 		return nil, fmt.Errorf("cluster identitry adapter: %w", err)
 	}

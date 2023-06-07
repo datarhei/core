@@ -1,4 +1,4 @@
-package iam
+package adapter
 
 import (
 	"strings"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/store"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
-	iamidentity "github.com/datarhei/core/v16/iam/identity"
 
 	"github.com/casbin/casbin/v2/model"
 )
@@ -100,26 +99,4 @@ func (a *policyAdapter) HasDomain(name string) bool {
 	_, ok := a.domains[name]
 
 	return ok
-}
-
-type identityAdapter struct {
-	store store.Store
-}
-
-func NewIdentityAdapter(store store.Store) (iamidentity.Adapter, error) {
-	a := &identityAdapter{
-		store: store,
-	}
-
-	return a, nil
-}
-
-func (a *identityAdapter) LoadIdentities() ([]iamidentity.User, error) {
-	users := a.store.UserList()
-
-	return users.Users, nil
-}
-
-func (a *identityAdapter) SaveIdentities([]iamidentity.User) error {
-	return nil
 }
