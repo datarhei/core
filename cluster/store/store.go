@@ -27,17 +27,7 @@ type Store interface {
 	UserList() Users
 	GetUser(name string) Users
 	PolicyList() Policies
-	PolicyUserList(nam string) Policies
-}
-
-type StoreError string
-
-func NewStoreError(format string, a ...any) StoreError {
-	return StoreError(fmt.Sprintf(format, a...))
-}
-
-func (se StoreError) Error() string {
-	return string(se)
+	PolicyUserList(name string) Policies
 }
 
 type Process struct {
@@ -172,70 +162,12 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	err := json.Unmarshal(entry.Data, &c)
 	if err != nil {
 		logger.Error().WithError(err).Log("Invalid entry")
-		return NewStoreError("invalid log entry, index: %d, term: %d", entry.Index, entry.Term)
+		return fmt.Errorf("invalid log entry, index: %d, term: %d", entry.Index, entry.Term)
 	}
 
 	logger.Debug().WithField("operation", c.Operation).Log("")
 
-	switch c.Operation {
-	case OpAddProcess:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandAddProcess{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.addProcess(cmd)
-	case OpRemoveProcess:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandRemoveProcess{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.removeProcess(cmd)
-	case OpUpdateProcess:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandUpdateProcess{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.updateProcess(cmd)
-	case OpSetProcessMetadata:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandSetProcessMetadata{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.setProcessMetadata(cmd)
-	case OpAddIdentity:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandAddIdentity{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.addIdentity(cmd)
-	case OpUpdateIdentity:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandUpdateIdentity{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.updateIdentity(cmd)
-	case OpRemoveIdentity:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandRemoveIdentity{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.removeIdentity(cmd)
-	case OpSetPolicies:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandSetPolicies{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.setPolicies(cmd)
-	case OpSetProcessNodeMap:
-		b, _ := json.Marshal(c.Data)
-		cmd := CommandSetProcessNodeMap{}
-		json.Unmarshal(b, &cmd)
-
-		err = s.setProcessNodeMap(cmd)
-	default:
-		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
-		return nil
-	}
+	err = s.applyCommand(c)
 
 	if err != nil {
 		logger.Debug().WithError(err).WithField("operation", c.Operation).Log("")
@@ -251,6 +183,127 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	return nil
 }
 
+func (s *store) applyCommand(c Command) error {
+	var b []byte
+	var err error = nil
+
+	switch c.Operation {
+	case OpAddProcess:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandAddProcess{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.addProcess(cmd)
+	case OpRemoveProcess:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandRemoveProcess{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.removeProcess(cmd)
+	case OpUpdateProcess:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandUpdateProcess{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.updateProcess(cmd)
+	case OpSetProcessMetadata:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandSetProcessMetadata{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.setProcessMetadata(cmd)
+	case OpAddIdentity:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandAddIdentity{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.addIdentity(cmd)
+	case OpUpdateIdentity:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandUpdateIdentity{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.updateIdentity(cmd)
+	case OpRemoveIdentity:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandRemoveIdentity{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.removeIdentity(cmd)
+	case OpSetPolicies:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandSetPolicies{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.setPolicies(cmd)
+	case OpSetProcessNodeMap:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandSetProcessNodeMap{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.setProcessNodeMap(cmd)
+	default:
+		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
+		err = fmt.Errorf("unknown operation: %s", c.Operation)
+	}
+
+	return err
+}
+
 func (s *store) addProcess(cmd CommandAddProcess) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -258,12 +311,12 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 	id := cmd.Config.ProcessID().String()
 
 	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return NewStoreError("the process with the ID '%s' must have limits defined", id)
+		return fmt.Errorf("the process with the ID '%s' must have limits defined", id)
 	}
 
 	_, ok := s.Process[id]
 	if ok {
-		return NewStoreError("the process with the ID '%s' already exists", id)
+		return fmt.Errorf("the process with the ID '%s' already exists", id)
 	}
 
 	now := time.Now()
@@ -285,7 +338,7 @@ func (s *store) removeProcess(cmd CommandRemoveProcess) error {
 
 	_, ok := s.Process[id]
 	if !ok {
-		return NewStoreError("the process with the ID '%s' doesn't exist", id)
+		return fmt.Errorf("the process with the ID '%s' doesn't exist", id)
 	}
 
 	delete(s.Process, id)
@@ -301,12 +354,12 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	dstid := cmd.Config.ProcessID().String()
 
 	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return NewStoreError("the process with the ID '%s' must have limits defined", dstid)
+		return fmt.Errorf("the process with the ID '%s' must have limits defined", dstid)
 	}
 
 	p, ok := s.Process[srcid]
 	if !ok {
-		return NewStoreError("the process with the ID '%s' doesn't exists", srcid)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists", srcid)
 	}
 
 	if p.Config.Equal(cmd.Config) {
@@ -318,17 +371,19 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 			UpdatedAt: time.Now(),
 			Config:    cmd.Config,
 		}
-	} else {
-		_, ok := s.Process[dstid]
-		if ok {
-			return NewStoreError("the process with the ID '%s' already exists", dstid)
-		}
 
-		delete(s.Process, srcid)
-		s.Process[dstid] = Process{
-			UpdatedAt: time.Now(),
-			Config:    cmd.Config,
-		}
+		return nil
+	}
+
+	_, ok = s.Process[dstid]
+	if ok {
+		return fmt.Errorf("the process with the ID '%s' already exists", dstid)
+	}
+
+	delete(s.Process, srcid)
+	s.Process[dstid] = Process{
+		UpdatedAt: time.Now(),
+		Config:    cmd.Config,
 	}
 
 	return nil
@@ -342,7 +397,7 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 
 	p, ok := s.Process[id]
 	if !ok {
-		return NewStoreError("the process with the ID '%s' doesn't exists", cmd.ID)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
 	}
 
 	if p.Metadata == nil {
@@ -367,7 +422,7 @@ func (s *store) addIdentity(cmd CommandAddIdentity) error {
 
 	_, ok := s.Users.Users[cmd.Identity.Name]
 	if ok {
-		return NewStoreError("the identity with the name '%s' already exists", cmd.Identity.Name)
+		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
 	}
 
 	s.Users.UpdatedAt = time.Now()
@@ -381,20 +436,31 @@ func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
 	defer s.lock.Unlock()
 
 	_, ok := s.Users.Users[cmd.Name]
-	if ok {
-		if cmd.Name == cmd.Identity.Name {
-			s.Users.UpdatedAt = time.Now()
-			s.Users.Users[cmd.Identity.Name] = cmd.Identity
-		} else {
-			_, ok := s.Users.Users[cmd.Identity.Name]
-			if !ok {
-				s.Users.UpdatedAt = time.Now()
-				s.Users.Users[cmd.Identity.Name] = cmd.Identity
-			} else {
-				return NewStoreError("the identity with the name '%s' already exists", cmd.Identity.Name)
-			}
-		}
+	if !ok {
+		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
 	}
+
+	if cmd.Name == cmd.Identity.Name {
+		s.Users.UpdatedAt = time.Now()
+		s.Users.Users[cmd.Identity.Name] = cmd.Identity
+
+		return nil
+	}
+
+	_, ok = s.Users.Users[cmd.Identity.Name]
+	if ok {
+		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
+	}
+
+	now := time.Now()
+
+	s.Users.UpdatedAt = now
+	s.Users.Users[cmd.Identity.Name] = cmd.Identity
+	s.Policies.UpdatedAt = now
+	s.Policies.Policies[cmd.Identity.Name] = s.Policies.Policies[cmd.Name]
+
+	delete(s.Users.Users, cmd.Name)
+	delete(s.Policies.Policies, cmd.Name)
 
 	return nil
 }
@@ -414,6 +480,10 @@ func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
 func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if _, ok := s.Users.Users[cmd.Name]; !ok {
+		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+	}
 
 	delete(s.Policies.Policies, cmd.Name)
 	s.Policies.Policies[cmd.Name] = cmd.Policies

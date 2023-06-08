@@ -318,7 +318,9 @@ func (c *cluster) revokeLeadership() {
 // All this happens if there's a leader. If there's no leader election possible, the node goes into the
 // emergency leadership mode after a certain duration (emergencyLeaderTimeout). The synchronization phase will
 // happen based on the last known list of processes from the cluster DB. Until nodeRecoverTimeout is reached,
-// process that would run on unreachable nodes will not be moved to the node. Rebalancing will be disabled.
+// process that would run on unreachable nodes will not be moved to the node. After that, all processes will
+// end on the node, but only if there are enough resources. Not to bog down the node. Rebalancing will be
+// disabled.
 //
 // The goal of synchronizing and rebalancing is to make as little moves as possible and to be tolerant for
 // a while if a node is not reachable.

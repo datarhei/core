@@ -558,6 +558,359 @@ func TestSynchronizeAddRemove(t *testing.T) {
 	}, reality)
 }
 
+func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
+	wish := map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node2",
+	}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}
+
+	have := []proxy.Process{
+		{
+			NodeID:    "node1",
+			Order:     "start",
+			State:     "running",
+			CPU:       12,
+			Mem:       5,
+			Runtime:   42,
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now().Add(-time.Minute),
+			Resources: proxy.NodeResources{
+				IsThrottling: true,
+				NCPU:         1,
+				CPU:          1,
+				Mem:          1,
+				CPULimit:     90,
+				MemLimit:     90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Empty(t, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node2",
+	}, reality)
+}
+
+func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
+	wish := map[string]string{
+		"foobar1@": "node1",
+	}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}
+
+	have := []proxy.Process{
+		{
+			NodeID:    "node1",
+			Order:     "start",
+			State:     "running",
+			CPU:       12,
+			Mem:       5,
+			Runtime:   42,
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now().Add(-time.Minute),
+			Resources: proxy.NodeResources{
+				IsThrottling: true,
+				NCPU:         1,
+				CPU:          1,
+				Mem:          1,
+				CPULimit:     90,
+				MemLimit:     90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Equal(t, []interface{}{
+		processOpAdd{
+			nodeid: "node1",
+			config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node1",
+	}, reality)
+}
+
+func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
+	wish := map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node3",
+	}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}
+
+	have := []proxy.Process{
+		{
+			NodeID:    "node1",
+			Order:     "start",
+			State:     "running",
+			CPU:       12,
+			Mem:       5,
+			Runtime:   42,
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now().Add(-time.Minute),
+			Resources: proxy.NodeResources{
+				IsThrottling: true,
+				NCPU:         1,
+				CPU:          1,
+				Mem:          1,
+				CPULimit:     90,
+				MemLimit:     90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Equal(t, []interface{}{
+		processOpAdd{
+			nodeid: "node1",
+			config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node1",
+	}, reality)
+}
+
+func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
+	wish := map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node2",
+	}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}
+
+	have := []proxy.Process{
+		{
+			NodeID:    "node1",
+			Order:     "start",
+			State:     "running",
+			CPU:       12,
+			Mem:       5,
+			Runtime:   42,
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 20,
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now().Add(-3 * time.Minute),
+			Resources: proxy.NodeResources{
+				IsThrottling: true,
+				NCPU:         1,
+				CPU:          1,
+				Mem:          1,
+				CPULimit:     90,
+				MemLimit:     90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Equal(t, []interface{}{
+		processOpAdd{
+			nodeid: "node1",
+			config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 30,
+			},
+		},
+	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node1",
+		"foobar2@": "node1",
+	}, reality)
+}
+
 func TestRebalanceNothingToDo(t *testing.T) {
 	processes := []proxy.Process{
 		{

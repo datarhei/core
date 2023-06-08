@@ -225,7 +225,7 @@ func (r *raft) Apply(data []byte) error {
 
 	res := future.Response()
 	if res != nil {
-		if err, ok := res.(store.StoreError); ok {
+		if err, ok := res.(error); ok {
 			return err
 		}
 	}
