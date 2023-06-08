@@ -28,11 +28,11 @@ type Node interface {
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string) (io.ReadCloser, error)
 
-	ProcessAdd(config *app.Config, metadata map[string]interface{}) error
-	ProcessStart(id app.ProcessID) error
-	ProcessStop(id app.ProcessID) error
-	ProcessDelete(id app.ProcessID) error
-	ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	AddProcess(config *app.Config, metadata map[string]interface{}) error
+	StartProcess(id app.ProcessID) error
+	StopProcess(id app.ProcessID) error
+	DeleteProcess(id app.ProcessID) error
+	UpdateProcess(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 
 	NodeReader
 }
@@ -855,7 +855,7 @@ func (n *node) ProcessList() ([]Process, error) {
 	return processes, nil
 }
 
-func (n *node) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {
+func (n *node) AddProcess(config *app.Config, metadata map[string]interface{}) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -924,7 +924,7 @@ func convertConfig(config *app.Config, metadata map[string]interface{}) clientap
 	return cfg
 }
 
-func (n *node) ProcessStart(id app.ProcessID) error {
+func (n *node) StartProcess(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -935,7 +935,7 @@ func (n *node) ProcessStart(id app.ProcessID) error {
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "start")
 }
 
-func (n *node) ProcessStop(id app.ProcessID) error {
+func (n *node) StopProcess(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -946,7 +946,7 @@ func (n *node) ProcessStop(id app.ProcessID) error {
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "stop")
 }
 
-func (n *node) ProcessDelete(id app.ProcessID) error {
+func (n *node) DeleteProcess(id app.ProcessID) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -957,7 +957,7 @@ func (n *node) ProcessDelete(id app.ProcessID) error {
 	return n.peer.ProcessDelete(client.NewProcessID(id.ID, id.Domain))
 }
 
-func (n *node) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+func (n *node) UpdateProcess(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 

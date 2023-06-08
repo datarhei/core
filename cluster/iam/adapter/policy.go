@@ -26,7 +26,7 @@ func NewPolicyAdapter(store store.Store) (iamaccess.Adapter, error) {
 }
 
 func (a *policyAdapter) LoadPolicy(model model.Model) error {
-	policies := a.store.PolicyList()
+	policies := a.store.ListPolicies()
 
 	rules := [][]string{}
 	domains := map[string]struct{}{}

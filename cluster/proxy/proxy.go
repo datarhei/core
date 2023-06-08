@@ -24,10 +24,10 @@ type Proxy interface {
 	ProxyReader
 	Reader() ProxyReader
 
-	ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error
-	ProcessDelete(nodeid string, id app.ProcessID) error
-	ProcessStart(nodeid string, id app.ProcessID) error
-	ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error
+	DeleteProcess(nodeid string, id app.ProcessID) error
+	StartProcess(nodeid string, id app.ProcessID) error
+	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 }
 
 type ProxyReader interface {
@@ -480,7 +480,7 @@ func (p *proxy) ListProcesses() []Process {
 	return processList
 }
 
-func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
+func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -489,29 +489,12 @@ func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[strin
 		return fmt.Errorf("node not found")
 	}
 
-	err := node.ProcessAdd(config, metadata)
+	err := node.AddProcess(config, metadata)
 	if err != nil {
 		return err
 	}
 
-	err = node.ProcessStart(config.ProcessID())
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *proxy) ProcessDelete(nodeid string, id app.ProcessID) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
-	}
-
-	err := node.ProcessDelete(id)
+	err = node.StartProcess(config.ProcessID())
 	if err != nil {
 		return err
 	}
@@ -519,7 +502,7 @@ func (p *proxy) ProcessDelete(nodeid string, id app.ProcessID) error {
 	return nil
 }
 
-func (p *proxy) ProcessStart(nodeid string, id app.ProcessID) error {
+func (p *proxy) DeleteProcess(nodeid string, id app.ProcessID) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -528,7 +511,7 @@ func (p *proxy) ProcessStart(nodeid string, id app.ProcessID) error {
 		return fmt.Errorf("node not found")
 	}
 
-	err := node.ProcessStart(id)
+	err := node.DeleteProcess(id)
 	if err != nil {
 		return err
 	}
@@ -536,7 +519,7 @@ func (p *proxy) ProcessStart(nodeid string, id app.ProcessID) error {
 	return nil
 }
 
-func (p *proxy) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+func (p *proxy) StartProcess(nodeid string, id app.ProcessID) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -545,5 +528,22 @@ func (p *proxy) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Confi
 		return fmt.Errorf("node not found")
 	}
 
-	return node.ProcessUpdate(id, config, metadata)
+	err := node.StartProcess(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *proxy) UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	return node.UpdateProcess(id, config, metadata)
 }

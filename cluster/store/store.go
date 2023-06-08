@@ -20,14 +20,14 @@ type Store interface {
 
 	OnApply(func(op Operation))
 
-	ProcessList() []Process
+	ListProcesses() []Process
 	GetProcess(id app.ProcessID) (Process, error)
 	GetProcessNodeMap() map[string]string
 
-	UserList() Users
+	ListUsers() Users
 	GetUser(name string) Users
-	PolicyList() Policies
-	PolicyUserList(name string) Policies
+	ListPolicies() Policies
+	ListUserPolicies(name string) Policies
 }
 
 type Process struct {
@@ -549,7 +549,7 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	return nil
 }
 
-func (s *store) ProcessList() []Process {
+func (s *store) ListProcesses() []Process {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -584,7 +584,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 	}, nil
 }
 
-func (s *store) UserList() Users {
+func (s *store) ListUsers() Users {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -614,7 +614,7 @@ func (s *store) GetUser(name string) Users {
 	return u
 }
 
-func (s *store) PolicyList() Policies {
+func (s *store) ListPolicies() Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -629,7 +629,7 @@ func (s *store) PolicyList() Policies {
 	return p
 }
 
-func (s *store) PolicyUserList(name string) Policies {
+func (s *store) ListUserPolicies(name string) Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

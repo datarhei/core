@@ -697,7 +697,7 @@ func (c *cluster) trackLeaderChanges() {
 }
 
 func (c *cluster) ListProcesses() []store.Process {
-	return c.store.ProcessList()
+	return c.store.ListProcesses()
 }
 
 func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
@@ -794,7 +794,7 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 }
 
 func (c *cluster) ListIdentities() (time.Time, []iamidentity.User) {
-	users := c.store.UserList()
+	users := c.store.ListUsers()
 
 	return users.UpdatedAt, users.Users
 }
@@ -810,13 +810,13 @@ func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error)
 }
 
 func (c *cluster) ListPolicies() (time.Time, []iamaccess.Policy) {
-	policies := c.store.PolicyList()
+	policies := c.store.ListPolicies()
 
 	return policies.UpdatedAt, policies.Policies
 }
 
 func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) {
-	policies := c.store.PolicyUserList(name)
+	policies := c.store.ListUserPolicies(name)
 
 	return policies.UpdatedAt, policies.Policies
 }

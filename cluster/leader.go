@@ -391,7 +391,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 	for _, op := range stack {
 		switch v := op.(type) {
 		case processOpAdd:
-			err := c.proxy.ProcessAdd(v.nodeid, v.config, v.metadata)
+			err := c.proxy.AddProcess(v.nodeid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ProcessID(),
@@ -400,7 +400,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
-			err = c.proxy.ProcessStart(v.nodeid, v.config.ProcessID())
+			err = c.proxy.StartProcess(v.nodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
@@ -413,7 +413,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
 		case processOpUpdate:
-			err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
+			err := c.proxy.UpdateProcess(v.nodeid, v.processid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ID,
@@ -427,7 +427,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"nodeid":    v.nodeid,
 			}).Log("Updating process")
 		case processOpDelete:
-			err := c.proxy.ProcessDelete(v.nodeid, v.processid)
+			err := c.proxy.DeleteProcess(v.nodeid, v.processid)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
@@ -441,7 +441,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"nodeid":    v.nodeid,
 			}).Log("Removing process")
 		case processOpMove:
-			err := c.proxy.ProcessAdd(v.toNodeid, v.config, v.metadata)
+			err := c.proxy.AddProcess(v.toNodeid, v.config, v.metadata)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -451,7 +451,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
-			err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ProcessID())
+			err = c.proxy.DeleteProcess(v.fromNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -461,7 +461,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
-			err = c.proxy.ProcessStart(v.toNodeid, v.config.ProcessID())
+			err = c.proxy.StartProcess(v.toNodeid, v.config.ProcessID())
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -477,7 +477,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"tonodeid":   v.toNodeid,
 			}).Log("Moving process")
 		case processOpStart:
-			err := c.proxy.ProcessStart(v.nodeid, v.processid)
+			err := c.proxy.StartProcess(v.nodeid, v.processid)
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
@@ -505,7 +505,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 
 func (c *cluster) doSynchronize(emergency bool) {
 	wish := c.store.GetProcessNodeMap()
-	want := c.store.ProcessList()
+	want := c.store.ListProcesses()
 	have := c.proxy.ListProcesses()
 	nodes := c.proxy.ListNodes()
 
