@@ -107,13 +107,8 @@ type CommandSetProcessNodeMap struct {
 	Map map[string]string
 }
 
-// Implement a FSM
-type store struct {
-	lock     sync.RWMutex
-	callback func(op Operation)
-
-	logger log.Logger
-
+type storeData struct {
+	Version        uint64
 	Process        map[string]Process
 	ProcessNodeMap map[string]string
 
@@ -128,23 +123,42 @@ type store struct {
 	}
 }
 
+func (s *storeData) init() {
+	now := time.Now()
+
+	s.Version = 1
+	s.Process = map[string]Process{}
+	s.ProcessNodeMap = map[string]string{}
+	s.Users.UpdatedAt = now
+	s.Users.Users = map[string]identity.User{}
+	s.Policies.UpdatedAt = now
+	s.Policies.Policies = map[string][]access.Policy{}
+}
+
+// store implements a raft.FSM
+type store struct {
+	lock     sync.RWMutex
+	callback func(op Operation)
+
+	logger log.Logger
+
+	data storeData
+}
+
 type Config struct {
 	Logger log.Logger
 }
 
 func NewStore(config Config) (Store, error) {
 	s := &store{
-		Process:        map[string]Process{},
-		ProcessNodeMap: map[string]string{},
-		logger:         config.Logger,
+		logger: config.Logger,
 	}
-
-	s.Users.Users = map[string]identity.User{}
-	s.Policies.Policies = map[string][]access.Policy{}
 
 	if s.logger == nil {
 		s.logger = log.New("")
 	}
+
+	s.data.init()
 
 	return s, nil
 }
@@ -314,13 +328,13 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 		return fmt.Errorf("the process with the ID '%s' must have limits defined", id)
 	}
 
-	_, ok := s.Process[id]
+	_, ok := s.data.Process[id]
 	if ok {
 		return fmt.Errorf("the process with the ID '%s' already exists", id)
 	}
 
 	now := time.Now()
-	s.Process[id] = Process{
+	s.data.Process[id] = Process{
 		CreatedAt: now,
 		UpdatedAt: now,
 		Config:    cmd.Config,
@@ -336,12 +350,12 @@ func (s *store) removeProcess(cmd CommandRemoveProcess) error {
 
 	id := cmd.ID.String()
 
-	_, ok := s.Process[id]
+	_, ok := s.data.Process[id]
 	if !ok {
 		return fmt.Errorf("the process with the ID '%s' doesn't exist", id)
 	}
 
-	delete(s.Process, id)
+	delete(s.data.Process, id)
 
 	return nil
 }
@@ -357,7 +371,7 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return fmt.Errorf("the process with the ID '%s' must have limits defined", dstid)
 	}
 
-	p, ok := s.Process[srcid]
+	p, ok := s.data.Process[srcid]
 	if !ok {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists", srcid)
 	}
@@ -367,7 +381,7 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	}
 
 	if srcid == dstid {
-		s.Process[srcid] = Process{
+		s.data.Process[srcid] = Process{
 			UpdatedAt: time.Now(),
 			Config:    cmd.Config,
 		}
@@ -375,13 +389,13 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return nil
 	}
 
-	_, ok = s.Process[dstid]
+	_, ok = s.data.Process[dstid]
 	if ok {
 		return fmt.Errorf("the process with the ID '%s' already exists", dstid)
 	}
 
-	delete(s.Process, srcid)
-	s.Process[dstid] = Process{
+	delete(s.data.Process, srcid)
+	s.data.Process[dstid] = Process{
 		UpdatedAt: time.Now(),
 		Config:    cmd.Config,
 	}
@@ -395,7 +409,7 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 
 	id := cmd.ID.String()
 
-	p, ok := s.Process[id]
+	p, ok := s.data.Process[id]
 	if !ok {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
 	}
@@ -411,7 +425,7 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 	}
 	p.UpdatedAt = time.Now()
 
-	s.Process[id] = p
+	s.data.Process[id] = p
 
 	return nil
 }
@@ -420,13 +434,13 @@ func (s *store) addIdentity(cmd CommandAddIdentity) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, ok := s.Users.Users[cmd.Identity.Name]
+	_, ok := s.data.Users.Users[cmd.Identity.Name]
 	if ok {
 		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
 	}
 
-	s.Users.UpdatedAt = time.Now()
-	s.Users.Users[cmd.Identity.Name] = cmd.Identity
+	s.data.Users.UpdatedAt = time.Now()
+	s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
 
 	return nil
 }
@@ -435,32 +449,32 @@ func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, ok := s.Users.Users[cmd.Name]
+	_, ok := s.data.Users.Users[cmd.Name]
 	if !ok {
 		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
 	}
 
 	if cmd.Name == cmd.Identity.Name {
-		s.Users.UpdatedAt = time.Now()
-		s.Users.Users[cmd.Identity.Name] = cmd.Identity
+		s.data.Users.UpdatedAt = time.Now()
+		s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
 
 		return nil
 	}
 
-	_, ok = s.Users.Users[cmd.Identity.Name]
+	_, ok = s.data.Users.Users[cmd.Identity.Name]
 	if ok {
 		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
 	}
 
 	now := time.Now()
 
-	s.Users.UpdatedAt = now
-	s.Users.Users[cmd.Identity.Name] = cmd.Identity
-	s.Policies.UpdatedAt = now
-	s.Policies.Policies[cmd.Identity.Name] = s.Policies.Policies[cmd.Name]
+	s.data.Users.UpdatedAt = now
+	s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
+	s.data.Policies.UpdatedAt = now
+	s.data.Policies.Policies[cmd.Identity.Name] = s.data.Policies.Policies[cmd.Name]
 
-	delete(s.Users.Users, cmd.Name)
-	delete(s.Policies.Policies, cmd.Name)
+	delete(s.data.Users.Users, cmd.Name)
+	delete(s.data.Policies.Policies, cmd.Name)
 
 	return nil
 }
@@ -469,10 +483,10 @@ func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	delete(s.Users.Users, cmd.Name)
-	s.Users.UpdatedAt = time.Now()
-	delete(s.Policies.Policies, cmd.Name)
-	s.Policies.UpdatedAt = time.Now()
+	delete(s.data.Users.Users, cmd.Name)
+	s.data.Users.UpdatedAt = time.Now()
+	delete(s.data.Policies.Policies, cmd.Name)
+	s.data.Policies.UpdatedAt = time.Now()
 
 	return nil
 }
@@ -481,13 +495,13 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, ok := s.Users.Users[cmd.Name]; !ok {
+	if _, ok := s.data.Users.Users[cmd.Name]; !ok {
 		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
 	}
 
-	delete(s.Policies.Policies, cmd.Name)
-	s.Policies.Policies[cmd.Name] = cmd.Policies
-	s.Policies.UpdatedAt = time.Now()
+	delete(s.data.Policies.Policies, cmd.Name)
+	s.data.Policies.Policies[cmd.Name] = cmd.Policies
+	s.data.Policies.UpdatedAt = time.Now()
 
 	return nil
 }
@@ -496,7 +510,7 @@ func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.ProcessNodeMap = cmd.Map
+	s.data.ProcessNodeMap = cmd.Map
 
 	return nil
 }
@@ -514,7 +528,7 @@ func (s *store) Snapshot() (raft.FSMSnapshot, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	data, err := json.Marshal(s)
+	data, err := json.Marshal(&s.data)
 	if err != nil {
 		return nil, err
 	}
@@ -532,19 +546,28 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	data := storeData{}
+	data.init()
+
 	dec := json.NewDecoder(snapshot)
-	if err := dec.Decode(s); err != nil {
+	if err := dec.Decode(&data); err != nil {
 		return err
 	}
 
-	for id, p := range s.Process {
+	for id, p := range data.Process {
 		if p.Metadata != nil {
 			continue
 		}
 
 		p.Metadata = map[string]interface{}{}
-		s.Process[id] = p
+		data.Process[id] = p
 	}
+
+	if data.Version == 0 {
+		data.Version = 1
+	}
+
+	s.data = data
 
 	return nil
 }
@@ -555,7 +578,7 @@ func (s *store) ListProcesses() []Process {
 
 	processes := []Process{}
 
-	for _, p := range s.Process {
+	for _, p := range s.data.Process {
 		processes = append(processes, Process{
 			CreatedAt: p.CreatedAt,
 			UpdatedAt: p.UpdatedAt,
@@ -571,7 +594,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	process, ok := s.Process[id.String()]
+	process, ok := s.data.Process[id.String()]
 	if !ok {
 		return Process{}, fmt.Errorf("not found")
 	}
@@ -589,10 +612,10 @@ func (s *store) ListUsers() Users {
 	defer s.lock.RUnlock()
 
 	u := Users{
-		UpdatedAt: s.Users.UpdatedAt,
+		UpdatedAt: s.data.Users.UpdatedAt,
 	}
 
-	for _, user := range s.Users.Users {
+	for _, user := range s.data.Users.Users {
 		u.Users = append(u.Users, user)
 	}
 
@@ -604,10 +627,10 @@ func (s *store) GetUser(name string) Users {
 	defer s.lock.RUnlock()
 
 	u := Users{
-		UpdatedAt: s.Users.UpdatedAt,
+		UpdatedAt: s.data.Users.UpdatedAt,
 	}
 
-	if user, ok := s.Users.Users[name]; ok {
+	if user, ok := s.data.Users.Users[name]; ok {
 		u.Users = append(u.Users, user)
 	}
 
@@ -619,10 +642,10 @@ func (s *store) ListPolicies() Policies {
 	defer s.lock.RUnlock()
 
 	p := Policies{
-		UpdatedAt: s.Policies.UpdatedAt,
+		UpdatedAt: s.data.Policies.UpdatedAt,
 	}
 
-	for _, policies := range s.Policies.Policies {
+	for _, policies := range s.data.Policies.Policies {
 		p.Policies = append(p.Policies, policies...)
 	}
 
@@ -634,10 +657,10 @@ func (s *store) ListUserPolicies(name string) Policies {
 	defer s.lock.RUnlock()
 
 	p := Policies{
-		UpdatedAt: s.Policies.UpdatedAt,
+		UpdatedAt: s.data.Policies.UpdatedAt,
 	}
 
-	p.Policies = append(p.Policies, s.Policies.Policies[name]...)
+	p.Policies = append(p.Policies, s.data.Policies.Policies[name]...)
 
 	return p
 }
@@ -648,7 +671,7 @@ func (s *store) GetProcessNodeMap() map[string]string {
 
 	m := map[string]string{}
 
-	for key, value := range s.ProcessNodeMap {
+	for key, value := range s.data.ProcessNodeMap {
 		m[key] = value
 	}
 

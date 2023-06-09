@@ -48,8 +48,23 @@ type APIClient struct {
 	Client  *http.Client
 }
 
+func (c *APIClient) Version() (string, error) {
+	data, err := c.call(http.MethodGet, "/", "", nil, "")
+	if err != nil {
+		return "", err
+	}
+
+	var version string
+	err = json.Unmarshal(data, &version)
+	if err != nil {
+		return "", err
+	}
+
+	return version, nil
+}
+
 func (c *APIClient) CoreAPIAddress() (string, error) {
-	data, err := c.call(http.MethodGet, "/core", "", nil, "")
+	data, err := c.call(http.MethodGet, "/v1/core", "", nil, "")
 	if err != nil {
 		return "", err
 	}
@@ -69,13 +84,13 @@ func (c *APIClient) Join(origin string, r JoinRequest) error {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/server", "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPost, "/v1/server", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
 func (c *APIClient) Leave(origin string, id string) error {
-	_, err := c.call(http.MethodDelete, "/server/"+id, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/server/"+id, "application/json", nil, origin)
 
 	return err
 }
@@ -86,13 +101,13 @@ func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/process", "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPost, "/v1/process", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
 func (c *APIClient) RemoveProcess(origin string, id app.ProcessID) error {
-	_, err := c.call(http.MethodDelete, "/process/"+id.ID+"?domain="+id.Domain, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/process/"+id.ID+"?domain="+id.Domain, "application/json", nil, origin)
 
 	return err
 }
@@ -103,7 +118,7 @@ func (c *APIClient) UpdateProcess(origin string, id app.ProcessID, r UpdateProce
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+id.ID+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/process/"+id.ID+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -114,7 +129,7 @@ func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key stri
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/process/"+id.ID+"/metadata/"+key+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/process/"+id.ID+"/metadata/"+key+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -125,7 +140,7 @@ func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
 		return err
 	}
 
-	_, err = c.call(http.MethodPost, "/iam/user", "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPost, "/v1/iam/user", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -136,7 +151,7 @@ func (c *APIClient) UpdateIdentity(origin, name string, r UpdateIdentityRequest)
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/iam/user/"+name, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/iam/user/"+name, "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -147,19 +162,19 @@ func (c *APIClient) SetPolicies(origin, name string, r SetPoliciesRequest) error
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/iam/user/"+name+"/policies", "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/iam/user/"+name+"/policies", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
 func (c *APIClient) RemoveIdentity(origin string, name string) error {
-	_, err := c.call(http.MethodDelete, "/iam/user/"+name, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/iam/user/"+name, "application/json", nil, origin)
 
 	return err
 }
 
 func (c *APIClient) Snapshot() (io.ReadCloser, error) {
-	return c.stream(http.MethodGet, "/snapshot", "", nil, "")
+	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, "")
 }
 
 func (c *APIClient) stream(method, path, contentType string, data io.Reader, origin string) (io.ReadCloser, error) {
@@ -167,7 +182,7 @@ func (c *APIClient) stream(method, path, contentType string, data io.Reader, ori
 		return nil, fmt.Errorf("no address defined")
 	}
 
-	address := "http://" + c.Address + "/v1" + path
+	address := "http://" + c.Address + path
 
 	req, err := http.NewRequest(method, address, data)
 	if err != nil {

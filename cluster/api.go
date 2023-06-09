@@ -95,6 +95,14 @@ func NewAPI(config APIConfig) (API, error) {
 	doc := a.router.Group("/v1/swagger/*")
 	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
+	a.router.GET("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, Version.String())
+	})
+
+	a.router.GET("/v1/about", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, Version.String())
+	})
+
 	a.router.POST("/v1/server", a.AddServer)
 	a.router.DELETE("/v1/server/:id", a.RemoveServer)
 

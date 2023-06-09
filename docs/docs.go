@@ -3782,17 +3782,23 @@ const docTemplate = `{
                 "core_api_address": {
                     "type": "string"
                 },
+                "degraded": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "string"
                 },
-                "server": {
+                "nodes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.ClusterServer"
+                        "$ref": "#/definitions/api.ClusterNode"
                     }
                 },
-                "stats": {
-                    "$ref": "#/definitions/api.ClusterStats"
+                "raft": {
+                    "$ref": "#/definitions/api.ClusterRaft"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
@@ -3827,6 +3833,9 @@ const docTemplate = `{
                 },
                 "uptime_seconds": {
                     "type": "integer"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
@@ -3863,9 +3872,11 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "memory_limit_bytes": {
+                    "description": "bytes",
                     "type": "integer"
                 },
                 "memory_used_bytes": {
+                    "description": "bytes",
                     "type": "integer"
                 },
                 "ncpu": {
@@ -3877,6 +3888,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "cpu": {
+                    "description": "percent 0-100*ncpu",
                     "type": "number"
                 },
                 "domain": {
@@ -3886,6 +3898,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "memory_bytes": {
+                    "description": "bytes",
                     "type": "integer"
                 },
                 "node_id": {
@@ -3901,6 +3914,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "runtime_seconds": {
+                    "description": "seconds",
                     "type": "integer"
                 },
                 "state": {
@@ -3908,7 +3922,21 @@ const docTemplate = `{
                 }
             }
         },
-        "api.ClusterServer": {
+        "api.ClusterRaft": {
+            "type": "object",
+            "properties": {
+                "server": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterRaftServer"
+                    }
+                },
+                "stats": {
+                    "$ref": "#/definitions/api.ClusterRaftStats"
+                }
+            }
+        },
+        "api.ClusterRaftServer": {
             "type": "object",
             "properties": {
                 "address": {
@@ -3926,7 +3954,7 @@ const docTemplate = `{
                 }
             }
         },
-        "api.ClusterStats": {
+        "api.ClusterRaftStats": {
             "type": "object",
             "properties": {
                 "last_contact_ms": {
@@ -4053,6 +4081,7 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "address": {
+                            "description": "ip:port",
                             "type": "string"
                         },
                         "bootstrap": {
@@ -4061,8 +4090,18 @@ const docTemplate = `{
                         "debug": {
                             "type": "boolean"
                         },
+                        "emergency_leader_timeout": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "node_recover_timeout": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "peers": {
                             "type": "array",
@@ -4072,6 +4111,11 @@ const docTemplate = `{
                         },
                         "recover": {
                             "type": "boolean"
+                        },
+                        "sync_interval": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -4261,9 +4305,11 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
                             "type": "number"
                         },
                         "max_memory_usage": {
+                            "description": "percent 0-100",
                             "type": "number"
                         }
                     }
@@ -6225,6 +6271,7 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "address": {
+                            "description": "ip:port",
                             "type": "string"
                         },
                         "bootstrap": {
@@ -6233,8 +6280,18 @@ const docTemplate = `{
                         "debug": {
                             "type": "boolean"
                         },
+                        "emergency_leader_timeout": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "node_recover_timeout": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
                         },
                         "peers": {
                             "type": "array",
@@ -6244,6 +6301,11 @@ const docTemplate = `{
                         },
                         "recover": {
                             "type": "boolean"
+                        },
+                        "sync_interval": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
                         }
                     }
                 },
@@ -6433,9 +6495,11 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
                             "type": "number"
                         },
                         "max_memory_usage": {
+                            "description": "percent 0-100",
                             "type": "number"
                         }
                     }

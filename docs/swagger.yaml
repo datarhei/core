@@ -73,14 +73,18 @@ definitions:
         type: string
       core_api_address:
         type: string
+      degraded:
+        type: boolean
       id:
         type: string
-      server:
+      nodes:
         items:
-          $ref: '#/definitions/api.ClusterServer'
+          $ref: '#/definitions/api.ClusterNode'
         type: array
-      stats:
-        $ref: '#/definitions/api.ClusterStats'
+      raft:
+        $ref: '#/definitions/api.ClusterRaft'
+      version:
+        type: string
     type: object
   api.ClusterNode:
     properties:
@@ -104,6 +108,8 @@ definitions:
         type: string
       uptime_seconds:
         type: integer
+      version:
+        type: string
     type: object
   api.ClusterNodeFiles:
     properties:
@@ -128,8 +134,10 @@ definitions:
       is_throttling:
         type: boolean
       memory_limit_bytes:
+        description: bytes
         type: integer
       memory_used_bytes:
+        description: bytes
         type: integer
       ncpu:
         type: number
@@ -137,12 +145,14 @@ definitions:
   api.ClusterProcess:
     properties:
       cpu:
+        description: percent 0-100*ncpu
         type: number
       domain:
         type: string
       id:
         type: string
       memory_bytes:
+        description: bytes
         type: integer
       node_id:
         type: string
@@ -153,11 +163,21 @@ definitions:
       reference:
         type: string
       runtime_seconds:
+        description: seconds
         type: integer
       state:
         type: string
     type: object
-  api.ClusterServer:
+  api.ClusterRaft:
+    properties:
+      server:
+        items:
+          $ref: '#/definitions/api.ClusterRaftServer'
+        type: array
+      stats:
+        $ref: '#/definitions/api.ClusterRaftStats'
+    type: object
+  api.ClusterRaftServer:
     properties:
       address:
         description: raft address
@@ -169,7 +189,7 @@ definitions:
       voter:
         type: boolean
     type: object
-  api.ClusterStats:
+  api.ClusterRaftStats:
     properties:
       last_contact_ms:
         type: number
@@ -252,19 +272,32 @@ definitions:
       cluster:
         properties:
           address:
+            description: ip:port
             type: string
           bootstrap:
             type: boolean
           debug:
             type: boolean
+          emergency_leader_timeout:
+            description: seconds
+            format: int64
+            type: integer
           enable:
             type: boolean
+          node_recover_timeout:
+            description: seconds
+            format: int64
+            type: integer
           peers:
             items:
               type: string
             type: array
           recover:
             type: boolean
+          sync_interval:
+            description: seconds
+            format: int64
+            type: integer
         type: object
       created_at:
         description: When this config has been persisted
@@ -393,8 +426,10 @@ definitions:
       resources:
         properties:
           max_cpu_usage:
+            description: percent 0-100
             type: number
           max_memory_usage:
+            description: percent 0-100
             type: number
         type: object
       router:
@@ -1783,19 +1818,32 @@ definitions:
       cluster:
         properties:
           address:
+            description: ip:port
             type: string
           bootstrap:
             type: boolean
           debug:
             type: boolean
+          emergency_leader_timeout:
+            description: seconds
+            format: int64
+            type: integer
           enable:
             type: boolean
+          node_recover_timeout:
+            description: seconds
+            format: int64
+            type: integer
           peers:
             items:
               type: string
             type: array
           recover:
             type: boolean
+          sync_interval:
+            description: seconds
+            format: int64
+            type: integer
         type: object
       created_at:
         description: When this config has been persisted
@@ -1924,8 +1972,10 @@ definitions:
       resources:
         properties:
           max_cpu_usage:
+            description: percent 0-100
             type: number
           max_memory_usage:
+            description: percent 0-100
             type: number
         type: object
       router:

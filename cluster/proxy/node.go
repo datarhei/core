@@ -167,8 +167,7 @@ func (n *node) Connect() error {
 	}
 
 	peer, err := client.New(client.Config{
-		Address:    n.address,
-		Auth0Token: "",
+		Address: n.address,
 		Client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
@@ -566,25 +565,20 @@ func (n *node) files() {
 	filesList := []string{}
 	errorList := []error{}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
 
-	go func(ctx context.Context) {
+	go func() {
 		defer wgList.Done()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case file := <-filesChan:
-				filesList = append(filesList, file)
-			case err := <-errorsChan:
-				errorList = append(errorList, err)
-			}
+		for file := range filesChan {
+			filesList = append(filesList, file)
 		}
-	}(ctx)
+
+		for err := range errorsChan {
+			errorList = append(errorList, err)
+		}
+	}()
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
@@ -687,7 +681,8 @@ func (n *node) files() {
 
 	wg.Wait()
 
-	cancel()
+	close(filesChan)
+	close(errorsChan)
 
 	wgList.Wait()
 

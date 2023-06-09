@@ -29,10 +29,10 @@ func TestCreateStore(t *testing.T) {
 	s, err := createStore()
 	require.NoError(t, err)
 
-	require.NotNil(t, s.Process)
-	require.NotNil(t, s.ProcessNodeMap)
-	require.NotNil(t, s.Users.Users)
-	require.NotNil(t, s.Policies.Policies)
+	require.NotNil(t, s.data.Process)
+	require.NotNil(t, s.data.ProcessNodeMap)
+	require.NotNil(t, s.data.Users.Users)
+	require.NotNil(t, s.data.Policies.Policies)
 }
 
 func TestAddProcessCommand(t *testing.T) {
@@ -52,9 +52,9 @@ func TestAddProcessCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, s.Process)
+	require.NotEmpty(t, s.data.Process)
 
-	p, ok := s.Process["foobar@"]
+	p, ok := s.data.Process["foobar@"]
 	require.True(t, ok)
 
 	require.NotZero(t, p.CreatedAt)
@@ -76,7 +76,7 @@ func TestAddProcess(t *testing.T) {
 		Config: config,
 	})
 	require.Error(t, err)
-	require.Empty(t, s.Process)
+	require.Empty(t, s.data.Process)
 
 	config = &app.Config{
 		ID:          "foobar",
@@ -88,7 +88,7 @@ func TestAddProcess(t *testing.T) {
 		Config: config,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	config = &app.Config{
 		ID:          "foobar",
@@ -100,7 +100,7 @@ func TestAddProcess(t *testing.T) {
 		Config: config,
 	})
 	require.Error(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	config = &app.Config{
 		ID:          "foobar",
@@ -113,7 +113,7 @@ func TestAddProcess(t *testing.T) {
 		Config: config,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 }
 
 func TestRemoveProcessCommand(t *testing.T) {
@@ -133,7 +133,7 @@ func TestRemoveProcessCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, s.Process)
+	require.NotEmpty(t, s.data.Process)
 
 	err = s.applyCommand(Command{
 		Operation: OpRemoveProcess,
@@ -142,7 +142,7 @@ func TestRemoveProcessCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Empty(t, s.Process)
+	require.Empty(t, s.data.Process)
 
 	err = s.applyCommand(Command{
 		Operation: OpRemoveProcess,
@@ -184,25 +184,25 @@ func TestRemoveProcess(t *testing.T) {
 		Config: config1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	err = s.addProcess(CommandAddProcess{
 		Config: config2,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 
 	err = s.removeProcess(CommandRemoveProcess{
 		ID: config1.ProcessID(),
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	err = s.removeProcess(CommandRemoveProcess{
 		ID: config2.ProcessID(),
 	})
 	require.NoError(t, err)
-	require.Empty(t, s.Process)
+	require.Empty(t, s.data.Process)
 }
 
 func TestUpdateProcessCommand(t *testing.T) {
@@ -224,7 +224,7 @@ func TestUpdateProcessCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, s.Process)
+	require.NotEmpty(t, s.data.Process)
 
 	config = &app.Config{
 		ID:          "foobaz",
@@ -240,7 +240,7 @@ func TestUpdateProcessCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, s.Process)
+	require.NotEmpty(t, s.data.Process)
 }
 
 func TestUpdateProcess(t *testing.T) {
@@ -263,13 +263,13 @@ func TestUpdateProcess(t *testing.T) {
 		Config: config1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	err = s.addProcess(CommandAddProcess{
 		Config: config2,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 
 	config := &app.Config{
 		ID:          "foobaz",
@@ -307,14 +307,14 @@ func TestUpdateProcess(t *testing.T) {
 		Config: config,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 
 	err = s.updateProcess(CommandUpdateProcess{
 		ID:     config.ProcessID(),
 		Config: config,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 
 	config3 := &app.Config{
 		ID:          config.ID,
@@ -327,7 +327,7 @@ func TestUpdateProcess(t *testing.T) {
 		Config: config3,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Process))
+	require.Equal(t, 2, len(s.data.Process))
 
 	_, err = s.GetProcess(config1.ProcessID())
 	require.Error(t, err)
@@ -356,7 +356,7 @@ func TestSetProcessMetadataCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, s.Process)
+	require.NotEmpty(t, s.data.Process)
 
 	p, err := s.GetProcess(config.ProcessID())
 	require.NoError(t, err)
@@ -403,7 +403,7 @@ func TestSetProcessMetadata(t *testing.T) {
 		Config: config,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Process))
+	require.Equal(t, 1, len(s.data.Process))
 
 	err = s.setProcessMetadata(CommandSetProcessMetadata{
 		ID:   config.ProcessID(),
@@ -471,7 +471,7 @@ func TestAddIdentityCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
+	require.Equal(t, 1, len(s.data.Users.Users))
 }
 
 func TestAddIdentity(t *testing.T) {
@@ -486,15 +486,15 @@ func TestAddIdentity(t *testing.T) {
 		Identity: identity,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 
 	err = s.addIdentity(CommandAddIdentity{
 		Identity: identity,
 	})
 	require.Error(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 }
 
 func TestRemoveIdentityCommand(t *testing.T) {
@@ -512,7 +512,7 @@ func TestRemoveIdentityCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
+	require.Equal(t, 1, len(s.data.Users.Users))
 
 	err = s.applyCommand(Command{
 		Operation: OpRemoveIdentity,
@@ -521,7 +521,7 @@ func TestRemoveIdentityCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 0, len(s.Users.Users))
+	require.Equal(t, 0, len(s.data.Users.Users))
 }
 
 func TestRemoveIdentity(t *testing.T) {
@@ -536,22 +536,22 @@ func TestRemoveIdentity(t *testing.T) {
 		Identity: identity,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 
 	err = s.removeIdentity(CommandRemoveIdentity{
 		Name: "foobar",
 	})
 	require.NoError(t, err)
-	require.Equal(t, 0, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 0, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 
 	err = s.removeIdentity(CommandRemoveIdentity{
 		Name: "foobar",
 	})
 	require.NoError(t, err)
-	require.Equal(t, 0, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 0, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 }
 
 func TestSetPoliciesCommand(t *testing.T) {
@@ -569,8 +569,8 @@ func TestSetPoliciesCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 
 	err = s.applyCommand(Command{
 		Operation: OpSetPolicies,
@@ -593,8 +593,8 @@ func TestSetPoliciesCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 2, len(s.Policies.Policies["foobar"]))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 2, len(s.data.Policies.Policies["foobar"]))
 }
 
 func TestSetPolicies(t *testing.T) {
@@ -625,22 +625,22 @@ func TestSetPolicies(t *testing.T) {
 		Policies: policies,
 	})
 	require.Error(t, err)
-	require.Equal(t, 0, len(s.Policies.Policies["foobar"]))
+	require.Equal(t, 0, len(s.data.Policies.Policies["foobar"]))
 
 	err = s.addIdentity(CommandAddIdentity{
 		Identity: identity,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies))
 
 	err = s.setPolicies(CommandSetPolicies{
 		Name:     "foobar",
 		Policies: policies,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 2, len(s.Policies.Policies["foobar"]))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 2, len(s.data.Policies.Policies["foobar"]))
 }
 
 func TestUpdateUserCommand(t *testing.T) {
@@ -662,7 +662,7 @@ func TestUpdateUserCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
+	require.Equal(t, 1, len(s.data.Users.Users))
 
 	err = s.applyCommand(Command{
 		Operation: OpAddIdentity,
@@ -671,7 +671,7 @@ func TestUpdateUserCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 
 	err = s.applyCommand(Command{
 		Operation: OpUpdateIdentity,
@@ -683,7 +683,7 @@ func TestUpdateUserCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 }
 
 func TestUpdateIdentity(t *testing.T) {
@@ -702,13 +702,13 @@ func TestUpdateIdentity(t *testing.T) {
 		Identity: idty1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
+	require.Equal(t, 1, len(s.data.Users.Users))
 
 	err = s.addIdentity(CommandAddIdentity{
 		Identity: idty2,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 
 	idty := identity.User{
 		Name: "foobaz",
@@ -719,7 +719,7 @@ func TestUpdateIdentity(t *testing.T) {
 		Identity: idty,
 	})
 	require.Error(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 
 	idty.Name = "foobar2"
 
@@ -728,7 +728,7 @@ func TestUpdateIdentity(t *testing.T) {
 		Identity: idty,
 	})
 	require.Error(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 
 	idty.Name = "foobaz"
 
@@ -737,7 +737,7 @@ func TestUpdateIdentity(t *testing.T) {
 		Identity: idty,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Users.Users))
+	require.Equal(t, 2, len(s.data.Users.Users))
 
 	u := s.GetUser("foobar1")
 	require.Empty(t, u.Users)
@@ -776,22 +776,22 @@ func TestUpdateIdentityWithPolicies(t *testing.T) {
 		Identity: idty1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
+	require.Equal(t, 1, len(s.data.Users.Users))
 
 	err = s.setPolicies(CommandSetPolicies{
 		Name:     "foobar",
 		Policies: policies,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 2, len(s.Policies.Policies["foobar"]))
+	require.Equal(t, 2, len(s.data.Policies.Policies["foobar"]))
 
 	err = s.updateIdentity(CommandUpdateIdentity{
 		Name:     "foobar",
 		Identity: idty1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 2, len(s.Policies.Policies["foobar"]))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 2, len(s.data.Policies.Policies["foobar"]))
 
 	idty2 := identity.User{
 		Name: "foobaz",
@@ -802,9 +802,9 @@ func TestUpdateIdentityWithPolicies(t *testing.T) {
 		Identity: idty2,
 	})
 	require.NoError(t, err)
-	require.Equal(t, 1, len(s.Users.Users))
-	require.Equal(t, 0, len(s.Policies.Policies["foobar"]))
-	require.Equal(t, 2, len(s.Policies.Policies["foobaz"]))
+	require.Equal(t, 1, len(s.data.Users.Users))
+	require.Equal(t, 0, len(s.data.Policies.Policies["foobar"]))
+	require.Equal(t, 2, len(s.data.Policies.Policies["foobaz"]))
 }
 
 func TestSetProcessNodeMapCommand(t *testing.T) {
@@ -822,7 +822,7 @@ func TestSetProcessNodeMapCommand(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, m1, s.ProcessNodeMap)
+	require.Equal(t, m1, s.data.ProcessNodeMap)
 }
 
 func TestSetProcessNodeMap(t *testing.T) {
@@ -837,7 +837,7 @@ func TestSetProcessNodeMap(t *testing.T) {
 		Map: m1,
 	})
 	require.NoError(t, err)
-	require.Equal(t, m1, s.ProcessNodeMap)
+	require.Equal(t, m1, s.data.ProcessNodeMap)
 
 	m2 := map[string]string{
 		"key": "value2",
@@ -847,7 +847,7 @@ func TestSetProcessNodeMap(t *testing.T) {
 		Map: m2,
 	})
 	require.NoError(t, err)
-	require.Equal(t, m2, s.ProcessNodeMap)
+	require.Equal(t, m2, s.data.ProcessNodeMap)
 
 	m := s.GetProcessNodeMap()
 	require.Equal(t, m2, m)

@@ -3,9 +3,11 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	gonet "net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"sync"
@@ -124,6 +126,9 @@ type cluster struct {
 
 	coreAddress string
 
+	isDegraded bool
+	stateLock  sync.Mutex
+
 	isRaftLeader  bool
 	hasRaftLeader bool
 	isLeader      bool
@@ -132,6 +137,8 @@ type cluster struct {
 	nodes     map[string]proxy.Node
 	nodesLock sync.RWMutex
 }
+
+var ErrDegraded = errors.New("cluster is currently degraded")
 
 func New(config ClusterConfig) (Cluster, error) {
 	c := &cluster{
@@ -301,7 +308,14 @@ func (c *cluster) ClusterAPIAddress(raftAddress string) (string, error) {
 		raftAddress = c.Address()
 	}
 
-	host, port, _ := gonet.SplitHostPort(raftAddress)
+	return clusterAPIAddress(raftAddress)
+}
+
+func clusterAPIAddress(raftAddress string) (string, error) {
+	host, port, err := gonet.SplitHostPort(raftAddress)
+	if err != nil {
+		return "", err
+	}
 
 	p, err := strconv.Atoi(port)
 	if err != nil {
@@ -377,6 +391,13 @@ func (c *cluster) IsRaftLeader() bool {
 	defer c.leaderLock.Unlock()
 
 	return c.isRaftLeader
+}
+
+func (c *cluster) IsDegraded() bool {
+	c.stateLock.Lock()
+	defer c.stateLock.Unlock()
+
+	return c.isDegraded
 }
 
 func (c *cluster) Leave(origin, id string) error {
@@ -524,19 +545,6 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 		"address": raftAddress,
 	}).Log("Received join request for remote server")
 
-	// connect to the peer's API in order to find out if our version is compatible
-	address, err := c.CoreAPIAddress(raftAddress)
-	if err != nil {
-		return fmt.Errorf("peer API doesn't respond: %w", err)
-	}
-
-	node := proxy.NewNode(address)
-	err = node.Connect()
-	if err != nil {
-		return fmt.Errorf("couldn't connect to peer: %w", err)
-	}
-	defer node.Disconnect()
-
 	servers, err := c.raft.Servers()
 	if err != nil {
 		c.logger.Error().WithError(err).Log("Raft configuration")
@@ -620,30 +628,44 @@ func (c *cluster) trackNodeChanges() {
 
 				_, ok := c.nodes[id]
 				if !ok {
-					address, err := c.CoreAPIAddress(server.Address)
+					logger := c.logger.WithFields(log.Fields{
+						"id":      server.ID,
+						"address": server.Address,
+					})
+
+					address, err := c.ClusterAPIAddress(server.Address)
 					if err != nil {
-						c.logger.Warn().WithError(err).WithFields(log.Fields{
-							"id":      id,
-							"address": server.Address,
-						}).Log("Discovering core API address")
+						logger.Warn().WithError(err).Log("Discovering cluster API address")
 						continue
 					}
 
-					node := proxy.NewNode(address)
+					if !checkClusterVersion(address) {
+						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
+					}
+
+					client := apiclient.APIClient{
+						Address: address,
+					}
+
+					coreAddress, err := client.CoreAPIAddress()
+					if err != nil {
+						logger.Warn().WithError(err).Log("Retrieve core API address")
+						continue
+					}
+
+					node := proxy.NewNode(coreAddress)
 					err = node.Connect()
 					if err != nil {
-						c.logger.Warn().WithError(err).WithFields(log.Fields{
-							"id":      id,
-							"address": server.Address,
-						}).Log("Connecting to core API")
+						c.logger.Warn().WithError(err).Log("Connecting to core API")
 						continue
 					}
 
+					// TODO: Check constraints
+
 					if _, err := c.proxy.AddNode(id, node); err != nil {
-						c.logger.Warn().WithError(err).WithFields(log.Fields{
-							"id":      id,
-							"address": address,
-						}).Log("Adding node")
+						c.logger.Warn().WithError(err).Log("Adding node")
+						node.Disconnect()
+						continue
 					}
 
 					c.nodes[id] = node
@@ -658,16 +680,92 @@ func (c *cluster) trackNodeChanges() {
 					continue
 				}
 
-				node.Disconnect()
 				c.proxy.RemoveNode(id)
+				node.Disconnect()
 				delete(c.nodes, id)
 			}
 
 			c.nodesLock.Unlock()
+
+			// Put the cluster in "degraded" mode in case there's a version mismatch
+			isDegraded := !c.checkClusterVersions(servers)
+
+			c.stateLock.Lock()
+			c.isDegraded = isDegraded
+			c.stateLock.Unlock()
 		case <-c.shutdownCh:
 			return
 		}
 	}
+}
+
+func (c *cluster) checkClusterVersions(servers []raft.Server) bool {
+	ok := true
+	okChan := make(chan bool, 64)
+
+	wgSummary := sync.WaitGroup{}
+	wgSummary.Add(1)
+
+	go func() {
+		defer wgSummary.Done()
+
+		for okServer := range okChan {
+			if !okServer {
+				ok = false
+			}
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+
+	for _, server := range servers {
+		wg.Add(1)
+
+		go func(server raft.Server, p chan<- bool) {
+			defer wg.Done()
+
+			address, err := clusterAPIAddress(server.Address)
+			if err != nil {
+				p <- false
+				return
+			}
+
+			p <- checkClusterVersion(address)
+		}(server, okChan)
+	}
+
+	wg.Wait()
+
+	close(okChan)
+
+	wgSummary.Wait()
+
+	return ok
+}
+
+func checkClusterVersion(address string) bool {
+	client := apiclient.APIClient{
+		Address: address,
+		Client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
+
+	v, err := client.Version()
+	if err != nil {
+		return false
+	}
+
+	version, err := ParseClusterVersion(v)
+	if err != nil {
+		return false
+	}
+
+	if !Version.Equal(version) {
+		return false
+	}
+
+	return true
 }
 
 // trackLeaderChanges registers an Observer with raft in order to receive updates
@@ -705,6 +803,10 @@ func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
 }
 
 func (c *cluster) AddProcess(origin string, config *app.Config) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddProcess(origin, config)
 	}
@@ -720,6 +822,10 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 }
 
 func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveProcess(origin, id)
 	}
@@ -735,6 +841,10 @@ func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
 }
 
 func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateProcess(origin, id, config)
 	}
@@ -751,6 +861,10 @@ func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Con
 }
 
 func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetProcessMetadata(origin, id, key, data)
 	}
@@ -784,7 +898,7 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 		Superuser:       superuser,
 		JWTRealm:        jwtRealm,
 		JWTSecret:       jwtSecret,
-		Logger:          c.logger.WithField("logname", "iam"),
+		Logger:          c.logger.WithComponent("IAM"),
 	}, c.store)
 	if err != nil {
 		return nil, fmt.Errorf("cluster iam: %w", err)
@@ -822,6 +936,10 @@ func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) 
 }
 
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddIdentity(origin, identity)
 	}
@@ -837,6 +955,10 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 }
 
 func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateIdentity(origin, name, identity)
 	}
@@ -853,6 +975,10 @@ func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User)
 }
 
 func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetPolicies(origin, name, policies)
 	}
@@ -869,6 +995,10 @@ func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) 
 }
 
 func (c *cluster) RemoveIdentity(origin string, name string) error {
+	if c.IsDegraded() {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveIdentity(origin, name)
 	}
@@ -897,17 +1027,22 @@ func (c *cluster) applyCommand(cmd *store.Command) error {
 	return nil
 }
 
-type ClusterServer struct {
+type ClusterRaftServer struct {
 	ID      string
 	Address string
 	Voter   bool
 	Leader  bool
 }
 
-type ClusterStats struct {
+type ClusterRaftStats struct {
 	State       string
 	LastContact time.Duration
 	NumPeers    uint64
+}
+
+type ClusterRaft struct {
+	Server []ClusterRaftServer
+	Stats  ClusterRaftStats
 }
 
 type ClusterAbout struct {
@@ -915,14 +1050,19 @@ type ClusterAbout struct {
 	Address           string
 	ClusterAPIAddress string
 	CoreAPIAddress    string
-	Nodes             []ClusterServer
-	Stats             ClusterStats
+	Raft              ClusterRaft
+	Nodes             []proxy.NodeAbout
+	Version           ClusterVersion
+	Degraded          bool
 }
 
 func (c *cluster) About() (ClusterAbout, error) {
+	degraded := c.IsDegraded()
+
 	about := ClusterAbout{
-		ID:      c.id,
-		Address: c.Address(),
+		ID:       c.id,
+		Address:  c.Address(),
+		Degraded: degraded,
 	}
 
 	if address, err := c.ClusterAPIAddress(""); err == nil {
@@ -935,9 +1075,9 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	stats := c.raft.Stats()
 
-	about.Stats.State = stats.State
-	about.Stats.LastContact = stats.LastContact
-	about.Stats.NumPeers = stats.NumPeers
+	about.Raft.Stats.State = stats.State
+	about.Raft.Stats.LastContact = stats.LastContact
+	about.Raft.Stats.NumPeers = stats.NumPeers
 
 	servers, err := c.raft.Servers()
 	if err != nil {
@@ -946,14 +1086,21 @@ func (c *cluster) About() (ClusterAbout, error) {
 	}
 
 	for _, server := range servers {
-		node := ClusterServer{
+		node := ClusterRaftServer{
 			ID:      server.ID,
 			Address: server.Address,
 			Voter:   server.Voter,
 			Leader:  server.Leader,
 		}
 
-		about.Nodes = append(about.Nodes, node)
+		about.Raft.Server = append(about.Raft.Server, node)
+	}
+
+	about.Version = Version
+
+	nodes := c.ProxyReader().ListNodes()
+	for _, node := range nodes {
+		about.Nodes = append(about.Nodes, node.About())
 	}
 
 	return about, nil

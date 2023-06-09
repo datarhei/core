@@ -65,21 +65,32 @@ func (h *ClusterHandler) About(c echo.Context) error {
 		Address:           state.Address,
 		ClusterAPIAddress: state.ClusterAPIAddress,
 		CoreAPIAddress:    state.CoreAPIAddress,
-		Server:            []api.ClusterServer{},
-		Stats: api.ClusterStats{
-			State:       state.Stats.State,
-			LastContact: state.Stats.LastContact.Seconds() * 1000,
-			NumPeers:    state.Stats.NumPeers,
+		Raft: api.ClusterRaft{
+			Server: []api.ClusterRaftServer{},
+			Stats: api.ClusterRaftStats{
+				State:       state.Raft.Stats.State,
+				LastContact: state.Raft.Stats.LastContact.Seconds() * 1000,
+				NumPeers:    state.Raft.Stats.NumPeers,
+			},
 		},
+		Version:  state.Version.String(),
+		Degraded: state.Degraded,
 	}
 
-	for _, n := range state.Nodes {
-		about.Server = append(about.Server, api.ClusterServer{
+	for _, n := range state.Raft.Server {
+		about.Raft.Server = append(about.Raft.Server, api.ClusterRaftServer{
 			ID:      n.ID,
 			Address: n.Address,
 			Voter:   n.Voter,
 			Leader:  n.Leader,
 		})
+	}
+
+	for _, node := range state.Nodes {
+		n := api.ClusterNode{}
+		n.Marshal(node)
+
+		about.Nodes = append(about.Nodes, n)
 	}
 
 	return c.JSON(http.StatusOK, about)
@@ -159,17 +170,8 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 
 	for _, node := range nodes {
 		about := node.About()
-		n := api.ClusterNode{
-			ID:          about.ID,
-			Name:        about.Name,
-			Address:     about.Address,
-			CreatedAt:   about.CreatedAt.Format(time.RFC3339),
-			Uptime:      int64(about.Uptime.Seconds()),
-			LastContact: about.LastContact.Unix(),
-			Latency:     about.Latency.Seconds() * 1000,
-			State:       about.State,
-			Resources:   api.ClusterNodeResources(about.Resources),
-		}
+		n := api.ClusterNode{}
+		n.Marshal(about)
 
 		list = append(list, n)
 	}

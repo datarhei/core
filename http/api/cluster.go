@@ -1,6 +1,11 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/datarhei/core/v16/cluster/proxy"
+)
 
 type ClusterNode struct {
 	ID          string               `json:"id"`
@@ -12,15 +17,28 @@ type ClusterNode struct {
 	Latency     float64              `json:"latency_ms"`   // milliseconds
 	State       string               `json:"state"`
 	Resources   ClusterNodeResources `json:"resources"`
+	Version     string               `json:"version"`
+}
+
+func (n *ClusterNode) Marshal(about proxy.NodeAbout) {
+	n.ID = about.ID
+	n.Name = about.Name
+	n.Address = about.Address
+	n.CreatedAt = about.CreatedAt.Format(time.RFC3339)
+	n.Uptime = int64(about.Uptime.Seconds())
+	n.LastContact = about.LastContact.Unix()
+	n.Latency = about.Latency.Seconds() * 1000
+	n.State = about.State
+	n.Resources = ClusterNodeResources(about.Resources)
 }
 
 type ClusterNodeResources struct {
 	IsThrottling bool    `json:"is_throttling"`
 	NCPU         float64 `json:"ncpu"`
-	CPU          float64 `json:"cpu_used"`  // percent 0-100*npcu
-	CPULimit     float64 `json:"cpu_limit"` // percent 0-100*npcu
-	Mem          uint64  `json:"memory_used_bytes"`
-	MemLimit     uint64  `json:"memory_limit_bytes"`
+	CPU          float64 `json:"cpu_used"`           // percent 0-100*npcu
+	CPULimit     float64 `json:"cpu_limit"`          // percent 0-100*npcu
+	Mem          uint64  `json:"memory_used_bytes"`  // bytes
+	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
 }
 
 type ClusterNodeFiles struct {
@@ -28,11 +46,33 @@ type ClusterNodeFiles struct {
 	Files      map[string][]string `json:"files"`
 }
 
-type ClusterServer struct {
+type ClusterRaftServer struct {
 	ID      string `json:"id"`
 	Address string `json:"address"` // raft address
 	Voter   bool   `json:"voter"`
 	Leader  bool   `json:"leader"`
+}
+
+type ClusterRaftStats struct {
+	State       string  `json:"state"`
+	LastContact float64 `json:"last_contact_ms"`
+	NumPeers    uint64  `json:"num_peers"`
+}
+
+type ClusterRaft struct {
+	Server []ClusterRaftServer `json:"server"`
+	Stats  ClusterRaftStats    `json:"stats"`
+}
+
+type ClusterAbout struct {
+	ID                string        `json:"id"`
+	Address           string        `json:"address"`
+	ClusterAPIAddress string        `json:"cluster_api_address"`
+	CoreAPIAddress    string        `json:"core_api_address"`
+	Raft              ClusterRaft   `json:"raft"`
+	Nodes             []ClusterNode `json:"nodes"`
+	Version           string        `json:"version"`
+	Degraded          bool          `json:"degraded"`
 }
 
 type ClusterProcess struct {
@@ -43,22 +83,7 @@ type ClusterProcess struct {
 	Reference string      `json:"reference"`
 	Order     string      `json:"order"`
 	State     string      `json:"state"`
-	CPU       json.Number `json:"cpu" swaggertype:"number" jsonschema:"type=number"`
-	Memory    uint64      `json:"memory_bytes"`
-	Runtime   int64       `json:"runtime_seconds"`
-}
-
-type ClusterStats struct {
-	State       string  `json:"state"`
-	LastContact float64 `json:"last_contact_ms"`
-	NumPeers    uint64  `json:"num_peers"`
-}
-
-type ClusterAbout struct {
-	ID                string          `json:"id"`
-	Address           string          `json:"address"`
-	ClusterAPIAddress string          `json:"cluster_api_address"`
-	CoreAPIAddress    string          `json:"core_api_address"`
-	Server            []ClusterServer `json:"server"`
-	Stats             ClusterStats    `json:"stats"`
+	CPU       json.Number `json:"cpu" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
+	Memory    uint64      `json:"memory_bytes"`                                      // bytes
+	Runtime   int64       `json:"runtime_seconds"`                                   // seconds
 }

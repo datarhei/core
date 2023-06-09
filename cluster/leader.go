@@ -333,6 +333,10 @@ func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval tim
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if c.IsDegraded() {
+				break
+			}
+
 			c.doSynchronize(emergency)
 
 			if !emergency {
@@ -551,7 +555,7 @@ func (c *cluster) doRebalance(emergency bool) {
 
 	c.logger.Debug().WithFields(log.Fields{
 		"have":  have,
-		"nodes": nodes,
+		"nodes": nodesMap,
 	}).Log("Rebalance")
 
 	opStack, _ := rebalance(have, nodesMap)
