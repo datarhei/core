@@ -243,9 +243,9 @@ func BenchmarkCleanup(b *testing.B) {
 		path = fmt.Sprintf("/%d/%s_1.m3u8", j, ids[j])
 		memfs.WriteFile(path, []byte("foobar"))
 		for k := 0; k < 20; k++ {
-			path = fmt.Sprintf("/%d/%s_0_%d.m3u8", j, ids[j], k)
+			path = fmt.Sprintf("/%d/%s_0_%d.ts", j, ids[j], k)
 			memfs.WriteFile(path, []byte("foobar"))
-			path = fmt.Sprintf("/%d/%s_1_%d.m3u8", j, ids[j], k)
+			path = fmt.Sprintf("/%d/%s_1_%d.ts", j, ids[j], k)
 			memfs.WriteFile(path, []byte("foobar"))
 		}
 	}
@@ -322,9 +322,9 @@ func BenchmarkPurge(b *testing.B) {
 		path = fmt.Sprintf("/%d/%s_1.m3u8", j, ids[j])
 		memfs.WriteFile(path, []byte("foobar"))
 		for k := 0; k < 20; k++ {
-			path = fmt.Sprintf("/%d/%s_0_%d.m3u8", j, ids[j], k)
+			path = fmt.Sprintf("/%d/%s_0_%d.ts", j, ids[j], k)
 			memfs.WriteFile(path, []byte("foobar"))
-			path = fmt.Sprintf("/%d/%s_1_%d.m3u8", j, ids[j], k)
+			path = fmt.Sprintf("/%d/%s_1_%d.ts", j, ids[j], k)
 			memfs.WriteFile(path, []byte("foobar"))
 		}
 	}
