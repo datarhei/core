@@ -525,6 +525,16 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string
 	var size int64 = 0
 	files := []string{}
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil, 0
+		}
+	}
+
 	fs.walk(path, func(path string, info os.FileInfo) {
 		if path == fs.root {
 			return
@@ -539,8 +549,8 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string
 			return
 		}
 
-		if len(options.Pattern) != 0 {
-			if ok, _ := glob.Match(options.Pattern, name, '/'); !ok {
+		if compiledPattern != nil {
+			if !compiledPattern.Match(name) {
 				return
 			}
 		}
@@ -582,6 +592,16 @@ func (fs *diskFilesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 	files := []FileInfo{}
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil
+		}
+	}
+
 	fs.walk(path, func(path string, info os.FileInfo) {
 		if path == fs.root {
 			return
@@ -596,8 +616,8 @@ func (fs *diskFilesystem) List(path string, options ListOptions) []FileInfo {
 			return
 		}
 
-		if len(options.Pattern) != 0 {
-			if ok, _ := glob.Match(options.Pattern, name, '/'); !ok {
+		if compiledPattern != nil {
+			if !compiledPattern.Match(name) {
 				return
 			}
 		}

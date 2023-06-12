@@ -943,9 +943,11 @@ func TestConfigValidationWithMkdir(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	diskrfs := rfs.New(rfs.Config{
-		FS: diskfs,
+	diskrfs, err := rfs.New(rfs.Config{
+		FS:       diskfs,
+		Interval: time.Second,
 	})
+	require.NoError(t, err)
 
 	hasfiles, err = validateConfig(config, []rfs.Filesystem{diskrfs}, rs.ffmpeg)
 	require.NoError(t, err)

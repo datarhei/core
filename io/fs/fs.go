@@ -120,8 +120,8 @@ type WriteFilesystem interface {
 	// the removed file in bytes. The size is negative if the file doesn't exist.
 	Remove(path string) int64
 
-	// RemoveList removes all files from the filesystem. Returns the size of the
-	// removed files in bytes.
+	// RemoveList removes all files from the filesystem. Returns a list of the names of
+	// the removed file and the total size of all removed files in bytes.
 	RemoveList(path string, options ListOptions) ([]string, int64)
 }
 

@@ -663,6 +663,16 @@ func (fs *memFilesystem) remove(path string) int64 {
 func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
 	path = fs.cleanPath(path)
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil, 0
+		}
+	}
+
 	fs.filesLock.Lock()
 	defer fs.filesLock.Unlock()
 
@@ -674,8 +684,8 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 			continue
 		}
 
-		if len(options.Pattern) != 0 {
-			if ok, _ := glob.Match(options.Pattern, file.name, '/'); !ok {
+		if compiledPattern != nil {
+			if !compiledPattern.Match(file.name) {
 				continue
 			}
 		}
@@ -720,6 +730,16 @@ func (fs *memFilesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 	files := []FileInfo{}
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil
+		}
+	}
+
 	fs.filesLock.RLock()
 	defer fs.filesLock.RUnlock()
 
@@ -728,8 +748,8 @@ func (fs *memFilesystem) List(path string, options ListOptions) []FileInfo {
 			continue
 		}
 
-		if len(options.Pattern) != 0 {
-			if ok, _ := glob.Match(options.Pattern, file.name, '/'); !ok {
+		if compiledPattern != nil {
+			if !compiledPattern.Match(file.name) {
 				continue
 			}
 		}

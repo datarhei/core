@@ -453,6 +453,16 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 	var totalSize int64 = 0
 	files := []string{}
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil, 0
+		}
+	}
+
 	objectsCh := make(chan minio.ObjectInfo)
 
 	// Send object names that are needed to be removed to objectsCh
@@ -478,8 +488,8 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 				continue
 			}
 
-			if len(options.Pattern) != 0 {
-				if ok, _ := glob.Match(options.Pattern, key, '/'); !ok {
+			if compiledPattern != nil {
+				if !compiledPattern.Match(key) {
 					continue
 				}
 			}
@@ -529,6 +539,18 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 	path = fs.cleanPath(path)
 
+	var compiledPattern glob.Glob
+	var err error
+
+	if len(options.Pattern) != 0 {
+		compiledPattern, err = glob.Compile(options.Pattern, '/')
+		if err != nil {
+			return nil
+		}
+	}
+
+	files := []FileInfo{}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -542,8 +564,6 @@ func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 		UseV1:        false,
 	})
 
-	files := []FileInfo{}
-
 	for object := range ch {
 		if object.Err != nil {
 			fs.logger.WithError(object.Err).Log("Listing object failed")
@@ -556,8 +576,8 @@ func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 			continue
 		}
 
-		if len(options.Pattern) != 0 {
-			if ok, _ := glob.Match(options.Pattern, key, '/'); !ok {
+		if compiledPattern != nil {
+			if !compiledPattern.Match(key) {
 				continue
 			}
 		}

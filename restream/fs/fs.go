@@ -1,25 +1,30 @@
+// Package FS implements a FS that supports cleanup rules for removing files.
 package fs
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 )
 
 type Config struct {
-	FS     fs.Filesystem
-	Logger log.Logger
+	FS       fs.Filesystem
+	Interval time.Duration
+	Logger   log.Logger
 }
 
 type Pattern struct {
-	Pattern       string
-	MaxFiles      uint
-	MaxFileAge    time.Duration
-	PurgeOnDelete bool
+	Pattern         string
+	compiledPattern glob.Glob
+	MaxFiles        uint
+	MaxFileAge      time.Duration
+	PurgeOnDelete   bool
 }
 
 type Filesystem interface {
@@ -44,6 +49,7 @@ type filesystem struct {
 	cleanupPatterns map[string][]Pattern
 	cleanupLock     sync.RWMutex
 
+	interval   time.Duration
 	stopTicker context.CancelFunc
 
 	startOnce sync.Once
@@ -52,10 +58,15 @@ type filesystem struct {
 	logger log.Logger
 }
 
-func New(config Config) Filesystem {
+func New(config Config) (Filesystem, error) {
 	rfs := &filesystem{
 		Filesystem: config.FS,
+		interval:   config.Interval,
 		logger:     config.Logger,
+	}
+
+	if rfs.interval <= time.Duration(0) {
+		return nil, fmt.Errorf("interval must be greater than 0")
 	}
 
 	if rfs.logger == nil {
@@ -72,14 +83,14 @@ func New(config Config) Filesystem {
 	// already drain the stop
 	rfs.stopOnce.Do(func() {})
 
-	return rfs
+	return rfs, nil
 }
 
 func (rfs *filesystem) Start() {
 	rfs.startOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		rfs.stopTicker = cancel
-		go rfs.cleanupTicker(ctx, time.Second)
+		go rfs.cleanupTicker(ctx, rfs.interval)
 
 		rfs.stopOnce = sync.Once{}
 
@@ -102,7 +113,15 @@ func (rfs *filesystem) SetCleanup(id string, patterns []Pattern) {
 		return
 	}
 
-	for _, p := range patterns {
+	for i, p := range patterns {
+		g, err := glob.Compile(p.Pattern, '/')
+		if err != nil {
+			continue
+		}
+
+		p.compiledPattern = g
+		patterns[i] = p
+
 		rfs.logger.Debug().WithFields(log.Fields{
 			"id":           id,
 			"pattern":      p.Pattern,
@@ -130,35 +149,50 @@ func (rfs *filesystem) UnsetCleanup(id string) {
 }
 
 func (rfs *filesystem) cleanup() {
+	filesAndDirs := rfs.Filesystem.List("/", fs.ListOptions{})
+	sort.SliceStable(filesAndDirs, func(i, j int) bool { return filesAndDirs[i].ModTime().Before(filesAndDirs[j].ModTime()) })
+
 	rfs.cleanupLock.RLock()
 	defer rfs.cleanupLock.RUnlock()
 
 	for _, patterns := range rfs.cleanupPatterns {
 		for _, pattern := range patterns {
-			filesAndDirs := rfs.Filesystem.List("/", fs.ListOptions{Pattern: pattern.Pattern})
-
-			files := []fs.FileInfo{}
+			matchFiles := []fs.FileInfo{}
 			for _, f := range filesAndDirs {
-				if f.IsDir() {
+				if !pattern.compiledPattern.Match(f.Name()) {
 					continue
 				}
 
-				files = append(files, f)
+				matchFiles = append(matchFiles, f)
 			}
 
-			sort.Slice(files, func(i, j int) bool { return files[i].ModTime().Before(files[j].ModTime()) })
+			if pattern.MaxFiles > 0 && uint(len(matchFiles)) > pattern.MaxFiles {
+				nFiles := uint(len(matchFiles)) - pattern.MaxFiles
+				if nFiles > 0 {
+					for _, f := range matchFiles {
+						if f.IsDir() {
+							continue
+						}
 
-			if pattern.MaxFiles > 0 && uint(len(files)) > pattern.MaxFiles {
-				for i := uint(0); i < uint(len(files))-pattern.MaxFiles; i++ {
-					rfs.logger.Debug().WithField("path", files[i].Name()).Log("Remove file because MaxFiles is exceeded")
-					rfs.Filesystem.Remove(files[i].Name())
+						rfs.logger.Debug().WithField("path", f.Name()).Log("Remove file because MaxFiles is exceeded")
+						rfs.Filesystem.Remove(f.Name())
+
+						nFiles--
+						if nFiles == 0 {
+							break
+						}
+					}
 				}
 			}
 
 			if pattern.MaxFileAge > 0 {
 				bestBefore := time.Now().Add(-pattern.MaxFileAge)
 
-				for _, f := range files {
+				for _, f := range matchFiles {
+					if f.IsDir() {
+						continue
+					}
+
 					if f.ModTime().Before(bestBefore) {
 						rfs.logger.Debug().WithField("path", f.Name()).Log("Remove file because MaxFileAge is exceeded")
 						rfs.Filesystem.Remove(f.Name())
@@ -169,22 +203,22 @@ func (rfs *filesystem) cleanup() {
 	}
 }
 
-func (rfs *filesystem) purge(patterns []Pattern) (nfiles uint64) {
+func (rfs *filesystem) purge(patterns []Pattern) int64 {
+	nfilesTotal := int64(0)
+
 	for _, pattern := range patterns {
 		if !pattern.PurgeOnDelete {
 			continue
 		}
 
-		files := rfs.Filesystem.List("/", fs.ListOptions{Pattern: pattern.Pattern})
-		sort.Slice(files, func(i, j int) bool { return len(files[i].Name()) > len(files[j].Name()) })
-		for _, f := range files {
-			rfs.logger.Debug().WithField("path", f.Name()).Log("Purging file")
-			rfs.Filesystem.Remove(f.Name())
-			nfiles++
-		}
+		_, nfiles := rfs.Filesystem.RemoveList("/", fs.ListOptions{
+			Pattern: pattern.Pattern,
+		})
+
+		nfilesTotal += nfiles
 	}
 
-	return
+	return nfilesTotal
 }
 
 func (rfs *filesystem) cleanupTicker(ctx context.Context, interval time.Duration) {

@@ -175,12 +175,16 @@ func New(config Config) (Restreamer, error) {
 	}
 
 	for _, fs := range config.Filesystems {
-		fs := rfs.New(rfs.Config{
-			FS:     fs,
-			Logger: r.logger.WithComponent("Cleanup"),
+		newfs, err := rfs.New(rfs.Config{
+			FS:       fs,
+			Interval: 5 * time.Second,
+			Logger:   r.logger.WithComponent("Cleanup"),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cleaup fs for %s", fs.Name())
+		}
 
-		r.fs.list = append(r.fs.list, fs)
+		r.fs.list = append(r.fs.list, newfs)
 	}
 
 	if r.replace == nil {
@@ -709,17 +713,13 @@ func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
 }
 
 func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
-	rePrefix := regexp.MustCompile(`^([a-z]+):`)
-
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {
-			// TODO: strings.Cut(c.Pattern, ":")
-			matches := rePrefix.FindStringSubmatch(c.Pattern)
-			if matches == nil {
+			name, path, found := strings.Cut(c.Pattern, ":")
+			if !found {
+				r.logger.Warn().WithField("pattern", c.Pattern).Log("invalid pattern, no prefix")
 				continue
 			}
-
-			name := matches[1]
 
 			// Support legacy names
 			if name == "diskfs" {
@@ -734,7 +734,7 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 				}
 
 				pattern := rfs.Pattern{
-					Pattern:       rePrefix.ReplaceAllString(c.Pattern, ""),
+					Pattern:       path,
 					MaxFiles:      c.MaxFiles,
 					MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
 					PurgeOnDelete: c.PurgeOnDelete,
