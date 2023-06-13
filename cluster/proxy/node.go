@@ -22,6 +22,8 @@ type Node interface {
 	Connect() error
 	Disconnect()
 
+	Config() clientapi.ConfigV3
+
 	StartFiles(updates chan<- NodeFiles) error
 	StopFiles()
 
@@ -39,6 +41,7 @@ type Node interface {
 
 type NodeReader interface {
 	IPs() []string
+	Ping() (time.Duration, error)
 	About() NodeAbout
 	Version() NodeVersion
 	Resources() NodeResources
@@ -113,6 +116,8 @@ type node struct {
 		mem        uint64
 		memLimit   uint64
 	}
+
+	config clientapi.ConfigV3
 
 	state       nodeState
 	latency     float64 // Seconds
@@ -190,6 +195,8 @@ func (n *node) Connect() error {
 		return fmt.Errorf("failed to convert config to expected version")
 	}
 
+	n.config = config
+
 	n.httpAddress = u
 
 	if config.RTMP.Enable {
@@ -204,6 +211,8 @@ func (n *node) Connect() error {
 			address = config.RTMP.AddressTLS
 			n.rtmpAddress.Scheme = "rtmps:"
 		}
+
+		n.rtmpAddress.JoinPath(config.RTMP.App)
 
 		n.rtmpAddress.Host = address
 	}
@@ -242,10 +251,10 @@ func (n *node) Connect() error {
 			select {
 			case <-ticker.C:
 				// Ping
-				ok, latency := n.Ping()
+				latency, err := n.Ping()
 
 				n.stateLock.Lock()
-				if !ok {
+				if err != nil {
 					n.state = stateDisconnected
 				} else {
 					n.lastContact = time.Now()
@@ -350,15 +359,26 @@ func (n *node) Connect() error {
 	return nil
 }
 
-func (n *node) Ping() (bool, time.Duration) {
+func (n *node) Config() clientapi.ConfigV3 {
+	return n.config
+}
+
+func (n *node) Ping() (time.Duration, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return false, 0
+		return 0, fmt.Errorf("not connected")
 	}
 
-	return n.peer.Ping()
+	ok, latency := n.peer.Ping()
+	var err error = nil
+
+	if !ok {
+		err = fmt.Errorf("not connected")
+	}
+
+	return latency, err
 }
 
 func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse, error) {
@@ -727,18 +747,18 @@ func cloneURL(src *url.URL) *url.URL {
 	return dst
 }
 
-func (n *node) GetURL(prefix, path string) (*url.URL, error) {
+func (n *node) GetURL(prefix, resource string) (*url.URL, error) {
 	var u *url.URL
 
 	if prefix == "mem" {
 		u = cloneURL(n.httpAddress)
-		u.JoinPath("memfs", path)
+		u.JoinPath("memfs", resource)
 	} else if prefix == "disk" {
 		u = cloneURL(n.httpAddress)
-		u.JoinPath(path)
+		u.JoinPath(resource)
 	} else if prefix == "rtmp" {
 		u = cloneURL(n.rtmpAddress)
-		u.JoinPath(path)
+		u.JoinPath(resource)
 	} else if prefix == "srt" {
 		u = cloneURL(n.srtAddress)
 	} else {

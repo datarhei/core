@@ -174,14 +174,12 @@ type Data struct {
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`
-		Bootstrap              bool     `json:"bootstrap"`
-		Recover                bool     `json:"recover"`
 		Debug                  bool     `json:"debug"`
 		Address                string   `json:"address"` // ip:port
 		Peers                  []string `json:"peers"`
-		SyncInterval           int64    `json:"sync_interval" format:"int64"`            // seconds
-		NodeRecoverTimeout     int64    `json:"node_recover_timeout" format:"int64"`     // seconds
-		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout" format:"int64"` // seconds
+		SyncInterval           int64    `json:"sync_interval_sec" format:"int64"`            // seconds
+		NodeRecoverTimeout     int64    `json:"node_recover_timeout_sec" format:"int64"`     // seconds
+		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout_sec" format:"int64"` // seconds
 	} `json:"cluster"`
 }
 

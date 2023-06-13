@@ -333,14 +333,18 @@ func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval tim
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if c.IsDegraded() {
-				break
-			}
-
-			c.doSynchronize(emergency)
-
 			if !emergency {
-				c.doRebalance(emergency)
+				if c.IsDegraded() {
+					break
+				}
+
+				c.doSynchronize(emergency)
+
+				if !emergency {
+					c.doRebalance(emergency)
+				}
+			} else {
+				c.doSynchronize(emergency)
 			}
 		}
 	}

@@ -82,12 +82,10 @@ type Stats struct {
 }
 
 type Config struct {
-	ID        string // ID of the node
-	Path      string // Path where to store all cluster data
-	Bootstrap bool   // Whether to bootstrap a cluster
-	Recover   bool   // Whether to recover this node
-	Address   string // Listen address for the raft protocol
-	Peers     []Peer // Address of a member of a cluster to join
+	ID      string // ID of the node
+	Path    string // Path where to store all cluster data
+	Address string // Listen address for the raft protocol
+	Peers   []Peer // Address of a member of a cluster to join
 
 	Store hcraft.FSM
 
@@ -118,7 +116,7 @@ func New(config Config) (Raft, error) {
 		r.logger = log.New("")
 	}
 
-	err := r.start(config.Store, config.Bootstrap, config.Recover, config.Peers, false)
+	err := r.start(config.Store, config.Peers, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start raft: %w", err)
 	}
@@ -320,7 +318,7 @@ func (r *raft) Snapshot() (io.ReadCloser, error) {
 	return &readCloserWrapper{&buffer}, nil
 }
 
-func (r *raft) start(fsm hcraft.FSM, bootstrap, recover bool, peers []Peer, inmem bool) error {
+func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
 	defer func() {
 		if r.raft == nil && r.raftStore != nil {
 			r.raftStore.Close()

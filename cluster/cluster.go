@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	gonet "net"
-	"net/http"
 	"net/url"
 	"strconv"
 	"sync"
@@ -20,6 +19,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
+	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/iam"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -74,13 +74,11 @@ type Peer struct {
 }
 
 type ClusterConfig struct {
-	ID        string // ID of the node
-	Name      string // Name of the node
-	Path      string // Path where to store all cluster data
-	Bootstrap bool   // Whether to bootstrap a cluster
-	Recover   bool   // Whether to recover this node
-	Address   string // Listen address for the raft protocol
-	Peers     []Peer // Address of a member of a cluster to join
+	ID      string // ID of the node
+	Name    string // Name of the node
+	Path    string // Path where to store all cluster data
+	Address string // Listen address for the raft protocol
+	Peers   []Peer // Address of a member of a cluster to join
 
 	SyncInterval           time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
 	NodeRecoverTimeout     time.Duration // Timeout for a node to recover before rebalancing the processes
@@ -89,6 +87,8 @@ type ClusterConfig struct {
 	CoreAPIAddress  string // Address of the core API
 	CoreAPIUsername string // Username for the core API
 	CoreAPIPassword string // Password for the core API
+
+	Config *config.Config
 
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
@@ -124,17 +124,19 @@ type cluster struct {
 	api       API
 	proxy     proxy.Proxy
 
+	config      *config.Config
 	coreAddress string
 
-	isDegraded bool
-	stateLock  sync.Mutex
+	isDegraded    bool
+	isDegradedErr error
+	stateLock     sync.Mutex
 
 	isRaftLeader  bool
 	hasRaftLeader bool
 	isLeader      bool
 	leaderLock    sync.Mutex
 
-	nodes     map[string]proxy.Node
+	nodes     map[string]*clusterNode
 	nodesLock sync.RWMutex
 }
 
@@ -156,7 +158,12 @@ func New(config ClusterConfig) (Cluster, error) {
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
 
-		nodes: map[string]proxy.Node{},
+		config: config.Config,
+		nodes:  map[string]*clusterNode{},
+	}
+
+	if c.config == nil {
+		return nil, fmt.Errorf("the core config must be provided")
 	}
 
 	u, err := url.Parse(config.CoreAPIAddress)
@@ -245,8 +252,6 @@ func New(config ClusterConfig) (Cluster, error) {
 	raft, err := raft.New(raft.Config{
 		ID:                  config.ID,
 		Path:                config.Path,
-		Bootstrap:           config.Bootstrap,
-		Recover:             config.Recover,
 		Address:             config.Address,
 		Peers:               peers,
 		Store:               store,
@@ -361,7 +366,7 @@ func (c *cluster) Shutdown() error {
 	close(c.shutdownCh)
 
 	for id, node := range c.nodes {
-		node.Disconnect()
+		node.Stop()
 		if c.proxy != nil {
 			c.proxy.RemoveNode(id)
 		}
@@ -624,7 +629,7 @@ func (c *cluster) trackNodeChanges() {
 			}
 
 			for _, server := range servers {
-				id := server.ID
+				id := server.ID + server.Address
 
 				_, ok := c.nodes[id]
 				if !ok {
@@ -633,42 +638,27 @@ func (c *cluster) trackNodeChanges() {
 						"address": server.Address,
 					})
 
-					address, err := c.ClusterAPIAddress(server.Address)
+					address, err := clusterAPIAddress(server.Address)
 					if err != nil {
 						logger.Warn().WithError(err).Log("Discovering cluster API address")
-						continue
 					}
 
-					if !checkClusterVersion(address) {
+					cnode := NewClusterNode(address)
+
+					if !verifyClusterVersion(cnode.Version()) {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
 					}
 
-					client := apiclient.APIClient{
-						Address: address,
+					if err := verifyClusterConfig(c.config, cnode.Config()); err != nil {
+						logger.Warn().WithError(err).Log("Config mismatch. Cluster will end up in degraded mode")
 					}
 
-					coreAddress, err := client.CoreAPIAddress()
-					if err != nil {
-						logger.Warn().WithError(err).Log("Retrieve core API address")
-						continue
-					}
-
-					node := proxy.NewNode(coreAddress)
-					err = node.Connect()
-					if err != nil {
-						c.logger.Warn().WithError(err).Log("Connecting to core API")
-						continue
-					}
-
-					// TODO: Check constraints
-
-					if _, err := c.proxy.AddNode(id, node); err != nil {
+					if _, err := c.proxy.AddNode(id, cnode.Proxy()); err != nil {
 						c.logger.Warn().WithError(err).Log("Adding node")
-						node.Disconnect()
 						continue
 					}
 
-					c.nodes[id] = node
+					c.nodes[id] = cnode
 				} else {
 					delete(removeNodes, id)
 				}
@@ -681,17 +671,23 @@ func (c *cluster) trackNodeChanges() {
 				}
 
 				c.proxy.RemoveNode(id)
-				node.Disconnect()
+				node.Stop()
 				delete(c.nodes, id)
 			}
 
 			c.nodesLock.Unlock()
 
-			// Put the cluster in "degraded" mode in case there's a version mismatch
-			isDegraded := !c.checkClusterVersions(servers)
+			// Put the cluster in "degraded" mode in case there's a mismatch in expected values
+			err = c.checkClusterNodes()
 
 			c.stateLock.Lock()
-			c.isDegraded = isDegraded
+			if err != nil {
+				c.isDegraded = true
+				c.isDegradedErr = err
+			} else {
+				c.isDegraded = false
+				c.isDegradedErr = nil
+			}
 			c.stateLock.Unlock()
 		case <-c.shutdownCh:
 			return
@@ -699,63 +695,30 @@ func (c *cluster) trackNodeChanges() {
 	}
 }
 
-func (c *cluster) checkClusterVersions(servers []raft.Server) bool {
-	ok := true
-	okChan := make(chan bool, 64)
+func (c *cluster) checkClusterNodes() error {
+	c.nodesLock.RLock()
+	defer c.nodesLock.RUnlock()
 
-	wgSummary := sync.WaitGroup{}
-	wgSummary.Add(1)
-
-	go func() {
-		defer wgSummary.Done()
-
-		for okServer := range okChan {
-			if !okServer {
-				ok = false
-			}
+	for id, node := range c.nodes {
+		if status, statusErr := node.Status(); status == "offline" {
+			return fmt.Errorf("node %s is offline: %w", id, statusErr)
 		}
-	}()
 
-	wg := sync.WaitGroup{}
+		version := node.Version()
+		if !verifyClusterVersion(version) {
+			return fmt.Errorf("node %s has a different version: %s", id, version)
+		}
 
-	for _, server := range servers {
-		wg.Add(1)
-
-		go func(server raft.Server, p chan<- bool) {
-			defer wg.Done()
-
-			address, err := clusterAPIAddress(server.Address)
-			if err != nil {
-				p <- false
-				return
-			}
-
-			p <- checkClusterVersion(address)
-		}(server, okChan)
+		config := node.Config()
+		if configErr := verifyClusterConfig(c.config, config); configErr != nil {
+			return fmt.Errorf("node %s has a different configuration: %w", id, configErr)
+		}
 	}
 
-	wg.Wait()
-
-	close(okChan)
-
-	wgSummary.Wait()
-
-	return ok
+	return nil
 }
 
-func checkClusterVersion(address string) bool {
-	client := apiclient.APIClient{
-		Address: address,
-		Client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
-	}
-
-	v, err := client.Version()
-	if err != nil {
-		return false
-	}
-
+func verifyClusterVersion(v string) bool {
 	version, err := ParseClusterVersion(v)
 	if err != nil {
 		return false
@@ -766,6 +729,46 @@ func checkClusterVersion(address string) bool {
 	}
 
 	return true
+}
+
+func verifyClusterConfig(local, remote *config.Config) error {
+	if remote == nil {
+		return fmt.Errorf("config is not available")
+	}
+
+	if local.Cluster.Enable != remote.Cluster.Enable {
+		return fmt.Errorf("cluster.enable is different")
+	}
+
+	if local.Cluster.SyncInterval != remote.Cluster.SyncInterval {
+		return fmt.Errorf("cluster.sync_interval_sec is different, local: %ds vs. remote: %ds", local.Cluster.SyncInterval, remote.Cluster.SyncInterval)
+	}
+
+	if local.Cluster.NodeRecoverTimeout != remote.Cluster.NodeRecoverTimeout {
+		return fmt.Errorf("cluster.node_recover_timeout_sec is different, local: %ds vs. remote: %ds", local.Cluster.NodeRecoverTimeout, remote.Cluster.NodeRecoverTimeout)
+	}
+
+	if local.Cluster.EmergencyLeaderTimeout != remote.Cluster.EmergencyLeaderTimeout {
+		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different, local: %ds vs. remote: %ds", local.Cluster.EmergencyLeaderTimeout, remote.Cluster.EmergencyLeaderTimeout)
+	}
+
+	if local.RTMP.Enable != remote.RTMP.Enable {
+		return fmt.Errorf("rtmp.enable is different")
+	}
+
+	if local.RTMP.App != remote.RTMP.App {
+		return fmt.Errorf("rtmp.app is different")
+	}
+
+	if local.SRT.Enable != remote.SRT.Enable {
+		return fmt.Errorf("srt.enable is different")
+	}
+
+	if local.SRT.Passphrase != remote.SRT.Passphrase {
+		return fmt.Errorf("srt.passphrase is different")
+	}
+
+	return nil
 }
 
 // trackLeaderChanges registers an Observer with raft in order to receive updates

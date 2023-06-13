@@ -277,9 +277,9 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	if ch == nil {
 		// Check in the cluster for that stream
-		url, err := s.proxy.GetURL("rtmp", conn.URL.Path)
+		url, err := s.proxy.GetURL("rtmp", playpath)
 		if err != nil {
-			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
+			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 			return
 		}
 
@@ -289,7 +289,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		src, err := avutil.Open(peerurl)
 		if err != nil {
 			s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
-			s.log(identity, "PLAY", "NOTFOUND", conn.URL.Path, "", remote)
+			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 			return
 		}
 
