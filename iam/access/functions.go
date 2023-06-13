@@ -3,10 +3,10 @@ package access
 import (
 	"strings"
 
-	"github.com/gobwas/glob"
+	"github.com/datarhei/core/v16/glob"
 )
 
-func resourceMatch(request, domain, policy string) bool {
+func resourceMatch(request, policy string) bool {
 	reqPrefix, reqResource := getPrefix(request)
 	polPrefix, polResource := getPrefix(policy)
 
@@ -18,12 +18,12 @@ func resourceMatch(request, domain, policy string) bool {
 	var err error
 
 	if reqPrefix == "api" || reqPrefix == "fs" || reqPrefix == "rtmp" || reqPrefix == "srt" {
-		match, err = globMatch(polResource, reqResource, rune('/'))
+		match, err = glob.Match(polResource, reqResource, rune('/'))
 		if err != nil {
 			return false
 		}
 	} else {
-		match, err = globMatch(polResource, reqResource)
+		match, err = glob.Match(polResource, reqResource)
 		if err != nil {
 			return false
 		}
@@ -34,10 +34,9 @@ func resourceMatch(request, domain, policy string) bool {
 
 func resourceMatchFunc(args ...interface{}) (interface{}, error) {
 	request := args[0].(string)
-	domain := args[1].(string)
-	policy := args[2].(string)
+	policy := args[1].(string)
 
-	return (bool)(resourceMatch(request, domain, policy)), nil
+	return (bool)(resourceMatch(request, policy)), nil
 }
 
 func actionMatch(request string, policy string) bool {
@@ -74,13 +73,4 @@ func getPrefix(s string) (string, string) {
 	}
 
 	return prefix, resource
-}
-
-func globMatch(pattern, name string, separators ...rune) (bool, error) {
-	g, err := glob.Compile(pattern, separators...)
-	if err != nil {
-		return false, err
-	}
-
-	return g.Match(name), nil
 }

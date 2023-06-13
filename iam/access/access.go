@@ -61,7 +61,7 @@ func New(config Config) (Manager, error) {
 	m.AddDef("p", "p", "sub, dom, obj, act")
 	m.AddDef("g", "g", "_, _, _")
 	m.AddDef("e", "e", "some(where (p.eft == allow))")
-	m.AddDef("m", "m", `g(r.sub, p.sub, r.dom) && r.dom == p.dom && ResourceMatch(r.obj, r.dom, p.obj) && ActionMatch(r.act, p.act) || r.sub == "$superuser"`)
+	m.AddDef("m", "m", `g(r.sub, p.sub, r.dom) && r.dom == p.dom && ResourceMatch(r.obj, p.obj) && ActionMatch(r.act, p.act) || r.sub == "$superuser"`)
 
 	e, err := casbin.NewEnforcer(m, am.adapter)
 	if err != nil {
