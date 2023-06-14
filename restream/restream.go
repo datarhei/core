@@ -721,6 +721,10 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 				continue
 			}
 
+			if len(config.Domain) != 0 {
+				path = filepath.Join(config.Domain, path)
+			}
+
 			// Support legacy names
 			if name == "diskfs" {
 				name = "disk"

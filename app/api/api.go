@@ -47,6 +47,7 @@ import (
 	"github.com/datarhei/core/v16/service"
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
+	srturl "github.com/datarhei/core/v16/srt/url"
 	"github.com/datarhei/core/v16/update"
 
 	"github.com/caddyserver/certmagic"
@@ -858,11 +859,21 @@ func (a *api) start() error {
 		})
 
 		a.replacer.RegisterReplaceFunc("diskfs", func(params map[string]string, config *restreamapp.Config, section string) string {
-			return a.diskfs.Metadata("base")
+			path := a.diskfs.Metadata("base")
+			if len(config.Domain) != 0 {
+				path = filepath.Join(path, config.Domain)
+			}
+
+			return path
 		}, nil)
 
 		a.replacer.RegisterReplaceFunc("fs:disk", func(params map[string]string, config *restreamapp.Config, section string) string {
-			return a.diskfs.Metadata("base")
+			path := a.diskfs.Metadata("base")
+			if len(config.Domain) != 0 {
+				path = filepath.Join(path, config.Domain)
+			}
+
+			return path
 		}, nil)
 
 		a.replacer.RegisterReplaceFunc("memfs", func(params map[string]string, config *restreamapp.Config, section string) string {
@@ -884,6 +895,10 @@ func (a *api) start() error {
 				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
 			} else {
 				u.User = url.User(config.Owner)
+			}
+
+			if len(config.Domain) != 0 {
+				u = u.JoinPath(config.Domain)
 			}
 
 			return u.String()
@@ -910,6 +925,10 @@ func (a *api) start() error {
 				u.User = url.User(config.Owner)
 			}
 
+			if len(config.Domain) != 0 {
+				u = u.JoinPath(config.Domain)
+			}
+
 			return u.String()
 		}, nil)
 
@@ -923,11 +942,19 @@ func (a *api) start() error {
 				if len(config.Owner) == 0 {
 					identity = a.iam.GetDefaultVerifier()
 				} else {
-					identity, _ = a.iam.GetVerifier(config.Owner)
+					var err error = nil
+					identity, err = a.iam.GetVerifier(config.Owner)
+					if err != nil {
+						identity = nil
+					}
 				}
 
 				if identity != nil {
 					u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+				}
+
+				if len(config.Domain) != 0 {
+					u = u.JoinPath(config.Domain)
 				}
 
 				return u.String()
@@ -940,25 +967,39 @@ func (a *api) start() error {
 				host = "localhost"
 			}
 
-			template := "rtmp://" + host + ":" + port
-			if cfg.RTMP.App != "/" {
-				template += cfg.RTMP.App
+			u := &url.URL{
+				Scheme: "rtmp:",
+				Host:   host + ":" + port,
+				Path:   "/",
 			}
-			template += "/" + params["name"]
+
+			if cfg.RTMP.App != "/" {
+				u = u.JoinPath(cfg.RTMP.App)
+			}
+
+			if len(config.Domain) != 0 {
+				u = u.JoinPath(config.Domain)
+			}
+
+			u = u.JoinPath(params["name"])
 
 			var identity iamidentity.Verifier = nil
 
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetVerifier(config.Owner)
+				var err error = nil
+				identity, err = a.iam.GetVerifier(config.Owner)
+				if err != nil {
+					identity = nil
+				}
 			}
 
 			if identity != nil {
-				template += "/" + identity.GetServiceToken()
+				u = u.JoinPath(identity.GetServiceToken())
 			}
 
-			return template
+			return u.String()
 		}, map[string]string{
 			"name": "",
 		})
@@ -969,9 +1010,30 @@ func (a *api) start() error {
 				host = "localhost"
 			}
 
-			template := "srt://" + host + ":" + port + "?mode=caller&transtype=live&latency=" + params["latency"] + "&streamid=" + params["name"]
+			u := srturl.URL{
+				Scheme: "srt:",
+				Host:   host + ":" + port,
+			}
+
+			options := url.Values{}
+
+			options.Set("mode", "caller")
+			options.Set("transtype", "live")
+
+			if len(cfg.SRT.Passphrase) != 0 {
+				options.Set("passphrase", cfg.SRT.Passphrase)
+			}
+
+			streamid := srturl.StreamInfo{}
+
 			if section == "output" {
-				template += ",mode:publish"
+				streamid.Mode = "publish"
+			}
+
+			if len(config.Domain) != 0 {
+				streamid.Resource = config.Domain + "/" + params["name"]
+			} else {
+				streamid.Resource = params["name"]
 			}
 
 			var identity iamidentity.Verifier = nil
@@ -979,18 +1041,18 @@ func (a *api) start() error {
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetVerifier(config.Owner)
+				var err error = nil
+				identity, err = a.iam.GetVerifier(config.Owner)
+				if err != nil {
+					identity = nil
+				}
 			}
 
 			if identity != nil {
-				template += ",token:" + identity.GetServiceToken()
+				streamid.Token = identity.GetServiceToken()
 			}
 
-			if len(cfg.SRT.Passphrase) != 0 {
-				template += "&passphrase=" + url.QueryEscape(cfg.SRT.Passphrase)
-			}
-
-			return template
+			return u.String()
 		}, map[string]string{
 			"name":    "",
 			"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
