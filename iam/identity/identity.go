@@ -40,8 +40,9 @@ type UserAuthAPIAuth0 struct {
 }
 
 type UserAuthServices struct {
-	Basic []string `json:"basic"`
-	Token []string `json:"token"`
+	Basic   []string `json:"basic"`   // Passwords for BasicAuth
+	Token   []string `json:"token"`   // Tokens/Streamkey for RTMP and SRT
+	Session []string `json:"session"` // Secrets for session JWT
 }
 
 func (u *User) validate() error {
@@ -79,8 +80,14 @@ func (u *User) marshalIdentity() *identity {
 func (u *User) clone() User {
 	user := *u
 
+	user.Auth.Services.Basic = make([]string, len(u.Auth.Services.Basic))
+	copy(user.Auth.Services.Basic, u.Auth.Services.Basic)
+
 	user.Auth.Services.Token = make([]string, len(u.Auth.Services.Token))
 	copy(user.Auth.Services.Token, u.Auth.Services.Token)
+
+	user.Auth.Services.Session = make([]string, len(u.Auth.Services.Session))
+	copy(user.Auth.Services.Session, u.Auth.Services.Session)
 
 	return user
 }
@@ -95,9 +102,11 @@ type Verifier interface {
 
 	VerifyServiceBasicAuth(password string) (bool, error)
 	VerifyServiceToken(token string) (bool, error)
+	VerifyServiceSession(jwt string) (bool, interface{}, error)
 
 	GetServiceBasicAuth() string
 	GetServiceToken() string
+	GetServiceSession(interface{}) string
 
 	IsSuperuser() bool
 }
@@ -272,11 +281,7 @@ func (i *identity) VerifyJWT(jwt string) (bool, error) {
 		return false, fmt.Errorf("wrong issuer")
 	}
 
-	if token.Method.Alg() != "HS256" {
-		return false, fmt.Errorf("invalid hashing algorithm")
-	}
-
-	token, err = jwtgo.Parse(jwt, i.jwtKeyFunc)
+	token, err = jwtgo.Parse(jwt, i.jwtKeyFunc, jwtgo.WithValidMethods([]string{"HS256"}))
 	if err != nil {
 		return false, err
 	}
@@ -362,6 +367,101 @@ func (i *identity) GetServiceToken() string {
 	}
 
 	return ""
+}
+
+func (i *identity) VerifyServiceSession(jwt string) (bool, interface{}, error) {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	if !i.isValid() {
+		return false, nil, fmt.Errorf("invalid identity")
+	}
+
+	if len(i.user.Auth.Services.Session) == 0 {
+		return false, nil, nil
+	}
+
+	p := &jwtgo.Parser{}
+	token, _, err := p.ParseUnverified(jwt, jwtgo.MapClaims{})
+	if err != nil {
+		return false, nil, err
+	}
+
+	claims, ok := token.Claims.(jwtgo.MapClaims)
+	if !ok {
+		return false, nil, fmt.Errorf("invalid claims")
+	}
+
+	var subject string
+	if sub, ok := claims["sub"]; ok {
+		subject = sub.(string)
+	}
+
+	if subject != i.user.Name {
+		return false, nil, fmt.Errorf("wrong subject")
+	}
+
+	var issuer string
+	if sub, ok := claims["iss"]; ok {
+		issuer = sub.(string)
+	}
+
+	if issuer != i.jwtRealm {
+		return false, nil, fmt.Errorf("wrong issuer")
+	}
+
+	for _, secret := range i.user.Auth.Services.Session {
+		fn := func(*jwtgo.Token) (interface{}, error) { return []byte(secret), nil }
+		token, err = jwtgo.Parse(jwt, fn, jwtgo.WithValidMethods([]string{"HS256"}))
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		return false, nil, fmt.Errorf("parse: %w", err)
+	}
+
+	if !token.Valid {
+		return false, nil, fmt.Errorf("invalid token")
+	}
+
+	return true, claims["data"], nil
+}
+
+func (i *identity) GetServiceSession(data interface{}) string {
+	i.lock.RLock()
+	defer i.lock.RUnlock()
+
+	if !i.isValid() {
+		return ""
+	}
+
+	if len(i.user.Auth.Services.Session) == 0 {
+		return ""
+	}
+
+	now := time.Now()
+	accessExpires := now.Add(time.Minute * 10)
+
+	// Create access token
+	accessToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
+		"iss":  i.jwtRealm,
+		"sub":  i.user.Name,
+		"iat":  now.Unix(),
+		"exp":  accessExpires.Unix(),
+		"exi":  uint64(accessExpires.Sub(now).Seconds()),
+		"jti":  uuid.New().String(),
+		"data": data,
+	})
+
+	// Generate encoded access token
+	at, err := accessToken.SignedString([]byte(i.user.Auth.Services.Session[0]))
+	if err != nil {
+		return ""
+	}
+
+	return at
 }
 
 func (i *identity) isValid() bool {

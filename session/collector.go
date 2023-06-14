@@ -19,9 +19,10 @@ type Session struct {
 	ID           string
 	Reference    string
 	CreatedAt    time.Time
+	ClosesAt     time.Time
 	Location     string
 	Peer         string
-	Extra        string
+	Extra        map[string]interface{}
 	RxBytes      uint64
 	RxBitrate    float64 // bit/s
 	TopRxBitrate float64 // bit/s
@@ -81,7 +82,7 @@ type Collector interface {
 	RegisterAndActivate(id, reference, location, peer string)
 
 	// Add arbitrary extra data to a session
-	Extra(id, extra string)
+	Extra(id string, extra map[string]interface{})
 
 	// Unregister cancels a session prematurely.
 	Unregister(id string)
@@ -581,7 +582,7 @@ func (c *collector) Activate(id string) bool {
 	return false
 }
 
-func (c *collector) Extra(id, extra string) {
+func (c *collector) Extra(id string, extra map[string]interface{}) {
 	c.lock.session.RLock()
 	sess, ok := c.sessions[id]
 	c.lock.session.RUnlock()
@@ -924,7 +925,7 @@ func NewNullCollector() Collector                                               
 func (n *nullCollector) Register(id, reference, location, peer string)            {}
 func (n *nullCollector) Activate(id string) bool                                  { return false }
 func (n *nullCollector) RegisterAndActivate(id, reference, location, peer string) {}
-func (n *nullCollector) Extra(id, extra string)                                   {}
+func (n *nullCollector) Extra(id string, extra map[string]interface{})            {}
 func (n *nullCollector) Unregister(id string)                                     {}
 func (n *nullCollector) Ingress(id string, size int64)                            {}
 func (n *nullCollector) Egress(id string, size int64)                             {}

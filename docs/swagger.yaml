@@ -274,17 +274,15 @@ definitions:
           address:
             description: ip:port
             type: string
-          bootstrap:
-            type: boolean
           debug:
             type: boolean
-          emergency_leader_timeout:
+          emergency_leader_timeout_sec:
             description: seconds
             format: int64
             type: integer
           enable:
             type: boolean
-          node_recover_timeout:
+          node_recover_timeout_sec:
             description: seconds
             format: int64
             type: integer
@@ -292,9 +290,7 @@ definitions:
             items:
               type: string
             type: array
-          recover:
-            type: boolean
-          sync_interval:
+          sync_interval_sec:
             description: seconds
             format: int64
             type: integer
@@ -779,6 +775,10 @@ definitions:
   api.IAMUserAuthServices:
     properties:
       basic:
+        items:
+          type: string
+        type: array
+      session:
         items:
           type: string
         type: array
@@ -1652,7 +1652,8 @@ definitions:
         format: int64
         type: integer
       extra:
-        type: string
+        additionalProperties: true
+        type: object
       id:
         type: string
       local:
@@ -1746,6 +1747,20 @@ definitions:
         format: uint64
         type: integer
     type: object
+  api.SessionTokenRequest:
+    properties:
+      extra:
+        additionalProperties: true
+        type: object
+      match:
+        type: string
+      remote:
+        items:
+          type: string
+        type: array
+      token:
+        type: string
+    type: object
   api.SessionsActive:
     additionalProperties:
       items:
@@ -1820,17 +1835,15 @@ definitions:
           address:
             description: ip:port
             type: string
-          bootstrap:
-            type: boolean
           debug:
             type: boolean
-          emergency_leader_timeout:
+          emergency_leader_timeout_sec:
             description: seconds
             format: int64
             type: integer
           enable:
             type: boolean
-          node_recover_timeout:
+          node_recover_timeout_sec:
             description: seconds
             format: int64
             type: integer
@@ -1838,9 +1851,7 @@ definitions:
             items:
               type: string
             type: array
-          recover:
-            type: boolean
-          sync_interval:
+          sync_interval_sec:
             description: seconds
             format: int64
             type: integer
@@ -4653,6 +4664,52 @@ paths:
       summary: Get a minimal summary of all active sessions
       tags:
       - v16.7.2
+  /api/v3/session/token/{username}:
+    put:
+      consumes:
+      - application/json
+      description: Request access tokens
+      operationId: session-3-create-token
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Token request
+        in: body
+        name: config
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.SessionTokenRequest'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.SessionTokenRequest'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Request access tokens
+      tags:
+      - v16.?.?
   /api/v3/skills:
     get:
       description: List all detected FFmpeg capabilities.

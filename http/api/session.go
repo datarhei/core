@@ -22,16 +22,16 @@ type SessionPeers struct {
 
 // Session represents an active session
 type Session struct {
-	ID        string      `json:"id"`
-	Reference string      `json:"reference"`
-	CreatedAt int64       `json:"created_at" format:"int64"`
-	Location  string      `json:"local"`
-	Peer      string      `json:"remote"`
-	Extra     string      `json:"extra"`
-	RxBytes   uint64      `json:"bytes_rx" format:"uint64"`
-	TxBytes   uint64      `json:"bytes_tx" format:"uint64"`
-	RxBitrate json.Number `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	TxBitrate json.Number `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	ID        string                 `json:"id"`
+	Reference string                 `json:"reference"`
+	CreatedAt int64                  `json:"created_at" format:"int64"`
+	Location  string                 `json:"local"`
+	Peer      string                 `json:"remote"`
+	Extra     map[string]interface{} `json:"extra"`
+	RxBytes   uint64                 `json:"bytes_rx" format:"uint64"`
+	TxBytes   uint64                 `json:"bytes_tx" format:"uint64"`
+	RxBitrate json.Number            `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	TxBitrate json.Number            `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 }
 
 func (s *Session) Unmarshal(sess session.Session) {
@@ -139,4 +139,11 @@ func (summary *SessionSummary) Unmarshal(sum session.Summary) {
 	summary.Summary.TotalSessions = sum.Summary.TotalSessions
 	summary.Summary.TotalRxBytes = sum.Summary.TotalRxBytes / 1024 / 1024
 	summary.Summary.TotalTxBytes = sum.Summary.TotalTxBytes / 1024 / 1024
+}
+
+type SessionTokenRequest struct {
+	Match  string                 `json:"match"`
+	Remote []string               `json:"remote"`
+	Extra  map[string]interface{} `json:"extra"`
+	Token  string                 `json:"token,omitempty"`
 }

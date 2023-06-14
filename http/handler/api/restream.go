@@ -56,31 +56,31 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err)
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process")
 	}
 
 	if !superuser {
 		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden")
+			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process", process.Owner)
 		}
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
+		return api.Err(http.StatusBadRequest, "", "Unsupported process type, supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
+		return api.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
 	}
 
 	config, metadata := process.Marshal()
 
 	if err := h.restream.AddProcess(config); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "Invalid process config: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -272,7 +272,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
 	}
 
 	tid := app.ProcessID{
@@ -293,12 +293,12 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", process.ID)
 	}
 
 	if !superuser {
 		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden")
+			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process: %s", process.Owner, process.ID)
 		}
 	}
 

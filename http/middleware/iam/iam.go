@@ -185,23 +185,30 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				domain = c.QueryParam("domain")
 				resource = "api:" + resource
 			} else {
-				identity, err = mw.findIdentityFromBasicAuth(c)
+				identity, err = mw.findIdentityFromSession(c)
 				if err != nil {
-					if err == ErrAuthRequired {
-						c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
-						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
-					} else {
-						if config.WaitAfterFailedLogin {
-							time.Sleep(5 * time.Second)
-						}
+					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+				}
 
-						if err == ErrBadRequest {
-							return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
-						} else if err == ErrUnauthorized {
+				if identity == nil {
+					identity, err = mw.findIdentityFromBasicAuth(c)
+					if err != nil {
+						if err == ErrAuthRequired {
 							c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
 							return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
 						} else {
-							return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+							if config.WaitAfterFailedLogin {
+								time.Sleep(5 * time.Second)
+							}
+
+							if err == ErrBadRequest {
+								return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+							} else if err == ErrUnauthorized {
+								c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
+								return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+							} else {
+								return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+							}
 						}
 					}
 				}
@@ -239,7 +246,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 }
 
-var ErrAuthRequired = errors.New("unauthorized")
+var ErrAuthRequired = errors.New("authentication required")
 var ErrUnauthorized = errors.New("unauthorized")
 var ErrBadRequest = errors.New("bad request")
 
@@ -302,6 +309,61 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iamidentity.V
 	return identity, nil
 }
 
+func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Verifier, error) {
+	// Look for "token" query parameter
+	auth := c.QueryParam("token")
+
+	if len(auth) == 0 {
+		return nil, nil
+	}
+
+	p := &jwtgo.Parser{}
+	token, _, err := p.ParseUnverified(auth, jwtgo.MapClaims{})
+	if err != nil {
+		m.logger.Debug().WithFields(log.Fields{
+			"path":   c.Request().URL.Path,
+			"method": c.Request().Method,
+		}).WithError(err).Log("identity not found")
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwtgo.MapClaims)
+	if !ok {
+		m.logger.Debug().WithFields(log.Fields{
+			"path":   c.Request().URL.Path,
+			"method": c.Request().Method,
+		}).WithError(err).Log("identity not found")
+		return nil, fmt.Errorf("invalid token. claims")
+	}
+
+	var subject string
+	if sub, ok := claims["sub"]; ok {
+		subject = sub.(string)
+	}
+
+	identity, err := m.iam.GetVerifier(subject)
+	if err != nil {
+		m.logger.Debug().WithFields(log.Fields{
+			"path":   c.Request().URL.Path,
+			"method": c.Request().Method,
+		}).WithError(err).Log("identity not found")
+		return nil, fmt.Errorf("invalid token, identity")
+	}
+
+	ok, data, err := identity.VerifyServiceSession(auth)
+	if !ok {
+		m.logger.Debug().WithFields(log.Fields{
+			"path":   c.Request().URL.Path,
+			"method": c.Request().Method,
+		}).WithError(err).Log("identity not found")
+		return nil, fmt.Errorf("invalid token, verify: %w", err)
+	}
+
+	c.Set("session", data)
+
+	return identity, nil
+}
+
 func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iamidentity.Verifier, error) {
 	// Look for an Auth header
 	values := c.Request().Header.Values("Authorization")
@@ -332,18 +394,23 @@ func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iamidentity.Verifie
 		return nil, err
 	}
 
+	claims, ok := token.Claims.(jwtgo.MapClaims)
+	if !ok {
+		m.logger.Debug().WithFields(log.Fields{
+			"path":   c.Request().URL.Path,
+			"method": c.Request().Method,
+		}).WithError(err).Log("identity not found")
+		return nil, fmt.Errorf("invalid token")
+	}
+
 	var subject string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["sub"]; ok {
-			subject = sub.(string)
-		}
+	if sub, ok := claims["sub"]; ok {
+		subject = sub.(string)
 	}
 
 	var usefor string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["usefor"]; ok {
-			usefor = sub.(string)
-		}
+	if sub, ok := claims["usefor"]; ok {
+		usefor = sub.(string)
 	}
 
 	identity, err := m.iam.GetVerifier(subject)

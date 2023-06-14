@@ -28,8 +28,9 @@ func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 			},
 		},
 		Services: IAMUserAuthServices{
-			Basic: user.Auth.Services.Basic,
-			Token: user.Auth.Services.Token,
+			Basic:   user.Auth.Services.Basic,
+			Token:   user.Auth.Services.Token,
+			Session: user.Auth.Services.Session,
 		},
 	}
 
@@ -59,8 +60,9 @@ func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
 				},
 			},
 			Services: identity.UserAuthServices{
-				Basic: u.Auth.Services.Basic,
-				Token: u.Auth.Services.Token,
+				Basic:   u.Auth.Services.Basic,
+				Token:   u.Auth.Services.Token,
+				Session: u.Auth.Services.Session,
 			},
 		},
 	}
@@ -95,8 +97,9 @@ type IAMUserAuthAPIAuth0 struct {
 }
 
 type IAMUserAuthServices struct {
-	Basic []string `json:"basic"`
-	Token []string `json:"token"`
+	Basic   []string `json:"basic"`
+	Token   []string `json:"token"`
+	Session []string `json:"session"`
 }
 
 type IAMAuth0Tenant struct {

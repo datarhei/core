@@ -3493,6 +3493,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/session/token/{username}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Request access tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Request access tokens",
+                "operationId": "session-3-create-token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Token request",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.SessionTokenRequest"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.SessionTokenRequest"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/skills": {
             "get": {
                 "security": [
@@ -4084,13 +4155,10 @@ const docTemplate = `{
                             "description": "ip:port",
                             "type": "string"
                         },
-                        "bootstrap": {
-                            "type": "boolean"
-                        },
                         "debug": {
                             "type": "boolean"
                         },
-                        "emergency_leader_timeout": {
+                        "emergency_leader_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -4098,7 +4166,7 @@ const docTemplate = `{
                         "enable": {
                             "type": "boolean"
                         },
-                        "node_recover_timeout": {
+                        "node_recover_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -4109,10 +4177,7 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
-                        "recover": {
-                            "type": "boolean"
-                        },
-                        "sync_interval": {
+                        "sync_interval_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -4837,6 +4902,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "basic": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "session": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -6023,7 +6094,8 @@ const docTemplate = `{
                     "format": "int64"
                 },
                 "extra": {
-                    "type": "string"
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "id": {
                     "type": "string"
@@ -6160,6 +6232,27 @@ const docTemplate = `{
                 }
             }
         },
+        "api.SessionTokenRequest": {
+            "type": "object",
+            "properties": {
+                "extra": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "match": {
+                    "type": "string"
+                },
+                "remote": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "api.SessionsActive": {
             "type": "object",
             "additionalProperties": {
@@ -6274,13 +6367,10 @@ const docTemplate = `{
                             "description": "ip:port",
                             "type": "string"
                         },
-                        "bootstrap": {
-                            "type": "boolean"
-                        },
                         "debug": {
                             "type": "boolean"
                         },
-                        "emergency_leader_timeout": {
+                        "emergency_leader_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -6288,7 +6378,7 @@ const docTemplate = `{
                         "enable": {
                             "type": "boolean"
                         },
-                        "node_recover_timeout": {
+                        "node_recover_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -6299,10 +6389,7 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
-                        "recover": {
-                            "type": "boolean"
-                        },
-                        "sync_interval": {
+                        "sync_interval_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"

@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/session"
 
 	"github.com/labstack/echo/v4"
@@ -14,12 +15,14 @@ import (
 // The SessionHandler type provides handlers to retrieve session information
 type SessionHandler struct {
 	registry session.RegistryReader
+	iam      iam.IAM
 }
 
 // NewSession returns a new Session type. You have to provide a session registry.
-func NewSession(registry session.RegistryReader) *SessionHandler {
+func NewSession(registry session.RegistryReader, iam iam.IAM) *SessionHandler {
 	return &SessionHandler{
 		registry: registry,
+		iam:      iam,
 	}
 }
 
@@ -76,4 +79,53 @@ func (s *SessionHandler) Active(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, sessionsActive)
+}
+
+// Request access tokens
+// @Summary Request access tokens
+// @Description Request access tokens
+// @Tags v16.?.?
+// @ID session-3-create-token
+// @Accept json
+// @Produce json
+// @Param username path string true "Username"
+// @Param config body []api.SessionTokenRequest true "Token request"
+// @Success 200 {array} api.SessionTokenRequest
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/session/token/{username} [put]
+func (s *SessionHandler) CreateToken(c echo.Context) error {
+	username := util.PathParam(c, "username")
+
+	identity, err := s.iam.GetVerifier(username)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "%s", err)
+	}
+
+	request := []api.SessionTokenRequest{}
+
+	if err := util.ShouldBindJSONValidation(c, &request, false); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	for _, r := range request {
+		err := c.Validate(r)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		}
+	}
+
+	for i, req := range request {
+		data := map[string]interface{}{
+			"match":  req.Match,
+			"remote": req.Remote,
+			"extra":  req.Extra,
+		}
+
+		request[i].Token = identity.GetServiceSession(data)
+	}
+
+	return c.JSON(http.StatusOK, request)
 }

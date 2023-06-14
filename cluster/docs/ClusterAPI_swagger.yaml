@@ -186,10 +186,17 @@ definitions:
   identity.UserAuthServices:
     properties:
       basic:
+        description: Passwords for BasicAuth
+        items:
+          type: string
+        type: array
+      session:
+        description: Secrets for session JWT
         items:
           type: string
         type: array
       token:
+        description: Tokens/Streamkey for RTMP and SRT
         items:
           type: string
         type: array

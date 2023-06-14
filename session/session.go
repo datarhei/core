@@ -12,6 +12,7 @@ type session struct {
 	id        string
 	reference string
 	createdAt time.Time
+	closedAt  time.Time
 
 	logger log.Logger
 
@@ -20,7 +21,7 @@ type session struct {
 
 	location string
 	peer     string
-	extra    string
+	extra    map[string]interface{}
 
 	stale    *time.Timer
 	timeout  time.Duration
@@ -53,6 +54,7 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 
 	s.location = ""
 	s.peer = ""
+	s.extra = map[string]interface{}{}
 
 	s.rxBitrate, _ = average.New(averageWindow, averageGranularity)
 	s.txBitrate, _ = average.New(averageWindow, averageGranularity)
@@ -91,6 +93,8 @@ func (s *session) close() {
 		s.stale.Stop()
 		s.lock.Unlock()
 
+		s.closedAt = time.Now()
+
 		close(s.tickerStop)
 		s.rxBitrate.Stop()
 		s.txBitrate.Stop()
@@ -125,7 +129,7 @@ func (s *session) Activate() bool {
 	return true
 }
 
-func (s *session) Extra(extra string) {
+func (s *session) Extra(extra map[string]interface{}) {
 	s.extra = extra
 
 	s.logger = s.logger.WithField("extra", extra)

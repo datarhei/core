@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/datarhei/core/v16/glob"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/session"
 
@@ -113,7 +116,9 @@ func (h *hls) handleIngress(c echo.Context, next echo.HandlerFunc) error {
 				// Register a new session
 				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 				h.ingressCollector.RegisterAndActivate(path, reference, path, "")
-				h.ingressCollector.Extra(path, req.Header.Get("User-Agent"))
+				h.ingressCollector.Extra(path, map[string]interface{}{
+					"user_agent": req.Header.Get("User-Agent"),
+				})
 			}
 
 			h.ingressCollector.Ingress(path, headerSize(req.Header))
@@ -163,6 +168,8 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 		return next(c)
 	}
 
+	ctxuser := util.DefaultContext(c, "user", "")
+
 	path := req.URL.Path
 	sessionID := c.QueryParam("session")
 
@@ -170,6 +177,46 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 	isTS := strings.HasSuffix(path, ".ts")
 
 	rewrite := false
+
+	data := map[string]interface{}{}
+
+	e := util.DefaultContext[interface{}](c, "session", nil)
+	if e != nil {
+		var ok bool
+		data, ok = e.(map[string]interface{})
+		if !ok {
+			return api.Err(http.StatusForbidden, "", "invalid session data, cast")
+		}
+
+		if match, ok := data["match"].(string); ok {
+			if ok, err := glob.Match(match, path, '/'); !ok {
+				if err != nil {
+					return api.Err(http.StatusForbidden, "", "invalid session data, no match for '%s' in %s: %s", match, path, err.Error())
+				}
+
+				return api.Err(http.StatusForbidden, "", "invalid session data, no match for '%s' in %s", match, path)
+			}
+		}
+
+		referrer := req.Header.Get("Referer")
+		if u, err := url.Parse(referrer); err == nil {
+			referrer = u.Host
+		}
+
+		if remote, ok := data["remote"].([]string); ok {
+			match := false
+			for _, r := range remote {
+				if referrer == r {
+					match = true
+					break
+				}
+			}
+
+			if !match {
+				return api.Err(http.StatusForbidden, "", "invalid session data, remote")
+			}
+		}
+	}
 
 	if isM3U8 {
 		if !h.egressCollector.IsKnownSession(sessionID) {
@@ -202,13 +249,16 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 				}
 
 				ip, _ := net.AnonymizeIPString(c.RealIP())
-				extra := "[" + ip + "] " + req.Header.Get("User-Agent")
+
+				data["ip"] = ip
+				data["user_agent"] = req.Header.Get("User-Agent")
+				data["name"] = ctxuser
 
 				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 
 				// Register a new session
 				h.egressCollector.Register(sessionID, reference, path, referrer)
-				h.egressCollector.Extra(sessionID, extra)
+				h.egressCollector.Extra(sessionID, data)
 
 				// Give the new session an initial top bitrate
 				h.egressCollector.SessionSetTopEgressBitrate(sessionID, streamBitrate)
@@ -241,7 +291,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 	res.Writer = writer
 
 	if rewrite {
-		if res.Status != 200 {
+		if res.Status < 200 || res.Status >= 300 {
 			res.Write(rewriter.buffer.Bytes())
 			return nil
 		}
@@ -254,13 +304,15 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 	}
 
 	if isM3U8 || isTS {
-		// Collect how many bytes we've written in this session
-		h.egressCollector.Egress(sessionID, headerSize(res.Header()))
-		h.egressCollector.Egress(sessionID, res.Size)
+		if res.Status < 200 || res.Status >= 300 {
+			// Collect how many bytes we've written in this session
+			h.egressCollector.Egress(sessionID, headerSize(res.Header()))
+			h.egressCollector.Egress(sessionID, res.Size)
 
-		if isTS {
-			// Activate the session. If the session is already active, this is a noop
-			h.egressCollector.Activate(sessionID)
+			if isTS {
+				// Activate the session. If the session is already active, this is a noop
+				h.egressCollector.Activate(sessionID)
+			}
 		}
 	}
 
@@ -403,7 +455,19 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 			continue
 		}
 
-		q := u.Query()
+		q := url.Values{}
+
+		for key, values := range requestURL.Query() {
+			for _, value := range values {
+				q.Add(key, value)
+			}
+		}
+
+		for key, values := range u.Query() {
+			for _, value := range values {
+				q.Set(key, value)
+			}
+		}
 
 		loop := false
 

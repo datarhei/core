@@ -926,12 +926,21 @@ const docTemplateClusterAPI = `{
             "type": "object",
             "properties": {
                 "basic": {
+                    "description": "Passwords for BasicAuth",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "session": {
+                    "description": "Secrets for session JWT",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "token": {
+                    "description": "Tokens/Streamkey for RTMP and SRT",
                     "type": "array",
                     "items": {
                         "type": "string"

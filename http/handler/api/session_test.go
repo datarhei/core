@@ -20,7 +20,7 @@ func getDummySessionRouter() *echo.Echo {
 	collector := registry.Collector("foo")
 	collector.RegisterAndActivate("foobar", "", "any", "any")
 
-	handler := NewSession(registry)
+	handler := NewSession(registry, nil)
 
 	router.Add("GET", "/summary", handler.Summary)
 	router.Add("GET", "/active", handler.Active)

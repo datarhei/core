@@ -307,6 +307,7 @@ func NewServer(config Config) (Server, error) {
 
 	s.v3handler.session = api.NewSession(
 		config.Sessions,
+		config.IAM,
 	)
 	s.middleware.session = mwsession.NewHLSWithConfig(mwsession.HLSConfig{
 		EgressCollector:  config.Sessions.Collector("hls"),
@@ -662,6 +663,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.session != nil {
 		v3.GET("/session", s.v3handler.session.Summary)
 		v3.GET("/session/active", s.v3handler.session.Active)
+		v3.PUT("/session/token/:username", s.v3handler.session.CreateToken)
 	}
 
 	// v3 Cluster
