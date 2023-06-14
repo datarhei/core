@@ -324,7 +324,7 @@ func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Ver
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("identity not found")
-		return nil, err
+		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwtgo.MapClaims)
@@ -333,7 +333,7 @@ func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Ver
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("identity not found")
-		return nil, fmt.Errorf("invalid token. claims")
+		return nil, fmt.Errorf("invalid claims in token")
 	}
 
 	var subject string
@@ -347,7 +347,7 @@ func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Ver
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("identity not found")
-		return nil, fmt.Errorf("invalid token, identity")
+		return nil, fmt.Errorf("identity not found")
 	}
 
 	ok, data, err := identity.VerifyServiceSession(auth)
@@ -356,7 +356,7 @@ func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Ver
 			"path":   c.Request().URL.Path,
 			"method": c.Request().Method,
 		}).WithError(err).Log("identity not found")
-		return nil, fmt.Errorf("invalid token, verify: %w", err)
+		return nil, fmt.Errorf("verifying token failed: %w", err)
 	}
 
 	c.Set("session", data)

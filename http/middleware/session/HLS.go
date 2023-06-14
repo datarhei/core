@@ -191,10 +191,10 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 		if match, ok := data["match"].(string); ok {
 			if ok, err := glob.Match(match, path, '/'); !ok {
 				if err != nil {
-					return api.Err(http.StatusForbidden, "", "invalid session data, no match for '%s' in %s: %s", match, path, err.Error())
+					return api.Err(http.StatusForbidden, "", "no match for '%s' in %s: %s", match, path, err.Error())
 				}
 
-				return api.Err(http.StatusForbidden, "", "invalid session data, no match for '%s' in %s", match, path)
+				return api.Err(http.StatusForbidden, "", "no match for '%s' in %s", match, path)
 			}
 		}
 
@@ -203,7 +203,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 			referrer = u.Host
 		}
 
-		if remote, ok := data["remote"].([]string); ok {
+		if remote, ok := data["remote"].([]string); ok && len(remote) != 0 {
 			match := false
 			for _, r := range remote {
 				if referrer == r {
@@ -213,7 +213,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 			}
 
 			if !match {
-				return api.Err(http.StatusForbidden, "", "invalid session data, remote")
+				return api.Err(http.StatusForbidden, "", "remote not allowed")
 			}
 		}
 	}
@@ -248,16 +248,17 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 					referrer = u.Host
 				}
 
+				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+
+				// Register a new session
+				h.egressCollector.Register(sessionID, reference, path, referrer)
+
 				ip, _ := net.AnonymizeIPString(c.RealIP())
 
 				data["ip"] = ip
 				data["user_agent"] = req.Header.Get("User-Agent")
 				data["name"] = ctxuser
 
-				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-
-				// Register a new session
-				h.egressCollector.Register(sessionID, reference, path, referrer)
 				h.egressCollector.Extra(sessionID, data)
 
 				// Give the new session an initial top bitrate
