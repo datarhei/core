@@ -75,6 +75,8 @@ definitions:
         type: string
       degraded:
         type: boolean
+      degraded_error:
+        type: string
       id:
         type: string
       nodes:
@@ -108,8 +110,6 @@ definitions:
         type: string
       uptime_seconds:
         type: integer
-      version:
-        type: string
     type: object
   api.ClusterNodeFiles:
     properties:

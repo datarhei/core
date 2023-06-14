@@ -3848,6 +3848,9 @@
                 "degraded": {
                     "type": "boolean"
                 },
+                "degraded_error": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3896,9 +3899,6 @@
                 },
                 "uptime_seconds": {
                     "type": "integer"
-                },
-                "version": {
-                    "type": "string"
                 }
             }
         },

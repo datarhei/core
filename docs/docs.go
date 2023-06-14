@@ -3856,6 +3856,9 @@ const docTemplate = `{
                 "degraded": {
                     "type": "boolean"
                 },
+                "degraded_error": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3904,9 +3907,6 @@ const docTemplate = `{
                 },
                 "uptime_seconds": {
                     "type": "integer"
-                },
-                "version": {
-                    "type": "string"
                 }
             }
         },
