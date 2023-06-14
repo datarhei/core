@@ -398,11 +398,11 @@ func (c *cluster) IsRaftLeader() bool {
 	return c.isRaftLeader
 }
 
-func (c *cluster) IsDegraded() bool {
+func (c *cluster) IsDegraded() (bool, error) {
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 
-	return c.isDegraded
+	return c.isDegraded, c.isDegradedErr
 }
 
 func (c *cluster) Leave(origin, id string) error {
@@ -608,7 +608,7 @@ func (c *cluster) Snapshot() (io.ReadCloser, error) {
 }
 
 func (c *cluster) trackNodeChanges() {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -629,7 +629,7 @@ func (c *cluster) trackNodeChanges() {
 			}
 
 			for _, server := range servers {
-				id := server.ID + server.Address
+				id := server.ID
 
 				_, ok := c.nodes[id]
 				if !ok {
@@ -643,18 +643,15 @@ func (c *cluster) trackNodeChanges() {
 						logger.Warn().WithError(err).Log("Discovering cluster API address")
 					}
 
-					cnode := NewClusterNode(address)
+					cnode := NewClusterNode(id, address)
 
-					if !verifyClusterVersion(cnode.Version()) {
+					if err := verifyClusterVersion(cnode.Version()); err != nil {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
 					}
 
-					if err := verifyClusterConfig(c.config, cnode.Config()); err != nil {
-						logger.Warn().WithError(err).Log("Config mismatch. Cluster will end up in degraded mode")
-					}
-
 					if _, err := c.proxy.AddNode(id, cnode.Proxy()); err != nil {
-						c.logger.Warn().WithError(err).Log("Adding node")
+						logger.Warn().WithError(err).Log("Adding node")
+						cnode.Stop()
 						continue
 					}
 
@@ -700,35 +697,38 @@ func (c *cluster) checkClusterNodes() error {
 	defer c.nodesLock.RUnlock()
 
 	for id, node := range c.nodes {
-		if status, statusErr := node.Status(); status == "offline" {
-			return fmt.Errorf("node %s is offline: %w", id, statusErr)
+		if status, err := node.Status(); status == "offline" {
+			return fmt.Errorf("node %s is offline: %w", id, err)
 		}
 
 		version := node.Version()
-		if !verifyClusterVersion(version) {
-			return fmt.Errorf("node %s has a different version: %s", id, version)
+		if err := verifyClusterVersion(version); err != nil {
+			return fmt.Errorf("node %s has a different version: %s: %w", id, version, err)
 		}
 
-		config := node.Config()
-		if configErr := verifyClusterConfig(c.config, config); configErr != nil {
-			return fmt.Errorf("node %s has a different configuration: %w", id, configErr)
+		config, err := node.Config()
+		if err != nil {
+			return fmt.Errorf("node %s has no configuration available: %w", id, err)
+		}
+		if err := verifyClusterConfig(c.config, config); err != nil {
+			return fmt.Errorf("node %s has a different configuration: %w", id, err)
 		}
 	}
 
 	return nil
 }
 
-func verifyClusterVersion(v string) bool {
+func verifyClusterVersion(v string) error {
 	version, err := ParseClusterVersion(v)
 	if err != nil {
-		return false
+		return fmt.Errorf("parsing version %s: %w", v, err)
 	}
 
 	if !Version.Equal(version) {
-		return false
+		return fmt.Errorf("version %s not equal to expected version %s", version.String(), Version.String())
 	}
 
-	return true
+	return nil
 }
 
 func verifyClusterConfig(local, remote *config.Config) error {
@@ -806,7 +806,7 @@ func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
 }
 
 func (c *cluster) AddProcess(origin string, config *app.Config) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -825,7 +825,7 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 }
 
 func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -844,7 +844,7 @@ func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
 }
 
 func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -864,7 +864,7 @@ func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Con
 }
 
 func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -939,7 +939,7 @@ func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) 
 }
 
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -958,7 +958,7 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 }
 
 func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -978,7 +978,7 @@ func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User)
 }
 
 func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -998,7 +998,7 @@ func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) 
 }
 
 func (c *cluster) RemoveIdentity(origin string, name string) error {
-	if c.IsDegraded() {
+	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -1057,15 +1057,17 @@ type ClusterAbout struct {
 	Nodes             []proxy.NodeAbout
 	Version           ClusterVersion
 	Degraded          bool
+	DegradedErr       error
 }
 
 func (c *cluster) About() (ClusterAbout, error) {
-	degraded := c.IsDegraded()
+	degraded, degradedErr := c.IsDegraded()
 
 	about := ClusterAbout{
-		ID:       c.id,
-		Address:  c.Address(),
-		Degraded: degraded,
+		ID:          c.id,
+		Address:     c.Address(),
+		Degraded:    degraded,
+		DegradedErr: degradedErr,
 	}
 
 	if address, err := c.ClusterAPIAddress(""); err == nil {

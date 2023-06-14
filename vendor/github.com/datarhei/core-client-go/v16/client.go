@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/datarhei/core-client-go/v16/api"
@@ -38,13 +39,13 @@ type RestClient interface {
 	// Address returns the address of the connected datarhei Core
 	Address() string
 
-	Ping() (bool, time.Duration)
+	Ping() (time.Duration, error)
 
-	About() api.About // GET /
+	About(cached bool) (api.About, error) // GET /
 
-	Config() (int64, api.Config, error) // GET /config
-	ConfigSet(config interface{}) error // POST /config
-	ConfigReload() error                // GET /config/reload
+	Config() (int64, api.Config, error) // GET /v3/config
+	ConfigSet(config interface{}) error // POST /v3/config
+	ConfigReload() error                // GET /v3/config/reload
 
 	Graph(query api.GraphQuery) (api.GraphResponse, error) // POST /graph
 
@@ -66,7 +67,7 @@ type RestClient interface {
 	FilesystemDeleteFile(name, path string) error                             // DELETE /v3/fs/{name}/{path}
 	FilesystemAddFile(name, path string, data io.Reader) error                // PUT /v3/fs/{name}/{path}
 
-	Log() ([]api.LogEvent, error) // GET /log
+	Log() ([]api.LogEvent, error) // GET /v3/log
 
 	Metadata(key string) (api.Metadata, error)           // GET /v3/metadata/{key}
 	MetadataSet(key string, metadata api.Metadata) error // PUT /v3/metadata/{key}
@@ -130,6 +131,7 @@ type restclient struct {
 	auth0Token   string
 	client       HTTPClient
 	about        api.About
+	aboutLock    sync.RWMutex
 
 	version struct {
 		connectedCore *semver.Version
@@ -152,40 +154,27 @@ func New(config Config) (RestClient, error) {
 	}
 
 	u, err := url.Parse(r.address)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		username := u.User.Username()
+		if len(username) != 0 {
+			r.username = username
+		}
+
+		if password, ok := u.User.Password(); ok {
+			r.password = password
+		}
+
+		u.User = nil
+		u.RawQuery = ""
+		u.Fragment = ""
+
+		r.address = u.String()
 	}
-
-	username := u.User.Username()
-	if len(username) != 0 {
-		r.username = username
-	}
-
-	if password, ok := u.User.Password(); ok {
-		r.password = password
-	}
-
-	u.User = nil
-	u.RawQuery = ""
-	u.Fragment = ""
-
-	r.address = u.String()
 
 	if r.client == nil {
 		r.client = &http.Client{
 			Timeout: 15 * time.Second,
 		}
-	}
-
-	about, err := r.info()
-	if err != nil {
-		return nil, err
-	}
-
-	r.about = about
-
-	if r.about.App != coreapp {
-		return nil, fmt.Errorf("didn't receive the expected API response (got: %s, want: %s)", r.about.Name, coreapp)
 	}
 
 	mustNewConstraint := func(constraint string) *semver.Constraints {
@@ -198,20 +187,35 @@ func New(config Config) (RestClient, error) {
 		"GET/api/v3/metrics": mustNewConstraint("^16.10.0"),
 	}
 
-	if len(r.about.ID) != 0 {
+	about, err := r.info()
+	if err != nil {
+		return nil, err
+	}
+
+	if about.App != coreapp {
+		return nil, fmt.Errorf("didn't receive the expected API response (got: %s, want: %s)", about.Name, coreapp)
+	}
+
+	r.aboutLock.Lock()
+	r.about = about
+	r.aboutLock.Unlock()
+
+	if len(about.ID) != 0 {
 		c, _ := semver.NewConstraint(coreversion)
-		v, err := semver.NewVersion(r.about.Version.Number)
+		v, err := semver.NewVersion(about.Version.Number)
 		if err != nil {
 			return nil, err
 		}
 
 		if !c.Check(v) {
-			return nil, fmt.Errorf("the core version (%s) is not supported, because a version %s is required", r.about.Version.Number, coreversion)
+			return nil, fmt.Errorf("the core version (%s) is not supported, because a version %s is required", about.Version.Number, coreversion)
 		}
 
+		r.aboutLock.Lock()
 		r.version.connectedCore = v
+		r.aboutLock.Unlock()
 	} else {
-		v, err := semver.NewVersion(r.about.Version.Number)
+		v, err := semver.NewVersion(about.Version.Number)
 		if err != nil {
 			return nil, err
 		}
@@ -228,11 +232,17 @@ func New(config Config) (RestClient, error) {
 	return r, nil
 }
 
-func (r restclient) String() string {
+func (r *restclient) String() string {
+	r.aboutLock.RLock()
+	defer r.aboutLock.RUnlock()
+
 	return fmt.Sprintf("%s %s (%s) %s @ %s", r.about.Name, r.about.Version.Number, r.about.Version.Arch, r.about.ID, r.address)
 }
 
 func (r *restclient) ID() string {
+	r.aboutLock.RLock()
+	defer r.aboutLock.RUnlock()
+
 	return r.about.ID
 }
 
@@ -244,30 +254,43 @@ func (r *restclient) Address() string {
 	return r.address
 }
 
-func (r *restclient) About() api.About {
-	return r.about
+func (r *restclient) About(cached bool) (api.About, error) {
+	if cached {
+		return r.about, nil
+	}
+
+	about, err := r.info()
+	if err != nil {
+		return api.About{}, err
+	}
+
+	r.about = about
+
+	return about, nil
 }
 
-func (r *restclient) Ping() (bool, time.Duration) {
+func (r *restclient) Ping() (time.Duration, error) {
 	req, err := http.NewRequest(http.MethodGet, r.address+"/ping", nil)
 	if err != nil {
-		return false, time.Duration(0)
+		return time.Duration(0), err
 	}
 
 	start := time.Now()
 
 	status, body, err := r.request(req)
 	if err != nil {
-		return false, time.Since(start)
+		return time.Duration(0), err
 	}
 
 	defer body.Close()
 
 	if status != 200 {
-		return false, time.Since(start)
+		return time.Duration(0), err
 	}
 
-	return true, time.Since(start)
+	io.ReadAll(body)
+
+	return time.Since(start), nil
 }
 
 func (r *restclient) login() error {
@@ -363,8 +386,10 @@ func (r *restclient) login() error {
 		return fmt.Errorf("the core version (%s) is not supported, because a version %s is required", about.Version.Number, coreversion)
 	}
 
+	r.aboutLock.Lock()
 	r.version.connectedCore = v
 	r.about = about
+	r.aboutLock.Unlock()
 
 	return nil
 }
@@ -375,6 +400,9 @@ func (r *restclient) checkVersion(method, path string) error {
 		return nil
 	}
 
+	r.aboutLock.RLock()
+	defer r.aboutLock.RUnlock()
+
 	if !c.Check(r.version.connectedCore) {
 		return fmt.Errorf("this method is only available in version %s of the core", c.String())
 	}
@@ -383,6 +411,10 @@ func (r *restclient) checkVersion(method, path string) error {
 }
 
 func (r *restclient) refresh() error {
+	if len(r.refreshToken) == 0 {
+		return fmt.Errorf("no refresh token defined")
+	}
+
 	req, err := http.NewRequest("GET", r.address+r.prefix+"/login/refresh", nil)
 	if err != nil {
 		return err

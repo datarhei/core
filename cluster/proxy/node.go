@@ -19,10 +19,11 @@ import (
 )
 
 type Node interface {
-	Connect() error
+	SetAddress(address string)
+	IsConnected() (bool, error)
 	Disconnect()
 
-	Config() clientapi.ConfigV3
+	Config() *clientapi.ConfigV3
 
 	StartFiles(updates chan<- NodeFiles) error
 	StopFiles()
@@ -98,10 +99,12 @@ const (
 )
 
 type node struct {
+	id      string
 	address string
 	ips     []string
 
 	peer       client.RestClient
+	peerErr    error
 	peerLock   sync.RWMutex
 	peerWg     sync.WaitGroup
 	disconnect context.CancelFunc
@@ -117,7 +120,7 @@ type node struct {
 		memLimit   uint64
 	}
 
-	config clientapi.ConfigV3
+	config *clientapi.ConfigV3
 
 	state       nodeState
 	latency     float64 // Seconds
@@ -138,22 +141,69 @@ type node struct {
 	srtAddress  *url.URL
 }
 
-func NewNode(address string) Node {
+func NewNode(id, address string) Node {
 	n := &node{
+		id:      id,
 		address: address,
 		state:   stateDisconnected,
 		secure:  strings.HasPrefix(address, "https://"),
 	}
 
+	n.resources.throttling = true
+	n.resources.cpu = 100
+	n.resources.ncpu = 1
+	n.resources.cpuLimit = 100
+	n.resources.mem = 0
+	n.resources.memLimit = 0
+
+	ctx, cancel := context.WithCancel(context.Background())
+	n.disconnect = cancel
+
+	err := n.connect(ctx)
+	if err != nil {
+		n.peerErr = err
+
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(3 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					err := n.connect(ctx)
+					if err == nil {
+						n.peerErr = nil
+						return
+					} else {
+						n.peerErr = err
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}(ctx)
+	}
+
 	return n
 }
 
-func (n *node) Connect() error {
+func (n *node) SetAddress(address string) {
+	n.peerLock.Lock()
+	defer n.peerLock.Unlock()
+
+	n.address = address
+}
+
+func (n *node) connect(ctx context.Context) error {
 	n.peerLock.Lock()
 	defer n.peerLock.Unlock()
 
 	if n.peer != nil {
 		return nil
+	}
+
+	if len(n.address) == 0 {
+		return fmt.Errorf("no address provided")
 	}
 
 	u, err := url.Parse(n.address)
@@ -195,7 +245,7 @@ func (n *node) Connect() error {
 		return fmt.Errorf("failed to convert config to expected version")
 	}
 
-	n.config = config
+	n.config = &config
 
 	n.httpAddress = u
 
@@ -237,129 +287,165 @@ func (n *node) Connect() error {
 
 	n.peer = peer
 
-	ctx, cancel := context.WithCancel(context.Background())
-	n.disconnect = cancel
-
 	n.peerWg.Add(2)
 
-	go func(ctx context.Context) {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		defer n.peerWg.Done()
-
-		for {
-			select {
-			case <-ticker.C:
-				// Ping
-				latency, err := n.Ping()
-
-				n.stateLock.Lock()
-				if err != nil {
-					n.state = stateDisconnected
-				} else {
-					n.lastContact = time.Now()
-					n.state = stateConnected
-				}
-				n.latency = n.latency*0.2 + latency.Seconds()*0.8
-				n.stateLock.Unlock()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(ctx)
-
-	go func(ctx context.Context) {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		defer n.peerWg.Done()
-
-		for {
-			select {
-			case <-ticker.C:
-				// Metrics
-				metrics, err := n.peer.Metrics(clientapi.MetricsQuery{
-					Metrics: []clientapi.MetricsQueryMetric{
-						{Name: "cpu_ncpu"},
-						{Name: "cpu_idle"},
-						{Name: "cpu_limit"},
-						{Name: "cpu_throttling"},
-						{Name: "mem_total"},
-						{Name: "mem_free"},
-						{Name: "mem_limit"},
-						{Name: "mem_throttling"},
-					},
-				})
-
-				if err != nil {
-					n.stateLock.Lock()
-					n.resources.throttling = true
-					n.resources.cpu = 100
-					n.resources.ncpu = 1
-					n.resources.cpuLimit = 100
-					n.resources.mem = 0
-					n.resources.memLimit = 0
-					n.state = stateDisconnected
-					n.stateLock.Unlock()
-
-					continue
-				}
-
-				cpu_ncpu := .0
-				cpu_idle := .0
-				cpu_limit := .0
-				mem_total := uint64(0)
-				mem_free := uint64(0)
-				mem_limit := uint64(0)
-				throttling := .0
-
-				for _, x := range metrics.Metrics {
-					if x.Name == "cpu_idle" {
-						cpu_idle = x.Values[0].Value
-					} else if x.Name == "cpu_ncpu" {
-						cpu_ncpu = x.Values[0].Value
-					} else if x.Name == "cpu_limit" {
-						cpu_limit = x.Values[0].Value
-					} else if x.Name == "cpu_throttling" {
-						throttling += x.Values[0].Value
-					} else if x.Name == "mem_total" {
-						mem_total = uint64(x.Values[0].Value)
-					} else if x.Name == "mem_free" {
-						mem_free = uint64(x.Values[0].Value)
-					} else if x.Name == "mem_limit" {
-						mem_limit = uint64(x.Values[0].Value)
-					} else if x.Name == "mem_throttling" {
-						throttling += x.Values[0].Value
-					}
-				}
-
-				n.stateLock.Lock()
-				if throttling > 0 {
-					n.resources.throttling = true
-				} else {
-					n.resources.throttling = false
-				}
-				n.resources.ncpu = cpu_ncpu
-				n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
-				n.resources.cpuLimit = cpu_limit * cpu_ncpu
-				if mem_total != 0 {
-					n.resources.mem = mem_total - mem_free
-					n.resources.memLimit = mem_limit
-				} else {
-					n.resources.mem = 0
-					n.resources.memLimit = 0
-				}
-				n.lastContact = time.Now()
-				n.stateLock.Unlock()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(ctx)
+	go n.pingPeer(ctx, &n.peerWg)
+	go n.updateResources(ctx, &n.peerWg)
 
 	return nil
 }
 
-func (n *node) Config() clientapi.ConfigV3 {
+func (n *node) IsConnected() (bool, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		fmt.Printf("\n***** n.peer is nil\n")
+		return false, fmt.Errorf("not connected: %w", n.peerErr)
+	}
+
+	return true, nil
+}
+
+func (n *node) Disconnect() {
+	n.peerLock.Lock()
+	if n.disconnect != nil {
+		n.disconnect()
+		n.disconnect = nil
+	}
+	n.peerLock.Unlock()
+
+	n.peerWg.Wait()
+
+	n.peerLock.Lock()
+	n.peer = nil
+	n.peerErr = fmt.Errorf("disconnected")
+	n.peerLock.Unlock()
+}
+
+func (n *node) pingPeer(ctx context.Context, wg *sync.WaitGroup) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer wg.Done()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Ping
+			latency, err := n.Ping()
+
+			n.peerLock.Lock()
+			n.peerErr = err
+			n.peerLock.Unlock()
+
+			n.stateLock.Lock()
+			if err != nil {
+				n.state = stateDisconnected
+			} else {
+				n.lastContact = time.Now()
+				n.state = stateConnected
+			}
+			n.latency = n.latency*0.2 + latency.Seconds()*0.8
+			n.stateLock.Unlock()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer wg.Done()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Metrics
+			metrics, err := n.peer.Metrics(clientapi.MetricsQuery{
+				Metrics: []clientapi.MetricsQueryMetric{
+					{Name: "cpu_ncpu"},
+					{Name: "cpu_idle"},
+					{Name: "cpu_limit"},
+					{Name: "cpu_throttling"},
+					{Name: "mem_total"},
+					{Name: "mem_free"},
+					{Name: "mem_limit"},
+					{Name: "mem_throttling"},
+				},
+			})
+
+			n.peerLock.Lock()
+			n.peerErr = err
+			n.peerLock.Unlock()
+
+			if err != nil {
+				n.stateLock.Lock()
+				n.resources.throttling = true
+				n.resources.cpu = 100
+				n.resources.ncpu = 1
+				n.resources.cpuLimit = 100
+				n.resources.mem = 0
+				n.resources.memLimit = 0
+				n.state = stateDisconnected
+				n.stateLock.Unlock()
+
+				continue
+			}
+
+			cpu_ncpu := .0
+			cpu_idle := .0
+			cpu_limit := .0
+			mem_total := uint64(0)
+			mem_free := uint64(0)
+			mem_limit := uint64(0)
+			throttling := .0
+
+			for _, x := range metrics.Metrics {
+				if x.Name == "cpu_idle" {
+					cpu_idle = x.Values[0].Value
+				} else if x.Name == "cpu_ncpu" {
+					cpu_ncpu = x.Values[0].Value
+				} else if x.Name == "cpu_limit" {
+					cpu_limit = x.Values[0].Value
+				} else if x.Name == "cpu_throttling" {
+					throttling += x.Values[0].Value
+				} else if x.Name == "mem_total" {
+					mem_total = uint64(x.Values[0].Value)
+				} else if x.Name == "mem_free" {
+					mem_free = uint64(x.Values[0].Value)
+				} else if x.Name == "mem_limit" {
+					mem_limit = uint64(x.Values[0].Value)
+				} else if x.Name == "mem_throttling" {
+					throttling += x.Values[0].Value
+				}
+			}
+
+			n.stateLock.Lock()
+			if throttling > 0 {
+				n.resources.throttling = true
+			} else {
+				n.resources.throttling = false
+			}
+			n.resources.ncpu = cpu_ncpu
+			n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
+			n.resources.cpuLimit = cpu_limit * cpu_ncpu
+			if mem_total != 0 {
+				n.resources.mem = mem_total - mem_free
+				n.resources.memLimit = mem_limit
+			} else {
+				n.resources.mem = 0
+				n.resources.memLimit = 0
+			}
+			n.lastContact = time.Now()
+			n.stateLock.Unlock()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (n *node) Config() *clientapi.ConfigV3 {
 	return n.config
 }
 
@@ -371,12 +457,7 @@ func (n *node) Ping() (time.Duration, error) {
 		return 0, fmt.Errorf("not connected")
 	}
 
-	ok, latency := n.peer.Ping()
-	var err error = nil
-
-	if !ok {
-		err = fmt.Errorf("not connected")
-	}
+	latency, err := n.peer.Ping()
 
 	return latency, err
 }
@@ -400,22 +481,7 @@ func (n *node) AboutPeer() (clientapi.About, error) {
 		return clientapi.About{}, fmt.Errorf("not connected")
 	}
 
-	return n.peer.About(), nil
-}
-
-func (n *node) Disconnect() {
-	n.peerLock.Lock()
-	if n.disconnect != nil {
-		n.disconnect()
-		n.disconnect = nil
-	}
-	n.peerLock.Unlock()
-
-	n.peerWg.Wait()
-
-	n.peerLock.Lock()
-	n.peer = nil
-	n.peerLock.Unlock()
+	return n.peer.About(false)
 }
 
 func (n *node) StartFiles(updates chan<- NodeFiles) error {
@@ -471,7 +537,9 @@ func (n *node) About() NodeAbout {
 	about, err := n.AboutPeer()
 	if err != nil {
 		return NodeAbout{
-			State: stateDisconnected.String(),
+			ID:      n.id,
+			Address: n.address,
+			State:   stateDisconnected.String(),
 		}
 	}
 
@@ -489,7 +557,7 @@ func (n *node) About() NodeAbout {
 	}
 
 	nodeAbout := NodeAbout{
-		ID:          about.ID,
+		ID:          n.id,
 		Name:        about.Name,
 		Address:     n.address,
 		State:       state.String(),

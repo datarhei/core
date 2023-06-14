@@ -873,11 +873,17 @@ func (a *api) start() error {
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetVerifier(config.Owner)
+				var err error = nil
+				identity, err = a.iam.GetVerifier(config.Owner)
+				if err != nil {
+					identity = nil
+				}
 			}
 
 			if identity != nil {
 				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			} else {
+				u.User = url.User(config.Owner)
 			}
 
 			return u.String()
@@ -891,11 +897,17 @@ func (a *api) start() error {
 			if len(config.Owner) == 0 {
 				identity = a.iam.GetDefaultVerifier()
 			} else {
-				identity, _ = a.iam.GetVerifier(config.Owner)
+				var err error = nil
+				identity, err = a.iam.GetVerifier(config.Owner)
+				if err != nil {
+					identity = nil
+				}
 			}
 
 			if identity != nil {
 				u.User = url.UserPassword(config.Owner, identity.GetServiceBasicAuth())
+			} else {
+				u.User = url.User(config.Owner)
 			}
 
 			return u.String()

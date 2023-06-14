@@ -17,7 +17,6 @@ type ClusterNode struct {
 	Latency     float64              `json:"latency_ms"`   // milliseconds
 	State       string               `json:"state"`
 	Resources   ClusterNodeResources `json:"resources"`
-	Version     string               `json:"version"`
 }
 
 func (n *ClusterNode) Marshal(about proxy.NodeAbout) {
@@ -73,6 +72,7 @@ type ClusterAbout struct {
 	Nodes             []ClusterNode `json:"nodes"`
 	Version           string        `json:"version"`
 	Degraded          bool          `json:"degraded"`
+	DegradedErr       string        `json:"degraded_error"`
 }
 
 type ClusterProcess struct {

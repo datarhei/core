@@ -77,6 +77,10 @@ func (h *ClusterHandler) About(c echo.Context) error {
 		Degraded: state.Degraded,
 	}
 
+	if state.DegradedErr != nil {
+		about.DegradedErr = state.DegradedErr.Error()
+	}
+
 	for _, n := range state.Raft.Server {
 		about.Raft.Server = append(about.Raft.Server, api.ClusterRaftServer{
 			ID:      n.ID,

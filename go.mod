@@ -9,7 +9,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.17.2
 	github.com/casbin/casbin/v2 v2.69.1
-	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230605095314-42546fbbbece
+	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230614141756-a25a5fc3c60e
 	github.com/datarhei/gosrt v0.4.1
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0

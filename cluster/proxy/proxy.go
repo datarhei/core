@@ -249,9 +249,9 @@ func (p *proxy) Resources() map[string]NodeResources {
 func (p *proxy) AddNode(id string, node Node) (string, error) {
 	about := node.About()
 
-	if id != about.ID {
-		return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, about.ID)
-	}
+	//if id != about.ID {
+	//	return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, about.ID)
+	//}
 
 	p.lock.Lock()
 	defer p.lock.Unlock()

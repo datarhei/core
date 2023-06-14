@@ -407,8 +407,9 @@ type ConfigV3 struct {
 			} `json:"output"`
 		} `json:"access"`
 		Log struct {
-			MaxLines   int `json:"max_lines" format:"int"`
-			MaxHistory int `json:"max_history" format:"int"`
+			MaxLines          int `json:"max_lines" format:"int"`
+			MaxHistory        int `json:"max_history" format:"int"`
+			MaxMinimalHistory int `json:"max_minimal_history" format:"int"`
 		} `json:"log"`
 	} `json:"ffmpeg"`
 	Playout struct {
@@ -417,9 +418,10 @@ type ConfigV3 struct {
 		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling   bool  `json:"profiling"`
-		ForceGC     int   `json:"force_gc" format:"int"`
-		MemoryLimit int64 `json:"memory_limit_mbytes" format:"int64"`
+		Profiling    bool  `json:"profiling"`
+		ForceGC      int   `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
+		MemoryLimit  int64 `json:"memory_limit_mbytes" format:"int64"`
+		AutoMaxProcs bool  `json:"auto_max_procs"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
@@ -447,16 +449,17 @@ type ConfigV3 struct {
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
 	Resources struct {
-		MaxCPUUsage    float64 `json:"max_cpu_usage"`
-		MaxMemoryUsage float64 `json:"max_memory_usage"`
+		MaxCPUUsage    float64 `json:"max_cpu_usage"`    // percent 0-100
+		MaxMemoryUsage float64 `json:"max_memory_usage"` // percent 0-100
 	} `json:"resources"`
 	Cluster struct {
-		Enable    bool     `json:"enable"`
-		Bootstrap bool     `json:"bootstrap"`
-		Recover   bool     `json:"recover"`
-		Debug     bool     `json:"debug"`
-		Address   string   `json:"address"`
-		Peers     []string `json:"peers"`
+		Enable                 bool     `json:"enable"`
+		Debug                  bool     `json:"debug"`
+		Address                string   `json:"address"` // ip:port
+		Peers                  []string `json:"peers"`
+		SyncInterval           int64    `json:"sync_interval_sec" format:"int64"`            // seconds
+		NodeRecoverTimeout     int64    `json:"node_recover_timeout_sec" format:"int64"`     // seconds
+		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout_sec" format:"int64"` // seconds
 	} `json:"cluster"`
 }
 

@@ -334,7 +334,7 @@ func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval tim
 			return
 		case <-ticker.C:
 			if !emergency {
-				if c.IsDegraded() {
+				if ok, _ := c.IsDegraded(); ok {
 					break
 				}
 
