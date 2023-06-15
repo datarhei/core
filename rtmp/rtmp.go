@@ -283,7 +283,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 			return
 		}
 
-		url.JoinPath(token)
+		url = url.JoinPath(token)
 		peerurl := url.String()
 
 		src, err := avutil.Open(peerurl)
@@ -317,7 +317,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 		for range ticker.C {
 			s.lock.RLock()
-			ch = s.channels[conn.URL.Path]
+			ch = s.channels[playpath]
 			s.lock.RUnlock()
 
 			if ch != nil {
