@@ -208,17 +208,17 @@ func (n *node) connect(ctx context.Context) error {
 
 	u, err := url.Parse(n.address)
 	if err != nil {
-		return fmt.Errorf("invalid address: %w", err)
+		return fmt.Errorf("invalid address (%s): %w", n.address, err)
 	}
 
-	host, _, err := net.SplitHostPort(u.Host)
+	nodehost, _, err := net.SplitHostPort(u.Host)
 	if err != nil {
-		return fmt.Errorf("invalid address: %w", err)
+		return fmt.Errorf("invalid address (%s): %w", u.Host, err)
 	}
 
-	addrs, err := net.LookupHost(host)
+	addrs, err := net.LookupHost(nodehost)
 	if err != nil {
-		return fmt.Errorf("lookup failed: %w", err)
+		return fmt.Errorf("lookup failed for %s: %w", nodehost, err)
 	}
 
 	peer, err := client.New(client.Config{
@@ -252,26 +252,45 @@ func (n *node) connect(ctx context.Context) error {
 	if config.RTMP.Enable {
 		n.hasRTMP = true
 		n.rtmpAddress = &url.URL{}
-		n.rtmpAddress.Scheme = "rtmp:"
+		n.rtmpAddress.Scheme = "rtmp"
 
-		isHostIP := net.ParseIP(host) != nil
+		isHostIP := net.ParseIP(nodehost) != nil
 
 		address := config.RTMP.Address
 		if n.secure && config.RTMP.EnableTLS && !isHostIP {
 			address = config.RTMP.AddressTLS
-			n.rtmpAddress.Scheme = "rtmps:"
+			n.rtmpAddress.Scheme = "rtmps"
 		}
 
-		n.rtmpAddress.JoinPath(config.RTMP.App)
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("invalid rtmp address '%s': %w", address, err)
+		}
 
-		n.rtmpAddress.Host = address
+		if len(host) == 0 {
+			n.rtmpAddress.Host = net.JoinHostPort(nodehost, port)
+		} else {
+			n.rtmpAddress.Host = net.JoinHostPort(host, port)
+		}
+
+		n.rtmpAddress = n.rtmpAddress.JoinPath(config.RTMP.App)
 	}
 
 	if config.SRT.Enable {
 		n.hasSRT = true
 		n.srtAddress = &url.URL{}
-		n.srtAddress.Scheme = "srt:"
-		n.srtAddress.Host = config.SRT.Address
+		n.srtAddress.Scheme = "srt"
+
+		host, port, err := net.SplitHostPort(config.SRT.Address)
+		if err != nil {
+			return fmt.Errorf("invalid srt address '%s': %w", config.SRT.Address, err)
+		}
+
+		if len(host) == 0 {
+			n.srtAddress.Host = net.JoinHostPort(nodehost, port)
+		} else {
+			n.srtAddress.Host = net.JoinHostPort(host, port)
+		}
 
 		v := url.Values{}
 
@@ -300,7 +319,6 @@ func (n *node) IsConnected() (bool, error) {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		fmt.Printf("\n***** n.peer is nil\n")
 		return false, fmt.Errorf("not connected: %w", n.peerErr)
 	}
 
@@ -820,13 +838,13 @@ func (n *node) GetURL(prefix, resource string) (*url.URL, error) {
 
 	if prefix == "mem" {
 		u = cloneURL(n.httpAddress)
-		u.JoinPath("memfs", resource)
+		u = u.JoinPath("memfs", resource)
 	} else if prefix == "disk" {
 		u = cloneURL(n.httpAddress)
-		u.JoinPath(resource)
+		u = u.JoinPath(resource)
 	} else if prefix == "rtmp" {
 		u = cloneURL(n.rtmpAddress)
-		u.JoinPath(resource)
+		u = u.JoinPath(resource)
 	} else if prefix == "srt" {
 		u = cloneURL(n.srtAddress)
 	} else {
