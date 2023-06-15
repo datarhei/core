@@ -322,7 +322,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	identity, err := s.findIdentityFromToken(si.Token)
 	if err != nil {
 		s.logger.Debug().WithError(err).Log("invalid token")
-		s.log("PUBLISH", "FORBIDDEN", si.Resource, "invalid token", client)
+		s.log("CONNECT", "FORBIDDEN", si.Resource, "invalid token", client)
 		return srt.REJECT
 	}
 
@@ -334,7 +334,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	}
 
 	if !s.iam.Enforce(identity, domain, resource, action) {
-		s.log("PUBLISH", "FORBIDDEN", si.Resource, "access denied", client)
+		s.log("CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
 		return srt.REJECT
 	}
 

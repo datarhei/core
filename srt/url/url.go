@@ -89,7 +89,7 @@ type StreamInfo struct {
 func (si *StreamInfo) String() string {
 	streamid := si.Resource
 
-	if si.Mode != "request" {
+	if len(si.Mode) != 0 && si.Mode != "request" {
 		streamid += ",mode:" + si.Mode
 	}
 
