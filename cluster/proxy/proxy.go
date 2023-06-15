@@ -196,7 +196,7 @@ func (p *proxy) Start() {
 				for _, file := range update.Files {
 					p.fileid[file] = update.ID
 				}
-				p.idfiles[update.ID] = files
+				p.idfiles[update.ID] = update.Files
 				p.idupdate[update.ID] = update.LastUpdate
 
 				p.lock.Unlock()
