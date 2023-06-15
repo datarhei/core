@@ -39,7 +39,7 @@ type ProcessConfigIOCleanup struct {
 }
 
 type ProcessConfigLimits struct {
-	CPU     float64 `json:"cpu_usage" jsonschema:"minimum=0,maximum=100"`
+	CPU     float64 `json:"cpu_usage" jsonschema:"minimum=0"`
 	Memory  uint64  `json:"memory_mbytes" jsonschema:"minimum=0" format:"uint64"`
 	WaitFor uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`
 }
