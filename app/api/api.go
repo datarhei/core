@@ -968,7 +968,7 @@ func (a *api) start() error {
 			}
 
 			u := &url.URL{
-				Scheme: "rtmp:",
+				Scheme: "rtmp",
 				Host:   host + ":" + port,
 				Path:   "/",
 			}
@@ -1011,7 +1011,7 @@ func (a *api) start() error {
 			}
 
 			u := srturl.URL{
-				Scheme: "srt:",
+				Scheme: "srt",
 				Host:   host + ":" + port,
 			}
 
@@ -1023,6 +1023,8 @@ func (a *api) start() error {
 			if len(cfg.SRT.Passphrase) != 0 {
 				options.Set("passphrase", cfg.SRT.Passphrase)
 			}
+
+			u.Options = options
 
 			streamid := srturl.StreamInfo{}
 
@@ -1051,6 +1053,8 @@ func (a *api) start() error {
 			if identity != nil {
 				streamid.Token = identity.GetServiceToken()
 			}
+
+			u.StreamId = streamid.String()
 
 			return u.String()
 		}, map[string]string{
