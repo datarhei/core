@@ -40,6 +40,8 @@ func (m *manager) apply(op store.Operation) {
 	switch op {
 	case store.OpAddIdentity:
 		m.ReloadIndentities()
+	case store.OpUpdateIdentity:
+		m.ReloadIndentities()
 	case store.OpRemoveIdentity:
 		m.ReloadIndentities()
 	case store.OpSetPolicies:
