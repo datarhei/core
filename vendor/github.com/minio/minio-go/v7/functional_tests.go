@@ -2539,13 +2539,13 @@ func testTrailingChecksums() {
 		test.ChecksumCRC32C = hashMultiPart(b, int(test.PO.PartSize), test.hasher)
 
 		// Set correct CRC.
-		c.TraceOn(os.Stdout)
+		// c.TraceOn(os.Stderr)
 		resp, err := c.PutObject(context.Background(), bucketName, objectName, bytes.NewReader(b), int64(bufSize), test.PO)
 		if err != nil {
 			logError(testName, function, args, startTime, "", "PutObject failed", err)
 			return
 		}
-		c.TraceOff()
+		// c.TraceOff()
 		cmpChecksum(resp.ChecksumSHA256, test.ChecksumSHA256)
 		cmpChecksum(resp.ChecksumSHA1, test.ChecksumSHA1)
 		cmpChecksum(resp.ChecksumCRC32, test.ChecksumCRC32)
@@ -2655,8 +2655,8 @@ func testPutObjectWithAutomaticChecksums() {
 	}
 
 	// Enable tracing, write to stderr.
-	c.TraceOn(os.Stderr)
-	defer c.TraceOff()
+	// c.TraceOn(os.Stderr)
+	// defer c.TraceOff()
 
 	for i, test := range tests {
 		bufSize := dataFileMap["datafile-10-kB"]
@@ -4821,6 +4821,11 @@ func testPresignedPostPolicy() {
 	policy.SetContentType("binary/octet-stream")
 	policy.SetContentLengthRange(10, 1024*1024)
 	policy.SetUserMetadata(metadataKey, metadataValue)
+
+	// Add CRC32C
+	checksum := minio.ChecksumCRC32C.ChecksumBytes(buf)
+	policy.SetChecksum(checksum)
+
 	args["policy"] = policy.String()
 
 	presignedPostPolicyURL, formData, err := c.PresignedPostPolicy(context.Background(), policy)
@@ -4888,6 +4893,7 @@ func testPresignedPostPolicy() {
 		Timeout:   30 * time.Second,
 		Transport: transport,
 	}
+	args["url"] = presignedPostPolicyURL.String()
 
 	req, err := http.NewRequest(http.MethodPost, presignedPostPolicyURL.String(), bytes.NewReader(formBuf.Bytes()))
 	if err != nil {
@@ -4920,13 +4926,21 @@ func testPresignedPostPolicy() {
 	expectedLocation := scheme + os.Getenv(serverEndpoint) + "/" + bucketName + "/" + objectName
 	expectedLocationBucketDNS := scheme + bucketName + "." + os.Getenv(serverEndpoint) + "/" + objectName
 
-	if val, ok := res.Header["Location"]; ok {
-		if val[0] != expectedLocation && val[0] != expectedLocationBucketDNS {
-			logError(testName, function, args, startTime, "", "Location in header response is incorrect", err)
+	if !strings.Contains(expectedLocation, "s3.amazonaws.com/") {
+		// Test when not against AWS S3.
+		if val, ok := res.Header["Location"]; ok {
+			if val[0] != expectedLocation && val[0] != expectedLocationBucketDNS {
+				logError(testName, function, args, startTime, "", fmt.Sprintf("Location in header response is incorrect. Want %q or %q, got %q", expectedLocation, expectedLocationBucketDNS, val[0]), err)
+				return
+			}
+		} else {
+			logError(testName, function, args, startTime, "", "Location not found in header response", err)
 			return
 		}
-	} else {
-		logError(testName, function, args, startTime, "", "Location not found in header response", err)
+	}
+	want := checksum.Encoded()
+	if got := res.Header.Get("X-Amz-Checksum-Crc32c"); got != want {
+		logError(testName, function, args, startTime, "", fmt.Sprintf("Want checksum %q, got %q", want, got), nil)
 		return
 	}
 

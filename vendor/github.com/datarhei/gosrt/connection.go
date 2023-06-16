@@ -633,69 +633,71 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 				c.handleKMResponse(p)
 			}
 		}
+
+		return
+	}
+
+	if header.PacketSequenceNumber.Gt(c.debug.expectedRcvPacketSequenceNumber) {
+		c.log("connection:error", func() string {
+			return fmt.Sprintf("recv lost packets. got: %d, expected: %d (%d)\n", header.PacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Distance(header.PacketSequenceNumber))
+		})
+	}
+
+	c.debug.expectedRcvPacketSequenceNumber = header.PacketSequenceNumber.Inc()
+
+	//fmt.Printf("%s\n", p.String())
+
+	// Ignore FEC filter control packets
+	// https://github.com/Haivision/srt/blob/master/docs/features/packet-filtering-and-fec.md
+	// "An FEC control packet is distinguished from a regular data packet by having
+	// its message number equal to 0. This value isn't normally used in SRT (message
+	// numbers start from 1, increment to a maximum, and then roll back to 1)."
+	if header.MessageNumber == 0 {
+		c.log("connection:filter", func() string { return "dropped FEC filter control packet" })
+		return
+	}
+
+	// 4.5.1.1.  TSBPD Time Base Calculation
+	if !c.tsbpdWrapPeriod {
+		if header.Timestamp > packet.MAX_TIMESTAMP-(30*1000000) {
+			c.tsbpdWrapPeriod = true
+			c.log("connection:tsbpd", func() string { return "TSBPD wrapping period started" })
+		}
 	} else {
-		if header.PacketSequenceNumber.Gt(c.debug.expectedRcvPacketSequenceNumber) {
-			c.log("connection:error", func() string {
-				return fmt.Sprintf("recv lost packets. got: %d, expected: %d (%d)\n", header.PacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Distance(header.PacketSequenceNumber))
-			})
+		if header.Timestamp >= (30*1000000) && header.Timestamp <= (60*1000000) {
+			c.tsbpdWrapPeriod = false
+			c.tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
+			c.log("connection:tsbpd", func() string { return "TSBPD wrapping period finished" })
 		}
+	}
 
-		c.debug.expectedRcvPacketSequenceNumber = header.PacketSequenceNumber.Inc()
-
-		//fmt.Printf("%s\n", p.String())
-
-		// Ignore FEC filter control packets
-		// https://github.com/Haivision/srt/blob/master/docs/features/packet-filtering-and-fec.md
-		// "An FEC control packet is distinguished from a regular data packet by having
-		// its message number equal to 0. This value isn't normally used in SRT (message
-		// numbers start from 1, increment to a maximum, and then roll back to 1)."
-		if header.MessageNumber == 0 {
-			c.log("connection:filter", func() string { return "dropped FEC filter control packet" })
-			return
+	tsbpdTimeBaseOffset := c.tsbpdTimeBaseOffset
+	if c.tsbpdWrapPeriod {
+		if header.Timestamp < (30 * 1000000) {
+			tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
 		}
+	}
 
-		// 4.5.1.1.  TSBPD Time Base Calculation
-		if !c.tsbpdWrapPeriod {
-			if header.Timestamp > packet.MAX_TIMESTAMP-(30*1000000) {
-				c.tsbpdWrapPeriod = true
-				c.log("connection:tsbpd", func() string { return "TSBPD wrapping period started" })
-			}
-		} else {
-			if header.Timestamp >= (30*1000000) && header.Timestamp <= (60*1000000) {
-				c.tsbpdWrapPeriod = false
-				c.tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
-				c.log("connection:tsbpd", func() string { return "TSBPD wrapping period finished" })
-			}
-		}
+	header.PktTsbpdTime = c.tsbpdTimeBase + tsbpdTimeBaseOffset + uint64(header.Timestamp) + c.tsbpdDelay + c.tsbpdDrift
 
-		tsbpdTimeBaseOffset := c.tsbpdTimeBaseOffset
-		if c.tsbpdWrapPeriod {
-			if header.Timestamp < (30 * 1000000) {
-				tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
-			}
-		}
+	c.log("data:recv:dump", func() string { return p.Dump() })
 
-		header.PktTsbpdTime = c.tsbpdTimeBase + tsbpdTimeBaseOffset + uint64(header.Timestamp) + c.tsbpdDelay + c.tsbpdDrift
-
-		c.log("data:recv:dump", func() string { return p.Dump() })
-
-		c.cryptoLock.Lock()
-		if c.crypto != nil {
-			if header.KeyBaseEncryptionFlag != 0 {
-				if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
-					c.statistics.pktRecvUndecrypt++
-					c.statistics.byteRecvUndecrypt += p.Len()
-				}
-			} else {
+	c.cryptoLock.Lock()
+	if c.crypto != nil {
+		if header.KeyBaseEncryptionFlag != 0 {
+			if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
 				c.statistics.pktRecvUndecrypt++
 				c.statistics.byteRecvUndecrypt += p.Len()
 			}
+		} else {
+			c.statistics.pktRecvUndecrypt++
+			c.statistics.byteRecvUndecrypt += p.Len()
 		}
-		c.cryptoLock.Unlock()
-
-		// Put the packet into receive congestion control
-		c.recv.Push(p)
 	}
+	c.cryptoLock.Unlock()
+
+	// Put the packet into receive congestion control
+	c.recv.Push(p)
 }
 
 // handleKeepAlive resets the idle timeout and sends a keepalive to the peer.

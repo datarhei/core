@@ -25,10 +25,13 @@ var expressions = map[string]string{
 	"@10minutes": "*/10 * * * *",
 	"@15minutes": "*/15 * * * *",
 	"@30minutes": "0,30 * * * *",
+
+	"@everysecond": "* * * * * *",
 }
 
 // SpaceRe is regex for whitespace.
 var SpaceRe = regexp.MustCompile(`\s+`)
+var yearRe = regexp.MustCompile(`\d{4}`)
 
 func normalize(expr string) []string {
 	expr = strings.Trim(expr, " \t")
@@ -55,11 +58,8 @@ func New() Gronx {
 // IsDue checks if cron expression is due for given reference time (or now).
 // It returns bool or error if any.
 func (g *Gronx) IsDue(expr string, ref ...time.Time) (bool, error) {
-	if len(ref) > 0 {
-		g.C.SetRef(ref[0])
-	} else {
-		g.C.SetRef(time.Now())
-	}
+	ref = append(ref, time.Now())
+	g.C.SetRef(ref[0])
 
 	segs, err := Segments(expr)
 	if err != nil {
@@ -69,12 +69,25 @@ func (g *Gronx) IsDue(expr string, ref ...time.Time) (bool, error) {
 	return g.SegmentsDue(segs)
 }
 
+func (g *Gronx) isDue(expr string, ref time.Time) bool {
+	due, err := g.IsDue(expr, ref)
+	return err == nil && due
+}
+
 // Segments splits expr into array array of cron parts.
+// If expression contains 5 parts or 6th part is year like, it prepends a second.
 // It returns array or error.
 func Segments(expr string) ([]string, error) {
 	segs := normalize(expr)
-	if len(segs) < 5 || len(segs) > 6 {
-		return []string{}, errors.New("expr should contain 5-6 segments separated by space")
+	slen := len(segs)
+	if slen < 5 || slen > 7 {
+		return []string{}, errors.New("expr should contain 5-7 segments separated by space")
+	}
+
+	// Prepend second if required
+	prepend := slen == 5 || (slen == 6 && yearRe.MatchString(segs[5]))
+	if prepend {
+		segs = append([]string{"0"}, segs...)
 	}
 
 	return segs, nil
@@ -82,8 +95,8 @@ func Segments(expr string) ([]string, error) {
 
 // SegmentsDue checks if all cron parts are due.
 // It returns bool. You should use IsDue(expr) instead.
-func (g *Gronx) SegmentsDue(segments []string) (bool, error) {
-	for pos, seg := range segments {
+func (g *Gronx) SegmentsDue(segs []string) (bool, error) {
+	for pos, seg := range segs {
 		if seg == "*" || seg == "?" {
 			continue
 		}
@@ -99,7 +112,17 @@ func (g *Gronx) SegmentsDue(segments []string) (bool, error) {
 // IsValid checks if cron expression is valid.
 // It returns bool.
 func (g *Gronx) IsValid(expr string) bool {
-	_, err := g.IsDue(expr)
+	segs, err := Segments(expr)
+	if err != nil {
+		return false
+	}
 
-	return err == nil
+	g.C.SetRef(time.Now())
+	for pos, seg := range segs {
+		if _, err := g.C.CheckDue(seg, pos); err != nil {
+			return false
+		}
+	}
+
+	return true
 }

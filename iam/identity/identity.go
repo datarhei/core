@@ -50,7 +50,7 @@ func (u *User) validate() error {
 		return fmt.Errorf("a name is required")
 	}
 
-	chars := `A-Za-z0-9:_-`
+	chars := `A-Za-z0-9._-`
 
 	re := regexp.MustCompile(`[^` + chars + `]`)
 	if re.MatchString(u.Name) {

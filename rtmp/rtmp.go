@@ -196,13 +196,13 @@ func (s *server) Channels() []string {
 	return channels
 }
 
-func (s *server) log(who, what, action, path, message string, client net.Addr) {
+func (s *server) log(who, handler, action, resource, message string, client net.Addr) {
 	s.logger.Info().WithFields(log.Fields{
-		"who":    who,
-		"what":   what,
-		"action": action,
-		"path":   path,
-		"client": client.String(),
+		"who":      who,
+		"handler":  handler,
+		"action":   action,
+		"resource": resource,
+		"client":   client.String(),
 	}).Log(message)
 }
 
@@ -258,7 +258,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 	identity, err := s.findIdentityFromStreamKey(token)
 	if err != nil {
 		s.logger.Debug().WithError(err).Log("invalid streamkey")
-		s.log(identity, "PLAY", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
+		s.log("", "PLAY", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
 		return
 	}
 
@@ -476,13 +476,13 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 
 	var token string
 
-	elements := strings.Split(key, ":")
-	if len(elements) == 1 {
+	before, after, found := strings.Cut(key, ":")
+	if !found {
 		identity = s.iam.GetDefaultVerifier()
-		token = elements[0]
+		token = before
 	} else {
-		identity, err = s.iam.GetVerifier(elements[0])
-		token = elements[1]
+		identity, err = s.iam.GetVerifier(before)
+		token = after
 	}
 
 	if err != nil {
@@ -490,7 +490,13 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 	}
 
 	if ok, err := identity.VerifyServiceToken(token); !ok {
-		return "$anon", fmt.Errorf("invalid token: %w", err)
+		if err != nil {
+			err = fmt.Errorf("invalid token: %w", err)
+		} else {
+			err = fmt.Errorf("invalid token")
+		}
+
+		return "$anon", err
 	}
 
 	return identity.Name(), nil

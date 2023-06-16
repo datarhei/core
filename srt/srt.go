@@ -268,10 +268,11 @@ func (s *server) srtlogListener(ctx context.Context) {
 	}
 }
 
-func (s *server) log(handler, action, resource, message string, client net.Addr) {
+func (s *server) log(who, handler, action, resource, message string, client net.Addr) {
 	s.logger.Info().WithFields(log.Fields{
+		"who":      who,
 		"handler":  handler,
-		"status":   action,
+		"action":   action,
 		"resource": resource,
 		"client":   client.String(),
 	}).Log(message)
@@ -282,14 +283,19 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	client := req.RemoteAddr()
 	streamId := req.StreamId()
 
+	if req.Version() != 5 {
+		s.log("", "CONNECT", "INVALID", streamId, "unsupported version", client)
+		return srt.REJECT
+	}
+
 	si, err := url.ParseStreamId(streamId)
 	if err != nil {
-		s.log("CONNECT", "INVALID", "", err.Error(), client)
+		s.log("", "CONNECT", "INVALID", streamId, err.Error(), client)
 		return srt.REJECT
 	}
 
 	if len(si.Resource) == 0 {
-		s.log("CONNECT", "INVALID", "", "stream resource not provided", client)
+		s.log("", "CONNECT", "INVALID", streamId, "stream resource not provided", client)
 		return srt.REJECT
 	}
 
@@ -298,23 +304,23 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	} else if si.Mode == "request" {
 		mode = srt.SUBSCRIBE
 	} else {
-		s.log("CONNECT", "INVALID", si.Resource, "invalid connection mode", client)
+		s.log("", "CONNECT", "INVALID", si.Resource, "invalid connection mode", client)
 		return srt.REJECT
 	}
 
 	if len(s.passphrase) != 0 {
 		if !req.IsEncrypted() {
-			s.log("CONNECT", "FORBIDDEN", si.Resource, "connection has to be encrypted", client)
+			s.log("", "CONNECT", "FORBIDDEN", si.Resource, "connection has to be encrypted", client)
 			return srt.REJECT
 		}
 
 		if err := req.SetPassphrase(s.passphrase); err != nil {
-			s.log("CONNECT", "FORBIDDEN", si.Resource, err.Error(), client)
+			s.log("", "CONNECT", "FORBIDDEN", si.Resource, err.Error(), client)
 			return srt.REJECT
 		}
 	} else {
 		if req.IsEncrypted() {
-			s.log("CONNECT", "INVALID", si.Resource, "connection must not be encrypted", client)
+			s.log("", "CONNECT", "INVALID", si.Resource, "connection must not be encrypted", client)
 			return srt.REJECT
 		}
 	}
@@ -322,7 +328,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	identity, err := s.findIdentityFromToken(si.Token)
 	if err != nil {
 		s.logger.Debug().WithError(err).Log("invalid token")
-		s.log("CONNECT", "FORBIDDEN", si.Resource, "invalid token", client)
+		s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "invalid token", client)
 		return srt.REJECT
 	}
 
@@ -334,7 +340,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	}
 
 	if !s.iam.Enforce(identity, domain, resource, action) {
-		s.log("CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
+		s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
 		return srt.REJECT
 	}
 
@@ -350,6 +356,7 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	client := conn.RemoteAddr()
 
 	si, _ := url.ParseStreamId(streamId)
+	identity, _ := s.findIdentityFromToken(si.Token)
 
 	// Look for the stream
 	s.lock.Lock()
@@ -363,15 +370,15 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	s.lock.Unlock()
 
 	if ch == nil {
-		s.log("PUBLISH", "CONFLICT", si.Resource, "already publishing", client)
+		s.log(identity, "PUBLISH", "CONFLICT", si.Resource, "already publishing", client)
 		conn.Close()
 		return fmt.Errorf("already publishing this resource")
 	}
 
-	s.log("PUBLISH", "START", si.Resource, "", client)
+	s.log(identity, "PUBLISH", "START", si.Resource, "", client)
 
 	// Blocks until connection closes
-	ch.pubsub.Publish(conn)
+	err := ch.pubsub.Publish(conn)
 
 	s.lock.Lock()
 	delete(s.channels, si.Resource)
@@ -379,7 +386,7 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 
 	ch.Close()
 
-	s.log("PUBLISH", "STOP", si.Resource, "", client)
+	s.log(identity, "PUBLISH", "STOP", si.Resource, err.Error(), client)
 
 	conn.Close()
 
@@ -393,6 +400,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 	client := conn.RemoteAddr()
 
 	si, _ := url.ParseStreamId(streamId)
+	identity, _ := s.findIdentityFromToken(si.Token)
 
 	// Look for the stream locally
 	s.lock.RLock()
@@ -403,7 +411,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		// Check in the cluster for the stream and proxy it
 		srturl, err := s.proxy.GetURL("srt", si.Resource)
 		if err != nil {
-			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
 
@@ -412,16 +420,16 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		config := srt.DefaultConfig()
 		config.StreamId = streamId
 		config.Latency = 200 * time.Millisecond // This might be a value obtained from the cluster
-		host, err := config.UnmarshalURL(peerurl)
+		host, port, err := config.UnmarshalURL(peerurl)
 		if err != nil {
 			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Parsing proxy address failed")
-			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
-		src, err := srt.Dial("srt", host, config)
+		src, err := srt.Dial("srt", host+":"+port, config)
 		if err != nil {
 			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Proxying address failed")
-			s.log("SUBSCRIBE", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
 
@@ -429,13 +437,13 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		wg.Add(1)
 
 		go func() {
-			s.log("SUBSCRIBE", "PROXYSTART", peerurl, "", client)
+			s.log(identity, "PLAY", "PROXYSTART", peerurl, "", client)
 			wg.Done()
 			err := s.publish(src, true)
 			if err != nil {
 				s.logger.Error().WithField("address", srturl).WithError(err).Log("Proxying address failed")
 			}
-			s.log("SUBSCRIBE", "PROXYPUBLISHSTOP", peerurl, "", client)
+			s.log(identity, "PLAY", "PROXYSTOP", peerurl, "", client)
 		}()
 
 		// Wait for the goroutine to start
@@ -463,14 +471,14 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 	}
 
 	if ch != nil {
-		s.log("SUBSCRIBE", "START", si.Resource, "", client)
+		s.log(identity, "PLAY", "START", si.Resource, "", client)
 
 		id := ch.AddSubscriber(conn, si.Resource)
 
 		// Blocks until connection closes
-		ch.pubsub.Subscribe(conn)
+		err := ch.pubsub.Subscribe(conn)
 
-		s.log("SUBSCRIBE", "STOP", si.Resource, "", client)
+		s.log(identity, "PLAY", "STOP", si.Resource, err.Error(), client)
 
 		ch.RemoveSubscriber(id)
 	}
@@ -486,13 +494,13 @@ func (s *server) findIdentityFromToken(key string) (string, error) {
 
 	var token string
 
-	elements := strings.Split(key, ":")
-	if len(elements) == 1 {
+	before, after, found := strings.Cut(key, ":")
+	if !found {
 		identity = s.iam.GetDefaultVerifier()
-		token = elements[0]
+		token = before
 	} else {
-		identity, err = s.iam.GetVerifier(elements[0])
-		token = elements[1]
+		identity, err = s.iam.GetVerifier(before)
+		token = after
 	}
 
 	if err != nil {
@@ -500,7 +508,13 @@ func (s *server) findIdentityFromToken(key string) (string, error) {
 	}
 
 	if ok, err := identity.VerifyServiceToken(token); !ok {
-		return "$anon", fmt.Errorf("invalid token: %w", err)
+		if err != nil {
+			err = fmt.Errorf("invalid token: %w", err)
+		} else {
+			err = fmt.Errorf("invalid token")
+		}
+
+		return "$anon", err
 	}
 
 	return identity.Name(), nil

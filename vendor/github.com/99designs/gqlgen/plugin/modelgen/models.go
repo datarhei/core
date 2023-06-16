@@ -374,7 +374,7 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 			GoName:      name,
 			Type:        typ,
 			Description: field.Description,
-			Tag:         getStructTagFromField(field),
+			Tag:         getStructTagFromField(cfg, field),
 			Omittable:   cfg.NullableInputOmittable && schemaType.Kind == ast.InputObject && !field.Type.NonNull,
 		}
 
@@ -409,11 +409,40 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 		fields = append(fields, f)
 	}
 
+	// appending extra fields at the end of the fields list.
+	modelcfg := cfg.Models[schemaType.Name]
+	if len(modelcfg.ExtraFields) > 0 {
+		ff := make([]*Field, 0, len(modelcfg.ExtraFields))
+		for fname, fspec := range modelcfg.ExtraFields {
+			ftype := buildType(fspec.Type)
+
+			tag := `json:"-"`
+			if fspec.OverrideTags != "" {
+				tag = fspec.OverrideTags
+			}
+
+			ff = append(ff,
+				&Field{
+					Name:        fname,
+					GoName:      fname,
+					Type:        ftype,
+					Description: fspec.Description,
+					Tag:         tag,
+				})
+		}
+
+		sort.Slice(ff, func(i, j int) bool {
+			return ff[i].Name < ff[j].Name
+		})
+
+		fields = append(fields, ff...)
+	}
+
 	return fields, nil
 }
 
-func getStructTagFromField(field *ast.FieldDefinition) string {
-	if !field.Type.NonNull {
+func getStructTagFromField(cfg *config.Config, field *ast.FieldDefinition) string {
+	if !field.Type.NonNull && (cfg.EnableModelJsonOmitemptyTag == nil || *cfg.EnableModelJsonOmitemptyTag) {
 		return `json:"` + field.Name + `,omitempty"`
 	}
 	return `json:"` + field.Name + `"`
