@@ -57,7 +57,7 @@ github.com/boltdb/bolt
 # github.com/caddyserver/certmagic v0.18.0
 ## explicit; go 1.19
 github.com/caddyserver/certmagic
-# github.com/casbin/casbin/v2 v2.71.0
+# github.com/casbin/casbin/v2 v2.71.1
 ## explicit; go 1.13
 github.com/casbin/casbin/v2
 github.com/casbin/casbin/v2/config
@@ -82,7 +82,7 @@ github.com/cpuguy83/go-md2man/v2/md2man
 ## explicit; go 1.18
 github.com/datarhei/core-client-go/v16
 github.com/datarhei/core-client-go/v16/api
-# github.com/datarhei/gosrt v0.5.0
+# github.com/datarhei/gosrt v0.5.2
 ## explicit; go 1.18
 github.com/datarhei/gosrt
 github.com/datarhei/gosrt/internal/circular
@@ -327,7 +327,7 @@ github.com/prometheus/client_model/go
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.10.1
+# github.com/prometheus/procfs v0.11.0
 ## explicit; go 1.19
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs

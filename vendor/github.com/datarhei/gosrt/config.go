@@ -217,18 +217,19 @@ func DefaultConfig() Config {
 }
 
 // UnmarshalURL takes a SRT URL and parses out the configuration. A SRT URL is
-// srt://[host]:[port]?[key1]=[value1]&[key2]=[value2]...
-func (c *Config) UnmarshalURL(addr string) (string, string, error) {
-	u, err := url.Parse(addr)
+// srt://[host]:[port]?[key1]=[value1]&[key2]=[value2]... It returns the host:port
+// of the URL.
+func (c *Config) UnmarshalURL(srturl string) (string, error) {
+	u, err := url.Parse(srturl)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
 	if u.Scheme != "srt" {
-		return "", "", fmt.Errorf("the URL doesn't seem to be an srt:// URL")
+		return "", fmt.Errorf("the URL doesn't seem to be an srt:// URL")
 	}
 
-	return u.Hostname(), u.Port(), c.UnmarshalQuery(u.RawQuery)
+	return u.Host, c.UnmarshalQuery(u.RawQuery)
 }
 
 // UnmarshalQuery parses a query string and interprets it as a configuration
@@ -471,9 +472,9 @@ func (c *Config) UnmarshalQuery(query string) error {
 	return nil
 }
 
-// MarshalURL returns the SRT URL for this config and the given host and port.
-func (c *Config) MarshalURL(host string, port uint) string {
-	return "srt://" + host + ":" + strconv.FormatUint(uint64(port), 10) + "?" + c.MarshalQuery()
+// MarshalURL returns the SRT URL for this config and the given address (host:port).
+func (c *Config) MarshalURL(address string) string {
+	return "srt://" + address + "?" + c.MarshalQuery()
 }
 
 // MarshalQuery returns the corresponding query string for a configuration.

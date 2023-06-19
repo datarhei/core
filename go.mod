@@ -8,9 +8,9 @@ require (
 	github.com/adhocore/gronx v1.6.3
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.18.0
-	github.com/casbin/casbin/v2 v2.71.0
+	github.com/casbin/casbin/v2 v2.71.1
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230614141756-a25a5fc3c60e
-	github.com/datarhei/gosrt v0.5.0
+	github.com/datarhei/gosrt v0.5.2
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.14.1
@@ -95,7 +95,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/prometheus/procfs v0.11.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect

@@ -420,13 +420,14 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		config := srt.DefaultConfig()
 		config.StreamId = streamId
 		config.Latency = 200 * time.Millisecond // This might be a value obtained from the cluster
-		host, port, err := config.UnmarshalURL(peerurl)
+		address, err := config.UnmarshalURL(peerurl)
+		peerurl = config.MarshalURL(address)
 		if err != nil {
 			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Parsing proxy address failed")
 			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return
 		}
-		src, err := srt.Dial("srt", host+":"+port, config)
+		src, err := srt.Dial("srt", address, config)
 		if err != nil {
 			s.logger.Error().WithField("address", peerurl).WithError(err).Log("Proxying address failed")
 			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
