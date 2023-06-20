@@ -40,7 +40,7 @@ func New(config iam.Config, store store.Store) (iam.IAM, error) {
 }
 
 func (m *manager) apply(op store.Operation) {
-	m.logger.Debug().WithField("operation", string(op)).Log("")
+	m.logger.Debug().WithField("operation", string(op)).Log("Applying action on operation")
 	switch op {
 	case store.OpAddIdentity:
 		m.ReloadIndentities()
