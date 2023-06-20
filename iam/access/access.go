@@ -27,8 +27,8 @@ type Manager interface {
 	Enforcer
 
 	HasPolicy(name, domain, resource string, actions []string) bool
-	AddPolicy(name, domain, resource string, actions []string) bool
-	RemovePolicy(name, domain, resource string, actions []string) bool
+	AddPolicy(name, domain, resource string, actions []string) error
+	RemovePolicy(name, domain, resource string, actions []string) error
 	ListPolicies(name, domain, resource string, actions []string) []Policy
 	ReloadPolicies() error
 }
@@ -83,23 +83,23 @@ func (am *access) HasPolicy(name, domain, resource string, actions []string) boo
 	return am.enforcer.HasPolicy(policy)
 }
 
-func (am *access) AddPolicy(name, domain, resource string, actions []string) bool {
+func (am *access) AddPolicy(name, domain, resource string, actions []string) error {
 	policy := []string{name, domain, resource, strings.Join(actions, "|")}
 
 	if am.enforcer.HasPolicy(policy) {
-		return true
+		return nil
 	}
 
-	ok, _ := am.enforcer.AddPolicy(policy)
+	_, err := am.enforcer.AddPolicy(policy)
 
-	return ok
+	return err
 }
 
-func (am *access) RemovePolicy(name, domain, resource string, actions []string) bool {
+func (am *access) RemovePolicy(name, domain, resource string, actions []string) error {
 	policies := am.enforcer.GetFilteredPolicy(0, name, domain, resource, strings.Join(actions, "|"))
-	am.enforcer.RemovePolicies(policies)
+	_, err := am.enforcer.RemovePolicies(policies)
 
-	return true
+	return err
 }
 
 func (am *access) ListPolicies(name, domain, resource string, actions []string) []Policy {

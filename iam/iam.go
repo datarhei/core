@@ -17,8 +17,8 @@ type IAM interface {
 	ListDomains() []string
 
 	HasPolicy(name, domain, resource string, actions []string) bool
-	AddPolicy(name, domain, resource string, actions []string) bool
-	RemovePolicy(name, domain, resource string, actions []string) bool
+	AddPolicy(name, domain, resource string, actions []string) error
+	RemovePolicy(name, domain, resource string, actions []string) error
 	ListPolicies(name, domain, resource string, actions []string) []access.Policy
 	ReloadPolicies() error
 
@@ -206,7 +206,7 @@ func (i *iam) HasPolicy(name, domain, resource string, actions []string) bool {
 	return i.am.HasPolicy(name, domain, resource, actions)
 }
 
-func (i *iam) AddPolicy(name, domain, resource string, actions []string) bool {
+func (i *iam) AddPolicy(name, domain, resource string, actions []string) error {
 	if len(name) == 0 {
 		name = "$anon"
 	}
@@ -218,7 +218,7 @@ func (i *iam) AddPolicy(name, domain, resource string, actions []string) bool {
 	return i.am.AddPolicy(name, domain, resource, actions)
 }
 
-func (i *iam) RemovePolicy(name, domain, resource string, actions []string) bool {
+func (i *iam) RemovePolicy(name, domain, resource string, actions []string) error {
 	return i.am.RemovePolicy(name, domain, resource, actions)
 }
 

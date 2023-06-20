@@ -109,13 +109,14 @@ func (h *IAMHandler) RemoveIdentity(c echo.Context) error {
 	}
 
 	// Remove the user
-	err = h.iam.DeleteIdentity(name)
-	if err != nil {
+	if err := h.iam.DeleteIdentity(name); err != nil {
 		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
 	}
 
 	// Remove all policies of that user
-	h.iam.RemovePolicy(name, "", "", nil)
+	if err := h.iam.RemovePolicy(name, "", "", nil); err != nil {
+		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
@@ -189,11 +190,13 @@ func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 	if name != "$anon" {
 		err = h.iam.UpdateIdentity(name, iamuser)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 		}
 	}
 
-	h.iam.RemovePolicy(name, "", "", nil)
+	if err := h.iam.RemovePolicy(name, "", "", nil); err != nil {
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	}
 
 	for _, p := range iampolicies {
 		h.iam.AddPolicy(p.Name, p.Domain, p.Resource, p.Actions)
@@ -226,7 +229,7 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -235,7 +238,7 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -246,27 +249,29 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	policies := []api.IAMPolicy{}
 
 	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err.Error())
 	}
 
 	for _, p := range policies {
 		err := c.Validate(p)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err.Error())
 		}
 	}
 
 	for _, p := range policies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can modify superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can modify superusers")
 	}
 
-	h.iam.RemovePolicy(name, "", "", nil)
+	if err := h.iam.RemovePolicy(name, "", "", nil); err != nil {
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	}
 
 	for _, p := range policies {
 		h.iam.AddPolicy(iamuser.Name, p.Domain, p.Resource, p.Actions)

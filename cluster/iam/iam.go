@@ -1,12 +1,16 @@
 package iam
 
 import (
+	"errors"
+
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 )
+
+var ErrClusterMode = errors.New("not available in cluster mode")
 
 type manager struct {
 	iam    iam.IAM
@@ -65,12 +69,12 @@ func (m *manager) HasPolicy(name, domain, resource string, actions []string) boo
 	return m.iam.HasPolicy(name, domain, resource, actions)
 }
 
-func (m *manager) AddPolicy(name, domain, resource string, actions []string) bool {
-	return true
+func (m *manager) AddPolicy(name, domain, resource string, actions []string) error {
+	return ErrClusterMode
 }
 
-func (m *manager) RemovePolicy(name, domain, resource string, actions []string) bool {
-	return true
+func (m *manager) RemovePolicy(name, domain, resource string, actions []string) error {
+	return ErrClusterMode
 }
 
 func (m *manager) ListPolicies(name, domain, resource string, actions []string) []access.Policy {
@@ -87,7 +91,7 @@ func (m *manager) Validators() []string {
 }
 
 func (m *manager) CreateIdentity(u identity.User) error {
-	return nil
+	return ErrClusterMode
 }
 
 func (m *manager) GetIdentity(name string) (identity.User, error) {
@@ -95,11 +99,11 @@ func (m *manager) GetIdentity(name string) (identity.User, error) {
 }
 
 func (m *manager) UpdateIdentity(name string, u identity.User) error {
-	return nil
+	return ErrClusterMode
 }
 
 func (m *manager) DeleteIdentity(name string) error {
-	return nil
+	return ErrClusterMode
 }
 
 func (m *manager) ListIdentities() []identity.User {
