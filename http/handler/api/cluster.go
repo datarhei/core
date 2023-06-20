@@ -812,7 +812,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 
 	err = h.cluster.SetPolicies("", name, accessPolicies)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "set policies: %w", err)
+		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, policies)

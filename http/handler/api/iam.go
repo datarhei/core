@@ -32,6 +32,7 @@ func NewIAM(iam iam.IAM) *IAMHandler {
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user [post]
@@ -83,6 +84,7 @@ func (h *IAMHandler) AddIdentity(c echo.Context) error {
 // @Param name path string true "Username"
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {string} string
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
@@ -130,6 +132,7 @@ func (h *IAMHandler) RemoveIdentity(c echo.Context) error {
 // @Param user body api.IAMUser true "User definition"
 // @Success 200 {object} api.IAMUser
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
@@ -211,6 +214,7 @@ func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 // @Param user body []api.IAMPolicy true "Policy definitions"
 // @Success 200 {array} api.IAMPolicy
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
@@ -271,6 +275,50 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	return c.JSON(http.StatusOK, policies)
 }
 
+// ListIdentities returns the list of identities stored in IAM
+// @Summary List of identities in IAM
+// @Description List of identities in IAM
+// @Tags v16.?.?
+// @ID iam-3-list-identities
+// @Produce json
+// @Success 200 {array} api.IAMUser
+// @Security ApiKeyAuth
+// @Router /api/v3/iam/user [get]
+func (h *IAMHandler) ListIdentities(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "$none")
+
+	identities := h.iam.ListIdentities()
+
+	users := make([]api.IAMUser, len(identities)+1)
+
+	for i, iamuser := range identities {
+		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "read") {
+			continue
+		}
+
+		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
+			iamuser = identity.User{
+				Name: iamuser.Name,
+			}
+		}
+
+		policies := h.iam.ListPolicies(iamuser.Name, "", "", nil)
+
+		users[i].Marshal(iamuser, policies)
+	}
+
+	anon := identity.User{
+		Name: "$anon",
+	}
+
+	policies := h.iam.ListPolicies("$anon", "", "", nil)
+
+	users[len(users)-1].Marshal(anon, policies)
+
+	return c.JSON(http.StatusOK, users)
+}
+
 // GetIdentity returns the user with the given name
 // @Summary List an user by its name
 // @Description List aa user by its name
@@ -280,6 +328,7 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 // @Param name path string true "Username"
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
+// @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user/{name} [get]

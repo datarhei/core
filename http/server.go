@@ -556,11 +556,15 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 	// v3 IAM
 	if s.v3handler.iam != nil {
-		v3.POST("/iam/user", s.v3handler.iam.AddIdentity)
+		v3.GET("/iam/user", s.v3handler.iam.ListIdentities)
 		v3.GET("/iam/user/:name", s.v3handler.iam.GetIdentity)
-		v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateIdentity)
-		v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateIdentityPolicies)
-		v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveIdentity)
+
+		if !s.readOnly {
+			v3.POST("/iam/user", s.v3handler.iam.AddIdentity)
+			v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateIdentity)
+			v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateIdentityPolicies)
+			v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveIdentity)
+		}
 	}
 
 	// v3 Restreamer

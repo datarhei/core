@@ -3489,6 +3489,23 @@ paths:
       tags:
       - v16.7.2
   /api/v3/iam/user:
+    get:
+      description: List of identities in IAM
+      operationId: iam-3-list-identities
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.IAMUser'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List of identities in IAM
+      tags:
+      - v16.?.?
     post:
       consumes:
       - application/json
@@ -3514,6 +3531,10 @@ paths:
             $ref: '#/definitions/api.IAMUser'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "500":
@@ -3546,6 +3567,10 @@ paths:
           description: OK
           schema:
             type: string
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
           schema:
@@ -3579,6 +3604,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.IAMUser'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
           schema:
@@ -3618,6 +3647,10 @@ paths:
             $ref: '#/definitions/api.IAMUser'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
@@ -3668,6 +3701,10 @@ paths:
             type: array
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
