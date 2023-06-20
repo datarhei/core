@@ -371,9 +371,9 @@ func (fs *diskFilesystem) WriteFile(path string, data []byte) (int64, bool, erro
 
 func (fs *diskFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
 	path = fs.cleanPath(path)
-	dir, filename := filepath.Split(path)
+	_, filename := filepath.Split(path)
 
-	tmpfile, err := os.CreateTemp(dir, filename)
+	tmpfile, err := os.CreateTemp("", filename)
 	if err != nil {
 		return -1, false, err
 	}
@@ -415,6 +415,11 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 		return nil
 	}
 
+	dir, _ := filepath.Split(dst)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %s: %w", dir, err)
+	}
+
 	// First try to rename the file
 	if err := os.Rename(src, dst); err == nil {
 		return nil
@@ -445,6 +450,12 @@ func (fs *diskFilesystem) copy(src, dst string) error {
 	source, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
+	}
+
+	dir, _ := filepath.Split(dst)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		source.Close()
+		return fmt.Errorf("failed to create destination directory: %s: %w", dir, err)
 	}
 
 	destination, err := os.Create(dst)

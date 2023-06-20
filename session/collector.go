@@ -15,20 +15,20 @@ import (
 
 // Session represents an active session
 type Session struct {
-	Collector    string
-	ID           string
-	Reference    string
-	CreatedAt    time.Time
-	ClosedAt     time.Time
-	Location     string
-	Peer         string
-	Extra        map[string]interface{}
-	RxBytes      uint64
-	RxBitrate    float64 // bit/s
-	TopRxBitrate float64 // bit/s
-	TxBytes      uint64
-	TxBitrate    float64 // bit/s
-	TopTxBitrate float64 // bit/s
+	Collector    string                 `json:"collector"`
+	ID           string                 `json:"id"`
+	Reference    string                 `json:"reference"`
+	CreatedAt    time.Time              `json:"created_at"`
+	ClosedAt     time.Time              `json:"closed_at"`
+	Location     string                 `json:"local"`
+	Peer         string                 `json:"remote"`
+	Extra        map[string]interface{} `json:"extra"`
+	RxBytes      uint64                 `json:"rx_bytes"`
+	RxBitrate    float64                `json:"rx_bitrate"`     // bit/s
+	TopRxBitrate float64                `json:"rx_top_bitrate"` // bit/s
+	TxBytes      uint64                 `json:"tx_bytes"`
+	TxBitrate    float64                `json:"tx_bitrate"`     // bit/s
+	TopTxBitrate float64                `json:"tx_top_bitrate"` // bit/s
 }
 
 // Summary is a summary over all current and past sessions.

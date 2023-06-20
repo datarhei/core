@@ -198,6 +198,12 @@ func (r *registry) sessionPersister(pattern *strftime.Strftime, bufferDuration t
 	buffer := &bytes.Buffer{}
 	path := pattern.FormatString(time.Now())
 
+	file := r.persist.fs.Open(path)
+	if file != nil {
+		buffer.ReadFrom(file)
+		file.Close()
+	}
+
 	enc := json.NewEncoder(buffer)
 
 	ticker := time.NewTicker(bufferDuration)
@@ -214,9 +220,15 @@ loop:
 			if currentPath != path {
 				if buffer.Len() > 0 {
 					_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
-					r.logger.Error().WithError(err).WithField("path", path).Log("")
+					if err != nil {
+						r.logger.Error().WithError(err).WithField("path", path).Log("")
+					}
 				}
 				buffer.Reset()
+				r.logger.Info().WithFields(log.Fields{
+					"previous": path,
+					"current":  currentPath,
+				}).Log("Creating new session log file")
 				path = currentPath
 			}
 
@@ -224,11 +236,19 @@ loop:
 		case t := <-ticker.C:
 			if buffer.Len() > 0 {
 				_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
-				r.logger.Error().WithError(err).WithField("path", path).Log("")
+				if err != nil {
+					r.logger.Error().WithError(err).WithField("path", path).Log("")
+				} else {
+					r.logger.Debug().WithField("path", path).Log("Persisted session log")
+				}
 			}
 			currentPath := pattern.FormatString(t)
 			if currentPath != path {
 				buffer.Reset()
+				r.logger.Info().WithFields(log.Fields{
+					"previous": path,
+					"current":  currentPath,
+				}).Log("Creating new session log file")
 				path = currentPath
 			}
 		}
@@ -236,7 +256,12 @@ loop:
 
 	if buffer.Len() > 0 {
 		_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
-		r.logger.Error().WithError(err).WithField("path", path).Log("")
+		if err != nil {
+			r.logger.Error().WithError(err).WithField("path", path).Log("")
+		} else {
+			r.logger.Debug().WithField("path", path).Log("Persisted session log")
+		}
+		buffer.Reset()
 	}
 
 	buffer = nil
