@@ -4464,6 +4464,13 @@ const docTemplate = `{
                             "type": "integer",
                             "format": "int"
                         },
+                        "session_log_buffer_sec": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "session_log_path_pattern": {
+                            "type": "string"
+                        },
                         "session_timeout_sec": {
                             "type": "integer",
                             "format": "int"
@@ -6675,6 +6682,13 @@ const docTemplate = `{
                         "persist_interval_sec": {
                             "type": "integer",
                             "format": "int"
+                        },
+                        "session_log_buffer_sec": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "session_log_path_pattern": {
+                            "type": "string"
                         },
                         "session_timeout_sec": {
                             "type": "integer",

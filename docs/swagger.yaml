@@ -485,6 +485,11 @@ definitions:
           persist_interval_sec:
             format: int
             type: integer
+          session_log_buffer_sec:
+            format: int
+            type: integer
+          session_log_path_pattern:
+            type: string
           session_timeout_sec:
             format: int
             type: integer
@@ -2046,6 +2051,11 @@ definitions:
           persist_interval_sec:
             format: int
             type: integer
+          session_log_buffer_sec:
+            format: int
+            type: integer
+          session_log_path_pattern:
+            type: string
           session_timeout_sec:
             format: int
             type: integer
