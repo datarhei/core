@@ -1,13 +1,12 @@
 package session
 
 import (
-	"context"
 	"encoding/json"
+	"io"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 
@@ -16,10 +15,11 @@ import (
 
 // Session represents an active session
 type Session struct {
+	Collector    string
 	ID           string
 	Reference    string
 	CreatedAt    time.Time
-	ClosesAt     time.Time
+	ClosedAt     time.Time
 	Location     string
 	Peer         string
 	Extra        map[string]interface{}
@@ -167,6 +167,12 @@ type Collector interface {
 
 	// Stop stops the collector to calculate rates
 	Stop()
+
+	// Snapshot returns the current snapshot of the history
+	Snapshot() (Snapshot, error)
+
+	// Restore restores a previously made snapshot
+	Restore(snapshot io.ReadCloser) error
 }
 
 // CollectorConfig is the configuration for registering a new collector
@@ -195,11 +201,6 @@ type CollectorConfig struct {
 	// SessionTimeout is the duration of how long an idle active session is kept. A
 	// session is idle if there are no ingress or egress bytes.
 	SessionTimeout time.Duration
-
-	// PersistInterval is the duration between persisting the
-	// history. Can be 0. Then the history will only be persisted
-	// at stopping the collector.
-	PersistInterval time.Duration
 }
 
 type totals struct {
@@ -212,7 +213,7 @@ type totals struct {
 }
 
 type history struct {
-	Sessions map[string]totals `json:"sessions"` // key = `${session.location}:${session.peer}`
+	Sessions map[string]totals `json:"sessions"` // key = `${session.location}:${session.peer}:${session.reference}`
 }
 
 type collector struct {
@@ -222,6 +223,7 @@ type collector struct {
 	sessions    map[string]*session
 	sessionPool sync.Pool
 	sessionsWG  sync.WaitGroup
+	sessionsCh  chan<- Session
 
 	staleCallback func(*session)
 
@@ -241,14 +243,6 @@ type collector struct {
 
 	history history
 
-	persist struct {
-		enable   bool
-		fs       fs.Filesystem
-		path     string
-		interval time.Duration
-		done     context.CancelFunc
-	}
-
 	inactiveTimeout time.Duration
 	sessionTimeout  time.Duration
 
@@ -259,12 +253,11 @@ type collector struct {
 	lock struct {
 		session   sync.RWMutex
 		history   sync.RWMutex
-		persist   sync.Mutex
+		run       sync.Mutex
 		companion sync.RWMutex
 	}
 
-	startOnce sync.Once
-	stopOnce  sync.Once
+	running bool
 }
 
 const (
@@ -285,20 +278,21 @@ func NewCollector(config CollectorConfig) Collector {
 	return collector
 }
 
-func newCollector(id string, persistFS fs.Filesystem, logger log.Logger, config CollectorConfig) (*collector, error) {
+func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, config CollectorConfig) (*collector, error) {
 	c := &collector{
+		id:              id,
+		logger:          logger,
+		sessionsCh:      sessionsCh,
 		maxRxBitrate:    float64(config.MaxRxBitrate),
 		maxTxBitrate:    float64(config.MaxTxBitrate),
 		maxSessions:     config.MaxSessions,
 		inactiveTimeout: config.InactiveTimeout,
 		sessionTimeout:  config.SessionTimeout,
 		limiter:         config.Limiter,
-		logger:          logger,
-		id:              id,
 	}
 
 	if c.logger == nil {
-		c.logger = log.New("Session")
+		c.logger = log.New("")
 	}
 
 	if c.limiter == nil {
@@ -370,6 +364,25 @@ func newCollector(id string, persistFS fs.Filesystem, logger log.Logger, config 
 
 		c.lock.history.Unlock()
 
+		if c.sessionsCh != nil {
+			c.sessionsCh <- Session{
+				Collector:    c.id,
+				ID:           sess.id,
+				Reference:    sess.reference,
+				CreatedAt:    sess.createdAt,
+				ClosedAt:     sess.closedAt,
+				Location:     sess.location,
+				Peer:         sess.peer,
+				Extra:        sess.extra,
+				RxBytes:      sess.rxBytes,
+				RxBitrate:    sess.RxBitrate(),
+				TopRxBitrate: sess.TopRxBitrate(),
+				TxBytes:      sess.txBytes,
+				TxBitrate:    sess.TxBitrate(),
+				TopTxBitrate: sess.TopTxBitrate(),
+			}
+		}
+
 		c.sessionPool.Put(sess)
 
 		c.currentActiveSessions--
@@ -379,123 +392,107 @@ func newCollector(id string, persistFS fs.Filesystem, logger log.Logger, config 
 
 	c.history.Sessions = make(map[string]totals)
 
-	c.persist.enable = persistFS != nil
-	c.persist.fs = persistFS
-	c.persist.path = "/" + id + ".json"
-	c.persist.interval = config.PersistInterval
-
-	c.loadHistory(c.persist.fs, c.persist.path, &c.history)
-
-	c.stopOnce.Do(func() {})
-
 	c.start()
 
 	return c, nil
 }
 
 func (c *collector) start() {
-	c.startOnce.Do(func() {
-		if c.persist.enable && c.persist.interval != 0 {
-			ctx, cancel := context.WithCancel(context.Background())
-			c.persist.done = cancel
-			go c.persister(ctx, c.persist.interval)
-		}
+	c.lock.run.Lock()
+	defer c.lock.run.Unlock()
 
-		c.rxBitrate, _ = average.New(averageWindow, averageGranularity)
-		c.txBitrate, _ = average.New(averageWindow, averageGranularity)
+	if c.running {
+		return
+	}
 
-		c.stopOnce = sync.Once{}
-	})
+	c.running = true
+
+	c.rxBitrate, _ = average.New(averageWindow, averageGranularity)
+	c.txBitrate, _ = average.New(averageWindow, averageGranularity)
 }
 
 func (c *collector) Stop() {
-	c.stopOnce.Do(func() {
-		if c.persist.enable && c.persist.interval != 0 {
-			c.persist.done()
-		}
+	c.lock.run.Lock()
+	defer c.lock.run.Unlock()
 
-		c.lock.session.RLock()
-		for _, sess := range c.sessions {
-			// Cancel all current sessions
-			sess.Cancel()
-		}
-		c.lock.session.RUnlock()
-
-		// Wait for all current sessions to finish
-		c.sessionsWG.Wait()
-
-		c.Persist()
-
-		c.startOnce = sync.Once{}
-	})
-}
-
-func (c *collector) Persist() {
-	c.lock.history.RLock()
-	defer c.lock.history.RUnlock()
-
-	c.saveHistory(c.persist.fs, c.persist.path, &c.history)
-}
-
-func (c *collector) persister(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			c.Persist()
-		}
-	}
-}
-
-func (c *collector) loadHistory(fs fs.Filesystem, path string, data *history) {
-	if fs == nil {
+	if !c.running {
 		return
 	}
 
-	c.logger.WithComponent("SessionStore").WithFields(log.Fields{
-		"base": fs.Metadata("base"),
-		"path": path,
-	}).Debug().Log("Loading history")
+	c.running = false
 
-	c.lock.persist.Lock()
-	defer c.lock.persist.Unlock()
+	c.lock.session.RLock()
+	for _, sess := range c.sessions {
+		// Cancel all current sessions
+		sess.Cancel()
+	}
+	c.lock.session.RUnlock()
 
-	jsondata, err := fs.ReadFile(path)
+	// Wait for all current sessions to finish
+	c.sessionsWG.Wait()
+}
+
+type historySnapshot struct {
+	data []byte
+}
+
+func (s *historySnapshot) Persist(sink SnapshotSink) error {
+	if _, err := sink.Write(s.data); err != nil {
+		sink.Cancel()
+		return err
+	}
+
+	return sink.Close()
+}
+
+func (s *historySnapshot) Release() {
+	s.data = nil
+}
+
+func (c *collector) Snapshot() (Snapshot, error) {
+	c.logger.Debug().Log("Creating history snapshot")
+
+	c.lock.history.Lock()
+	defer c.lock.history.Unlock()
+
+	jsondata, err := json.MarshalIndent(&c.history, "", "    ")
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	if err = json.Unmarshal(jsondata, data); err != nil {
-		return
+	s := &historySnapshot{
+		data: jsondata,
 	}
+
+	return s, nil
 }
 
-func (c *collector) saveHistory(fs fs.Filesystem, path string, data *history) {
-	if fs == nil {
-		return
+func (c *collector) Restore(snapshot io.ReadCloser) error {
+	if snapshot == nil {
+		return nil
 	}
 
-	c.logger.WithComponent("SessionStore").WithFields(log.Fields{
-		"base": fs.Metadata("base"),
-		"path": path,
-	}).Debug().Log("Storing history")
+	defer snapshot.Close()
 
-	c.lock.persist.Lock()
-	defer c.lock.persist.Unlock()
+	c.logger.Debug().Log("Restoring history snapshot")
 
-	jsondata, err := json.MarshalIndent(data, "", "    ")
+	jsondata, err := io.ReadAll(snapshot)
 	if err != nil {
-		return
+		return err
 	}
 
-	_, _, err = fs.WriteFileSafe(path, jsondata)
-	if err != nil {
-		return
+	data := history{}
+
+	if err = json.Unmarshal(jsondata, &data); err != nil {
+		return err
 	}
+
+	c.lock.history.Lock()
+	defer c.lock.history.Unlock()
+
+	c.history = data
+
+	return nil
 }
 
 func (c *collector) IsCollectableIP(ip string) bool {
@@ -838,6 +835,7 @@ func (c *collector) Active() []Session {
 		}
 
 		session := Session{
+			Collector:    c.id,
 			ID:           sess.id,
 			Reference:    sess.reference,
 			CreatedAt:    sess.createdAt,
@@ -953,3 +951,5 @@ func (n *nullCollector) CompanionEgressBitrate() float64                        
 func (n *nullCollector) CompanionTopIngressBitrate() float64                      { return 0.0 }
 func (n *nullCollector) CompanionTopEgressBitrate() float64                       { return 0.0 }
 func (n *nullCollector) Stop()                                                    {}
+func (n *nullCollector) Snapshot() (Snapshot, error)                              { return nil, nil }
+func (n *nullCollector) Restore(snapshot io.ReadCloser) error                     { return snapshot.Close() }

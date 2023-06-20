@@ -430,13 +430,15 @@ type ConfigV3 struct {
 		Interval         int64 `json:"interval_sec" format:"int64"` // seconds
 	} `json:"metrics"`
 	Sessions struct {
-		Enable          bool     `json:"enable"`
-		IPIgnoreList    []string `json:"ip_ignorelist"`
-		SessionTimeout  int      `json:"session_timeout_sec" format:"int"`
-		Persist         bool     `json:"persist"`
-		PersistInterval int      `json:"persist_interval_sec" format:"int"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"uint64"`
-		MaxSessions     uint64   `json:"max_sessions" format:"uint64"`
+		Enable                bool     `json:"enable"`
+		IPIgnoreList          []string `json:"ip_ignorelist"`
+		Persist               bool     `json:"persist"`
+		PersistInterval       int      `json:"persist_interval_sec" format:"int"`
+		SessionTimeout        int      `json:"session_timeout_sec" format:"int"`
+		SessionLogPathPattern string   `json:"session_log_path_pattern"`
+		SessionLogBuffer      int      `json:"session_log_buffer_sec" format:"int"`
+		MaxBitrate            uint64   `json:"max_bitrate_mbit" format:"uint64"`
+		MaxSessions           uint64   `json:"max_sessions" format:"uint64"`
 	} `json:"sessions"`
 	Service struct {
 		Enable bool   `json:"enable"`

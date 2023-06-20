@@ -28,3 +28,23 @@ func TestTimeValue(t *testing.T) {
 
 	require.Equal(t, time.Time(time.Date(2009, time.November, 11, 23, 0, 0, 0, time.UTC)), x)
 }
+
+func TestStrftimeValue(t *testing.T) {
+	var x string
+
+	val := NewStrftime(&x, "%Y-%m-%d.log")
+
+	require.Equal(t, "%Y-%m-%d.log", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	x = "%Y-%m-%d-%H:%M:%S.log"
+
+	require.Equal(t, "%Y-%m-%d-%H:%M:%S.log", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	val.Set("bla.log")
+
+	require.Equal(t, "bla.log", x)
+}

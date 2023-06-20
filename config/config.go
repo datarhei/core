@@ -260,10 +260,12 @@ func (d *Config) init() {
 	d.vars.Register(value.NewInt64(&d.Metrics.Interval, 2), "metrics.interval_seconds", "CORE_METRICS_INTERVAL_SECONDS", nil, "Interval for collecting metrics", false, false)
 
 	// Sessions
-	d.vars.Register(value.NewBool(&d.Sessions.Enable, true), "sessions.enable", "CORE_SESSIONS_ENABLE", nil, "Enable collecting HLS session stats for /memfs", false, false)
+	d.vars.Register(value.NewBool(&d.Sessions.Enable, true), "sessions.enable", "CORE_SESSIONS_ENABLE", nil, "Enable collecting session stats", false, false)
 	d.vars.Register(value.NewCIDRList(&d.Sessions.IPIgnoreList, []string{"127.0.0.1/32", "::1/128"}, ","), "sessions.ip_ignorelist", "CORE_SESSIONS_IP_IGNORELIST", nil, "List of IP ranges in CIDR notation to ignore", false, false)
 	d.vars.Register(value.NewInt(&d.Sessions.SessionTimeout, 30), "sessions.session_timeout_sec", "CORE_SESSIONS_SESSION_TIMEOUT_SEC", nil, "Timeout for an idle session", false, false)
-	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored as sessions.json in db.dir", false, false)
+	d.vars.Register(value.NewStrftime(&d.Sessions.SessionLogPathPattern, ""), "sessions.session_log_path_pattern", "CORE_SESSIONS_LOG_PATH_PATTERN", nil, "Path to where the sessions will be logged, may contain strftime-patterns, leave empty for no session logging, persist must be enabled", false, false)
+	d.vars.Register(value.NewInt(&d.Sessions.SessionLogBuffer, 15), "sessions.session_log_buffer_sec", "CORE_SESSIONS_SESSION_LOG_BUFFER_SEC", nil, "Maximum duration to buffer session logs in memory before persisting on disk", false, false)
+	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored in /sessions/[collector].json in db.dir", false, false)
 	d.vars.Register(value.NewInt(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history", false, false)
 	d.vars.Register(value.NewUint64(&d.Sessions.MaxBitrate, 0), "sessions.max_bitrate_mbit", "CORE_SESSIONS_MAXBITRATE_MBIT", nil, "Max. allowed outgoing bitrate in mbit/s, 0 for unlimited", false, false)
 	d.vars.Register(value.NewUint64(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAX_SESSIONS", []string{"CORE_SESSIONS_MAXSESSIONS"}, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)

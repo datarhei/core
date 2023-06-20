@@ -150,13 +150,15 @@ type Data struct {
 		Interval         int64 `json:"interval_sec" format:"int64"` // seconds
 	} `json:"metrics"`
 	Sessions struct {
-		Enable          bool     `json:"enable"`
-		IPIgnoreList    []string `json:"ip_ignorelist"`
-		SessionTimeout  int      `json:"session_timeout_sec" format:"int"`
-		Persist         bool     `json:"persist"`
-		PersistInterval int      `json:"persist_interval_sec" format:"int"`
-		MaxBitrate      uint64   `json:"max_bitrate_mbit" format:"uint64"`
-		MaxSessions     uint64   `json:"max_sessions" format:"uint64"`
+		Enable                bool     `json:"enable"`
+		IPIgnoreList          []string `json:"ip_ignorelist"`
+		Persist               bool     `json:"persist"`
+		PersistInterval       int      `json:"persist_interval_sec" format:"int"`
+		SessionTimeout        int      `json:"session_timeout_sec" format:"int"`
+		SessionLogPathPattern string   `json:"session_log_path_pattern"`
+		SessionLogBuffer      int      `json:"session_log_buffer_sec" format:"int"`
+		MaxBitrate            uint64   `json:"max_bitrate_mbit" format:"uint64"`
+		MaxSessions           uint64   `json:"max_sessions" format:"uint64"`
 	} `json:"sessions"`
 	Service struct {
 		Enable bool   `json:"enable"`
@@ -207,7 +209,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.SRT = d.SRT
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
-	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
 
@@ -233,7 +234,13 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.FFmpeg.Log.MaxLines = d.FFmpeg.Log.MaxLines
 	data.FFmpeg.Log.MaxHistory = d.FFmpeg.Log.MaxHistory
 
+	data.Sessions.Enable = d.Sessions.Enable
 	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+	data.Sessions.SessionTimeout = d.Sessions.SessionTimeout
+	data.Sessions.Persist = d.Sessions.Persist
+	data.Sessions.PersistInterval = d.Sessions.PersistInterval
+	data.Sessions.MaxBitrate = d.Sessions.MaxBitrate
+	data.Sessions.MaxSessions = d.Sessions.MaxSessions
 
 	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
 
@@ -295,7 +302,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.SRT = d.SRT
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
-	data.Sessions = d.Sessions
 	data.Service = d.Service
 	data.Router = d.Router
 
@@ -321,7 +327,13 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.FFmpeg.Log.MaxLines = d.FFmpeg.Log.MaxLines
 	data.FFmpeg.Log.MaxHistory = d.FFmpeg.Log.MaxHistory
 
+	data.Sessions.Enable = d.Sessions.Enable
 	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+	data.Sessions.SessionTimeout = d.Sessions.SessionTimeout
+	data.Sessions.Persist = d.Sessions.Persist
+	data.Sessions.PersistInterval = d.Sessions.PersistInterval
+	data.Sessions.MaxBitrate = d.Sessions.MaxBitrate
+	data.Sessions.MaxSessions = d.Sessions.MaxSessions
 
 	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
 

@@ -339,7 +339,10 @@ func (a *api) start() error {
 
 	if cfg.Sessions.Enable {
 		sessionConfig := session.Config{
-			Logger: a.log.logger.core.WithComponent("Session"),
+			PersistInterval:   time.Duration(cfg.Sessions.PersistInterval) * time.Second,
+			LogPattern:        cfg.Sessions.SessionLogPathPattern,
+			LogBufferDuration: time.Duration(cfg.Sessions.SessionLogBuffer) * time.Second,
+			Logger:            a.log.logger.core.WithComponent("Session"),
 		}
 
 		if cfg.Sessions.Persist {
@@ -371,7 +374,6 @@ func (a *api) start() error {
 			MaxSessions:     cfg.Sessions.MaxSessions,
 			InactiveTimeout: 5 * time.Second,
 			SessionTimeout:  time.Duration(cfg.Sessions.SessionTimeout) * time.Second,
-			PersistInterval: time.Duration(cfg.Sessions.PersistInterval) * time.Second,
 			Limiter:         iplimiter,
 		}
 
@@ -1823,6 +1825,7 @@ func (a *api) stop() {
 	// Stop the session tracker
 	if a.sessions != nil {
 		a.sessions.UnregisterAll()
+		a.sessions.Close()
 		a.sessions = nil
 	}
 

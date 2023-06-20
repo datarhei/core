@@ -1,6 +1,10 @@
 package value
 
-import "time"
+import (
+	"time"
+
+	"github.com/lestrrat-go/strftime"
+)
 
 // time
 
@@ -33,4 +37,32 @@ func (u *Time) Validate() error {
 func (u *Time) IsEmpty() bool {
 	v := time.Time(*u)
 	return v.IsZero()
+}
+
+// strftime
+
+type Strftime string
+
+func NewStrftime(p *string, val string) *Strftime {
+	*p = val
+
+	return (*Strftime)(p)
+}
+
+func (s *Strftime) Set(val string) error {
+	*s = Strftime(val)
+	return nil
+}
+
+func (s *Strftime) String() string {
+	return string(*s)
+}
+
+func (s *Strftime) Validate() error {
+	_, err := strftime.New(string(*s))
+	return err
+}
+
+func (s *Strftime) IsEmpty() bool {
+	return len(string(*s)) == 0
 }

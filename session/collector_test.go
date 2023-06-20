@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRegisterSession(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Hour,
-		SessionTimeout:  time.Hour,
+func createCollector(inactive, session time.Duration) (*collector, error) {
+	return newCollector("", nil, nil, CollectorConfig{
+		InactiveTimeout: inactive,
+		SessionTimeout:  session,
 	})
+}
+
+func TestRegisterSession(t *testing.T) {
+	c, err := createCollector(time.Hour, time.Hour)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -31,10 +35,7 @@ func TestRegisterSession(t *testing.T) {
 }
 
 func TestInactiveSession(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Second,
-		SessionTimeout:  time.Hour,
-	})
+	c, err := createCollector(time.Second, time.Hour)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -52,10 +53,7 @@ func TestInactiveSession(t *testing.T) {
 }
 
 func TestActivateSession(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Second,
-		SessionTimeout:  time.Second,
-	})
+	c, err := createCollector(time.Second, time.Second)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -73,10 +71,7 @@ func TestActivateSession(t *testing.T) {
 }
 
 func TestIngress(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Second,
-		SessionTimeout:  time.Hour,
-	})
+	c, err := createCollector(time.Second, time.Hour)
 	require.Equal(t, nil, err)
 
 	c.RegisterAndActivate("foobar", "", "", "")
@@ -92,10 +87,7 @@ func TestIngress(t *testing.T) {
 }
 
 func TestEgress(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Second,
-		SessionTimeout:  time.Hour,
-	})
+	c, err := createCollector(time.Second, time.Hour)
 	require.Equal(t, nil, err)
 
 	c.RegisterAndActivate("foobar", "", "", "")
@@ -111,10 +103,7 @@ func TestEgress(t *testing.T) {
 }
 
 func TestNbSessions(t *testing.T) {
-	c, err := newCollector("", nil, nil, CollectorConfig{
-		InactiveTimeout: time.Hour,
-		SessionTimeout:  time.Hour,
-	})
+	c, err := createCollector(time.Hour, time.Hour)
 	require.Equal(t, nil, err)
 
 	nsessions := c.Sessions()
