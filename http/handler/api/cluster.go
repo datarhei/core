@@ -950,7 +950,7 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 
 	identities := h.iam.ListIdentities()
 
-	users := make([]api.IAMUser, len(identities))
+	users := make([]api.IAMUser, len(identities)+1)
 
 	for i, iamuser := range identities {
 		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "read") {
@@ -967,6 +967,14 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 
 		users[i].Marshal(iamuser, policies)
 	}
+
+	anon := identity.User{
+		Name: "$anon",
+	}
+
+	policies := h.iam.ListPolicies("$anon", "", "", nil)
+
+	users[len(users)-1].Marshal(anon, policies)
 
 	return c.JSON(http.StatusOK, users)
 }
