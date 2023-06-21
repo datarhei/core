@@ -83,7 +83,7 @@ func TestIngress(t *testing.T) {
 	require.Equal(t, 1, len(sessions))
 	require.Equal(t, uint64(1024), sessions[0].RxBytes)
 
-	c.Stop()
+	c.stop()
 }
 
 func TestEgress(t *testing.T) {
@@ -99,7 +99,7 @@ func TestEgress(t *testing.T) {
 	require.Equal(t, 1, len(sessions))
 	require.Equal(t, uint64(1024), sessions[0].TxBytes)
 
-	c.Stop()
+	c.stop()
 }
 
 func TestNbSessions(t *testing.T) {
@@ -124,7 +124,7 @@ func TestNbSessions(t *testing.T) {
 	nsessions = c.Sessions()
 	require.Equal(t, uint64(2), nsessions)
 
-	c.Stop()
+	c.stop()
 
 	time.Sleep(2 * time.Second)
 

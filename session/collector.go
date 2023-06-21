@@ -127,6 +127,9 @@ type Collector interface {
 	// IsKnowsession returns whether a session with the given id exists.
 	IsKnownSession(id string) bool
 
+	// Close closes the session with the id.
+	Close(id string) bool
+
 	// IsAllowedIP returns whether traffic from/to the given IP should be considered.
 	IsCollectableIP(ip string) bool
 
@@ -164,9 +167,6 @@ type Collector interface {
 
 	// TopEgressBitrate returns the summed current top bitrates of all egress sessions.
 	CompanionTopEgressBitrate() float64
-
-	// Stop stops the collector to calculate rates
-	Stop()
 
 	// Snapshot returns the current snapshot of the history
 	Snapshot() (Snapshot, error)
@@ -410,7 +410,7 @@ func (c *collector) start() {
 	c.txBitrate, _ = average.New(averageWindow, averageGranularity)
 }
 
-func (c *collector) Stop() {
+func (c *collector) stop() {
 	c.lock.run.Lock()
 	defer c.lock.run.Unlock()
 
@@ -576,6 +576,20 @@ func (c *collector) Activate(id string) bool {
 	}
 
 	return false
+}
+
+func (c *collector) Close(id string) bool {
+	c.lock.session.RLock()
+	sess, ok := c.sessions[id]
+	c.lock.session.RUnlock()
+
+	if !ok {
+		return false
+	}
+
+	sess.Cancel()
+
+	return true
 }
 
 func (c *collector) Extra(id string, extra map[string]interface{}) {
@@ -921,6 +935,7 @@ type nullCollector struct{}
 func NewNullCollector() Collector                                                 { return &nullCollector{} }
 func (n *nullCollector) Register(id, reference, location, peer string)            {}
 func (n *nullCollector) Activate(id string) bool                                  { return false }
+func (n *nullCollector) Close(id string) bool                                     { return true }
 func (n *nullCollector) RegisterAndActivate(id, reference, location, peer string) {}
 func (n *nullCollector) Extra(id string, extra map[string]interface{})            {}
 func (n *nullCollector) Unregister(id string)                                     {}

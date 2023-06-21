@@ -350,7 +350,7 @@ func (r *registry) unregister(id string) error {
 		return fmt.Errorf("a collector with the ID '%s' doesn't exist", id)
 	}
 
-	m.Stop()
+	m.stop()
 
 	delete(r.collector, id)
 
