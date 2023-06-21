@@ -31,12 +31,13 @@ type Config struct {
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
-	wroteHeader       bool
-	wroteBody         bool
-	minLength         int
-	minLengthExceeded bool
-	buffer            *bytes.Buffer
-	code              int
+	wroteHeader         bool
+	wroteBody           bool
+	minLength           int
+	minLengthExceeded   bool
+	buffer              *bytes.Buffer
+	code                int
+	headerContentLength string
 }
 
 const gzipScheme = "gzip"
@@ -140,6 +141,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						// If the minimum content length hasn't exceeded, write the uncompressed response
 						res.Writer = rw
 						if grw.wroteHeader {
+							// Restore Content-Length header in case it was deleted
+							if len(grw.headerContentLength) != 0 {
+								grw.Header().Set(echo.HeaderContentLength, grw.headerContentLength)
+							}
 							grw.ResponseWriter.WriteHeader(grw.code)
 						}
 						grw.buffer.WriteTo(rw)
@@ -162,6 +167,7 @@ func (w *gzipResponseWriter) WriteHeader(code int) {
 	if code == http.StatusNoContent { // Issue #489
 		w.ResponseWriter.Header().Del(echo.HeaderContentEncoding)
 	}
+	w.headerContentLength = w.Header().Get(echo.HeaderContentLength)
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
 
 	w.wroteHeader = true
