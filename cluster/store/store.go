@@ -164,6 +164,10 @@ func NewStore(config Config) (Store, error) {
 }
 
 func (s *store) Apply(entry *raft.Log) interface{} {
+	if entry.Type != raft.LogCommand {
+		return nil
+	}
+
 	logger := s.logger.WithFields(log.Fields{
 		"index": entry.Index,
 		"term":  entry.Term,
