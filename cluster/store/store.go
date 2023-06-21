@@ -434,6 +434,10 @@ func (s *store) addIdentity(cmd CommandAddIdentity) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	if cmd.Identity.Name == "$anon" {
+		return fmt.Errorf("the identity with the name '%s' can't be created", cmd.Identity.Name)
+	}
+
 	_, ok := s.data.Users.Users[cmd.Identity.Name]
 	if ok {
 		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
@@ -448,6 +452,10 @@ func (s *store) addIdentity(cmd CommandAddIdentity) error {
 func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if cmd.Name == "$anon" {
+		return fmt.Errorf("the identity with the name '%s' can't be updated", cmd.Name)
+	}
 
 	_, ok := s.data.Users.Users[cmd.Name]
 	if !ok {
@@ -495,8 +503,19 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, ok := s.data.Users.Users[cmd.Name]; !ok {
-		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+	if cmd.Name != "$anon" {
+		if _, ok := s.data.Users.Users[cmd.Name]; !ok {
+			return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+		}
+	}
+
+	for i, p := range cmd.Policies {
+		if len(p.Domain) != 0 {
+			continue
+		}
+
+		p.Domain = "$none"
+		cmd.Policies[i] = p
 	}
 
 	delete(s.data.Policies.Policies, cmd.Name)

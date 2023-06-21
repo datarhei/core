@@ -32,6 +32,10 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 	domains := map[string]struct{}{}
 
 	for _, p := range policies.Policies {
+		if len(p.Domain) == 0 {
+			p.Domain = "$none"
+		}
+
 		rule := []string{
 			p.Name,
 			p.Domain,
