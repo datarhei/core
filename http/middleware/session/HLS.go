@@ -94,6 +94,8 @@ func NewHLSWithConfig(config HLSConfig) echo.MiddlewareFunc {
 func (h *hls) handleIngress(c echo.Context, next echo.HandlerFunc) error {
 	req := c.Request()
 
+	ctxuser := util.DefaultContext(c, "user", "")
+
 	path := req.URL.Path
 
 	if strings.HasSuffix(path, ".m3u8") {
@@ -113,10 +115,15 @@ func (h *hls) handleIngress(c echo.Context, next echo.HandlerFunc) error {
 			}
 
 			if !h.ingressCollector.IsKnownSession(path) {
+				ip, _ := net.AnonymizeIPString(c.RealIP())
+
 				// Register a new session
 				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-				h.ingressCollector.RegisterAndActivate(path, reference, path, "")
+				h.ingressCollector.RegisterAndActivate(path, reference, path, ip)
+
 				h.ingressCollector.Extra(path, map[string]interface{}{
+					"name":       ctxuser,
+					"ip":         ip,
 					"user_agent": req.Header.Get("User-Agent"),
 				})
 			}

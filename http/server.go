@@ -371,9 +371,6 @@ func NewServer(config Config) (Server, error) {
 			return nil
 		},
 	}))
-	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
-		Collector: config.Sessions.Collector("http"),
-	}))
 
 	s.router.HideBanner = true
 	s.router.HidePort = true
@@ -385,6 +382,10 @@ func NewServer(config Config) (Server, error) {
 	}
 
 	s.router.Use(s.middleware.iam)
+
+	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
+		Collector: config.Sessions.Collector("http"),
+	}))
 
 	// Add static routes
 	if path, target := config.Router.StaticRoute(); len(target) != 0 {

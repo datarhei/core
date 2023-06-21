@@ -314,7 +314,7 @@ func (r *registry) Register(id string, conf CollectorConfig) (Collector, error) 
 		return nil, fmt.Errorf("a collector with the ID '%s' already exists", id)
 	}
 
-	m, err := newCollector(id, r.persist.sessionsCh, r.logger.WithComponent(id), conf)
+	m, err := newCollector(id, r.persist.sessionsCh, r.logger, conf)
 	if err != nil {
 		return nil, err
 	}
