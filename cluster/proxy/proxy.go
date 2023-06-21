@@ -12,6 +12,8 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
+
+	clientapi "github.com/datarhei/core-client-go/v16/api"
 )
 
 type Proxy interface {
@@ -35,10 +37,12 @@ type ProxyReader interface {
 	GetNode(id string) (NodeReader, error)
 
 	Resources() map[string]NodeResources
-	ListProcesses() []Process
+	ListProcesses(ProcessListOptions) []clientapi.Process
+	ListProxyProcesses() []Process
 
 	GetURL(prefix, path string) (*url.URL, error)
-	GetFile(prefix, path string) (io.ReadCloser, error)
+	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
+	GetFileInfo(prefix, path string) (int64, time.Time, error)
 }
 
 func NewNullProxyReader() ProxyReader {
@@ -73,12 +77,20 @@ func (p *proxyReader) Resources() map[string]NodeResources {
 	return p.proxy.Resources()
 }
 
-func (p *proxyReader) ListProcesses() []Process {
+func (p *proxyReader) ListProcesses(options ProcessListOptions) []clientapi.Process {
 	if p.proxy == nil {
 		return nil
 	}
 
-	return p.proxy.ListProcesses()
+	return p.proxy.ListProcesses(options)
+}
+
+func (p *proxyReader) ListProxyProcesses() []Process {
+	if p.proxy == nil {
+		return nil
+	}
+
+	return p.proxy.ListProxyProcesses()
 }
 
 func (p *proxyReader) GetURL(prefix, path string) (*url.URL, error) {
@@ -89,12 +101,20 @@ func (p *proxyReader) GetURL(prefix, path string) (*url.URL, error) {
 	return p.proxy.GetURL(prefix, path)
 }
 
-func (p *proxyReader) GetFile(prefix, path string) (io.ReadCloser, error) {
+func (p *proxyReader) GetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
 	if p.proxy == nil {
 		return nil, fmt.Errorf("no proxy provided")
 	}
 
-	return p.proxy.GetFile(prefix, path)
+	return p.proxy.GetFile(prefix, path, offset)
+}
+
+func (p *proxyReader) GetFileInfo(prefix, path string) (int64, time.Time, error) {
+	if p.proxy == nil {
+		return 0, time.Time{}, fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.GetFileInfo(prefix, path)
 }
 
 type ProxyConfig struct {
@@ -380,39 +400,19 @@ func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
 	return url, nil
 }
 
-func (p *proxy) GetFile(prefix, path string) (io.ReadCloser, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
+func (p *proxy) GetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
 	logger := p.logger.WithFields(log.Fields{
 		"path":   path,
 		"prefix": prefix,
 	})
 
-	id, ok := p.fileid[prefix+":"+path]
-	if !ok {
-		logger.Debug().Log("Not found")
+	node, err := p.getNodeForFile(prefix, path)
+	if err != nil {
+		logger.Debug().WithError(err).Log("File not available")
 		return nil, fmt.Errorf("file not found")
 	}
 
-	ts, ok := p.idupdate[id]
-	if !ok {
-		logger.Debug().Log("No age information found")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		logger.Debug().Log("File too old")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	node, ok := p.nodes[id]
-	if !ok {
-		logger.Debug().Log("Unknown node")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	data, err := node.GetFile(prefix, path)
+	data, err := node.GetFile(prefix, path, offset)
 	if err != nil {
 		logger.Debug().Log("Invalid path")
 		return nil, fmt.Errorf("file not found")
@@ -421,6 +421,55 @@ func (p *proxy) GetFile(prefix, path string) (io.ReadCloser, error) {
 	logger.Debug().Log("File cluster path")
 
 	return data, nil
+}
+
+func (p *proxy) GetFileInfo(prefix, path string) (int64, time.Time, error) {
+	logger := p.logger.WithFields(log.Fields{
+		"path":   path,
+		"prefix": prefix,
+	})
+
+	node, err := p.getNodeForFile(prefix, path)
+	if err != nil {
+		logger.Debug().WithError(err).Log("File not available")
+		return 0, time.Time{}, fmt.Errorf("file not found")
+	}
+
+	size, lastModified, err := node.GetFileInfo(prefix, path)
+	if err != nil {
+		logger.Debug().Log("Invalid path")
+		return 0, time.Time{}, fmt.Errorf("file not found")
+	}
+
+	logger.Debug().Log("File cluster path")
+
+	return size, lastModified, nil
+}
+
+func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	id, ok := p.fileid[prefix+":"+path]
+	if !ok {
+		return nil, fmt.Errorf("file not found")
+	}
+
+	ts, ok := p.idupdate[id]
+	if !ok {
+		return nil, fmt.Errorf("no age information found")
+	}
+
+	if time.Since(ts) > 2*time.Second {
+		return nil, fmt.Errorf("file too old")
+	}
+
+	node, ok := p.nodes[id]
+	if !ok {
+		return nil, fmt.Errorf("unknown node")
+	}
+
+	return node, nil
 }
 
 type Process struct {
@@ -435,7 +484,18 @@ type Process struct {
 	Metadata  map[string]interface{}
 }
 
-func (p *proxy) ListProcesses() []Process {
+type ProcessListOptions struct {
+	ID            []string
+	Filter        []string
+	Domain        string
+	Reference     string
+	IDPattern     string
+	RefPattern    string
+	OwnerPattern  string
+	DomainPattern string
+}
+
+func (p *proxy) ListProxyProcesses() []Process {
 	processChan := make(chan Process, 64)
 	processList := []Process{}
 
@@ -459,7 +519,52 @@ func (p *proxy) ListProcesses() []Process {
 		go func(node Node, p chan<- Process) {
 			defer wg.Done()
 
-			processes, err := node.ProcessList()
+			processes, err := node.ProxyProcessList()
+			if err != nil {
+				return
+			}
+
+			for _, process := range processes {
+				p <- process
+			}
+		}(node, processChan)
+	}
+	p.lock.RUnlock()
+
+	wg.Wait()
+
+	close(processChan)
+
+	wgList.Wait()
+
+	return processList
+}
+
+func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
+	processChan := make(chan clientapi.Process, 64)
+	processList := []clientapi.Process{}
+
+	wgList := sync.WaitGroup{}
+	wgList.Add(1)
+
+	go func() {
+		defer wgList.Done()
+
+		for process := range processChan {
+			processList = append(processList, process)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+
+	p.lock.RLock()
+	for _, node := range p.nodes {
+		wg.Add(1)
+
+		go func(node Node, p chan<- clientapi.Process) {
+			defer wg.Done()
+
+			processes, err := node.ProcessList(options)
 			if err != nil {
 				return
 			}

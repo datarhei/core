@@ -37,7 +37,7 @@ definitions:
         description: seconds
         type: integer
       logPatterns:
-        description: will we interpreted as regualr expressions
+        description: will we interpreted as regular expressions
         items:
           type: string
         type: array

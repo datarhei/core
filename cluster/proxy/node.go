@@ -29,7 +29,8 @@ type Node interface {
 	StopFiles()
 
 	GetURL(prefix, path string) (*url.URL, error)
-	GetFile(prefix, path string) (io.ReadCloser, error)
+	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
+	GetFileInfo(prefix, path string) (int64, time.Time, error)
 
 	AddProcess(config *app.Config, metadata map[string]interface{}) error
 	StartProcess(id app.ProcessID) error
@@ -48,7 +49,8 @@ type NodeReader interface {
 	Resources() NodeResources
 
 	Files() NodeFiles
-	ProcessList() ([]Process, error)
+	ProcessList(ProcessListOptions) ([]clientapi.Process, error)
+	ProxyProcessList() ([]Process, error)
 }
 
 type NodeFiles struct {
@@ -854,7 +856,7 @@ func (n *node) GetURL(prefix, resource string) (*url.URL, error) {
 	return u, nil
 }
 
-func (n *node) GetFile(prefix, path string) (io.ReadCloser, error) {
+func (n *node) GetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -862,12 +864,30 @@ func (n *node) GetFile(prefix, path string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	return n.peer.FilesystemGetFile(prefix, path)
+	return n.peer.FilesystemGetFileOffset(prefix, path, offset)
 }
 
-func (n *node) ProcessList() ([]Process, error) {
-	id := n.About().ID
+func (n *node) GetFileInfo(prefix, path string) (int64, time.Time, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
 
+	if n.peer == nil {
+		return 0, time.Time{}, fmt.Errorf("not connected")
+	}
+
+	info, err := n.peer.FilesystemList(prefix, path, "", "")
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("not found: %w", err)
+	}
+
+	if len(info) != 1 {
+		return 0, time.Time{}, fmt.Errorf("ambigous result")
+	}
+
+	return info[0].Size, time.Unix(info[0].LastMod, 0), nil
+}
+
+func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -875,22 +895,31 @@ func (n *node) ProcessList() ([]Process, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	list, err := n.peer.ProcessList(client.ProcessListOptions{
-		Filter: []string{
-			"state",
-			"config",
-			"metadata",
-		},
+	return n.peer.ProcessList(client.ProcessListOptions{
+		ID:            options.ID,
+		Filter:        options.Filter,
+		Domain:        options.Domain,
+		Reference:     options.Reference,
+		IDPattern:     options.IDPattern,
+		RefPattern:    options.RefPattern,
+		OwnerPattern:  options.OwnerPattern,
+		DomainPattern: options.DomainPattern,
 	})
+}
+
+func (n *node) ProxyProcessList() ([]Process, error) {
+	list, err := n.ProcessList(ProcessListOptions{})
 	if err != nil {
 		return nil, err
 	}
+
+	nodeid := n.About().ID
 
 	processes := []Process{}
 
 	for _, p := range list {
 		process := Process{
-			NodeID:    id,
+			NodeID:    nodeid,
 			Order:     p.State.Order,
 			State:     p.State.State,
 			Mem:       p.State.Memory,

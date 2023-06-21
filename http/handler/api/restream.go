@@ -124,7 +124,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
-	ownerpattern := util.DefaultContext(c, "ownerpattern", "")
+	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
 	preids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
@@ -195,7 +195,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 
 	p, err := h.getProcess(tid, filter)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, p)

@@ -14,7 +14,7 @@ func (r *restclient) Graph(query api.GraphQuery) (api.GraphResponse, error) {
 	e := json.NewEncoder(&buf)
 	e.Encode(query)
 
-	data, err := r.call("PUT", "/v3/graph", nil, "application/json", &buf)
+	data, err := r.call("PUT", "/v3/graph", nil, nil, "application/json", &buf)
 	if err != nil {
 		return resp, err
 	}

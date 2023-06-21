@@ -9,7 +9,7 @@ import (
 func (r *restclient) Skills() (api.Skills, error) {
 	var skills api.Skills
 
-	data, err := r.call("GET", "/v3/skills", nil, "", nil)
+	data, err := r.call("GET", "/v3/skills", nil, nil, "", nil)
 	if err != nil {
 		return skills, err
 	}
@@ -20,7 +20,7 @@ func (r *restclient) Skills() (api.Skills, error) {
 }
 
 func (r *restclient) SkillsReload() error {
-	_, err := r.call("GET", "/v3/skills/reload", nil, "", nil)
+	_, err := r.call("GET", "/v3/skills/reload", nil, nil, "", nil)
 
 	return err
 }

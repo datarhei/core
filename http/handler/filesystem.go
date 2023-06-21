@@ -82,7 +82,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 		return c.Blob(http.StatusOK, "application/data", nil)
 	}
 
-	var streamFile io.Reader = file
+	var streamFile io.ReadCloser = file
 	status := http.StatusOK
 
 	ifRange := c.Request().Header.Get("If-Range")
@@ -101,7 +101,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	if len(byteRange) != 0 {
 		ranges, err := parseRange(byteRange, stat.Size())
 		if err != nil {
-			return api.Err(http.StatusRequestedRangeNotSatisfiable, "")
+			return api.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
 		}
 
 		if len(ranges) > 1 {
@@ -111,7 +111,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 		if len(ranges) == 1 {
 			_, err := file.Seek(ranges[0].start, io.SeekStart)
 			if err != nil {
-				return api.Err(http.StatusRequestedRangeNotSatisfiable, "")
+				return api.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
 			}
 
 			c.Response().Header().Set("Content-Range", ranges[0].contentRange(stat.Size()))
@@ -331,7 +331,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 }
 
 type limitReader struct {
-	r    io.Reader
+	r    io.ReadCloser
 	size int
 }
 
@@ -348,12 +348,25 @@ func (l *limitReader) Read(p []byte) (int, error) {
 
 	i, err := l.r.Read(p)
 	if err != nil {
+		l.r.Close()
 		return i, err
 	}
 
 	l.size -= i
 
+	if l.size == 0 {
+		l.r.Close()
+	}
+
 	return i, nil
+}
+
+func (l *limitReader) Close() error {
+	if l.r != nil {
+		l.r.Close()
+	}
+
+	return nil
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb

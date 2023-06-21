@@ -838,6 +838,48 @@ const docTemplate = `{
                         "description": "Domain to act on",
                         "name": "domain",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
+                        "name": "filter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return only these process that have this reference value. If empty, the reference will be ignored.",
+                        "name": "reference",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned.",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "idpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "refpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "ownerpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "domainpattern",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -846,7 +888,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.ClusterProcess"
+                                "$ref": "#/definitions/api.Process"
                             }
                         }
                     },
@@ -928,6 +970,48 @@ const docTemplate = `{
                         "description": "Domain to act on",
                         "name": "domain",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
+                        "name": "filter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Return only these process that have this reference value. If empty, the reference will be ignored.",
+                        "name": "reference",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned.",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "idpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "refpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "ownerpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "domainpattern",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -936,7 +1020,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.ClusterProcess"
+                                "$ref": "#/definitions/api.Process"
                             }
                         }
                     }
@@ -994,6 +1078,63 @@ const docTemplate = `{
             }
         },
         "/api/v3/cluster/process/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List a process by its ID",
+                "operationId": "cluster-3-get-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output",
+                        "name": "filter",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Process"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -4009,44 +4150,6 @@ const docTemplate = `{
                 },
                 "ncpu": {
                     "type": "number"
-                }
-            }
-        },
-        "api.ClusterProcess": {
-            "type": "object",
-            "properties": {
-                "cpu": {
-                    "description": "percent 0-100*ncpu",
-                    "type": "number"
-                },
-                "domain": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "memory_bytes": {
-                    "description": "bytes",
-                    "type": "integer"
-                },
-                "node_id": {
-                    "type": "string"
-                },
-                "order": {
-                    "type": "string"
-                },
-                "owner": {
-                    "type": "string"
-                },
-                "reference": {
-                    "type": "string"
-                },
-                "runtime_seconds": {
-                    "description": "seconds",
-                    "type": "integer"
-                },
-                "state": {
-                    "type": "string"
                 }
             }
         },

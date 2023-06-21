@@ -16,7 +16,7 @@ type configVersion struct {
 func (r *restclient) Config() (int64, api.Config, error) {
 	version := configVersion{}
 
-	data, err := r.call("GET", "/v3/config", nil, "", nil)
+	data, err := r.call("GET", "/v3/config", nil, nil, "", nil)
 	if err != nil {
 		return 0, api.Config{}, err
 	}
@@ -69,7 +69,7 @@ func (r *restclient) ConfigSet(config interface{}) error {
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
 
-	_, err := r.call("PUT", "/v3/config", nil, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/config", nil, nil, "application/json", &buf)
 
 	if e, ok := err.(api.Error); ok {
 		if e.Code == 409 {
@@ -85,7 +85,7 @@ func (r *restclient) ConfigSet(config interface{}) error {
 }
 
 func (r *restclient) ConfigReload() error {
-	_, err := r.call("GET", "/v3/config/reload", nil, "", nil)
+	_, err := r.call("GET", "/v3/config/reload", nil, nil, "", nil)
 
 	return err
 }

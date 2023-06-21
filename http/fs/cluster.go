@@ -42,14 +42,18 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	data, err := fs.proxy.GetFile(fs.name, path)
+	size, lastModified, err := fs.proxy.GetFileInfo(fs.name, path)
 	if err != nil {
 		return nil
 	}
 
 	file := &file{
-		ReadCloser: data,
-		name:       path,
+		getFile: func(offset int64) (io.ReadCloser, error) {
+			return fs.proxy.GetFile(fs.name, path, offset)
+		},
+		name:          path,
+		size:          size,
+		lastModiefied: lastModified,
 	}
 
 	return file
@@ -58,11 +62,53 @@ func (fs *filesystem) Open(path string) fs.File {
 type file struct {
 	io.ReadCloser
 
-	name string
+	getFile       func(offset int64) (io.ReadCloser, error)
+	name          string
+	size          int64
+	lastModiefied time.Time
+}
+
+func (f *file) Read(p []byte) (int, error) {
+	if f.ReadCloser == nil {
+		data, err := f.getFile(0)
+		if err != nil {
+			return 0, err
+		}
+
+		f.ReadCloser = data
+	}
+
+	return f.ReadCloser.Read(p)
+}
+
+func (f *file) Close() error {
+	if f.ReadCloser == nil {
+		return nil
+	}
+
+	return f.ReadCloser.Close()
 }
 
 func (f *file) Seek(offset int64, whence int) (int64, error) {
-	return 0, fmt.Errorf("not implemented")
+	if whence != io.SeekStart {
+		return 0, fmt.Errorf("not implemented")
+	}
+
+	if f.ReadCloser != nil {
+		f.ReadCloser.Close()
+		f.ReadCloser = nil
+	}
+
+	if f.ReadCloser == nil {
+		data, err := f.getFile(offset)
+		if err != nil {
+			return 0, err
+		}
+
+		f.ReadCloser = data
+	}
+
+	return offset, nil
 }
 
 func (f *file) Name() string {
@@ -78,11 +124,11 @@ func (f *file) Mode() gofs.FileMode {
 }
 
 func (f *file) Size() int64 {
-	return 0
+	return f.size
 }
 
 func (f *file) ModTime() time.Time {
-	return time.Now()
+	return f.lastModiefied
 }
 
 func (f *file) IsLink() (string, bool) {

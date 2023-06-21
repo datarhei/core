@@ -514,7 +514,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 func (c *cluster) doSynchronize(emergency bool) {
 	wish := c.store.GetProcessNodeMap()
 	want := c.store.ListProcesses()
-	have := c.proxy.ListProcesses()
+	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
 	nodesMap := map[string]proxy.NodeAbout{}
@@ -547,7 +547,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 }
 
 func (c *cluster) doRebalance(emergency bool) {
-	have := c.proxy.ListProcesses()
+	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
 	nodesMap := map[string]proxy.NodeAbout{}

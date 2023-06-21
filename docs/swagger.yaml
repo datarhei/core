@@ -142,32 +142,6 @@ definitions:
       ncpu:
         type: number
     type: object
-  api.ClusterProcess:
-    properties:
-      cpu:
-        description: percent 0-100*ncpu
-        type: number
-      domain:
-        type: string
-      id:
-        type: string
-      memory_bytes:
-        description: bytes
-        type: integer
-      node_id:
-        type: string
-      order:
-        type: string
-      owner:
-        type: string
-      reference:
-        type: string
-      runtime_seconds:
-        description: seconds
-        type: integer
-      state:
-        type: string
-    type: object
   api.ClusterRaft:
     properties:
       server:
@@ -2916,6 +2890,42 @@ paths:
         in: query
         name: domain
         type: string
+      - description: Comma separated list of fields (config, state, report, metadata)
+          that will be part of the output. If empty, all fields will be part of the
+          output.
+        in: query
+        name: filter
+        type: string
+      - description: Return only these process that have this reference value. If
+          empty, the reference will be ignored.
+        in: query
+        name: reference
+        type: string
+      - description: Comma separated list of process ids to list. Overrides the reference.
+          If empty all IDs will be returned.
+        in: query
+        name: id
+        type: string
+      - description: Glob pattern for process IDs. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: idpattern
+        type: string
+      - description: Glob pattern for process references. If empty all IDs will be
+          returned. Intersected with results from other pattern matches.
+        in: query
+        name: refpattern
+        type: string
+      - description: Glob pattern for process owners. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: ownerpattern
+        type: string
+      - description: Glob pattern for process domain. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: domainpattern
+        type: string
       produces:
       - application/json
       responses:
@@ -2923,7 +2933,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.ClusterProcess'
+              $ref: '#/definitions/api.Process'
             type: array
         "404":
           description: Not Found
@@ -2973,6 +2983,42 @@ paths:
         in: query
         name: domain
         type: string
+      - description: Comma separated list of fields (config, state, report, metadata)
+          that will be part of the output. If empty, all fields will be part of the
+          output.
+        in: query
+        name: filter
+        type: string
+      - description: Return only these process that have this reference value. If
+          empty, the reference will be ignored.
+        in: query
+        name: reference
+        type: string
+      - description: Comma separated list of process ids to list. Overrides the reference.
+          If empty all IDs will be returned.
+        in: query
+        name: id
+        type: string
+      - description: Glob pattern for process IDs. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: idpattern
+        type: string
+      - description: Glob pattern for process references. If empty all IDs will be
+          returned. Intersected with results from other pattern matches.
+        in: query
+        name: refpattern
+        type: string
+      - description: Glob pattern for process owners. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: ownerpattern
+        type: string
+      - description: Glob pattern for process domain. If empty all IDs will be returned.
+          Intersected with results from other pattern matches.
+        in: query
+        name: domainpattern
+        type: string
       produces:
       - application/json
       responses:
@@ -2980,7 +3026,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.ClusterProcess'
+              $ref: '#/definitions/api.Process'
             type: array
       security:
       - ApiKeyAuth: []
@@ -3047,6 +3093,45 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Delete a process by its ID
+      tags:
+      - v16.?.?
+    get:
+      description: List a process by its ID. Use the filter parameter to specifiy
+        the level of detail of the output.
+      operationId: cluster-3-get-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Comma separated list of fields (config, state, report, metadata)
+          to be part of the output. If empty, all fields will be part of the output
+        in: query
+        name: filter
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Process'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List a process by its ID
       tags:
       - v16.?.?
     put:

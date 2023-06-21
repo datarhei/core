@@ -9,7 +9,7 @@ import (
 func (r *restclient) SRTChannels() ([]api.SRTChannel, error) {
 	var m []api.SRTChannel
 
-	data, err := r.call("GET", "/v3/srt", nil, "", nil)
+	data, err := r.call("GET", "/v3/srt", nil, nil, "", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -52,6 +52,16 @@ github.com/datarhei/core-client-go/v16 v16.11.1-0.20230614141756-a25a5fc3c60e h1
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230614141756-a25a5fc3c60e/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620131644-140b3a61d4c8 h1:CILOzUB7CJGHtZHOxMJn+dN6rKzH29TOOOOep0AnFWM=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620131644-140b3a61d4c8/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620190007-900b37caabbf h1:3/t2rLE/Vh51z7kJrT3WZYS+JKCQvZ1afdpLXLDi28o=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620190007-900b37caabbf/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620192304-1a2e44319306 h1:9CwCYAeo1rEccFDZ0yFkk4uHZ01rLdW6hARrZCU8ywg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230620192304-1a2e44319306/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621090506-6b04f0277e7a h1:aFlwQNcgyp7k8Vv8ESEvKwmKUI2KiiK53qCFaHYk5wY=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621090506-6b04f0277e7a/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621090732-c6ae9699cea6 h1:iS1ji9i8gmYJe+LhCxHnHcvC/ieftBwdteqNg2yay+k=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621090732-c6ae9699cea6/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621092648-5cc658d8a73c h1:WUjP8x7hl1EsTbV5w8WEhK6c8t3uRqLUSn7+FFHDpJU=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230621092648-5cc658d8a73c/go.mod h1:6L0zr/NUwvaPsCTK/IL17m8JUEtgLp3BDtlsBREwacg=
 github.com/datarhei/gosrt v0.5.2 h1:eagqZwEIiGPNJW0rLep3gwceObyaZ17+iKRc+l4VEpc=
 github.com/datarhei/gosrt v0.5.2/go.mod h1:0308GQhAu5hxe2KYdbss901aKceSSKXnwCr8Vs++eiw=
 github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a h1:Tf4DSHY1xruBglr+yYP5Wct7czM86GKMYgbXH8a7OFo=

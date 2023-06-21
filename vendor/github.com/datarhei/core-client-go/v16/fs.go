@@ -3,8 +3,10 @@ package coreclient
 import (
 	"encoding/json"
 	"io"
+	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 
 	"github.com/datarhei/core-client-go/v16/api"
 )
@@ -28,7 +30,7 @@ func (r *restclient) FilesystemList(name, pattern, sort, order string) ([]api.Fi
 	query.Set("sort", sort)
 	query.Set("order", order)
 
-	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(name), query, "", nil)
+	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(name), query, nil, "", nil)
 	if err != nil {
 		return files, err
 	}
@@ -43,17 +45,28 @@ func (r *restclient) FilesystemHasFile(name, path string) bool {
 		path = "/" + path
 	}
 
-	_, err := r.call("HEAD", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
+	_, err := r.call("HEAD", "/v3/fs/"+url.PathEscape(name)+path, nil, nil, "", nil)
 
 	return err == nil
 }
 
 func (r *restclient) FilesystemGetFile(name, path string) (io.ReadCloser, error) {
+	return r.FilesystemGetFileOffset(name, path, 0)
+}
+
+func (r *restclient) FilesystemGetFileOffset(name, path string, offset int64) (io.ReadCloser, error) {
 	if !filepath.IsAbs(path) {
 		path = "/" + path
 	}
 
-	return r.stream("GET", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
+	var header http.Header = nil
+
+	if offset > 0 {
+		header = make(http.Header)
+		header.Set("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
+	}
+
+	return r.stream("GET", "/v3/fs/"+url.PathEscape(name)+path, nil, header, "", nil)
 }
 
 func (r *restclient) FilesystemDeleteFile(name, path string) error {
@@ -61,7 +74,7 @@ func (r *restclient) FilesystemDeleteFile(name, path string) error {
 		path = "/" + path
 	}
 
-	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(name)+path, nil, "", nil)
+	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(name)+path, nil, nil, "", nil)
 
 	return err
 }
@@ -71,7 +84,7 @@ func (r *restclient) FilesystemAddFile(name, path string, data io.Reader) error 
 		path = "/" + path
 	}
 
-	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(name)+path, nil, "application/data", data)
+	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(name)+path, nil, nil, "application/data", data)
 
 	return err
 }

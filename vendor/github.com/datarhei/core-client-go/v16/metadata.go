@@ -16,7 +16,7 @@ func (r *restclient) Metadata(key string) (api.Metadata, error) {
 		path += "/" + url.PathEscape(key)
 	}
 
-	data, err := r.call("GET", path, nil, "", nil)
+	data, err := r.call("GET", path, nil, nil, "", nil)
 	if err != nil {
 		return m, err
 	}
@@ -37,7 +37,7 @@ func (r *restclient) MetadataSet(key string, metadata api.Metadata) error {
 		path += "/" + url.PathEscape(key)
 	}
 
-	_, err := r.call("PUT", path, nil, "application/json", &buf)
+	_, err := r.call("PUT", path, nil, nil, "application/json", &buf)
 	if err != nil {
 		return err
 	}

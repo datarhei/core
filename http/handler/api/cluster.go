@@ -9,7 +9,6 @@ import (
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
-	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
@@ -18,6 +17,7 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
 
+	clientapi "github.com/datarhei/core-client-go/v16/api"
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
 )
@@ -117,44 +117,99 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// ListAllNodeProcesses returns the list of processes running on all nodes of the cluster
+// ListAllNodesProcesses returns the list of processes running on all nodes of the cluster
 // @Summary List of processes in the cluster
 // @Description List of processes in the cluster
 // @Tags v16.?.?
 // @ID cluster-3-list-all-node-processes
 // @Produce json
 // @Param domain query string false "Domain to act on"
-// @Success 200 {array} api.ClusterProcess
+// @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
+// @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
+// @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
+// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [get]
-func (h *ClusterHandler) ListAllNodeProcesses(c echo.Context) error {
+func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
+	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
+		return r == rune(',')
+	})
+	reference := util.DefaultQuery(c, "reference", "")
+	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
+		return r == rune(',')
+	})
 	domain := util.DefaultQuery(c, "domain", "")
+	idpattern := util.DefaultQuery(c, "idpattern", "")
+	refpattern := util.DefaultQuery(c, "refpattern", "")
+	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
+	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	procs := h.proxy.ListProcesses()
+	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
+		ID:            wantids,
+		Filter:        filter,
+		Domain:        domain,
+		Reference:     reference,
+		IDPattern:     idpattern,
+		RefPattern:    refpattern,
+		OwnerPattern:  ownerpattern,
+		DomainPattern: domainpattern,
+	})
 
-	processes := []api.ClusterProcess{}
+	processes := []clientapi.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process:"+p.ID, "read") {
 			continue
 		}
 
-		processes = append(processes, api.ClusterProcess{
-			ID:        p.Config.ID,
-			Owner:     p.Config.Owner,
-			Domain:    p.Config.Domain,
-			NodeID:    p.NodeID,
-			Reference: p.Config.Reference,
-			Order:     p.Order,
-			State:     p.State,
-			CPU:       json.ToNumber(p.CPU),
-			Memory:    p.Mem,
-			Runtime:   int64(p.Runtime.Seconds()),
-		})
+		processes = append(processes, p)
 	}
 
 	return c.JSON(http.StatusOK, processes)
+}
+
+// GetAllNodesProcess returns the process with the given ID whereever it's running on the cluster
+// @Summary List a process by its ID
+// @Description List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.
+// @Tags v16.?.?
+// @ID cluster-3-get-process
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
+// @Success 200 {object} api.Process
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id} [get]
+func (h *ClusterHandler) GetAllNodesProcess(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	id := util.PathParam(c, "id")
+	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
+		return r == rune(',')
+	})
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
+		ID:     []string{id},
+		Filter: filter,
+		Domain: domain,
+	})
+
+	if len(procs) == 0 {
+		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
+	}
+
+	return c.JSON(http.StatusOK, procs[0])
 }
 
 // GetNodes returns the list of proxy nodes in the cluster
@@ -301,45 +356,61 @@ func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Param domain query string false "Domain to act on"
-// @Success 200 {array} api.ClusterProcess
+// @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
+// @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
+// @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
+// @Param idpattern query string false "Glob pattern for process IDs. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Success 200 {array} api.Process
 // @Failure 404 {object} api.Error
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/process [get]
 func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
-	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
+		return r == rune(',')
+	})
+	reference := util.DefaultQuery(c, "reference", "")
+	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
+		return r == rune(',')
+	})
+	domain := util.DefaultQuery(c, "domain", "")
+	idpattern := util.DefaultQuery(c, "idpattern", "")
+	refpattern := util.DefaultQuery(c, "refpattern", "")
+	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
+	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
 	peer, err := h.proxy.GetNode(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
 	}
 
-	procs, err := peer.ProcessList()
+	procs, err := peer.ProcessList(proxy.ProcessListOptions{
+		ID:            wantids,
+		Filter:        filter,
+		Domain:        domain,
+		Reference:     reference,
+		IDPattern:     idpattern,
+		RefPattern:    refpattern,
+		OwnerPattern:  ownerpattern,
+		DomainPattern: domainpattern,
+	})
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "Node not connected: %s", err)
+		return api.Err(http.StatusInternalServerError, "", "Node not available: %s", err)
 	}
 
-	processes := []api.ClusterProcess{}
+	processes := []clientapi.Process{}
 
 	for _, p := range procs {
 		if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
 			continue
 		}
 
-		processes = append(processes, api.ClusterProcess{
-			ID:        p.Config.ID,
-			Owner:     p.Config.Owner,
-			Domain:    p.Config.Domain,
-			NodeID:    p.NodeID,
-			Reference: p.Config.Reference,
-			Order:     p.Order,
-			State:     p.State,
-			CPU:       json.ToNumber(p.CPU),
-			Memory:    p.Mem,
-			Runtime:   int64(p.Runtime.Seconds()),
-		})
+		processes = append(processes, p)
 	}
 
 	return c.JSON(http.StatusOK, processes)

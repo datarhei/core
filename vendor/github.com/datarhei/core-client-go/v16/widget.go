@@ -13,7 +13,7 @@ func (r *restclient) WidgetProcess(id ProcessID) (api.WidgetProcess, error) {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/widget/process"+url.PathEscape(id.ID), query, "", nil)
+	data, err := r.call("GET", "/v3/widget/process"+url.PathEscape(id.ID), query, nil, "", nil)
 	if err != nil {
 		return w, err
 	}

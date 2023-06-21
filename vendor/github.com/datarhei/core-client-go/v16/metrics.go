@@ -10,7 +10,7 @@ import (
 func (r *restclient) MetricsList() ([]api.MetricsDescription, error) {
 	descriptions := []api.MetricsDescription{}
 
-	data, err := r.call("GET", "/v3/metrics", nil, "application/json", nil)
+	data, err := r.call("GET", "/v3/metrics", nil, nil, "application/json", nil)
 	if err != nil {
 		return descriptions, err
 	}
@@ -27,7 +27,7 @@ func (r *restclient) Metrics(query api.MetricsQuery) (api.MetricsResponse, error
 	e := json.NewEncoder(&buf)
 	e.Encode(query)
 
-	data, err := r.call("POST", "/v3/metrics", nil, "application/json", &buf)
+	data, err := r.call("POST", "/v3/metrics", nil, nil, "application/json", &buf)
 	if err != nil {
 		return m, err
 	}

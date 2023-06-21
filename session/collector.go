@@ -342,7 +342,6 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 
 		// Only log session that have been active
 		logger.Info().Log("Closed")
-		logger.Debug().Log("Closed")
 
 		c.lock.history.Lock()
 
@@ -557,9 +556,10 @@ func (c *collector) Activate(id string) bool {
 		return false
 	}
 
-	c.lock.session.RLock()
+	c.lock.session.Lock()
+	defer c.lock.session.Unlock()
+
 	sess, ok := c.sessions[id]
-	c.lock.session.RUnlock()
 
 	if !ok {
 		return false
@@ -571,7 +571,6 @@ func (c *collector) Activate(id string) bool {
 		c.totalSessions++
 
 		sess.logger.Info().Log("Active")
-		sess.logger.Debug().Log("Active")
 
 		return true
 	}

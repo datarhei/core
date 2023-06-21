@@ -13,7 +13,7 @@ func (r *restclient) Log() ([]api.LogEvent, error) {
 	query := &url.Values{}
 	query.Set("format", "raw")
 
-	data, err := r.call("GET", "/v3/log", query, "", nil)
+	data, err := r.call("GET", "/v3/log", query, nil, "", nil)
 	if err != nil {
 		return log, err
 	}

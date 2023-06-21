@@ -39,12 +39,14 @@ func (p ProcessID) String() string {
 }
 
 type ProcessListOptions struct {
-	ID         []string
-	Filter     []string
-	Domain     string
-	Reference  string
-	IDPattern  string
-	RefPattern string
+	ID            []string
+	Filter        []string
+	Domain        string
+	Reference     string
+	IDPattern     string
+	RefPattern    string
+	OwnerPattern  string
+	DomainPattern string
 }
 
 func (p *ProcessListOptions) Query() *url.Values {
@@ -55,6 +57,8 @@ func (p *ProcessListOptions) Query() *url.Values {
 	values.Set("reference", p.Reference)
 	values.Set("idpattern", p.IDPattern)
 	values.Set("refpattern", p.RefPattern)
+	values.Set("ownerpattern", p.OwnerPattern)
+	values.Set("domainpattern", p.DomainPattern)
 
 	return values
 }
@@ -62,7 +66,7 @@ func (p *ProcessListOptions) Query() *url.Values {
 func (r *restclient) ProcessList(opts ProcessListOptions) ([]api.Process, error) {
 	var processes []api.Process
 
-	data, err := r.call("GET", "/v3/process", opts.Query(), "", nil)
+	data, err := r.call("GET", "/v3/process", opts.Query(), nil, "", nil)
 	if err != nil {
 		return processes, err
 	}
@@ -79,7 +83,7 @@ func (r *restclient) Process(id ProcessID, filter []string) (api.Process, error)
 	values.Set("filter", strings.Join(filter, ","))
 	values.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID), values, "", nil)
+	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID), values, nil, "", nil)
 	if err != nil {
 		return info, err
 	}
@@ -95,7 +99,7 @@ func (r *restclient) ProcessAdd(p api.ProcessConfig) error {
 	e := json.NewEncoder(&buf)
 	e.Encode(p)
 
-	_, err := r.call("POST", "/v3/process", nil, "application/json", &buf)
+	_, err := r.call("POST", "/v3/process", nil, nil, "application/json", &buf)
 	if err != nil {
 		return err
 	}
@@ -112,7 +116,7 @@ func (r *restclient) ProcessUpdate(id ProcessID, p api.ProcessConfig) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", &buf)
 	if err != nil {
 		return err
 	}
@@ -124,7 +128,7 @@ func (r *restclient) ProcessDelete(id ProcessID) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	r.call("DELETE", "/v3/process/"+url.PathEscape(id.ID), query, "", nil)
+	r.call("DELETE", "/v3/process/"+url.PathEscape(id.ID), query, nil, "", nil)
 
 	return nil
 }
@@ -140,7 +144,7 @@ func (r *restclient) ProcessCommand(id ProcessID, command string) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", &buf)
 	if err != nil {
 		return err
 	}
@@ -154,7 +158,7 @@ func (r *restclient) ProcessProbe(id ProcessID) (api.Probe, error) {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/probe", query, "", nil)
+	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/probe", query, nil, "", nil)
 	if err != nil {
 		return p, err
 	}
@@ -170,7 +174,7 @@ func (r *restclient) ProcessConfig(id ProcessID) (api.ProcessConfig, error) {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/config", query, "", nil)
+	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/config", query, nil, "", nil)
 	if err != nil {
 		return p, err
 	}
@@ -186,7 +190,7 @@ func (r *restclient) ProcessReport(id ProcessID) (api.ProcessReport, error) {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, "", nil)
+	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "", nil)
 	if err != nil {
 		return p, err
 	}
@@ -202,7 +206,7 @@ func (r *restclient) ProcessState(id ProcessID) (api.ProcessState, error) {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/state", query, "", nil)
+	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/state", query, nil, "", nil)
 	if err != nil {
 		return p, err
 	}
@@ -223,7 +227,7 @@ func (r *restclient) ProcessMetadata(id ProcessID, key string) (api.Metadata, er
 		path += "/" + url.PathEscape(key)
 	}
 
-	data, err := r.call("GET", path, query, "", nil)
+	data, err := r.call("GET", path, query, nil, "", nil)
 	if err != nil {
 		return m, err
 	}
@@ -242,7 +246,7 @@ func (r *restclient) ProcessMetadataSet(id ProcessID, key string, metadata api.M
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", &buf)
 	if err != nil {
 		return err
 	}

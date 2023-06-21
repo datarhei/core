@@ -698,7 +698,7 @@ const docTemplateClusterAPI = `{
                     "type": "integer"
                 },
                 "logPatterns": {
-                    "description": "will we interpreted as regualr expressions",
+                    "description": "will we interpreted as regular expressions",
                     "type": "array",
                     "items": {
                         "type": "string"
