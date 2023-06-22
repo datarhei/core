@@ -39,6 +39,7 @@ type Cluster interface {
 	// CoreAPIAddress returns the address of the core API of a node with
 	// the given raft address.
 	CoreAPIAddress(raftAddress string) (string, error)
+	CoreConfig() *config.Config
 
 	About() (ClusterAbout, error)
 
@@ -359,6 +360,10 @@ func (c *cluster) CoreAPIAddress(raftAddress string) (string, error) {
 	coreAddress, err := client.CoreAPIAddress()
 
 	return coreAddress, err
+}
+
+func (c *cluster) CoreConfig() *config.Config {
+	return c.config.Clone()
 }
 
 func (c *cluster) Shutdown() error {

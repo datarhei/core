@@ -158,6 +158,402 @@ definitions:
       message:
         type: string
     type: object
+  config.Config:
+    properties:
+      address:
+        type: string
+      api:
+        properties:
+          access:
+            properties:
+              http:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              https:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+          auth:
+            properties:
+              auth0:
+                properties:
+                  enable:
+                    type: boolean
+                  tenants:
+                    items:
+                      $ref: '#/definitions/value.Auth0Tenant'
+                    type: array
+                type: object
+              disable_localhost:
+                type: boolean
+              enable:
+                type: boolean
+              jwt:
+                properties:
+                  secret:
+                    type: string
+                type: object
+              password:
+                type: string
+              username:
+                type: string
+            type: object
+          read_only:
+            type: boolean
+        type: object
+      cluster:
+        properties:
+          address:
+            description: ip:port
+            type: string
+          debug:
+            type: boolean
+          emergency_leader_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
+          enable:
+            type: boolean
+          node_recover_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
+          peers:
+            items:
+              type: string
+            type: array
+          sync_interval_sec:
+            description: seconds
+            format: int64
+            type: integer
+        type: object
+      created_at:
+        description: When this config has been persisted
+        type: string
+      db:
+        properties:
+          dir:
+            type: string
+        type: object
+      debug:
+        properties:
+          auto_max_procs:
+            type: boolean
+          force_gc:
+            description: deprecated, use MemoryLimit instead
+            format: int
+            type: integer
+          memory_limit_mbytes:
+            format: int64
+            type: integer
+          profiling:
+            type: boolean
+        type: object
+      ffmpeg:
+        properties:
+          access:
+            properties:
+              input:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+              output:
+                properties:
+                  allow:
+                    items:
+                      type: string
+                    type: array
+                  block:
+                    items:
+                      type: string
+                    type: array
+                type: object
+            type: object
+          binary:
+            type: string
+          log:
+            properties:
+              max_history:
+                format: int
+                type: integer
+              max_lines:
+                format: int
+                type: integer
+              max_minimal_history:
+                format: int
+                type: integer
+            type: object
+          max_processes:
+            format: int64
+            type: integer
+        type: object
+      host:
+        properties:
+          auto:
+            type: boolean
+          name:
+            items:
+              type: string
+            type: array
+        type: object
+      id:
+        type: string
+      log:
+        properties:
+          level:
+            enum:
+            - debug
+            - info
+            - warn
+            - error
+            - silent
+            type: string
+          max_lines:
+            format: int
+            type: integer
+          topics:
+            items:
+              type: string
+            type: array
+        type: object
+      metrics:
+        properties:
+          enable:
+            type: boolean
+          enable_prometheus:
+            type: boolean
+          interval_sec:
+            description: seconds
+            format: int64
+            type: integer
+          range_sec:
+            description: seconds
+            format: int64
+            type: integer
+        type: object
+      name:
+        type: string
+      playout:
+        properties:
+          enable:
+            type: boolean
+          max_port:
+            format: int
+            type: integer
+          min_port:
+            format: int
+            type: integer
+        type: object
+      resources:
+        properties:
+          max_cpu_usage:
+            description: percent 0-100
+            type: number
+          max_memory_usage:
+            description: percent 0-100
+            type: number
+        type: object
+      router:
+        properties:
+          blocked_prefixes:
+            items:
+              type: string
+            type: array
+          routes:
+            additionalProperties:
+              type: string
+            type: object
+          ui_path:
+            type: string
+        type: object
+      rtmp:
+        properties:
+          address:
+            type: string
+          address_tls:
+            type: string
+          app:
+            type: string
+          enable:
+            type: boolean
+          enable_tls:
+            type: boolean
+          token:
+            description: Deprecated, use IAM
+            type: string
+        type: object
+      service:
+        properties:
+          enable:
+            type: boolean
+          token:
+            type: string
+          url:
+            type: string
+        type: object
+      sessions:
+        properties:
+          enable:
+            type: boolean
+          ip_ignorelist:
+            items:
+              type: string
+            type: array
+          max_bitrate_mbit:
+            format: uint64
+            type: integer
+          max_sessions:
+            format: uint64
+            type: integer
+          persist:
+            type: boolean
+          persist_interval_sec:
+            format: int
+            type: integer
+          session_log_buffer_sec:
+            format: int
+            type: integer
+          session_log_path_pattern:
+            type: string
+          session_timeout_sec:
+            format: int
+            type: integer
+        type: object
+      srt:
+        properties:
+          address:
+            type: string
+          enable:
+            type: boolean
+          log:
+            properties:
+              enable:
+                type: boolean
+              topics:
+                items:
+                  type: string
+                type: array
+            type: object
+          passphrase:
+            type: string
+          token:
+            description: Deprecated, use IAM
+            type: string
+        type: object
+      storage:
+        properties:
+          cors:
+            properties:
+              origins:
+                items:
+                  type: string
+                type: array
+            type: object
+          disk:
+            properties:
+              cache:
+                properties:
+                  enable:
+                    type: boolean
+                  max_file_size_mbytes:
+                    format: uint64
+                    type: integer
+                  max_size_mbytes:
+                    format: uint64
+                    type: integer
+                  ttl_seconds:
+                    format: int64
+                    type: integer
+                  types:
+                    properties:
+                      allow:
+                        items:
+                          type: string
+                        type: array
+                      block:
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+              dir:
+                type: string
+              max_size_mbytes:
+                format: int64
+                type: integer
+            type: object
+          memory:
+            properties:
+              auth:
+                description: Deprecated, use IAM
+                properties:
+                  enable:
+                    description: Deprecated, use IAM
+                    type: boolean
+                  password:
+                    description: Deprecated, use IAM
+                    type: string
+                  username:
+                    description: Deprecated, use IAM
+                    type: string
+                type: object
+              max_size_mbytes:
+                format: int64
+                type: integer
+              purge:
+                type: boolean
+            type: object
+          mimetypes_file:
+            type: string
+          s3:
+            items:
+              $ref: '#/definitions/value.S3Storage'
+            type: array
+        type: object
+      tls:
+        properties:
+          address:
+            type: string
+          auto:
+            type: boolean
+          cert_file:
+            type: string
+          email:
+            type: string
+          enable:
+            type: boolean
+          key_file:
+            type: string
+        type: object
+      update_check:
+        type: boolean
+      version:
+        format: int64
+        type: integer
+    type: object
   identity.Auth0Tenant:
     properties:
       audience:
@@ -215,6 +611,54 @@ definitions:
           type: string
         type: array
     type: object
+  value.Auth0Tenant:
+    properties:
+      audience:
+        type: string
+      clientid:
+        type: string
+      domain:
+        type: string
+      users:
+        items:
+          type: string
+        type: array
+    type: object
+  value.S3Storage:
+    properties:
+      access_key_id:
+        type: string
+      auth:
+        allOf:
+        - $ref: '#/definitions/value.S3StorageAuth'
+        description: Deprecated, use IAM
+      bucket:
+        type: string
+      endpoint:
+        type: string
+      mountpoint:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      secret_access_key:
+        type: string
+      use_ssl:
+        type: boolean
+    type: object
+  value.S3StorageAuth:
+    properties:
+      enable:
+        description: Deprecated, use IAM
+        type: boolean
+      password:
+        description: Deprecated, use IAM
+        type: string
+      username:
+        description: Deprecated, use IAM
+        type: string
+    type: object
 info:
   contact:
     email: hello@datarhei.com
@@ -238,11 +682,21 @@ paths:
           description: OK
           schema:
             type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/cluster.Error'
       summary: Core API address and login
+      tags:
+      - v1.0.0
+  /v1/core/config:
+    get:
+      description: Core config of this node
+      operationId: cluster-1-core-config
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/config.Config'
+      summary: Core config
       tags:
       - v1.0.0
   /v1/iam/user:
@@ -448,6 +902,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
         "508":
           description: Loop Detected
           schema:
@@ -511,6 +969,10 @@ paths:
             type: string
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/cluster.Error'
         "508":

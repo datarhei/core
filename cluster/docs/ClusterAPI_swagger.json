@@ -33,11 +33,26 @@
                         "schema": {
                             "type": "string"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
+                    }
+                }
+            }
+        },
+        "/v1/core/config": {
+            "get": {
+                "description": "Core config of this node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Core config",
+                "operationId": "cluster-1-core-config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/cluster.Error"
+                            "$ref": "#/definitions/config.Config"
                         }
                     }
                 }
@@ -348,6 +363,12 @@
                             "$ref": "#/definitions/cluster.Error"
                         }
                     },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
                     "508": {
                         "description": "Loop Detected",
                         "schema": {
@@ -442,6 +463,12 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/cluster.Error"
                         }
@@ -1068,6 +1095,595 @@
                 }
             }
         },
+        "config.Config": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "api": {
+                    "type": "object",
+                    "properties": {
+                        "access": {
+                            "type": "object",
+                            "properties": {
+                                "http": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "https": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "object",
+                            "properties": {
+                                "auth0": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "type": "boolean"
+                                        },
+                                        "tenants": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/value.Auth0Tenant"
+                                            }
+                                        }
+                                    }
+                                },
+                                "disable_localhost": {
+                                    "type": "boolean"
+                                },
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "jwt": {
+                                    "type": "object",
+                                    "properties": {
+                                        "secret": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "password": {
+                                    "type": "string"
+                                },
+                                "username": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "read_only": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "cluster": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "description": "ip:port",
+                            "type": "string"
+                        },
+                        "debug": {
+                            "type": "boolean"
+                        },
+                        "emergency_leader_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "node_recover_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
+                        "peers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "sync_interval_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                },
+                "created_at": {
+                    "description": "When this config has been persisted",
+                    "type": "string"
+                },
+                "db": {
+                    "type": "object",
+                    "properties": {
+                        "dir": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "debug": {
+                    "type": "object",
+                    "properties": {
+                        "auto_max_procs": {
+                            "type": "boolean"
+                        },
+                        "force_gc": {
+                            "description": "deprecated, use MemoryLimit instead",
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "memory_limit_mbytes": {
+                            "type": "integer",
+                            "format": "int64"
+                        },
+                        "profiling": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "ffmpeg": {
+                    "type": "object",
+                    "properties": {
+                        "access": {
+                            "type": "object",
+                            "properties": {
+                                "input": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
+                                "output": {
+                                    "type": "object",
+                                    "properties": {
+                                        "allow": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "block": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "binary": {
+                            "type": "string"
+                        },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "max_history": {
+                                    "type": "integer",
+                                    "format": "int"
+                                },
+                                "max_lines": {
+                                    "type": "integer",
+                                    "format": "int"
+                                },
+                                "max_minimal_history": {
+                                    "type": "integer",
+                                    "format": "int"
+                                }
+                            }
+                        },
+                        "max_processes": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                },
+                "host": {
+                    "type": "object",
+                    "properties": {
+                        "auto": {
+                            "type": "boolean"
+                        },
+                        "name": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "log": {
+                    "type": "object",
+                    "properties": {
+                        "level": {
+                            "type": "string",
+                            "enum": [
+                                "debug",
+                                "info",
+                                "warn",
+                                "error",
+                                "silent"
+                            ]
+                        },
+                        "max_lines": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "topics": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "enable_prometheus": {
+                            "type": "boolean"
+                        },
+                        "interval_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
+                        "range_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "playout": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "max_port": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "min_port": {
+                            "type": "integer",
+                            "format": "int"
+                        }
+                    }
+                },
+                "resources": {
+                    "type": "object",
+                    "properties": {
+                        "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        }
+                    }
+                },
+                "router": {
+                    "type": "object",
+                    "properties": {
+                        "blocked_prefixes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "routes": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "ui_path": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "rtmp": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "address_tls": {
+                            "type": "string"
+                        },
+                        "app": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "enable_tls": {
+                            "type": "boolean"
+                        },
+                        "token": {
+                            "description": "Deprecated, use IAM",
+                            "type": "string"
+                        }
+                    }
+                },
+                "service": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "token": {
+                            "type": "string"
+                        },
+                        "url": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "sessions": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "ip_ignorelist": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "max_bitrate_mbit": {
+                            "type": "integer",
+                            "format": "uint64"
+                        },
+                        "max_sessions": {
+                            "type": "integer",
+                            "format": "uint64"
+                        },
+                        "persist": {
+                            "type": "boolean"
+                        },
+                        "persist_interval_sec": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "session_log_buffer_sec": {
+                            "type": "integer",
+                            "format": "int"
+                        },
+                        "session_log_path_pattern": {
+                            "type": "string"
+                        },
+                        "session_timeout_sec": {
+                            "type": "integer",
+                            "format": "int"
+                        }
+                    }
+                },
+                "srt": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "log": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "topics": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "passphrase": {
+                            "type": "string"
+                        },
+                        "token": {
+                            "description": "Deprecated, use IAM",
+                            "type": "string"
+                        }
+                    }
+                },
+                "storage": {
+                    "type": "object",
+                    "properties": {
+                        "cors": {
+                            "type": "object",
+                            "properties": {
+                                "origins": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        },
+                        "disk": {
+                            "type": "object",
+                            "properties": {
+                                "cache": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "type": "boolean"
+                                        },
+                                        "max_file_size_mbytes": {
+                                            "type": "integer",
+                                            "format": "uint64"
+                                        },
+                                        "max_size_mbytes": {
+                                            "type": "integer",
+                                            "format": "uint64"
+                                        },
+                                        "ttl_seconds": {
+                                            "type": "integer",
+                                            "format": "int64"
+                                        },
+                                        "types": {
+                                            "type": "object",
+                                            "properties": {
+                                                "allow": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "block": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "dir": {
+                                    "type": "string"
+                                },
+                                "max_size_mbytes": {
+                                    "type": "integer",
+                                    "format": "int64"
+                                }
+                            }
+                        },
+                        "memory": {
+                            "type": "object",
+                            "properties": {
+                                "auth": {
+                                    "description": "Deprecated, use IAM",
+                                    "type": "object",
+                                    "properties": {
+                                        "enable": {
+                                            "description": "Deprecated, use IAM",
+                                            "type": "boolean"
+                                        },
+                                        "password": {
+                                            "description": "Deprecated, use IAM",
+                                            "type": "string"
+                                        },
+                                        "username": {
+                                            "description": "Deprecated, use IAM",
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "max_size_mbytes": {
+                                    "type": "integer",
+                                    "format": "int64"
+                                },
+                                "purge": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "mimetypes_file": {
+                            "type": "string"
+                        },
+                        "s3": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/value.S3Storage"
+                            }
+                        }
+                    }
+                },
+                "tls": {
+                    "type": "object",
+                    "properties": {
+                        "address": {
+                            "type": "string"
+                        },
+                        "auto": {
+                            "type": "boolean"
+                        },
+                        "cert_file": {
+                            "type": "string"
+                        },
+                        "email": {
+                            "type": "string"
+                        },
+                        "enable": {
+                            "type": "boolean"
+                        },
+                        "key_file": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "update_check": {
+                    "type": "boolean"
+                },
+                "version": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
         "identity.Auth0Tenant": {
             "type": "object",
             "properties": {
@@ -1152,6 +1768,80 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "value.Auth0Tenant": {
+            "type": "object",
+            "properties": {
+                "audience": {
+                    "type": "string"
+                },
+                "clientid": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "value.S3Storage": {
+            "type": "object",
+            "properties": {
+                "access_key_id": {
+                    "type": "string"
+                },
+                "auth": {
+                    "description": "Deprecated, use IAM",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/value.S3StorageAuth"
+                        }
+                    ]
+                },
+                "bucket": {
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "mountpoint": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "secret_access_key": {
+                    "type": "string"
+                },
+                "use_ssl": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "value.S3StorageAuth": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "description": "Deprecated, use IAM",
+                    "type": "boolean"
+                },
+                "password": {
+                    "description": "Deprecated, use IAM",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "Deprecated, use IAM",
+                    "type": "string"
                 }
             }
         }
