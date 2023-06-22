@@ -87,3 +87,8 @@ type ClusterProcess struct {
 	Memory    uint64      `json:"memory_bytes"`                                      // bytes
 	Runtime   int64       `json:"runtime_seconds"`                                   // seconds
 }
+
+type ClusterLock struct {
+	Name       string    `json:"name"`
+	ValidUntil time.Time `json:"valid_until"`
+}

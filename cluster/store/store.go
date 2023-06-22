@@ -28,6 +28,8 @@ type Store interface {
 	GetUser(name string) Users
 	ListPolicies() Policies
 	ListUserPolicies(name string) Policies
+
+	ListLocks() map[string]time.Time
 }
 
 type Process struct {
@@ -59,6 +61,8 @@ const (
 	OpRemoveIdentity     Operation = "removeIdentity"
 	OpSetPolicies        Operation = "setPolicies"
 	OpSetProcessNodeMap  Operation = "setProcessNodeMap"
+	OpCreateLock         Operation = "createLock"
+	OpDeleteLock         Operation = "deleteLock"
 )
 
 type Command struct {
@@ -107,6 +111,15 @@ type CommandSetProcessNodeMap struct {
 	Map map[string]string
 }
 
+type CommandCreateLock struct {
+	Name       string
+	ValidUntil time.Time
+}
+
+type CommandDeleteLock struct {
+	Name string
+}
+
 type storeData struct {
 	Version        uint64
 	Process        map[string]Process
@@ -121,6 +134,8 @@ type storeData struct {
 		UpdatedAt time.Time
 		Policies  map[string][]access.Policy
 	}
+
+	Locks map[string]time.Time
 }
 
 func (s *storeData) init() {
@@ -133,6 +148,7 @@ func (s *storeData) init() {
 	s.Users.Users = map[string]identity.User{}
 	s.Policies.UpdatedAt = now
 	s.Policies.Policies = map[string][]access.Policy{}
+	s.Locks = map[string]time.Time{}
 }
 
 // store implements a raft.FSM
@@ -314,6 +330,30 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.setProcessNodeMap(cmd)
+	case OpCreateLock:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandCreateLock{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.createLock(cmd)
+	case OpDeleteLock:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandDeleteLock{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.deleteLock(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -538,6 +578,36 @@ func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
 	return nil
 }
 
+func (s *store) createLock(cmd CommandCreateLock) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	validUntil, ok := s.data.Locks[cmd.Name]
+
+	if ok {
+		if time.Now().Before(validUntil) {
+			return fmt.Errorf("the lock with the ID '%s' already exists", cmd.Name)
+		}
+	}
+
+	s.data.Locks[cmd.Name] = cmd.ValidUntil
+
+	return nil
+}
+
+func (s *store) deleteLock(cmd CommandDeleteLock) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if _, ok := s.data.Locks[cmd.Name]; !ok {
+		return nil
+	}
+
+	delete(s.data.Locks, cmd.Name)
+
+	return nil
+}
+
 func (s *store) OnApply(fn func(op Operation)) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -695,6 +765,19 @@ func (s *store) GetProcessNodeMap() map[string]string {
 	m := map[string]string{}
 
 	for key, value := range s.data.ProcessNodeMap {
+		m[key] = value
+	}
+
+	return m
+}
+
+func (s *store) ListLocks() map[string]time.Time {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := map[string]time.Time{}
+
+	for key, value := range s.data.Locks {
 		m[key] = value
 	}
 

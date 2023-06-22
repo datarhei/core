@@ -154,6 +154,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/db/locks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of locks in the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List locks in the cluster DB",
+                "operationId": "cluster-3-db-list-locks",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterLock"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/db/policies": {
             "get": {
                 "security": [
@@ -4070,6 +4099,17 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.ClusterRaft"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterLock": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "valid_until": {
                     "type": "string"
                 }
             }

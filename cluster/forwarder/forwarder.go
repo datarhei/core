@@ -31,6 +31,9 @@ type Forwarder interface {
 	UpdateIdentity(origin, name string, identity iamidentity.User) error
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
+
+	CreateLock(origin string, name string, validUntil time.Time) error
+	DeleteLock(origin string, name string) error
 }
 
 type forwarder struct {
@@ -257,4 +260,33 @@ func (f *forwarder) RemoveIdentity(origin string, name string) error {
 	f.lock.RUnlock()
 
 	return client.RemoveIdentity(origin, name)
+}
+
+func (f *forwarder) CreateLock(origin string, name string, validUntil time.Time) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.LockRequest{
+		Name:       name,
+		ValidUntil: validUntil,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.Lock(origin, r)
+}
+
+func (f *forwarder) DeleteLock(origin string, name string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.Unlock(origin, name)
 }

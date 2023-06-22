@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
@@ -33,6 +34,7 @@ func TestCreateStore(t *testing.T) {
 	require.NotNil(t, s.data.ProcessNodeMap)
 	require.NotNil(t, s.data.Users.Users)
 	require.NotNil(t, s.data.Policies.Policies)
+	require.NotNil(t, s.data.Locks)
 }
 
 func TestAddProcessCommand(t *testing.T) {
@@ -851,6 +853,101 @@ func TestSetProcessNodeMap(t *testing.T) {
 
 	m := s.GetProcessNodeMap()
 	require.Equal(t, m2, m)
+}
+
+func TestCreateLockCommand(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	err = s.applyCommand(Command{
+		Operation: OpCreateLock,
+		Data: CommandCreateLock{
+			Name:       "foobar",
+			ValidUntil: time.Now().Add(3 * time.Second),
+		},
+	})
+	require.NoError(t, err)
+
+	_, ok := s.data.Locks["foobar"]
+	require.True(t, ok)
+}
+
+func TestCreateLock(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	cmd := CommandCreateLock{
+		Name:       "foobar",
+		ValidUntil: time.Now().Add(3 * time.Second),
+	}
+
+	err = s.createLock(cmd)
+	require.NoError(t, err)
+
+	err = s.createLock(cmd)
+	require.Error(t, err)
+
+	require.Eventually(t, func() bool {
+		err = s.createLock(cmd)
+		return err == nil
+	}, 5*time.Second, time.Second)
+}
+
+func TestDeleteLockCommand(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	err = s.applyCommand(Command{
+		Operation: OpCreateLock,
+		Data: CommandCreateLock{
+			Name:       "foobar",
+			ValidUntil: time.Now().Add(10 * time.Second),
+		},
+	})
+	require.NoError(t, err)
+
+	_, ok := s.data.Locks["foobar"]
+	require.True(t, ok)
+
+	err = s.applyCommand(Command{
+		Operation: OpDeleteLock,
+		Data: CommandDeleteLock{
+			Name: "foobar",
+		},
+	})
+	require.NoError(t, err)
+
+	_, ok = s.data.Locks["foobar"]
+	require.False(t, ok)
+}
+
+func TestDeleteLock(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	err = s.deleteLock(CommandDeleteLock{
+		Name: "foobar",
+	})
+	require.NoError(t, err)
+
+	cmd := CommandCreateLock{
+		Name:       "foobar",
+		ValidUntil: time.Now().Add(10 * time.Second),
+	}
+
+	err = s.createLock(cmd)
+	require.NoError(t, err)
+
+	err = s.createLock(cmd)
+	require.Error(t, err)
+
+	err = s.deleteLock(CommandDeleteLock{
+		Name: "foobar",
+	})
+	require.NoError(t, err)
+
+	err = s.createLock(cmd)
+	require.NoError(t, err)
 }
 
 func TestApplyCommand(t *testing.T) {

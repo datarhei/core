@@ -111,6 +111,13 @@ definitions:
       raft_address:
         type: string
     type: object
+  client.LockRequest:
+    properties:
+      name:
+        type: string
+      valid_until:
+        type: string
+    type: object
   client.SetPoliciesRequest:
     properties:
       policies:
@@ -227,9 +234,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            items:
-              $ref: '#/definitions/cluster.Error'
-            type: array
+            $ref: '#/definitions/cluster.Error'
       summary: Core API address and login
       tags:
       - v1.0.0
@@ -376,6 +381,71 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Set identity policies
+      tags:
+      - v1.0.0
+  /v1/lock:
+    post:
+      description: Acquire a named lock
+      operationId: cluster-1-lock
+      parameters:
+      - description: Lock request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.LockRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Acquire a named lock
+      tags:
+      - v1.0.0
+  /v1/lock/{name}:
+    delete:
+      description: Remove a lock
+      operationId: cluster-1-unlock
+      parameters:
+      - description: Lock name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove a lock
       tags:
       - v1.0.0
   /v1/process:

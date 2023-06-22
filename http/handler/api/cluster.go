@@ -1191,3 +1191,27 @@ func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, "OK")
 }
+
+// ListStoreLocks returns the list of currently stored locks
+// @Summary List locks in the cluster DB
+// @Description List of locks in the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-db-list-locks
+// @Produce json
+// @Success 200 {array} api.ClusterLock
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/locks [get]
+func (h *ClusterHandler) ListStoreLocks(c echo.Context) error {
+	clusterlocks := h.cluster.ListLocks()
+
+	locks := []api.ClusterLock{}
+
+	for name, validUntil := range clusterlocks {
+		locks = append(locks, api.ClusterLock{
+			Name:       name,
+			ValidUntil: validUntil,
+		})
+	}
+
+	return c.JSON(http.StatusOK, locks)
+}

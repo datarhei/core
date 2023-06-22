@@ -45,10 +45,7 @@ const docTemplateClusterAPI = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/cluster.Error"
-                            }
+                            "$ref": "#/definitions/cluster.Error"
                         }
                     }
                 }
@@ -257,6 +254,104 @@ const docTemplateClusterAPI = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/lock": {
+            "post": {
+                "description": "Acquire a named lock",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Acquire a named lock",
+                "operationId": "cluster-1-lock",
+                "parameters": [
+                    {
+                        "description": "Lock request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.LockRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/lock/{name}": {
+            "delete": {
+                "description": "Remove a lock",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Remove a lock",
+                "operationId": "cluster-1-unlock",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Lock name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/cluster.Error"
                         }
@@ -806,6 +901,17 @@ const docTemplateClusterAPI = `{
                     "type": "string"
                 },
                 "raft_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "client.LockRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "valid_until": {
                     "type": "string"
                 }
             }

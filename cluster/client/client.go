@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	httpapi "github.com/datarhei/core/v16/http/api"
@@ -41,6 +42,11 @@ type UpdateIdentityRequest struct {
 
 type SetPoliciesRequest struct {
 	Policies []iamaccess.Policy `json:"policies"`
+}
+
+type LockRequest struct {
+	Name       string    `json:"name"`
+	ValidUntil time.Time `json:"valid_until"`
 }
 
 type APIClient struct {
@@ -90,7 +96,7 @@ func (c *APIClient) Join(origin string, r JoinRequest) error {
 }
 
 func (c *APIClient) Leave(origin string, id string) error {
-	_, err := c.call(http.MethodDelete, "/v1/server/"+id, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/server/"+url.PathEscape(id), "application/json", nil, origin)
 
 	return err
 }
@@ -107,7 +113,7 @@ func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
 }
 
 func (c *APIClient) RemoveProcess(origin string, id app.ProcessID) error {
-	_, err := c.call(http.MethodDelete, "/v1/process/"+id.ID+"?domain="+id.Domain, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", nil, origin)
 
 	return err
 }
@@ -118,7 +124,7 @@ func (c *APIClient) UpdateProcess(origin string, id app.ProcessID, r UpdateProce
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/v1/process/"+id.ID+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -129,7 +135,7 @@ func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key stri
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/v1/process/"+id.ID+"/metadata/"+key+"?domain="+id.Domain, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -151,7 +157,7 @@ func (c *APIClient) UpdateIdentity(origin, name string, r UpdateIdentityRequest)
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/v1/iam/user/"+name, "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/iam/user/"+url.PathEscape(name), "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
@@ -162,13 +168,30 @@ func (c *APIClient) SetPolicies(origin, name string, r SetPoliciesRequest) error
 		return err
 	}
 
-	_, err = c.call(http.MethodPut, "/v1/iam/user/"+name+"/policies", "application/json", bytes.NewReader(data), origin)
+	_, err = c.call(http.MethodPut, "/v1/iam/user/"+url.PathEscape(name)+"/policies", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
 
 func (c *APIClient) RemoveIdentity(origin string, name string) error {
-	_, err := c.call(http.MethodDelete, "/v1/iam/user/"+name, "application/json", nil, origin)
+	_, err := c.call(http.MethodDelete, "/v1/iam/user/"+url.PathEscape(name), "application/json", nil, origin)
+
+	return err
+}
+
+func (c *APIClient) Lock(origin string, r LockRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/v1/lock", "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) Unlock(origin string, name string) error {
+	_, err := c.call(http.MethodDelete, "/v1/lock/"+url.PathEscape(name), "application/json", nil, origin)
 
 	return err
 }

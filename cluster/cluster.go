@@ -65,6 +65,10 @@ type Cluster interface {
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 
+	CreateLock(origin string, name string, validUntil time.Time) error
+	DeleteLock(origin string, name string) error
+	ListLocks() map[string]time.Time
+
 	ProxyReader() proxy.ProxyReader
 }
 
@@ -1014,6 +1018,49 @@ func (c *cluster) RemoveIdentity(origin string, name string) error {
 	}
 
 	return c.applyCommand(cmd)
+}
+
+func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.CreateLock(origin, name, validUntil)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpCreateLock,
+		Data: &store.CommandCreateLock{
+			Name:       name,
+			ValidUntil: validUntil,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) DeleteLock(origin string, name string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.DeleteLock(origin, name)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpDeleteLock,
+		Data: &store.CommandDeleteLock{
+			Name: name,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) ListLocks() map[string]time.Time {
+	return c.store.ListLocks()
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {

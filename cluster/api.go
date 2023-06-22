@@ -552,11 +552,79 @@ func (a *api) RemoveIdentity(c echo.Context) error {
 // @ID cluster-1-core-api-address
 // @Produce json
 // @Success 200 {string} string
-// @Success 500 {array} Error
+// @Success 500 {object} Error
 // @Router /v1/core [get]
 func (a *api) CoreAPIAddress(c echo.Context) error {
 	address, _ := a.cluster.CoreAPIAddress("")
 	return c.JSON(http.StatusOK, address)
+}
+
+// Lock tries to acquire a named lock
+// @Summary Acquire a named lock
+// @Description Acquire a named lock
+// @Tags v1.0.0
+// @ID cluster-1-lock
+// @Produce json
+// @Param data body client.LockRequest true "Lock request"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Success 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/lock [post]
+func (a *api) Lock(c echo.Context) error {
+	r := client.LockRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("name", r.Name).Log("Acquire lock")
+
+	err := a.cluster.CreateLock(origin, r.Name, r.ValidUntil)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("name", r.Name).Log("Unable to acquire lock")
+		return Err(http.StatusInternalServerError, "unable to acquire lock", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// Unlock removes a named lock
+// @Summary Remove a lock
+// @Description Remove a lock
+// @Tags v1.0.0
+// @ID cluster-1-unlock
+// @Produce json
+// @Param name path string true "Lock name"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 404 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/lock/{name} [delete]
+func (a *api) Unlock(c echo.Context) error {
+	name := util.PathParam(c, "name")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("name", name).Log("Remove lock request")
+
+	err := a.cluster.DeleteLock(origin, name)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("name", name).Log("Unable to remove lock")
+		return Err(http.StatusInternalServerError, "unable to remove lock", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // Error represents an error response of the API
