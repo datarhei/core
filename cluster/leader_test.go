@@ -22,6 +22,7 @@ func TestSynchronizeAdd(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 50,
 			},
+			Order: "start",
 		},
 	}
 
@@ -101,6 +102,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 20,
 			},
+			Order: "start",
 		},
 		{
 			UpdatedAt: now,
@@ -110,6 +112,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 30,
 			},
+			Order: "start",
 		},
 	}
 
@@ -185,6 +188,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 5,
 			},
+			Order: "start",
 		},
 	}
 
@@ -259,6 +263,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 				LimitCPU:    30,
 				LimitMemory: 5,
 			},
+			Order: "start",
 		},
 	}
 
@@ -308,6 +313,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 				LimitCPU:    1,
 				LimitMemory: 50,
 			},
+			Order: "start",
 		},
 	}
 
@@ -355,6 +361,7 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 			Config: &app.Config{
 				ID: "foobar",
 			},
+			Order: "start",
 		},
 	}
 
@@ -479,6 +486,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 5,
 			},
+			Order: "start",
 		},
 	}
 
@@ -575,6 +583,7 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 20,
 			},
+			Order: "start",
 		},
 		{
 			UpdatedAt: now,
@@ -584,6 +593,7 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 30,
 			},
+			Order: "start",
 		},
 	}
 
@@ -655,6 +665,7 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 20,
 			},
+			Order: "start",
 		},
 		{
 			UpdatedAt: now,
@@ -664,6 +675,7 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 30,
 			},
+			Order: "start",
 		},
 	}
 
@@ -746,6 +758,7 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 20,
 			},
+			Order: "start",
 		},
 		{
 			UpdatedAt: now,
@@ -755,6 +768,7 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 30,
 			},
+			Order: "start",
 		},
 	}
 
@@ -837,6 +851,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 20,
 			},
+			Order: "start",
 		},
 		{
 			UpdatedAt: now,
@@ -846,6 +861,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 				LimitCPU:    10,
 				LimitMemory: 30,
 			},
+			Order: "start",
 		},
 	}
 
