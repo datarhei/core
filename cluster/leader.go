@@ -293,7 +293,10 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 	c.cancelLeaderShip = cancel
 
 	go c.synchronizeAndRebalance(ctx, c.syncInterval, emergency)
-	go c.clearLocks(ctx, time.Minute)
+
+	if !emergency {
+		go c.clearLocks(ctx, time.Minute)
+	}
 
 	return nil
 }
