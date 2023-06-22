@@ -118,6 +118,13 @@ definitions:
       valid_until:
         type: string
     type: object
+  client.SetKVRequest:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
   client.SetPoliciesRequest:
     properties:
       policies:
@@ -381,6 +388,71 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Set identity policies
+      tags:
+      - v1.0.0
+  /v1/kv:
+    post:
+      description: Store value under key
+      operationId: cluster-1-kv-set
+      parameters:
+      - description: Set KV request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetKVRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Store value under key
+      tags:
+      - v1.0.0
+  /v1/kv/{key}:
+    delete:
+      description: Removes a key
+      operationId: cluster-1-kv-unset
+      parameters:
+      - description: Key name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Removes a key
       tags:
       - v1.0.0
   /v1/lock:

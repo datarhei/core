@@ -267,6 +267,104 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/kv": {
+            "post": {
+                "description": "Store value under key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Store value under key",
+                "operationId": "cluster-1-kv-set",
+                "parameters": [
+                    {
+                        "description": "Set KV request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.SetKVRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/kv/{key}": {
+            "delete": {
+                "description": "Removes a key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Removes a key",
+                "operationId": "cluster-1-kv-unset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/lock": {
             "post": {
                 "description": "Acquire a named lock",
@@ -912,6 +1010,17 @@ const docTemplateClusterAPI = `{
                     "type": "string"
                 },
                 "valid_until": {
+                    "type": "string"
+                }
+            }
+        },
+        "client.SetKVRequest": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "value": {
                     "type": "string"
                 }
             }
