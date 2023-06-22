@@ -700,6 +700,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
+			v3.PUT("/cluster/process/:id/command", s.v3handler.cluster.SetProcessCommand)
 			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.SetProcessMetadata)
 
 			v3.PUT("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)

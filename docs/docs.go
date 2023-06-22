@@ -1273,6 +1273,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/process/{id}/command": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Issue a command to a process: start, stop, reload, restart",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Issue a command to a process in the cluster",
+                "operationId": "cluster-3-set-process-command",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Process command",
+                        "name": "command",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.Command"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/process/{id}/metadata/{key}": {
             "put": {
                 "security": [

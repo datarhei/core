@@ -621,6 +621,9 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	// we want to be running on the nodes.
 	wantMap := map[string]store.Process{}
 	for _, process := range want {
+		if process.Order != "start" {
+			continue
+		}
 		pid := process.Config.ProcessID().String()
 		wantMap[pid] = process
 	}
@@ -634,7 +637,8 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 
 	for _, haveP := range have {
 		pid := haveP.Config.ProcessID().String()
-		if wantP, ok := wantMap[pid]; !ok {
+		wantP, ok := wantMap[pid]
+		if !ok {
 			// The process is not on the wantMap. Delete it and adjust the resources.
 			opStack = append(opStack, processOpDelete{
 				nodeid:    haveP.NodeID,
@@ -664,11 +668,12 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		delete(wantMap, pid)
 		reality[pid] = haveP.NodeID
 
-		if haveP.Order != "start" {
+		if haveP.Order != wantP.Order { // wantP.Order is always "start" because we selected only those above
 			opStack = append(opStack, processOpStart{
 				nodeid:    haveP.NodeID,
 				processid: haveP.Config.ProcessID(),
 			})
+
 		}
 
 		haveAfterRemove = append(haveAfterRemove, haveP)

@@ -41,6 +41,7 @@ type Process struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Config    *app.Config
+	Order     string
 	Metadata  map[string]interface{}
 }
 
@@ -65,6 +66,7 @@ const (
 	OpAddProcess         Operation = "addProcess"
 	OpRemoveProcess      Operation = "removeProcess"
 	OpUpdateProcess      Operation = "updateProcess"
+	OpSetProcessOrder    Operation = "setProcessOrder"
 	OpSetProcessMetadata Operation = "setProcessMetadata"
 	OpAddIdentity        Operation = "addIdentity"
 	OpUpdateIdentity     Operation = "updateIdentity"
@@ -94,6 +96,11 @@ type CommandUpdateProcess struct {
 
 type CommandRemoveProcess struct {
 	ID app.ProcessID
+}
+
+type CommandSetProcessOrder struct {
+	ID    app.ProcessID
+	Order string
 }
 
 type CommandSetProcessMetadata struct {
@@ -244,7 +251,7 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	return nil
 }
 
-func convertCommand[T any](cmd T, data any) error {
+func decodeCommand[T any](cmd T, data any) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -261,7 +268,7 @@ func (s *store) applyCommand(c Command) error {
 	switch c.Operation {
 	case OpAddProcess:
 		cmd := CommandAddProcess{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -269,7 +276,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.addProcess(cmd)
 	case OpRemoveProcess:
 		cmd := CommandRemoveProcess{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -277,15 +284,23 @@ func (s *store) applyCommand(c Command) error {
 		err = s.removeProcess(cmd)
 	case OpUpdateProcess:
 		cmd := CommandUpdateProcess{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.updateProcess(cmd)
+	case OpSetProcessOrder:
+		cmd := CommandSetProcessOrder{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setProcessOrder(cmd)
 	case OpSetProcessMetadata:
 		cmd := CommandSetProcessMetadata{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -293,7 +308,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.setProcessMetadata(cmd)
 	case OpAddIdentity:
 		cmd := CommandAddIdentity{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -301,7 +316,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.addIdentity(cmd)
 	case OpUpdateIdentity:
 		cmd := CommandUpdateIdentity{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -309,7 +324,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.updateIdentity(cmd)
 	case OpRemoveIdentity:
 		cmd := CommandRemoveIdentity{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -317,7 +332,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.removeIdentity(cmd)
 	case OpSetPolicies:
 		cmd := CommandSetPolicies{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -325,7 +340,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.setPolicies(cmd)
 	case OpSetProcessNodeMap:
 		cmd := CommandSetProcessNodeMap{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -333,7 +348,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.setProcessNodeMap(cmd)
 	case OpCreateLock:
 		cmd := CommandCreateLock{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -341,7 +356,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.createLock(cmd)
 	case OpDeleteLock:
 		cmd := CommandDeleteLock{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -349,7 +364,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.deleteLock(cmd)
 	case OpClearLocks:
 		cmd := CommandClearLocks{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -357,7 +372,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.clearLocks(cmd)
 	case OpSetKV:
 		cmd := CommandSetKV{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -365,7 +380,7 @@ func (s *store) applyCommand(c Command) error {
 		err = s.setKV(cmd)
 	case OpUnsetKV:
 		cmd := CommandUnsetKV{}
-		err = convertCommand(&cmd, c.Data)
+		err = decodeCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
@@ -394,11 +409,18 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 		return fmt.Errorf("the process with the ID '%s' already exists", id)
 	}
 
+	order := "stop"
+	if cmd.Config.Autostart {
+		order = "start"
+		cmd.Config.Autostart = false
+	}
+
 	now := time.Now()
 	s.data.Process[id] = Process{
 		CreatedAt: now,
 		UpdatedAt: now,
 		Config:    cmd.Config,
+		Order:     order,
 		Metadata:  map[string]interface{}{},
 	}
 
@@ -442,10 +464,10 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	}
 
 	if srcid == dstid {
-		s.data.Process[srcid] = Process{
-			UpdatedAt: time.Now(),
-			Config:    cmd.Config,
-		}
+		p.UpdatedAt = time.Now()
+		p.Config = cmd.Config
+
+		s.data.Process[srcid] = p
 
 		return nil
 	}
@@ -455,11 +477,33 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return fmt.Errorf("the process with the ID '%s' already exists", dstid)
 	}
 
+	now := time.Now()
+
+	p.CreatedAt = now
+	p.UpdatedAt = now
+	p.Config = cmd.Config
+
 	delete(s.data.Process, srcid)
-	s.data.Process[dstid] = Process{
-		UpdatedAt: time.Now(),
-		Config:    cmd.Config,
+	s.data.Process[dstid] = p
+
+	return nil
+}
+
+func (s *store) setProcessOrder(cmd CommandSetProcessOrder) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	id := cmd.ID.String()
+
+	p, ok := s.data.Process[id]
+	if !ok {
+		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
 	}
+
+	p.Order = cmd.Order
+	p.UpdatedAt = time.Now()
+
+	s.data.Process[id] = p
 
 	return nil
 }
@@ -736,6 +780,7 @@ func (s *store) ListProcesses() []Process {
 			CreatedAt: p.CreatedAt,
 			UpdatedAt: p.UpdatedAt,
 			Config:    p.Config.Clone(),
+			Order:     p.Order,
 			Metadata:  p.Metadata,
 		})
 	}

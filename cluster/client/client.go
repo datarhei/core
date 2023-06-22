@@ -29,6 +29,10 @@ type UpdateProcessRequest struct {
 	Config app.Config `json:"config"`
 }
 
+type SetProcessCommandRequest struct {
+	Command string `json:"order"`
+}
+
 type SetProcessMetadataRequest struct {
 	Metadata interface{} `json:"metadata"`
 }
@@ -146,6 +150,17 @@ func (c *APIClient) UpdateProcess(origin string, id app.ProcessID, r UpdateProce
 	}
 
 	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) SetProcessCommand(origin string, id app.ProcessID, r SetProcessCommandRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"/command?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
 
 	return err
 }

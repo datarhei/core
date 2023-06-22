@@ -132,6 +132,11 @@ definitions:
           $ref: '#/definitions/access.Policy'
         type: array
     type: object
+  client.SetProcessCommandRequest:
+    properties:
+      order:
+        type: string
+    type: object
   client.SetProcessMetadataRequest:
     properties:
       metadata: {}
@@ -1094,6 +1099,44 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Replace an existing process
+      tags:
+      - v1.0.0
+  /v1/process/{id}/command:
+    put:
+      description: Set the order for a process.
+      operationId: cluster-3-set-process-order
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Process order
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetProcessCommandRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Set the order for a process
       tags:
       - v1.0.0
   /v1/process/{id}/metadata/{key}:

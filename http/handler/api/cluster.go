@@ -595,6 +595,58 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 	return c.JSON(http.StatusOK, process)
 }
 
+// Command issues a command to a process in the cluster
+// @Summary Issue a command to a process in the cluster
+// @Description Issue a command to a process: start, stop, reload, restart
+// @Tags v16.?.?
+// @ID cluster-3-set-process-command
+// @Accept json
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param command body api.Command true "Process command"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/command [put]
+func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "Forbidden")
+	}
+
+	var command api.Command
+
+	if err := util.ShouldBindJSON(c, &command); err != nil {
+		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+	}
+
+	pid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	switch command.Command {
+	case "start":
+	case "stop":
+	case "restart":
+	case "reload":
+	default:
+		return api.Err(http.StatusBadRequest, "", "unknown command provided. known commands are: start, stop, reload, restart")
+	}
+
+	if err := h.cluster.SetProcessCommand("", pid, command.Command); err != nil {
+		return api.Err(http.StatusNotFound, "", "command failed: %s", err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // SetProcessMetadata stores metadata with a process
 // @Summary Add JSON metadata with a process under the given key
 // @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
@@ -618,17 +670,17 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "Invalid key", "The key must not be of length 0")
+		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	pid := app.ProcessID{
@@ -637,7 +689,7 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	}
 
 	if err := h.cluster.SetProcessMetadata("", pid, key, data); err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "setting metadata failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)

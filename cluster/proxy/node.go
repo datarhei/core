@@ -35,6 +35,8 @@ type Node interface {
 	AddProcess(config *app.Config, metadata map[string]interface{}) error
 	StartProcess(id app.ProcessID) error
 	StopProcess(id app.ProcessID) error
+	RestartProcess(id app.ProcessID) error
+	ReloadProcess(id app.ProcessID) error
 	DeleteProcess(id app.ProcessID) error
 	UpdateProcess(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 
@@ -1074,6 +1076,28 @@ func (n *node) StopProcess(id app.ProcessID) error {
 	}
 
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "stop")
+}
+
+func (n *node) RestartProcess(id app.ProcessID) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "restart")
+}
+
+func (n *node) ReloadProcess(id app.ProcessID) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "reload")
 }
 
 func (n *node) DeleteProcess(id app.ProcessID) error {

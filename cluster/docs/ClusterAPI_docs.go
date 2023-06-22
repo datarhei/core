@@ -661,6 +661,63 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/process/{id}/command": {
+            "put": {
+                "description": "Set the order for a process.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Set the order for a process",
+                "operationId": "cluster-3-set-process-order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Process order",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.SetProcessCommandRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/process/{id}/metadata/{key}": {
             "put": {
                 "description": "Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.",
@@ -1060,6 +1117,14 @@ const docTemplateClusterAPI = `{
                     "items": {
                         "$ref": "#/definitions/access.Policy"
                     }
+                }
+            }
+        },
+        "client.SetProcessCommandRequest": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "string"
                 }
             }
         },

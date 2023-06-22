@@ -54,6 +54,7 @@ type Cluster interface {
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin string, id app.ProcessID) error
 	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
+	SetProcessCommand(origin string, id app.ProcessID, order string) error
 	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
@@ -874,6 +875,47 @@ func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Con
 	}
 
 	return c.applyCommand(cmd)
+}
+
+func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.SetProcessCommand(origin, id, command)
+	}
+
+	if command == "start" || command == "stop" {
+		cmd := &store.Command{
+			Operation: store.OpSetProcessOrder,
+			Data: &store.CommandSetProcessOrder{
+				ID:    id,
+				Order: command,
+			},
+		}
+
+		return c.applyCommand(cmd)
+	}
+
+	procs := c.proxy.ListProxyProcesses()
+	nodeid := ""
+
+	for _, p := range procs {
+		if p.Config.ProcessID() != id {
+			continue
+		}
+
+		nodeid = p.NodeID
+
+		break
+	}
+
+	if len(nodeid) == 0 {
+		return fmt.Errorf("the process '%s' is not registered with any node", id.String())
+	}
+
+	return c.proxy.CommandProcess(nodeid, id, command)
 }
 
 func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {

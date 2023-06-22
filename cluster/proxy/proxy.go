@@ -30,6 +30,7 @@ type Proxy interface {
 	DeleteProcess(nodeid string, id app.ProcessID) error
 	StartProcess(nodeid string, id app.ProcessID) error
 	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	CommandProcess(nodeid string, id app.ProcessID, command string) error
 }
 
 type ProxyReader interface {
@@ -651,4 +652,31 @@ func (p *proxy) UpdateProcess(nodeid string, id app.ProcessID, config *app.Confi
 	}
 
 	return node.UpdateProcess(id, config, metadata)
+}
+
+func (p *proxy) CommandProcess(nodeid string, id app.ProcessID, command string) error {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		return fmt.Errorf("node not found")
+	}
+
+	var err error = nil
+
+	switch command {
+	case "start":
+		err = node.StartProcess(id)
+	case "stop":
+		err = node.StopProcess(id)
+	case "restart":
+		err = node.RestartProcess(id)
+	case "reload":
+		err = node.ReloadProcess(id)
+	default:
+		err = fmt.Errorf("unknown command: %s", command)
+	}
+
+	return err
 }

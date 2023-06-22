@@ -3200,6 +3200,52 @@ paths:
       summary: Replace an existing process
       tags:
       - v16.?.?
+  /api/v3/cluster/process/{id}/command:
+    put:
+      consumes:
+      - application/json
+      description: 'Issue a command to a process: start, stop, reload, restart'
+      operationId: cluster-3-set-process-command
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Process command
+        in: body
+        name: command
+        required: true
+        schema:
+          $ref: '#/definitions/api.Command'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Issue a command to a process in the cluster
+      tags:
+      - v16.?.?
   /api/v3/cluster/process/{id}/metadata/{key}:
     put:
       description: Add arbitrary JSON metadata under the given key. If the key exists,

@@ -112,6 +112,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.POST("/v1/process", a.AddProcess)
 	a.router.DELETE("/v1/process/:id", a.RemoveProcess)
 	a.router.PUT("/v1/process/:id", a.UpdateProcess)
+	a.router.PUT("/v1/process/:id/command", a.SetProcessCommand)
 	a.router.PUT("/v1/process/:id/metadata/:key", a.SetProcessMetadata)
 
 	a.router.POST("/v1/iam/user", a.AddIdentity)
@@ -352,6 +353,46 @@ func (a *api) UpdateProcess(c echo.Context) error {
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update process")
 		return Err(http.StatusInternalServerError, "", "unable to update process: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// SetProcessCommand sets the order for a process
+// @Summary Set the order for a process
+// @Description Set the order for a process.
+// @Tags v1.0.0
+// @ID cluster-3-set-process-order
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param data body client.SetProcessCommandRequest true "Process order"
+// @Success 200 {string} string
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/process/{id}/command [put]
+func (a *api) SetProcessCommand(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	r := client.SetProcessCommandRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	pid := app.ProcessID{ID: id, Domain: domain}
+
+	err := a.cluster.SetProcessCommand(origin, pid, r.Command)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to set order")
+		return Err(http.StatusInternalServerError, "", "unable to set order: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
