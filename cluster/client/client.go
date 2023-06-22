@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/datarhei/core/v16/config"
 	httpapi "github.com/datarhei/core/v16/http/api"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -87,6 +88,21 @@ func (c *APIClient) CoreAPIAddress() (string, error) {
 	}
 
 	return address, nil
+}
+
+func (c *APIClient) CoreConfig() (*config.Config, error) {
+	data, err := c.call(http.MethodGet, "/v1/core/config", "", nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &config.Config{}
+	err = json.Unmarshal(data, &cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 func (c *APIClient) Join(origin string, r JoinRequest) error {
