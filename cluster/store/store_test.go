@@ -950,6 +950,70 @@ func TestDeleteLock(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestClearLocksCommand(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	err = s.applyCommand(Command{
+		Operation: OpCreateLock,
+		Data: CommandCreateLock{
+			Name:       "foobar",
+			ValidUntil: time.Now().Add(3 * time.Second),
+		},
+	})
+	require.NoError(t, err)
+
+	_, ok := s.data.Locks["foobar"]
+	require.True(t, ok)
+
+	err = s.applyCommand(Command{
+		Operation: OpClearLocks,
+		Data:      CommandClearLocks{},
+	})
+	require.NoError(t, err)
+
+	_, ok = s.data.Locks["foobar"]
+	require.True(t, ok)
+
+	time.Sleep(3 * time.Second)
+
+	err = s.applyCommand(Command{
+		Operation: OpClearLocks,
+		Data:      CommandClearLocks{},
+	})
+	require.NoError(t, err)
+
+	_, ok = s.data.Locks["foobar"]
+	require.False(t, ok)
+}
+
+func TestClearLocks(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	cmd := CommandCreateLock{
+		Name:       "foobar",
+		ValidUntil: time.Now().Add(3 * time.Second),
+	}
+
+	err = s.createLock(cmd)
+	require.NoError(t, err)
+
+	err = s.clearLocks(CommandClearLocks{})
+	require.NoError(t, err)
+
+	err = s.createLock(cmd)
+	require.Error(t, err)
+
+	time.Sleep(3 * time.Second)
+
+	err = s.clearLocks(CommandClearLocks{})
+	require.NoError(t, err)
+
+	err = s.createLock(cmd)
+	require.NoError(t, err)
+}
+
 func TestApplyCommand(t *testing.T) {
 	s, err := createStore()
 	require.NoError(t, err)

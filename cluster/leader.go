@@ -292,7 +292,8 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
 
-	go c.startSynchronizeAndRebalance(ctx, c.syncInterval, emergency)
+	go c.synchronizeAndRebalance(ctx, c.syncInterval, emergency)
+	go c.clearLocks(ctx, time.Minute)
 
 	return nil
 }
@@ -300,10 +301,13 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 func (c *cluster) revokeLeadership() {
 	c.logger.Debug().Log("Revoking leadership")
 
-	c.cancelLeaderShip()
+	if c.cancelLeaderShip != nil {
+		c.cancelLeaderShip()
+		c.cancelLeaderShip = nil
+	}
 }
 
-// startSynchronizeAndRebalance synchronizes and rebalances the processes in a given interval. Synchronizing
+// synchronizeAndRebalance synchronizes and rebalances the processes in a given interval. Synchronizing
 // takes care that all processes in the cluster DB are running on one node. It writes the process->node mapping
 // to the cluster DB such that when a new leader gets elected it knows where which process should be running.
 // This is checked against the actual state. If a node is not reachable, the leader still knows which processes
@@ -324,7 +328,7 @@ func (c *cluster) revokeLeadership() {
 //
 // The goal of synchronizing and rebalancing is to make as little moves as possible and to be tolerant for
 // a while if a node is not reachable.
-func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval time.Duration, emergency bool) {
+func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Duration, emergency bool) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -345,6 +349,38 @@ func (c *cluster) startSynchronizeAndRebalance(ctx context.Context, interval tim
 				}
 			} else {
 				c.doSynchronize(emergency)
+			}
+		}
+	}
+}
+
+func (c *cluster) clearLocks(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			locks := c.ListLocks()
+			hasExpiredLocks := false
+
+			for _, validUntil := range locks {
+				if time.Now().Before(validUntil) {
+					continue
+				}
+
+				hasExpiredLocks = true
+				break
+			}
+
+			if hasExpiredLocks {
+				c.logger.Debug().Log("Clearing locks")
+				c.applyCommand(&store.Command{
+					Operation: store.OpClearLocks,
+					Data:      &store.CommandClearLocks{},
+				})
 			}
 		}
 	}

@@ -63,6 +63,7 @@ const (
 	OpSetProcessNodeMap  Operation = "setProcessNodeMap"
 	OpCreateLock         Operation = "createLock"
 	OpDeleteLock         Operation = "deleteLock"
+	OpClearLocks         Operation = "clearLocks"
 )
 
 type Command struct {
@@ -119,6 +120,8 @@ type CommandCreateLock struct {
 type CommandDeleteLock struct {
 	Name string
 }
+
+type CommandClearLocks struct{}
 
 type storeData struct {
 	Version        uint64
@@ -354,6 +357,18 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.deleteLock(cmd)
+	case OpClearLocks:
+		b, err = json.Marshal(c.Data)
+		if err != nil {
+			break
+		}
+		cmd := CommandClearLocks{}
+		err = json.Unmarshal(b, &cmd)
+		if err != nil {
+			break
+		}
+
+		err = s.clearLocks(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -604,6 +619,22 @@ func (s *store) deleteLock(cmd CommandDeleteLock) error {
 	}
 
 	delete(s.data.Locks, cmd.Name)
+
+	return nil
+}
+
+func (s *store) clearLocks(cmd CommandClearLocks) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for name, validUntil := range s.data.Locks {
+		if time.Now().Before(validUntil) {
+			// Lock is still valid
+			continue
+		}
+
+		delete(s.data.Locks, name)
+	}
 
 	return nil
 }
