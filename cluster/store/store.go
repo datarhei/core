@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +32,9 @@ type Store interface {
 	ListUserPolicies(name string) Policies
 
 	ListLocks() map[string]time.Time
+
+	ListKVS(prefix string) map[string]Value
+	GetFromKVS(key string) (Value, error)
 }
 
 type Process struct {
@@ -49,6 +54,11 @@ type Policies struct {
 	Policies  []access.Policy
 }
 
+type Value struct {
+	Value     string
+	UpdatedAt time.Time
+}
+
 type Operation string
 
 const (
@@ -64,6 +74,8 @@ const (
 	OpCreateLock         Operation = "createLock"
 	OpDeleteLock         Operation = "deleteLock"
 	OpClearLocks         Operation = "clearLocks"
+	OpSetKV              Operation = "setKV"
+	OpUnsetKV            Operation = "unsetKV"
 )
 
 type Command struct {
@@ -123,6 +135,15 @@ type CommandDeleteLock struct {
 
 type CommandClearLocks struct{}
 
+type CommandSetKV struct {
+	Key   string
+	Value string
+}
+
+type CommandUnsetKV struct {
+	Key string
+}
+
 type storeData struct {
 	Version        uint64
 	Process        map[string]Process
@@ -139,6 +160,8 @@ type storeData struct {
 	}
 
 	Locks map[string]time.Time
+
+	KVS map[string]Value
 }
 
 func (s *storeData) init() {
@@ -152,6 +175,7 @@ func (s *storeData) init() {
 	s.Policies.UpdatedAt = now
 	s.Policies.Policies = map[string][]access.Policy{}
 	s.Locks = map[string]time.Time{}
+	s.KVS = map[string]Value{}
 }
 
 // store implements a raft.FSM
@@ -220,155 +244,133 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	return nil
 }
 
+func convertCommand[T any](cmd T, data any) error {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(b, cmd)
+
+	return err
+}
+
 func (s *store) applyCommand(c Command) error {
-	var b []byte
 	var err error = nil
 
 	switch c.Operation {
 	case OpAddProcess:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandAddProcess{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.addProcess(cmd)
 	case OpRemoveProcess:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandRemoveProcess{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.removeProcess(cmd)
 	case OpUpdateProcess:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandUpdateProcess{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.updateProcess(cmd)
 	case OpSetProcessMetadata:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandSetProcessMetadata{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.setProcessMetadata(cmd)
 	case OpAddIdentity:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandAddIdentity{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.addIdentity(cmd)
 	case OpUpdateIdentity:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandUpdateIdentity{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.updateIdentity(cmd)
 	case OpRemoveIdentity:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandRemoveIdentity{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.removeIdentity(cmd)
 	case OpSetPolicies:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandSetPolicies{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.setPolicies(cmd)
 	case OpSetProcessNodeMap:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandSetProcessNodeMap{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.setProcessNodeMap(cmd)
 	case OpCreateLock:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandCreateLock{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.createLock(cmd)
 	case OpDeleteLock:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandDeleteLock{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.deleteLock(cmd)
 	case OpClearLocks:
-		b, err = json.Marshal(c.Data)
-		if err != nil {
-			break
-		}
 		cmd := CommandClearLocks{}
-		err = json.Unmarshal(b, &cmd)
+		err = convertCommand(&cmd, c.Data)
 		if err != nil {
 			break
 		}
 
 		err = s.clearLocks(cmd)
+	case OpSetKV:
+		cmd := CommandSetKV{}
+		err = convertCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setKV(cmd)
+	case OpUnsetKV:
+		cmd := CommandUnsetKV{}
+		err = convertCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.unsetKV(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -639,6 +641,33 @@ func (s *store) clearLocks(cmd CommandClearLocks) error {
 	return nil
 }
 
+func (s *store) setKV(cmd CommandSetKV) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	value := s.data.KVS[cmd.Key]
+
+	value.Value = cmd.Value
+	value.UpdatedAt = time.Now()
+
+	s.data.KVS[cmd.Key] = value
+
+	return nil
+}
+
+func (s *store) unsetKV(cmd CommandUnsetKV) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if _, ok := s.data.KVS[cmd.Key]; !ok {
+		return fs.ErrNotExist
+	}
+
+	delete(s.data.KVS, cmd.Key)
+
+	return nil
+}
+
 func (s *store) OnApply(fn func(op Operation)) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -813,6 +842,35 @@ func (s *store) ListLocks() map[string]time.Time {
 	}
 
 	return m
+}
+
+func (s *store) ListKVS(prefix string) map[string]Value {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := map[string]Value{}
+
+	for key, value := range s.data.KVS {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+
+		m[key] = value
+	}
+
+	return m
+}
+
+func (s *store) GetFromKVS(key string) (Value, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	value, ok := s.data.KVS[key]
+	if !ok {
+		return Value{}, fs.ErrNotExist
+	}
+
+	return value, nil
 }
 
 type fsmSnapshot struct {

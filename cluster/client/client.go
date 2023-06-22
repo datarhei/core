@@ -49,6 +49,11 @@ type LockRequest struct {
 	ValidUntil time.Time `json:"valid_until"`
 }
 
+type SetKVRequest struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type APIClient struct {
 	Address string
 	Client  *http.Client
@@ -192,6 +197,23 @@ func (c *APIClient) Lock(origin string, r LockRequest) error {
 
 func (c *APIClient) Unlock(origin string, name string) error {
 	_, err := c.call(http.MethodDelete, "/v1/lock/"+url.PathEscape(name), "application/json", nil, origin)
+
+	return err
+}
+
+func (c *APIClient) SetKV(origin string, r SetKVRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPost, "/v1/kv", "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) UnsetKV(origin string, key string) error {
+	_, err := c.call(http.MethodDelete, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
 
 	return err
 }

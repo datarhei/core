@@ -69,6 +69,10 @@ type Cluster interface {
 	DeleteLock(origin string, name string) error
 	ListLocks() map[string]time.Time
 
+	SetKV(origin, key, value string) error
+	UnsetKV(origin, key string) error
+	GetKV(key string) (string, time.Time, error)
+
 	ProxyReader() proxy.ProxyReader
 }
 
@@ -1061,6 +1065,54 @@ func (c *cluster) DeleteLock(origin string, name string) error {
 
 func (c *cluster) ListLocks() map[string]time.Time {
 	return c.store.ListLocks()
+}
+
+func (c *cluster) SetKV(origin, key, value string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.SetKV(origin, key, value)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpSetKV,
+		Data: &store.CommandSetKV{
+			Key:   key,
+			Value: value,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) UnsetKV(origin, key string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.UnsetKV(origin, key)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpUnsetKV,
+		Data: &store.CommandUnsetKV{
+			Key: key,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
+func (c *cluster) GetKV(key string) (string, time.Time, error) {
+	value, err := c.store.GetFromKVS(key)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return value.Value, value.UpdatedAt, nil
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {

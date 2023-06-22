@@ -34,6 +34,9 @@ type Forwarder interface {
 
 	CreateLock(origin string, name string, validUntil time.Time) error
 	DeleteLock(origin string, name string) error
+
+	SetKV(origin, key, value string) error
+	UnsetKV(origin, key string) error
 }
 
 type forwarder struct {
@@ -289,4 +292,33 @@ func (f *forwarder) DeleteLock(origin string, name string) error {
 	f.lock.RUnlock()
 
 	return client.Unlock(origin, name)
+}
+
+func (f *forwarder) SetKV(origin, key, value string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.SetKVRequest{
+		Key:   key,
+		Value: value,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.SetKV(origin, r)
+}
+
+func (f *forwarder) UnsetKV(origin, key string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.UnsetKV(origin, key)
 }

@@ -118,6 +118,12 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.PUT("/v1/iam/user/:name/policies", a.SetIdentityPolicies)
 	a.router.DELETE("/v1/iam/user/:name", a.RemoveIdentity)
 
+	a.router.POST("/v1/lock", a.Lock)
+	a.router.DELETE("/v1/lock/:name", a.Unlock)
+
+	a.router.POST("/v1/kv", a.SetKV)
+	a.router.DELETE("/v1/kv/:key", a.UnsetKV)
+
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 
 	return a, nil
@@ -151,7 +157,7 @@ func (a *api) AddServer(c echo.Context) error {
 	r := client.JoinRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	a.logger.Debug().WithFields(log.Fields{
@@ -168,7 +174,7 @@ func (a *api) AddServer(c echo.Context) error {
 	err := a.cluster.Join(origin, r.ID, r.RaftAddress, "")
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to join cluster")
-		return Err(http.StatusInternalServerError, "unable to join cluster", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to join cluster", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -202,7 +208,7 @@ func (a *api) RemoveServer(c echo.Context) error {
 	err := a.cluster.Leave(origin, id)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to leave cluster")
-		return Err(http.StatusInternalServerError, "unable to leave cluster", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to leave cluster", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -221,7 +227,7 @@ func (a *api) Snapshot(c echo.Context) error {
 	data, err := a.cluster.Snapshot()
 	if err != nil {
 		a.logger.Debug().WithError(err).Log("Unable to create snaphot")
-		return Err(http.StatusInternalServerError, "unable to create snapshot", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to create snapshot", "%s", err.Error())
 	}
 
 	defer data.Close()
@@ -247,7 +253,7 @@ func (a *api) AddProcess(c echo.Context) error {
 	r := client.AddProcessRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -261,7 +267,7 @@ func (a *api) AddProcess(c echo.Context) error {
 	err := a.cluster.AddProcess(origin, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("Unable to add process")
-		return Err(http.StatusInternalServerError, "unable to add process", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to add process", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -297,7 +303,7 @@ func (a *api) RemoveProcess(c echo.Context) error {
 	err := a.cluster.RemoveProcess(origin, pid)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to remove process")
-		return Err(http.StatusInternalServerError, "unable to remove process", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to remove process", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -324,7 +330,7 @@ func (a *api) UpdateProcess(c echo.Context) error {
 	r := client.UpdateProcessRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -343,7 +349,7 @@ func (a *api) UpdateProcess(c echo.Context) error {
 	err := a.cluster.UpdateProcess(origin, pid, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update process")
-		return Err(http.StatusInternalServerError, "unable to update process", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to update process", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -371,7 +377,7 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 	r := client.SetProcessMetadataRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -385,7 +391,7 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 	err := a.cluster.SetProcessMetadata(origin, pid, key, r.Metadata)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update metadata")
-		return Err(http.StatusInternalServerError, "unable to update metadata", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to update metadata", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -409,7 +415,7 @@ func (a *api) AddIdentity(c echo.Context) error {
 	r := client.AddIdentityRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -423,7 +429,7 @@ func (a *api) AddIdentity(c echo.Context) error {
 	err := a.cluster.AddIdentity(origin, r.Identity)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", r.Identity).Log("Unable to add identity")
-		return Err(http.StatusInternalServerError, "unable to add identity", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to add identity", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -448,7 +454,7 @@ func (a *api) UpdateIdentity(c echo.Context) error {
 	r := client.UpdateIdentityRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -468,7 +474,7 @@ func (a *api) UpdateIdentity(c echo.Context) error {
 			"name":     name,
 			"identity": r.Identity,
 		}).Log("Unable to add identity")
-		return Err(http.StatusInternalServerError, "unable to update identity", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to update identity", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -493,7 +499,7 @@ func (a *api) SetIdentityPolicies(c echo.Context) error {
 	r := client.SetPoliciesRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -507,7 +513,7 @@ func (a *api) SetIdentityPolicies(c echo.Context) error {
 	err := a.cluster.SetPolicies(origin, name, r.Policies)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("policies", r.Policies).Log("Unable to set policies")
-		return Err(http.StatusInternalServerError, "unable to add identity", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to add identity", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -539,7 +545,7 @@ func (a *api) RemoveIdentity(c echo.Context) error {
 	err := a.cluster.RemoveIdentity(origin, name)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", name).Log("Unable to remove identity")
-		return Err(http.StatusInternalServerError, "unable to remove identity", "%s", err)
+		return Err(http.StatusInternalServerError, "unable to remove identity", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -575,7 +581,7 @@ func (a *api) Lock(c echo.Context) error {
 	r := client.LockRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
-		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
 	}
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -622,6 +628,74 @@ func (a *api) Unlock(c echo.Context) error {
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", name).Log("Unable to remove lock")
 		return Err(http.StatusInternalServerError, "unable to remove lock", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// SetKV stores the value under key
+// @Summary Store value under key
+// @Description Store value under key
+// @Tags v1.0.0
+// @ID cluster-1-kv-set
+// @Produce json
+// @Param data body client.SetKVRequest true "Set KV request"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Success 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/kv [post]
+func (a *api) SetKV(c echo.Context) error {
+	r := client.SetKVRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "Invalid JSON", "%s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("key", r.Key).Log("Store value")
+
+	err := a.cluster.SetKV(origin, r.Key, r.Value)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("key", r.Key).Log("Unable to store value")
+		return Err(http.StatusInternalServerError, "unable to store value", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// UnsetKV removes a key
+// @Summary Removes a key
+// @Description Removes a key
+// @Tags v1.0.0
+// @ID cluster-1-kv-unset
+// @Produce json
+// @Param name path string true "Key name"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 404 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/kv/{key} [delete]
+func (a *api) UnsetKV(c echo.Context) error {
+	key := util.PathParam(c, "key")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("key", key).Log("Delete key")
+
+	err := a.cluster.UnsetKV(origin, key)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("key", key).Log("Unable to remove key")
+		return Err(http.StatusInternalServerError, "unable to remove key", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
