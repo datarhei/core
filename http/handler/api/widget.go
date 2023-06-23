@@ -47,7 +47,7 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if w.restream == nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID")
+		return api.Err(http.StatusNotFound, "", "Unknown process ID")
 	}
 
 	tid := app.ProcessID{
@@ -57,12 +57,12 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 
 	process, err := w.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	state, err := w.restream.GetProcessState(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	data := api.WidgetProcess{

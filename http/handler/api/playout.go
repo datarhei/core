@@ -36,7 +36,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -46,14 +46,14 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/status"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -61,7 +61,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	if response.StatusCode == http.StatusOK {
@@ -69,7 +69,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 
 		err := json.Unmarshal(data, &status)
 		if err != nil {
-			return api.Err(http.StatusInternalServerError, "", "%s", err)
+			return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 		}
 
 		apistatus := api.PlayoutStatus{}
@@ -105,7 +105,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -115,7 +115,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/keyframe/last."
@@ -128,7 +128,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -136,7 +136,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -163,7 +163,7 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -173,14 +173,14 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/errorframe/encode"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -188,7 +188,7 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -218,7 +218,7 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -228,19 +228,19 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Failed to read request body", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
 	}
 
 	path := "/v1/errorframe.jpg"
 
 	response, err := h.request(http.MethodPut, addr, path, "application/octet-stream", data)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -248,7 +248,7 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 	// Read the whole response
 	data, err = io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -284,14 +284,14 @@ func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/reopen"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -299,7 +299,7 @@ func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -328,7 +328,7 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -338,19 +338,19 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process or input", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Failed to read request body", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
 	}
 
 	path := "/v1/stream"
 
 	response, err := h.request(http.MethodPut, addr, path, "text/plain", data)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -358,7 +358,7 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 	// Read the whole response
 	data, err = io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)

@@ -74,7 +74,7 @@ func (r *MetricsHandler) Metrics(c echo.Context) error {
 	var query api.MetricsQuery
 
 	if err := util.ShouldBindJSON(c, &query); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	patterns := []metric.Pattern{}

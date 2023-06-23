@@ -56,7 +56,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
@@ -70,17 +70,17 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "Unsupported process type, supported process types are: ffmpeg")
+		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
+		return api.Err(http.StatusBadRequest, "", "at least one input and one output need to be defined")
 	}
 
 	config, metadata := process.Marshal()
 
 	if err := h.restream.AddProcess(config); err != nil {
-		return api.Err(http.StatusBadRequest, "", "Invalid process config: %s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "invalid process config: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -195,7 +195,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 
 	p, err := h.getProcess(tid, filter)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", err.Error())
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, p)
@@ -227,16 +227,16 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 
 	if !superuser {
 		if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden")
+			return api.Err(http.StatusForbidden, "")
 		}
 	}
 
 	if err := h.restream.StopProcess(tid); err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	if err := h.restream.DeleteProcess(tid); err != nil {
-		return api.Err(http.StatusInternalServerError, "Process can't be deleted", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "process can't be deleted: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -282,14 +282,14 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 
 	current, err := h.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+		return api.Err(http.StatusNotFound, "")
 	}
 
 	// Prefill the config with the current values
 	process.Unmarshal(current.Config)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
@@ -311,10 +311,10 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 
 	if err := h.restream.UpdateProcess(tid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+			return api.Err(http.StatusNotFound, "", "process not found: %s", id)
 		}
 
-		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "process can't be updated: %s", err.Error())
 	}
 
 	tid = app.ProcessID{
@@ -353,13 +353,13 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	var command api.Command
 
 	if err := util.ShouldBindJSON(c, &command); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -377,11 +377,11 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 	} else if command.Command == "reload" {
 		err = h.restream.ReloadProcess(tid)
 	} else {
-		return api.Err(http.StatusBadRequest, "Unknown command provided", "Known commands are: start, stop, reload, restart")
+		return api.Err(http.StatusBadRequest, "", "unknown command provided: known commands are: start, stop, reload, restart")
 	}
 
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Command failed", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "command failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -407,7 +407,7 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -417,7 +417,7 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 
 	p, err := h.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	config := api.ProcessConfig{}
@@ -446,7 +446,7 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -456,7 +456,7 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 
 	s, err := h.restream.GetProcessState(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	state := api.ProcessState{}
@@ -493,7 +493,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 
 	if len(createdUnix) != 0 {
 		if x, err := strconv.ParseInt(createdUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid created_at unix timestamp", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
 		} else {
 			createdAt = &x
 		}
@@ -501,14 +501,14 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 
 	if len(exitedUnix) != 0 {
 		if x, err := strconv.ParseInt(exitedUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid exited_at unix timestamp", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
 		} else {
 			exitedAt = &x
 		}
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -518,7 +518,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 
 	l, err := h.restream.GetProcessLog(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	report := api.ProcessReport{}
@@ -556,7 +556,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 	}
 
 	if len(entries) == 0 {
-		return api.Err(http.StatusNotFound, "No matching reports found")
+		return api.Err(http.StatusNotFound, "", "No matching reports found")
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -603,7 +603,7 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 
 	if len(fromUnix) != 0 {
 		if x, err := strconv.ParseInt(fromUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid search range", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			from = &t
@@ -612,7 +612,7 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 
 	if len(toUnix) != 0 {
 		if x, err := strconv.ParseInt(toUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid search range", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			to = &t
@@ -651,7 +651,7 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -726,7 +726,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -736,7 +736,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 
 	data, err := h.restream.GetProcessMetadata(tid, key)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -765,17 +765,17 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "Invalid key", "The key must not be of length 0")
+		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -784,7 +784,7 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 	}
 
 	if err := h.restream.SetProcessMetadata(tid, key, data); err != nil {
-		return api.Err(http.StatusNotFound, "Unknown process ID", "%s", err)
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -807,7 +807,7 @@ func (h *RestreamHandler) GetMetadata(c echo.Context) error {
 
 	data, err := h.restream.GetMetadata(key)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Metadata not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "metadata not found: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -829,17 +829,17 @@ func (h *RestreamHandler) SetMetadata(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "Invalid key", "The key must not be of length 0")
+		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if err := h.restream.SetMetadata(key, data); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid metadata", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid metadata: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)

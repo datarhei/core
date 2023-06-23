@@ -27,7 +27,7 @@ func (j *JWTHandler) Login(c echo.Context) error {
 
 	at, rt, err := j.iam.CreateJWT(subject)
 	if err != nil {
-		return api.Err(http.StatusForbidden, "Failed to create JWT", "%s", err)
+		return api.Err(http.StatusForbidden, "", "failed to create JWT: %s", err)
 	}
 
 	return c.JSON(http.StatusOK, api.JWT{
@@ -39,12 +39,12 @@ func (j *JWTHandler) Login(c echo.Context) error {
 func (j *JWTHandler) Refresh(c echo.Context) error {
 	subject, ok := c.Get("user").(string)
 	if !ok {
-		return api.Err(http.StatusForbidden, "Invalid token")
+		return api.Err(http.StatusForbidden, "", "invalid token")
 	}
 
 	at, _, err := j.iam.CreateJWT(subject)
 	if err != nil {
-		return api.Err(http.StatusForbidden, "Failed to create JWT", "%s", err)
+		return api.Err(http.StatusForbidden, "", "failed to create JWT: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, api.JWTRefresh{

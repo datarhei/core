@@ -51,7 +51,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 	config, ok := h.filesystems[name]
 	if !ok {
-		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+		return api.Err(http.StatusNotFound, "", "file not found: unknown filesystem: %s", name)
 	}
 
 	return config.Handler.GetFile(c)
@@ -78,7 +78,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	config, ok := h.filesystems[name]
 	if !ok {
-		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+		return api.Err(http.StatusNotFound, "", "file not found: unknown filesystem: %s", name)
 	}
 
 	return config.Handler.PutFile(c)
@@ -101,7 +101,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 
 	config, ok := h.filesystems[name]
 	if !ok {
-		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+		return api.Err(http.StatusNotFound, "", "file not found: unknown filesystem: %s", name)
 	}
 
 	return config.Handler.DeleteFile(c)
@@ -127,7 +127,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 
 	config, ok := h.filesystems[name]
 	if !ok {
-		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+		return api.Err(http.StatusNotFound, "", "file not found: unknown filesystem: %s", name)
 	}
 
 	return config.Handler.DeleteFiles(c)
@@ -155,7 +155,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 
 	config, ok := h.filesystems[name]
 	if !ok {
-		return api.Err(http.StatusNotFound, "File not found", "unknown filesystem: %s", name)
+		return api.Err(http.StatusNotFound, "", "file not found: unknown filesystem: %s", name)
 	}
 
 	return config.Handler.ListFiles(c)
@@ -201,25 +201,25 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 	operation := api.FilesystemOperation{}
 
 	if err := util.ShouldBindJSON(c, &operation); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if operation.Operation != "copy" && operation.Operation != "move" {
-		return api.Err(http.StatusBadRequest, "Invalid operation", "%s", operation.Operation)
+		return api.Err(http.StatusBadRequest, "", "invalid operation: %s", operation.Operation)
 	}
 
 	rePrefix := regexp.MustCompile(`^(.+):`)
 
 	matches := rePrefix.FindStringSubmatch(operation.Source)
 	if matches == nil {
-		return api.Err(http.StatusBadRequest, "Missing source filesystem prefix")
+		return api.Err(http.StatusBadRequest, "", "missing source filesystem prefix")
 	}
 
 	fromFSName := matches[1]
 	fromPath := rePrefix.ReplaceAllString(operation.Source, "")
 	fromFS, ok := h.filesystems[fromFSName]
 	if !ok {
-		return api.Err(http.StatusBadRequest, "Source filesystem not found", "%s", fromFSName)
+		return api.Err(http.StatusBadRequest, "", "source filesystem not found: %s", fromFSName)
 	}
 
 	if operation.Source == operation.Target {
@@ -228,26 +228,26 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 
 	matches = rePrefix.FindStringSubmatch(operation.Target)
 	if matches == nil {
-		return api.Err(http.StatusBadRequest, "Missing target filesystem prefix")
+		return api.Err(http.StatusBadRequest, "", "missing target filesystem prefix")
 	}
 
 	toFSName := matches[1]
 	toPath := rePrefix.ReplaceAllString(operation.Target, "")
 	toFS, ok := h.filesystems[toFSName]
 	if !ok {
-		return api.Err(http.StatusBadRequest, "Target filesystem not found", "%s", toFSName)
+		return api.Err(http.StatusBadRequest, "", "target filesystem not found: %s", toFSName)
 	}
 
 	fromFile := fromFS.Handler.FS.Filesystem.Open(fromPath)
 	if fromFile == nil {
-		return api.Err(http.StatusNotFound, "File not found", "%s:%s", fromFSName, fromPath)
+		return api.Err(http.StatusNotFound, "", "file not found: %s:%s", fromFSName, fromPath)
 	}
 
 	defer fromFile.Close()
 
 	fromFileStat, err := fromFile.Stat()
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Source files with unknown size", "%s", fromFSName)
+		return api.Err(http.StatusBadRequest, "", "source files with unknown size: %s", fromFSName)
 	}
 
 	var reader io.Reader = fromFile
@@ -266,7 +266,7 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 	_, _, err = toFS.Handler.FS.Filesystem.WriteFileReader(toPath, sizer)
 	if err != nil {
 		toFS.Handler.FS.Filesystem.Remove(toPath)
-		return api.Err(http.StatusBadRequest, "Writing target file failed", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "writing target file failed: %s", err)
 	}
 
 	if operation.Operation == "move" {

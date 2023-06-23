@@ -40,7 +40,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 	file := h.FS.Filesystem.Open(path)
 	if file == nil {
-		return api.Err(http.StatusNotFound, "File not found", path)
+		return api.Err(http.StatusNotFound, "", "file not found: %s", path)
 	}
 
 	stat, _ := file.Stat()
@@ -53,7 +53,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 			file = h.FS.Filesystem.Open(path)
 			if file == nil {
-				return api.Err(http.StatusNotFound, "File not found", path)
+				return api.Err(http.StatusNotFound, "", "file not found: %s", path)
 			}
 
 			stat, _ = file.Stat()
@@ -136,7 +136,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	_, created, err := h.FS.Filesystem.WriteFileReader(path, req.Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	if h.FS.Cache != nil {
@@ -178,7 +178,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 	}
 
 	if size < 0 {
-		return api.Err(http.StatusNotFound, "File not found", path)
+		return api.Err(http.StatusNotFound, "", "file not found: %s", path)
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)
@@ -192,7 +192,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
 
 	if len(pattern) == 0 {
-		return api.Err(http.StatusBadRequest, "Bad request", "A glob pattern is required")
+		return api.Err(http.StatusBadRequest, "", "a glob pattern is required")
 	}
 
 	options := fs.ListOptions{
@@ -200,20 +200,20 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 	}
 
 	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
 	} else {
 		options.SizeMin = x
 	}
 
 	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
 	} else {
 		options.SizeMax = x
 	}
 
 	if len(modifiedStart) != 0 {
 		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			options.ModifiedStart = &t
@@ -222,7 +222,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 
 	if len(modifiedEnd) != 0 {
 		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
 		} else {
 			t := time.Unix(x+1, 0)
 			options.ModifiedEnd = &t
@@ -261,20 +261,20 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
 	} else {
 		options.SizeMin = x
 	}
 
 	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
 	} else {
 		options.SizeMax = x
 	}
 
 	if len(modifiedStart) != 0 {
 		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			options.ModifiedStart = &t
@@ -283,7 +283,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 
 	if len(modifiedEnd) != 0 {
 		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "lastmode_end: %s", err.Error())
 		} else {
 			t := time.Unix(x+1, 0)
 			options.ModifiedEnd = &t

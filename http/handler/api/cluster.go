@@ -196,7 +196,7 @@ func (h *ClusterHandler) GetAllNodesProcess(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
@@ -254,7 +254,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 
 	peer, err := h.proxy.GetNode(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "Node not found: %s", err.Error())
 	}
 
 	about := peer.About()
@@ -290,7 +290,7 @@ func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 
 	peer, err := h.proxy.GetNode(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "Node not found: %s", err.Error())
 	}
 
 	v := peer.Version()
@@ -323,7 +323,7 @@ func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 
 	peer, err := h.proxy.GetNode(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "Node not found: %s", err.Error())
 	}
 
 	files := api.ClusterNodeFiles{
@@ -386,7 +386,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 
 	peer, err := h.proxy.GetNode(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Node not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "Node not found: %s", err.Error())
 	}
 
 	procs, err := peer.ProcessList(proxy.ProcessListOptions{
@@ -400,7 +400,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 		DomainPattern: domainpattern,
 	})
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "Node not available: %s", err)
+		return api.Err(http.StatusInternalServerError, "", "Node not available: %s", err.Error())
 	}
 
 	processes := []clientapi.Process{}
@@ -485,31 +485,31 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
 	}
 
 	if !superuser {
 		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden")
+			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process", process.Owner)
 		}
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "Unsupported process type", "Supported process types are: ffmpeg")
+		return api.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "At least one input and one output need to be defined")
+		return api.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
 	}
 
 	config, metadata := process.Marshal()
 
 	if err := h.cluster.AddProcess("", config); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid process config", "%s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "invalid process config: %s", err.Error())
 	}
 
 	for key, value := range metadata {
@@ -549,30 +549,30 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	pid := process.ProcessID()
 
 	current, err := h.cluster.GetProcess(pid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+		return api.Err(http.StatusNotFound, "", "Process not found: %s", id)
 	}
 
 	// Prefill the config with the current values
 	process.Unmarshal(current.Config)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
 	}
 
 	if !superuser {
 		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden")
+			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process", process.Owner)
 		}
 	}
 
@@ -580,10 +580,10 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	if err := h.cluster.UpdateProcess("", pid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "Process not found", "%s", id)
+			return api.Err(http.StatusNotFound, "", "Process not found: %s", id)
 		}
 
-		return api.Err(http.StatusBadRequest, "Process can't be updated", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "Process can't be updated: %s", err.Error())
 	}
 
 	pid = process.ProcessID()
@@ -617,13 +617,13 @@ func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	var command api.Command
 
 	if err := util.ShouldBindJSON(c, &command); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	pid := app.ProcessID{
@@ -641,7 +641,7 @@ func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
 	}
 
 	if err := h.cluster.SetProcessCommand("", pid, command.Command); err != nil {
-		return api.Err(http.StatusNotFound, "", "command failed: %s", err)
+		return api.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -670,7 +670,7 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	if len(key) == 0 {
@@ -713,7 +713,7 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to delete this process")
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	pid := app.ProcessID{
@@ -722,7 +722,7 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 	}
 
 	if err := h.cluster.RemoveProcess("", pid); err != nil {
-		return api.Err(http.StatusBadRequest, "", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -749,31 +749,31 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 	user := api.IAMUser{}
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies := user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to create user '%s'", iamuser.Name)
+		return api.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can add superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can add superusers")
 	}
 
 	if err := h.cluster.AddIdentity("", iamuser); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid identity", "%s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 
 	if err := h.cluster.SetPolicies("", iamuser.Name, iampolicies); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid policies", "%s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "Invalid policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, user)
@@ -803,7 +803,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -812,7 +812,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+			return api.Err(http.StatusNotFound, "", "Not found: %s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -826,35 +826,35 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	user.Marshal(iamuser, iampolicies)
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies = user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to create user '%s'", iamuser.Name)
+		return api.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can modify superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can modify superusers")
 	}
 
 	if name != "$anon" {
 		err = h.cluster.UpdateIdentity("", name, iamuser)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 		}
 	}
 
 	err = h.cluster.SetPolicies("", name, iampolicies)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "set policies: %w", err)
+		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, user)
@@ -884,7 +884,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -893,7 +893,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -904,13 +904,13 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	policies := []api.IAMPolicy{}
 
 	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, p := range policies {
 		err := c.Validate(p)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 
@@ -918,7 +918,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 
 	for _, p := range policies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 
 		accessPolicies = append(accessPolicies, access.Policy{
@@ -930,7 +930,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can modify superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can modify superusers")
 	}
 
 	err = h.cluster.SetPolicies("", name, accessPolicies)
@@ -995,7 +995,7 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to access this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to access this user")
 	}
 
 	var updatedAt time.Time
@@ -1005,7 +1005,7 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 	if name != "$anon" {
 		updatedAt, iamuser, err = h.cluster.ListIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 
 		if ctxuser != iamuser.Name {
@@ -1047,12 +1047,12 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 func (h *ClusterHandler) ReloadIAM(c echo.Context) error {
 	err := h.iam.ReloadIndentities()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "reload identities: %w", err)
+		return api.Err(http.StatusInternalServerError, "", "reload identities: %w", err.Error())
 	}
 
 	err = h.iam.ReloadPolicies()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "reload policies: %w", err)
+		return api.Err(http.StatusInternalServerError, "", "reload policies: %w", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -1128,7 +1128,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 
 		if ctxuser != iamuser.Name {
@@ -1225,20 +1225,20 @@ func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to delete this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to delete this user")
 	}
 
 	iamuser, err := h.iam.GetIdentity(name)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can remove superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can remove superusers")
 	}
 
 	if err := h.cluster.RemoveIdentity("", name); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid identity", "%s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

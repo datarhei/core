@@ -42,7 +42,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 	filters := api.EventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	filter := map[string]*api.EventFilter{}
@@ -51,7 +51,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 		f := f
 
 		if err := f.Compile(); err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid filter", "%s: %s", f.Component, err)
+			return api.Err(http.StatusBadRequest, "", "invalid filter: %s: %s", f.Component, err.Error())
 		}
 
 		component := strings.ToLower(f.Component)

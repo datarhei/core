@@ -101,19 +101,19 @@ func (s *SessionHandler) CreateToken(c echo.Context) error {
 
 	identity, err := s.iam.GetVerifier(username)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "%s", err)
+		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	request := []api.SessionTokenRequest{}
 
 	if err := util.ShouldBindJSONValidation(c, &request, false); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, r := range request {
 		err := c.Validate(r)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 

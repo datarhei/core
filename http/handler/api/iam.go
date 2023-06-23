@@ -44,28 +44,28 @@ func (h *IAMHandler) AddIdentity(c echo.Context) error {
 	user := api.IAMUser{}
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies := user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to create user '%s'", iamuser.Name)
+		return api.Err(http.StatusForbidden, "", "not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can add superusers")
+		return api.Err(http.StatusForbidden, "", "only superusers can add superusers")
 	}
 
 	err := h.iam.CreateIdentity(iamuser)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	for _, p := range iampolicies {
@@ -96,26 +96,26 @@ func (h *IAMHandler) RemoveIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to delete this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to delete this user")
 	}
 
 	iamuser, err := h.iam.GetIdentity(name)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "Not found", "%s", err)
+		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can remove superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can remove superusers")
 	}
 
 	// Remove the user
 	if err := h.iam.DeleteIdentity(name); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	// Remove all policies of that user
 	if err := h.iam.RemovePolicy(name, "", "", nil); err != nil {
-		return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -145,7 +145,7 @@ func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to modify this user")
+		return api.Err(http.StatusForbidden, "", "Not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -154,7 +154,7 @@ func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -168,23 +168,23 @@ func (h *IAMHandler) UpdateIdentity(c echo.Context) error {
 	user.Marshal(iamuser, iampolicies)
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "Invalid JSON", "%s", err)
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies = user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to create user '%s'", iamuser.Name)
+		return api.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "Forbidden", "Only superusers can modify superusers")
+		return api.Err(http.StatusForbidden, "", "Only superusers can modify superusers")
 	}
 
 	if name != "$anon" {
@@ -249,24 +249,24 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 	policies := []api.IAMPolicy{}
 
 	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, p := range policies {
 		err := c.Validate(p)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "Invalid JSON: %s", err.Error())
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 
 	for _, p := range policies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
+			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "", "Only superusers can modify superusers")
+		return api.Err(http.StatusForbidden, "", "only superusers can modify superusers")
 	}
 
 	if err := h.iam.RemovePolicy(name, "", "", nil); err != nil {
@@ -343,7 +343,7 @@ func (h *IAMHandler) GetIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden", "Not allowed to access this user")
+		return api.Err(http.StatusForbidden, "", "not allowed to access this user")
 	}
 
 	var iamuser identity.User
@@ -352,7 +352,7 @@ func (h *IAMHandler) GetIdentity(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "Not found", "%s", err)
+			return api.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 
 		if ctxuser != iamuser.Name {
