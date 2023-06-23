@@ -473,7 +473,7 @@ func (a *api) start() error {
 			})
 		}
 
-		cluster, err := cluster.New(cluster.ClusterConfig{
+		cluster, err := cluster.New(cluster.Config{
 			ID:                     cfg.ID,
 			Name:                   cfg.Name,
 			Path:                   filepath.Join(cfg.DB.Dir, "cluster"),

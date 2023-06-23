@@ -647,7 +647,7 @@ func (a *api) Lock(c echo.Context) error {
 
 	a.logger.Debug().WithField("name", r.Name).Log("Acquire lock")
 
-	err := a.cluster.CreateLock(origin, r.Name, r.ValidUntil)
+	_, err := a.cluster.CreateLock(origin, r.Name, r.ValidUntil)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", r.Name).Log("Unable to acquire lock")
 		return Err(http.StatusInternalServerError, "", "unable to acquire lock: %s", err.Error())

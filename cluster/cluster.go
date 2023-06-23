@@ -67,13 +67,14 @@ type Cluster interface {
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 
-	CreateLock(origin string, name string, validUntil time.Time) error
+	CreateLock(origin string, name string, validUntil time.Time) (*Lock, error)
 	DeleteLock(origin string, name string) error
 	ListLocks() map[string]time.Time
 
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
 	GetKV(key string) (string, time.Time, error)
+	ListKV(prefix string) map[string]store.Value
 
 	ProxyReader() proxy.ProxyReader
 }
@@ -83,7 +84,7 @@ type Peer struct {
 	Address string
 }
 
-type ClusterConfig struct {
+type Config struct {
 	ID      string // ID of the node
 	Name    string // Name of the node
 	Path    string // Path where to store all cluster data
@@ -152,7 +153,7 @@ type cluster struct {
 
 var ErrDegraded = errors.New("cluster is currently degraded")
 
-func New(config ClusterConfig) (Cluster, error) {
+func New(config Config) (Cluster, error) {
 	c := &cluster{
 		id:     config.ID,
 		name:   config.Name,
@@ -1071,13 +1072,22 @@ func (c *cluster) RemoveIdentity(origin string, name string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) error {
+func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*Lock, error) {
 	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
+		return nil, ErrDegraded
 	}
 
 	if !c.IsRaftLeader() {
-		return c.forwarder.CreateLock(origin, name, validUntil)
+		err := c.forwarder.CreateLock(origin, name, validUntil)
+		if err != nil {
+			return nil, err
+		}
+
+		l := &Lock{
+			ValidUntil: validUntil,
+		}
+
+		return l, nil
 	}
 
 	cmd := &store.Command{
@@ -1088,7 +1098,16 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) e
 		},
 	}
 
-	return c.applyCommand(cmd)
+	err := c.applyCommand(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	l := &Lock{
+		ValidUntil: validUntil,
+	}
+
+	return l, nil
 }
 
 func (c *cluster) DeleteLock(origin string, name string) error {
@@ -1160,6 +1179,12 @@ func (c *cluster) GetKV(key string) (string, time.Time, error) {
 	}
 
 	return value.Value, value.UpdatedAt, nil
+}
+
+func (c *cluster) ListKV(prefix string) map[string]store.Value {
+	storeValues := c.store.ListKVS(prefix)
+
+	return storeValues
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {
