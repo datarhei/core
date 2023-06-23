@@ -82,7 +82,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 		return c.Blob(http.StatusOK, "application/data", nil)
 	}
 
-	var streamFile io.ReadCloser = file
+	var streamFile io.Reader = file
 	status := http.StatusOK
 
 	ifRange := c.Request().Header.Get("If-Range")
@@ -331,7 +331,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 }
 
 type limitReader struct {
-	r    io.ReadCloser
+	r    io.Reader
 	size int
 }
 
@@ -348,25 +348,12 @@ func (l *limitReader) Read(p []byte) (int, error) {
 
 	i, err := l.r.Read(p)
 	if err != nil {
-		l.r.Close()
 		return i, err
 	}
 
 	l.size -= i
 
-	if l.size == 0 {
-		l.r.Close()
-	}
-
 	return i, nil
-}
-
-func (l *limitReader) Close() error {
-	if l.r != nil {
-		l.r.Close()
-	}
-
-	return nil
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb
