@@ -19,15 +19,19 @@ func createAdapter() (Adapter, error) {
 func TestUserName(t *testing.T) {
 	user := User{}
 
-	err := user.validate()
+	err := user.Validate()
 	require.Error(t, err)
 
 	user.Name = "foobar_5"
-	err = user.validate()
+	err = user.Validate()
+	require.NoError(t, err)
+
+	user.Name = "foobar:5"
+	err = user.Validate()
 	require.NoError(t, err)
 
 	user.Name = "$foob:ar"
-	err = user.validate()
+	err = user.Validate()
 	require.Error(t, err)
 }
 

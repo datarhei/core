@@ -744,7 +744,7 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 
 	user := api.IAMUser{}
 
@@ -799,7 +799,7 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
@@ -880,7 +880,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
@@ -952,7 +952,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 // @Router /api/v3/cluster/db/user [get]
 func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 
 	updatedAt, identities := h.cluster.ListIdentities()
 
@@ -991,7 +991,7 @@ func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
 // @Router /api/v3/cluster/db/user/{name} [get]
 func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {
@@ -1069,7 +1069,7 @@ func (h *ClusterHandler) ReloadIAM(c echo.Context) error {
 // @Router /api/v3/cluster/iam/user [get]
 func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 
 	identities := h.iam.ListIdentities()
 
@@ -1115,7 +1115,7 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 // @Router /api/v3/cluster/iam/user/{name} [get]
 func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {

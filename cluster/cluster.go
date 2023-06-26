@@ -1007,6 +1007,10 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 		return ErrDegraded
 	}
 
+	if err := identity.Validate(); err != nil {
+		return fmt.Errorf("invalid identity: %w", err)
+	}
+
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddIdentity(origin, identity)
 	}

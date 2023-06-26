@@ -2,10 +2,11 @@ package identity
 
 import (
 	"fmt"
-	"regexp"
+	"strings"
 	"sync"
 	"time"
 
+	enctoken "github.com/datarhei/core/v16/encoding/token"
 	"github.com/datarhei/core/v16/iam/jwks"
 	"github.com/datarhei/core/v16/log"
 	"github.com/google/uuid"
@@ -45,16 +46,13 @@ type UserAuthServices struct {
 	Session []string `json:"session"` // Secrets for session JWT
 }
 
-func (u *User) validate() error {
+func (u *User) Validate() error {
 	if len(u.Name) == 0 {
 		return fmt.Errorf("a name is required")
 	}
 
-	chars := `A-Za-z0-9._-`
-
-	re := regexp.MustCompile(`[^` + chars + `]`)
-	if re.MatchString(u.Name) {
-		return fmt.Errorf("the name can only contain [%s]", chars)
+	if strings.HasPrefix(u.Name, "$") {
+		return fmt.Errorf("name is not allowed to start with $")
 	}
 
 	if len(u.Auth.API.Auth0.User) != 0 {
@@ -363,7 +361,7 @@ func (i *identity) GetServiceToken() string {
 			continue
 		}
 
-		return i.Name() + ":" + token
+		return enctoken.Marshal(i.Name(), token)
 	}
 
 	return ""
@@ -608,7 +606,7 @@ func (im *identityManager) Reload() error {
 			continue
 		}
 
-		if err := u.validate(); err != nil {
+		if err := u.Validate(); err != nil {
 			continue
 		}
 
@@ -624,7 +622,7 @@ func (im *identityManager) Reload() error {
 }
 
 func (im *identityManager) Create(u User) error {
-	if err := u.validate(); err != nil {
+	if err := u.Validate(); err != nil {
 		return err
 	}
 
@@ -689,7 +687,7 @@ func (im *identityManager) create(u User) (*identity, error) {
 }
 
 func (im *identityManager) Update(name string, u User) error {
-	if err := u.validate(); err != nil {
+	if err := u.Validate(); err != nil {
 		return err
 	}
 

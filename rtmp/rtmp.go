@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/cluster/proxy"
+	enctoken "github.com/datarhei/core/v16/encoding/token"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
@@ -212,7 +213,7 @@ func (s *server) log(who, handler, action, resource, message string, client net.
 func GetToken(u *url.URL) (string, string) {
 	q := u.Query()
 	if q.Has("token") {
-		// The token was in the query. Return the unmomdified path and the token
+		// The token was in the query. Return the unmomdified path and the token.
 		return u.Path, q.Get("token")
 	}
 
@@ -471,18 +472,16 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 		return "$anon", nil
 	}
 
-	var identity iamidentity.Verifier
-	var err error
+	var identity iamidentity.Verifier = nil
+	var err error = nil
 
 	var token string
 
-	before, after, found := strings.Cut(key, ":")
-	if !found {
+	username, token := enctoken.Unmarshal(key)
+	if len(username) == 0 {
 		identity = s.iam.GetDefaultVerifier()
-		token = before
 	} else {
-		identity, err = s.iam.GetVerifier(before)
-		token = after
+		identity, err = s.iam.GetVerifier(username)
 	}
 
 	if err != nil {
