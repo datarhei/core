@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -123,4 +125,33 @@ func (m *manager) AcquireCertificates(ctx context.Context, listenAddress string,
 	wg.Wait()
 
 	return certerr
+}
+
+func ProxyHTTPChallenge(ctx context.Context, listenAddress string, target *url.URL) error {
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Start temporary http server on configured port
+	tempserver := &http.Server{
+		Addr:           listenAddress,
+		Handler:        proxy,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		tempserver.ListenAndServe()
+		wg.Done()
+	}()
+
+	<-ctx.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	tempserver.Shutdown(ctx)
+	cancel()
+
+	return nil
 }

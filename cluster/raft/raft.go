@@ -24,8 +24,14 @@ import (
 
 type Raft interface {
 	Shutdown()
+
+	// IsLeader returns whether this node is the leader.
 	IsLeader() bool
-	Leader() string
+
+	// Leader returns the address and ID of the current leader.
+	Leader() (string, string)
+
+	// Servers returns the list of servers in the cluster.
 	Servers() ([]Server, error)
 	Stats() Stats
 	Apply([]byte) error
@@ -156,10 +162,10 @@ func (r *raft) IsLeader() bool {
 	return r.isLeader
 }
 
-func (r *raft) Leader() string {
-	_, leaderID := r.raft.LeaderWithID()
+func (r *raft) Leader() (string, string) {
+	leaderAddress, leaderID := r.raft.LeaderWithID()
 
-	return string(leaderID)
+	return string(leaderAddress), string(leaderID)
 }
 
 func (r *raft) Servers() ([]Server, error) {
@@ -168,7 +174,7 @@ func (r *raft) Servers() ([]Server, error) {
 		return nil, fmt.Errorf("failed to get raft configuration: %w", err)
 	}
 
-	leaderID := r.Leader()
+	_, leaderID := r.Leader()
 
 	servers := []Server{}
 

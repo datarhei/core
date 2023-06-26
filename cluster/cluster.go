@@ -330,7 +330,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	c.logger.Info().Log("Waiting for a leader to be elected ...")
 
 	for {
-		leader := c.raft.Leader()
+		_, leader := c.raft.Leader()
 		if len(leader) != 0 {
 			break
 		}
@@ -369,55 +369,91 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 	c.logger.Info().Log("Cluster is operational")
 
-	if c.isTLSRequired && c.IsRaftLeader() {
-		names, err := c.getClusterHostnames()
-		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("failed to assemble list of all configured hostnames: %w", err)
-		}
+	if c.isTLSRequired {
+		if c.IsRaftLeader() {
+			// Acquire certificates
+			names, err := c.getClusterHostnames()
+			if err != nil {
+				c.Shutdown()
+				return nil, fmt.Errorf("failed to assemble list of all configured hostnames: %w", err)
+			}
 
-		kvs, err := NewClusterKVS(c)
-		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("cluster KVS: %w", err)
-		}
+			kvs, err := NewClusterKVS(c)
+			if err != nil {
+				c.Shutdown()
+				return nil, fmt.Errorf("cluster KVS: %w", err)
+			}
 
-		storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
-		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("certificate store: %w", err)
-		}
+			storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
+			if err != nil {
+				c.Shutdown()
+				return nil, fmt.Errorf("certificate store: %w", err)
+			}
 
-		manager, err := autocert.New(autocert.Config{
-			Storage:         storage,
-			DefaultHostname: names[0],
-			EmailAddress:    c.config.TLS.Email,
-			IsProduction:    false,
-			Logger:          c.logger.WithComponent("Let's Encrypt"),
-		})
-		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("certificate manager: %w", err)
-		}
+			manager, err := autocert.New(autocert.Config{
+				Storage:         storage,
+				DefaultHostname: names[0],
+				EmailAddress:    c.config.TLS.Email,
+				IsProduction:    false,
+				Logger:          c.logger.WithComponent("Let's Encrypt"),
+			})
+			if err != nil {
+				c.Shutdown()
+				return nil, fmt.Errorf("certificate manager: %w", err)
+			}
 
-		c.certManager = manager
+			c.certManager = manager
 
-		err = manager.AcquireCertificates(ctx, c.config.Address, names)
-		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("failed to acquire certificates: %w", err)
+			err = manager.AcquireCertificates(ctx, c.config.Address, names)
+			if err != nil {
+				c.Shutdown()
+				return nil, fmt.Errorf("failed to acquire certificates: %w", err)
+			}
 		}
 	}
 
 	if !c.IsRaftLeader() {
+		tempctx, cancel := context.WithCancel(context.Background())
+
+		if c.isTLSRequired {
+			// All followers forward any HTTP requests to the leader such that it can respond to the HTTP challenge
+			leaderAddress, _ := c.raft.Leader()
+			leader, err := c.CoreAPIAddress(leaderAddress)
+			if err != nil {
+				cancel()
+				c.Shutdown()
+				return nil, fmt.Errorf("unable to find leader address: %w", err)
+			}
+
+			url, err := url.Parse(leader)
+			if err != nil {
+				cancel()
+				return nil, fmt.Errorf("unable to parse leader address: %w", err)
+			}
+
+			url.Scheme = "http"
+			url.Path = "/"
+			url.User = nil
+			url.RawQuery = ""
+
+			go func() {
+				c.logger.Info().WithField("leader", url.String()).Log("Forwarding ACME challenges to leader")
+				autocert.ProxyHTTPChallenge(tempctx, c.config.Address, url)
+				c.logger.Info().WithField("leader", url.String()).Log("Stopped forwarding ACME challenges to leader")
+			}()
+		}
+
 		for {
+			// Ask leader if it is ready
 			err := c.IsReady("")
 			if err == nil {
+				cancel()
 				break
 			}
 
 			select {
 			case <-ctx.Done():
+				cancel()
 				c.Shutdown()
 				return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
 			default:
