@@ -62,7 +62,7 @@ type API interface {
 	// been ended with Stop() or Destroy(). In this case a nil error
 	// is returned. An ErrConfigReload error is returned if a
 	// configuration reload has been requested.
-	Start() error
+	Start(ctx context.Context) error
 
 	// Stop stops the API, some states may be kept intact such
 	// that they can be reused after starting the API again.
@@ -296,7 +296,7 @@ func (a *api) Reload() error {
 	return nil
 }
 
-func (a *api) start() error {
+func (a *api) start(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -473,7 +473,7 @@ func (a *api) start() error {
 			})
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
 
 		cluster, err := cluster.New(ctx, cluster.Config{
@@ -521,7 +521,7 @@ func (a *api) start() error {
 					return fmt.Errorf("failed to initialize autocert manager: %w", err)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 				err = manager.AcquireCertificates(ctx, cfg.Address, cfg.Host.Name)
 				cancel()
 
@@ -1662,7 +1662,7 @@ func (a *api) start() error {
 	wgStart.Wait()
 
 	if cfg.Debug.ForceGC > 0 {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 		a.gcTickerStop = cancel
 
 		go func(ctx context.Context) {
@@ -1715,13 +1715,13 @@ func (a *api) start() error {
 	return nil
 }
 
-func (a *api) Start() error {
-	if err := a.start(); err != nil {
+func (a *api) Start(ctx context.Context) error {
+	if err := a.start(ctx); err != nil {
 		a.stop()
 		return err
 	}
 
-	// Block until is an error from the servers
+	// Block until there's an error from the servers
 	err := <-a.errorChan
 
 	return err

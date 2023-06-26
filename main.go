@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 
@@ -22,7 +23,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	go func() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func(ctx context.Context) {
 		defer func() {
 			if proc, err := os.FindProcess(os.Getpid()); err == nil {
 				proc.Signal(os.Interrupt)
@@ -30,7 +33,7 @@ func main() {
 		}()
 
 		for {
-			if err := app.Start(); err != api.ErrConfigReload {
+			if err := app.Start(ctx); err != api.ErrConfigReload {
 				if err != nil {
 					logger.Error().WithError(err).Log("Failed to start API")
 				}
@@ -47,12 +50,14 @@ func main() {
 				break
 			}
 		}
-	}()
+	}(ctx)
 
 	// Wait for interrupt signal to gracefully shutdown the app
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
+
+	cancel()
 
 	// Stop the app
 	app.Destroy()
