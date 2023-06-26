@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/restream/app"
 
 	client "github.com/datarhei/core-client-go/v16"
@@ -19,11 +20,11 @@ import (
 )
 
 type Node interface {
-	SetAddress(address string)
+	SetEssentials(address string, config *config.Config)
 	IsConnected() (bool, error)
 	Disconnect()
 
-	Config() *clientapi.ConfigV3
+	Config() *config.Config
 
 	StartFiles(updates chan<- NodeFiles) error
 	StopFiles()
@@ -124,7 +125,7 @@ type node struct {
 		memLimit   uint64
 	}
 
-	config *clientapi.ConfigV3
+	config *config.Config
 
 	state       nodeState
 	latency     float64 // Seconds
@@ -145,10 +146,11 @@ type node struct {
 	srtAddress  *url.URL
 }
 
-func NewNode(id, address string) Node {
+func NewNode(id, address string, config *config.Config) Node {
 	n := &node{
 		id:      id,
 		address: address,
+		config:  config,
 		state:   stateDisconnected,
 		secure:  strings.HasPrefix(address, "https://"),
 	}
@@ -191,11 +193,12 @@ func NewNode(id, address string) Node {
 	return n
 }
 
-func (n *node) SetAddress(address string) {
+func (n *node) SetEssentials(address string, config *config.Config) {
 	n.peerLock.Lock()
 	defer n.peerLock.Unlock()
 
 	n.address = address
+	n.config = config
 }
 
 func (n *node) connect(ctx context.Context) error {
@@ -208,6 +211,10 @@ func (n *node) connect(ctx context.Context) error {
 
 	if len(n.address) == 0 {
 		return fmt.Errorf("no address provided")
+	}
+
+	if n.config == nil {
+		return fmt.Errorf("config not available")
 	}
 
 	u, err := url.Parse(n.address)
@@ -235,34 +242,18 @@ func (n *node) connect(ctx context.Context) error {
 		return fmt.Errorf("creating client failed (%s): %w", n.address, err)
 	}
 
-	version, cfg, err := peer.Config()
-	if err != nil {
-		return err
-	}
-
-	if version != 3 {
-		return fmt.Errorf("unsupported core config version: %d", version)
-	}
-
-	config, ok := cfg.Config.(clientapi.ConfigV3)
-	if !ok {
-		return fmt.Errorf("failed to convert config to expected version")
-	}
-
-	n.config = &config
-
 	n.httpAddress = u
 
-	if config.RTMP.Enable {
+	if n.config.RTMP.Enable {
 		n.hasRTMP = true
 		n.rtmpAddress = &url.URL{}
 		n.rtmpAddress.Scheme = "rtmp"
 
 		isHostIP := net.ParseIP(nodehost) != nil
 
-		address := config.RTMP.Address
-		if n.secure && config.RTMP.EnableTLS && !isHostIP {
-			address = config.RTMP.AddressTLS
+		address := n.config.RTMP.Address
+		if n.secure && n.config.RTMP.EnableTLS && !isHostIP {
+			address = n.config.RTMP.AddressTLS
 			n.rtmpAddress.Scheme = "rtmps"
 		}
 
@@ -277,17 +268,17 @@ func (n *node) connect(ctx context.Context) error {
 			n.rtmpAddress.Host = net.JoinHostPort(host, port)
 		}
 
-		n.rtmpAddress = n.rtmpAddress.JoinPath(config.RTMP.App)
+		n.rtmpAddress = n.rtmpAddress.JoinPath(n.config.RTMP.App)
 	}
 
-	if config.SRT.Enable {
+	if n.config.SRT.Enable {
 		n.hasSRT = true
 		n.srtAddress = &url.URL{}
 		n.srtAddress.Scheme = "srt"
 
-		host, port, err := net.SplitHostPort(config.SRT.Address)
+		host, port, err := net.SplitHostPort(n.config.SRT.Address)
 		if err != nil {
-			return fmt.Errorf("invalid srt address '%s': %w", config.SRT.Address, err)
+			return fmt.Errorf("invalid srt address '%s': %w", n.config.SRT.Address, err)
 		}
 
 		if len(host) == 0 {
@@ -299,8 +290,8 @@ func (n *node) connect(ctx context.Context) error {
 		v := url.Values{}
 
 		v.Set("mode", "caller")
-		if len(config.SRT.Passphrase) != 0 {
-			v.Set("passphrase", config.SRT.Passphrase)
+		if len(n.config.SRT.Passphrase) != 0 {
+			v.Set("passphrase", n.config.SRT.Passphrase)
 		}
 
 		n.srtAddress.RawQuery = v.Encode()
@@ -467,7 +458,10 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (n *node) Config() *clientapi.ConfigV3 {
+func (n *node) Config() *config.Config {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
 	return n.config
 }
 

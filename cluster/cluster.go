@@ -721,7 +721,7 @@ func (c *cluster) checkClusterNodes() error {
 			return fmt.Errorf("node %s has a different version: %s: %w", id, version, err)
 		}
 
-		config, err := node.Config()
+		config, err := node.CoreConfig()
 		if err != nil {
 			return fmt.Errorf("node %s has no configuration available: %w", id, err)
 		}
@@ -781,6 +781,14 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 	if local.SRT.Passphrase != remote.SRT.Passphrase {
 		return fmt.Errorf("srt.passphrase is different")
+	}
+
+	if local.Resources.MaxCPUUsage == 0 || remote.Resources.MaxCPUUsage == 0 {
+		return fmt.Errorf("resources.max_cpu_usage must be defined")
+	}
+
+	if local.Resources.MaxMemoryUsage == 0 || remote.Resources.MaxMemoryUsage == 0 {
+		return fmt.Errorf("resources.max_memory_usage must be defined")
 	}
 
 	return nil
