@@ -41,15 +41,22 @@ func New(config iam.Config, store store.Store) (iam.IAM, error) {
 
 func (m *manager) apply(op store.Operation) {
 	m.logger.Debug().WithField("operation", string(op)).Log("Applying action on operation")
+
+	var err error
+
 	switch op {
 	case store.OpAddIdentity:
-		m.ReloadIndentities()
+		err = m.ReloadIndentities()
 	case store.OpUpdateIdentity:
-		m.ReloadIndentities()
+		err = m.ReloadIndentities()
 	case store.OpRemoveIdentity:
-		m.ReloadIndentities()
+		err = m.ReloadIndentities()
 	case store.OpSetPolicies:
-		m.ReloadPolicies()
+		err = m.ReloadPolicies()
+	}
+
+	if err != nil {
+		m.logger.Error().WithError(err).WithField("operation", string(op)).Log("")
 	}
 }
 

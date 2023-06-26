@@ -607,7 +607,7 @@ func (im *identityManager) Reload() error {
 		}
 
 		if err := u.Validate(); err != nil {
-			continue
+			return fmt.Errorf("invalid user from adapter: %s, %w", u.Name, err)
 		}
 
 		identity, err := im.create(u)
