@@ -104,6 +104,21 @@ func NewAPI(config APIConfig) (API, error) {
 		return c.JSON(http.StatusOK, Version.String())
 	})
 
+	a.router.GET("/v1/ready", func(c echo.Context) error {
+		origin := c.Request().Header.Get("X-Cluster-Origin")
+
+		if origin == a.id {
+			return Err(http.StatusLoopDetected, "", "breaking circuit")
+		}
+
+		err := a.cluster.IsReady(origin)
+		if err != nil {
+			return Err(http.StatusLocked, "", "not ready yet")
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	})
+
 	a.router.POST("/v1/server", a.AddServer)
 	a.router.DELETE("/v1/server/:id", a.RemoveServer)
 

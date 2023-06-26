@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/autocert"
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/config"
 	configstore "github.com/datarhei/core/v16/config/store"
@@ -53,7 +54,6 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/lestrrat-go/strftime"
 	"go.uber.org/automaxprocs/maxprocs"
-	"go.uber.org/zap"
 )
 
 // The API interface is the implementation for the restreamer API.
@@ -473,7 +473,10 @@ func (a *api) start() error {
 			})
 		}
 
-		cluster, err := cluster.New(cluster.Config{
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		cluster, err := cluster.New(ctx, cluster.Config{
 			ID:                     cfg.ID,
 			Name:                   cfg.Name,
 			Path:                   filepath.Join(cfg.DB.Dir, "cluster"),
@@ -482,7 +485,7 @@ func (a *api) start() error {
 			SyncInterval:           time.Duration(cfg.Cluster.SyncInterval) * time.Second,
 			NodeRecoverTimeout:     time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
 			EmergencyLeaderTimeout: time.Duration(cfg.Cluster.EmergencyLeaderTimeout) * time.Second,
-			Config:                 cfg.Clone(),
+			CoreConfig:             cfg.Clone(),
 			CoreAPIAddress:         scheme + gonet.JoinHostPort(host, port),
 			CoreAPIUsername:        cfg.API.Auth.Username,
 			CoreAPIPassword:        cfg.API.Auth.Password,
@@ -494,6 +497,54 @@ func (a *api) start() error {
 		}
 
 		a.cluster = cluster
+	}
+
+	var autocertManager autocert.Manager
+
+	if cfg.TLS.Enable {
+		if cfg.TLS.Auto {
+			if len(cfg.Host.Name) == 0 {
+				return fmt.Errorf("at least one host must be provided in host.name or CORE_HOST_NAME")
+			}
+
+			if a.cluster == nil {
+				manager, err := autocert.New(autocert.Config{
+					Storage: &certmagic.FileStorage{
+						Path: filepath.Join(cfg.DB.Dir, "cert"),
+					},
+					DefaultHostname: cfg.Host.Name[0],
+					EmailAddress:    cfg.TLS.Email,
+					IsProduction:    false,
+					Logger:          a.log.logger.core.WithComponent("Let's Encrypt"),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to initialize autocert manager: %w", err)
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				err = manager.AcquireCertificates(ctx, cfg.Address, cfg.Host.Name)
+				cancel()
+
+				autocertManager = manager
+
+				if err != nil {
+					a.log.logger.core.Error().WithError(err).Log("Failed to acquire certificates")
+				}
+
+				if err == nil {
+					a.log.logger.core.Warn().Log("Continuing with disabled TLS")
+					autocertManager = nil
+					cfg.TLS.Enable = false
+				} else {
+					cfg.TLS.CertFile = ""
+					cfg.TLS.KeyFile = ""
+				}
+			} else {
+				autocertManager = a.cluster.CertManager()
+			}
+		} else {
+			a.log.logger.core.Info().Log("Enabling TLS with cert and key files")
+		}
 	}
 
 	{
@@ -1222,108 +1273,6 @@ func (a *api) start() error {
 		a.cache = cache
 	}
 
-	var autocertManager *certmagic.Config
-
-	if cfg.TLS.Enable {
-		if cfg.TLS.Auto {
-			if len(cfg.Host.Name) == 0 {
-				return fmt.Errorf("at least one host must be provided in host.name or CORE_HOST_NAME")
-			}
-
-			certmagic.Default.Storage = &certmagic.FileStorage{
-				Path: filepath.Join(cfg.DB.Dir, "cert"),
-			}
-			certmagic.Default.DefaultServerName = cfg.Host.Name[0]
-			certmagic.Default.Logger = zap.NewNop()
-
-			certmagic.DefaultACME.Agreed = true
-			certmagic.DefaultACME.Email = cfg.TLS.Email
-			certmagic.DefaultACME.CA = certmagic.LetsEncryptProductionCA
-			certmagic.DefaultACME.DisableHTTPChallenge = false
-			certmagic.DefaultACME.DisableTLSALPNChallenge = true
-			certmagic.DefaultACME.Logger = zap.NewNop()
-
-			magic := certmagic.NewDefault()
-			acme := certmagic.NewACMEIssuer(magic, certmagic.DefaultACME)
-			acme.Logger = zap.NewNop()
-
-			magic.Issuers = []certmagic.Issuer{acme}
-			magic.Logger = zap.NewNop()
-
-			autocertManager = magic
-
-			// Start temporary http server on configured port
-			tempserver := &gohttp.Server{
-				Addr: cfg.Address,
-				Handler: acme.HTTPChallengeHandler(gohttp.HandlerFunc(func(w gohttp.ResponseWriter, r *gohttp.Request) {
-					w.WriteHeader(gohttp.StatusNotFound)
-				})),
-				ReadTimeout:    10 * time.Second,
-				WriteTimeout:   10 * time.Second,
-				MaxHeaderBytes: 1 << 20,
-			}
-
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-
-			go func() {
-				tempserver.ListenAndServe()
-				wg.Done()
-			}()
-
-			var certerror bool
-
-			// For each domain, get the certificate
-			for _, host := range cfg.Host.Name {
-				logger := a.log.logger.core.WithComponent("Let's Encrypt").WithField("host", host)
-				logger.Info().Log("Acquiring certificate ...")
-
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Minute))
-
-				err := autocertManager.ManageSync(ctx, []string{host})
-
-				cancel()
-
-				if err != nil {
-					logger.Error().WithField("error", err).Log("Failed to acquire certificate")
-					certerror = true
-					/*
-						problems, err := letsdebug.Check(host, letsdebug.HTTP01)
-						if err != nil {
-							logger.Error().WithField("error", err).Log("Failed to debug certificate acquisition")
-						}
-
-						for _, p := range problems {
-							logger.Error().WithFields(log.Fields{
-								"name":   p.Name,
-								"detail": p.Detail,
-							}).Log(p.Explanation)
-						}
-					*/
-					break
-				}
-
-				logger.Info().Log("Successfully acquired certificate")
-			}
-
-			// Shut down the temporary http server
-			tempserver.Close()
-
-			wg.Wait()
-
-			if certerror {
-				a.log.logger.core.Warn().Log("Continuing with disabled TLS")
-				autocertManager = nil
-				cfg.TLS.Enable = false
-			} else {
-				cfg.TLS.CertFile = ""
-				cfg.TLS.KeyFile = ""
-			}
-		} else {
-			a.log.logger.core.Info().Log("Enabling TLS with cert and key files")
-		}
-	}
-
 	if cfg.RTMP.Enable {
 		a.log.logger.rtmp = a.log.logger.core.WithComponent("RTMP").WithField("address", cfg.RTMP.Address)
 
@@ -1559,9 +1508,7 @@ func (a *api) start() error {
 			a.mainserver.TLSConfig = &tls.Config{
 				GetCertificate: autocertManager.GetCertificate,
 			}
-
-			acme := autocertManager.Issuers[0].(*certmagic.ACMEIssuer)
-			a.sidecarserver.Handler = acme.HTTPChallengeHandler(sidecarserverhandler)
+			a.sidecarserver.Handler = autocertManager.HTTPChallengeHandler(sidecarserverhandler)
 		}
 
 		wgStart.Add(1)

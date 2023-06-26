@@ -137,7 +137,14 @@ func (n *clusterNode) Status() (string, error) {
 		return "offline", fmt.Errorf("the cluster API didn't respond for %s because: %w", since, n.lastContactErr)
 	}
 
-	since = time.Since(n.lastCoreContact)
+	return "online", nil
+}
+
+func (n *clusterNode) CoreStatus() (string, error) {
+	n.pingLock.RLock()
+	defer n.pingLock.RUnlock()
+
+	since := time.Since(n.lastCoreContact)
 	if since > 5*time.Second {
 		return "offline", fmt.Errorf("the core API didn't respond for %s because: %w", since, n.lastCoreContactErr)
 	}

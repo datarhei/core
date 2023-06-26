@@ -253,6 +253,12 @@ func (c *APIClient) Snapshot() (io.ReadCloser, error) {
 	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, "")
 }
 
+func (c *APIClient) IsReady(origin string) error {
+	_, err := c.call(http.MethodGet, "/v1/ready", "application/json", nil, origin)
+
+	return err
+}
+
 func (c *APIClient) stream(method, path, contentType string, data io.Reader, origin string) (io.ReadCloser, error) {
 	if len(c.Address) == 0 {
 		return nil, fmt.Errorf("no address defined")

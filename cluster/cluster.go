@@ -8,10 +8,12 @@ import (
 	"io"
 	gonet "net"
 	"net/url"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/autocert"
 	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/forwarder"
 	clusteriam "github.com/datarhei/core/v16/cluster/iam"
@@ -42,6 +44,7 @@ type Cluster interface {
 	CoreConfig() *config.Config
 
 	About() (ClusterAbout, error)
+	IsReady(origin string) error
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
@@ -77,6 +80,7 @@ type Cluster interface {
 	ListKV(prefix string) map[string]store.Value
 
 	ProxyReader() proxy.ProxyReader
+	CertManager() autocert.Manager
 }
 
 type Peer struct {
@@ -99,7 +103,7 @@ type Config struct {
 	CoreAPIUsername string // Username for the core API
 	CoreAPIPassword string // Password for the core API
 
-	Config *config.Config
+	CoreConfig *config.Config
 
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
@@ -138,22 +142,29 @@ type cluster struct {
 	config      *config.Config
 	coreAddress string
 
-	isDegraded    bool
-	isDegradedErr error
-	stateLock     sync.Mutex
+	isDegraded        bool
+	isDegradedErr     error
+	isCoreDegraded    bool
+	isCoreDegradedErr error
+	stateLock         sync.Mutex
 
 	isRaftLeader  bool
 	hasRaftLeader bool
 	isLeader      bool
 	leaderLock    sync.Mutex
 
+	isTLSRequired bool
+	certManager   autocert.Manager
+
 	nodes     map[string]*clusterNode
 	nodesLock sync.RWMutex
+
+	ready bool
 }
 
 var ErrDegraded = errors.New("cluster is currently degraded")
 
-func New(config Config) (Cluster, error) {
+func New(ctx context.Context, config Config) (Cluster, error) {
 	c := &cluster{
 		id:     config.ID,
 		name:   config.Name,
@@ -169,13 +180,15 @@ func New(config Config) (Cluster, error) {
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
 
-		config: config.Config,
+		config: config.CoreConfig,
 		nodes:  map[string]*clusterNode{},
 	}
 
 	if c.config == nil {
 		return nil, fmt.Errorf("the core config must be provided")
 	}
+
+	c.isTLSRequired = c.config.TLS.Enable && c.config.TLS.Auto
 
 	u, err := url.Parse(config.CoreAPIAddress)
 	if err != nil {
@@ -312,6 +325,112 @@ func New(config Config) (Cluster, error) {
 	go c.monitorLeadership()
 	go c.sentinel()
 
+	// Wait for a leader to be selected
+
+	c.logger.Info().Log("Waiting for a leader to be elected ...")
+
+	for {
+		leader := c.raft.Leader()
+		if len(leader) != 0 {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			c.Shutdown()
+			return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
+		default:
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	c.logger.Info().Log("Leader has been elected")
+
+	// Wait for cluster to leave degraded mode
+
+	c.logger.Info().Log("Waiting for cluster to become operational ...")
+
+	for {
+		ok, _ := c.IsClusterDegraded()
+		if !ok {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			c.Shutdown()
+			return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
+		default:
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	c.logger.Info().Log("Cluster is operational")
+
+	if c.isTLSRequired && c.IsRaftLeader() {
+		names, err := c.getClusterHostnames()
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("failed to assemble list of all configured hostnames: %w", err)
+		}
+
+		kvs, err := NewClusterKVS(c)
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("cluster KVS: %w", err)
+		}
+
+		storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("certificate store: %w", err)
+		}
+
+		manager, err := autocert.New(autocert.Config{
+			Storage:         storage,
+			DefaultHostname: names[0],
+			EmailAddress:    c.config.TLS.Email,
+			IsProduction:    false,
+			Logger:          c.logger.WithComponent("Let's Encrypt"),
+		})
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("certificate manager: %w", err)
+		}
+
+		c.certManager = manager
+
+		err = manager.AcquireCertificates(ctx, c.config.Address, names)
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("failed to acquire certificates: %w", err)
+		}
+	}
+
+	if !c.IsRaftLeader() {
+		for {
+			err := c.IsReady("")
+			if err == nil {
+				break
+			}
+
+			select {
+			case <-ctx.Done():
+				c.Shutdown()
+				return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
+			default:
+			}
+
+			time.Sleep(time.Second)
+		}
+	}
+
+	c.ready = true
+
+	c.logger.Info().Log("Cluster is ready")
+
 	return c, nil
 }
 
@@ -368,6 +487,10 @@ func (c *cluster) CoreConfig() *config.Config {
 	return c.config.Clone()
 }
 
+func (c *cluster) CertManager() autocert.Manager {
+	return c.certManager
+}
+
 func (c *cluster) Shutdown() error {
 	c.logger.Info().Log("Shutting down cluster")
 	c.shutdownLock.Lock()
@@ -414,6 +537,17 @@ func (c *cluster) IsRaftLeader() bool {
 }
 
 func (c *cluster) IsDegraded() (bool, error) {
+	c.stateLock.Lock()
+	defer c.stateLock.Unlock()
+
+	if c.isDegraded {
+		return c.isDegraded, c.isDegradedErr
+	}
+
+	return c.isCoreDegraded, c.isCoreDegradedErr
+}
+
+func (c *cluster) IsClusterDegraded() (bool, error) {
 	c.stateLock.Lock()
 	defer c.stateLock.Unlock()
 
@@ -701,6 +835,19 @@ func (c *cluster) trackNodeChanges() {
 				c.isDegradedErr = nil
 			}
 			c.stateLock.Unlock()
+
+			// Put the cluster in "coreDegraded" mode in case there's a mismatch in expected values
+			err = c.checkClusterCoreNodes()
+
+			c.stateLock.Lock()
+			if err != nil {
+				c.isCoreDegraded = true
+				c.isCoreDegradedErr = err
+			} else {
+				c.isCoreDegraded = false
+				c.isCoreDegradedErr = nil
+			}
+			c.stateLock.Unlock()
 		case <-c.shutdownCh:
 			return
 		}
@@ -731,6 +878,47 @@ func (c *cluster) checkClusterNodes() error {
 	}
 
 	return nil
+}
+
+func (c *cluster) checkClusterCoreNodes() error {
+	c.nodesLock.RLock()
+	defer c.nodesLock.RUnlock()
+
+	for id, node := range c.nodes {
+		if status, err := node.CoreStatus(); status == "offline" {
+			return fmt.Errorf("node %s core is offline: %w", id, err)
+		}
+	}
+
+	return nil
+}
+
+func (c *cluster) getClusterHostnames() ([]string, error) {
+	hostnames := map[string]struct{}{}
+
+	c.nodesLock.RLock()
+	defer c.nodesLock.RUnlock()
+
+	for id, node := range c.nodes {
+		config, err := node.CoreConfig()
+		if err != nil {
+			return nil, fmt.Errorf("node %s has no configuration available: %w", id, err)
+		}
+
+		for _, name := range config.Host.Name {
+			hostnames[name] = struct{}{}
+		}
+	}
+
+	names := []string{}
+
+	for key := range hostnames {
+		names = append(names, key)
+	}
+
+	sort.Strings(names)
+
+	return names, nil
 }
 
 func verifyClusterVersion(v string) error {
@@ -771,16 +959,20 @@ func verifyClusterConfig(local, remote *config.Config) error {
 		return fmt.Errorf("rtmp.enable is different")
 	}
 
-	if local.RTMP.App != remote.RTMP.App {
-		return fmt.Errorf("rtmp.app is different")
+	if local.RTMP.Enable {
+		if local.RTMP.App != remote.RTMP.App {
+			return fmt.Errorf("rtmp.app is different")
+		}
 	}
 
 	if local.SRT.Enable != remote.SRT.Enable {
 		return fmt.Errorf("srt.enable is different")
 	}
 
-	if local.SRT.Passphrase != remote.SRT.Passphrase {
-		return fmt.Errorf("srt.passphrase is different")
+	if local.SRT.Enable {
+		if local.SRT.Passphrase != remote.SRT.Passphrase {
+			return fmt.Errorf("srt.passphrase is different")
+		}
 	}
 
 	if local.Resources.MaxCPUUsage == 0 || remote.Resources.MaxCPUUsage == 0 {
@@ -789,6 +981,20 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 	if local.Resources.MaxMemoryUsage == 0 || remote.Resources.MaxMemoryUsage == 0 {
 		return fmt.Errorf("resources.max_memory_usage must be defined")
+	}
+
+	if local.TLS.Enable != remote.TLS.Enable {
+		return fmt.Errorf("tls.enable is different")
+	}
+
+	if local.TLS.Enable {
+		if local.TLS.Auto != remote.TLS.Auto {
+			return fmt.Errorf("tls.auto is different")
+		}
+
+		if len(local.Host.Name) == 0 || len(remote.Host.Name) == 0 {
+			return fmt.Errorf("host.name must be set")
+		}
 	}
 
 	return nil
@@ -1085,7 +1291,7 @@ func (c *cluster) RemoveIdentity(origin string, name string) error {
 }
 
 func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*Lock, error) {
-	if ok, _ := c.IsDegraded(); ok {
+	if ok, _ := c.IsClusterDegraded(); ok {
 		return nil, ErrDegraded
 	}
 
@@ -1123,7 +1329,7 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 }
 
 func (c *cluster) DeleteLock(origin string, name string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if ok, _ := c.IsClusterDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -1146,7 +1352,7 @@ func (c *cluster) ListLocks() map[string]time.Time {
 }
 
 func (c *cluster) SetKV(origin, key, value string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if ok, _ := c.IsClusterDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -1166,7 +1372,7 @@ func (c *cluster) SetKV(origin, key, value string) error {
 }
 
 func (c *cluster) UnsetKV(origin, key string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if ok, _ := c.IsClusterDegraded(); ok {
 		return ErrDegraded
 	}
 
@@ -1197,6 +1403,22 @@ func (c *cluster) ListKV(prefix string) map[string]store.Value {
 	storeValues := c.store.ListKVS(prefix)
 
 	return storeValues
+}
+
+func (c *cluster) IsReady(origin string) error {
+	if ok, _ := c.IsClusterDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.IsReady(origin)
+	}
+
+	if !c.ready {
+		return fmt.Errorf("no ready yet")
+	}
+
+	return nil
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {

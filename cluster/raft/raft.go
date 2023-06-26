@@ -488,7 +488,6 @@ func (r *raft) trackLeaderChanges() {
 	obsCh := make(chan hcraft.Observation, 16)
 	observer := hcraft.NewObserver(obsCh, false, func(o *hcraft.Observation) bool {
 		_, leaderOK := o.Data.(hcraft.LeaderObservation)
-
 		return leaderOK
 	})
 
