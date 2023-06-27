@@ -1,7 +1,6 @@
 package session
 
 import (
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -152,48 +151,5 @@ func NewHTTPWithConfig(config HTTPConfig) echo.MiddlewareFunc {
 
 			return next(c)
 		}
-	}
-}
-
-type fakeReader struct {
-	reader io.ReadCloser
-	size   int64
-}
-
-func (r *fakeReader) Read(b []byte) (int, error) {
-	n, err := r.reader.Read(b)
-	r.size += int64(n)
-
-	return n, err
-}
-
-func (r *fakeReader) Close() error {
-	return r.reader.Close()
-}
-
-type fakeWriter struct {
-	http.ResponseWriter
-	size int64
-	code int
-}
-
-func (w *fakeWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader(statusCode)
-
-	w.code = statusCode
-}
-
-func (w *fakeWriter) Write(body []byte) (int, error) {
-	n, err := w.ResponseWriter.Write(body)
-
-	w.size += int64(n)
-
-	return n, err
-}
-
-func (w *fakeWriter) Flush() {
-	flusher, ok := w.ResponseWriter.(http.Flusher)
-	if ok {
-		flusher.Flush()
 	}
 }

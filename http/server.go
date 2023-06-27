@@ -139,7 +139,6 @@ type server struct {
 		log        echo.MiddlewareFunc
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
-		session    echo.MiddlewareFunc
 		hlsrewrite echo.MiddlewareFunc
 		iam        echo.MiddlewareFunc
 	}
@@ -309,10 +308,6 @@ func NewServer(config Config) (Server, error) {
 		config.Sessions,
 		config.IAM,
 	)
-	s.middleware.session = mwsession.NewHLSWithConfig(mwsession.HLSConfig{
-		EgressCollector:  config.Sessions.Collector("hls"),
-		IngressCollector: config.Sessions.Collector("hlsingress"),
-	})
 
 	s.middleware.log = mwlog.NewWithConfig(mwlog.Config{
 		Logger: s.logger,
@@ -383,8 +378,20 @@ func NewServer(config Config) (Server, error) {
 
 	s.router.Use(s.middleware.iam)
 
-	s.router.Use(mwsession.NewHTTPWithConfig(mwsession.HTTPConfig{
-		Collector: config.Sessions.Collector("http"),
+	s.router.Use(mwsession.NewWithConfig(mwsession.Config{
+		HLSIngressCollector: config.Sessions.Collector("hlsingest"),
+		HLSEgressCollector:  config.Sessions.Collector("hls"),
+		HTTPCollector:       config.Sessions.Collector("http"),
+		Skipper: func(c echo.Context) bool {
+			// Exclude the API from the sessions
+			path := c.Request().URL.Path
+
+			if path == "/api" {
+				return true
+			}
+
+			return strings.HasPrefix(path, "/api/")
+		},
 	}))
 
 	// Add static routes
@@ -493,10 +500,6 @@ func (s *server) setRoutes() {
 
 		if filesystem.middleware != nil {
 			fs.Use(filesystem.middleware)
-		}
-
-		if s.middleware.session != nil {
-			fs.Use(s.middleware.session)
 		}
 
 		fs.GET("", filesystem.handler.GetFile)
