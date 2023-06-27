@@ -213,7 +213,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 		if remote, ok := data["remote"].([]string); ok && len(remote) != 0 {
 			match := false
 			for _, r := range remote {
-				if referrer == r {
+				if ok, _ := glob.Match(r, referrer, '.'); ok {
 					match = true
 					break
 				}
