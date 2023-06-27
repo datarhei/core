@@ -249,8 +249,8 @@ func (c *APIClient) UnsetKV(origin string, key string) error {
 	return err
 }
 
-func (c *APIClient) Snapshot() (io.ReadCloser, error) {
-	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, "")
+func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {
+	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, origin)
 }
 
 func (c *APIClient) IsReady(origin string) error {

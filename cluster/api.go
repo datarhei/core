@@ -242,7 +242,13 @@ func (a *api) RemoveServer(c echo.Context) error {
 // @Success 500 {array} Error
 // @Router /v1/snapshot [get]
 func (a *api) Snapshot(c echo.Context) error {
-	data, err := a.cluster.Snapshot()
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	data, err := a.cluster.Snapshot(origin)
 	if err != nil {
 		a.logger.Debug().WithError(err).Log("Unable to create snaphot")
 		return Err(http.StatusInternalServerError, "", "unable to create snapshot: %s", err.Error())

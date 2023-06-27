@@ -1441,6 +1441,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/snapshot": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve snapshot of the cluster DB",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve snapshot of the cluster DB",
+                "operationId": "cluster-3-snapshot",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/config": {
             "get": {
                 "security": [

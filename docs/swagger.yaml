@@ -3323,6 +3323,22 @@ paths:
       summary: Add JSON metadata with a process under the given key
       tags:
       - v16.?.?
+  /api/v3/cluster/snapshot:
+    get:
+      description: Retrieve snapshot of the cluster DB
+      operationId: cluster-3-snapshot
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve snapshot of the cluster DB
+      tags:
+      - v16.?.?
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration

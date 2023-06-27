@@ -48,7 +48,7 @@ type Cluster interface {
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
-	Snapshot() (io.ReadCloser, error)
+	Snapshot(origin string) (io.ReadCloser, error)
 
 	Shutdown() error
 
@@ -827,10 +827,10 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 	return nil
 }
 
-func (c *cluster) Snapshot() (io.ReadCloser, error) {
+func (c *cluster) Snapshot(origin string) (io.ReadCloser, error) {
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
-		return c.forwarder.Snapshot()
+		return c.forwarder.Snapshot(origin)
 	}
 
 	return c.raft.Snapshot()

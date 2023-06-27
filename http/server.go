@@ -675,6 +675,8 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	if s.v3handler.cluster != nil {
 		v3.GET("/cluster", s.v3handler.cluster.About)
 
+		v3.GET("/cluster/snapshot", s.v3handler.cluster.GetSnapshot)
+
 		v3.GET("/cluster/db/process", s.v3handler.cluster.ListStoreProcesses)
 		v3.GET("/cluster/db/user", s.v3handler.cluster.ListStoreIdentities)
 		v3.GET("/cluster/db/user/:name", s.v3handler.cluster.ListStoreIdentity)

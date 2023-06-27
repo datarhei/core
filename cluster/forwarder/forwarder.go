@@ -20,7 +20,7 @@ type Forwarder interface {
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error
-	Snapshot() (io.ReadCloser, error)
+	Snapshot(origin string) (io.ReadCloser, error)
 
 	AddProcess(origin string, config *app.Config) error
 	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
@@ -140,12 +140,12 @@ func (f *forwarder) Leave(origin, id string) error {
 	return client.Leave(origin, id)
 }
 
-func (f *forwarder) Snapshot() (io.ReadCloser, error) {
+func (f *forwarder) Snapshot(origin string) (io.ReadCloser, error) {
 	f.lock.RLock()
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.Snapshot()
+	return client.Snapshot(origin)
 }
 
 func (f *forwarder) AddProcess(origin string, config *app.Config) error {

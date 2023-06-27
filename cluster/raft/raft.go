@@ -2,7 +2,8 @@ package raft
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	gonet "net"
@@ -287,7 +288,7 @@ func (rcw *readCloserWrapper) Close() error {
 
 type Snapshot struct {
 	Metadata *hcraft.SnapshotMeta
-	Data     []byte
+	Data     string
 }
 
 func (r *raft) Snapshot() (io.ReadCloser, error) {
@@ -311,11 +312,11 @@ func (r *raft) Snapshot() (io.ReadCloser, error) {
 
 	snapshot := Snapshot{
 		Metadata: metadata,
-		Data:     data,
+		Data:     base64.StdEncoding.EncodeToString(data),
 	}
 
 	buffer := bytes.Buffer{}
-	enc := gob.NewEncoder(&buffer)
+	enc := json.NewEncoder(&buffer)
 	err = enc.Encode(snapshot)
 	if err != nil {
 		return nil, err

@@ -1291,3 +1291,23 @@ func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, kvs)
 }
+
+// GetSnapshot returns a current snapshot of the cluster DB
+// @Summary Retrieve snapshot of the cluster DB
+// @Description Retrieve snapshot of the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-snapshot
+// @Produce application/octet-stream
+// @Success 200 {file} byte
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/snapshot [get]
+func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
+	r, err := h.cluster.Snapshot("")
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "failed to retrieve snapshot: %w", err)
+	}
+
+	defer r.Close()
+
+	return c.Stream(http.StatusOK, "application/octet-stream", r)
+}
