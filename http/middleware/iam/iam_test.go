@@ -66,6 +66,18 @@ func getIAM() (iam.IAM, error) {
 		},
 	})
 
+	i.CreateIdentity(iamidentity.User{
+		Name: "foobar:2",
+		Auth: iamidentity.UserAuth{
+			API: iamidentity.UserAuthAPI{
+				Password: "secret",
+			},
+			Services: iamidentity.UserAuthServices{
+				Basic: []string{"secret"},
+			},
+		},
+	})
+
 	return i, nil
 }
 
@@ -142,6 +154,42 @@ func TestBasicAuth(t *testing.T) {
 	req.Header.Set(echo.HeaderAuthorization, auth)
 	he = h(c).(api.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
+}
+
+func TestBasicAuthEncoding(t *testing.T) {
+	iam, err := getIAM()
+	require.NoError(t, err)
+
+	iam.AddPolicy("foobar:2", "$none", "fs:/**", []string{"ANY"})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	res := httptest.NewRecorder()
+	c := e.NewContext(req, res)
+	h := NewWithConfig(Config{
+		IAM: iam,
+	})(func(c echo.Context) error {
+		return c.String(http.StatusOK, "test")
+	})
+
+	// Valid credentials
+	auth := basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar%3A2:secret"))
+	req.Header.Set(echo.HeaderAuthorization, auth)
+	require.NoError(t, h(c))
+
+	// Invalid encoded credentials
+	auth = basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar%32:secret"))
+	req.Header.Set(echo.HeaderAuthorization, auth)
+	he := h(c).(api.Error)
+	require.Equal(t, http.StatusUnauthorized, he.Code)
+	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
+
+	// Invalid credentials
+	auth = basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar:2:secret"))
+	req.Header.Set(echo.HeaderAuthorization, auth)
+	he = h(c).(api.Error)
+	require.Equal(t, http.StatusUnauthorized, he.Code)
+	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 }
 
 func TestFindDomainFromFilesystem(t *testing.T) {
