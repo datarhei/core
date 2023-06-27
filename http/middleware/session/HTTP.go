@@ -48,6 +48,10 @@ func NewHTTPWithConfig(config HTTPConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
+			if !config.Collector.IsCollectableIP(c.RealIP()) {
+				return next(c)
+			}
+
 			ctxuser := util.DefaultContext(c, "user", "")
 
 			req := c.Request()

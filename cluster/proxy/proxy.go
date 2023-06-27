@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
 
 	clientapi "github.com/datarhei/core-client-go/v16/api"
@@ -119,23 +118,18 @@ func (p *proxyReader) GetFileInfo(prefix, path string) (int64, time.Time, error)
 }
 
 type ProxyConfig struct {
-	ID   string // ID of the node
-	Name string // Name of the node
+	ID string // ID of the node
 
-	IPLimiter net.IPLimiter
-	Logger    log.Logger
+	Logger log.Logger
 }
 
 type proxy struct {
-	id   string
-	name string
+	id string
 
 	nodes    map[string]Node      // List of known nodes
 	idfiles  map[string][]string  // Map from nodeid to list of files
 	idupdate map[string]time.Time // Map from nodeid to time of last update
 	fileid   map[string]string    // Map from file name to nodeid
-
-	limiter net.IPLimiter
 
 	updates chan NodeFiles
 
@@ -152,18 +146,12 @@ var ErrNodeNotFound = errors.New("node not found")
 func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{
 		id:       config.ID,
-		name:     config.Name,
 		nodes:    map[string]Node{},
 		idfiles:  map[string][]string{},
 		idupdate: map[string]time.Time{},
 		fileid:   map[string]string{},
-		limiter:  config.IPLimiter,
 		updates:  make(chan NodeFiles, 64),
 		logger:   config.Logger,
-	}
-
-	if p.limiter == nil {
-		p.limiter = net.NewNullIPLimiter()
 	}
 
 	if p.logger == nil {
@@ -281,17 +269,6 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 		n.StopFiles()
 
 		delete(p.nodes, id)
-
-		ips := node.IPs()
-
-		for _, ip := range ips {
-			p.limiter.RemoveBlock(ip)
-		}
-	}
-
-	ips := node.IPs()
-	for _, ip := range ips {
-		p.limiter.AddBlock(ip)
 	}
 
 	p.nodes[id] = node
@@ -319,12 +296,6 @@ func (p *proxy) RemoveNode(id string) error {
 	node.StopFiles()
 
 	delete(p.nodes, id)
-
-	ips := node.IPs()
-
-	for _, ip := range ips {
-		p.limiter.RemoveBlock(ip)
-	}
 
 	p.logger.Info().WithFields(log.Fields{
 		"id": id,

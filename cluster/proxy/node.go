@@ -45,7 +45,6 @@ type Node interface {
 }
 
 type NodeReader interface {
-	IPs() []string
 	Ping() (time.Duration, error)
 	About() NodeAbout
 	Version() NodeVersion
@@ -106,7 +105,6 @@ const (
 type node struct {
 	id      string
 	address string
-	ips     []string
 
 	peer       client.RestClient
 	peerErr    error
@@ -227,11 +225,6 @@ func (n *node) connect(ctx context.Context) error {
 		return fmt.Errorf("invalid address (%s): %w", u.Host, err)
 	}
 
-	addrs, err := net.LookupHost(nodehost)
-	if err != nil {
-		return fmt.Errorf("lookup failed for %s: %w", nodehost, err)
-	}
-
 	peer, err := client.New(client.Config{
 		Address: u.String(),
 		Client: &http.Client{
@@ -296,8 +289,6 @@ func (n *node) connect(ctx context.Context) error {
 
 		n.srtAddress.RawQuery = v.Encode()
 	}
-
-	n.ips = addrs
 
 	n.peer = peer
 
@@ -636,10 +627,6 @@ func (n *node) Version() NodeVersion {
 	}
 
 	return version
-}
-
-func (n *node) IPs() []string {
-	return n.ips
 }
 
 func (n *node) Files() NodeFiles {

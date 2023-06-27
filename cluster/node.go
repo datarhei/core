@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ type clusterNode struct {
 
 	id                 string
 	address            string
+	ips                []string
 	version            string
 	lastContact        time.Time
 	lastContactErr     error
@@ -42,6 +44,12 @@ func NewClusterNode(id, address string) *clusterNode {
 				Timeout: 5 * time.Second,
 			},
 		},
+	}
+
+	if host, _, err := net.SplitHostPort(address); err == nil {
+		if addrs, err := net.LookupHost(host); err == nil {
+			n.ips = addrs
+		}
 	}
 
 	if version, err := n.client.Version(); err == nil {
@@ -126,6 +134,10 @@ func (n *clusterNode) Version() string {
 	defer n.pingLock.RUnlock()
 
 	return n.version
+}
+
+func (n *clusterNode) IPs() []string {
+	return n.ips
 }
 
 func (n *clusterNode) Status() (string, error) {

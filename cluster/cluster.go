@@ -156,6 +156,8 @@ type cluster struct {
 	nodesLock sync.RWMutex
 
 	ready bool
+
+	limiter net.IPLimiter
 }
 
 var ErrDegraded = errors.New("cluster is currently degraded")
@@ -184,10 +186,16 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 		config: config.CoreConfig,
 		nodes:  map[string]*clusterNode{},
+
+		limiter: config.IPLimiter,
 	}
 
 	if c.config == nil {
 		return nil, fmt.Errorf("the core config must be provided")
+	}
+
+	if c.limiter == nil {
+		c.limiter = net.NewNullIPLimiter()
 	}
 
 	c.isTLSRequired = c.config.TLS.Enable && c.config.TLS.Auto
@@ -253,10 +261,8 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	c.api = api
 
 	nodeproxy, err := proxy.NewProxy(proxy.ProxyConfig{
-		ID:        c.id,
-		Name:      c.name,
-		IPLimiter: config.IPLimiter,
-		Logger:    c.logger.WithField("logname", "proxy"),
+		ID:     c.id,
+		Logger: c.logger.WithField("logname", "proxy"),
 	})
 	if err != nil {
 		c.Shutdown()
@@ -872,19 +878,24 @@ func (c *cluster) trackNodeChanges() {
 						logger.Warn().WithError(err).Log("Discovering cluster API address")
 					}
 
-					cnode := NewClusterNode(id, address)
+					node := NewClusterNode(id, address)
 
-					if err := verifyClusterVersion(cnode.Version()); err != nil {
+					if err := verifyClusterVersion(node.Version()); err != nil {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
 					}
 
-					if _, err := c.proxy.AddNode(id, cnode.Proxy()); err != nil {
+					if _, err := c.proxy.AddNode(id, node.Proxy()); err != nil {
 						logger.Warn().WithError(err).Log("Adding node")
-						cnode.Stop()
+						node.Stop()
 						continue
 					}
 
-					c.nodes[id] = cnode
+					c.nodes[id] = node
+
+					ips := node.IPs()
+					for _, ip := range ips {
+						c.limiter.AddBlock(ip)
+					}
 				} else {
 					delete(removeNodes, id)
 				}
@@ -898,6 +909,12 @@ func (c *cluster) trackNodeChanges() {
 
 				c.proxy.RemoveNode(id)
 				node.Stop()
+
+				ips := node.IPs()
+				for _, ip := range ips {
+					c.limiter.RemoveBlock(ip)
+				}
+
 				delete(c.nodes, id)
 			}
 
