@@ -454,6 +454,10 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 
 		process.Config = config
 
+		process.State = &api.ProcessState{
+			Order: p.Order,
+		}
+
 		processes = append(processes, process)
 	}
 
