@@ -172,6 +172,8 @@ func New(config Config) (RestClient, error) {
 		r.address = u.String()
 	}
 
+	r.address = strings.TrimSuffix(r.address, "/")
+
 	if r.client == nil {
 		r.client = &http.Client{
 			Timeout: 15 * time.Second,

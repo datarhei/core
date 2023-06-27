@@ -99,10 +99,6 @@ type Config struct {
 	NodeRecoverTimeout     time.Duration // Timeout for a node to recover before rebalancing the processes
 	EmergencyLeaderTimeout time.Duration // Timeout for establishing the emergency leadership after lost contact to raft leader
 
-	CoreAPIAddress  string // Address of the core API
-	CoreAPIUsername string // Username for the core API
-	CoreAPIPassword string // Password for the core API
-
 	CoreConfig *config.Config
 
 	IPLimiter net.IPLimiter
@@ -180,6 +176,12 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
 
+		isDegraded:    true,
+		isDegradedErr: fmt.Errorf("cluster not yet startet"),
+
+		isCoreDegraded:    true,
+		isCoreDegradedErr: fmt.Errorf("cluster not yet started"),
+
 		config: config.CoreConfig,
 		nodes:  map[string]*clusterNode{},
 	}
@@ -190,15 +192,34 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 	c.isTLSRequired = c.config.TLS.Enable && c.config.TLS.Auto
 
-	u, err := url.Parse(config.CoreAPIAddress)
+	host, port, err := gonet.SplitHostPort(c.config.Address)
 	if err != nil {
-		return nil, fmt.Errorf("invalid core API address: %w", err)
+		return nil, fmt.Errorf("invalid core address: %s: %w", c.config.Address, err)
 	}
 
-	if len(config.CoreAPIPassword) == 0 {
-		u.User = url.User(config.CoreAPIUsername)
+	chost, _, err := gonet.SplitHostPort(c.config.Cluster.Address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cluster address: %s: %w", c.config.Cluster.Address, err)
+	}
+
+	if len(chost) == 0 {
+		return nil, fmt.Errorf("invalid cluster address: %s: %w", c.config.Cluster.Address, err)
+	}
+
+	if len(host) == 0 {
+		host = chost
+	}
+
+	u := &url.URL{
+		Scheme: "http",
+		Host:   gonet.JoinHostPort(host, port),
+		Path:   "/",
+	}
+
+	if len(c.config.API.Auth.Password) == 0 {
+		u.User = url.User(c.config.API.Auth.Username)
 	} else {
-		u.User = url.UserPassword(config.CoreAPIUsername, config.CoreAPIPassword)
+		u.User = url.UserPassword(c.config.API.Auth.Username, c.config.API.Auth.Password)
 	}
 
 	c.coreAddress = u.String()
@@ -375,19 +396,24 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 			names, err := c.getClusterHostnames()
 			if err != nil {
 				c.Shutdown()
-				return nil, fmt.Errorf("failed to assemble list of all configured hostnames: %w", err)
+				return nil, fmt.Errorf("tls: failed to assemble list of all configured hostnames: %w", err)
 			}
 
-			kvs, err := NewClusterKVS(c)
+			if len(names) == 0 {
+				c.Shutdown()
+				return nil, fmt.Errorf("tls: no hostnames are configured")
+			}
+
+			kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
 			if err != nil {
 				c.Shutdown()
-				return nil, fmt.Errorf("cluster KVS: %w", err)
+				return nil, fmt.Errorf("tls: cluster KVS: %w", err)
 			}
 
 			storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
 			if err != nil {
 				c.Shutdown()
-				return nil, fmt.Errorf("certificate store: %w", err)
+				return nil, fmt.Errorf("tls: certificate store: %w", err)
 			}
 
 			manager, err := autocert.New(autocert.Config{
@@ -399,7 +425,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 			})
 			if err != nil {
 				c.Shutdown()
-				return nil, fmt.Errorf("certificate manager: %w", err)
+				return nil, fmt.Errorf("tls: certificate manager: %w", err)
 			}
 
 			c.certManager = manager
@@ -407,7 +433,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 			err = manager.AcquireCertificates(ctx, c.config.Address, names)
 			if err != nil {
 				c.Shutdown()
-				return nil, fmt.Errorf("failed to acquire certificates: %w", err)
+				return nil, fmt.Errorf("tls: failed to acquire certificates: %w", err)
 			}
 		}
 	}
@@ -585,9 +611,27 @@ func (c *cluster) IsDegraded() (bool, error) {
 
 func (c *cluster) IsClusterDegraded() (bool, error) {
 	c.stateLock.Lock()
-	defer c.stateLock.Unlock()
+	isDegraded, isDegradedErr := c.isDegraded, c.isDegradedErr
+	c.stateLock.Unlock()
 
-	return c.isDegraded, c.isDegradedErr
+	if isDegraded {
+		return isDegraded, isDegradedErr
+	}
+
+	servers, err := c.raft.Servers()
+	if err != nil {
+		return true, err
+	}
+
+	c.nodesLock.Lock()
+	nodes := len(c.nodes)
+	c.nodesLock.Unlock()
+
+	if len(servers) != nodes {
+		return true, fmt.Errorf("not all nodes are connected")
+	}
+
+	return false, nil
 }
 
 func (c *cluster) Leave(origin, id string) error {

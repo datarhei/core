@@ -92,3 +92,10 @@ type ClusterLock struct {
 	Name       string    `json:"name"`
 	ValidUntil time.Time `json:"valid_until"`
 }
+
+type ClusterKVSValue struct {
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ClusterKVS map[string]ClusterKVSValue

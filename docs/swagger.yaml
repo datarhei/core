@@ -88,6 +88,17 @@ definitions:
       version:
         type: string
     type: object
+  api.ClusterKVS:
+    additionalProperties:
+      $ref: '#/definitions/api.ClusterKVSValue'
+    type: object
+  api.ClusterKVSValue:
+    properties:
+      updated_at:
+        type: string
+      value:
+        type: string
+    type: object
   api.ClusterLock:
     properties:
       name:
@@ -2465,6 +2476,22 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of nodes in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/kv:
+    get:
+      description: List of KV in the cluster DB
+      operationId: cluster-3-db-list-kv
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterKVS'
+      security:
+      - ApiKeyAuth: []
+      summary: List KV in the cluster DB
       tags:
       - v16.?.?
   /api/v3/cluster/db/locks:

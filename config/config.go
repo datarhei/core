@@ -483,7 +483,7 @@ func (d *Config) Validate(resetLogs bool) {
 		}
 	}
 
-	// If cluster mode is enabled, we can't join and bootstrap at the same time
+	// If cluster mode is enabled, a proper address must be provided
 	if d.Cluster.Enable {
 		if len(d.Cluster.Address) == 0 {
 			d.vars.Log("error", "cluster.address", "must be provided")

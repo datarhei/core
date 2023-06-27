@@ -1267,3 +1267,27 @@ func (h *ClusterHandler) ListStoreLocks(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, locks)
 }
+
+// ListStoreKV returns the list of currently stored key/value pairs
+// @Summary List KV in the cluster DB
+// @Description List of KV in the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-db-list-kv
+// @Produce json
+// @Success 200 {object} api.ClusterKVS
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/kv [get]
+func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
+	clusterkv := h.cluster.ListKV("")
+
+	kvs := api.ClusterKVS{}
+
+	for key, v := range clusterkv {
+		kvs[key] = api.ClusterKVSValue{
+			Value:     v.Value,
+			UpdatedAt: v.UpdatedAt,
+		}
+	}
+
+	return c.JSON(http.StatusOK, kvs)
+}

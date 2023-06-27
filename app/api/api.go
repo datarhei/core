@@ -433,32 +433,6 @@ func (a *api) start(ctx context.Context) error {
 	}
 
 	if cfg.Cluster.Enable {
-		scheme := "http://"
-		address := cfg.Address
-
-		if cfg.TLS.Enable {
-			scheme = "https://"
-			address = cfg.TLS.Address
-		}
-
-		host, port, err := gonet.SplitHostPort(address)
-		if err != nil {
-			return fmt.Errorf("invalid core address: %s: %w", address, err)
-		}
-
-		if len(host) == 0 {
-			chost, _, err := gonet.SplitHostPort(cfg.Cluster.Address)
-			if err != nil {
-				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
-			}
-
-			if len(chost) == 0 {
-				return fmt.Errorf("invalid cluster address: %s: %w", cfg.Cluster.Address, err)
-			}
-
-			host = chost
-		}
-
 		peers := []cluster.Peer{}
 
 		for _, p := range cfg.Cluster.Peers {
@@ -486,9 +460,6 @@ func (a *api) start(ctx context.Context) error {
 			NodeRecoverTimeout:     time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
 			EmergencyLeaderTimeout: time.Duration(cfg.Cluster.EmergencyLeaderTimeout) * time.Second,
 			CoreConfig:             cfg.Clone(),
-			CoreAPIAddress:         scheme + gonet.JoinHostPort(host, port),
-			CoreAPIUsername:        cfg.API.Auth.Username,
-			CoreAPIPassword:        cfg.API.Auth.Password,
 			IPLimiter:              a.sessionsLimiter,
 			Logger:                 a.log.logger.core.WithComponent("Cluster"),
 		})
@@ -531,7 +502,7 @@ func (a *api) start(ctx context.Context) error {
 					a.log.logger.core.Error().WithError(err).Log("Failed to acquire certificates")
 				}
 
-				if err == nil {
+				if err != nil {
 					a.log.logger.core.Warn().Log("Continuing with disabled TLS")
 					autocertManager = nil
 					cfg.TLS.Enable = false

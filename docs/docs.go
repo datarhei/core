@@ -154,6 +154,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/db/kv": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of KV in the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List KV in the cluster DB",
+                "operationId": "cluster-3-db-list-kv",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterKVS"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/db/locks": {
             "get": {
                 "security": [
@@ -4170,6 +4196,23 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.ClusterRaft"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterKVS": {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/definitions/api.ClusterKVSValue"
+            }
+        },
+        "api.ClusterKVSValue": {
+            "type": "object",
+            "properties": {
+                "updated_at": {
+                    "type": "string"
+                },
+                "value": {
                     "type": "string"
                 }
             }

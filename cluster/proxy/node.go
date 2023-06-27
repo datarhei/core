@@ -233,7 +233,7 @@ func (n *node) connect(ctx context.Context) error {
 	}
 
 	peer, err := client.New(client.Config{
-		Address: n.address,
+		Address: u.String(),
 		Client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
