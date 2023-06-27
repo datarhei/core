@@ -36,6 +36,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -287,6 +288,12 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iamidentity.V
 				break
 			}
 		}
+	}
+
+	if name, err := url.QueryUnescape(username); err != nil {
+		return nil, ErrBadRequest
+	} else {
+		username = name
 	}
 
 	identity, err := m.iam.GetVerifier(username)
