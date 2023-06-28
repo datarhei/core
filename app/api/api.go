@@ -447,7 +447,7 @@ func (a *api) start(ctx context.Context) error {
 			})
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Cluster.StartupTimeout)*time.Second)
 		defer cancel()
 
 		cluster, err := cluster.New(ctx, cluster.Config{
