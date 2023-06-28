@@ -282,6 +282,10 @@ definitions:
             items:
               type: string
             type: array
+          startup_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
           sync_interval_sec:
             description: seconds
             format: int64
@@ -591,6 +595,8 @@ definitions:
             type: boolean
           key_file:
             type: string
+          staging:
+            type: boolean
         type: object
       update_check:
         type: boolean
@@ -1848,6 +1854,10 @@ definitions:
             items:
               type: string
             type: array
+          startup_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
           sync_interval_sec:
             description: seconds
             format: int64
@@ -2157,6 +2167,8 @@ definitions:
             type: boolean
           key_file:
             type: string
+          staging:
+            type: boolean
         type: object
       update_check:
         type: boolean
@@ -2532,7 +2544,7 @@ paths:
       - v16.?.?
   /api/v3/cluster/db/process:
     get:
-      description: List of processes in the cluster
+      description: List of processes in the cluster DB
       operationId: cluster-3-db-list-processes
       produces:
       - application/json
@@ -2545,7 +2557,33 @@ paths:
             type: array
       security:
       - ApiKeyAuth: []
-      summary: List of processes in the cluster
+      summary: List of processes in the cluster DB
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/process/:id:
+    get:
+      description: Get a process in the cluster DB
+      operationId: cluster-3-db-get-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Process'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a process in the cluster DB
       tags:
       - v16.?.?
   /api/v3/cluster/db/user:
@@ -3196,6 +3234,10 @@ paths:
         in: path
         name: id
         required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
         type: string
       - description: Process config
         in: body

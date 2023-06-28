@@ -150,7 +150,6 @@ func (config *Config) Hash() []byte {
 	b.WriteString(config.Reference)
 	b.WriteString(config.Owner)
 	b.WriteString(config.Domain)
-	b.WriteString(config.FFVersion)
 	b.WriteString(config.Scheduler)
 	b.WriteString(strings.Join(config.Options, ","))
 	b.WriteString(strings.Join(config.LogPatterns, ","))

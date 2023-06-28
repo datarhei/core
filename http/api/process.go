@@ -65,7 +65,7 @@ type ProcessConfig struct {
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Marshal converts a process config in API representation to a restreamer process config
+// Marshal converts a process config in API representation to a restreamer process config and metadata
 func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 	p := &app.Config{
 		ID:             cfg.ID,

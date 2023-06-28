@@ -209,6 +209,10 @@ func (h *ClusterHandler) GetAllNodesProcess(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
 	}
 
+	if procs[0].Domain != domain {
+		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
+	}
+
 	return c.JSON(http.StatusOK, procs[0])
 }
 
@@ -417,8 +421,8 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 }
 
 // ListStoreProcesses returns the list of processes stored in the DB of the cluster
-// @Summary List of processes in the cluster
-// @Description List of processes in the cluster
+// @Summary List of processes in the cluster DB
+// @Description List of processes in the cluster DB
 // @Tags v16.?.?
 // @ID cluster-3-db-list-processes
 // @Produce json
@@ -427,14 +431,13 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 // @Router /api/v3/cluster/db/process [get]
 func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "")
 
 	procs := h.cluster.ListProcesses()
 
 	processes := []api.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
+		if !h.iam.Enforce(ctxuser, p.Config.Domain, "process:"+p.Config.ID, "read") {
 			continue
 		}
 
@@ -462,6 +465,59 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, processes)
+}
+
+// GerStoreProcess returns a process stored in the DB of the cluster
+// @Summary Get a process in the cluster DB
+// @Description Get a process in the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-db-get-process
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Success 200 {object} api.Process
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/process/:id [get]
+func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+	id := util.PathParam(c, "id")
+
+	pid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
+	}
+
+	p, err := h.cluster.GetProcess(pid)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+	}
+
+	process := api.Process{
+		ID:        p.Config.ID,
+		Owner:     p.Config.Owner,
+		Domain:    p.Config.Domain,
+		Type:      "ffmpeg",
+		Reference: p.Config.Reference,
+		CreatedAt: p.CreatedAt.Unix(),
+		UpdatedAt: p.UpdatedAt.Unix(),
+		Metadata:  p.Metadata,
+	}
+
+	config := &api.ProcessConfig{}
+	config.Unmarshal(p.Config)
+
+	process.Config = config
+
+	process.State = &api.ProcessState{
+		Order: p.Order,
+	}
+
+	return c.JSON(http.StatusOK, process)
 }
 
 // Add adds a new process to the cluster
@@ -531,6 +587,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
@@ -560,7 +617,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	current, err := h.cluster.GetProcess(pid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s", id)
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	// Prefill the config with the current values
@@ -584,7 +641,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	if err := h.cluster.UpdateProcess("", pid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "", "process not found: %s", id)
+			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 
 		return api.Err(http.StatusBadRequest, "", "process can't be updated: %s", err.Error())

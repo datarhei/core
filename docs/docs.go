@@ -245,14 +245,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List of processes in the cluster",
+                "description": "List of processes in the cluster DB",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "List of processes in the cluster",
+                "summary": "List of processes in the cluster DB",
                 "operationId": "cluster-3-db-list-processes",
                 "responses": {
                     "200": {
@@ -262,6 +262,47 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/api.Process"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/process/:id": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get a process in the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Get a process in the cluster DB",
+                "operationId": "cluster-3-db-get-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Process"
                         }
                     }
                 }
@@ -1215,6 +1256,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
                     },
                     {
                         "description": "Process config",
@@ -4517,6 +4564,11 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
+                        "startup_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "sync_interval_sec": {
                             "description": "seconds",
                             "type": "integer",
@@ -4973,6 +5025,9 @@ const docTemplate = `{
                         },
                         "key_file": {
                             "type": "string"
+                        },
+                        "staging": {
+                            "type": "boolean"
                         }
                     }
                 },
@@ -6736,6 +6791,11 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
+                        "startup_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "sync_interval_sec": {
                             "description": "seconds",
                             "type": "integer",
@@ -7192,6 +7252,9 @@ const docTemplate = `{
                         },
                         "key_file": {
                             "type": "string"
+                        },
+                        "staging": {
+                            "type": "boolean"
                         }
                     }
                 },

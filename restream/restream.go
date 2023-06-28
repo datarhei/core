@@ -1175,14 +1175,14 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 		return ErrUnknownProcess
 	}
 
+	// If the new config has the same hash as the current config, do nothing.
+	if task.process.Config.Equal(config) {
+		return nil
+	}
+
 	t, err := r.createTask(config)
 	if err != nil {
 		return err
-	}
-
-	// If the new config has the same hash as the current config, do nothing.
-	if task.config.Equal(t.config) {
-		return nil
 	}
 
 	tid := t.ID()

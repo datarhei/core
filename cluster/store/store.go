@@ -801,6 +801,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,
 		Config:    process.Config.Clone(),
+		Order:     process.Order,
 		Metadata:  process.Metadata,
 	}, nil
 }

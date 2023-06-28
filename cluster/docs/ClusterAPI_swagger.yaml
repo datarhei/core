@@ -243,6 +243,10 @@ definitions:
             items:
               type: string
             type: array
+          startup_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
           sync_interval_sec:
             description: seconds
             format: int64
@@ -552,6 +556,8 @@ definitions:
             type: boolean
           key_file:
             type: string
+          staging:
+            type: boolean
         type: object
       update_check:
         type: boolean

@@ -1289,6 +1289,11 @@ const docTemplateClusterAPI = `{
                                 "type": "string"
                             }
                         },
+                        "startup_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "sync_interval_sec": {
                             "description": "seconds",
                             "type": "integer",
@@ -1745,6 +1750,9 @@ const docTemplateClusterAPI = `{
                         },
                         "key_file": {
                             "type": "string"
+                        },
+                        "staging": {
+                            "type": "boolean"
                         }
                     }
                 },

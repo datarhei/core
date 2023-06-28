@@ -891,7 +891,9 @@ func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, err
 }
 
 func (n *node) ProxyProcessList() ([]Process, error) {
-	list, err := n.ProcessList(ProcessListOptions{})
+	list, err := n.ProcessList(ProcessListOptions{
+		Filter: []string{"config", "state", "metadata"},
+	})
 	if err != nil {
 		return nil, err
 	}
