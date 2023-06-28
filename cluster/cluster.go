@@ -369,7 +369,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 		default:
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	c.logger.Info().Log("Leader has been elected")
@@ -379,19 +379,21 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	c.logger.Info().Log("Waiting for cluster to become operational ...")
 
 	for {
-		ok, _ := c.IsClusterDegraded()
+		ok, err := c.IsClusterDegraded()
 		if !ok {
 			break
 		}
 
+		c.logger.Warn().WithError(err).Log("Cluster is degraded")
+
 		select {
 		case <-ctx.Done():
 			c.Shutdown()
-			return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
+			return nil, fmt.Errorf("starting cluster has been aborted: %w: %w", ctx.Err(), err)
 		default:
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(time.Second)
 	}
 
 	c.logger.Info().Log("Cluster is operational")
@@ -1033,7 +1035,7 @@ func verifyClusterVersion(v string) error {
 }
 
 func verifyClusterConfig(local, remote *config.Config) error {
-	if remote == nil {
+	if local == nil || remote == nil {
 		return fmt.Errorf("config is not available")
 	}
 
@@ -1042,15 +1044,15 @@ func verifyClusterConfig(local, remote *config.Config) error {
 	}
 
 	if local.Cluster.SyncInterval != remote.Cluster.SyncInterval {
-		return fmt.Errorf("cluster.sync_interval_sec is different, local: %ds vs. remote: %ds", local.Cluster.SyncInterval, remote.Cluster.SyncInterval)
+		return fmt.Errorf("cluster.sync_interval_sec is different")
 	}
 
 	if local.Cluster.NodeRecoverTimeout != remote.Cluster.NodeRecoverTimeout {
-		return fmt.Errorf("cluster.node_recover_timeout_sec is different, local: %ds vs. remote: %ds", local.Cluster.NodeRecoverTimeout, remote.Cluster.NodeRecoverTimeout)
+		return fmt.Errorf("cluster.node_recover_timeout_sec is different")
 	}
 
 	if local.Cluster.EmergencyLeaderTimeout != remote.Cluster.EmergencyLeaderTimeout {
-		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different, local: %ds vs. remote: %ds", local.Cluster.EmergencyLeaderTimeout, remote.Cluster.EmergencyLeaderTimeout)
+		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
 	}
 
 	if local.RTMP.Enable != remote.RTMP.Enable {
@@ -1092,6 +1094,12 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 		if len(local.Host.Name) == 0 || len(remote.Host.Name) == 0 {
 			return fmt.Errorf("host.name must be set")
+		}
+
+		if local.TLS.Auto {
+			if local.TLS.Email != remote.TLS.Email {
+				return fmt.Errorf("tls.email is different")
+			}
 		}
 	}
 
