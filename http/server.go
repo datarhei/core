@@ -302,6 +302,18 @@ func NewServer(config Config) (Server, error) {
 
 	if config.Sessions == nil {
 		config.Sessions, _ = session.New(session.Config{})
+
+		if config.Sessions.Collector("hlsingress") == nil {
+			return nil, fmt.Errorf("hlsingress session collector must be available")
+		}
+
+		if config.Sessions.Collector("hls") == nil {
+			return nil, fmt.Errorf("hls session collector must be available")
+		}
+
+		if config.Sessions.Collector("http") == nil {
+			return nil, fmt.Errorf("http session collector must be available")
+		}
 	}
 
 	s.v3handler.session = api.NewSession(
@@ -379,7 +391,7 @@ func NewServer(config Config) (Server, error) {
 	s.router.Use(s.middleware.iam)
 
 	s.router.Use(mwsession.NewWithConfig(mwsession.Config{
-		HLSIngressCollector: config.Sessions.Collector("hlsingest"),
+		HLSIngressCollector: config.Sessions.Collector("hlsingress"),
 		HLSEgressCollector:  config.Sessions.Collector("hls"),
 		HTTPCollector:       config.Sessions.Collector("http"),
 		Skipper: func(c echo.Context) bool {
