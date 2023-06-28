@@ -53,6 +53,9 @@ func New(config Config) (Manager, error) {
 	ca := certmagic.LetsEncryptStagingCA
 	if config.IsProduction {
 		ca = certmagic.LetsEncryptProductionCA
+		m.logger.Info().WithField("ca", ca).Log("Using production CA")
+	} else {
+		m.logger.Info().WithField("ca", ca).Log("Using staging CA")
 	}
 
 	certmagic.DefaultACME.Agreed = true

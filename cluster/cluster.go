@@ -427,7 +427,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 			Storage:         storage,
 			DefaultHostname: names[0],
 			EmailAddress:    c.config.TLS.Email,
-			IsProduction:    false,
+			IsProduction:    !c.config.TLS.Staging,
 			Logger:          c.logger.WithComponent("Let's Encrypt"),
 		})
 		if err != nil {
@@ -1099,6 +1099,10 @@ func verifyClusterConfig(local, remote *config.Config) error {
 		if local.TLS.Auto {
 			if local.TLS.Email != remote.TLS.Email {
 				return fmt.Errorf("tls.email is different")
+			}
+
+			if local.TLS.Staging != remote.TLS.Staging {
+				return fmt.Errorf("tls.staging is different")
 			}
 		}
 	}

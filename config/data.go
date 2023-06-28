@@ -62,6 +62,7 @@ type Data struct {
 		Enable   bool   `json:"enable"`
 		Auto     bool   `json:"auto"`
 		Email    string `json:"email"`
+		Staging  bool   `json:"staging"`
 		CertFile string `json:"cert_file"`
 		KeyFile  string `json:"key_file"`
 	} `json:"tls"`

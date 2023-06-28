@@ -186,6 +186,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
 	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
+	d.vars.Register(value.NewBool(&d.TLS.Staging, false), "tls.staging", "CORE_TLS_STAGING", nil, "Use Let's Encrypt staging CA", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERT_FILE", []string{"CORE_TLS_CERTFILE"}, "Path to certificate file in PEM format", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEY_FILE", []string{"CORE_TLS_KEYFILE"}, "Path to key file in PEM format", false, false)
 

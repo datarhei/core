@@ -485,7 +485,7 @@ func (a *api) start(ctx context.Context) error {
 					},
 					DefaultHostname: cfg.Host.Name[0],
 					EmailAddress:    cfg.TLS.Email,
-					IsProduction:    false,
+					IsProduction:    !cfg.TLS.Staging,
 					Logger:          a.log.logger.core.WithComponent("Let's Encrypt"),
 				})
 				if err != nil {
