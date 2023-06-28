@@ -397,45 +397,46 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	c.logger.Info().Log("Cluster is operational")
 
 	if c.isTLSRequired {
+		// Create certificate manager
+		names, err := c.getClusterHostnames()
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("tls: failed to assemble list of all configured hostnames: %w", err)
+		}
+
+		if len(names) == 0 {
+			c.Shutdown()
+			return nil, fmt.Errorf("tls: no hostnames are configured")
+		}
+
+		kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("tls: cluster KVS: %w", err)
+		}
+
+		storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("tls: certificate store: %w", err)
+		}
+
+		manager, err := autocert.New(autocert.Config{
+			Storage:         storage,
+			DefaultHostname: names[0],
+			EmailAddress:    c.config.TLS.Email,
+			IsProduction:    false,
+			Logger:          c.logger.WithComponent("Let's Encrypt"),
+		})
+		if err != nil {
+			c.Shutdown()
+			return nil, fmt.Errorf("tls: certificate manager: %w", err)
+		}
+
+		c.certManager = manager
+
 		if c.IsRaftLeader() {
 			// Acquire certificates
-			names, err := c.getClusterHostnames()
-			if err != nil {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: failed to assemble list of all configured hostnames: %w", err)
-			}
-
-			if len(names) == 0 {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: no hostnames are configured")
-			}
-
-			kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
-			if err != nil {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: cluster KVS: %w", err)
-			}
-
-			storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
-			if err != nil {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: certificate store: %w", err)
-			}
-
-			manager, err := autocert.New(autocert.Config{
-				Storage:         storage,
-				DefaultHostname: names[0],
-				EmailAddress:    c.config.TLS.Email,
-				IsProduction:    false,
-				Logger:          c.logger.WithComponent("Let's Encrypt"),
-			})
-			if err != nil {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: certificate manager: %w", err)
-			}
-
-			c.certManager = manager
-
 			err = manager.AcquireCertificates(ctx, c.config.Address, names)
 			if err != nil {
 				c.Shutdown()
