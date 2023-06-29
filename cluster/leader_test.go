@@ -703,7 +703,7 @@ func TestSynchronizeUpdate(t *testing.T) {
 				LimitMemory: 5,
 				Reference:   "baz",
 			},
-			metadata: nil,
+			metadata: map[string]interface{}{},
 		},
 	}, stack)
 

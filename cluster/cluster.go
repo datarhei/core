@@ -402,7 +402,7 @@ func (c *cluster) setup(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("starting cluster has been aborted: %w: %w", ctx.Err(), err)
+			return fmt.Errorf("starting cluster has been aborted: %w: %s", ctx.Err(), err.Error())
 		default:
 		}
 
@@ -512,7 +512,7 @@ func (c *cluster) Barrier(ctx context.Context, name string) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("barrier %s: starting cluster has been aborted: %w: %w", name, ctx.Err(), err)
+			return fmt.Errorf("barrier %s: starting cluster has been aborted: %w: %s", name, ctx.Err(), err.Error())
 		default:
 		}
 
