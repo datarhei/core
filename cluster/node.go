@@ -193,6 +193,10 @@ func (n *clusterNode) CoreAPIAddress() (string, error) {
 	return n.client.CoreAPIAddress()
 }
 
+func (n *clusterNode) Barrier(name string) (bool, error) {
+	return n.client.Barrier(name)
+}
+
 func (n *clusterNode) Proxy() proxy.Node {
 	return n.proxyNode
 }

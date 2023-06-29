@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/datarhei/core/v16/cluster/client"
-	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/handler/util"
 	httplog "github.com/datarhei/core/v16/http/log"
 	mwlog "github.com/datarhei/core/v16/http/middleware/log"
@@ -75,7 +74,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router = echo.New()
 	a.router.Debug = true
-	a.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
+	a.router.HTTPErrorHandler = ErrorHandler
 	a.router.Validator = validator.New()
 	a.router.HideBanner = true
 	a.router.HidePort = true
@@ -96,28 +95,10 @@ func NewAPI(config APIConfig) (API, error) {
 	doc := a.router.Group("/v1/swagger/*")
 	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
-	a.router.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, Version.String())
-	})
+	a.router.GET("/", a.Version)
+	a.router.GET("/v1/about", a.Version)
 
-	a.router.GET("/v1/about", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, Version.String())
-	})
-
-	a.router.GET("/v1/ready", func(c echo.Context) error {
-		origin := c.Request().Header.Get("X-Cluster-Origin")
-
-		if origin == a.id {
-			return Err(http.StatusLoopDetected, "", "breaking circuit")
-		}
-
-		err := a.cluster.IsReady(origin)
-		if err != nil {
-			return Err(http.StatusLocked, "", "not ready yet")
-		}
-
-		return c.JSON(http.StatusOK, "OK")
-	})
+	a.router.GET("/v1/barrier/:name", a.Barrier)
 
 	a.router.POST("/v1/server", a.AddServer)
 	a.router.DELETE("/v1/server/:id", a.RemoveServer)
@@ -139,6 +120,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.DELETE("/v1/lock/:name", a.Unlock)
 
 	a.router.POST("/v1/kv", a.SetKV)
+	a.router.GET("/v1/kv/:key", a.GetKV)
 	a.router.DELETE("/v1/kv/:key", a.UnsetKV)
 
 	a.router.GET("/v1/core", a.CoreAPIAddress)
@@ -155,6 +137,34 @@ func (a *api) Start() error {
 func (a *api) Shutdown(ctx context.Context) error {
 	a.logger.Debug().WithField("address", a.address).Log("Shutting down api")
 	return a.router.Shutdown(ctx)
+}
+
+// Version returns the version of the cluster
+// @Summary The cluster version
+// @Description The cluster version
+// @Tags v1.0.0
+// @ID cluster-1-version
+// @Produce json
+// @Success 200 {string} string
+// @Success 500 {object} Error
+// @Router /v1/version [get]
+func (a *api) Version(c echo.Context) error {
+	return c.JSON(http.StatusOK, Version.String())
+}
+
+// Barrier returns if the barrier already has been passed
+// @Summary Has the barrier already has been passed
+// @Description Has the barrier already has been passed
+// @Tags v1.0.0
+// @ID cluster-1-barrier
+// @Produce json
+// @Param name path string true "Barrier name"
+// @Success 200 {string} string
+// @Success 404 {object} Error
+// @Router /v1/barrier/{name} [get]
+func (a *api) Barrier(c echo.Context) error {
+	name := util.PathParam(c, "name")
+	return c.JSON(http.StatusOK, a.cluster.GetBarrier(name))
 }
 
 // AddServer adds a new server to the cluster
@@ -239,7 +249,7 @@ func (a *api) RemoveServer(c echo.Context) error {
 // @ID cluster-1-snapshot
 // @Produce application/octet-stream
 // @Success 200 {file} byte
-// @Success 500 {array} Error
+// @Success 500 {object} Error
 // @Router /v1/snapshot [get]
 func (a *api) Snapshot(c echo.Context) error {
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -747,8 +757,8 @@ func (a *api) SetKV(c echo.Context) error {
 }
 
 // UnsetKV removes a key
-// @Summary Removes a key
-// @Description Removes a key
+// @Summary Remove a key
+// @Description Remove a key
 // @Tags v1.0.0
 // @ID cluster-1-kv-unset
 // @Produce json
@@ -773,6 +783,7 @@ func (a *api) UnsetKV(c echo.Context) error {
 	err := a.cluster.UnsetKV(origin, key)
 	if err != nil {
 		if err == fs.ErrNotExist {
+			a.logger.Debug().WithError(err).WithField("key", key).Log("Delete key: not found")
 			return Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 		a.logger.Debug().WithError(err).WithField("key", key).Log("Unable to remove key")
@@ -780,6 +791,48 @@ func (a *api) UnsetKV(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, "OK")
+}
+
+// GetKV fetches a key
+// @Summary Fetch a key
+// @Description Fetch a key
+// @Tags v1.0.0
+// @ID cluster-1-kv-get
+// @Produce json
+// @Param name path string true "Key name"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 404 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/kv/{key} [get]
+func (a *api) GetKV(c echo.Context) error {
+	key := util.PathParam(c, "key")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("key", key).Log("Get key")
+
+	value, updatedAt, err := a.cluster.GetKV(origin, key)
+	if err != nil {
+		if err == fs.ErrNotExist {
+			a.logger.Debug().WithError(err).WithField("key", key).Log("Get key: not found")
+			return Err(http.StatusNotFound, "", "%s", err.Error())
+		}
+		a.logger.Debug().WithError(err).WithField("key", key).Log("Unable to retrieve key")
+		return Err(http.StatusInternalServerError, "", "unable to retrieve key: %s", err.Error())
+	}
+
+	res := client.GetKVResponse{
+		Value:     value,
+		UpdatedAt: updatedAt,
+	}
+
+	return c.JSON(http.StatusOK, res)
 }
 
 // Error represents an error response of the API
@@ -815,4 +868,51 @@ func Err(code int, message string, args ...interface{}) Error {
 	}
 
 	return e
+}
+
+// ErrorHandler is a genral handler for echo handler errors
+func ErrorHandler(err error, c echo.Context) {
+	var code int = 0
+	var details []string
+	message := ""
+
+	if he, ok := err.(Error); ok {
+		code = he.Code
+		message = he.Message
+		details = he.Details
+	} else if he, ok := err.(*echo.HTTPError); ok {
+		if he.Internal != nil {
+			if herr, ok := he.Internal.(*echo.HTTPError); ok {
+				he = herr
+			}
+		}
+
+		code = he.Code
+		message = http.StatusText(he.Code)
+		if len(message) == 0 {
+			switch code {
+			case 509:
+				message = "Bandwith limit exceeded"
+			default:
+			}
+		}
+		details = strings.Split(fmt.Sprintf("%v", he.Message), "\n")
+	} else {
+		code = http.StatusInternalServerError
+		message = http.StatusText(http.StatusInternalServerError)
+		details = strings.Split(fmt.Sprintf("%s", err), "\n")
+	}
+
+	// Send response
+	if !c.Response().Committed {
+		if c.Request().Method == http.MethodHead {
+			c.NoContent(code)
+		} else {
+			c.JSON(code, Error{
+				Code:    code,
+				Message: message,
+				Details: details,
+			})
+		}
+	}
 }

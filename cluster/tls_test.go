@@ -17,7 +17,7 @@ func setupStorage() (certmagic.Storage, error) {
 		return nil, err
 	}
 
-	return NewClusterStorage(kvs, "some_prefix")
+	return NewClusterStorage(kvs, "some_prefix", nil)
 }
 
 func TestStorageStore(t *testing.T) {

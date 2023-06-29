@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"time"
@@ -59,6 +60,11 @@ type SetKVRequest struct {
 	Value string `json:"value"`
 }
 
+type GetKVResponse struct {
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type APIClient struct {
 	Address string
 	Client  *http.Client
@@ -77,6 +83,21 @@ func (c *APIClient) Version() (string, error) {
 	}
 
 	return version, nil
+}
+
+func (c *APIClient) Barrier(name string) (bool, error) {
+	data, err := c.call(http.MethodGet, "/v1/barrier/"+url.PathEscape(name), "application/json", nil, "")
+	if err != nil {
+		return false, err
+	}
+
+	var passed bool
+	err = json.Unmarshal(data, &passed)
+	if err != nil {
+		return false, err
+	}
+
+	return passed, nil
 }
 
 func (c *APIClient) CoreAPIAddress() (string, error) {
@@ -245,18 +266,38 @@ func (c *APIClient) SetKV(origin string, r SetKVRequest) error {
 
 func (c *APIClient) UnsetKV(origin string, key string) error {
 	_, err := c.call(http.MethodDelete, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
+	if err != nil {
+		e, ok := err.(httpapi.Error)
+		if ok && e.Code == 404 {
+			return fs.ErrNotExist
+		}
+	}
 
 	return err
+}
+
+func (c *APIClient) GetKV(origin string, key string) (string, time.Time, error) {
+	data, err := c.call(http.MethodGet, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
+	if err != nil {
+		e, ok := err.(httpapi.Error)
+		if ok && e.Code == 404 {
+			return "", time.Time{}, fs.ErrNotExist
+		}
+
+		return "", time.Time{}, err
+	}
+
+	res := GetKVResponse{}
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return res.Value, res.UpdatedAt, nil
 }
 
 func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {
 	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, origin)
-}
-
-func (c *APIClient) IsReady(origin string) error {
-	_, err := c.call(http.MethodGet, "/v1/ready", "application/json", nil, origin)
-
-	return err
 }
 
 func (c *APIClient) stream(method, path, contentType string, data io.Reader, origin string) (io.ReadCloser, error) {

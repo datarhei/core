@@ -44,7 +44,9 @@ type Cluster interface {
 	CoreConfig() *config.Config
 
 	About() (ClusterAbout, error)
-	IsReady(origin string) error
+	IsClusterDegraded() (bool, error)
+	IsDegraded() (bool, error)
+	GetBarrier(name string) bool
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
@@ -76,7 +78,7 @@ type Cluster interface {
 
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
-	GetKV(key string) (string, time.Time, error)
+	GetKV(origin, key string) (string, time.Time, error)
 	ListKV(prefix string) map[string]store.Value
 
 	ProxyReader() proxy.ProxyReader
@@ -155,7 +157,8 @@ type cluster struct {
 	nodes     map[string]*clusterNode
 	nodesLock sync.RWMutex
 
-	ready bool
+	barrier     map[string]bool
+	barrierLock sync.RWMutex
 
 	limiter net.IPLimiter
 }
@@ -186,6 +189,8 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 		config: config.CoreConfig,
 		nodes:  map[string]*clusterNode{},
+
+		barrier: map[string]bool{},
 
 		limiter: config.IPLimiter,
 	}
@@ -352,6 +357,16 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	go c.monitorLeadership()
 	go c.sentinel()
 
+	err = c.setup(ctx)
+	if err != nil {
+		c.Shutdown()
+		return nil, fmt.Errorf("failed to setup cluster: %w", err)
+	}
+
+	return c, nil
+}
+
+func (c *cluster) setup(ctx context.Context) error {
 	// Wait for a leader to be selected
 
 	c.logger.Info().Log("Waiting for a leader to be elected ...")
@@ -364,8 +379,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 		select {
 		case <-ctx.Done():
-			c.Shutdown()
-			return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
+			return fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
 		default:
 		}
 
@@ -374,7 +388,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 
 	c.logger.Info().Log("Leader has been elected")
 
-	// Wait for cluster to leave degraded mode
+	// Wait for all cluster nodes to leave degraded mode
 
 	c.logger.Info().Log("Waiting for cluster to become operational ...")
 
@@ -384,125 +398,128 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 			break
 		}
 
-		c.logger.Warn().WithError(err).Log("Cluster is degraded")
+		c.logger.Warn().WithError(err).Log("Cluster is in degraded state")
 
 		select {
 		case <-ctx.Done():
-			c.Shutdown()
-			return nil, fmt.Errorf("starting cluster has been aborted: %w: %w", ctx.Err(), err)
+			return fmt.Errorf("starting cluster has been aborted: %w: %w", ctx.Err(), err)
 		default:
 		}
 
 		time.Sleep(time.Second)
 	}
 
+	err := c.Barrier(ctx, "operational")
+	if err != nil {
+		return fmt.Errorf("failed on barrier: %w", err)
+	}
+
 	c.logger.Info().Log("Cluster is operational")
 
 	if c.isTLSRequired {
+		c.logger.Info().Log("Waiting for TLS certificates ...")
+
 		// Create certificate manager
-		names, err := c.getClusterHostnames()
+		hostnames, err := c.getClusterHostnames()
 		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("tls: failed to assemble list of all configured hostnames: %w", err)
+			return fmt.Errorf("tls: failed to assemble list of all configured hostnames: %w", err)
 		}
 
-		if len(names) == 0 {
-			c.Shutdown()
-			return nil, fmt.Errorf("tls: no hostnames are configured")
+		if len(hostnames) == 0 {
+			return fmt.Errorf("no hostnames are configured")
 		}
 
 		kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
 		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("tls: cluster KVS: %w", err)
+			return fmt.Errorf("tls: cluster KVS: %w", err)
 		}
 
-		storage, err := NewClusterStorage(kvs, "core-cluster-certificates")
+		storage, err := NewClusterStorage(kvs, "core-cluster-certificates", c.logger.WithComponent("KVS"))
 		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("tls: certificate store: %w", err)
+			return fmt.Errorf("tls: certificate store: %w", err)
 		}
 
 		manager, err := autocert.New(autocert.Config{
 			Storage:         storage,
-			DefaultHostname: names[0],
+			DefaultHostname: hostnames[0],
 			EmailAddress:    c.config.TLS.Email,
 			IsProduction:    !c.config.TLS.Staging,
 			Logger:          c.logger.WithComponent("Let's Encrypt"),
 		})
 		if err != nil {
-			c.Shutdown()
-			return nil, fmt.Errorf("tls: certificate manager: %w", err)
+			return fmt.Errorf("tls: certificate manager: %w", err)
 		}
 
 		c.certManager = manager
 
-		if c.IsRaftLeader() {
-			// Acquire certificates
-			err = manager.AcquireCertificates(ctx, c.config.Address, names)
-			if err != nil {
-				c.Shutdown()
-				return nil, fmt.Errorf("tls: failed to acquire certificates: %w", err)
-			}
+		resctx, rescancel := context.WithCancel(ctx)
+		defer rescancel()
+
+		err = manager.HTTPChallengeResolver(resctx, c.config.Address)
+		if err != nil {
+			return fmt.Errorf("tls: failed to start the HTTP challenge resolver: %w", err)
 		}
+
+		// We have to wait for all nodes to have the HTTP challenge resolver started
+		err = c.Barrier(ctx, "acme")
+		if err != nil {
+			return fmt.Errorf("tls: failed on barrier: %w", err)
+		}
+
+		// Acquire certificates, all nodes can do this at the same time because everything
+		// is synched via the storage.
+		err = manager.AcquireCertificates(ctx, hostnames)
+		if err != nil {
+			return fmt.Errorf("tls: failed to acquire certificates: %w", err)
+		}
+
+		rescancel()
+
+		c.logger.Info().Log("TLS certificates acquired")
 	}
 
-	if !c.IsRaftLeader() {
-		tempctx, cancel := context.WithCancel(context.Background())
+	c.logger.Info().Log("Waiting for cluster to become ready ...")
 
-		if c.isTLSRequired {
-			// All followers forward any HTTP requests to the leader such that it can respond to the HTTP challenge
-			leaderAddress, _ := c.raft.Leader()
-			leader, err := c.CoreAPIAddress(leaderAddress)
-			if err != nil {
-				cancel()
-				c.Shutdown()
-				return nil, fmt.Errorf("unable to find leader address: %w", err)
-			}
-
-			url, err := url.Parse(leader)
-			if err != nil {
-				cancel()
-				return nil, fmt.Errorf("unable to parse leader address: %w", err)
-			}
-
-			url.Scheme = "http"
-			url.Path = "/"
-			url.User = nil
-			url.RawQuery = ""
-
-			go func() {
-				c.logger.Info().WithField("leader", url.String()).Log("Forwarding ACME challenges to leader")
-				autocert.ProxyHTTPChallenge(tempctx, c.config.Address, url)
-				c.logger.Info().WithField("leader", url.String()).Log("Stopped forwarding ACME challenges to leader")
-			}()
-		}
-
-		for {
-			// Ask leader if it is ready
-			err := c.IsReady("")
-			if err == nil {
-				cancel()
-				break
-			}
-
-			select {
-			case <-ctx.Done():
-				cancel()
-				c.Shutdown()
-				return nil, fmt.Errorf("starting cluster has been aborted: %w", ctx.Err())
-			default:
-			}
-
-			time.Sleep(time.Second)
-		}
+	err = c.Barrier(ctx, "ready")
+	if err != nil {
+		return fmt.Errorf("failed on barrier: %w", err)
 	}
-
-	c.ready = true
 
 	c.logger.Info().Log("Cluster is ready")
 
-	return c, nil
+	return nil
+}
+
+func (c *cluster) GetBarrier(name string) bool {
+	c.barrierLock.RLock()
+	defer c.barrierLock.RUnlock()
+
+	return c.barrier[name]
+}
+
+func (c *cluster) Barrier(ctx context.Context, name string) error {
+	c.barrierLock.Lock()
+	c.barrier[name] = true
+	c.barrierLock.Unlock()
+
+	for {
+		ok, err := c.getClusterBarrier(name)
+		if ok {
+			break
+		}
+
+		c.logger.Warn().WithField("name", name).WithError(err).Log("Waiting for barrier")
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("barrier %s: starting cluster has been aborted: %w: %w", name, ctx.Err(), err)
+		default:
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	return nil
 }
 
 func (c *cluster) Address() string {
@@ -924,7 +941,7 @@ func (c *cluster) trackNodeChanges() {
 			c.nodesLock.Unlock()
 
 			// Put the cluster in "degraded" mode in case there's a mismatch in expected values
-			err = c.checkClusterNodes()
+			_, err = c.checkClusterNodes()
 
 			c.stateLock.Lock()
 			if err != nil {
@@ -948,36 +965,62 @@ func (c *cluster) trackNodeChanges() {
 				c.isCoreDegradedErr = nil
 			}
 			c.stateLock.Unlock()
+			/*
+				if c.isTLSRequired {
+					// Update list of managed hostnames
+					if c.certManager != nil {
+						c.certManager.ManageCertificates(context.Background(), hostnames)
+					}
+
+				}
+			*/
 		case <-c.shutdownCh:
 			return
 		}
 	}
 }
 
-func (c *cluster) checkClusterNodes() error {
+// checkClusterNodes returns a list of all hostnames configured on all nodes. The
+// returned list will not contain any duplicates. An error is returned in case the
+// node is not compatible.
+func (c *cluster) checkClusterNodes() ([]string, error) {
+	hostnames := map[string]struct{}{}
+
 	c.nodesLock.RLock()
 	defer c.nodesLock.RUnlock()
 
 	for id, node := range c.nodes {
 		if status, err := node.Status(); status == "offline" {
-			return fmt.Errorf("node %s is offline: %w", id, err)
+			return nil, fmt.Errorf("node %s is offline: %w", id, err)
 		}
 
 		version := node.Version()
 		if err := verifyClusterVersion(version); err != nil {
-			return fmt.Errorf("node %s has a different version: %s: %w", id, version, err)
+			return nil, fmt.Errorf("node %s has a different version: %s: %w", id, version, err)
 		}
 
 		config, err := node.CoreConfig()
 		if err != nil {
-			return fmt.Errorf("node %s has no configuration available: %w", id, err)
+			return nil, fmt.Errorf("node %s has no configuration available: %w", id, err)
 		}
 		if err := verifyClusterConfig(c.config, config); err != nil {
-			return fmt.Errorf("node %s has a different configuration: %w", id, err)
+			return nil, fmt.Errorf("node %s has a different configuration: %w", id, err)
+		}
+
+		for _, name := range config.Host.Name {
+			hostnames[name] = struct{}{}
 		}
 	}
 
-	return nil
+	names := []string{}
+
+	for key := range hostnames {
+		names = append(names, key)
+	}
+
+	sort.Strings(names)
+
+	return names, nil
 }
 
 func (c *cluster) checkClusterCoreNodes() error {
@@ -993,6 +1036,8 @@ func (c *cluster) checkClusterCoreNodes() error {
 	return nil
 }
 
+// getClusterHostnames return a list of all hostnames configured on all nodes. The
+// returned list will not contain any duplicates.
 func (c *cluster) getClusterHostnames() ([]string, error) {
 	hostnames := map[string]struct{}{}
 
@@ -1019,6 +1064,21 @@ func (c *cluster) getClusterHostnames() ([]string, error) {
 	sort.Strings(names)
 
 	return names, nil
+}
+
+// getClusterBarrier returns whether all nodes are currently on the same barrier.
+func (c *cluster) getClusterBarrier(name string) (bool, error) {
+	c.nodesLock.RLock()
+	defer c.nodesLock.RUnlock()
+
+	for _, node := range c.nodes {
+		ok, err := node.Barrier(name)
+		if !ok {
+			return false, err
+		}
+	}
+
+	return true, nil
 }
 
 func verifyClusterVersion(v string) error {
@@ -1500,7 +1560,15 @@ func (c *cluster) UnsetKV(origin, key string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) GetKV(key string) (string, time.Time, error) {
+func (c *cluster) GetKV(origin, key string) (string, time.Time, error) {
+	if ok, _ := c.IsClusterDegraded(); ok {
+		return "", time.Time{}, ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.GetKV(origin, key)
+	}
+
 	value, err := c.store.GetFromKVS(key)
 	if err != nil {
 		return "", time.Time{}, err
@@ -1513,22 +1581,6 @@ func (c *cluster) ListKV(prefix string) map[string]store.Value {
 	storeValues := c.store.ListKVS(prefix)
 
 	return storeValues
-}
-
-func (c *cluster) IsReady(origin string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.IsReady(origin)
-	}
-
-	if !c.ready {
-		return fmt.Errorf("no ready yet")
-	}
-
-	return nil
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {

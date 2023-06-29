@@ -682,6 +682,30 @@ info:
   title: datarhei Core Cluster API
   version: "1.0"
 paths:
+  /v1/barrier/{name}:
+    get:
+      description: Has the barrier already has been passed
+      operationId: cluster-1-barrier
+      parameters:
+      - description: Barrier name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Has the barrier already has been passed
+      tags:
+      - v1.0.0
   /v1/core:
     get:
       description: Core API address and login of this node
@@ -890,7 +914,7 @@ paths:
       - v1.0.0
   /v1/kv/{key}:
     delete:
-      description: Removes a key
+      description: Remove a key
       operationId: cluster-1-kv-unset
       parameters:
       - description: Key name
@@ -921,7 +945,42 @@ paths:
           description: Loop Detected
           schema:
             $ref: '#/definitions/cluster.Error'
-      summary: Removes a key
+      summary: Remove a key
+      tags:
+      - v1.0.0
+    get:
+      description: Fetch a key
+      operationId: cluster-1-kv-get
+      parameters:
+      - description: Key name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Fetch a key
       tags:
       - v1.0.0
   /v1/lock:
@@ -1276,10 +1335,26 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            items:
-              $ref: '#/definitions/cluster.Error'
-            type: array
+            $ref: '#/definitions/cluster.Error'
       summary: Cluster DB snapshot
+      tags:
+      - v1.0.0
+  /v1/version:
+    get:
+      description: The cluster version
+      operationId: cluster-1-version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: The cluster version
       tags:
       - v1.0.0
 swagger: "2.0"

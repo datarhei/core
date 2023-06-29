@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	golog "log"
@@ -492,9 +491,16 @@ func (a *api) start(ctx context.Context) error {
 					return fmt.Errorf("failed to initialize autocert manager: %w", err)
 				}
 
-				ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-				err = manager.AcquireCertificates(ctx, cfg.Address, cfg.Host.Name)
-				cancel()
+				resctx, rescancel := context.WithCancel(ctx)
+				err = manager.HTTPChallengeResolver(resctx, cfg.Address)
+
+				if err == nil {
+					ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+					err = manager.AcquireCertificates(ctx, cfg.Host.Name)
+					cancel()
+				}
+
+				rescancel()
 
 				autocertManager = manager
 
@@ -1266,9 +1272,7 @@ func (a *api) start(ctx context.Context) error {
 
 			a.log.logger.rtmps = a.log.logger.core.WithComponent("RTMPS").WithField("address", cfg.RTMP.AddressTLS)
 			if autocertManager != nil {
-				config.TLSConfig = &tls.Config{
-					GetCertificate: autocertManager.GetCertificate,
-				}
+				config.TLSConfig = autocertManager.TLSConfig()
 			}
 		}
 
@@ -1476,9 +1480,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		if cfg.TLS.Auto {
-			a.mainserver.TLSConfig = &tls.Config{
-				GetCertificate: autocertManager.GetCertificate,
-			}
+			a.mainserver.TLSConfig = autocertManager.TLSConfig()
 			a.sidecarserver.Handler = autocertManager.HTTPChallengeHandler(sidecarserverhandler)
 		}
 

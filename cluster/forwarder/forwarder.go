@@ -38,8 +38,7 @@ type Forwarder interface {
 
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
-
-	IsReady(origin string) error
+	GetKV(origin, key string) (string, time.Time, error)
 }
 
 type forwarder struct {
@@ -342,7 +341,7 @@ func (f *forwarder) UnsetKV(origin, key string) error {
 	return client.UnsetKV(origin, key)
 }
 
-func (f *forwarder) IsReady(origin string) error {
+func (f *forwarder) GetKV(origin, key string) (string, time.Time, error) {
 	if origin == "" {
 		origin = f.id
 	}
@@ -351,5 +350,5 @@ func (f *forwarder) IsReady(origin string) error {
 	client := f.client
 	f.lock.RUnlock()
 
-	return client.IsReady(origin)
+	return client.GetKV(origin, key)
 }

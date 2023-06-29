@@ -24,6 +24,42 @@ const docTemplateClusterAPI = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/v1/barrier/{name}": {
+            "get": {
+                "description": "Has the barrier already has been passed",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Has the barrier already has been passed",
+                "operationId": "cluster-1-barrier",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Barrier name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/core": {
             "get": {
                 "description": "Core API address and login of this node",
@@ -333,15 +369,67 @@ const docTemplateClusterAPI = `{
             }
         },
         "/v1/kv/{key}": {
-            "delete": {
-                "description": "Removes a key",
+            "get": {
+                "description": "Fetch a key",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v1.0.0"
                 ],
-                "summary": "Removes a key",
+                "summary": "Fetch a key",
+                "operationId": "cluster-1-kv-get",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove a key",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Remove a key",
                 "operationId": "cluster-1-kv-unset",
                 "parameters": [
                     {
@@ -910,10 +998,34 @@ const docTemplateClusterAPI = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/cluster.Error"
-                            }
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/version": {
+            "get": {
+                "description": "The cluster version",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "The cluster version",
+                "operationId": "cluster-1-version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
                         }
                     }
                 }

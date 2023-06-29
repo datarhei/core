@@ -93,6 +93,7 @@ func (s *clusterKVS) DeleteLock(name string) error {
 }
 
 func (s *clusterKVS) ListLocks() map[string]time.Time {
+	s.logger.Debug().Log("List locks")
 	return s.cluster.ListLocks()
 }
 
@@ -111,10 +112,11 @@ func (s *clusterKVS) UnsetKV(key string) error {
 
 func (s *clusterKVS) GetKV(key string) (string, time.Time, error) {
 	s.logger.Debug().WithField("key", key).Log("Get KV")
-	return s.cluster.GetKV(key)
+	return s.cluster.GetKV("", key)
 }
 
 func (s *clusterKVS) ListKV(prefix string) map[string]store.Value {
+	s.logger.Debug().Log("List KV")
 	return s.cluster.ListKV(prefix)
 }
 
