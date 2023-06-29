@@ -375,6 +375,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/healthy": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Whether the cluster is healthy",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Whether the cluster is healthy",
+                "operationId": "cluster-3-healthy",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "bool"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/iam/policies": {
             "get": {
                 "security": [

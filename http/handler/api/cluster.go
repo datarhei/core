@@ -100,6 +100,21 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	return c.JSON(http.StatusOK, about)
 }
 
+// Healthy returns whether the cluster is healthy
+// @Summary Whether the cluster is healthy
+// @Description Whether the cluster is healthy
+// @Tags v16.?.?
+// @ID cluster-3-healthy
+// @Produce json
+// @Success 200 {bool} bool
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/healthy [get]
+func (h *ClusterHandler) Healthy(c echo.Context) error {
+	degraded, _ := h.cluster.IsDegraded()
+
+	return c.JSON(http.StatusOK, !degraded)
+}
+
 // Leave the cluster gracefully
 // @Summary Leave the cluster gracefully
 // @Description Leave the cluster gracefully

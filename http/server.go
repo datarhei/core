@@ -689,6 +689,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 Cluster
 	if s.v3handler.cluster != nil {
 		v3.GET("/cluster", s.v3handler.cluster.About)
+		v3.GET("/cluster/healthy", s.v3handler.cluster.Healthy)
 
 		v3.GET("/cluster/snapshot", s.v3handler.cluster.GetSnapshot)
 

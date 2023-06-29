@@ -2628,6 +2628,22 @@ paths:
       summary: List of identities in the cluster
       tags:
       - v16.?.?
+  /api/v3/cluster/healthy:
+    get:
+      description: Whether the cluster is healthy
+      operationId: cluster-3-healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: bool
+      security:
+      - ApiKeyAuth: []
+      summary: Whether the cluster is healthy
+      tags:
+      - v16.?.?
   /api/v3/cluster/iam/policies:
     get:
       description: List of policies IAM
