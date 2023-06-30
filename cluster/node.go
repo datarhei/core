@@ -72,9 +72,6 @@ func (n *clusterNode) start(id string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	n.cancelPing = cancel
 
-	go n.ping(ctx)
-	go n.pingCore(ctx)
-
 	n.lastCoreContactErr = fmt.Errorf("not started yet")
 	n.lastContactErr = fmt.Errorf("not started yet")
 
@@ -109,6 +106,9 @@ func (n *clusterNode) start(id string) error {
 			}
 		}(ctx)
 	}
+
+	go n.ping(ctx)
+	go n.pingCore(ctx)
 
 	return nil
 }
