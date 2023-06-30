@@ -348,10 +348,7 @@ func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Dur
 				}
 
 				c.doSynchronize(emergency)
-
-				if !emergency {
-					c.doRebalance(emergency)
-				}
+				c.doRebalance(emergency)
 			} else {
 				c.doSynchronize(emergency)
 			}
@@ -588,6 +585,11 @@ func (c *cluster) doSynchronize(emergency bool) {
 }
 
 func (c *cluster) doRebalance(emergency bool) {
+	if emergency {
+		// Don't rebalance in emergency mode
+		return
+	}
+
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 

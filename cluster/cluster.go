@@ -1697,6 +1697,11 @@ func (c *cluster) sentinel() {
 				"num_peers":    stats.NumPeers,
 			}).Log("Stats")
 
+			if stats.NumPeers > 1 {
+				// Enable emergency leadership only in a configuration with two nodes.
+				break
+			}
+
 			if stats.LastContact > c.emergencyLeaderTimeout && !isEmergencyLeader {
 				c.logger.Warn().Log("Force leadership due to lost contact to leader")
 				c.raftEmergencyNotifyCh <- true
