@@ -17,9 +17,8 @@ import (
 	clusterautocert "github.com/datarhei/core/v16/cluster/autocert"
 	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/forwarder"
-	clusteriam "github.com/datarhei/core/v16/cluster/iam"
-	clusteriamadapter "github.com/datarhei/core/v16/cluster/iam/adapter"
 	"github.com/datarhei/core/v16/cluster/kvs"
+	clusternode "github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
@@ -156,7 +155,7 @@ type cluster struct {
 	isTLSRequired bool
 	certManager   autocert.Manager
 
-	nodes     map[string]*clusterNode
+	nodes     map[string]clusternode.Node
 	nodesLock sync.RWMutex
 
 	barrier     map[string]bool
@@ -190,7 +189,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 		isCoreDegradedErr: fmt.Errorf("cluster not yet started"),
 
 		config: config.CoreConfig,
-		nodes:  map[string]*clusterNode{},
+		nodes:  map[string]clusternode.Node{},
 
 		barrier: map[string]bool{},
 
@@ -904,7 +903,7 @@ func (c *cluster) trackNodeChanges() {
 						logger.Warn().WithError(err).Log("Discovering cluster API address")
 					}
 
-					node := NewClusterNode(id, address)
+					node := clusternode.New(id, address)
 
 					if err := verifyClusterVersion(node.Version()); err != nil {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
@@ -971,15 +970,6 @@ func (c *cluster) trackNodeChanges() {
 				c.isCoreDegradedErr = nil
 			}
 			c.stateLock.Unlock()
-			/*
-				if c.isTLSRequired {
-					// Update list of managed hostnames
-					if c.certManager != nil {
-						c.certManager.ManageCertificates(context.Background(), hostnames)
-					}
-
-				}
-			*/
 		case <-c.shutdownCh:
 			return
 		}
@@ -1204,393 +1194,6 @@ func (c *cluster) trackLeaderChanges() {
 			return
 		}
 	}
-}
-
-func (c *cluster) ListProcesses() []store.Process {
-	return c.store.ListProcesses()
-}
-
-func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
-	return c.store.GetProcess(id)
-}
-
-func (c *cluster) AddProcess(origin string, config *app.Config) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.AddProcess(origin, config)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpAddProcess,
-		Data: &store.CommandAddProcess{
-			Config: config,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.RemoveProcess(origin, id)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpRemoveProcess,
-		Data: &store.CommandRemoveProcess{
-			ID: id,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.UpdateProcess(origin, id, config)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpUpdateProcess,
-		Data: &store.CommandUpdateProcess{
-			ID:     id,
-			Config: config,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.SetProcessCommand(origin, id, command)
-	}
-
-	if command == "start" || command == "stop" {
-		cmd := &store.Command{
-			Operation: store.OpSetProcessOrder,
-			Data: &store.CommandSetProcessOrder{
-				ID:    id,
-				Order: command,
-			},
-		}
-
-		return c.applyCommand(cmd)
-	}
-
-	procs := c.proxy.ListProxyProcesses()
-	nodeid := ""
-
-	for _, p := range procs {
-		if p.Config.ProcessID() != id {
-			continue
-		}
-
-		nodeid = p.NodeID
-
-		break
-	}
-
-	if len(nodeid) == 0 {
-		return fmt.Errorf("the process '%s' is not registered with any node", id.String())
-	}
-
-	return c.proxy.CommandProcess(nodeid, id, command)
-}
-
-func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.SetProcessMetadata(origin, id, key, data)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpSetProcessMetadata,
-		Data: &store.CommandSetProcessMetadata{
-			ID:   id,
-			Key:  key,
-			Data: data,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error) {
-	policyAdapter, err := clusteriamadapter.NewPolicyAdapter(c.store)
-	if err != nil {
-		return nil, fmt.Errorf("cluster policy adapter: %w", err)
-	}
-
-	identityAdapter, err := clusteriamadapter.NewIdentityAdapter(c.store)
-	if err != nil {
-		return nil, fmt.Errorf("cluster identitry adapter: %w", err)
-	}
-
-	iam, err := clusteriam.New(iam.Config{
-		PolicyAdapter:   policyAdapter,
-		IdentityAdapter: identityAdapter,
-		Superuser:       superuser,
-		JWTRealm:        jwtRealm,
-		JWTSecret:       jwtSecret,
-		Logger:          c.logger.WithComponent("IAM"),
-	}, c.store)
-	if err != nil {
-		return nil, fmt.Errorf("cluster iam: %w", err)
-	}
-
-	return iam, nil
-}
-
-func (c *cluster) ListIdentities() (time.Time, []iamidentity.User) {
-	users := c.store.ListUsers()
-
-	return users.UpdatedAt, users.Users
-}
-
-func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error) {
-	user := c.store.GetUser(name)
-
-	if len(user.Users) == 0 {
-		return time.Time{}, iamidentity.User{}, fmt.Errorf("not found")
-	}
-
-	return user.UpdatedAt, user.Users[0], nil
-}
-
-func (c *cluster) ListPolicies() (time.Time, []iamaccess.Policy) {
-	policies := c.store.ListPolicies()
-
-	return policies.UpdatedAt, policies.Policies
-}
-
-func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) {
-	policies := c.store.ListUserPolicies(name)
-
-	return policies.UpdatedAt, policies.Policies
-}
-
-func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if err := identity.Validate(); err != nil {
-		return fmt.Errorf("invalid identity: %w", err)
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.AddIdentity(origin, identity)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpAddIdentity,
-		Data: &store.CommandAddIdentity{
-			Identity: identity,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.UpdateIdentity(origin, name, identity)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpUpdateIdentity,
-		Data: &store.CommandUpdateIdentity{
-			Name:     name,
-			Identity: identity,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.SetPolicies(origin, name, policies)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpSetPolicies,
-		Data: &store.CommandSetPolicies{
-			Name:     name,
-			Policies: policies,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) RemoveIdentity(origin string, name string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.RemoveIdentity(origin, name)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpRemoveIdentity,
-		Data: &store.CommandRemoveIdentity{
-			Name: name,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error) {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return nil, ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		err := c.forwarder.CreateLock(origin, name, validUntil)
-		if err != nil {
-			return nil, err
-		}
-
-		l := &kvs.Lock{
-			ValidUntil: validUntil,
-		}
-
-		return l, nil
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpCreateLock,
-		Data: &store.CommandCreateLock{
-			Name:       name,
-			ValidUntil: validUntil,
-		},
-	}
-
-	err := c.applyCommand(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	l := &kvs.Lock{
-		ValidUntil: validUntil,
-	}
-
-	return l, nil
-}
-
-func (c *cluster) DeleteLock(origin string, name string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.DeleteLock(origin, name)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpDeleteLock,
-		Data: &store.CommandDeleteLock{
-			Name: name,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) ListLocks() map[string]time.Time {
-	return c.store.ListLocks()
-}
-
-func (c *cluster) SetKV(origin, key, value string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.SetKV(origin, key, value)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpSetKV,
-		Data: &store.CommandSetKV{
-			Key:   key,
-			Value: value,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) UnsetKV(origin, key string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.UnsetKV(origin, key)
-	}
-
-	cmd := &store.Command{
-		Operation: store.OpUnsetKV,
-		Data: &store.CommandUnsetKV{
-			Key: key,
-		},
-	}
-
-	return c.applyCommand(cmd)
-}
-
-func (c *cluster) GetKV(origin, key string) (string, time.Time, error) {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return "", time.Time{}, ErrDegraded
-	}
-
-	if !c.IsRaftLeader() {
-		return c.forwarder.GetKV(origin, key)
-	}
-
-	value, err := c.store.GetFromKVS(key)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return value.Value, value.UpdatedAt, nil
-}
-
-func (c *cluster) ListKV(prefix string) map[string]store.Value {
-	storeValues := c.store.ListKVS(prefix)
-
-	return storeValues
 }
 
 func (c *cluster) applyCommand(cmd *store.Command) error {

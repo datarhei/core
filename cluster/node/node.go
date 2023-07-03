@@ -1,4 +1,4 @@
-package cluster
+package node
 
 import (
 	"context"
@@ -13,7 +13,23 @@ import (
 	"github.com/datarhei/core/v16/config"
 )
 
-type clusterNode struct {
+type Node interface {
+	Stop() error
+	Version() string
+	IPs() []string
+	Status() (string, error)
+	LastContact() time.Time
+	Barrier(name string) (bool, error)
+
+	CoreStatus() (string, error)
+	CoreEssentials() (string, *config.Config, error)
+	CoreConfig() (*config.Config, error)
+	CoreAPIAddress() (string, error)
+
+	Proxy() proxy.Node
+}
+
+type node struct {
 	client client.APIClient
 
 	id                 string
@@ -33,8 +49,8 @@ type clusterNode struct {
 	proxyNode proxy.Node
 }
 
-func NewClusterNode(id, address string) *clusterNode {
-	n := &clusterNode{
+func New(id, address string) Node {
+	n := &node{
 		id:      id,
 		address: address,
 		version: "0.0.0",
@@ -61,7 +77,7 @@ func NewClusterNode(id, address string) *clusterNode {
 	return n
 }
 
-func (n *clusterNode) start(id string) error {
+func (n *node) start(id string) error {
 	n.runLock.Lock()
 	defer n.runLock.Unlock()
 
@@ -113,7 +129,7 @@ func (n *clusterNode) start(id string) error {
 	return nil
 }
 
-func (n *clusterNode) Stop() error {
+func (n *node) Stop() error {
 	n.runLock.Lock()
 	defer n.runLock.Unlock()
 
@@ -129,18 +145,18 @@ func (n *clusterNode) Stop() error {
 	return nil
 }
 
-func (n *clusterNode) Version() string {
+func (n *node) Version() string {
 	n.pingLock.RLock()
 	defer n.pingLock.RUnlock()
 
 	return n.version
 }
 
-func (n *clusterNode) IPs() []string {
+func (n *node) IPs() []string {
 	return n.ips
 }
 
-func (n *clusterNode) Status() (string, error) {
+func (n *node) Status() (string, error) {
 	n.pingLock.RLock()
 	defer n.pingLock.RUnlock()
 
@@ -152,7 +168,7 @@ func (n *clusterNode) Status() (string, error) {
 	return "online", nil
 }
 
-func (n *clusterNode) CoreStatus() (string, error) {
+func (n *node) CoreStatus() (string, error) {
 	n.pingLock.RLock()
 	defer n.pingLock.RUnlock()
 
@@ -164,14 +180,14 @@ func (n *clusterNode) CoreStatus() (string, error) {
 	return "online", nil
 }
 
-func (n *clusterNode) LastContact() time.Time {
+func (n *node) LastContact() time.Time {
 	n.pingLock.RLock()
 	defer n.pingLock.RUnlock()
 
 	return n.lastContact
 }
 
-func (n *clusterNode) CoreEssentials() (string, *config.Config, error) {
+func (n *node) CoreEssentials() (string, *config.Config, error) {
 	address, err := n.CoreAPIAddress()
 	if err != nil {
 		return "", nil, err
@@ -185,23 +201,23 @@ func (n *clusterNode) CoreEssentials() (string, *config.Config, error) {
 	return address, config, nil
 }
 
-func (n *clusterNode) CoreConfig() (*config.Config, error) {
+func (n *node) CoreConfig() (*config.Config, error) {
 	return n.client.CoreConfig()
 }
 
-func (n *clusterNode) CoreAPIAddress() (string, error) {
+func (n *node) CoreAPIAddress() (string, error) {
 	return n.client.CoreAPIAddress()
 }
 
-func (n *clusterNode) Barrier(name string) (bool, error) {
+func (n *node) Barrier(name string) (bool, error) {
 	return n.client.Barrier(name)
 }
 
-func (n *clusterNode) Proxy() proxy.Node {
+func (n *node) Proxy() proxy.Node {
 	return n.proxyNode
 }
 
-func (n *clusterNode) ping(ctx context.Context) {
+func (n *node) ping(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -227,7 +243,7 @@ func (n *clusterNode) ping(ctx context.Context) {
 	}
 }
 
-func (n *clusterNode) pingCore(ctx context.Context) {
+func (n *node) pingCore(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
