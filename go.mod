@@ -3,11 +3,11 @@ module github.com/datarhei/core/v16
 go 1.18
 
 require (
-	github.com/99designs/gqlgen v0.17.33
+	github.com/99designs/gqlgen v0.17.34
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/adhocore/gronx v1.6.3
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/caddyserver/certmagic v0.18.0
+	github.com/caddyserver/certmagic v0.18.2
 	github.com/casbin/casbin/v2 v2.71.1
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230627120001-16d06aa77802
 	github.com/datarhei/gosrt v0.5.2
@@ -28,14 +28,14 @@ require (
 	github.com/lestrrat-go/strftime v1.0.6
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.19
-	github.com/minio/minio-go/v7 v7.0.57
+	github.com/minio/minio-go/v7 v7.0.59
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.16.0
-	github.com/shirou/gopsutil/v3 v3.23.5
+	github.com/shirou/gopsutil/v3 v3.23.6
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/echo-swagger v1.4.0
 	github.com/swaggo/swag v1.16.1
-	github.com/vektah/gqlparser/v2 v2.5.3
+	github.com/vektah/gqlparser/v2 v2.5.6
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/automaxprocs v1.5.2
@@ -73,11 +73,11 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.3 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.4 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.16.6 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
@@ -85,8 +85,8 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/mholt/acmez v1.1.1 // indirect
-	github.com/miekg/dns v1.1.54 // indirect
+	github.com/mholt/acmez v1.2.0 // indirect
+	github.com/miekg/dns v1.1.55 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -120,7 +120,7 @@ require (
 	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

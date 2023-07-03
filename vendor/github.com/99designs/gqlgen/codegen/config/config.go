@@ -26,8 +26,10 @@ type Config struct {
 	Models                        TypeMap                    `yaml:"models,omitempty"`
 	StructTag                     string                     `yaml:"struct_tag,omitempty"`
 	Directives                    map[string]DirectiveConfig `yaml:"directives,omitempty"`
+	GoInitialisms                 GoInitialismsConfig        `yaml:"go_initialisms,omitempty"`
 	OmitSliceElementPointers      bool                       `yaml:"omit_slice_element_pointers,omitempty"`
 	OmitGetters                   bool                       `yaml:"omit_getters,omitempty"`
+	OmitInterfaceChecks           bool                       `yaml:"omit_interface_checks,omitempty"`
 	OmitComplexity                bool                       `yaml:"omit_complexity,omitempty"`
 	OmitGQLGenFileNotice          bool                       `yaml:"omit_gqlgen_file_notice,omitempty"`
 	OmitGQLGenVersionInFileNotice bool                       `yaml:"omit_gqlgen_version_in_file_notice,omitempty"`
@@ -201,6 +203,9 @@ func CompleteConfig(config *Config) error {
 
 		config.Sources = append(config.Sources, &ast.Source{Name: filename, Input: string(schemaRaw)})
 	}
+
+	config.GoInitialisms.setInitialisms()
+
 	return nil
 }
 
@@ -305,8 +310,9 @@ func (c *Config) injectTypesFromSchema() error {
 
 					if c.Models[schemaType.Name].Fields == nil {
 						c.Models[schemaType.Name] = TypeMapEntry{
-							Model:  c.Models[schemaType.Name].Model,
-							Fields: map[string]TypeMapField{},
+							Model:       c.Models[schemaType.Name].Model,
+							ExtraFields: c.Models[schemaType.Name].ExtraFields,
+							Fields:      map[string]TypeMapField{},
 						}
 					}
 
