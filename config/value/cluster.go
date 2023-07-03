@@ -7,63 +7,6 @@ import (
 	"strings"
 )
 
-// cluster address (host:port)
-
-type ClusterAddress string
-
-func NewClusterAddress(p *string, val string) *ClusterAddress {
-	*p = val
-
-	return (*ClusterAddress)(p)
-}
-
-func (s *ClusterAddress) Set(val string) error {
-	// Check if the new value is only a port number
-	host, port, err := net.SplitHostPort(val)
-	if err != nil {
-		return err
-	}
-
-	if len(host) == 0 || len(port) == 0 {
-		return fmt.Errorf("invalid address: host and port must be provided")
-	}
-
-	re := regexp.MustCompile("^[0-9]+$")
-	if !re.MatchString(port) {
-		return fmt.Errorf("the port must be numerical")
-	}
-
-	*s = ClusterAddress(val)
-
-	return nil
-}
-
-func (s *ClusterAddress) String() string {
-	return string(*s)
-}
-
-func (s *ClusterAddress) Validate() error {
-	host, port, err := net.SplitHostPort(string(*s))
-	if err != nil {
-		return err
-	}
-
-	if len(host) == 0 || len(port) == 0 {
-		return fmt.Errorf("invalid address: host and port must be provided")
-	}
-
-	re := regexp.MustCompile("^[0-9]+$")
-	if !re.MatchString(port) {
-		return fmt.Errorf("the port must be numerical")
-	}
-
-	return nil
-}
-
-func (s *ClusterAddress) IsEmpty() bool {
-	return s.Validate() != nil
-}
-
 // cluster peer (id@host:port)
 
 type ClusterPeer string

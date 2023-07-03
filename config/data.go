@@ -141,10 +141,11 @@ type Data struct {
 		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling    bool  `json:"profiling"`
-		ForceGC      int   `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
-		MemoryLimit  int64 `json:"memory_limit_mbytes" format:"int64"`
-		AutoMaxProcs bool  `json:"auto_max_procs"`
+		Profiling    bool   `json:"profiling"`
+		ForceGC      int    `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
+		MemoryLimit  int64  `json:"memory_limit_mbytes" format:"int64"`
+		AutoMaxProcs bool   `json:"auto_max_procs"`
+		AgentAddress string `json:"agent_address"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
@@ -262,6 +263,7 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Debug.Profiling = d.Debug.Profiling
 	data.Debug.ForceGC = d.Debug.ForceGC
 	data.Debug.MemoryLimit = 0
+	data.Debug.AgentAddress = ""
 
 	data.TLS.Enable = d.TLS.Enable
 	data.TLS.Address = d.TLS.Address

@@ -24,6 +24,54 @@ func TestAddressValue(t *testing.T) {
 	val.Set("fooboz:7070")
 
 	require.Equal(t, "fooboz:7070", x)
+
+	val.Set("")
+
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+}
+
+func TestMustAddressValue(t *testing.T) {
+	var x string
+
+	val := NewMustAddress(&x, ":8080")
+
+	require.Equal(t, ":8080", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	x = "foobaz:9090"
+
+	require.Equal(t, "foobaz:9090", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	val.Set("fooboz:7070")
+
+	require.Equal(t, "fooboz:7070", x)
+}
+
+func TestFullAddressValue(t *testing.T) {
+	var x string
+
+	val := NewFullAddress(&x, "foobar:8080")
+
+	require.Equal(t, "foobar:8080", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	x = "foobaz:9090"
+
+	require.Equal(t, "foobaz:9090", val.String())
+	require.Equal(t, nil, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	val.Set("fooboz:7070")
+
+	require.Equal(t, "fooboz:7070", x)
+
+	err := val.Set(":7070")
+	require.Error(t, err)
 }
 
 func TestCIDRListValue(t *testing.T) {

@@ -50,6 +50,7 @@ import (
 	"github.com/datarhei/core/v16/srt"
 	srturl "github.com/datarhei/core/v16/srt/url"
 	"github.com/datarhei/core/v16/update"
+	"github.com/google/gops/agent"
 
 	"github.com/lestrrat-go/strftime"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -321,6 +322,15 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		a.undoMaxprocs = undoMaxprocs
+	}
+
+	if len(cfg.Debug.AgentAddress) != 0 {
+		if err := agent.Listen(agent.Options{
+			Addr:                   cfg.Debug.AgentAddress,
+			ReuseSocketAddrAndPort: true,
+		}); err != nil {
+			a.log.logger.main.Error().WithError(err).Log("")
+		}
 	}
 
 	resources, err := resources.New(resources.Config{
@@ -1835,6 +1845,9 @@ func (a *api) stop() {
 		a.gcTickerStop()
 		a.gcTickerStop = nil
 	}
+
+	// Stop gops agent
+	agent.Close()
 
 	// Wait for all server goroutines to exit
 	logger.Info().Log("Waiting for all servers to stop ...")

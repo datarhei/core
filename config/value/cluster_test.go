@@ -6,29 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClusterAddressValue(t *testing.T) {
-	var x string
-
-	val := NewClusterAddress(&x, "foobar:8080")
-
-	require.Equal(t, "foobar:8080", val.String())
-	require.Equal(t, nil, val.Validate())
-	require.Equal(t, false, val.IsEmpty())
-
-	x = "foobaz:9090"
-
-	require.Equal(t, "foobaz:9090", val.String())
-	require.Equal(t, nil, val.Validate())
-	require.Equal(t, false, val.IsEmpty())
-
-	val.Set("fooboz:7070")
-
-	require.Equal(t, "fooboz:7070", x)
-
-	err := val.Set(":7070")
-	require.Error(t, err)
-}
-
 func TestClusterPeerValue(t *testing.T) {
 	var x string
 

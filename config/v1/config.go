@@ -118,7 +118,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewTime(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
 	d.vars.Register(value.NewString(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
 	d.vars.Register(value.NewString(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
-	d.vars.Register(value.NewAddress(&d.Address, ":8080"), "address", "CORE_ADDRESS", nil, "HTTP listening address", false, false)
+	d.vars.Register(value.NewMustAddress(&d.Address, ":8080"), "address", "CORE_ADDRESS", nil, "HTTP listening address", false, false)
 	d.vars.Register(value.NewBool(&d.CheckForUpdates, true), "update_check", "CORE_UPDATE_CHECK", nil, "Check for updates and send anonymized data", false, false)
 
 	// Log
@@ -152,7 +152,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewTenantList(&d.API.Auth.Auth0.Tenants, []value.Auth0Tenant{}, ","), "api.auth.auth0.tenants", "CORE_API_AUTH_AUTH0_TENANTS", nil, "List of Auth0 tenants", false, false)
 
 	// TLS
-	d.vars.Register(value.NewAddress(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
+	d.vars.Register(value.NewMustAddress(&d.TLS.Address, ":8181"), "tls.address", "CORE_TLS_ADDRESS", nil, "HTTPS listening address", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Enable, false), "tls.enable", "CORE_TLS_ENABLE", nil, "Enable HTTPS", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERTFILE", nil, "Path to certificate file in PEM format", false, false)
@@ -183,13 +183,13 @@ func (d *Config) init() {
 	// RTMP
 	d.vars.Register(value.NewBool(&d.RTMP.Enable, false), "rtmp.enable", "CORE_RTMP_ENABLE", nil, "Enable RTMP server", false, false)
 	d.vars.Register(value.NewBool(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
-	d.vars.Register(value.NewAddress(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
+	d.vars.Register(value.NewMustAddress(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
 	d.vars.Register(value.NewAbsolutePath(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.vars.Register(value.NewString(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
 
 	// SRT
 	d.vars.Register(value.NewBool(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
-	d.vars.Register(value.NewAddress(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
+	d.vars.Register(value.NewMustAddress(&d.SRT.Address, ":6000"), "srt.address", "CORE_SRT_ADDRESS", nil, "SRT server listen address", false, false)
 	d.vars.Register(value.NewString(&d.SRT.Passphrase, ""), "srt.passphrase", "CORE_SRT_PASSPHRASE", nil, "SRT encryption passphrase", false, true)
 	d.vars.Register(value.NewString(&d.SRT.Token, ""), "srt.token", "CORE_SRT_TOKEN", nil, "SRT token for publishing and playing", false, true)
 	d.vars.Register(value.NewBool(&d.SRT.Log.Enable, false), "srt.log.enable", "CORE_SRT_LOG_ENABLE", nil, "Enable SRT server logging", false, false)

@@ -177,6 +177,11 @@ github.com/golang-jwt/jwt/v4
 # github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
+# github.com/google/gops v0.3.27
+## explicit; go 1.17
+github.com/google/gops/agent
+github.com/google/gops/internal
+github.com/google/gops/signal
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid

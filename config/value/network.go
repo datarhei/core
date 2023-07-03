@@ -12,7 +12,7 @@ import (
 	"github.com/datarhei/core/v16/http/cors"
 )
 
-// address (host?:port)
+// optional address
 
 type Address string
 
@@ -23,6 +23,11 @@ func NewAddress(p *string, val string) *Address {
 }
 
 func (s *Address) Set(val string) error {
+	if len(val) == 0 {
+		*s = Address(val)
+		return nil
+	}
+
 	// Check if the new value is only a port number
 	re := regexp.MustCompile("^[0-9]+$")
 	if re.MatchString(val) {
@@ -38,6 +43,10 @@ func (s *Address) String() string {
 }
 
 func (s *Address) Validate() error {
+	if len(string(*s)) == 0 {
+		return nil
+	}
+
 	_, port, err := net.SplitHostPort(string(*s))
 	if err != nil {
 		return err
@@ -52,6 +61,106 @@ func (s *Address) Validate() error {
 }
 
 func (s *Address) IsEmpty() bool {
+	return s.Validate() != nil
+}
+
+// address (host?:port)
+
+type MustAddress string
+
+func NewMustAddress(p *string, val string) *MustAddress {
+	*p = val
+
+	return (*MustAddress)(p)
+}
+
+func (s *MustAddress) Set(val string) error {
+	// Check if the new value is only a port number
+	re := regexp.MustCompile("^[0-9]+$")
+	if re.MatchString(val) {
+		val = ":" + val
+	}
+
+	*s = MustAddress(val)
+	return nil
+}
+
+func (s *MustAddress) String() string {
+	return string(*s)
+}
+
+func (s *MustAddress) Validate() error {
+	_, port, err := net.SplitHostPort(string(*s))
+	if err != nil {
+		return err
+	}
+
+	re := regexp.MustCompile("^[0-9]+$")
+	if !re.MatchString(port) {
+		return fmt.Errorf("the port must be numerical")
+	}
+
+	return nil
+}
+
+func (s *MustAddress) IsEmpty() bool {
+	return s.Validate() != nil
+}
+
+// full address (host:port)
+
+type FullAddress string
+
+func NewFullAddress(p *string, val string) *FullAddress {
+	*p = val
+
+	return (*FullAddress)(p)
+}
+
+func (s *FullAddress) Set(val string) error {
+	// Check if the new value is only a port number
+	host, port, err := net.SplitHostPort(val)
+	if err != nil {
+		return err
+	}
+
+	if len(host) == 0 || len(port) == 0 {
+		return fmt.Errorf("invalid address: host and port must be provided")
+	}
+
+	re := regexp.MustCompile("^[0-9]+$")
+	if !re.MatchString(port) {
+		return fmt.Errorf("the port must be numerical")
+	}
+
+	*s = FullAddress(val)
+
+	return nil
+}
+
+func (s *FullAddress) String() string {
+	return string(*s)
+}
+
+func (s *FullAddress) Validate() error {
+	host, port, err := net.SplitHostPort(string(*s))
+	if err != nil {
+		return err
+	}
+
+	if len(host) == 0 || len(port) == 0 {
+		return fmt.Errorf("invalid address: host and port must be provided")
+	}
+
+	re := regexp.MustCompile("^[0-9]+$")
+	if !re.MatchString(port) {
+		return fmt.Errorf("the port must be numerical")
+	}
+
+	return nil
+}
+
+func (s *FullAddress) IsEmpty() bool {
 	return s.Validate() != nil
 }
 
