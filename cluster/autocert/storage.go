@@ -1,4 +1,4 @@
-package cluster
+package autocert
 
 import (
 	"context"
@@ -11,23 +11,24 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/datarhei/core/v16/cluster/kvs"
 	"github.com/datarhei/core/v16/log"
 )
 
-type clusterStorage struct {
-	kvs     KVS
+type storage struct {
+	kvs     kvs.KVS
 	prefix  string
-	locks   map[string]*Lock
+	locks   map[string]*kvs.Lock
 	muLocks sync.Mutex
 
 	logger log.Logger
 }
 
-func NewClusterStorage(kvs KVS, prefix string, logger log.Logger) (certmagic.Storage, error) {
-	s := &clusterStorage{
-		kvs:    kvs,
+func NewStorage(kv kvs.KVS, prefix string, logger log.Logger) (certmagic.Storage, error) {
+	s := &storage{
+		kvs:    kv,
 		prefix: prefix,
-		locks:  map[string]*Lock{},
+		locks:  map[string]*kvs.Lock{},
 		logger: logger,
 	}
 
@@ -38,15 +39,15 @@ func NewClusterStorage(kvs KVS, prefix string, logger log.Logger) (certmagic.Sto
 	return s, nil
 }
 
-func (s *clusterStorage) prefixKey(key string) string {
+func (s *storage) prefixKey(key string) string {
 	return path.Join(s.prefix, key)
 }
 
-func (s *clusterStorage) unprefixKey(key string) string {
+func (s *storage) unprefixKey(key string) string {
 	return strings.TrimPrefix(key, s.prefix+"/")
 }
 
-func (s *clusterStorage) Lock(ctx context.Context, name string) error {
+func (s *storage) Lock(ctx context.Context, name string) error {
 	s.logger.Debug().WithField("name", name).Log("StorageLock")
 	for {
 		lock, err := s.kvs.CreateLock(s.prefixKey(name), time.Now().Add(time.Minute))
@@ -73,7 +74,7 @@ func (s *clusterStorage) Lock(ctx context.Context, name string) error {
 	}
 }
 
-func (s *clusterStorage) Unlock(ctx context.Context, name string) error {
+func (s *storage) Unlock(ctx context.Context, name string) error {
 	s.logger.Debug().WithField("name", name).Log("StorageUnlock")
 	err := s.kvs.DeleteLock(s.prefixKey(name))
 	if err != nil {
@@ -92,14 +93,14 @@ func (s *clusterStorage) Unlock(ctx context.Context, name string) error {
 }
 
 // Store puts value at key.
-func (s *clusterStorage) Store(ctx context.Context, key string, value []byte) error {
+func (s *storage) Store(ctx context.Context, key string, value []byte) error {
 	s.logger.Debug().WithField("key", key).Log("StorageStore")
 	encodedValue := base64.StdEncoding.EncodeToString(value)
 	return s.kvs.SetKV(s.prefixKey(key), encodedValue)
 }
 
 // Load retrieves the value at key.
-func (s *clusterStorage) Load(ctx context.Context, key string) ([]byte, error) {
+func (s *storage) Load(ctx context.Context, key string) ([]byte, error) {
 	s.logger.Debug().WithField("key", key).Log("StorageLoad")
 	encodedValue, _, err := s.kvs.GetKV(s.prefixKey(key))
 	if err != nil {
@@ -113,14 +114,14 @@ func (s *clusterStorage) Load(ctx context.Context, key string) ([]byte, error) {
 // Delete deletes key. An error should be
 // returned only if the key still exists
 // when the method returns.
-func (s *clusterStorage) Delete(ctx context.Context, key string) error {
+func (s *storage) Delete(ctx context.Context, key string) error {
 	s.logger.Debug().WithField("key", key).Log("StorageDelete")
 	return s.kvs.UnsetKV(s.prefixKey(key))
 }
 
 // Exists returns true if the key exists
 // and there was no error checking.
-func (s *clusterStorage) Exists(ctx context.Context, key string) bool {
+func (s *storage) Exists(ctx context.Context, key string) bool {
 	s.logger.Debug().WithField("key", key).Log("StorageExits")
 	_, _, err := s.kvs.GetKV(s.prefixKey(key))
 	return err == nil
@@ -131,7 +132,7 @@ func (s *clusterStorage) Exists(ctx context.Context, key string) bool {
 // will be enumerated (i.e. "directories"
 // should be walked); otherwise, only keys
 // prefixed exactly by prefix will be listed.
-func (s *clusterStorage) List(ctx context.Context, prefix string, recursive bool) ([]string, error) {
+func (s *storage) List(ctx context.Context, prefix string, recursive bool) ([]string, error) {
 	s.logger.Debug().WithField("prefix", prefix).Log("StorageList")
 	values := s.kvs.ListKV(s.prefixKey(prefix))
 
@@ -166,7 +167,7 @@ func (s *clusterStorage) List(ctx context.Context, prefix string, recursive bool
 }
 
 // Stat returns information about key.
-func (s *clusterStorage) Stat(ctx context.Context, key string) (certmagic.KeyInfo, error) {
+func (s *storage) Stat(ctx context.Context, key string) (certmagic.KeyInfo, error) {
 	s.logger.Debug().WithField("key", key).Log("StorageStat")
 	encodedValue, lastModified, err := s.kvs.GetKV(s.prefixKey(key))
 	if err != nil {

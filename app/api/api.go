@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/autocert"
 	"github.com/datarhei/core/v16/cluster"
@@ -50,7 +51,6 @@ import (
 	srturl "github.com/datarhei/core/v16/srt/url"
 	"github.com/datarhei/core/v16/update"
 
-	"github.com/caddyserver/certmagic"
 	"github.com/lestrrat-go/strftime"
 	"go.uber.org/automaxprocs/maxprocs"
 )
@@ -478,10 +478,18 @@ func (a *api) start(ctx context.Context) error {
 			}
 
 			if a.cluster == nil {
+				var storage certmagic.Storage
+				storage = &certmagic.FileStorage{
+					Path: filepath.Join(cfg.DB.Dir, "cert"),
+				}
+
+				if len(cfg.TLS.Secret) != 0 {
+					crypto := autocert.NewCrypto(cfg.TLS.Secret)
+					storage = autocert.NewCryptoStorage(storage, crypto)
+				}
+
 				manager, err := autocert.New(autocert.Config{
-					Storage: &certmagic.FileStorage{
-						Path: filepath.Join(cfg.DB.Dir, "cert"),
-					},
+					Storage:         storage,
 					DefaultHostname: cfg.Host.Name[0],
 					EmailAddress:    cfg.TLS.Email,
 					IsProduction:    !cfg.TLS.Staging,

@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/autocert"
+	clusterautocert "github.com/datarhei/core/v16/cluster/autocert"
 	apiclient "github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/forwarder"
 	clusteriam "github.com/datarhei/core/v16/cluster/iam"
 	clusteriamadapter "github.com/datarhei/core/v16/cluster/iam/adapter"
+	"github.com/datarhei/core/v16/cluster/kvs"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
@@ -72,7 +74,7 @@ type Cluster interface {
 	SetPolicies(origin, name string, policies []iamaccess.Policy) error
 	RemoveIdentity(origin string, name string) error
 
-	CreateLock(origin string, name string, validUntil time.Time) (*Lock, error)
+	CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
 	DeleteLock(origin string, name string) error
 	ListLocks() map[string]time.Time
 
@@ -434,9 +436,13 @@ func (c *cluster) setup(ctx context.Context) error {
 			return fmt.Errorf("tls: cluster KVS: %w", err)
 		}
 
-		storage, err := NewClusterStorage(kvs, "core-cluster-certificates", c.logger.WithComponent("KVS"))
+		storage, err := clusterautocert.NewStorage(kvs, "core-cluster-certificates", c.logger.WithComponent("KVS"))
 		if err != nil {
 			return fmt.Errorf("tls: certificate store: %w", err)
+		}
+
+		if len(c.config.TLS.Secret) != 0 {
+			storage = autocert.NewCryptoStorage(storage, autocert.NewCrypto(c.config.TLS.Secret))
 		}
 
 		manager, err := autocert.New(autocert.Config{
@@ -1164,6 +1170,10 @@ func verifyClusterConfig(local, remote *config.Config) error {
 			if local.TLS.Staging != remote.TLS.Staging {
 				return fmt.Errorf("tls.staging is different")
 			}
+
+			if local.TLS.Secret != remote.TLS.Secret {
+				return fmt.Errorf("tls.secret is different")
+			}
 		}
 	}
 
@@ -1460,7 +1470,7 @@ func (c *cluster) RemoveIdentity(origin string, name string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*Lock, error) {
+func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error) {
 	if ok, _ := c.IsClusterDegraded(); ok {
 		return nil, ErrDegraded
 	}
@@ -1471,7 +1481,7 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 			return nil, err
 		}
 
-		l := &Lock{
+		l := &kvs.Lock{
 			ValidUntil: validUntil,
 		}
 
@@ -1491,7 +1501,7 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 		return nil, err
 	}
 
-	l := &Lock{
+	l := &kvs.Lock{
 		ValidUntil: validUntil,
 	}
 

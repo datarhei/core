@@ -1,4 +1,4 @@
-package cluster
+package kvs
 
 import (
 	"io/fs"

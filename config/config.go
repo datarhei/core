@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/math/rand"
+	"github.com/datarhei/core/v16/slices"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"
@@ -108,35 +109,35 @@ func (d *Config) Clone() *Config {
 	data.Resources = d.Resources
 	data.Cluster = d.Cluster
 
-	data.Log.Topics = copy.Slice(d.Log.Topics)
+	data.Log.Topics = slices.Copy(d.Log.Topics)
 
-	data.Host.Name = copy.Slice(d.Host.Name)
+	data.Host.Name = slices.Copy(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = slices.Copy(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = slices.Copy(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = slices.Copy(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = slices.Copy(d.API.Access.HTTPS.Block)
 
 	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
-	data.Storage.Disk.Cache.Types.Allow = copy.Slice(d.Storage.Disk.Cache.Types.Allow)
-	data.Storage.Disk.Cache.Types.Block = copy.Slice(d.Storage.Disk.Cache.Types.Block)
-	data.Storage.S3 = copy.Slice(d.Storage.S3)
+	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
+	data.Storage.Disk.Cache.Types.Allow = slices.Copy(d.Storage.Disk.Cache.Types.Allow)
+	data.Storage.Disk.Cache.Types.Block = slices.Copy(d.Storage.Disk.Cache.Types.Block)
+	data.Storage.S3 = slices.Copy(d.Storage.S3)
 
-	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = slices.Copy(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = slices.Copy(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = slices.Copy(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = slices.Copy(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = slices.Copy(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = slices.Copy(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.BlockedPrefixes = slices.Copy(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
-	data.Cluster.Peers = copy.Slice(d.Cluster.Peers)
+	data.Cluster.Peers = slices.Copy(d.Cluster.Peers)
 
 	data.vars.Transfer(&d.vars)
 
@@ -187,6 +188,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.TLS.Auto, false), "tls.auto", "CORE_TLS_AUTO", nil, "Enable Let's Encrypt certificate", false, false)
 	d.vars.Register(value.NewEmail(&d.TLS.Email, "cert@datarhei.com"), "tls.email", "CORE_TLS_EMAIL", nil, "Email for Let's Encrypt registration", false, false)
 	d.vars.Register(value.NewBool(&d.TLS.Staging, false), "tls.staging", "CORE_TLS_STAGING", nil, "Use Let's Encrypt staging CA", false, false)
+	d.vars.Register(value.NewString(&d.TLS.Secret, ""), "tls.secret", "CORE_TLS_SECRET", nil, "Use this secret to encrypt automatic certificates on the storage", false, true)
 	d.vars.Register(value.NewFile(&d.TLS.CertFile, "", d.fs), "tls.cert_file", "CORE_TLS_CERT_FILE", []string{"CORE_TLS_CERTFILE"}, "Path to certificate file in PEM format", false, false)
 	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEY_FILE", []string{"CORE_TLS_KEYFILE"}, "Path to key file in PEM format", false, false)
 

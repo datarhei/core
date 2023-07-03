@@ -1,4 +1,4 @@
-package cluster
+package autocert
 
 import (
 	"context"
@@ -8,16 +8,17 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/datarhei/core/v16/cluster/kvs"
 	"github.com/stretchr/testify/require"
 )
 
 func setupStorage() (certmagic.Storage, error) {
-	kvs, err := NewMemoryKVS()
+	kvs, err := kvs.NewMemoryKVS()
 	if err != nil {
 		return nil, err
 	}
 
-	return NewClusterStorage(kvs, "some_prefix", nil)
+	return NewStorage(kvs, "some_prefix", nil)
 }
 
 func TestStorageStore(t *testing.T) {

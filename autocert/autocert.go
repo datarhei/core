@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/slices"
 
 	"github.com/caddyserver/certmagic"
 	"github.com/klauspost/cpuid/v2"
@@ -168,7 +169,7 @@ func (m *manager) HTTPChallengeResolver(ctx context.Context, listenAddress strin
 // AcquireCertificates tries to acquire the certificates for the given hostnames synchronously.
 func (m *manager) AcquireCertificates(ctx context.Context, hostnames []string) error {
 	m.lock.Lock()
-	added, removed := diffStringSlice(hostnames, m.hostnames)
+	added, removed := slices.Diff(hostnames, m.hostnames)
 	m.lock.Unlock()
 
 	var err error
@@ -201,7 +202,7 @@ func (m *manager) AcquireCertificates(ctx context.Context, hostnames []string) e
 // ManageCertificates is the same as AcquireCertificates but it does it in the background.
 func (m *manager) ManageCertificates(ctx context.Context, hostnames []string) error {
 	m.lock.Lock()
-	added, removed := diffStringSlice(hostnames, m.hostnames)
+	added, removed := slices.Diff(hostnames, m.hostnames)
 	m.hostnames = make([]string, len(hostnames))
 	copy(m.hostnames, hostnames)
 	m.lock.Unlock()
@@ -286,30 +287,3 @@ var (
 		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 	}
 )
-
-// diffHostnames returns a list of newly added hostnames and a list of removed hostnames based
-// the provided list and the list of currently managed hostnames.
-func diffStringSlice(next, current []string) ([]string, []string) {
-	added, removed := []string{}, []string{}
-
-	currentMap := map[string]struct{}{}
-
-	for _, name := range current {
-		currentMap[name] = struct{}{}
-	}
-
-	for _, name := range next {
-		if _, ok := currentMap[name]; ok {
-			delete(currentMap, name)
-			continue
-		}
-
-		added = append(added, name)
-	}
-
-	for name := range currentMap {
-		removed = append(removed, name)
-	}
-
-	return added, removed
-}

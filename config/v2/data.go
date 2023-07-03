@@ -11,6 +11,7 @@ import (
 	v1 "github.com/datarhei/core/v16/config/v1"
 	"github.com/datarhei/core/v16/config/value"
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/slices"
 )
 
 type Data struct {
@@ -198,29 +199,29 @@ func MergeV1ToV2(data *Data, d *v1.Data) (*Data, error) {
 	data.Service = d.Service
 	data.Router = d.Router
 
-	data.Log.Topics = copy.Slice(d.Log.Topics)
+	data.Log.Topics = slices.Copy(d.Log.Topics)
 
-	data.Host.Name = copy.Slice(d.Host.Name)
+	data.Host.Name = slices.Copy(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = slices.Copy(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = slices.Copy(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = slices.Copy(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = slices.Copy(d.API.Access.HTTPS.Block)
 
 	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
 
-	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = slices.Copy(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = slices.Copy(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = slices.Copy(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = slices.Copy(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = slices.Copy(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = slices.Copy(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.BlockedPrefixes = slices.Copy(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
@@ -282,29 +283,29 @@ func DowngradeV2toV1(d *Data) (*v1.Data, error) {
 	data.Service = d.Service
 	data.Router = d.Router
 
-	data.Log.Topics = copy.Slice(d.Log.Topics)
+	data.Log.Topics = slices.Copy(d.Log.Topics)
 
-	data.Host.Name = copy.Slice(d.Host.Name)
+	data.Host.Name = slices.Copy(d.Host.Name)
 
-	data.API.Access.HTTP.Allow = copy.Slice(d.API.Access.HTTP.Allow)
-	data.API.Access.HTTP.Block = copy.Slice(d.API.Access.HTTP.Block)
-	data.API.Access.HTTPS.Allow = copy.Slice(d.API.Access.HTTPS.Allow)
-	data.API.Access.HTTPS.Block = copy.Slice(d.API.Access.HTTPS.Block)
+	data.API.Access.HTTP.Allow = slices.Copy(d.API.Access.HTTP.Allow)
+	data.API.Access.HTTP.Block = slices.Copy(d.API.Access.HTTP.Block)
+	data.API.Access.HTTPS.Allow = slices.Copy(d.API.Access.HTTPS.Allow)
+	data.API.Access.HTTPS.Block = slices.Copy(d.API.Access.HTTPS.Block)
 
 	data.API.Auth.Auth0.Tenants = copy.TenantSlice(d.API.Auth.Auth0.Tenants)
 
-	data.Storage.CORS.Origins = copy.Slice(d.Storage.CORS.Origins)
+	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
 
-	data.FFmpeg.Access.Input.Allow = copy.Slice(d.FFmpeg.Access.Input.Allow)
-	data.FFmpeg.Access.Input.Block = copy.Slice(d.FFmpeg.Access.Input.Block)
-	data.FFmpeg.Access.Output.Allow = copy.Slice(d.FFmpeg.Access.Output.Allow)
-	data.FFmpeg.Access.Output.Block = copy.Slice(d.FFmpeg.Access.Output.Block)
+	data.FFmpeg.Access.Input.Allow = slices.Copy(d.FFmpeg.Access.Input.Allow)
+	data.FFmpeg.Access.Input.Block = slices.Copy(d.FFmpeg.Access.Input.Block)
+	data.FFmpeg.Access.Output.Allow = slices.Copy(d.FFmpeg.Access.Output.Allow)
+	data.FFmpeg.Access.Output.Block = slices.Copy(d.FFmpeg.Access.Output.Block)
 
-	data.Sessions.IPIgnoreList = copy.Slice(d.Sessions.IPIgnoreList)
+	data.Sessions.IPIgnoreList = slices.Copy(d.Sessions.IPIgnoreList)
 
-	data.SRT.Log.Topics = copy.Slice(d.SRT.Log.Topics)
+	data.SRT.Log.Topics = slices.Copy(d.SRT.Log.Topics)
 
-	data.Router.BlockedPrefixes = copy.Slice(d.Router.BlockedPrefixes)
+	data.Router.BlockedPrefixes = slices.Copy(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
 	// Actual changes
