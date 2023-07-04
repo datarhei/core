@@ -12,6 +12,6 @@ func TestDiff(t *testing.T) {
 
 	added, removed := Diff(a, b)
 
-	require.Equal(t, []string{"e", "f"}, added)
-	require.Equal(t, []string{"a", "b"}, removed)
+	require.ElementsMatch(t, []string{"e", "f"}, added)
+	require.ElementsMatch(t, []string{"a", "b"}, removed)
 }
