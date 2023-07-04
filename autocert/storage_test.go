@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getCryptoStorage() certmagic.Storage {
+func getCryptoStorage(t *testing.T) certmagic.Storage {
 	s := &certmagic.FileStorage{
 		Path: "./testing",
 	}
@@ -18,12 +18,15 @@ func getCryptoStorage() certmagic.Storage {
 
 	sc := NewCryptoStorage(s, c)
 
+	t.Cleanup(func() {
+		os.RemoveAll("./testing/")
+	})
+
 	return sc
 }
 
 func TestFileStorageStoreLoad(t *testing.T) {
-	s := getCryptoStorage()
-	defer os.RemoveAll("./testing/")
+	s := getCryptoStorage(t)
 
 	data := []byte("some data")
 	ctx := context.Background()
@@ -37,8 +40,7 @@ func TestFileStorageStoreLoad(t *testing.T) {
 }
 
 func TestFileStorageDelete(t *testing.T) {
-	s := getCryptoStorage()
-	defer os.RemoveAll("./testing/")
+	s := getCryptoStorage(t)
 
 	data := []byte("some data")
 	ctx := context.Background()
@@ -57,8 +59,7 @@ func TestFileStorageDelete(t *testing.T) {
 }
 
 func TestFileStorageExists(t *testing.T) {
-	s := getCryptoStorage()
-	defer os.RemoveAll("./testing/")
+	s := getCryptoStorage(t)
 
 	data := []byte("some data")
 	ctx := context.Background()
@@ -80,8 +81,7 @@ func TestFileStorageExists(t *testing.T) {
 }
 
 func TestFileStorageStat(t *testing.T) {
-	s := getCryptoStorage()
-	defer os.RemoveAll("./testing/")
+	s := getCryptoStorage(t)
 
 	data := []byte("some data")
 	ctx := context.Background()
