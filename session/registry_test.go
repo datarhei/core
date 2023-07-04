@@ -1,6 +1,7 @@
 package session
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -299,4 +300,40 @@ func TestPersistSessionBuffer(t *testing.T) {
 	info, err := memfs.Stat(path)
 	require.NoError(t, err)
 	require.Greater(t, info.Size(), int64(0))
+}
+
+func TestRegisterAfterCloseWithPersist(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	pattern := "/log/%Y-%m-%d.log"
+
+	r, err := New(Config{
+		PersistFS:         memfs,
+		LogPattern:        pattern,
+		LogBufferDuration: 5 * time.Second,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+	})
+
+	c, err := r.Register("foobar", CollectorConfig{
+		SessionTimeout: 3 * time.Second,
+	})
+	require.NoError(t, err)
+
+	for i := 0; i < 1000; i++ {
+		c.RegisterAndActivate("foo_"+strconv.Itoa(i), "ref", "location", "peer")
+		c.Egress("foo", int64(i))
+	}
+
+	r.Close()
+
+	c.RegisterAndActivate("foo_XXX", "ref", "location", "peer")
+	c.Egress("foo", 42)
+
+	time.Sleep(5 * time.Second)
+
+	require.Equal(t, int64(2), memfs.Files())
 }

@@ -407,8 +407,6 @@ func (r *registry) UnregisterAll() {
 	for id := range r.collector {
 		r.unregister(id)
 	}
-
-	r.collector = make(map[string]*collector)
 }
 
 func (r *registry) Summary(id string) Summary {

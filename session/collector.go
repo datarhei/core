@@ -431,6 +431,13 @@ func (c *collector) stop() {
 	c.sessionsWG.Wait()
 }
 
+func (c *collector) isRunning() bool {
+	c.lock.run.Lock()
+	defer c.lock.run.Unlock()
+
+	return c.running
+}
+
 type historySnapshot struct {
 	data []byte
 }
@@ -507,11 +514,19 @@ func (c *collector) IsKnownSession(id string) bool {
 }
 
 func (c *collector) RegisterAndActivate(id, reference, location, peer string) {
+	if !c.isRunning() {
+		return
+	}
+
 	c.Register(id, reference, location, peer)
 	c.Activate(id)
 }
 
 func (c *collector) Register(id, reference, location, peer string) {
+	if !c.isRunning() {
+		return
+	}
+
 	c.lock.session.Lock()
 	defer c.lock.session.Unlock()
 
