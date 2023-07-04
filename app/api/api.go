@@ -1734,58 +1734,12 @@ func (a *api) stop() {
 		a.cluster.Shutdown()
 	}
 
-	if a.iam != nil {
-		a.iam.Close()
-	}
-
-	if a.update != nil {
-		a.update.Stop()
-		a.update = nil
-	}
-
-	if a.service != nil {
-		a.service.Stop()
-		a.service = nil
-	}
-
 	// Stop all restream processes
 	if a.restream != nil {
 		logger.Info().Log("Stopping all processes ...")
 		a.restream.Stop()
 		a.restream = nil
 	}
-
-	if a.process != nil {
-		a.process.Stop()
-		a.process = nil
-	}
-
-	// Stop the session tracker
-	if a.sessions != nil {
-		a.sessions.UnregisterAll()
-		a.sessions.Close()
-		a.sessions = nil
-	}
-
-	// Unregister all collectors
-	if a.metrics != nil {
-		a.metrics.UnregisterAll()
-		a.metrics = nil
-	}
-
-	if a.prom != nil {
-		a.prom.UnregisterAll()
-		a.prom = nil
-	}
-
-	// Free the cached objects
-	if a.cache != nil {
-		a.cache.Purge()
-		a.cache = nil
-	}
-
-	// Free the S3 mounts
-	a.s3fs = map[string]fs.Filesystem{}
 
 	// Stop the SRT server
 	if a.srtserver != nil {
@@ -1835,9 +1789,54 @@ func (a *api) stop() {
 		a.sidecarserver = nil
 	}
 
+	if a.iam != nil {
+		a.iam.Close()
+	}
+
+	if a.update != nil {
+		a.update.Stop()
+		a.update = nil
+	}
+
+	if a.service != nil {
+		a.service.Stop()
+		a.service = nil
+	}
+
+	if a.process != nil {
+		a.process.Stop()
+		a.process = nil
+	}
+
+	// Unregister all collectors
+	if a.metrics != nil {
+		a.metrics.UnregisterAll()
+		a.metrics = nil
+	}
+
+	if a.prom != nil {
+		a.prom.UnregisterAll()
+		a.prom = nil
+	}
+
+	// Free the cached objects
+	if a.cache != nil {
+		a.cache.Purge()
+		a.cache = nil
+	}
+
+	// Free the S3 mounts
+	a.s3fs = map[string]fs.Filesystem{}
+
 	// Stop resource observer
 	if a.resources != nil {
 		a.resources.Stop()
+	}
+
+	// Stop the session tracker
+	if a.sessions != nil {
+		a.sessions.Close()
+		a.sessions = nil
 	}
 
 	// Stop the GC ticker
