@@ -35,9 +35,12 @@ type ProxyReader interface {
 	ListNodes() []NodeReader
 	GetNode(id string) (NodeReader, error)
 
+	FindNodeFromProcess(id app.ProcessID) (string, error)
+
 	Resources() map[string]NodeResources
 	ListProcesses(ProcessListOptions) []clientapi.Process
 	ListProxyProcesses() []Process
+	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
 
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
@@ -68,6 +71,14 @@ func (p *proxyReader) GetNode(id string) (NodeReader, error) {
 	return p.proxy.GetNode(id)
 }
 
+func (p *proxyReader) FindNodeFromProcess(id app.ProcessID) (string, error) {
+	if p.proxy == nil {
+		return "", fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.FindNodeFromProcess(id)
+}
+
 func (p *proxyReader) Resources() map[string]NodeResources {
 	if p.proxy == nil {
 		return nil
@@ -90,6 +101,16 @@ func (p *proxyReader) ListProxyProcesses() []Process {
 	}
 
 	return p.proxy.ListProxyProcesses()
+}
+
+func (p *proxyReader) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error) {
+	if p.proxy == nil {
+		return clientapi.Probe{
+			Log: []string{fmt.Sprintf("no proxy for node %s provided", nodeid)},
+		}, fmt.Errorf("no proxy provided")
+	}
+
+	return p.proxy.ProbeProcess(nodeid, id)
 }
 
 func (p *proxyReader) GetURL(prefix, path string) (*url.URL, error) {
@@ -511,6 +532,27 @@ func (p *proxy) ListProxyProcesses() []Process {
 	return processList
 }
 
+func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
+	procs := p.ListProxyProcesses()
+	nodeid := ""
+
+	for _, p := range procs {
+		if p.Config.ProcessID() != id {
+			continue
+		}
+
+		nodeid = p.NodeID
+
+		break
+	}
+
+	if len(nodeid) == 0 {
+		return "", fmt.Errorf("the process '%s' is not registered with any node", id.String())
+	}
+
+	return nodeid, nil
+}
+
 func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 	processChan := make(chan clientapi.Process, 64)
 	processList := []clientapi.Process{}
@@ -566,11 +608,6 @@ func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[strin
 	}
 
 	err := node.AddProcess(config, metadata)
-	if err != nil {
-		return err
-	}
-
-	err = node.StartProcess(config.ProcessID())
 	if err != nil {
 		return err
 	}
@@ -632,4 +669,19 @@ func (p *proxy) CommandProcess(nodeid string, id app.ProcessID, command string) 
 	}
 
 	return err
+}
+
+func (p *proxy) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	node, ok := p.nodes[nodeid]
+	if !ok {
+		probe := clientapi.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process %s should reside on, doesn't exist", nodeid, id.String())},
+		}
+		return probe, fmt.Errorf("node not found")
+	}
+
+	return node.ProbeProcess(id)
 }

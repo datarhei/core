@@ -301,6 +301,8 @@ definitions:
         type: object
       debug:
         properties:
+          agent_address:
+            type: string
           auto_max_procs:
             type: boolean
           force_gc:
@@ -594,6 +596,8 @@ definitions:
           enable:
             type: boolean
           key_file:
+            type: string
+          secret:
             type: string
           staging:
             type: boolean
@@ -1873,6 +1877,8 @@ definitions:
         type: object
       debug:
         properties:
+          agent_address:
+            type: string
           auto_max_procs:
             type: boolean
           force_gc:
@@ -2166,6 +2172,8 @@ definitions:
           enable:
             type: boolean
           key_file:
+            type: string
+          secret:
             type: string
           staging:
             type: boolean
@@ -3379,6 +3387,37 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata with a process under the given key
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process/{id}/probe:
+    get:
+      description: Probe an existing process to get a detailed stream information
+        on the inputs.
+      operationId: cluster-3-process-probe
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Probe'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Probe a process in the cluster
       tags:
       - v16.?.?
   /api/v3/cluster/snapshot:

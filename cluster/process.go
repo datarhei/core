@@ -78,11 +78,11 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 		return ErrDegraded
 	}
 
-	if !c.IsRaftLeader() {
-		return c.forwarder.SetProcessCommand(origin, id, command)
-	}
-
 	if command == "start" || command == "stop" {
+		if !c.IsRaftLeader() {
+			return c.forwarder.SetProcessCommand(origin, id, command)
+		}
+
 		cmd := &store.Command{
 			Operation: store.OpSetProcessOrder,
 			Data: &store.CommandSetProcessOrder{
@@ -94,21 +94,9 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 		return c.applyCommand(cmd)
 	}
 
-	procs := c.proxy.ListProxyProcesses()
-	nodeid := ""
-
-	for _, p := range procs {
-		if p.Config.ProcessID() != id {
-			continue
-		}
-
-		nodeid = p.NodeID
-
-		break
-	}
-
-	if len(nodeid) == 0 {
-		return fmt.Errorf("the process '%s' is not registered with any node", id.String())
+	nodeid, err := c.proxy.FindNodeFromProcess(id)
+	if err != nil {
+		return fmt.Errorf("the process '%s' is not registered with any node: %w", id.String(), err)
 	}
 
 	return c.proxy.CommandProcess(nodeid, id, command)

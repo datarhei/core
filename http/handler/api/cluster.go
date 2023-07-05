@@ -771,6 +771,44 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
+// Probe probes a process in the cluster
+// @Summary Probe a process in the cluster
+// @Description Probe an existing process to get a detailed stream information on the inputs.
+// @Tags v16.?.?
+// @ID cluster-3-process-probe
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Success 200 {object} api.Probe
+// @Failure 403 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/probe [get]
+func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+		return api.Err(http.StatusForbidden, "")
+	}
+
+	pid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	nodeid, err := h.proxy.FindNodeFromProcess(pid)
+	if err != nil {
+		return c.JSON(http.StatusOK, api.Probe{
+			Log: []string{fmt.Sprintf("the process can't be found: %s", err.Error())},
+		})
+	}
+
+	probe, _ := h.proxy.ProbeProcess(nodeid, pid)
+
+	return c.JSON(http.StatusOK, probe)
+}
+
 // Delete deletes the process with the given ID from the cluster
 // @Summary Delete a process by its ID
 // @Description Delete a process by its ID

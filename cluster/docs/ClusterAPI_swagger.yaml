@@ -262,6 +262,8 @@ definitions:
         type: object
       debug:
         properties:
+          agent_address:
+            type: string
           auto_max_procs:
             type: boolean
           force_gc:
@@ -555,6 +557,8 @@ definitions:
           enable:
             type: boolean
           key_file:
+            type: string
+          secret:
             type: string
           staging:
             type: boolean

@@ -1514,6 +1514,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/process/{id}/probe": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Probe an existing process to get a detailed stream information on the inputs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Probe a process in the cluster",
+                "operationId": "cluster-3-process-probe",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Probe"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/snapshot": {
             "get": {
                 "security": [
@@ -4617,6 +4664,9 @@ const docTemplate = `{
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "agent_address": {
+                            "type": "string"
+                        },
                         "auto_max_procs": {
                             "type": "boolean"
                         },
@@ -5050,6 +5100,9 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "key_file": {
+                            "type": "string"
+                        },
+                        "secret": {
                             "type": "string"
                         },
                         "staging": {
@@ -6844,6 +6897,9 @@ const docTemplate = `{
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "agent_address": {
+                            "type": "string"
+                        },
                         "auto_max_procs": {
                             "type": "boolean"
                         },
@@ -7277,6 +7333,9 @@ const docTemplate = `{
                             "type": "boolean"
                         },
                         "key_file": {
+                            "type": "string"
+                        },
+                        "secret": {
                             "type": "string"
                         },
                         "staging": {

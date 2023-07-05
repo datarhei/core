@@ -1428,6 +1428,9 @@ const docTemplateClusterAPI = `{
                 "debug": {
                     "type": "object",
                     "properties": {
+                        "agent_address": {
+                            "type": "string"
+                        },
                         "auto_max_procs": {
                             "type": "boolean"
                         },
@@ -1861,6 +1864,9 @@ const docTemplateClusterAPI = `{
                             "type": "boolean"
                         },
                         "key_file": {
+                            "type": "string"
+                        },
+                        "secret": {
                             "type": "string"
                         },
                         "staging": {

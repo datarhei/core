@@ -40,6 +40,7 @@ type Node interface {
 	ReloadProcess(id app.ProcessID) error
 	DeleteProcess(id app.ProcessID) error
 	UpdateProcess(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	ProbeProcess(id app.ProcessID) (clientapi.Probe, error)
 
 	NodeReader
 }
@@ -1105,4 +1106,22 @@ func (n *node) UpdateProcess(id app.ProcessID, config *app.Config, metadata map[
 	cfg := convertConfig(config, metadata)
 
 	return n.peer.ProcessUpdate(client.NewProcessID(id.ID, id.Domain), cfg)
+}
+
+func (n *node) ProbeProcess(id app.ProcessID) (clientapi.Probe, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		probe := clientapi.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process %s resides, is not connected", n.id, id.String())},
+		}
+		return probe, fmt.Errorf("not connected")
+	}
+
+	probe, err := n.peer.ProcessProbe(client.NewProcessID(id.ID, id.Domain))
+
+	probe.Log = append([]string{fmt.Sprintf("probed on node: %s", n.id)}, probe.Log...)
+
+	return probe, err
 }

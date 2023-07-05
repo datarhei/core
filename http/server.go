@@ -707,6 +707,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodesProcesses)
 		v3.GET("/cluster/process/:id", s.v3handler.cluster.GetAllNodesProcess)
+		v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProbeProcess)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
 		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
