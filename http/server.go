@@ -594,7 +594,6 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/process/:id/config", s.v3handler.restream.GetConfig)
 		v3.GET("/process/:id/state", s.v3handler.restream.GetState)
 		v3.GET("/process/:id/report", s.v3handler.restream.GetReport)
-		v3.GET("/process/:id/probe", s.v3handler.restream.Probe)
 
 		v3.GET("/process/:id/metadata", s.v3handler.restream.GetProcessMetadata)
 		v3.GET("/process/:id/metadata/:key", s.v3handler.restream.GetProcessMetadata)
@@ -603,6 +602,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/metadata/:key", s.v3handler.restream.GetMetadata)
 
 		if !s.readOnly {
+			v3.GET("/process/:id/probe", s.v3handler.restream.Probe)
 			v3.POST("/process", s.v3handler.restream.Add)
 			v3.PUT("/process/:id", s.v3handler.restream.Update)
 			v3.DELETE("/process/:id", s.v3handler.restream.Delete)
@@ -707,7 +707,6 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodesProcesses)
 		v3.GET("/cluster/process/:id", s.v3handler.cluster.GetAllNodesProcess)
-		v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProbeProcess)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
 		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
@@ -720,6 +719,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
+			v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProbeProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
 			v3.PUT("/cluster/process/:id/command", s.v3handler.cluster.SetProcessCommand)
 			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.SetProcessMetadata)
