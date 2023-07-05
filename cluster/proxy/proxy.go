@@ -27,7 +27,6 @@ type Proxy interface {
 
 	AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error
 	DeleteProcess(nodeid string, id app.ProcessID) error
-	StartProcess(nodeid string, id app.ProcessID) error
 	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 	CommandProcess(nodeid string, id app.ProcessID, command string) error
 }
@@ -589,23 +588,6 @@ func (p *proxy) DeleteProcess(nodeid string, id app.ProcessID) error {
 	}
 
 	err := node.DeleteProcess(id)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *proxy) StartProcess(nodeid string, id app.ProcessID) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
-	}
-
-	err := node.StartProcess(id)
 	if err != nil {
 		return err
 	}

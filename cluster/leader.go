@@ -409,10 +409,16 @@ type processOpStart struct {
 	processid app.ProcessID
 }
 
+type processOpStop struct {
+	nodeid    string
+	processid app.ProcessID
+}
+
 type processOpAdd struct {
 	nodeid   string
 	config   *app.Config
 	metadata map[string]interface{}
+	order    string
 }
 
 type processOpUpdate struct {
@@ -446,13 +452,15 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
-			err = c.proxy.StartProcess(v.nodeid, v.config.ProcessID())
-			if err != nil {
-				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.config.ID,
-					"nodeid":    v.nodeid,
-				}).Log("Starting process")
-				break
+			if v.order == "start" {
+				err = c.proxy.CommandProcess(v.nodeid, v.config.ProcessID(), "start")
+				if err != nil {
+					c.logger.Info().WithError(err).WithFields(log.Fields{
+						"processid": v.config.ID,
+						"nodeid":    v.nodeid,
+					}).Log("Starting process")
+					break
+				}
 			}
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.config.ID,
@@ -507,7 +515,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
-			err = c.proxy.StartProcess(v.toNodeid, v.config.ProcessID())
+			err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ID,
@@ -523,7 +531,7 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"tonodeid":   v.toNodeid,
 			}).Log("Moving process")
 		case processOpStart:
-			err := c.proxy.StartProcess(v.nodeid, v.processid)
+			err := c.proxy.CommandProcess(v.nodeid, v.processid, "start")
 			if err != nil {
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
@@ -536,6 +544,20 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Starting process")
+		case processOpStop:
+			err := c.proxy.CommandProcess(v.nodeid, v.processid, "stop")
+			if err != nil {
+				c.logger.Info().WithError(err).WithFields(log.Fields{
+					"processid": v.processid,
+					"nodeid":    v.nodeid,
+				}).Log("Stopping process")
+				break
+			}
+
+			c.logger.Info().WithFields(log.Fields{
+				"processid": v.processid,
+				"nodeid":    v.nodeid,
+			}).Log("Stopping process")
 		case processOpReject:
 			c.logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
 		case processOpSkip:
@@ -610,7 +632,7 @@ func (c *cluster) doRebalance(emergency bool) {
 	c.applyOpStack(opStack)
 }
 
-// isMetadataUpdateRequired compares two metadata. It relies on the documents property that json.Marshal
+// isMetadataUpdateRequired compares two metadata. It relies on the documented property that json.Marshal
 // sorts the map keys prior encoding.
 func isMetadataUpdateRequired(wantMap map[string]interface{}, haveMap map[string]interface{}) (bool, map[string]interface{}) {
 	hasChanges := false
@@ -674,9 +696,6 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	// we want to be running on the nodes.
 	wantMap := map[string]store.Process{}
 	for _, process := range want {
-		if process.Order != "start" {
-			continue
-		}
 		pid := process.Config.ProcessID().String()
 		wantMap[pid] = process
 	}
@@ -684,7 +703,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	opStack := []interface{}{}
 
 	// Now we iterate through the processes we actually have running on the nodes
-	// and remove them from the wantMap. We also make sure that they are running.
+	// and remove them from the wantMap. We also make sure that they have the correct order.
 	// If a process cannot be found on the wantMap, it will be deleted from the nodes.
 	haveAfterRemove := []proxy.Process{}
 
@@ -723,12 +742,34 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		delete(wantMap, pid)
 		reality[pid] = haveP.NodeID
 
-		if haveP.Order != wantP.Order { // wantP.Order is always "start" because we selected only those above
-			opStack = append(opStack, processOpStart{
-				nodeid:    haveP.NodeID,
-				processid: haveP.Config.ProcessID(),
-			})
+		if haveP.Order != wantP.Order {
+			if wantP.Order == "start" {
+				opStack = append(opStack, processOpStart{
+					nodeid:    haveP.NodeID,
+					processid: haveP.Config.ProcessID(),
+				})
 
+				// Consume the resources
+				r, ok := resources[haveP.NodeID]
+				if ok {
+					r.CPU += haveP.Config.LimitCPU
+					r.Mem += haveP.Config.LimitMemory
+					resources[haveP.NodeID] = r
+				}
+			} else {
+				opStack = append(opStack, processOpStop{
+					nodeid:    haveP.NodeID,
+					processid: haveP.Config.ProcessID(),
+				})
+
+				// Release the resources
+				r, ok := resources[haveP.NodeID]
+				if ok {
+					r.CPU -= haveP.CPU
+					r.Mem -= haveP.Mem
+					resources[haveP.NodeID] = r
+				}
+			}
 		}
 
 		haveAfterRemove = append(haveAfterRemove, haveP)
@@ -755,10 +796,10 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 
 	// The wantMap now contains only those processes that need to be installed on a node.
 
-	// A map from the process reference to the node it is running on.
+	// Create a map from the process reference to the node it is running on.
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
 
-	// Now all remaining processes in the wantMap must be added to one of the nodes.
+	// Now, all remaining processes in the wantMap must be added to one of the nodes.
 	for pid, process := range wantMap {
 		// If a process doesn't have any limits defined, reject that process
 		if process.Config.LimitCPU <= 0 || process.Config.LimitMemory <= 0 {
@@ -775,8 +816,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		// not, then select a node with the most available resources.
 		nodeid := ""
 
-		// Try to add the process to a node where other processes with the same
-		// reference currently reside.
+		// Try to add the process to a node where other processes with the same reference currently reside.
 		if len(process.Config.Reference) != 0 {
 			for _, count := range haveReferenceAffinityMap[process.Config.Reference+"@"+process.Config.Domain] {
 				r := resources[count.nodeid]
@@ -815,9 +855,10 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 				nodeid:   nodeid,
 				config:   process.Config,
 				metadata: process.Metadata,
+				order:    process.Order,
 			})
 
-			// Adjust the resources
+			// Consume the resources
 			r, ok := resources[nodeid]
 			if ok {
 				r.CPU += process.Config.LimitCPU
