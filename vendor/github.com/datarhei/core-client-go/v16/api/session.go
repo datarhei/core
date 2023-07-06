@@ -58,3 +58,10 @@ type SessionsSummary map[string]SessionSummary
 
 // SessionsActive is the API representation of all active sessions
 type SessionsActive map[string][]Session
+
+type SessionTokenRequest struct {
+	Match  string                 `json:"match"`
+	Remote []string               `json:"remote"`
+	Extra  map[string]interface{} `json:"extra"`
+	Token  string                 `json:"token,omitempty"`
+}

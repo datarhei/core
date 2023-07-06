@@ -16,6 +16,60 @@
     },
     "basePath": "/",
     "paths": {
+        "/": {
+            "get": {
+                "description": "The cluster version",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "The cluster version",
+                "operationId": "cluster-1-version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/about": {
+            "get": {
+                "description": "Cluster info",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Cluster info",
+                "operationId": "cluster-1-about",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/barrier/{name}": {
             "get": {
                 "description": "Has the barrier already has been passed",
@@ -89,6 +143,27 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/config.Config"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/core/skills": {
+            "get": {
+                "description": "Core skills of this node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Core skills",
+                "operationId": "cluster-1-core-skills",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/skills.Skills"
                         }
                     }
                 }
@@ -985,33 +1060,6 @@
                         "description": "OK",
                         "schema": {
                             "type": "file"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/cluster.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/version": {
-            "get": {
-                "description": "The cluster version",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v1.0.0"
-                ],
-                "summary": "The cluster version",
-                "operationId": "cluster-1-version",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
                         }
                     },
                     "500": {
@@ -1959,6 +2007,247 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "skills.Codec": {
+            "type": "object",
+            "properties": {
+                "decoders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "encoders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Device": {
+            "type": "object",
+            "properties": {
+                "devices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.HWDevice"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Filter": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Format": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.HWAccel": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.HWDevice": {
+            "type": "object",
+            "properties": {
+                "extra": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "media": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Library": {
+            "type": "object",
+            "properties": {
+                "compiled": {
+                    "type": "string"
+                },
+                "linked": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Protocol": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "skills.Skills": {
+            "type": "object",
+            "properties": {
+                "codecs": {
+                    "$ref": "#/definitions/skills.ffCodecs"
+                },
+                "devices": {
+                    "$ref": "#/definitions/skills.ffDevices"
+                },
+                "ffmpeg": {
+                    "$ref": "#/definitions/skills.ffmpeg"
+                },
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Filter"
+                    }
+                },
+                "formats": {
+                    "$ref": "#/definitions/skills.ffFormats"
+                },
+                "hwaccels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.HWAccel"
+                    }
+                },
+                "protocols": {
+                    "$ref": "#/definitions/skills.ffProtocols"
+                }
+            }
+        },
+        "skills.ffCodecs": {
+            "type": "object",
+            "properties": {
+                "audio": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Codec"
+                    }
+                },
+                "subtitle": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Codec"
+                    }
+                },
+                "video": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Codec"
+                    }
+                }
+            }
+        },
+        "skills.ffDevices": {
+            "type": "object",
+            "properties": {
+                "demuxers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Device"
+                    }
+                },
+                "muxers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Device"
+                    }
+                }
+            }
+        },
+        "skills.ffFormats": {
+            "type": "object",
+            "properties": {
+                "demuxers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Format"
+                    }
+                },
+                "muxers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Format"
+                    }
+                }
+            }
+        },
+        "skills.ffProtocols": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Protocol"
+                    }
+                },
+                "output": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Protocol"
+                    }
+                }
+            }
+        },
+        "skills.ffmpeg": {
+            "type": "object",
+            "properties": {
+                "compiler": {
+                    "type": "string"
+                },
+                "configuration": {
+                    "type": "string"
+                },
+                "libraries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/skills.Library"
+                    }
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },

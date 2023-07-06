@@ -1,6 +1,7 @@
 package coreclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/url"
 	"strings"
@@ -38,4 +39,21 @@ func (r *restclient) SessionsActive(collectors []string) (api.SessionsActive, er
 	err = json.Unmarshal(data, &sessions)
 
 	return sessions, err
+}
+
+func (r *restclient) SessionToken(name string, req []api.SessionTokenRequest) ([]api.SessionTokenRequest, error) {
+	var tokens []api.SessionTokenRequest
+	var buf bytes.Buffer
+
+	e := json.NewEncoder(&buf)
+	e.Encode(req)
+
+	data, err := r.call("PUT", "/session/token/"+url.PathEscape(name), nil, nil, "application/json", &buf)
+	if err != nil {
+		return tokens, err
+	}
+
+	err = json.Unmarshal(data, &tokens)
+
+	return tokens, nil
 }

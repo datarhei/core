@@ -342,6 +342,8 @@ type ConfigV3 struct {
 		Enable   bool   `json:"enable"`
 		Auto     bool   `json:"auto"`
 		Email    string `json:"email"`
+		Staging  bool   `json:"staging"`
+		Secret   string `json:"secret"`
 		CertFile string `json:"cert_file"`
 		KeyFile  string `json:"key_file"`
 	} `json:"tls"`
@@ -362,10 +364,10 @@ type ConfigV3 struct {
 		} `json:"disk"`
 		Memory struct {
 			Auth struct {
-				Enable   bool   `json:"enable"`
-				Username string `json:"username"`
-				Password string `json:"password"`
-			} `json:"auth"`
+				Enable   bool   `json:"enable"`   // Deprecated, use IAM
+				Username string `json:"username"` // Deprecated, use IAM
+				Password string `json:"password"` // Deprecated, use IAM
+			} `json:"auth"` // Deprecated, use IAM
 			Size  int64 `json:"max_size_mbytes" format:"int64"`
 			Purge bool  `json:"purge"`
 		} `json:"memory"`
@@ -381,13 +383,13 @@ type ConfigV3 struct {
 		Address    string `json:"address"`
 		AddressTLS string `json:"address_tls"`
 		App        string `json:"app"`
-		Token      string `json:"token"`
+		Token      string `json:"token"` // Deprecated, use IAM
 	} `json:"rtmp"`
 	SRT struct {
 		Enable     bool   `json:"enable"`
 		Address    string `json:"address"`
 		Passphrase string `json:"passphrase"`
-		Token      string `json:"token"`
+		Token      string `json:"token"` // Deprecated, use IAM
 		Log        struct {
 			Enable bool     `json:"enable"`
 			Topics []string `json:"topics"`
@@ -418,10 +420,11 @@ type ConfigV3 struct {
 		MaxPort int  `json:"max_port" format:"int"`
 	} `json:"playout"`
 	Debug struct {
-		Profiling    bool  `json:"profiling"`
-		ForceGC      int   `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
-		MemoryLimit  int64 `json:"memory_limit_mbytes" format:"int64"`
-		AutoMaxProcs bool  `json:"auto_max_procs"`
+		Profiling    bool   `json:"profiling"`
+		ForceGC      int    `json:"force_gc" format:"int"` // deprecated, use MemoryLimit instead
+		MemoryLimit  int64  `json:"memory_limit_mbytes" format:"int64"`
+		AutoMaxProcs bool   `json:"auto_max_procs"`
+		AgentAddress string `json:"agent_address"`
 	} `json:"debug"`
 	Metrics struct {
 		Enable           bool  `json:"enable"`
@@ -459,6 +462,7 @@ type ConfigV3 struct {
 		Debug                  bool     `json:"debug"`
 		Address                string   `json:"address"` // ip:port
 		Peers                  []string `json:"peers"`
+		StartupTimeout         int64    `json:"startup_timeout_sec" format:"int64"`          // seconds
 		SyncInterval           int64    `json:"sync_interval_sec" format:"int64"`            // seconds
 		NodeRecoverTimeout     int64    `json:"node_recover_timeout_sec" format:"int64"`     // seconds
 		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout_sec" format:"int64"` // seconds

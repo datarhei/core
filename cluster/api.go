@@ -96,7 +96,7 @@ func NewAPI(config APIConfig) (API, error) {
 	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
 	a.router.GET("/", a.Version)
-	a.router.GET("/v1/about", a.Version)
+	a.router.GET("/v1/about", a.About)
 
 	a.router.GET("/v1/barrier/:name", a.Barrier)
 
@@ -125,6 +125,7 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
+	a.router.GET("/v1/core/skills", a.CoreSkills)
 
 	return a, nil
 }
@@ -147,9 +148,27 @@ func (a *api) Shutdown(ctx context.Context) error {
 // @Produce json
 // @Success 200 {string} string
 // @Success 500 {object} Error
-// @Router /v1/version [get]
+// @Router / [get]
 func (a *api) Version(c echo.Context) error {
 	return c.JSON(http.StatusOK, Version.String())
+}
+
+// About returns info about the cluster
+// @Summary Cluster info
+// @Description Cluster info
+// @Tags v1.0.0
+// @ID cluster-1-about
+// @Produce json
+// @Success 200 {string} string
+// @Success 500 {object} Error
+// @Router /v1/about [get]
+func (a *api) About(c echo.Context) error {
+	about, err := a.cluster.About()
+	if err != nil {
+		return Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, about)
 }
 
 // Barrier returns if the barrier already has been passed
@@ -649,6 +668,19 @@ func (a *api) CoreAPIAddress(c echo.Context) error {
 func (a *api) CoreConfig(c echo.Context) error {
 	config := a.cluster.CoreConfig()
 	return c.JSON(http.StatusOK, config)
+}
+
+// CoreSkills returns the Core skills of this node
+// @Summary Core skills
+// @Description Core skills of this node
+// @Tags v1.0.0
+// @ID cluster-1-core-skills
+// @Produce json
+// @Success 200 {object} skills.Skills
+// @Router /v1/core/skills [get]
+func (a *api) CoreSkills(c echo.Context) error {
+	skills := a.cluster.CoreSkills()
+	return c.JSON(http.StatusOK, skills)
 }
 
 // Lock tries to acquire a named lock

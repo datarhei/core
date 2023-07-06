@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
 )
 
 type Node interface {
@@ -24,6 +25,7 @@ type Node interface {
 	CoreStatus() (string, error)
 	CoreEssentials() (string, *config.Config, error)
 	CoreConfig() (*config.Config, error)
+	CoreSkills() (skills.Skills, error)
 	CoreAPIAddress() (string, error)
 
 	Proxy() proxy.Node
@@ -203,6 +205,10 @@ func (n *node) CoreEssentials() (string, *config.Config, error) {
 
 func (n *node) CoreConfig() (*config.Config, error) {
 	return n.client.CoreConfig()
+}
+
+func (n *node) CoreSkills() (skills.Skills, error) {
+	return n.client.CoreSkills()
 }
 
 func (n *node) CoreAPIAddress() (string, error) {

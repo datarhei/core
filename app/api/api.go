@@ -441,6 +441,42 @@ func (a *api) start(ctx context.Context) error {
 		a.sessions = sessions
 	}
 
+	var portrange net.Portranger
+
+	if cfg.Playout.Enable {
+		portrange, err = net.NewPortrange(cfg.Playout.MinPort, cfg.Playout.MaxPort)
+		if err != nil {
+			return fmt.Errorf("playout port range: %w", err)
+		}
+	}
+
+	validatorIn, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Input.Allow, cfg.FFmpeg.Access.Input.Block)
+	if err != nil {
+		return fmt.Errorf("input address validator: %w", err)
+	}
+
+	validatorOut, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Output.Allow, cfg.FFmpeg.Access.Output.Block)
+	if err != nil {
+		return fmt.Errorf("output address validator: %w", err)
+	}
+
+	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
+		Binary:                  cfg.FFmpeg.Binary,
+		MaxProc:                 cfg.FFmpeg.MaxProcesses,
+		MaxLogLines:             cfg.FFmpeg.Log.MaxLines,
+		LogHistoryLength:        cfg.FFmpeg.Log.MaxHistory,
+		LogMinimalHistoryLength: cfg.FFmpeg.Log.MaxMinimalHistory,
+		ValidatorInput:          validatorIn,
+		ValidatorOutput:         validatorOut,
+		Portrange:               portrange,
+		Collector:               a.sessions.Collector("ffmpeg"),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create ffmpeg: %w", err)
+	}
+
+	a.ffmpeg = ffmpeg
+
 	if cfg.Cluster.Enable {
 		peers := []cluster.Peer{}
 
@@ -469,6 +505,7 @@ func (a *api) start(ctx context.Context) error {
 			NodeRecoverTimeout:     time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
 			EmergencyLeaderTimeout: time.Duration(cfg.Cluster.EmergencyLeaderTimeout) * time.Second,
 			CoreConfig:             cfg.Clone(),
+			CoreSkills:             a.ffmpeg.Skills(),
 			IPLimiter:              a.sessionsLimiter,
 			Logger:                 a.log.logger.core.WithComponent("Cluster"),
 		})
@@ -820,42 +857,6 @@ func (a *api) start(ctx context.Context) error {
 
 		a.s3fs[s3.Name] = s3fs
 	}
-
-	var portrange net.Portranger
-
-	if cfg.Playout.Enable {
-		portrange, err = net.NewPortrange(cfg.Playout.MinPort, cfg.Playout.MaxPort)
-		if err != nil {
-			return fmt.Errorf("playout port range: %w", err)
-		}
-	}
-
-	validatorIn, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Input.Allow, cfg.FFmpeg.Access.Input.Block)
-	if err != nil {
-		return fmt.Errorf("input address validator: %w", err)
-	}
-
-	validatorOut, err := ffmpeg.NewValidator(cfg.FFmpeg.Access.Output.Allow, cfg.FFmpeg.Access.Output.Block)
-	if err != nil {
-		return fmt.Errorf("output address validator: %w", err)
-	}
-
-	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary:                  cfg.FFmpeg.Binary,
-		MaxProc:                 cfg.FFmpeg.MaxProcesses,
-		MaxLogLines:             cfg.FFmpeg.Log.MaxLines,
-		LogHistoryLength:        cfg.FFmpeg.Log.MaxHistory,
-		LogMinimalHistoryLength: cfg.FFmpeg.Log.MaxMinimalHistory,
-		ValidatorInput:          validatorIn,
-		ValidatorOutput:         validatorOut,
-		Portrange:               portrange,
-		Collector:               a.sessions.Collector("ffmpeg"),
-	})
-	if err != nil {
-		return fmt.Errorf("unable to create ffmpeg: %w", err)
-	}
-
-	a.ffmpeg = ffmpeg
 
 	var rw rewrite.Rewriter
 

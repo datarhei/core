@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
 	httpapi "github.com/datarhei/core/v16/http/api"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -128,6 +129,21 @@ func (c *APIClient) CoreConfig() (*config.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func (c *APIClient) CoreSkills() (skills.Skills, error) {
+	data, err := c.call(http.MethodGet, "/v1/core/skills", "", nil, "")
+	if err != nil {
+		return skills.Skills{}, err
+	}
+
+	s := skills.Skills{}
+	err = json.Unmarshal(data, &s)
+	if err != nil {
+		return skills.Skills{}, err
+	}
+
+	return s, nil
 }
 
 func (c *APIClient) Join(origin string, r JoinRequest) error {

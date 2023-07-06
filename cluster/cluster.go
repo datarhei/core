@@ -23,6 +23,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/iam"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -43,6 +44,7 @@ type Cluster interface {
 	// the given raft address.
 	CoreAPIAddress(raftAddress string) (string, error)
 	CoreConfig() *config.Config
+	CoreSkills() skills.Skills
 
 	About() (ClusterAbout, error)
 	IsClusterDegraded() (bool, error)
@@ -103,6 +105,7 @@ type Config struct {
 	EmergencyLeaderTimeout time.Duration // Timeout for establishing the emergency leadership after lost contact to raft leader
 
 	CoreConfig *config.Config
+	CoreSkills skills.Skills
 
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
@@ -139,6 +142,7 @@ type cluster struct {
 	proxy     proxy.Proxy
 
 	config      *config.Config
+	skills      skills.Skills
 	coreAddress string
 
 	isDegraded        bool
@@ -189,6 +193,7 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 		isCoreDegradedErr: fmt.Errorf("cluster not yet started"),
 
 		config: config.CoreConfig,
+		skills: config.CoreSkills,
 		nodes:  map[string]clusternode.Node{},
 
 		barrier: map[string]bool{},
@@ -578,6 +583,10 @@ func (c *cluster) CoreAPIAddress(raftAddress string) (string, error) {
 
 func (c *cluster) CoreConfig() *config.Config {
 	return c.config.Clone()
+}
+
+func (c *cluster) CoreSkills() skills.Skills {
+	return c.skills
 }
 
 func (c *cluster) CertManager() autocert.Manager {
@@ -1003,6 +1012,14 @@ func (c *cluster) checkClusterNodes() ([]string, error) {
 			return nil, fmt.Errorf("node %s has a different configuration: %w", id, err)
 		}
 
+		skills, err := node.CoreSkills()
+		if err != nil {
+			return nil, fmt.Errorf("node %s has no FFmpeg skills available: %w", id, err)
+		}
+		if !c.skills.Equal(skills) {
+			return nil, fmt.Errorf("node %s has mismatching FFmpeg skills", id)
+		}
+
 		for _, name := range config.Host.Name {
 			hostnames[name] = struct{}{}
 		}
@@ -1109,6 +1126,26 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 	if local.Cluster.EmergencyLeaderTimeout != remote.Cluster.EmergencyLeaderTimeout {
 		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
+	}
+
+	if !local.API.Auth.Enable {
+		return fmt.Errorf("api.auth.enable must be true")
+	}
+
+	if local.API.Auth.Enable != remote.API.Auth.Enable {
+		return fmt.Errorf("api.auth.enable is different")
+	}
+
+	if local.API.Auth.Username != remote.API.Auth.Username {
+		return fmt.Errorf("api.auth.username is different")
+	}
+
+	if local.API.Auth.Password != remote.API.Auth.Password {
+		return fmt.Errorf("api.auth.password is different")
+	}
+
+	if local.API.Auth.JWT.Secret != remote.API.Auth.JWT.Secret {
+		return fmt.Errorf("api.auth.jwt.secret is different")
 	}
 
 	if local.RTMP.Enable != remote.RTMP.Enable {

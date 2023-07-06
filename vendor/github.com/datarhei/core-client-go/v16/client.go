@@ -14,6 +14,7 @@ import (
 	"github.com/datarhei/core-client-go/v16/api"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/gobwas/glob"
 )
 
 const (
@@ -89,11 +90,50 @@ type RestClient interface {
 	ProcessMetadata(id ProcessID, key string) (api.Metadata, error)           // GET /v3/process/{id}/metadata/{key}
 	ProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error // PUT /v3/process/{id}/metadata/{key}
 
+	IdentitiesList() ([]api.IAMUser, error)                   // GET /v3/iam/user
+	Identity(name string) (api.IAMUser, error)                // GET /v3/iam/user/{name}
+	IdentityAdd(u api.IAMUser) error                          // POST /v3/iam/user
+	IdentityUpdate(name string, u api.IAMUser) error          // PUT /v3/iam/user/{name}
+	IdentitySetPolicies(name string, p []api.IAMPolicy) error // PUT /v3/iam/user/{name}/policy
+	IdentityDelete(name string) error                         // DELETE /v3/iam/user/{name}
+
+	Cluster() (api.ClusterAbout, error)      // GET /v3/cluster
+	ClusterHealthy() (bool, error)           // GET /v3/cluster/healthy
+	ClusterSnapshot() (io.ReadCloser, error) // GET /v3/cluster/snapshot
+	ClusterLeave() error                     // PUT /v3/cluster/leave
+
+	ClusterDBProcessList() ([]api.Process, error)       // GET /v3/cluster/db/process
+	ClusterDBProcess(id ProcessID) (api.Process, error) // GET /v3/cluster/db/process/{id}
+	ClusterDBUserList() ([]api.IAMUser, error)          // GET /v3/cluster/db/user
+	ClusterDBUser(name string) (api.IAMUser, error)     // GET /v3/cluster/db/user/{name}
+	ClusterDBPolicies() ([]api.IAMPolicy, error)        // GET /v3/cluster/db/policies
+	ClusterDBLocks() ([]api.ClusterLock, error)         // GET /v3/cluster/db/locks
+	ClusterDBKeyValues() (api.ClusterKVS, error)        // GET /v3/cluster/db/kv
+
+	ClusterProcessList(opts ProcessListOptions) ([]api.Process, error)               // GET /v3/cluster/process
+	ClusterProcess(id ProcessID, filter []string) (api.Process, error)               // POST /v3/cluster/process
+	ClusterProcessAdd(p api.ProcessConfig) error                                     // GET /v3/cluster/process/{id}
+	ClusterProcessUpdate(id ProcessID, p api.ProcessConfig) error                    // PUT /v3/cluster/process/{id}
+	ClusterProcessDelete(id ProcessID) error                                         // DELETE /v3/cluster/process/{id}
+	ClusterProcessCommand(id ProcessID, command string) error                        // PUT /v3/cluster/process/{id}/command
+	ClusterProcessMetadata(id ProcessID, key string) (api.Metadata, error)           // GET /v3/cluster/process/{id}/metadata/{key}
+	ClusterProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error // PUT /v3/cluster/process/{id}/metadata/{key}
+	ClusterProcessProbe(id ProcessID) (api.Probe, error)                             // GET /v3/cluster/process/{id}/probe
+
+	ClusterIdentitiesList() ([]api.IAMUser, error)                   // GET /v3/cluster/iam/user
+	ClusterIdentity(name string) (api.IAMUser, error)                // GET /v3/cluster/iam/user/{name}
+	ClusterIdentityAdd(u api.IAMUser) error                          // POST /v3/cluster/iam/user
+	ClusterIdentityUpdate(name string, u api.IAMUser) error          // PUT /v3/cluster/iam/user/{name}
+	ClusterIdentitySetPolicies(name string, p []api.IAMPolicy) error // PUT /v3/cluster/iam/user/{name}/policy
+	ClusterIdentityDelete(name string) error                         // DELETE /v3/cluster/iam/user/{name}
+	ClusterIAMReload() error                                         // PUT /v3/cluster/iam/reload
+
 	RTMPChannels() ([]api.RTMPChannel, error) // GET /v3/rtmp
 	SRTChannels() ([]api.SRTChannel, error)   // GET /v3/srt
 
-	Sessions(collectors []string) (api.SessionsSummary, error)      // GET /v3/session
-	SessionsActive(collectors []string) (api.SessionsActive, error) // GET /v3/session/active
+	Sessions(collectors []string) (api.SessionsSummary, error)                                  // GET /v3/session
+	SessionsActive(collectors []string) (api.SessionsActive, error)                             // GET /v3/session/active
+	SessionToken(name string, req []api.SessionTokenRequest) ([]api.SessionTokenRequest, error) // PUT /v3/session/token/{username}
 
 	Skills() (api.Skills, error) // GET /v3/skills
 	SkillsReload() error         // GET /v3/skills/reload
@@ -121,6 +161,11 @@ type Config struct {
 	Client HTTPClient
 }
 
+type apiconstraint struct {
+	path       glob.Glob
+	constraint *semver.Constraints
+}
+
 // restclient implements the RestClient interface.
 type restclient struct {
 	address      string
@@ -136,7 +181,7 @@ type restclient struct {
 
 	version struct {
 		connectedCore *semver.Version
-		methods       map[string]*semver.Constraints
+		methods       map[string][]apiconstraint
 	}
 }
 
@@ -185,9 +230,159 @@ func New(config Config) (RestClient, error) {
 		return v
 	}
 
-	r.version.methods = map[string]*semver.Constraints{
-		"GET/api/v3/srt":     mustNewConstraint("^16.9.0"),
-		"GET/api/v3/metrics": mustNewConstraint("^16.10.0"),
+	mustNewGlob := func(pattern string) glob.Glob {
+		return glob.MustCompile(pattern, '/')
+	}
+
+	r.version.methods = map[string][]apiconstraint{
+		"GET": {
+			{
+				path:       mustNewGlob("/api/v3/srt"),
+				constraint: mustNewConstraint("^16.9.0"),
+			},
+			{
+				path:       mustNewGlob("/api/v3/metrics"),
+				constraint: mustNewConstraint("^16.10.0"),
+			},
+			{
+				path:       mustNewGlob("/api/v3/iam/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/healthy"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/snapshot"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/process/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/policies"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/locks"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/kv"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*/metadata/**"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*/probe"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+		},
+		"POST": {
+			{
+				path:       mustNewGlob("/api/v3/iam/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+		},
+		"PUT": {
+			{
+				path:       mustNewGlob("/api/v3/iam/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/api/v3/iam/user/*/policy"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/leave"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*/command"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/*/metadata/**"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user/*/policy"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/reload"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/session/token/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+		},
+		"DELETE": {
+			{
+				path:       mustNewGlob("/api/v3/iam/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/{id}"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/iam/user/{name}"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+		},
 	}
 
 	about, err := r.info()
@@ -398,7 +593,22 @@ func (r *restclient) login() error {
 }
 
 func (r *restclient) checkVersion(method, path string) error {
-	c := r.version.methods[method+path]
+	constraints := r.version.methods[method]
+	if constraints == nil {
+		return nil
+	}
+
+	var c *semver.Constraints = nil
+
+	for _, constraint := range constraints {
+		if !constraint.path.Match(path) {
+			continue
+		}
+
+		c = constraint.constraint
+		break
+	}
+
 	if c == nil {
 		return nil
 	}
@@ -407,7 +617,7 @@ func (r *restclient) checkVersion(method, path string) error {
 	defer r.aboutLock.RUnlock()
 
 	if !c.Check(r.version.connectedCore) {
-		return fmt.Errorf("this method is only available in version %s of the core", c.String())
+		return fmt.Errorf("this method is only available as of version %s of the core", c.String())
 	}
 
 	return nil
@@ -459,9 +669,10 @@ func (r *restclient) info() (api.About, error) {
 		req.Header.Add("Authorization", "Bearer "+r.accessToken)
 	}
 
-	status, body, err := r.request(req)
-	if err != nil {
-		return api.About{}, err
+	status, body, _ := r.request(req)
+	if status == http.StatusUnauthorized {
+		req.Header.Del("Authorization")
+		status, body, _ = r.request(req)
 	}
 
 	if status != 200 {

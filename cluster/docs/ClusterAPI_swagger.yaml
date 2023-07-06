@@ -626,6 +626,162 @@ definitions:
           type: string
         type: array
     type: object
+  skills.Codec:
+    properties:
+      decoders:
+        items:
+          type: string
+        type: array
+      encoders:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Device:
+    properties:
+      devices:
+        items:
+          $ref: '#/definitions/skills.HWDevice'
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Filter:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Format:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.HWAccel:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.HWDevice:
+    properties:
+      extra:
+        type: string
+      id:
+        type: string
+      media:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Library:
+    properties:
+      compiled:
+        type: string
+      linked:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Protocol:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  skills.Skills:
+    properties:
+      codecs:
+        $ref: '#/definitions/skills.ffCodecs'
+      devices:
+        $ref: '#/definitions/skills.ffDevices'
+      ffmpeg:
+        $ref: '#/definitions/skills.ffmpeg'
+      filters:
+        items:
+          $ref: '#/definitions/skills.Filter'
+        type: array
+      formats:
+        $ref: '#/definitions/skills.ffFormats'
+      hwaccels:
+        items:
+          $ref: '#/definitions/skills.HWAccel'
+        type: array
+      protocols:
+        $ref: '#/definitions/skills.ffProtocols'
+    type: object
+  skills.ffCodecs:
+    properties:
+      audio:
+        items:
+          $ref: '#/definitions/skills.Codec'
+        type: array
+      subtitle:
+        items:
+          $ref: '#/definitions/skills.Codec'
+        type: array
+      video:
+        items:
+          $ref: '#/definitions/skills.Codec'
+        type: array
+    type: object
+  skills.ffDevices:
+    properties:
+      demuxers:
+        items:
+          $ref: '#/definitions/skills.Device'
+        type: array
+      muxers:
+        items:
+          $ref: '#/definitions/skills.Device'
+        type: array
+    type: object
+  skills.ffFormats:
+    properties:
+      demuxers:
+        items:
+          $ref: '#/definitions/skills.Format'
+        type: array
+      muxers:
+        items:
+          $ref: '#/definitions/skills.Format'
+        type: array
+    type: object
+  skills.ffProtocols:
+    properties:
+      input:
+        items:
+          $ref: '#/definitions/skills.Protocol'
+        type: array
+      output:
+        items:
+          $ref: '#/definitions/skills.Protocol'
+        type: array
+    type: object
+  skills.ffmpeg:
+    properties:
+      compiler:
+        type: string
+      configuration:
+        type: string
+      libraries:
+        items:
+          $ref: '#/definitions/skills.Library'
+        type: array
+      version:
+        type: string
+    type: object
   value.Auth0Tenant:
     properties:
       audience:
@@ -686,6 +842,42 @@ info:
   title: datarhei Core Cluster API
   version: "1.0"
 paths:
+  /:
+    get:
+      description: The cluster version
+      operationId: cluster-1-version
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: The cluster version
+      tags:
+      - v1.0.0
+  /v1/about:
+    get:
+      description: Cluster info
+      operationId: cluster-1-about
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Cluster info
+      tags:
+      - v1.0.0
   /v1/barrier/{name}:
     get:
       description: Has the barrier already has been passed
@@ -736,6 +928,20 @@ paths:
           schema:
             $ref: '#/definitions/config.Config'
       summary: Core config
+      tags:
+      - v1.0.0
+  /v1/core/skills:
+    get:
+      description: Core skills of this node
+      operationId: cluster-1-core-skills
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/skills.Skills'
+      summary: Core skills
       tags:
       - v1.0.0
   /v1/iam/user:
@@ -1341,24 +1547,6 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Cluster DB snapshot
-      tags:
-      - v1.0.0
-  /v1/version:
-    get:
-      description: The cluster version
-      operationId: cluster-1-version
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/cluster.Error'
-      summary: The cluster version
       tags:
       - v1.0.0
 swagger: "2.0"
