@@ -13,3 +13,15 @@ func TestCopy(t *testing.T) {
 
 	require.Equal(t, []string{"a", "b", "c"}, b)
 }
+
+func (a String) Clone() String {
+	return String(string(a))
+}
+
+func TestCopyDeep(t *testing.T) {
+	a := []String{"a", "b", "c"}
+
+	b := CopyDeep[String](a)
+
+	require.Equal(t, []String{"a", "b", "c"}, b)
+}

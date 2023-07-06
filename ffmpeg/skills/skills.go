@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/datarhei/core/v16/slices"
 )
 
 // Codec represents a codec with its availabe encoders and decoders
@@ -21,10 +23,46 @@ type Codec struct {
 	Decoders []string
 }
 
+func (a Codec) Equal(b Codec) bool {
+	if a.Id != b.Id {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Encoders, b.Encoders) {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Decoders, b.Decoders) {
+		return false
+	}
+
+	return true
+}
+
 type ffCodecs struct {
 	Audio    []Codec
 	Video    []Codec
 	Subtitle []Codec
+}
+
+func (a ffCodecs) Equal(b ffCodecs) bool {
+	if !slices.EqualEqualerElements(a.Audio, b.Audio) {
+		return false
+	}
+
+	if !slices.EqualEqualerElements(a.Video, b.Video) {
+		return false
+	}
+
+	if !slices.EqualEqualerElements(a.Subtitle, b.Subtitle) {
+		return false
+	}
+
+	return true
 }
 
 // HWDevice represents a hardware device (e.g. USB device)
@@ -35,6 +73,26 @@ type HWDevice struct {
 	Media string
 }
 
+func (a HWDevice) Equal(b HWDevice) bool {
+	if a.Id != b.Id {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	if a.Extra != b.Extra {
+		return false
+	}
+
+	if a.Media != b.Media {
+		return false
+	}
+
+	return true
+}
+
 // Device represents a type of device (e.g. V4L2) including connected actual devices
 type Device struct {
 	Id      string
@@ -42,9 +100,37 @@ type Device struct {
 	Devices []HWDevice
 }
 
+func (a Device) Equal(b Device) bool {
+	if a.Id != b.Id {
+		return false
+	}
+
+	if a.Name != b.Name {
+		return false
+	}
+
+	if !slices.EqualEqualerElements(a.Devices, b.Devices) {
+		return false
+	}
+
+	return true
+}
+
 type ffDevices struct {
 	Demuxers []Device
 	Muxers   []Device
+}
+
+func (a ffDevices) Equal(b ffDevices) bool {
+	if !slices.EqualEqualerElements(a.Demuxers, b.Demuxers) {
+		return false
+	}
+
+	if !slices.EqualEqualerElements(a.Muxers, b.Muxers) {
+		return false
+	}
+
+	return true
 }
 
 // Format represents a supported format (e.g. flv)
@@ -58,6 +144,18 @@ type ffFormats struct {
 	Muxers   []Format
 }
 
+func (a ffFormats) Equal(b ffFormats) bool {
+	if !slices.EqualComparableElements(a.Demuxers, b.Demuxers) {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Muxers, b.Muxers) {
+		return false
+	}
+
+	return true
+}
+
 // Protocol represents a supported protocol (e.g. rtsp)
 type Protocol struct {
 	Id   string
@@ -67,6 +165,18 @@ type Protocol struct {
 type ffProtocols struct {
 	Input  []Protocol
 	Output []Protocol
+}
+
+func (a ffProtocols) Equal(b ffProtocols) bool {
+	if !slices.EqualComparableElements(a.Input, b.Input) {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Output, b.Output) {
+		return false
+	}
+
+	return true
 }
 
 type HWAccel struct {
@@ -94,6 +204,26 @@ type ffmpeg struct {
 	Libraries     []Library
 }
 
+func (a ffmpeg) Equal(b ffmpeg) bool {
+	if a.Version != b.Version {
+		return false
+	}
+
+	if a.Compiler != b.Compiler {
+		return false
+	}
+
+	if a.Configuration != b.Configuration {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Libraries, b.Libraries) {
+		return false
+	}
+
+	return true
+}
+
 // Skills are the detected capabilities of a ffmpeg binary
 type Skills struct {
 	FFmpeg ffmpeg
@@ -105,6 +235,38 @@ type Skills struct {
 	Devices   ffDevices
 	Formats   ffFormats
 	Protocols ffProtocols
+}
+
+func (a Skills) Equal(b Skills) bool {
+	if !a.FFmpeg.Equal(b.FFmpeg) {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.Filters, b.Filters) {
+		return false
+	}
+
+	if !slices.EqualComparableElements(a.HWAccels, b.HWAccels) {
+		return false
+	}
+
+	if !a.Codecs.Equal(b.Codecs) {
+		return false
+	}
+
+	if !a.Devices.Equal(b.Devices) {
+		return false
+	}
+
+	if !a.Formats.Equal(b.Formats) {
+		return false
+	}
+
+	if !a.Protocols.Equal(b.Protocols) {
+		return false
+	}
+
+	return true
 }
 
 // New returns all skills that ffmpeg provides
@@ -193,7 +355,7 @@ func filters(binary string) []Filter {
 func parseFilters(data []byte) []Filter {
 	filters := []Filter{}
 
-	re := regexp.MustCompile(`^\s[TSC.]{3} ([0-9A-Za-z_]+)\s+(?:.*?)\s+(.*)?$`)
+	re := regexp.MustCompile(`^\s*[TSC.]{3} ([0-9A-Za-z_]+)\s+(?:.*?)\s+(.*)?$`)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Split(bufio.ScanLines)
@@ -227,7 +389,7 @@ func codecs(binary string) ffCodecs {
 func parseCodecs(data []byte) ffCodecs {
 	codecs := ffCodecs{}
 
-	re := regexp.MustCompile(`^\s([D.])([E.])([VAS]).{3} ([0-9A-Za-z_]+)\s+(.*?)(?:\(decoders:([^\)]+)\))?\s?(?:\(encoders:([^\)]+)\))?$`)
+	re := regexp.MustCompile(`^\s*([D.])([E.])([VAS]).{3} ([0-9A-Za-z_]+)\s+(.*?)(?:\(decoders:([^\)]+)\))?\s?(?:\(encoders:([^\)]+)\))?$`)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Split(bufio.ScanLines)
@@ -286,7 +448,7 @@ func formats(binary string) ffFormats {
 func parseFormats(data []byte) ffFormats {
 	formats := ffFormats{}
 
-	re := regexp.MustCompile(`^\s([D ])([E ]) ([0-9A-Za-z_,]+)\s+(.*?)$`)
+	re := regexp.MustCompile(`^\s*([D ])([E ])\s+([0-9A-Za-z_,]+)\s+(.*?)$`)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Split(bufio.ScanLines)
@@ -330,7 +492,7 @@ func devices(binary string) ffDevices {
 func parseDevices(data []byte, binary string) ffDevices {
 	devices := ffDevices{}
 
-	re := regexp.MustCompile(`^\s([D ])([E ]) ([0-9A-Za-z_,]+)\s+(.*?)$`)
+	re := regexp.MustCompile(`^\s*([D ])([E ]) ([0-9A-Za-z_,]+)\s+(.*?)$`)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Split(bufio.ScanLines)

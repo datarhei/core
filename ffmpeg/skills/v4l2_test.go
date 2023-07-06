@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/datarhei/core/v16/slices"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,15 +17,9 @@ func TestNoV4LDevices(t *testing.T) {
 }
 
 func TestV4LDevices(t *testing.T) {
-	data := bytes.NewBufferString(`mmal service 16.1 (platform:bcm2835-v4l2):
-	/dev/video0
+	data := v4ldata
 
-Webcam C170: Webcam C170 (usb-3f980000.usb-1.3):
-	/dev/video1
-
-`)
-
-	devices := parseV4LDevices(data)
+	devices := parseV4LDevices(bytes.NewBuffer(slices.Copy([]byte(data))))
 
 	require.Equal(t, []HWDevice{
 		{

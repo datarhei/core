@@ -1,28 +1,81 @@
 package slices
 
-// Diff returns a sliceof newly added entries and a slice of removed entries based
-// the provided slices.
-func Diff[T comparable](next, current []T) ([]T, []T) {
-	added, removed := []T{}, []T{}
+// DiffComparable diffs two arrays/slices and returns slices of elements that are only in A and only in B.
+// If some element is present multiple times, each instance is counted separately (e.g. if something is 2x in A and
+// 5x in B, it will be 0x in extraA and 3x in extraB). The order of items in both lists is ignored.
+// Adapted from https://github.com/stretchr/testify/blob/f97607b89807936ac4ff96748d766cf4b9711f78/assert/assertions.go#L1073C21-L1073C21
+func DiffComparable[T comparable](listA, listB []T) ([]T, []T) {
+	extraA, extraB := []T{}, []T{}
 
-	currentMap := map[T]struct{}{}
+	aLen := len(listA)
+	bLen := len(listB)
 
-	for _, name := range current {
-		currentMap[name] = struct{}{}
+	// Mark indexes in listA that we already used
+	visited := make([]bool, bLen)
+	for i := 0; i < aLen; i++ {
+		element := listA[i]
+		found := false
+		for j := 0; j < bLen; j++ {
+			if visited[j] {
+				continue
+			}
+			if listB[j] == element {
+				visited[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			extraA = append(extraA, element)
+		}
 	}
 
-	for _, name := range next {
-		if _, ok := currentMap[name]; ok {
-			delete(currentMap, name)
+	for j := 0; j < bLen; j++ {
+		if visited[j] {
 			continue
 		}
-
-		added = append(added, name)
+		extraB = append(extraB, listB[j])
 	}
 
-	for name := range currentMap {
-		removed = append(removed, name)
+	return extraA, extraB
+}
+
+// DiffEqualer diffs two arrays/slices where each element implements the Equaler interface and returns slices of
+// elements that are only in A and only in B. If some element is present multiple times, each instance is counted
+// separately (e.g. if something is 2x in A and 5x in B, it will be 0x in extraA and 3x in extraB). The order of
+// items in both lists is ignored.
+func DiffEqualer[T any, X Equaler[T]](listA []T, listB []X) ([]T, []X) {
+	extraA, extraB := []T{}, []X{}
+
+	aLen := len(listA)
+	bLen := len(listB)
+
+	// Mark indexes in listA that we already used
+	visited := make([]bool, bLen)
+	for i := 0; i < aLen; i++ {
+		element := listA[i]
+		found := false
+		for j := 0; j < bLen; j++ {
+			if visited[j] {
+				continue
+			}
+			if listB[j].Equal(element) {
+				visited[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			extraA = append(extraA, element)
+		}
 	}
 
-	return added, removed
+	for j := 0; j < bLen; j++ {
+		if visited[j] {
+			continue
+		}
+		extraB = append(extraB, listB[j])
+	}
+
+	return extraA, extraB
 }

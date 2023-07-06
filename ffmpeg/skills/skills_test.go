@@ -1,8 +1,10 @@
 package skills
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/datarhei/core/v16/slices"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,6 +33,70 @@ func TestNewInvalidBinary(t *testing.T) {
 
 	require.Empty(t, skills.Protocols.Input)
 	require.Empty(t, skills.Protocols.Output)
+}
+
+func TestEqualEmptySkills(t *testing.T) {
+	s := Skills{}
+
+	ok := s.Equal(s)
+	require.True(t, ok)
+}
+
+func TestEuqalSkills(t *testing.T) {
+	s1 := Skills{
+		FFmpeg:    parseVersion([]byte(ffmpegdata)),
+		Filters:   parseFilters([]byte(filterdata)),
+		HWAccels:  parseHWAccels([]byte(hwacceldata)),
+		Codecs:    parseCodecs([]byte(codecdata)),
+		Devices:   ffDevices{},
+		Formats:   parseFormats([]byte(formatdata)),
+		Protocols: parseProtocols([]byte(protocoldata)),
+	}
+
+	devices := parseV4LDevices(bytes.NewBuffer(slices.Copy([]byte(v4ldata))))
+
+	s1.Devices.Demuxers = append(s1.Devices.Demuxers, Device{
+		Id:      "v4l2",
+		Name:    "webcam",
+		Devices: devices,
+	})
+	s1.Devices.Muxers = append(s1.Devices.Muxers, Device{
+		Id:      "v4l2",
+		Name:    "webcam",
+		Devices: devices,
+	})
+
+	ok := s1.Equal(s1)
+	require.True(t, ok)
+
+	s2 := Skills{
+		FFmpeg:    parseVersion([]byte(ffmpegdata)),
+		Filters:   parseFilters([]byte(filterdata)),
+		HWAccels:  parseHWAccels([]byte(hwacceldata)),
+		Codecs:    parseCodecs([]byte(codecdata)),
+		Devices:   ffDevices{},
+		Formats:   parseFormats([]byte(formatdata)),
+		Protocols: parseProtocols([]byte(protocoldata)),
+	}
+
+	devices = parseV4LDevices(bytes.NewBuffer(slices.Copy([]byte(v4ldata))))
+
+	s2.Devices.Demuxers = append(s2.Devices.Demuxers, Device{
+		Id:      "v4l2",
+		Name:    "webcam",
+		Devices: devices,
+	})
+	s2.Devices.Muxers = append(s2.Devices.Muxers, Device{
+		Id:      "v4l2",
+		Name:    "webcam",
+		Devices: devices,
+	})
+
+	ok = s1.Equal(s2)
+	require.True(t, ok)
+
+	ok = s1.Equal(Skills{})
+	require.False(t, ok)
 }
 
 func TestPatchVersion(t *testing.T) {
@@ -162,17 +228,7 @@ func TestMinorVersion(t *testing.T) {
 }
 
 func TestCustomVersion(t *testing.T) {
-	data := `ffmpeg version 4.4.1-datarhei Copyright (c) 2000-2021 the FFmpeg developers
-built with gcc 10.3.1 (Alpine 10.3.1_git20211027) 20211027
-configuration: --extra-version=datarhei --prefix=/usr --extra-libs='-lpthread -lm -lz -lsupc++ -lstdc++ -lssl -lcrypto -lz -lc -ldl' --enable-nonfree --enable-gpl --enable-version3 --enable-postproc --enable-static --enable-openssl --enable-omx --enable-omx-rpi --enable-mmal --enable-v4l2_m2m --enable-libfreetype --enable-libsrt --enable-libx264 --enable-libx265 --enable-libvpx --enable-libmp3lame --enable-libopus --enable-libvorbis --disable-ffplay --disable-debug --disable-doc --disable-shared
-libavutil      56. 70.100 / 56. 70.100
-libavcodec     58.134.100 / 58.134.100
-libavformat    58. 76.100 / 58. 76.100
-libavdevice    58. 13.100 / 58. 13.100
-libavfilter     7.110.100 /  7.110.100
-libswscale      5.  9.100 /  5.  9.100
-libswresample   3.  9.100 /  3.  9.100
-libpostproc    55.  9.100 / 55.  9.100`
+	data := ffmpegdata
 
 	f := parseVersion([]byte(data))
 
@@ -226,16 +282,7 @@ libpostproc    55.  9.100 / 55.  9.100`
 }
 
 func TestFilters(t *testing.T) {
-	data := ` ... afirsrc           |->A       Generate a FIR coefficients audio stream.
- ... anoisesrc         |->A       Generate a noise audio signal.
- ... anullsrc          |->A       Null audio source, return empty audio frames.
- ... hilbert           |->A       Generate a Hilbert transform FIR coefficients.
- ... sinc              |->A       Generate a sinc kaiser-windowed low-pass, high-pass, band-pass, or band-reject FIR coefficients.
- ... sine              |->A       Generate sine wave audio signal.
- ... anullsink         A->|       Do absolutely nothing with the input audio.
- ... addroi            V->V       Add region of interest to frame.
- ... alphaextract      V->N       Extract an alpha channel as a grayscale image component.
- T.. alphamerge        VV->V      Copy the luma value of the second input into the alpha channel of the first input.`
+	data := filterdata
 
 	f := parseFilters([]byte(data))
 
@@ -284,10 +331,7 @@ func TestFilters(t *testing.T) {
 }
 
 func TestCodecs(t *testing.T) {
-	data := ` DEAIL. aac                  AAC (Advanced Audio Coding) (decoders: aac aac_fixed aac_at ) (encoders: aac aac_at )
-	DEVI.S y41p                 Uncompressed YUV 4:1:1 12-bit
-	DEV.LS h264                 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (encoders: libx264 libx264rgb h264_videotoolbox )
-	DEV.L. flv1                 FLV / Sorenson Spark / Sorenson H.263 (Flash Video) (decoders: flv ) (encoders: flv )`
+	data := codecdata
 
 	c := parseCodecs([]byte(data))
 
@@ -346,12 +390,7 @@ func TestCodecs(t *testing.T) {
 }
 
 func TestFormats(t *testing.T) {
-	data := ` DE mpeg            MPEG-1 Systems / MPEG program stream
-  E mpeg1video      raw MPEG-1 video
-  E mpeg2video      raw MPEG-2 video
- DE mpegts          MPEG-TS (MPEG-2 Transport Stream)
- D  mpegtsraw       raw MPEG-TS (MPEG-2 Transport Stream)
- D  mpegvideo       raw MPEG video`
+	data := formatdata
 
 	f := parseFormats([]byte(data))
 
@@ -396,15 +435,7 @@ func TestFormats(t *testing.T) {
 }
 
 func TestProtocols(t *testing.T) {
-	data := `Input:
-	async
-	bluray
-	cache
-Output:
-	crypto
-	file
-	ftp
-	gopher`
+	data := protocoldata
 
 	p := parseProtocols([]byte(data))
 
@@ -445,8 +476,7 @@ Output:
 }
 
 func TestHWAccels(t *testing.T) {
-	data := `Hardware acceleration methods:
-videotoolbox`
+	data := hwacceldata
 
 	p := parseHWAccels([]byte(data))
 

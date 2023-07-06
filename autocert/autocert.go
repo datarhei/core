@@ -169,7 +169,7 @@ func (m *manager) HTTPChallengeResolver(ctx context.Context, listenAddress strin
 // AcquireCertificates tries to acquire the certificates for the given hostnames synchronously.
 func (m *manager) AcquireCertificates(ctx context.Context, hostnames []string) error {
 	m.lock.Lock()
-	added, removed := slices.Diff(hostnames, m.hostnames)
+	added, removed := slices.DiffComparable(hostnames, m.hostnames)
 	m.lock.Unlock()
 
 	var err error
@@ -202,7 +202,7 @@ func (m *manager) AcquireCertificates(ctx context.Context, hostnames []string) e
 // ManageCertificates is the same as AcquireCertificates but it does it in the background.
 func (m *manager) ManageCertificates(ctx context.Context, hostnames []string) error {
 	m.lock.Lock()
-	added, removed := slices.Diff(hostnames, m.hostnames)
+	added, removed := slices.DiffComparable(hostnames, m.hostnames)
 	m.hostnames = make([]string, len(hostnames))
 	copy(m.hostnames, hostnames)
 	m.lock.Unlock()
