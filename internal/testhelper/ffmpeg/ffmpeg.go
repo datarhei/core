@@ -6,21 +6,101 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/datarhei/core/v16/slices"
 )
 
 func main() {
-	header := `ffmpeg version 4.0.2 Copyright (c) 2000-2018 the FFmpeg developers
-  built with Apple LLVM version 9.1.0 (clang-902.0.39.2)
-  configuration: --prefix=/usr/local/Cellar/ffmpeg/4.0.2 --enable-shared --enable-pthreads --enable-version3 --enable-hardcoded-tables --enable-avresample --cc=clang --host-cflags= --host-ldflags= --enable-gpl --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libxvid --enable-opencl --enable-videotoolbox --disable-lzma
-  libavutil      56. 14.100 / 56. 14.100
-  libavcodec     58. 18.100 / 58. 18.100
-  libavformat    58. 12.100 / 58. 12.100
-  libavdevice    58.  3.100 / 58.  3.100
-  libavfilter     7. 16.100 /  7. 16.100
-  libavresample   4.  0.  0 /  4.  0.  0
-  libswscale      5.  1.100 /  5.  1.100
-  libswresample   3.  1.100 /  3.  1.100
-  libpostproc    55.  1.100 / 55.  1.100`
+	header := `ffmpeg version 4.4.1-datarhei Copyright (c) 2000-2021 the FFmpeg developers
+	built with gcc 10.3.1 (Alpine 10.3.1_git20211027) 20211027
+	configuration: --extra-version=datarhei --prefix=/usr --extra-libs='-lpthread -lm -lz -lsupc++ -lstdc++ -lssl -lcrypto -lz -lc -ldl' --enable-nonfree --enable-gpl --enable-version3 --enable-postproc --enable-static --enable-openssl --enable-omx --enable-omx-rpi --enable-mmal --enable-v4l2_m2m --enable-libfreetype --enable-libsrt --enable-libx264 --enable-libx265 --enable-libvpx --enable-libmp3lame --enable-libopus --enable-libvorbis --disable-ffplay --disable-debug --disable-doc --disable-shared
+	libavutil      56. 70.100 / 56. 70.100
+	libavcodec     58.134.100 / 58.134.100
+	libavformat    58. 76.100 / 58. 76.100
+	libavdevice    58. 13.100 / 58. 13.100
+	libavfilter     7.110.100 /  7.110.100
+	libswscale      5.  9.100 /  5.  9.100
+	libswresample   3.  9.100 /  3.  9.100
+	libpostproc    55.  9.100 / 55.  9.100`
+
+	codecs := `Codecs:
+ D..... = Decoding supported
+ .E.... = Encoding supported
+ ..V... = Video codec
+ ..A... = Audio codec
+ ..S... = Subtitle codec
+ ..D... = Data codec
+ ..T... = Attachment codec
+ ...I.. = Intra frame-only codec
+ ....L. = Lossy compression
+ .....S = Lossless compression
+ -------
+ DEAIL. aac                  AAC (Advanced Audio Coding) (decoders: aac aac_fixed aac_at ) (encoders: aac aac_at )
+ DEVI.S y41p                 Uncompressed YUV 4:1:1 12-bit
+ DEV.LS h264                 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (encoders: libx264 libx264rgb h264_videotoolbox )
+ DEV.L. flv1                 FLV / Sorenson Spark / Sorenson H.263 (Flash Video) (decoders: flv ) (encoders: flv )`
+
+	filters := `Filters:
+ T.. = Timeline support
+ .S. = Slice threading
+ ..C = Command support
+ A = Audio input/output
+ V = Video input/output
+ N = Dynamic number and/or type of input/output
+ | = Source or sink filter
+ ... afirsrc           |->A       Generate a FIR coefficients audio stream.
+ ... anoisesrc         |->A       Generate a noise audio signal.
+ ... anullsrc          |->A       Null audio source, return empty audio frames.
+ ... hilbert           |->A       Generate a Hilbert transform FIR coefficients.
+ ... sinc              |->A       Generate a sinc kaiser-windowed low-pass, high-pass, band-pass, or band-reject FIR coefficients.
+ ... sine              |->A       Generate sine wave audio signal.
+ ... anullsink         A->|       Do absolutely nothing with the input audio.
+ ... addroi            V->V       Add region of interest to frame.
+ ... alphaextract      V->N       Extract an alpha channel as a grayscale image component.
+ T.. alphamerge        VV->V      Copy the luma value of the second input into the alpha channel of the first input.`
+
+	formats := `File formats:
+ D. = Demuxing supported
+ .E = Muxing supported
+ --
+ DE mpeg            MPEG-1 Systems / MPEG program stream
+  E  mpeg1video      raw MPEG-1 video
+  E  mpeg2video      raw MPEG-2 video
+ DE  mpegts          MPEG-TS (MPEG-2 Transport Stream)
+ D   mpegtsraw       raw MPEG-TS (MPEG-2 Transport Stream)
+ D   mpegvideo       raw MPEG video`
+
+	devices := `Devices:
+ D. = Demuxing supported
+ .E = Muxing supported
+ --
+  E audiotoolbox    AudioToolbox output device
+ D  avfoundation    AVFoundation input device
+ D  lavfi           Libavfilter virtual input device
+  E sdl,sdl2        SDL2 output device
+ D  x11grab         X11 screen capture, using XCB`
+
+	protocols := `Supported file protocols:
+Input:
+  async
+  bluray
+  cache
+Output:
+  crypto
+  file
+  ftp
+  gopher`
+
+	hwaccels := `Hardware acceleration methods:
+videotoolbox`
+
+	avfoundation := `[AVFoundation input device @ 0x7fc2db40f240] AVFoundation video devices:
+[AVFoundation input device @ 0x7fc2db40f240] [0] FaceTime HD Camera (Built-in)
+[AVFoundation input device @ 0x7fc2db40f240] [1] Capture screen 0
+[AVFoundation input device @ 0x7fc2db40f240] [2] Capture screen 1
+[AVFoundation input device @ 0x7fc2db40f240] AVFoundation audio devices:
+[AVFoundation input device @ 0x7fc2db40f240] [0] Built-in Microphone
+: Input/output error`
 
 	prelude := `Input #0, lavfi, from 'testsrc=size=1280x720:rate=25':
   Duration: N/A, start: 0.000000, bitrate: N/A
@@ -59,9 +139,35 @@ Output #0, hls, to './data/testsrc.m3u8':
 		os.Exit(2)
 	}
 
+	if slices.EqualComparableElements(os.Args[1:], []string{"-f", "avfoundation", "-list_devices", "true", "-i", ""}) {
+		fmt.Fprintf(os.Stderr, "%s\n", avfoundation)
+		os.Exit(0)
+	}
+
 	lastArg := os.Args[len(os.Args)-1]
 
 	if lastArg == "-version" {
+		os.Exit(0)
+	}
+
+	switch lastArg {
+	case "-codecs":
+		fmt.Fprintf(os.Stderr, "%s\n", codecs)
+		os.Exit(0)
+	case "-filters":
+		fmt.Fprintf(os.Stderr, "%s\n", filters)
+		os.Exit(0)
+	case "-formats":
+		fmt.Fprintf(os.Stderr, "%s\n", formats)
+		os.Exit(0)
+	case "-devices":
+		fmt.Fprintf(os.Stderr, "%s\n", devices)
+		os.Exit(0)
+	case "-protocols":
+		fmt.Fprintf(os.Stderr, "%s\n", protocols)
+		os.Exit(0)
+	case "-hwaccels":
+		fmt.Fprintf(os.Stderr, "%s\n", hwaccels)
 		os.Exit(0)
 	}
 

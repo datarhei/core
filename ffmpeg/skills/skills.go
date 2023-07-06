@@ -347,7 +347,7 @@ func filters(binary string) []Filter {
 	cmd := exec.Command(binary, "-filters")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseFilters(stdout)
 }
@@ -381,7 +381,7 @@ func codecs(binary string) ffCodecs {
 	cmd := exec.Command(binary, "-codecs")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseCodecs(stdout)
 }
@@ -440,7 +440,7 @@ func formats(binary string) ffFormats {
 	cmd := exec.Command(binary, "-formats")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseFormats(stdout)
 }
@@ -484,7 +484,7 @@ func devices(binary string) ffDevices {
 	cmd := exec.Command(binary, "-devices")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseDevices(stdout, binary)
 }
@@ -539,7 +539,7 @@ func protocols(binary string) ffProtocols {
 	cmd := exec.Command(binary, "-protocols")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseProtocols(stdout)
 }
@@ -588,7 +588,7 @@ func hwaccels(binary string) []HWAccel {
 	cmd := exec.Command(binary, "-hwaccels")
 	cmd.Env = []string{}
 
-	stdout, _ := cmd.Output()
+	stdout, _ := cmd.CombinedOutput()
 
 	return parseHWAccels(stdout)
 }

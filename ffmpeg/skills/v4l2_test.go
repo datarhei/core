@@ -17,7 +17,13 @@ func TestNoV4LDevices(t *testing.T) {
 }
 
 func TestV4LDevices(t *testing.T) {
-	data := v4ldata
+	data := `mmal service 16.1 (platform:bcm2835-v4l2):
+	/dev/video0
+
+Webcam C170: Webcam C170 (usb-3f980000.usb-1.3):
+	/dev/video1
+
+`
 
 	devices := parseV4LDevices(bytes.NewBuffer(slices.Copy([]byte(data))))
 
