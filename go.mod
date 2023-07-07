@@ -9,7 +9,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.18.2
 	github.com/casbin/casbin/v2 v2.71.1
-	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230706135951-8384538979ca
+	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230707144101-ac4b18eafa83
 	github.com/datarhei/gosrt v0.5.2
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
@@ -40,8 +40,8 @@ require (
 	go.etcd.io/bbolt v1.3.7
 	go.uber.org/automaxprocs v1.5.2
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.10.0
-	golang.org/x/mod v0.11.0
+	golang.org/x/crypto v0.11.0
+	golang.org/x/mod v0.12.0
 )
 
 //replace github.com/datarhei/core-client-go/v16 => ../core-client-go
@@ -115,11 +115,11 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.10.0 // indirect
+	golang.org/x/tools v0.11.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

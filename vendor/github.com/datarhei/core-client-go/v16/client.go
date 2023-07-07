@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gobwas/glob"
+	jwtgo "github.com/golang-jwt/jwt/v4"
 )
 
 const (
@@ -141,6 +143,75 @@ type RestClient interface {
 	WidgetProcess(id ProcessID) (api.WidgetProcess, error) // GET /v3/widget/process/{id}
 }
 
+type Token struct {
+	token     string
+	expiresAt time.Time
+	lock      sync.Mutex
+}
+
+func (t *Token) IsSet() bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return len(t.token) != 0
+}
+
+func (t *Token) Set(token string) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.token = token
+	t.expiresAt = time.Time{}
+
+	if len(t.token) == 0 {
+		return
+	}
+
+	p := &jwtgo.Parser{}
+	parsedToken, _, err := p.ParseUnverified(token, jwtgo.MapClaims{})
+	if err != nil {
+		return
+	}
+
+	claims, ok := parsedToken.Claims.(jwtgo.MapClaims)
+	if !ok {
+		return
+	}
+
+	sub, ok := claims["exp"]
+	if !ok {
+		t.expiresAt = time.Now().Add(time.Hour)
+		return
+	}
+
+	floatToTime := func(t float64, offset time.Duration) time.Time {
+		sec, dec := math.Modf(t)
+		return time.Unix(int64(sec), int64(dec*(1e9))).Add(offset)
+	}
+
+	switch exp := sub.(type) {
+	case float64:
+		t.expiresAt = floatToTime(exp, -15*time.Second)
+	case json.Number:
+		v, _ := exp.Float64()
+		t.expiresAt = floatToTime(v, -15*time.Second)
+	}
+}
+
+func (t *Token) String() string {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.token
+}
+
+func (t *Token) IsExpired() bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return time.Now().After(t.expiresAt)
+}
+
 // Config is the configuration for a new REST API client.
 type Config struct {
 	// Address is the address of the datarhei Core to connect to.
@@ -170,8 +241,8 @@ type apiconstraint struct {
 type restclient struct {
 	address      string
 	prefix       string
-	accessToken  string
-	refreshToken string
+	accessToken  Token
+	refreshToken Token
 	username     string
 	password     string
 	auth0Token   string
@@ -189,14 +260,20 @@ type restclient struct {
 // in case of an error.
 func New(config Config) (RestClient, error) {
 	r := &restclient{
-		address:      config.Address,
-		prefix:       "/api",
-		username:     config.Username,
-		password:     config.Password,
-		accessToken:  config.AccessToken,
-		refreshToken: config.RefreshToken,
-		auth0Token:   config.Auth0Token,
-		client:       config.Client,
+		address:    config.Address,
+		prefix:     "/api",
+		username:   config.Username,
+		password:   config.Password,
+		auth0Token: config.Auth0Token,
+		client:     config.Client,
+	}
+
+	if len(config.AccessToken) != 0 {
+		r.accessToken.Set(config.AccessToken)
+	}
+
+	if len(config.RefreshToken) != 0 {
+		r.refreshToken.Set(config.RefreshToken)
 	}
 
 	u, err := url.Parse(r.address)
@@ -445,7 +522,7 @@ func (r *restclient) ID() string {
 }
 
 func (r *restclient) Tokens() (string, string) {
-	return r.accessToken, r.refreshToken
+	return r.accessToken.String(), r.refreshToken.String()
 }
 
 func (r *restclient) Address() string {
@@ -562,8 +639,8 @@ func (r *restclient) login() error {
 
 	json.Unmarshal(data, &jwt)
 
-	r.accessToken = jwt.AccessToken
-	r.refreshToken = jwt.RefreshToken
+	r.accessToken.Set(jwt.AccessToken)
+	r.refreshToken.Set(jwt.RefreshToken)
 
 	about, err := r.info()
 	if err != nil {
@@ -624,8 +701,8 @@ func (r *restclient) checkVersion(method, path string) error {
 }
 
 func (r *restclient) refresh() error {
-	if len(r.refreshToken) == 0 {
-		return fmt.Errorf("no refresh token defined")
+	if r.refreshToken.IsExpired() {
+		return fmt.Errorf("no valid refresh token available")
 	}
 
 	req, err := http.NewRequest("GET", r.address+r.prefix+"/login/refresh", nil)
@@ -633,7 +710,7 @@ func (r *restclient) refresh() error {
 		return err
 	}
 
-	req.Header.Add("Authorization", "Bearer "+r.refreshToken)
+	req.Header.Add("Authorization", "Bearer "+r.refreshToken.String())
 
 	status, body, err := r.request(req)
 	if err != nil {
@@ -654,7 +731,7 @@ func (r *restclient) refresh() error {
 
 	json.Unmarshal(data, &jwt)
 
-	r.accessToken = jwt.AccessToken
+	r.accessToken.Set(jwt.AccessToken)
 
 	return nil
 }
@@ -665,8 +742,8 @@ func (r *restclient) info() (api.About, error) {
 		return api.About{}, err
 	}
 
-	if len(r.accessToken) != 0 {
-		req.Header.Add("Authorization", "Bearer "+r.accessToken)
+	if r.accessToken.IsSet() && !r.accessToken.IsExpired() {
+		req.Header.Add("Authorization", "Bearer "+r.accessToken.String())
 	}
 
 	status, body, _ := r.request(req)
@@ -720,22 +797,19 @@ func (r *restclient) stream(method, path string, query *url.Values, header http.
 		req.Header.Add("Content-Type", contentType)
 	}
 
-	if len(r.accessToken) != 0 {
-		req.Header.Add("Authorization", "Bearer "+r.accessToken)
-	}
-
-	status, body, err := r.request(req)
-	if status == http.StatusUnauthorized {
-		if err := r.refresh(); err != nil {
-			if err := r.login(); err != nil {
-				return nil, err
+	if r.accessToken.IsSet() {
+		if r.accessToken.IsExpired() {
+			if err := r.refresh(); err != nil {
+				if err := r.login(); err != nil {
+					return nil, err
+				}
 			}
 		}
 
-		req.Header.Set("Authorization", "Bearer "+r.accessToken)
-		status, body, err = r.request(req)
+		req.Header.Add("Authorization", "Bearer "+r.accessToken.String())
 	}
 
+	status, body, err := r.request(req)
 	if err != nil {
 		return nil, err
 	}
