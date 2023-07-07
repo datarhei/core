@@ -369,10 +369,9 @@ func (c *APIClient) call(method, path, contentType string, data io.Reader, origi
 
 func (c *APIClient) request(req *http.Request) (int, io.ReadCloser, error) {
 	if c.Client == nil {
-		tr := &http.Transport{
-			MaxIdleConns:    10,
-			IdleConnTimeout: 30 * time.Second,
-		}
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.MaxIdleConns = 10
+		tr.IdleConnTimeout = 30 * time.Second
 
 		c.Client = &http.Client{
 			Transport: tr,

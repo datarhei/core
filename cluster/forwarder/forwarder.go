@@ -65,10 +65,9 @@ func New(config ForwarderConfig) (Forwarder, error) {
 		f.logger = log.New("")
 	}
 
-	tr := &http.Transport{
-		MaxIdleConns:    10,
-		IdleConnTimeout: 30 * time.Second,
-	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.MaxIdleConns = 10
+	tr.IdleConnTimeout = 30 * time.Second
 
 	client := &http.Client{
 		Transport: tr,

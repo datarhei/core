@@ -147,12 +147,13 @@ func (s *checker) check() error {
 		CoreViewer:         uint64(metrics.Value("session_active", "collector", "hls").Val() + metrics.Value("session_active", "collector", "rtmp").Val()),
 	}
 
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.MaxIdleConns = 10
+	tr.IdleConnTimeout = 30 * time.Second
+
 	client := &http.Client{
-		Transport: &http.Transport{
-			MaxIdleConns:    10,
-			IdleConnTimeout: 30 * time.Second,
-		},
-		Timeout: 5 * time.Second,
+		Transport: tr,
+		Timeout:   5 * time.Second,
 	}
 
 	var data bytes.Buffer
