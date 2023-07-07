@@ -33,7 +33,7 @@ type Proxy interface {
 
 type ProxyReader interface {
 	ListNodes() []NodeReader
-	GetNode(id string) (NodeReader, error)
+	GetNodeReader(id string) (NodeReader, error)
 
 	FindNodeFromProcess(id app.ProcessID) (string, error)
 
@@ -47,96 +47,6 @@ type ProxyReader interface {
 	GetFileInfo(prefix, path string) (int64, time.Time, error)
 }
 
-func NewNullProxyReader() ProxyReader {
-	return &proxyReader{}
-}
-
-type proxyReader struct {
-	proxy *proxy
-}
-
-func (p *proxyReader) ListNodes() []NodeReader {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.ListNodes()
-}
-
-func (p *proxyReader) GetNode(id string) (NodeReader, error) {
-	if p.proxy == nil {
-		return nil, fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.GetNode(id)
-}
-
-func (p *proxyReader) FindNodeFromProcess(id app.ProcessID) (string, error) {
-	if p.proxy == nil {
-		return "", fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.FindNodeFromProcess(id)
-}
-
-func (p *proxyReader) Resources() map[string]NodeResources {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.Resources()
-}
-
-func (p *proxyReader) ListProcesses(options ProcessListOptions) []clientapi.Process {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.ListProcesses(options)
-}
-
-func (p *proxyReader) ListProxyProcesses() []Process {
-	if p.proxy == nil {
-		return nil
-	}
-
-	return p.proxy.ListProxyProcesses()
-}
-
-func (p *proxyReader) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error) {
-	if p.proxy == nil {
-		return clientapi.Probe{
-			Log: []string{fmt.Sprintf("no proxy for node %s provided", nodeid)},
-		}, fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.ProbeProcess(nodeid, id)
-}
-
-func (p *proxyReader) GetURL(prefix, path string) (*url.URL, error) {
-	if p.proxy == nil {
-		return nil, fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.GetURL(prefix, path)
-}
-
-func (p *proxyReader) GetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
-	if p.proxy == nil {
-		return nil, fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.GetFile(prefix, path, offset)
-}
-
-func (p *proxyReader) GetFileInfo(prefix, path string) (int64, time.Time, error) {
-	if p.proxy == nil {
-		return 0, time.Time{}, fmt.Errorf("no proxy provided")
-	}
-
-	return p.proxy.GetFileInfo(prefix, path)
-}
-
 type ProxyConfig struct {
 	ID string // ID of the node
 
@@ -146,10 +56,13 @@ type ProxyConfig struct {
 type proxy struct {
 	id string
 
-	nodes    map[string]Node      // List of known nodes
-	idfiles  map[string][]string  // Map from nodeid to list of files
-	idupdate map[string]time.Time // Map from nodeid to time of last update
-	fileid   map[string]string    // Map from file name to nodeid
+	nodes     map[string]Node // List of known nodes
+	nodesLock sync.RWMutex
+
+	idfiles   map[string][]string  // Map from nodeid to list of files
+	idupdate  map[string]time.Time // Map from nodeid to time of last update
+	fileid    map[string]string    // Map from file name to nodeid
+	filesLock sync.RWMutex
 
 	updates chan NodeFiles
 
@@ -197,6 +110,24 @@ func (p *proxy) Start() {
 	p.cancel = cancel
 
 	go func(ctx context.Context) {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				p.nodesLock.RLock()
+				for _, node := range p.nodes {
+					p.updates <- node.Files()
+				}
+				p.nodesLock.RUnlock()
+			}
+		}
+	}(ctx)
+
+	go func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -211,7 +142,7 @@ func (p *proxy) Start() {
 					continue
 				}
 
-				p.lock.Lock()
+				p.filesLock.Lock()
 
 				// Cleanup
 				files := p.idfiles[update.ID]
@@ -228,7 +159,7 @@ func (p *proxy) Start() {
 				p.idfiles[update.ID] = update.Files
 				p.idupdate[update.ID] = update.LastUpdate
 
-				p.lock.Unlock()
+				p.filesLock.Unlock()
 			}
 		}
 	}(ctx)
@@ -249,24 +180,18 @@ func (p *proxy) Stop() {
 	p.cancel()
 	p.cancel = nil
 
-	for _, node := range p.nodes {
-		node.StopFiles()
-	}
-
 	p.nodes = map[string]Node{}
 }
 
 func (p *proxy) Reader() ProxyReader {
-	return &proxyReader{
-		proxy: p,
-	}
+	return p
 }
 
 func (p *proxy) Resources() map[string]NodeResources {
 	resources := map[string]NodeResources{}
 
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	p.nodesLock.RLock()
+	defer p.nodesLock.RUnlock()
 
 	for id, node := range p.nodes {
 		resources[id] = node.Resources()
@@ -282,18 +207,15 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 	//	return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, about.ID)
 	//}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.nodesLock.Lock()
+	defer p.nodesLock.Unlock()
 
 	if n, ok := p.nodes[id]; ok {
-		n.StopFiles()
-
+		n.Disconnect()
 		delete(p.nodes, id)
 	}
 
 	p.nodes[id] = node
-
-	node.StartFiles(p.updates)
 
 	p.logger.Info().WithFields(log.Fields{
 		"address": about.Address,
@@ -305,15 +227,15 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 }
 
 func (p *proxy) RemoveNode(id string) error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.nodesLock.Lock()
+	defer p.nodesLock.Unlock()
 
 	node, ok := p.nodes[id]
 	if !ok {
 		return ErrNodeNotFound
 	}
 
-	node.StopFiles()
+	node.Disconnect()
 
 	delete(p.nodes, id)
 
@@ -327,8 +249,8 @@ func (p *proxy) RemoveNode(id string) error {
 func (p *proxy) ListNodes() []NodeReader {
 	list := []NodeReader{}
 
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	p.nodesLock.RLock()
+	defer p.nodesLock.RUnlock()
 
 	for _, node := range p.nodes {
 		list = append(list, node)
@@ -337,9 +259,9 @@ func (p *proxy) ListNodes() []NodeReader {
 	return list
 }
 
-func (p *proxy) GetNode(id string) (NodeReader, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (p *proxy) GetNode(id string) (Node, error) {
+	p.nodesLock.RLock()
+	defer p.nodesLock.RUnlock()
 
 	node, ok := p.nodes[id]
 	if !ok {
@@ -349,36 +271,20 @@ func (p *proxy) GetNode(id string) (NodeReader, error) {
 	return node, nil
 }
 
-func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (p *proxy) GetNodeReader(id string) (NodeReader, error) {
+	return p.GetNode(id)
+}
 
+func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
 	logger := p.logger.WithFields(log.Fields{
 		"path":   path,
 		"prefix": prefix,
 	})
 
-	id, ok := p.fileid[prefix+":"+path]
-	if !ok {
-		logger.Debug().Log("Not found")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	ts, ok := p.idupdate[id]
-	if !ok {
-		logger.Debug().Log("No age information found")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		logger.Debug().Log("File too old")
-		return nil, fmt.Errorf("file not found")
-	}
-
-	node, ok := p.nodes[id]
-	if !ok {
-		logger.Debug().Log("Unknown node")
-		return nil, fmt.Errorf("file not found")
+	node, err := p.getNodeForFile(prefix, path)
+	if err != nil {
+		logger.Debug().WithError(err).Log("Unknown node")
+		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
 	url, err := node.GetURL(prefix, path)
@@ -438,30 +344,34 @@ func (p *proxy) GetFileInfo(prefix, path string) (int64, time.Time, error) {
 	return size, lastModified, nil
 }
 
-func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
+	p.filesLock.RLock()
+	defer p.filesLock.RUnlock()
 
 	id, ok := p.fileid[prefix+":"+path]
 	if !ok {
-		return nil, fmt.Errorf("file not found")
+		return "", fmt.Errorf("file not found")
 	}
 
 	ts, ok := p.idupdate[id]
 	if !ok {
-		return nil, fmt.Errorf("no age information found")
+		return "", fmt.Errorf("no age information found")
 	}
 
 	if time.Since(ts) > 2*time.Second {
-		return nil, fmt.Errorf("file too old")
+		return "", fmt.Errorf("file too old")
 	}
 
-	node, ok := p.nodes[id]
-	if !ok {
-		return nil, fmt.Errorf("unknown node")
+	return id, nil
+}
+
+func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
+	id, err := p.getNodeIDForFile(prefix, path)
+	if err != nil {
+		return nil, err
 	}
 
-	return node, nil
+	return p.GetNode(id)
 }
 
 type Process struct {
@@ -504,7 +414,7 @@ func (p *proxy) ListProxyProcesses() []Process {
 
 	wg := sync.WaitGroup{}
 
-	p.lock.RLock()
+	p.nodesLock.RLock()
 	for _, node := range p.nodes {
 		wg.Add(1)
 
@@ -521,7 +431,7 @@ func (p *proxy) ListProxyProcesses() []Process {
 			}
 		}(node, processChan)
 	}
-	p.lock.RUnlock()
+	p.nodesLock.RUnlock()
 
 	wg.Wait()
 
@@ -570,7 +480,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 
 	wg := sync.WaitGroup{}
 
-	p.lock.RLock()
+	p.nodesLock.RLock()
 	for _, node := range p.nodes {
 		wg.Add(1)
 
@@ -587,7 +497,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 			}
 		}(node, processChan)
 	}
-	p.lock.RUnlock()
+	p.nodesLock.RUnlock()
 
 	wg.Wait()
 
@@ -599,61 +509,37 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 }
 
 func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
-	}
-
-	err := node.AddProcess(config, metadata)
+	node, err := p.GetNode(nodeid)
 	if err != nil {
-		return err
+		return fmt.Errorf("node not found: %w", err)
 	}
 
-	return nil
+	return node.AddProcess(config, metadata)
 }
 
 func (p *proxy) DeleteProcess(nodeid string, id app.ProcessID) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
-	}
-
-	err := node.DeleteProcess(id)
+	node, err := p.GetNode(nodeid)
 	if err != nil {
-		return err
+		return fmt.Errorf("node not found: %w", err)
 	}
 
-	return nil
+	return node.DeleteProcess(id)
 }
 
 func (p *proxy) UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
+	node, err := p.GetNode(nodeid)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
 	}
 
 	return node.UpdateProcess(id, config, metadata)
 }
 
 func (p *proxy) CommandProcess(nodeid string, id app.ProcessID, command string) error {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
-		return fmt.Errorf("node not found")
+	node, err := p.GetNode(nodeid)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
 	}
-
-	var err error = nil
 
 	switch command {
 	case "start":
@@ -672,15 +558,12 @@ func (p *proxy) CommandProcess(nodeid string, id app.ProcessID, command string) 
 }
 
 func (p *proxy) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	node, ok := p.nodes[nodeid]
-	if !ok {
+	node, err := p.GetNode(nodeid)
+	if err != nil {
 		probe := clientapi.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process %s should reside on, doesn't exist", nodeid, id.String())},
 		}
-		return probe, fmt.Errorf("node not found")
+		return probe, fmt.Errorf("node not found: %w", err)
 	}
 
 	return node.ProbeProcess(id)

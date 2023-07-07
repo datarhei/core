@@ -102,10 +102,6 @@ func New(config Config) (Server, error) {
 		s.collector = session.NewNullCollector()
 	}
 
-	if s.proxy == nil {
-		s.proxy = proxy.NewNullProxyReader()
-	}
-
 	if s.logger == nil {
 		s.logger = log.New("")
 	}
@@ -408,7 +404,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 	ch := s.channels[si.Resource]
 	s.lock.RUnlock()
 
-	if ch == nil {
+	if ch == nil && s.proxy != nil {
 		// Check in the cluster for the stream and proxy it
 		srturl, err := s.proxy.GetURL("srt", si.Resource)
 		if err != nil {

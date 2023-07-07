@@ -114,10 +114,6 @@ func (n *node) start(id string) error {
 						n.lastCoreContactErr = err
 					}
 					n.pingLock.Unlock()
-
-					if err == nil {
-						return
-					}
 				case <-ctx.Done():
 					return
 				}

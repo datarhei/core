@@ -126,10 +126,6 @@ func New(config Config) (Server, error) {
 		s.collector = session.NewNullCollector()
 	}
 
-	if s.proxy == nil {
-		s.proxy = proxy.NewNullProxyReader()
-	}
-
 	s.server = &rtmp.Server{
 		Addr:          config.Addr,
 		HandlePlay:    s.handlePlay,
@@ -276,7 +272,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 	ch := s.channels[playpath]
 	s.lock.RUnlock()
 
-	if ch == nil {
+	if ch == nil && s.proxy != nil {
 		// Check in the cluster for that stream
 		url, err := s.proxy.GetURL("rtmp", playpath)
 		if err != nil {

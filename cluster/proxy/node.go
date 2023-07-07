@@ -24,15 +24,6 @@ type Node interface {
 	IsConnected() (bool, error)
 	Disconnect()
 
-	Config() *config.Config
-
-	StartFiles(updates chan<- NodeFiles) error
-	StopFiles()
-
-	GetURL(prefix, path string) (*url.URL, error)
-	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
-	GetFileInfo(prefix, path string) (int64, time.Time, error)
-
 	AddProcess(config *app.Config, metadata map[string]interface{}) error
 	StartProcess(id app.ProcessID) error
 	StopProcess(id app.ProcessID) error
@@ -52,6 +43,11 @@ type NodeReader interface {
 	Resources() NodeResources
 
 	Files() NodeFiles
+
+	GetURL(prefix, path string) (*url.URL, error)
+	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
+	GetFileInfo(prefix, path string) (int64, time.Time, error)
+
 	ProcessList(ProcessListOptions) ([]clientapi.Process, error)
 	ProxyProcessList() ([]Process, error)
 }
@@ -76,6 +72,7 @@ type NodeAbout struct {
 	Name        string
 	Address     string
 	State       string
+	Error       error
 	CreatedAt   time.Time
 	Uptime      time.Duration
 	LastContact time.Time
@@ -103,6 +100,8 @@ const (
 	stateConnected    nodeState = "connected"
 )
 
+var ErrNoPeer = errors.New("not connected to the core API: client not available")
+
 type node struct {
 	id      string
 	address string
@@ -126,16 +125,11 @@ type node struct {
 
 	config *config.Config
 
-	state       nodeState
-	latency     float64 // Seconds
-	stateLock   sync.RWMutex
-	updates     chan<- NodeFiles
-	filesList   []string
-	lastUpdate  time.Time
-	cancelFiles context.CancelFunc
-
-	runningLock sync.Mutex
-	running     bool
+	state      nodeState
+	latency    float64 // Seconds
+	stateLock  sync.RWMutex
+	filesList  []string
+	lastUpdate time.Time
 
 	secure      bool
 	httpAddress *url.URL
@@ -164,30 +158,37 @@ func NewNode(id, address string, config *config.Config) Node {
 	ctx, cancel := context.WithCancel(context.Background())
 	n.disconnect = cancel
 
-	err := n.connect(ctx)
+	err := n.connect()
 	if err != nil {
 		n.peerErr = err
-
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(3 * time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ticker.C:
-					err := n.connect(ctx)
-					if err == nil {
-						n.peerErr = nil
-						return
-					} else {
-						n.peerErr = err
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(ctx)
 	}
+
+	n.peerWg.Add(4)
+
+	go func(ctx context.Context) {
+		// This tries to reconnect to the core API. If everything's
+		// fine, this is a no-op.
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		defer n.peerWg.Done()
+
+		for {
+			select {
+			case <-ticker.C:
+				err := n.connect()
+
+				n.peerLock.Lock()
+				n.peerErr = err
+				n.peerLock.Unlock()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx)
+
+	go n.pingPeer(ctx, &n.peerWg)
+	go n.updateResources(ctx, &n.peerWg)
+	go n.updateFiles(ctx, &n.peerWg)
 
 	return n
 }
@@ -196,15 +197,27 @@ func (n *node) SetEssentials(address string, config *config.Config) {
 	n.peerLock.Lock()
 	defer n.peerLock.Unlock()
 
-	n.address = address
-	n.config = config
+	if address != n.address {
+		n.address = address
+		n.peer = nil // force reconnet
+	}
+
+	if n.config == nil && config != nil {
+		n.config = config
+		n.peer = nil // force reconnect
+	}
+
+	if n.config.UpdatedAt != config.UpdatedAt {
+		n.config = config
+		n.peer = nil // force reconnect
+	}
 }
 
-func (n *node) connect(ctx context.Context) error {
+func (n *node) connect() error {
 	n.peerLock.Lock()
 	defer n.peerLock.Unlock()
 
-	if n.peer != nil {
+	if n.peer != nil && n.state != stateDisconnected {
 		return nil
 	}
 
@@ -293,11 +306,6 @@ func (n *node) connect(ctx context.Context) error {
 
 	n.peer = peer
 
-	n.peerWg.Add(2)
-
-	go n.pingPeer(ctx, &n.peerWg)
-	go n.updateResources(ctx, &n.peerWg)
-
 	return nil
 }
 
@@ -306,7 +314,11 @@ func (n *node) IsConnected() (bool, error) {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return false, fmt.Errorf("not connected: %w", n.peerErr)
+		return false, ErrNoPeer
+	}
+
+	if n.peerErr != nil {
+		return false, n.peerErr
 	}
 
 	return true, nil
@@ -367,7 +379,7 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 		select {
 		case <-ticker.C:
 			// Metrics
-			metrics, err := n.peer.Metrics(clientapi.MetricsQuery{
+			metrics, err := n.Metrics(clientapi.MetricsQuery{
 				Metrics: []clientapi.MetricsQueryMetric{
 					{Name: "cpu_ncpu"},
 					{Name: "cpu_idle"},
@@ -450,11 +462,19 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (n *node) Config() *config.Config {
-	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
+func (n *node) updateFiles(ctx context.Context, wg *sync.WaitGroup) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer wg.Done()
 
-	return n.config
+	for {
+		select {
+		case <-ticker.C:
+			n.files()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (n *node) Ping() (time.Duration, error) {
@@ -462,7 +482,7 @@ func (n *node) Ping() (time.Duration, error) {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return 0, fmt.Errorf("not connected")
+		return 0, ErrNoPeer
 	}
 
 	latency, err := n.peer.Ping()
@@ -475,7 +495,7 @@ func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse,
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return clientapi.MetricsResponse{}, fmt.Errorf("not connected")
+		return clientapi.MetricsResponse{}, ErrNoPeer
 	}
 
 	return n.peer.Metrics(query)
@@ -486,59 +506,10 @@ func (n *node) AboutPeer() (clientapi.About, error) {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return clientapi.About{}, fmt.Errorf("not connected")
+		return clientapi.About{}, ErrNoPeer
 	}
 
 	return n.peer.About(false)
-}
-
-func (n *node) StartFiles(updates chan<- NodeFiles) error {
-	n.runningLock.Lock()
-	defer n.runningLock.Unlock()
-
-	if n.running {
-		return nil
-	}
-
-	n.running = true
-	n.updates = updates
-
-	ctx, cancel := context.WithCancel(context.Background())
-	n.cancelFiles = cancel
-
-	go func(ctx context.Context) {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				n.files()
-
-				select {
-				case n.updates <- n.Files():
-				default:
-				}
-			}
-		}
-	}(ctx)
-
-	return nil
-}
-
-func (n *node) StopFiles() {
-	n.runningLock.Lock()
-	defer n.runningLock.Unlock()
-
-	if !n.running {
-		return
-	}
-
-	n.running = false
-
-	n.cancelFiles()
 }
 
 func (n *node) About() NodeAbout {
@@ -548,6 +519,7 @@ func (n *node) About() NodeAbout {
 			ID:      n.id,
 			Address: n.address,
 			State:   stateDisconnected.String(),
+			Error:   err,
 		}
 	}
 
@@ -636,20 +608,18 @@ func (n *node) Files() NodeFiles {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	state := NodeFiles{
+	files := NodeFiles{
 		ID:         id,
 		LastUpdate: n.lastUpdate,
 	}
 
 	if n.state != stateDisconnected && time.Since(n.lastUpdate) <= 2*time.Second {
-		state.Files = make([]string, len(n.filesList))
-		copy(state.Files, n.filesList)
+		files.Files = make([]string, len(n.filesList))
+		copy(files.Files, n.filesList)
 	}
 
-	return state
+	return files
 }
-
-var errNoPeer = errors.New("no peer")
 
 func (n *node) files() {
 	errorsChan := make(chan error, 8)
@@ -682,7 +652,7 @@ func (n *node) files() {
 		defer n.peerLock.RUnlock()
 
 		if n.peer == nil {
-			e <- errNoPeer
+			e <- ErrNoPeer
 			return
 		}
 
@@ -704,7 +674,7 @@ func (n *node) files() {
 		defer n.peerLock.RUnlock()
 
 		if n.peer == nil {
-			e <- errNoPeer
+			e <- ErrNoPeer
 			return
 		}
 
@@ -729,7 +699,7 @@ func (n *node) files() {
 			defer n.peerLock.RUnlock()
 
 			if n.peer == nil {
-				e <- errNoPeer
+				e <- ErrNoPeer
 				return
 			}
 
@@ -755,7 +725,7 @@ func (n *node) files() {
 			defer n.peerLock.RUnlock()
 
 			if n.peer == nil {
-				e <- errNoPeer
+				e <- ErrNoPeer
 				return
 			}
 
@@ -845,7 +815,7 @@ func (n *node) GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return nil, fmt.Errorf("not connected")
+		return nil, ErrNoPeer
 	}
 
 	return n.peer.FilesystemGetFileOffset(prefix, path, offset)
@@ -856,12 +826,12 @@ func (n *node) GetFileInfo(prefix, path string) (int64, time.Time, error) {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return 0, time.Time{}, fmt.Errorf("not connected")
+		return 0, time.Time{}, ErrNoPeer
 	}
 
 	info, err := n.peer.FilesystemList(prefix, path, "", "")
 	if err != nil {
-		return 0, time.Time{}, fmt.Errorf("not found: %w", err)
+		return 0, time.Time{}, fmt.Errorf("file not found: %w", err)
 	}
 
 	if len(info) != 1 {
@@ -876,7 +846,7 @@ func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, err
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return nil, fmt.Errorf("not connected")
+		return nil, ErrNoPeer
 	}
 
 	return n.peer.ProcessList(client.ProcessListOptions{
@@ -976,7 +946,7 @@ func (n *node) AddProcess(config *app.Config, metadata map[string]interface{}) e
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	cfg := convertConfig(config, metadata)
@@ -1045,7 +1015,7 @@ func (n *node) StartProcess(id app.ProcessID) error {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "start")
@@ -1056,7 +1026,7 @@ func (n *node) StopProcess(id app.ProcessID) error {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "stop")
@@ -1067,7 +1037,7 @@ func (n *node) RestartProcess(id app.ProcessID) error {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "restart")
@@ -1078,7 +1048,7 @@ func (n *node) ReloadProcess(id app.ProcessID) error {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	return n.peer.ProcessCommand(client.NewProcessID(id.ID, id.Domain), "reload")
@@ -1089,7 +1059,7 @@ func (n *node) DeleteProcess(id app.ProcessID) error {
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	return n.peer.ProcessDelete(client.NewProcessID(id.ID, id.Domain))
@@ -1100,7 +1070,7 @@ func (n *node) UpdateProcess(id app.ProcessID, config *app.Config, metadata map[
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return fmt.Errorf("not connected")
+		return ErrNoPeer
 	}
 
 	cfg := convertConfig(config, metadata)
@@ -1116,7 +1086,7 @@ func (n *node) ProbeProcess(id app.ProcessID) (clientapi.Probe, error) {
 		probe := clientapi.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process %s resides, is not connected", n.id, id.String())},
 		}
-		return probe, fmt.Errorf("not connected")
+		return probe, ErrNoPeer
 	}
 
 	probe, err := n.peer.ProcessProbe(client.NewProcessID(id.ID, id.Domain))

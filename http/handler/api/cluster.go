@@ -271,7 +271,7 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 func (h *ClusterHandler) GetNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNode(id)
+	peer, err := h.proxy.GetNodeReader(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
@@ -307,7 +307,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNode(id)
+	peer, err := h.proxy.GetNodeReader(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
@@ -340,7 +340,7 @@ func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNode(id)
+	peer, err := h.proxy.GetNodeReader(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
@@ -403,7 +403,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	peer, err := h.proxy.GetNode(id)
+	peer, err := h.proxy.GetNodeReader(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
