@@ -16,7 +16,6 @@ import (
 	"github.com/datarhei/core/v16/ffmpeg/probe"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/glob"
-	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
@@ -77,7 +76,6 @@ type Config struct {
 	MaxProcesses int64
 	Resources    resources.Resources
 	Logger       log.Logger
-	IAM          iam.IAM
 }
 
 type task struct {
@@ -134,8 +132,6 @@ type restream struct {
 
 	startOnce sync.Once
 	stopOnce  sync.Once
-
-	iam iam.IAM
 }
 
 // New returns a new instance that implements the Restreamer interface
@@ -148,15 +144,10 @@ func New(config Config) (Restreamer, error) {
 		replace:   config.Replace,
 		rewrite:   config.Rewrite,
 		logger:    config.Logger,
-		iam:       config.IAM,
 	}
 
 	if r.logger == nil {
 		r.logger = log.New("")
-	}
-
-	if r.iam == nil {
-		return nil, fmt.Errorf("missing IAM")
 	}
 
 	if r.store == nil {
@@ -1059,8 +1050,6 @@ func (r *restream) resolveAddress(tasks map[app.ProcessID]*task, id, address str
 		return address, fmt.Errorf("unknown process '%s' in domain '%s' (%s)", matches["id"], matches["domain"], address)
 	}
 
-	identity, _ := r.iam.GetVerifier(t.config.Owner)
-
 	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
 
 	for _, x := range t.config.Output {
@@ -1070,7 +1059,7 @@ func (r *restream) resolveAddress(tasks map[app.ProcessID]*task, id, address str
 
 		// Check for non-tee output
 		if !strings.Contains(x.Address, "|") && !strings.HasPrefix(x.Address, "[") {
-			return r.rewrite.RewriteAddress(x.Address, identity, rewrite.READ), nil
+			return r.rewrite.RewriteAddress(x.Address, t.config.Owner, rewrite.READ), nil
 		}
 
 		// Split tee output in its individual addresses
@@ -1086,7 +1075,7 @@ func (r *restream) resolveAddress(tasks map[app.ProcessID]*task, id, address str
 		}
 
 		if len(matches["source"]) == 0 {
-			return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+			return r.rewrite.RewriteAddress(addresses[0], t.config.Owner, rewrite.READ), nil
 		}
 
 		for _, a := range addresses {
@@ -1098,21 +1087,21 @@ func (r *restream) resolveAddress(tasks map[app.ProcessID]*task, id, address str
 
 			if matches["source"] == "hls" {
 				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.RawPath, ".m3u8") {
-					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
 			} else if matches["source"] == "rtmp" {
 				if u.Scheme == "rtmp" {
-					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
 			} else if matches["source"] == "srt" {
 				if u.Scheme == "srt" {
-					return r.rewrite.RewriteAddress(a, identity, rewrite.READ), nil
+					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
 			}
 		}
 
 		// If none of the sources matched, return the first address
-		return r.rewrite.RewriteAddress(addresses[0], identity, rewrite.READ), nil
+		return r.rewrite.RewriteAddress(addresses[0], t.config.Owner, rewrite.READ), nil
 	}
 
 	return address, fmt.Errorf("the process '%s' in group '%s' has no outputs with the ID '%s' (%s)", matches["id"], matches["group"], matches["output"], address)

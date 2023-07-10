@@ -71,7 +71,9 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 
 	iam.AddPolicy("$anon", "$none", "process:*", []string{"CREATE", "GET", "DELETE", "UPDATE", "COMMAND", "PROBE", "METADATA", "PLAYOUT"})
 
-	rewriter, err := rewrite.New(rewrite.Config{})
+	rewriter, err := rewrite.New(rewrite.Config{
+		IAM: iam,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +83,6 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		Replace:     replacer,
 		Filesystems: []fs.Filesystem{memfs},
 		Rewrite:     rewriter,
-		IAM:         iam,
 	})
 	if err != nil {
 		return nil, err

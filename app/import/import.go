@@ -17,9 +17,6 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
-	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
-	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
@@ -1459,33 +1456,9 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
-	policyAdapter, err := iamaccess.NewJSONAdapter(dummyfs, "./policy.json", nil)
-	if err != nil {
-		return app.Probe{}
-	}
-
-	identityAdapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
-	if err != nil {
-		return app.Probe{}
-	}
-
-	iam, _ := iam.New(iam.Config{
-		PolicyAdapter:   policyAdapter,
-		IdentityAdapter: identityAdapter,
-		Superuser: iamidentity.User{
-			Name: "foobar",
-		},
-		JWTRealm:  "",
-		JWTSecret: "",
-		Logger:    nil,
-	})
-
-	iam.AddPolicy("$anon", "$none", "process:*", []string{"CREATE", "GET", "DELETE", "PROBE"})
-
 	rs, err := restream.New(restream.Config{
 		FFmpeg: ffmpeg,
 		Store:  store,
-		IAM:    iam,
 	})
 	if err != nil {
 		return app.Probe{}

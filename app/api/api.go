@@ -884,6 +884,7 @@ func (a *api) start(ctx context.Context) error {
 			HTTPBase: "http://" + httpBase,
 			RTMPBase: "rtmp://" + rtmpBase,
 			SRTBase:  "srt://" + srtBase,
+			IAM:      a.iam,
 		})
 		if err != nil {
 			return fmt.Errorf("unable to create url rewriter: %w", err)
@@ -1153,7 +1154,6 @@ func (a *api) start(ctx context.Context) error {
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
 		Resources:    a.resources,
-		IAM:          a.iam,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 

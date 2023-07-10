@@ -4,16 +4,26 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/datarhei/core/v16/iam"
+	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/stretchr/testify/require"
 )
 
-func getIdentityManager(enableBasic bool) (iamidentity.Manager, error) {
-	dummyfs, _ := fs.NewMemFilesystem(fs.MemConfig{})
+func getIAM(enableBasic bool) (iam.IAM, error) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	if err != nil {
+		return nil, err
+	}
 
-	adapter, err := iamidentity.NewJSONAdapter(dummyfs, "./users.json", nil)
+	policyAdapter, err := iamaccess.NewJSONAdapter(memfs, "./policy.json", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identityAdapter, err := iamidentity.NewJSONAdapter(memfs, "./users.json", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -33,30 +43,31 @@ func getIdentityManager(enableBasic bool) (iamidentity.Manager, error) {
 		superuser.Auth.Services.Basic = []string{"basicauthpassword"}
 	}
 
-	im, err := iamidentity.New(iamidentity.Config{
-		Adapter:   adapter,
-		Superuser: superuser,
-		JWTRealm:  "",
-		JWTSecret: "",
-		Logger:    nil,
+	iam, err := iam.New(iam.Config{
+		PolicyAdapter:   policyAdapter,
+		IdentityAdapter: identityAdapter,
+		Superuser:       superuser,
+		JWTRealm:        "",
+		JWTSecret:       "",
+		Logger:          nil,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return im, err
+	return iam, err
 }
 
 func TestRewriteHTTP(t *testing.T) {
-	im, err := getIdentityManager(false)
+	iam, err := getIAM(false)
 	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		HTTPBase: "http://localhost:8080/",
+		IAM:      iam,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rewrite)
-
-	identity, err := im.GetVerifier("foobar")
-	require.NoError(t, err)
-	require.NotNil(t, identity)
 
 	samples := [][3]string{
 		{"http://example.com/live/stream.m3u8", "read", "http://example.com/live/stream.m3u8"},
@@ -70,24 +81,21 @@ func TestRewriteHTTP(t *testing.T) {
 	}
 
 	for _, e := range samples {
-		rewritten := rewrite.RewriteAddress(e[0], identity, Access(e[1]))
+		rewritten := rewrite.RewriteAddress(e[0], "foobar", Access(e[1]))
 		require.Equal(t, e[2], rewritten, "%s %s", e[0], e[1])
 	}
 }
 
 func TestRewriteHTTPPassword(t *testing.T) {
-	im, err := getIdentityManager(true)
+	iam, err := getIAM(true)
 	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		HTTPBase: "http://localhost:8080/",
+		IAM:      iam,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rewrite)
-
-	identity, err := im.GetVerifier("foobar")
-	require.NoError(t, err)
-	require.NotNil(t, identity)
 
 	samples := [][3]string{
 		{"http://example.com/live/stream.m3u8", "read", "http://example.com/live/stream.m3u8"},
@@ -101,24 +109,21 @@ func TestRewriteHTTPPassword(t *testing.T) {
 	}
 
 	for _, e := range samples {
-		rewritten := rewrite.RewriteAddress(e[0], identity, Access(e[1]))
+		rewritten := rewrite.RewriteAddress(e[0], "foobar", Access(e[1]))
 		require.Equal(t, e[2], rewritten, "%s %s", e[0], e[1])
 	}
 }
 
 func TestRewriteRTMP(t *testing.T) {
-	im, err := getIdentityManager(false)
+	iam, err := getIAM(false)
 	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		RTMPBase: "rtmp://localhost:1935/live",
+		IAM:      iam,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rewrite)
-
-	identity, err := im.GetVerifier("foobar")
-	require.NoError(t, err)
-	require.NotNil(t, identity)
 
 	samples := [][3]string{
 		{"rtmp://example.com/live/stream", "read", "rtmp://example.com/live/stream"},
@@ -130,24 +135,21 @@ func TestRewriteRTMP(t *testing.T) {
 	}
 
 	for _, e := range samples {
-		rewritten := rewrite.RewriteAddress(e[0], identity, Access(e[1]))
+		rewritten := rewrite.RewriteAddress(e[0], "foobar", Access(e[1]))
 		require.Equal(t, e[2], rewritten, "%s %s", e[0], e[1])
 	}
 }
 
 func TestRewriteSRT(t *testing.T) {
-	im, err := getIdentityManager(false)
+	iam, err := getIAM(false)
 	require.NoError(t, err)
 
 	rewrite, err := New(Config{
 		SRTBase: "srt://localhost:6000/",
+		IAM:     iam,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rewrite)
-
-	identity, err := im.GetVerifier("foobar")
-	require.NoError(t, err)
-	require.NotNil(t, identity)
 
 	samples := [][3]string{
 		{"srt://example.com/?streamid=stream", "read", "srt://example.com/?streamid=stream"},
@@ -161,7 +163,7 @@ func TestRewriteSRT(t *testing.T) {
 	}
 
 	for _, e := range samples {
-		rewritten := rewrite.RewriteAddress(e[0], identity, Access(e[1]))
+		rewritten := rewrite.RewriteAddress(e[0], "foobar", Access(e[1]))
 		require.Equal(t, e[2], rewritten, "%s %s", e[0], e[1])
 	}
 }

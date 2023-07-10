@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/rtmp"
 	srturl "github.com/datarhei/core/v16/srt/url"
@@ -21,17 +22,19 @@ type Config struct {
 	HTTPBase string
 	RTMPBase string
 	SRTBase  string
+	IAM      iam.IAM
 }
 
 // to a new identity, i.e. adjusting the credentials to the given identity.
 type Rewriter interface {
-	RewriteAddress(address string, identity iamidentity.Verifier, mode Access) string
+	RewriteAddress(address, user string, mode Access) string
 }
 
 type rewrite struct {
 	httpBase string
 	rtmpBase string
 	srtBase  string
+	iam      iam.IAM
 }
 
 func New(config Config) (Rewriter, error) {
@@ -39,12 +42,17 @@ func New(config Config) (Rewriter, error) {
 		httpBase: config.HTTPBase,
 		rtmpBase: config.RTMPBase,
 		srtBase:  config.SRTBase,
+		iam:      config.IAM,
+	}
+
+	if r.iam == nil {
+		return nil, fmt.Errorf("missing IAM")
 	}
 
 	return r, nil
 }
 
-func (g *rewrite) RewriteAddress(address string, identity iamidentity.Verifier, mode Access) string {
+func (g *rewrite) RewriteAddress(address, user string, mode Access) string {
 	u, err := url.Parse(address)
 	if err != nil {
 		return address
@@ -54,6 +62,8 @@ func (g *rewrite) RewriteAddress(address string, identity iamidentity.Verifier, 
 	if !g.isLocal(u) {
 		return address
 	}
+
+	identity, _ := g.iam.GetVerifier(user)
 
 	if identity == nil {
 		return address

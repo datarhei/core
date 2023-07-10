@@ -16,9 +16,6 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/validator"
-	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
-	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/restream"
@@ -57,35 +54,10 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, err
 	}
 
-	policyAdapter, err := iamaccess.NewJSONAdapter(memfs, "./policy.json", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	identityAdapter, err := iamidentity.NewJSONAdapter(memfs, "./users.json", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	iam, err := iam.New(iam.Config{
-		PolicyAdapter:   policyAdapter,
-		IdentityAdapter: identityAdapter,
-		Superuser: iamidentity.User{
-			Name: "foobar",
-		},
-		JWTRealm:  "",
-		JWTSecret: "",
-		Logger:    nil,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	rs, err := restream.New(restream.Config{
 		Store:       store,
 		FFmpeg:      ffmpeg,
 		Filesystems: []fs.Filesystem{memfs},
-		IAM:         iam,
 	})
 	if err != nil {
 		return nil, err
