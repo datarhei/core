@@ -180,13 +180,15 @@ type Data struct {
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`
-		Debug                  bool     `json:"debug"`
 		Address                string   `json:"address"` // ip:port
 		Peers                  []string `json:"peers"`
 		StartupTimeout         int64    `json:"startup_timeout_sec" format:"int64"`          // seconds
 		SyncInterval           int64    `json:"sync_interval_sec" format:"int64"`            // seconds
 		NodeRecoverTimeout     int64    `json:"node_recover_timeout_sec" format:"int64"`     // seconds
 		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout_sec" format:"int64"` // seconds
+		Debug                  struct {
+			DisableFFmpegCheck bool `json:"disable_ffmpeg_check"`
+		} `json:"debug"`
 	} `json:"cluster"`
 }
 

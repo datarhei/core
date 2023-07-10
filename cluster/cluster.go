@@ -93,6 +93,10 @@ type Peer struct {
 	Address string
 }
 
+type DebugConfig struct {
+	DisableFFmpegCheck bool
+}
+
 type Config struct {
 	ID      string // ID of the node
 	Name    string // Name of the node
@@ -109,6 +113,8 @@ type Config struct {
 
 	IPLimiter net.IPLimiter
 	Logger    log.Logger
+
+	Debug DebugConfig
 }
 
 type cluster struct {
@@ -166,6 +172,8 @@ type cluster struct {
 	barrierLock sync.RWMutex
 
 	limiter net.IPLimiter
+
+	debugDisableFFmpegCheck bool
 }
 
 var ErrDegraded = errors.New("cluster is currently degraded")
@@ -199,6 +207,8 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 		barrier: map[string]bool{},
 
 		limiter: config.IPLimiter,
+
+		debugDisableFFmpegCheck: config.Debug.DisableFFmpegCheck,
 	}
 
 	if c.config == nil {
@@ -1012,12 +1022,14 @@ func (c *cluster) checkClusterNodes() ([]string, error) {
 			return nil, fmt.Errorf("node %s has a different configuration: %w", id, err)
 		}
 
-		skills, err := node.CoreSkills()
-		if err != nil {
-			return nil, fmt.Errorf("node %s has no FFmpeg skills available: %w", id, err)
-		}
-		if !c.skills.Equal(skills) {
-			return nil, fmt.Errorf("node %s has mismatching FFmpeg skills", id)
+		if !c.debugDisableFFmpegCheck {
+			skills, err := node.CoreSkills()
+			if err != nil {
+				return nil, fmt.Errorf("node %s has no FFmpeg skills available: %w", id, err)
+			}
+			if !c.skills.Equal(skills) {
+				return nil, fmt.Errorf("node %s has mismatching FFmpeg skills", id)
+			}
 		}
 
 		for _, name := range config.Host.Name {

@@ -508,6 +508,9 @@ func (a *api) start(ctx context.Context) error {
 			CoreSkills:             a.ffmpeg.Skills(),
 			IPLimiter:              a.sessionsLimiter,
 			Logger:                 a.log.logger.core.WithComponent("Cluster"),
+			Debug: cluster.DebugConfig{
+				DisableFFmpegCheck: cfg.Cluster.Debug.DisableFFmpegCheck,
+			},
 		})
 		if err != nil {
 			return fmt.Errorf("unable to create cluster: %w", err)
