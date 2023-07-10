@@ -55,5 +55,5 @@ func (r *restclient) SessionToken(name string, req []api.SessionTokenRequest) ([
 
 	err = json.Unmarshal(data, &tokens)
 
-	return tokens, nil
+	return tokens, err
 }

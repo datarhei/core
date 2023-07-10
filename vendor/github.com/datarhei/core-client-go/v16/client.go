@@ -104,6 +104,12 @@ type RestClient interface {
 	ClusterSnapshot() (io.ReadCloser, error) // GET /v3/cluster/snapshot
 	ClusterLeave() error                     // PUT /v3/cluster/leave
 
+	ClusterNodeList() ([]api.ClusterNode, error)                                      // GET /v3/cluster/node
+	ClusterNode(id string) (api.ClusterNode, error)                                   // GET /v3/cluster/node/{id}
+	ClusterNodeFiles(id string) (api.ClusterNodeFiles, error)                         // GET /v3/cluster/node/{id}/files
+	ClusterNodeProcessList(id string, opts ProcessListOptions) ([]api.Process, error) // GET /v3/cluster/node/{id}/process
+	ClusterNodeVersion(id string) (api.Version, error)                                // GET /v3/cluster/node/{id}/version
+
 	ClusterDBProcessList() ([]api.Process, error)       // GET /v3/cluster/db/process
 	ClusterDBProcess(id ProcessID) (api.Process, error) // GET /v3/cluster/db/process/{id}
 	ClusterDBUserList() ([]api.IAMUser, error)          // GET /v3/cluster/db/user
@@ -387,6 +393,26 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/cluster/process/*/probe"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/files"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/version"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},

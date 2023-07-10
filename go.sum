@@ -46,8 +46,8 @@ github.com/circonus-labs/circonusllhist v0.1.3/go.mod h1:kMXHVDlOchFAehlya5ePtbp
 github.com/cpuguy83/go-md2man/v2 v2.0.2 h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHHBfMQ6w=
 github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/datarhei/core-client-go/v16 v16.11.1-0.20230707144101-ac4b18eafa83 h1:Lg1MPmGxXV1GttviBxoDqIosxPU6vkVyWf0plhvpUvc=
-github.com/datarhei/core-client-go/v16 v16.11.1-0.20230707144101-ac4b18eafa83/go.mod h1:3eKfwhPKoW7faTn+luShRVNMqcIskvlIKjRJ7ShjyL8=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230710090938-bfcb7f5f7b3e h1:PUBHatfuW/qclTFQ062QtxlDEsqH3HlIjqI3vUOKR3c=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230710090938-bfcb7f5f7b3e/go.mod h1:3eKfwhPKoW7faTn+luShRVNMqcIskvlIKjRJ7ShjyL8=
 github.com/datarhei/gosrt v0.5.2 h1:eagqZwEIiGPNJW0rLep3gwceObyaZ17+iKRc+l4VEpc=
 github.com/datarhei/gosrt v0.5.2/go.mod h1:0308GQhAu5hxe2KYdbss901aKceSSKXnwCr8Vs++eiw=
 github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a h1:Tf4DSHY1xruBglr+yYP5Wct7czM86GKMYgbXH8a7OFo=
