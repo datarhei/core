@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/cluster/kvs"
@@ -140,9 +141,11 @@ type ClusterKVS interface {
 }
 
 type clusterKVS struct {
-	cluster    Cluster
+	cluster Cluster
+	logger  log.Logger
+
 	allowStale bool
-	logger     log.Logger
+	staleLock  sync.Mutex
 }
 
 func NewClusterKVS(cluster Cluster, logger log.Logger) (ClusterKVS, error) {
@@ -159,6 +162,9 @@ func NewClusterKVS(cluster Cluster, logger log.Logger) (ClusterKVS, error) {
 }
 
 func (s *clusterKVS) AllowStaleKeys(allow bool) {
+	s.staleLock.Lock()
+	defer s.staleLock.Unlock()
+
 	s.allowStale = allow
 }
 
@@ -194,11 +200,15 @@ func (s *clusterKVS) UnsetKV(key string) error {
 }
 
 func (s *clusterKVS) GetKV(key string) (string, time.Time, error) {
+	s.staleLock.Lock()
+	stale := s.allowStale
+	s.staleLock.Unlock()
+
 	s.logger.Debug().WithFields(log.Fields{
 		"key":   key,
-		"stale": s.allowStale,
+		"stale": stale,
 	}).Log("Get KV")
-	return s.cluster.GetKV("", key, s.allowStale)
+	return s.cluster.GetKV("", key, stale)
 }
 
 func (s *clusterKVS) ListKV(prefix string) map[string]store.Value {
