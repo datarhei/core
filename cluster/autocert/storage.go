@@ -50,7 +50,7 @@ func (s *storage) unprefixKey(key string) string {
 func (s *storage) Lock(ctx context.Context, name string) error {
 	s.logger.Debug().WithField("name", name).Log("StorageLock")
 	for {
-		lock, err := s.kvs.CreateLock(s.prefixKey(name), time.Now().Add(time.Minute))
+		lock, err := s.kvs.CreateLock(s.prefixKey(name), time.Now().Add(5*time.Minute))
 		if err == nil {
 			go func() {
 				<-lock.Expired()

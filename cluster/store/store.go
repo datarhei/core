@@ -31,6 +31,7 @@ type Store interface {
 	ListPolicies() Policies
 	ListUserPolicies(name string) Policies
 
+	HasLock(name string) bool
 	ListLocks() map[string]time.Time
 
 	ListKVS(prefix string) map[string]Value
@@ -875,6 +876,15 @@ func (s *store) GetProcessNodeMap() map[string]string {
 	}
 
 	return m
+}
+
+func (s *store) HasLock(name string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	_, ok := s.data.Locks[name]
+
+	return ok
 }
 
 func (s *store) ListLocks() map[string]time.Time {

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -25,6 +26,10 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 		}
 
 		return l, nil
+	}
+
+	if c.store.HasLock(name) {
+		return nil, fmt.Errorf("the lock '%s' already exists", name)
 	}
 
 	cmd := &store.Command{
