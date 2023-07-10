@@ -33,6 +33,9 @@ import (
 )
 
 type Cluster interface {
+	Start(ctx context.Context) error
+	Shutdown() error
+
 	// Address returns the raft address of this node
 	Address() string
 
@@ -54,8 +57,6 @@ type Cluster interface {
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error // gracefully remove a node from the cluster
 	Snapshot(origin string) (io.ReadCloser, error)
-
-	Shutdown() error
 
 	ListProcesses() []store.Process
 	GetProcess(id app.ProcessID) (store.Process, error)
@@ -81,7 +82,7 @@ type Cluster interface {
 
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
-	GetKV(origin, key string) (string, time.Time, error)
+	GetKV(origin, key string, stale bool) (string, time.Time, error)
 	ListKV(prefix string) map[string]store.Value
 
 	ProxyReader() proxy.ProxyReader
@@ -163,6 +164,7 @@ type cluster struct {
 	leaderLock    sync.Mutex
 
 	isTLSRequired bool
+	clusterKVS    ClusterKVS
 	certManager   autocert.Manager
 
 	nodes     map[string]clusternode.Node
@@ -178,7 +180,7 @@ type cluster struct {
 
 var ErrDegraded = errors.New("cluster is currently degraded")
 
-func New(ctx context.Context, config Config) (Cluster, error) {
+func New(config Config) (Cluster, error) {
 	c := &cluster{
 		id:     config.ID,
 		name:   config.Name,
@@ -220,6 +222,11 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	}
 
 	c.isTLSRequired = c.config.TLS.Enable && c.config.TLS.Auto
+	if c.isTLSRequired {
+		if len(c.config.Host.Name) == 0 {
+			return nil, fmt.Errorf("tls: at least one hostname must be configured")
+		}
+	}
 
 	host, port, err := gonet.SplitHostPort(c.config.Address)
 	if err != nil {
@@ -373,18 +380,51 @@ func New(ctx context.Context, config Config) (Cluster, error) {
 	go c.monitorLeadership()
 	go c.sentinel()
 
-	err = c.setup(ctx)
-	if err != nil {
-		c.Shutdown()
-		return nil, fmt.Errorf("failed to setup cluster: %w", err)
+	if c.isTLSRequired {
+		kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
+		if err != nil {
+			return nil, fmt.Errorf("tls: cluster KVS: %w", err)
+		}
+
+		storage, err := clusterautocert.NewStorage(kvs, "core-cluster-certificates", c.logger.WithComponent("KVS"))
+		if err != nil {
+			return nil, fmt.Errorf("tls: certificate store: %w", err)
+		}
+
+		if len(c.config.TLS.Secret) != 0 {
+			storage = autocert.NewCryptoStorage(storage, autocert.NewCrypto(c.config.TLS.Secret))
+		}
+
+		manager, err := autocert.New(autocert.Config{
+			Storage:         storage,
+			DefaultHostname: c.config.Host.Name[0],
+			EmailAddress:    c.config.TLS.Email,
+			IsProduction:    !c.config.TLS.Staging,
+			Logger:          c.logger.WithComponent("Let's Encrypt"),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("tls: certificate manager: %w", err)
+		}
+
+		c.clusterKVS = kvs
+		c.certManager = manager
 	}
 
 	return c, nil
 }
 
+func (c *cluster) Start(ctx context.Context) error {
+	err := c.setup(ctx)
+	if err != nil {
+		c.Shutdown()
+		return fmt.Errorf("failed to setup cluster: %w", err)
+	}
+
+	return nil
+}
+
 func (c *cluster) setup(ctx context.Context) error {
 	// Wait for a leader to be selected
-
 	c.logger.Info().Log("Waiting for a leader to be elected ...")
 
 	for {
@@ -404,8 +444,15 @@ func (c *cluster) setup(ctx context.Context) error {
 
 	c.logger.Info().Log("Leader has been elected")
 
-	// Wait for all cluster nodes to leave degraded mode
+	if c.certManager != nil {
+		// Load certificates into cache, in case we already have them in the KV store. It
+		// allows the API to serve requests. This requires a raft leader.
+		c.clusterKVS.AllowStaleKeys(true)
+		c.certManager.CacheManagedCertificate(context.Background(), c.config.Host.Name)
+		c.clusterKVS.AllowStaleKeys(false)
+	}
 
+	// Wait for all cluster nodes to leave degraded mode
 	c.logger.Info().Log("Waiting for cluster to become operational ...")
 
 	for {
@@ -432,7 +479,7 @@ func (c *cluster) setup(ctx context.Context) error {
 
 	c.logger.Info().Log("Cluster is operational")
 
-	if c.isTLSRequired {
+	if c.certManager != nil {
 		c.logger.Info().Log("Waiting for TLS certificates ...")
 
 		// Create certificate manager
@@ -445,41 +492,6 @@ func (c *cluster) setup(ctx context.Context) error {
 			return fmt.Errorf("no hostnames are configured")
 		}
 
-		kvs, err := NewClusterKVS(c, c.logger.WithComponent("KVS"))
-		if err != nil {
-			return fmt.Errorf("tls: cluster KVS: %w", err)
-		}
-
-		storage, err := clusterautocert.NewStorage(kvs, "core-cluster-certificates", c.logger.WithComponent("KVS"))
-		if err != nil {
-			return fmt.Errorf("tls: certificate store: %w", err)
-		}
-
-		if len(c.config.TLS.Secret) != 0 {
-			storage = autocert.NewCryptoStorage(storage, autocert.NewCrypto(c.config.TLS.Secret))
-		}
-
-		manager, err := autocert.New(autocert.Config{
-			Storage:         storage,
-			DefaultHostname: hostnames[0],
-			EmailAddress:    c.config.TLS.Email,
-			IsProduction:    !c.config.TLS.Staging,
-			Logger:          c.logger.WithComponent("Let's Encrypt"),
-		})
-		if err != nil {
-			return fmt.Errorf("tls: certificate manager: %w", err)
-		}
-
-		c.certManager = manager
-
-		resctx, rescancel := context.WithCancel(ctx)
-		defer rescancel()
-
-		err = manager.HTTPChallengeResolver(resctx, c.config.Address)
-		if err != nil {
-			return fmt.Errorf("tls: failed to start the HTTP challenge resolver: %w", err)
-		}
-
 		// We have to wait for all nodes to have the HTTP challenge resolver started
 		err = c.Barrier(ctx, "acme")
 		if err != nil {
@@ -488,12 +500,10 @@ func (c *cluster) setup(ctx context.Context) error {
 
 		// Acquire certificates, all nodes can do this at the same time because everything
 		// is synched via the storage.
-		err = manager.AcquireCertificates(ctx, hostnames)
+		err = c.certManager.AcquireCertificates(ctx, hostnames)
 		if err != nil {
 			return fmt.Errorf("tls: failed to acquire certificates: %w", err)
 		}
-
-		rescancel()
 
 		c.logger.Info().Log("TLS certificates acquired")
 	}
@@ -1113,7 +1123,7 @@ func verifyClusterVersion(v string) error {
 	}
 
 	if !Version.Equal(version) {
-		return fmt.Errorf("version %s not equal to expected version %s", version.String(), Version.String())
+		return fmt.Errorf("version %s not equal to my version %s", version.String(), Version.String())
 	}
 
 	return nil
@@ -1138,6 +1148,10 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 	if local.Cluster.EmergencyLeaderTimeout != remote.Cluster.EmergencyLeaderTimeout {
 		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
+	}
+
+	if local.Cluster.Debug.DisableFFmpegCheck != remote.Cluster.Debug.DisableFFmpegCheck {
+		return fmt.Errorf("cluster.debug.disable_ffmpeg_check is different")
 	}
 
 	if !local.API.Auth.Enable {

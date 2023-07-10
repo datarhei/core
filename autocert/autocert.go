@@ -18,6 +18,7 @@ import (
 )
 
 type Manager interface {
+	CacheManagedCertificate(ctx context.Context, hostnames []string)
 	AcquireCertificates(ctx context.Context, hostnames []string) error
 	ManageCertificates(ctx context.Context, hostnames []string) error
 	HTTPChallengeResolver(ctx context.Context, listenAddress string) error
@@ -164,6 +165,12 @@ func (m *manager) HTTPChallengeResolver(ctx context.Context, listenAddress strin
 	}(ctx)
 
 	return nil
+}
+
+func (m *manager) CacheManagedCertificate(ctx context.Context, hostnames []string) {
+	for _, name := range hostnames {
+		m.config.CacheManagedCertificate(ctx, name)
+	}
 }
 
 // AcquireCertificates tries to acquire the certificates for the given hostnames synchronously.

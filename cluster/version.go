@@ -39,5 +39,5 @@ func ParseClusterVersion(version string) (ClusterVersion, error) {
 var Version = ClusterVersion{
 	Major: 1,
 	Minor: 0,
-	Patch: 0,
+	Patch: 2,
 }

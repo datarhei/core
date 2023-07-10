@@ -849,7 +849,7 @@ func (a *api) GetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", key).Log("Get key")
 
-	value, updatedAt, err := a.cluster.GetKV(origin, key)
+	value, updatedAt, err := a.cluster.GetKV(origin, key, false)
 	if err != nil {
 		if err == fs.ErrNotExist {
 			a.logger.Debug().WithError(err).WithField("key", key).Log("Get key: not found")

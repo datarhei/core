@@ -333,6 +333,43 @@ func (a *api) start(ctx context.Context) error {
 		}
 	}
 
+	if cfg.Debug.ForceGC > 0 {
+		ctx, cancel := context.WithCancel(ctx)
+		a.gcTickerStop = cancel
+
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					debug.FreeOSMemory()
+					/*
+						var mem runtime.MemStats
+						runtime.ReadMemStats(&mem)
+						a.log.logger.main.WithComponent("memory").Debug().WithFields(log.Fields{
+							"Sys":          float64(mem.Sys) / (1 << 20),
+							"HeapSys":      float64(mem.HeapSys) / (1 << 20),
+							"HeapAlloc":    float64(mem.HeapAlloc) / (1 << 20),
+							"HeapIdle":     float64(mem.HeapIdle) / (1 << 20),
+							"HeapInuse":    float64(mem.HeapInuse) / (1 << 20),
+							"HeapReleased": float64(mem.HeapReleased) / (1 << 20),
+						}).Log("")
+					*/
+				}
+			}
+		}(ctx)
+	}
+
+	if cfg.Debug.MemoryLimit > 0 {
+		debug.SetMemoryLimit(cfg.Debug.MemoryLimit * 1024 * 1024)
+	} else {
+		debug.SetMemoryLimit(math.MaxInt64)
+	}
+
 	resources, err := resources.New(resources.Config{
 		MaxCPU:    cfg.Resources.MaxCPUUsage,
 		MaxMemory: cfg.Resources.MaxMemoryUsage,
@@ -492,10 +529,7 @@ func (a *api) start(ctx context.Context) error {
 			})
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Cluster.StartupTimeout)*time.Second)
-		defer cancel()
-
-		cluster, err := cluster.New(ctx, cluster.Config{
+		cluster, err := cluster.New(cluster.Config{
 			ID:                     cfg.ID,
 			Name:                   cfg.Name,
 			Path:                   filepath.Join(cfg.DB.Dir, "cluster"),
@@ -1656,44 +1690,19 @@ func (a *api) start(ctx context.Context) error {
 	// Wait for all servers to be started
 	wgStart.Wait()
 
-	if cfg.Debug.ForceGC > 0 {
-		ctx, cancel := context.WithCancel(ctx)
-		a.gcTickerStop = cancel
-
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Duration(cfg.Debug.ForceGC) * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					debug.FreeOSMemory()
-					/*
-						var mem runtime.MemStats
-						runtime.ReadMemStats(&mem)
-						a.log.logger.main.WithComponent("memory").Debug().WithFields(log.Fields{
-							"Sys":          float64(mem.Sys) / (1 << 20),
-							"HeapSys":      float64(mem.HeapSys) / (1 << 20),
-							"HeapAlloc":    float64(mem.HeapAlloc) / (1 << 20),
-							"HeapIdle":     float64(mem.HeapIdle) / (1 << 20),
-							"HeapInuse":    float64(mem.HeapInuse) / (1 << 20),
-							"HeapReleased": float64(mem.HeapReleased) / (1 << 20),
-						}).Log("")
-					*/
-				}
-			}
-		}(ctx)
-	}
-
-	if cfg.Debug.MemoryLimit > 0 {
-		debug.SetMemoryLimit(cfg.Debug.MemoryLimit * 1024 * 1024)
-	} else {
-		debug.SetMemoryLimit(math.MaxInt64)
-	}
-
 	// Start the restream processes
 	restream.Start()
+
+	// Start the cluster
+	if a.cluster != nil {
+		ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Cluster.StartupTimeout)*time.Second)
+		defer cancel()
+
+		err := a.cluster.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to start cluster: %w", err)
+		}
+	}
 
 	// Start the service
 	if a.service != nil {

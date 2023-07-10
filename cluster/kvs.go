@@ -108,13 +108,15 @@ func (c *cluster) UnsetKV(origin, key string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) GetKV(origin, key string) (string, time.Time, error) {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return "", time.Time{}, ErrDegraded
-	}
+func (c *cluster) GetKV(origin, key string, stale bool) (string, time.Time, error) {
+	if !stale {
+		if ok, _ := c.IsClusterDegraded(); ok {
+			return "", time.Time{}, ErrDegraded
+		}
 
-	if !c.IsRaftLeader() {
-		return c.forwarder.GetKV(origin, key)
+		if !c.IsRaftLeader() {
+			return c.forwarder.GetKV(origin, key)
+		}
 	}
 
 	value, err := c.store.GetFromKVS(key)
@@ -131,12 +133,19 @@ func (c *cluster) ListKV(prefix string) map[string]store.Value {
 	return storeValues
 }
 
-type clusterKVS struct {
-	cluster Cluster
-	logger  log.Logger
+type ClusterKVS interface {
+	kvs.KVS
+
+	AllowStaleKeys(allow bool)
 }
 
-func NewClusterKVS(cluster Cluster, logger log.Logger) (kvs.KVS, error) {
+type clusterKVS struct {
+	cluster    Cluster
+	allowStale bool
+	logger     log.Logger
+}
+
+func NewClusterKVS(cluster Cluster, logger log.Logger) (ClusterKVS, error) {
 	s := &clusterKVS{
 		cluster: cluster,
 		logger:  logger,
@@ -147,6 +156,10 @@ func NewClusterKVS(cluster Cluster, logger log.Logger) (kvs.KVS, error) {
 	}
 
 	return s, nil
+}
+
+func (s *clusterKVS) AllowStaleKeys(allow bool) {
+	s.allowStale = allow
 }
 
 func (s *clusterKVS) CreateLock(name string, validUntil time.Time) (*kvs.Lock, error) {
@@ -181,8 +194,11 @@ func (s *clusterKVS) UnsetKV(key string) error {
 }
 
 func (s *clusterKVS) GetKV(key string) (string, time.Time, error) {
-	s.logger.Debug().WithField("key", key).Log("Get KV")
-	return s.cluster.GetKV("", key)
+	s.logger.Debug().WithFields(log.Fields{
+		"key":   key,
+		"stale": s.allowStale,
+	}).Log("Get KV")
+	return s.cluster.GetKV("", key, s.allowStale)
 }
 
 func (s *clusterKVS) ListKV(prefix string) map[string]store.Value {
