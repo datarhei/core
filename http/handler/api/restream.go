@@ -92,7 +92,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
-	p, _ := h.getProcess(tid, "config")
+	p, _ := h.getProcess(tid, newFilter("config"))
 
 	return c.JSON(http.StatusOK, p.Config)
 }
@@ -116,7 +116,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Router /api/v3/process [get]
 func (h *RestreamHandler) GetAll(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	filter := util.DefaultQuery(c, "filter", "")
+	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	reference := util.DefaultQuery(c, "reference", "")
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
@@ -193,7 +193,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 		Domain: domain,
 	}
 
-	p, err := h.getProcess(tid, filter)
+	p, err := h.getProcess(tid, newFilter(filter))
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
@@ -326,7 +326,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
-	p, _ := h.getProcess(tid, "config")
+	p, _ := h.getProcess(tid, newFilter("config"))
 
 	return c.JSON(http.StatusOK, p.Config)
 }
@@ -845,8 +845,15 @@ func (h *RestreamHandler) SetMetadata(c echo.Context) error {
 	return c.JSON(http.StatusOK, data)
 }
 
-func (h *RestreamHandler) getProcess(id app.ProcessID, filterString string) (api.Process, error) {
-	filter := strings.FieldsFunc(filterString, func(r rune) bool {
+type filter struct {
+	config   bool
+	state    bool
+	report   bool
+	metadata bool
+}
+
+func newFilter(filterString string) filter {
+	filters := strings.FieldsFunc(filterString, func(r rune) bool {
 		return r == rune(',')
 	})
 
@@ -857,18 +864,55 @@ func (h *RestreamHandler) getProcess(id app.ProcessID, filterString string) (api
 		"metadata": true,
 	}
 
-	if len(filter) != 0 {
+	if len(filters) != 0 {
 		for k := range wants {
 			wants[k] = false
 		}
 
-		for _, f := range filter {
+		for _, f := range filters {
 			if _, ok := wants[f]; ok {
 				wants[f] = true
 			}
 		}
 	}
 
+	f := filter{
+		config:   wants["config"],
+		state:    wants["state"],
+		report:   wants["report"],
+		metadata: wants["metadata"],
+	}
+
+	return f
+}
+
+func (f filter) Slice() []string {
+	what := []string{}
+
+	if f.config {
+		what = append(what, "config")
+	}
+
+	if f.state {
+		what = append(what, "state")
+	}
+
+	if f.report {
+		what = append(what, "report")
+	}
+
+	if f.metadata {
+		what = append(what, "metadata")
+	}
+
+	return what
+}
+
+func (f filter) String() string {
+	return strings.Join(f.Slice(), ",")
+}
+
+func (h *RestreamHandler) getProcess(id app.ProcessID, filter filter) (api.Process, error) {
 	process, err := h.restream.GetProcess(id)
 	if err != nil {
 		return api.Process{}, err
@@ -884,26 +928,26 @@ func (h *RestreamHandler) getProcess(id app.ProcessID, filterString string) (api
 		UpdatedAt: process.UpdatedAt,
 	}
 
-	if wants["config"] {
+	if filter.config {
 		info.Config = &api.ProcessConfig{}
 		info.Config.Unmarshal(process.Config)
 	}
 
-	if wants["state"] {
+	if filter.state {
 		if state, err := h.restream.GetProcessState(id); err == nil {
 			info.State = &api.ProcessState{}
 			info.State.Unmarshal(state)
 		}
 	}
 
-	if wants["report"] {
+	if filter.report {
 		if log, err := h.restream.GetProcessLog(id); err == nil {
 			info.Report = &api.ProcessReport{}
 			info.Report.Unmarshal(log)
 		}
 	}
 
-	if wants["metadata"] {
+	if filter.metadata {
 		if data, err := h.restream.GetProcessMetadata(id, ""); err == nil {
 			info.Metadata = api.NewMetadata(data)
 		}

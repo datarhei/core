@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -9,6 +11,8 @@ import (
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/store"
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
@@ -39,6 +43,10 @@ func NewCluster(cluster cluster.Cluster, iam iam.IAM) (*ClusterHandler, error) {
 
 	if h.cluster == nil {
 		return nil, fmt.Errorf("no cluster provided")
+	}
+
+	if h.proxy == nil {
+		return nil, fmt.Errorf("proxy reader from cluster is not available")
 	}
 
 	if h.iam == nil {
@@ -169,9 +177,7 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 // @Router /api/v3/cluster/process [get]
 func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
-		return r == rune(',')
-	})
+	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	reference := util.DefaultQuery(c, "reference", "")
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
@@ -184,7 +190,7 @@ func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 
 	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
 		ID:            wantids,
-		Filter:        filter,
+		Filter:        filter.Slice(),
 		Domain:        domain,
 		Reference:     reference,
 		IDPattern:     idpattern,
@@ -194,6 +200,7 @@ func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 	})
 
 	processes := []clientapi.Process{}
+	pmap := map[app.ProcessID]struct{}{}
 
 	for _, p := range procs {
 		if !h.iam.Enforce(ctxuser, domain, "process:"+p.ID, "read") {
@@ -201,9 +208,190 @@ func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 		}
 
 		processes = append(processes, p)
+		pmap[app.NewProcessID(p.ID, p.Domain)] = struct{}{}
 	}
 
-	return c.JSON(http.StatusOK, processes)
+	missing := []api.Process{}
+
+	// Here we have to add those processes that are in the cluster DB and couldn't be deployed
+	{
+		processes := h.cluster.ListProcesses()
+		filtered := h.getFilteredStoreProcesses(processes, wantids, domain, reference, idpattern, refpattern, ownerpattern, domainpattern)
+
+		for _, p := range filtered {
+			if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
+				continue
+			}
+
+			// Check if the process has been deployed
+			if _, ok := pmap[p.Config.ProcessID()]; ok {
+				continue
+			}
+
+			process := api.Process{
+				ID:        p.Config.ID,
+				Owner:     p.Config.Owner,
+				Domain:    p.Config.Domain,
+				Type:      "ffmpeg",
+				Reference: p.Config.Reference,
+				CreatedAt: p.CreatedAt.Unix(),
+				UpdatedAt: p.UpdatedAt.Unix(),
+			}
+
+			if filter.metadata {
+				process.Metadata = p.Metadata
+			}
+
+			if filter.config {
+				config := &api.ProcessConfig{}
+				config.Unmarshal(p.Config)
+
+				process.Config = config
+			}
+
+			if filter.state {
+				process.State = &api.ProcessState{
+					State:   "failed",
+					Order:   p.Order,
+					LastLog: p.Error,
+				}
+			}
+
+			if filter.report {
+				process.Report = &api.ProcessReport{}
+			}
+
+			missing = append(missing, process)
+		}
+	}
+
+	// We're doing some byte-wrangling here because the processes from the nodes
+	// are of type clientapi.Process, the missing processes are from type api.Process.
+	// They are actually the same and converting them is cumbersome. That's why
+	// we're doing the JSON marshalling here and appending these two slices is done
+	// in JSON representation.
+
+	data, err := json.Marshal(processes)
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", err.Error())
+	}
+
+	buf := &bytes.Buffer{}
+
+	if len(missing) != 0 {
+		reallyData, err := json.Marshal(missing)
+		if err != nil {
+			return api.Err(http.StatusInternalServerError, "", err.Error())
+		}
+
+		i := bytes.LastIndexByte(data, ']')
+		if i == -1 {
+			return api.Err(http.StatusInternalServerError, "", "no valid JSON")
+		}
+
+		if len(processes) != 0 {
+			data[i] = ','
+		} else {
+			data[i] = ' '
+		}
+		buf.Write(data)
+
+		i = bytes.IndexByte(reallyData, '[')
+		if i == -1 {
+			return api.Err(http.StatusInternalServerError, "", "no valid JSON")
+		}
+		buf.Write(reallyData[i+1:])
+	} else {
+		buf.Write(data)
+	}
+
+	return c.Stream(http.StatusOK, "application/json", buf)
+}
+
+func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, domain, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
+	filtered := []store.Process{}
+
+	count := 0
+
+	var idglob glob.Glob
+	var refglob glob.Glob
+	var ownerglob glob.Glob
+	var domainglob glob.Glob
+
+	if len(idpattern) != 0 {
+		count++
+		idglob, _ = glob.Compile(idpattern)
+	}
+
+	if len(refpattern) != 0 {
+		count++
+		refglob, _ = glob.Compile(refpattern)
+	}
+
+	if len(ownerpattern) != 0 {
+		count++
+		ownerglob, _ = glob.Compile(ownerpattern)
+	}
+
+	if len(domainpattern) != 0 {
+		count++
+		domainglob, _ = glob.Compile(domainpattern)
+	}
+
+	for _, t := range processes {
+		matches := 0
+		if idglob != nil {
+			if match := idglob.Match(t.Config.ID); match {
+				matches++
+			}
+		}
+
+		if refglob != nil {
+			if match := refglob.Match(t.Config.Reference); match {
+				matches++
+			}
+		}
+
+		if ownerglob != nil {
+			if match := ownerglob.Match(t.Config.Owner); match {
+				matches++
+			}
+		}
+
+		if domainglob != nil {
+			if match := domainglob.Match(t.Config.Domain); match {
+				matches++
+			}
+		}
+
+		if count != matches {
+			continue
+		}
+
+		filtered = append(filtered, t)
+	}
+
+	final := []store.Process{}
+
+	if len(wantids) == 0 || len(reference) != 0 {
+		for _, p := range filtered {
+			if len(reference) != 0 && p.Config.Reference != reference {
+				continue
+			}
+
+			final = append(final, p)
+		}
+	} else {
+		for _, p := range filtered {
+			for _, wantid := range wantids {
+				if wantid == p.Config.ID {
+					final = append(final, p)
+				}
+			}
+		}
+	}
+
+	return final
 }
 
 // GetAllNodesProcess returns the process with the given ID whereever it's running on the cluster
@@ -223,9 +411,7 @@ func (h *ClusterHandler) ListAllNodesProcesses(c echo.Context) error {
 func (h *ClusterHandler) GetAllNodesProcess(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
-	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
-		return r == rune(',')
-	})
+	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
@@ -234,12 +420,51 @@ func (h *ClusterHandler) GetAllNodesProcess(c echo.Context) error {
 
 	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
 		ID:     []string{id},
-		Filter: filter,
+		Filter: filter.Slice(),
 		Domain: domain,
 	})
 
 	if len(procs) == 0 {
-		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
+		// Check the store in the store for an undeployed process
+		p, err := h.cluster.GetProcess(app.NewProcessID(id, domain))
+		if err != nil {
+			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
+		}
+
+		process := api.Process{
+			ID:        p.Config.ID,
+			Owner:     p.Config.Owner,
+			Domain:    p.Config.Domain,
+			Type:      "ffmpeg",
+			Reference: p.Config.Reference,
+			CreatedAt: p.CreatedAt.Unix(),
+			UpdatedAt: p.UpdatedAt.Unix(),
+		}
+
+		if filter.metadata {
+			process.Metadata = p.Metadata
+		}
+
+		if filter.config {
+			config := &api.ProcessConfig{}
+			config.Unmarshal(p.Config)
+
+			process.Config = config
+		}
+
+		if filter.state {
+			process.State = &api.ProcessState{
+				State:   "failed",
+				Order:   p.Order,
+				LastLog: p.Error,
+			}
+		}
+
+		if filter.report {
+			process.Report = &api.ProcessReport{}
+		}
+
+		return c.JSON(http.StatusOK, process)
 	}
 
 	if procs[0].Domain != domain {
@@ -491,6 +716,7 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 		process.Config = config
 
 		process.State = &api.ProcessState{
+			State:   "failed",
 			Order:   p.Order,
 			LastLog: p.Error,
 		}
@@ -548,7 +774,9 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 	process.Config = config
 
 	process.State = &api.ProcessState{
-		Order: p.Order,
+		State:   "failed",
+		Order:   p.Order,
+		LastLog: p.Error,
 	}
 
 	return c.JSON(http.StatusOK, process)
