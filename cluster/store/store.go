@@ -44,6 +44,7 @@ type Process struct {
 	Config    *app.Config
 	Order     string
 	Metadata  map[string]interface{}
+	Error     string
 }
 
 type Users struct {
@@ -69,6 +70,7 @@ const (
 	OpUpdateProcess      Operation = "updateProcess"
 	OpSetProcessOrder    Operation = "setProcessOrder"
 	OpSetProcessMetadata Operation = "setProcessMetadata"
+	OpSetProcessError    Operation = "setProcessError"
 	OpAddIdentity        Operation = "addIdentity"
 	OpUpdateIdentity     Operation = "updateIdentity"
 	OpRemoveIdentity     Operation = "removeIdentity"
@@ -108,6 +110,11 @@ type CommandSetProcessMetadata struct {
 	ID   app.ProcessID
 	Key  string
 	Data interface{}
+}
+
+type CommandSetProcessError struct {
+	ID    app.ProcessID
+	Error string
 }
 
 type CommandAddIdentity struct {
@@ -307,6 +314,14 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.setProcessMetadata(cmd)
+	case OpSetProcessError:
+		cmd := CommandSetProcessError{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setProcessError(cmd)
 	case OpAddIdentity:
 		cmd := CommandAddIdentity{}
 		err = decodeCommand(&cmd, c.Data)
@@ -530,6 +545,24 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 		p.Metadata[cmd.Key] = cmd.Data
 	}
 	p.UpdatedAt = time.Now()
+
+	s.data.Process[id] = p
+
+	return nil
+}
+
+func (s *store) setProcessError(cmd CommandSetProcessError) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	id := cmd.ID.String()
+
+	p, ok := s.data.Process[id]
+	if !ok {
+		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
+	}
+
+	p.Error = cmd.Error
 
 	s.data.Process[id] = p
 
@@ -783,6 +816,7 @@ func (s *store) ListProcesses() []Process {
 			Config:    p.Config.Clone(),
 			Order:     p.Order,
 			Metadata:  p.Metadata,
+			Error:     p.Error,
 		})
 	}
 
@@ -804,6 +838,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 		Config:    process.Config.Clone(),
 		Order:     process.Order,
 		Metadata:  process.Metadata,
+		Error:     process.Error,
 	}, nil
 }
 

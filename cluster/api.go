@@ -968,7 +968,7 @@ func ErrorHandler(err error, c echo.Context) {
 	} else {
 		code = http.StatusInternalServerError
 		message = http.StatusText(http.StatusInternalServerError)
-		details = strings.Split(fmt.Sprintf("%s", err), "\n")
+		details = strings.Split(err.Error(), "\n")
 	}
 
 	// Send response

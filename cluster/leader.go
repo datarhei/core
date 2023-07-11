@@ -443,12 +443,23 @@ type processOpSkip struct {
 	err       error
 }
 
-func (c *cluster) applyOpStack(stack []interface{}) {
+type processOpError struct {
+	processid app.ProcessID
+	err       error
+}
+
+func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
+	errors := []processOpError{}
+
 	for _, op := range stack {
 		switch v := op.(type) {
 		case processOpAdd:
 			err := c.proxy.AddProcess(v.nodeid, v.config, v.metadata)
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.config.ProcessID(),
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ProcessID(),
 					"nodeid":    v.nodeid,
@@ -459,40 +470,68 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 			if v.order == "start" {
 				err = c.proxy.CommandProcess(v.nodeid, v.config.ProcessID(), "start")
 				if err != nil {
+					errors = append(errors, processOpError{
+						processid: v.config.ProcessID(),
+						err:       err,
+					})
 					c.logger.Info().WithError(err).WithFields(log.Fields{
-						"processid": v.config.ID,
+						"processid": v.config.ProcessID(),
 						"nodeid":    v.nodeid,
 					}).Log("Starting process")
 					break
 				}
 			}
+
+			errors = append(errors, processOpError{
+				processid: v.config.ProcessID(),
+				err:       nil,
+			})
+
 			c.logger.Info().WithFields(log.Fields{
-				"processid": v.config.ID,
+				"processid": v.config.ProcessID(),
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
 		case processOpUpdate:
 			err := c.proxy.UpdateProcess(v.nodeid, v.processid, v.config, v.metadata)
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.processid,
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.config.ID,
+					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Updating process")
 				break
 			}
 
+			errors = append(errors, processOpError{
+				processid: v.processid,
+				err:       nil,
+			})
+
 			c.logger.Info().WithFields(log.Fields{
-				"processid": v.config.ID,
+				"processid": v.config.ProcessID(),
 				"nodeid":    v.nodeid,
 			}).Log("Updating process")
 		case processOpDelete:
 			err := c.proxy.DeleteProcess(v.nodeid, v.processid)
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.processid,
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Removing process")
 				break
 			}
+
+			errors = append(errors, processOpError{
+				processid: v.processid,
+				err:       nil,
+			})
 
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
@@ -501,8 +540,12 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 		case processOpMove:
 			err := c.proxy.AddProcess(v.toNodeid, v.config, v.metadata)
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.config.ProcessID(),
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ID,
+					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
 				}).Log("Moving process, adding process")
@@ -511,8 +554,12 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 
 			err = c.proxy.DeleteProcess(v.fromNodeid, v.config.ProcessID())
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.config.ProcessID(),
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ID,
+					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
 				}).Log("Moving process, removing process")
@@ -521,28 +568,46 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 
 			err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.config.ProcessID(),
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ID,
+					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
 				}).Log("Moving process, starting process")
 				break
 			}
 
+			errors = append(errors, processOpError{
+				processid: v.config.ProcessID(),
+				err:       nil,
+			})
+
 			c.logger.Info().WithFields(log.Fields{
-				"processid":  v.config.ID,
+				"processid":  v.config.ProcessID(),
 				"fromnodeid": v.fromNodeid,
 				"tonodeid":   v.toNodeid,
 			}).Log("Moving process")
 		case processOpStart:
 			err := c.proxy.CommandProcess(v.nodeid, v.processid, "start")
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.processid,
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Starting process")
 				break
 			}
+
+			errors = append(errors, processOpError{
+				processid: v.processid,
+				err:       nil,
+			})
 
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
@@ -551,6 +616,10 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 		case processOpStop:
 			err := c.proxy.CommandProcess(v.nodeid, v.processid, "stop")
 			if err != nil {
+				errors = append(errors, processOpError{
+					processid: v.processid,
+					err:       err,
+				})
 				c.logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
@@ -558,21 +627,35 @@ func (c *cluster) applyOpStack(stack []interface{}) {
 				break
 			}
 
+			errors = append(errors, processOpError{
+				processid: v.processid,
+				err:       nil,
+			})
+
 			c.logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Stopping process")
 		case processOpReject:
+			errors = append(errors, processOpError(v))
 			c.logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
 		case processOpSkip:
+			errors = append(errors, processOpError{
+				processid: v.processid,
+				err:       v.err,
+			})
 			c.logger.Warn().WithError(v.err).WithFields(log.Fields{
 				"nodeid":    v.nodeid,
 				"processid": v.processid,
 			}).Log("Process skipped")
+		case processOpError:
+			errors = append(errors, v)
 		default:
 			c.logger.Warn().Log("Unknown operation on stack: %+v", v)
 		}
 	}
+
+	return errors
 }
 
 func (c *cluster) doSynchronize(emergency bool) {
@@ -608,7 +691,37 @@ func (c *cluster) doSynchronize(emergency bool) {
 		c.applyCommand(cmd)
 	}
 
-	c.applyOpStack(opStack)
+	errors := c.applyOpStack(opStack)
+
+	if !emergency {
+		for _, e := range errors {
+			// Only apply the command if the error is different.
+			process, err := c.store.GetProcess(e.processid)
+			if err != nil {
+				continue
+			}
+
+			if e.err != nil {
+				if process.Error == e.err.Error() {
+					continue
+				}
+			} else {
+				if len(process.Error) == 0 {
+					continue
+				}
+			}
+
+			cmd := &store.Command{
+				Operation: store.OpSetProcessError,
+				Data: store.CommandSetProcessError{
+					ID:    e.processid,
+					Error: e.err.Error(),
+				},
+			}
+
+			c.applyCommand(cmd)
+		}
+	}
 }
 
 func (c *cluster) doRebalance(emergency bool) {
@@ -634,7 +747,35 @@ func (c *cluster) doRebalance(emergency bool) {
 
 	opStack, _ := rebalance(have, nodesMap)
 
-	c.applyOpStack(opStack)
+	errors := c.applyOpStack(opStack)
+
+	for _, e := range errors {
+		// Only apply the command if the error is different.
+		process, err := c.store.GetProcess(e.processid)
+		if err != nil {
+			continue
+		}
+
+		if e.err != nil {
+			if process.Error == e.err.Error() {
+				continue
+			}
+		} else {
+			if len(process.Error) == 0 {
+				continue
+			}
+		}
+
+		cmd := &store.Command{
+			Operation: store.OpSetProcessError,
+			Data: store.CommandSetProcessError{
+				ID:    e.processid,
+				Error: e.err.Error(),
+			},
+		}
+
+		c.applyCommand(cmd)
+	}
 }
 
 // isMetadataUpdateRequired compares two metadata. It relies on the documented property that json.Marshal

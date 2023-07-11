@@ -343,6 +343,92 @@ func TestUpdateProcess(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSetProcessOrderCommand(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	config := &app.Config{
+		ID:          "foobar",
+		LimitCPU:    1,
+		LimitMemory: 1,
+	}
+
+	err = s.applyCommand(Command{
+		Operation: OpAddProcess,
+		Data: CommandAddProcess{
+			Config: config,
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, s.data.Process)
+
+	p, err := s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "stop", p.Order)
+
+	err = s.applyCommand(Command{
+		Operation: OpSetProcessOrder,
+		Data: CommandSetProcessOrder{
+			ID:    config.ProcessID(),
+			Order: "start",
+		},
+	})
+	require.NoError(t, err)
+
+	p, err = s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "start", p.Order)
+}
+
+func TestSetProcessOrder(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	config := &app.Config{
+		ID:          "foobar",
+		LimitCPU:    1,
+		LimitMemory: 1,
+	}
+
+	err = s.setProcessOrder(CommandSetProcessOrder{
+		ID:    config.ProcessID(),
+		Order: "start",
+	})
+	require.Error(t, err)
+
+	err = s.addProcess(CommandAddProcess{
+		Config: config,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(s.data.Process))
+
+	err = s.setProcessOrder(CommandSetProcessOrder{
+		ID:    config.ProcessID(),
+		Order: "start",
+	})
+	require.NoError(t, err)
+
+	err = s.setProcessOrder(CommandSetProcessOrder{
+		ID:    config.ProcessID(),
+		Order: "stop",
+	})
+	require.NoError(t, err)
+
+	p, err := s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "stop", p.Order)
+
+	err = s.setProcessOrder(CommandSetProcessOrder{
+		ID:    config.ProcessID(),
+		Order: "start",
+	})
+	require.NoError(t, err)
+
+	p, err = s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "start", p.Order)
+}
+
 func TestSetProcessMetadataCommand(t *testing.T) {
 	s, err := createStore()
 	require.NoError(t, err)
@@ -458,6 +544,92 @@ func TestSetProcessMetadata(t *testing.T) {
 	require.NotEmpty(t, p.Metadata)
 	require.Equal(t, 1, len(p.Metadata))
 	require.Equal(t, "bor", p.Metadata["foo"])
+}
+
+func TestSetProcessErrorCommand(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	config := &app.Config{
+		ID:          "foobar",
+		LimitCPU:    1,
+		LimitMemory: 1,
+	}
+
+	err = s.applyCommand(Command{
+		Operation: OpAddProcess,
+		Data: CommandAddProcess{
+			Config: config,
+		},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, s.data.Process)
+
+	p, err := s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "", p.Error)
+
+	err = s.applyCommand(Command{
+		Operation: OpSetProcessError,
+		Data: CommandSetProcessError{
+			ID:    config.ProcessID(),
+			Error: "foobar",
+		},
+	})
+	require.NoError(t, err)
+
+	p, err = s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "foobar", p.Error)
+}
+
+func TestSetProcessError(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	config := &app.Config{
+		ID:          "foobar",
+		LimitCPU:    1,
+		LimitMemory: 1,
+	}
+
+	err = s.setProcessError(CommandSetProcessError{
+		ID:    config.ProcessID(),
+		Error: "foobar",
+	})
+	require.Error(t, err)
+
+	err = s.addProcess(CommandAddProcess{
+		Config: config,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(s.data.Process))
+
+	err = s.setProcessError(CommandSetProcessError{
+		ID:    config.ProcessID(),
+		Error: "foobar",
+	})
+	require.NoError(t, err)
+
+	err = s.setProcessError(CommandSetProcessError{
+		ID:    config.ProcessID(),
+		Error: "",
+	})
+	require.NoError(t, err)
+
+	p, err := s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "", p.Error)
+
+	err = s.setProcessError(CommandSetProcessError{
+		ID:    config.ProcessID(),
+		Error: "foobar",
+	})
+	require.NoError(t, err)
+
+	p, err = s.GetProcess(config.ProcessID())
+	require.NoError(t, err)
+	require.Equal(t, "foobar", p.Error)
 }
 
 func TestAddIdentityCommand(t *testing.T) {
