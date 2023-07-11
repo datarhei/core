@@ -1613,6 +1613,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/transfer/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Transfer the leadership to another node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Transfer the leadership to another node",
+                "operationId": "cluster-3-transfer-leadership",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/config": {
             "get": {
                 "security": [

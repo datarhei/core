@@ -103,6 +103,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.POST("/v1/server", a.AddServer)
 	a.router.DELETE("/v1/server/:id", a.RemoveServer)
 
+	a.router.PUT("/v1/transfer/:id", a.TransferLeadership)
+
 	a.router.GET("/v1/snaphot", a.Snapshot)
 
 	a.router.POST("/v1/process", a.AddProcess)
@@ -255,7 +257,41 @@ func (a *api) RemoveServer(c echo.Context) error {
 	err := a.cluster.Leave(origin, id)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to leave cluster")
-		return Err(http.StatusInternalServerError, "", "unable to leave cluster%s", err.Error())
+		return Err(http.StatusInternalServerError, "", "unable to leave cluster: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// TransferLeadership transfers the leadership to another node
+// @Summary Transfer leadership
+// @Description Transfer leadership
+// @Tags v1.0.0
+// @ID cluster-1-transfer-leadership
+// @Accept json
+// @Produce json
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/transfer/{id} [put]
+func (a *api) TransferLeadership(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	a.logger.Debug().WithFields(log.Fields{
+		"id": id,
+	}).Log("Transfer request")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	err := a.cluster.TransferLeadership(origin, id)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to transfer leadership")
+		return Err(http.StatusInternalServerError, "", "unable to transfer leadership: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

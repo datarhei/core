@@ -41,7 +41,7 @@ type Raft interface {
 
 	AddServer(id, address string) error
 	RemoveServer(id string) error
-	LeadershipTransfer() error
+	LeadershipTransfer(id string) error
 
 	Snapshot() (io.ReadCloser, error)
 }
@@ -265,8 +265,27 @@ func (r *raft) RemoveServer(id string) error {
 	return nil
 }
 
-func (r *raft) LeadershipTransfer() error {
-	future := r.raft.LeadershipTransfer()
+func (r *raft) LeadershipTransfer(id string) error {
+	var future hcraft.Future
+
+	if len(id) == 0 {
+		future = r.raft.LeadershipTransfer()
+	} else {
+		servers, err := r.Servers()
+		if err != nil {
+			return err
+		}
+
+		for _, server := range servers {
+			if server.ID != id {
+				continue
+			}
+
+			future = r.raft.LeadershipTransferToServer(hcraft.ServerID(id), hcraft.ServerAddress(server.Address))
+			break
+		}
+	}
+
 	if err := future.Error(); err != nil {
 		return fmt.Errorf("failed to transfer leadership: %w", err)
 	}

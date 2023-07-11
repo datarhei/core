@@ -1070,6 +1070,50 @@
                     }
                 }
             }
+        },
+        "/v1/transfer/{id}": {
+            "put": {
+                "description": "Transfer leadership",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Transfer leadership",
+                "operationId": "cluster-1-transfer-leadership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {

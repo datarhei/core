@@ -55,7 +55,8 @@ type Cluster interface {
 	GetBarrier(name string) bool
 
 	Join(origin, id, raftAddress, peerAddress string) error
-	Leave(origin, id string) error // gracefully remove a node from the cluster
+	Leave(origin, id string) error              // gracefully remove a node from the cluster
+	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
 
 	ListProcesses() []store.Process
@@ -696,6 +697,10 @@ func (c *cluster) IsClusterDegraded() (bool, error) {
 }
 
 func (c *cluster) Leave(origin, id string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
 	if len(id) == 0 {
 		id = c.id
 	}
@@ -761,7 +766,7 @@ func (c *cluster) Leave(origin, id string) error {
 		}
 
 		// Transfer the leadership to another server
-		err := c.leadershipTransfer()
+		err := c.leadershipTransfer("")
 		if err != nil {
 			c.logger.Warn().WithError(err).Log("Transfer leadership")
 			return err
@@ -830,6 +835,10 @@ func (c *cluster) Leave(origin, id string) error {
 }
 
 func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Join(origin, id, raftAddress, peerAddress)
@@ -888,7 +897,24 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 	return nil
 }
 
+func (c *cluster) TransferLeadership(origin, id string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		c.logger.Debug().Log("Not leader, forwarding to leader")
+		return c.forwarder.TransferLeadership(origin, id)
+	}
+
+	return c.leadershipTransfer(id)
+}
+
 func (c *cluster) Snapshot(origin string) (io.ReadCloser, error) {
+	if ok, _ := c.IsDegraded(); ok {
+		return nil, ErrDegraded
+	}
+
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Snapshot(origin)

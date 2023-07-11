@@ -187,10 +187,14 @@ func (c *cluster) monitorLeadership() {
 
 // leadershipTransfer tries to transfer the leadership to another node e.g. in order
 // to do a graceful shutdown.
-func (c *cluster) leadershipTransfer() error {
+func (c *cluster) leadershipTransfer(id string) error {
+	if id == c.id {
+		return nil
+	}
+
 	retryCount := 3
 	for i := 0; i < retryCount; i++ {
-		err := c.raft.LeadershipTransfer()
+		err := c.raft.LeadershipTransfer(id)
 		if err != nil {
 			c.logger.Error().WithError(err).WithFields(log.Fields{
 				"attempt":     i,
@@ -254,7 +258,7 @@ RECONCILE:
 			// longer the leader. If leadershipTransfer() fails, we
 			// will try to acquire it again after
 			// 5 seconds.
-			if err := c.leadershipTransfer(); err != nil {
+			if err := c.leadershipTransfer(""); err != nil {
 				c.logger.Error().WithError(err).Log("Transfer leadership")
 				interval = time.After(5 * time.Second)
 				goto WAIT

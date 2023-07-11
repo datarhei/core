@@ -115,6 +115,24 @@ func (h *ClusterHandler) Healthy(c echo.Context) error {
 	return c.JSON(http.StatusOK, !degraded)
 }
 
+// Transfer the leadership to another node
+// @Summary Transfer the leadership to another node
+// @Description Transfer the leadership to another node
+// @Tags v16.?.?
+// @ID cluster-3-transfer-leadership
+// @Produce json
+// @Success 200 {string} string
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/transfer/{id} [put]
+func (h *ClusterHandler) TransferLeadership(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	h.cluster.TransferLeadership("", id)
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // Leave the cluster gracefully
 // @Summary Leave the cluster gracefully
 // @Description Leave the cluster gracefully
@@ -564,12 +582,12 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
 	}
 
 	if !superuser {
 		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
-			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process", process.Owner)
+			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process in domain %s", process.Owner, process.Domain)
 		}
 	}
 
@@ -584,7 +602,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 	config, metadata := process.Marshal()
 
 	if err := h.cluster.AddProcess("", config); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid process config: %s", err.Error())
+		return api.Err(http.StatusBadRequest, "", "adding process config: %s", err.Error())
 	}
 
 	for key, value := range metadata {

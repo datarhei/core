@@ -20,6 +20,7 @@ type Forwarder interface {
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error
+	TransferLeadership(origin, id string) error
 	Snapshot(origin string) (io.ReadCloser, error)
 
 	AddProcess(origin string, config *app.Config) error
@@ -136,6 +137,20 @@ func (f *forwarder) Leave(origin, id string) error {
 	f.lock.RUnlock()
 
 	return client.Leave(origin, id)
+}
+
+func (f *forwarder) TransferLeadership(origin, id string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	f.logger.Debug().WithField("id", id).Log("Transferring leadership")
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.TransferLeadership(origin, id)
 }
 
 func (f *forwarder) Snapshot(origin string) (io.ReadCloser, error) {

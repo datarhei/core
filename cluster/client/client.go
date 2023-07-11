@@ -163,6 +163,12 @@ func (c *APIClient) Leave(origin string, id string) error {
 	return err
 }
 
+func (c *APIClient) TransferLeadership(origin, id string) error {
+	_, err := c.call(http.MethodPut, "/v1/transfer/"+url.PathEscape(id), "application/json", nil, origin)
+
+	return err
+}
+
 func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {

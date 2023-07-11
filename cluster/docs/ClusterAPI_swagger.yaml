@@ -1552,4 +1552,33 @@ paths:
       summary: Cluster DB snapshot
       tags:
       - v1.0.0
+  /v1/transfer/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Transfer leadership
+      operationId: cluster-1-transfer-leadership
+      parameters:
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Transfer leadership
+      tags:
+      - v1.0.0
 swagger: "2.0"
