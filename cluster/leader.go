@@ -701,10 +701,14 @@ func (c *cluster) doSynchronize(emergency bool) {
 				continue
 			}
 
+			var errmessage string = ""
+
 			if e.err != nil {
 				if process.Error == e.err.Error() {
 					continue
 				}
+
+				errmessage = e.err.Error()
 			} else {
 				if len(process.Error) == 0 {
 					continue
@@ -715,7 +719,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 				Operation: store.OpSetProcessError,
 				Data: store.CommandSetProcessError{
 					ID:    e.processid,
-					Error: e.err.Error(),
+					Error: errmessage,
 				},
 			}
 
