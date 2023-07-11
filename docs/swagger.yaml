@@ -160,6 +160,10 @@ definitions:
       ncpu:
         type: number
     type: object
+  api.ClusterProcessMap:
+    additionalProperties:
+      type: string
+    type: object
   api.ClusterRaft:
     properties:
       server:
@@ -267,7 +271,10 @@ definitions:
             description: ip:port
             type: string
           debug:
-            type: boolean
+            properties:
+              disable_ffmpeg_check:
+                type: boolean
+            type: object
           emergency_leader_timeout_sec:
             description: seconds
             format: int64
@@ -1843,7 +1850,10 @@ definitions:
             description: ip:port
             type: string
           debug:
-            type: boolean
+            properties:
+              disable_ffmpeg_check:
+                type: boolean
+            type: object
           emergency_leader_timeout_sec:
             description: seconds
             format: int64
@@ -2914,6 +2924,22 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Leave the cluster gracefully
+      tags:
+      - v16.?.?
+  /api/v3/cluster/map/process:
+    get:
+      description: Retrieve a map of which process is running on which node
+      operationId: cluster-3-process-node-map
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterProcessMap'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve a map of which process is running on which node
       tags:
       - v16.?.?
   /api/v3/cluster/node:

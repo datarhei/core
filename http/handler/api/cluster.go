@@ -1425,3 +1425,18 @@ func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 
 	return c.Stream(http.StatusOK, "application/octet-stream", r)
 }
+
+// GetProcessNodeMap returns a map of which process is running on which node
+// @Summary Retrieve a map of which process is running on which node
+// @Description Retrieve a map of which process is running on which node
+// @Tags v16.?.?
+// @ID cluster-3-process-node-map
+// @Produce json
+// @Success 200 {object} api.ClusterProcessMap
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/map/process [get]
+func (h *ClusterHandler) GetProcessNodeMap(c echo.Context) error {
+	m := h.cluster.GetProcessNodeMap()
+
+	return c.JSON(http.StatusOK, m)
+}

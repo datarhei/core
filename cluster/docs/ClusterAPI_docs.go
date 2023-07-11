@@ -1428,7 +1428,12 @@ const docTemplateClusterAPI = `{
                             "type": "string"
                         },
                         "debug": {
-                            "type": "boolean"
+                            "type": "object",
+                            "properties": {
+                                "disable_ffmpeg_check": {
+                                    "type": "boolean"
+                                }
+                            }
                         },
                         "emergency_leader_timeout_sec": {
                             "description": "seconds",

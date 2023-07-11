@@ -593,6 +593,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 	opStack, _, reality := synchronize(wish, want, have, nodesMap, c.nodeRecoverTimeout)
 
 	if !emergency && len(opStack) != 0 {
+		// TODO: only apply a new map if there are actually changes
 		cmd := &store.Command{
 			Operation: store.OpSetProcessNodeMap,
 			Data: store.CommandSetProcessNodeMap{

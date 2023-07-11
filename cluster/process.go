@@ -122,3 +122,7 @@ func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string
 
 	return c.applyCommand(cmd)
 }
+
+func (c *cluster) GetProcessNodeMap() map[string]string {
+	return c.store.GetProcessNodeMap()
+}

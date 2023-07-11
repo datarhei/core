@@ -228,7 +228,10 @@ definitions:
             description: ip:port
             type: string
           debug:
-            type: boolean
+            properties:
+              disable_ffmpeg_check:
+                type: boolean
+            type: object
           emergency_leader_timeout_sec:
             description: seconds
             format: int64

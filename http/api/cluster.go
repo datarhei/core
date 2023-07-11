@@ -99,3 +99,5 @@ type ClusterKVSValue struct {
 }
 
 type ClusterKVS map[string]ClusterKVSValue
+
+type ClusterProcessMap map[string]string

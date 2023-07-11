@@ -814,6 +814,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/map/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a map of which process is running on which node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve a map of which process is running on which node",
+                "operationId": "cluster-3-process-node-map",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterProcessMap"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/node": {
             "get": {
                 "security": [
@@ -4453,6 +4479,12 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterProcessMap": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
         "api.ClusterRaft": {
             "type": "object",
             "properties": {
@@ -4616,7 +4648,12 @@ const docTemplate = `{
                             "type": "string"
                         },
                         "debug": {
-                            "type": "boolean"
+                            "type": "object",
+                            "properties": {
+                                "disable_ffmpeg_check": {
+                                    "type": "boolean"
+                                }
+                            }
                         },
                         "emergency_leader_timeout_sec": {
                             "description": "seconds",
@@ -6849,7 +6886,12 @@ const docTemplate = `{
                             "type": "string"
                         },
                         "debug": {
-                            "type": "boolean"
+                            "type": "object",
+                            "properties": {
+                                "disable_ffmpeg_check": {
+                                    "type": "boolean"
+                                }
+                            }
                         },
                         "emergency_leader_timeout_sec": {
                             "description": "seconds",
