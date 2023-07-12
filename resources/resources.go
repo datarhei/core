@@ -54,6 +54,12 @@ type Config struct {
 }
 
 func New(config Config) (Resources, error) {
+	isUnlimited := false
+
+	if config.MaxCPU <= 0 && config.MaxMemory <= 0 {
+		isUnlimited = true
+	}
+
 	if config.MaxCPU <= 0 {
 		config.MaxCPU = 100
 	}
@@ -67,13 +73,10 @@ func New(config Config) (Resources, error) {
 	}
 
 	r := &resources{
-		maxCPU: config.MaxCPU,
-		psutil: config.PSUtil,
-		logger: config.Logger,
-	}
-
-	if config.MaxCPU == 100 && config.MaxMemory == 100 {
-		r.isUnlimited = true
+		maxCPU:      config.MaxCPU,
+		psutil:      config.PSUtil,
+		isUnlimited: isUnlimited,
+		logger:      config.Logger,
 	}
 
 	if r.logger == nil {
@@ -167,31 +170,35 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 
 			doCPULimit := false
 
-			if !r.isCPULimiting {
-				if cpuload > r.maxCPU {
-					r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit reached")
+			if !r.isUnlimited {
+				if !r.isCPULimiting {
+					if cpuload >= r.maxCPU {
+						r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit reached")
+						doCPULimit = true
+					}
+				} else {
 					doCPULimit = true
-				}
-			} else {
-				doCPULimit = true
-				if cpuload <= r.maxCPU {
-					r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit released")
-					doCPULimit = false
+					if cpuload < r.maxCPU {
+						r.logger.Debug().WithField("cpu", cpuload).Log("CPU limit released")
+						doCPULimit = false
+					}
 				}
 			}
 
 			doMemoryLimit := false
 
-			if !r.isMemoryLimiting {
-				if vmstat.Used > r.maxMemory {
-					r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit reached")
+			if !r.isUnlimited {
+				if !r.isMemoryLimiting {
+					if vmstat.Used >= r.maxMemory {
+						r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit reached")
+						doMemoryLimit = true
+					}
+				} else {
 					doMemoryLimit = true
-				}
-			} else {
-				doMemoryLimit = true
-				if vmstat.Used <= r.maxMemory {
-					r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit released")
-					doMemoryLimit = false
+					if vmstat.Used < r.maxMemory {
+						r.logger.Debug().WithField("memory", vmstat.Used).Log("Memory limit released")
+						doMemoryLimit = false
+					}
 				}
 			}
 

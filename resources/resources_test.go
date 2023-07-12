@@ -178,6 +178,16 @@ func TestHasLimits(t *testing.T) {
 	require.True(t, r.HasLimits())
 
 	r, err = New(Config{
+		MaxCPU:    100,
+		MaxMemory: 100,
+		PSUtil:    &util{},
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+
+	require.True(t, r.HasLimits())
+
+	r, err = New(Config{
 		MaxCPU:    0,
 		MaxMemory: 0,
 		PSUtil:    &util{},
