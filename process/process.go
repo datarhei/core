@@ -37,7 +37,7 @@ type Process interface {
 
 	// Kill stops the process such that it will restart
 	// automatically if it is defined to do so.
-	Kill(wait bool) error
+	Kill(wait bool, reason string) error
 
 	// IsRunning returns whether the process is currently
 	// running or not.
@@ -195,14 +195,16 @@ type process struct {
 		timer       *time.Timer
 		lock        sync.Mutex
 	}
-	timeout       time.Duration
-	stopTimer     *time.Timer
-	stopTimerLock sync.Mutex
-	killTimer     *time.Timer
-	killTimerLock sync.Mutex
-	logger        log.Logger
-	debuglogger   log.Logger
-	callbacks     struct {
+	timeout        time.Duration
+	stopTimer      *time.Timer
+	stopTimerLock  sync.Mutex
+	stopReason     string
+	stopReasonLock sync.Mutex
+	killTimer      *time.Timer
+	killTimerLock  sync.Mutex
+	logger         log.Logger
+	debuglogger    log.Logger
+	callbacks      struct {
 		onArgs        func(args []string) []string
 		onBeforeStart func() error
 		onStart       func()
@@ -280,8 +282,8 @@ func New(config Config) (Process, error) {
 			p.logger.WithFields(log.Fields{
 				"cpu":    cpu,
 				"memory": memory,
-			}).Warn().Log("Stopping because limits are exceeded")
-			p.Kill(false)
+			}).Warn().Log("Killed because limits are exceeded")
+			p.Kill(false, fmt.Sprintf("Killed because limits are exceeded (mode: %s, tolerance: %s): %.2f (%.2f) CPU, %d (%d) bytes memory", config.LimitMode.String(), config.LimitDuration.String(), cpu, config.LimitCPU, memory, config.LimitMemory))
 		},
 	})
 
@@ -608,7 +610,7 @@ func (p *process) start() error {
 		if p.stopTimer == nil {
 			// Only create a new timer if there isn't already one running
 			p.stopTimer = time.AfterFunc(p.timeout, func() {
-				p.Kill(false)
+				p.Kill(false, fmt.Sprintf("Killed because timeout triggered (%s)", p.timeout))
 
 				p.stopTimerLock.Lock()
 				p.stopTimer.Stop()
@@ -657,7 +659,7 @@ func (p *process) Stop(wait bool) error {
 		return nil
 	}
 
-	err := p.stop(wait)
+	err := p.stop(wait, "")
 	if err != nil {
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),
@@ -671,20 +673,20 @@ func (p *process) Stop(wait bool) error {
 
 // Kill will stop the process without changing the order such that it
 // will restart automatically if enabled.
-func (p *process) Kill(wait bool) error {
+func (p *process) Kill(wait bool, reason string) error {
 	// If the process is currently not running, we don't need
 	// to do anything.
 	if !p.isRunning() {
 		return nil
 	}
 
-	err := p.stop(wait)
+	err := p.stop(wait, reason)
 
 	return err
 }
 
 // stop will stop a process considering the current order and state.
-func (p *process) stop(wait bool) error {
+func (p *process) stop(wait bool, reason string) error {
 	// If the process is currently not running, stop the restart timer
 	if !p.isRunning() {
 		p.unreconnect()
@@ -695,6 +697,10 @@ func (p *process) stop(wait bool) error {
 	if p.getState() == stateFinishing {
 		return nil
 	}
+
+	p.stopReasonLock.Lock()
+	p.stopReason = reason
+	p.stopReasonLock.Unlock()
 
 	p.setState(stateFinishing)
 
@@ -769,7 +775,7 @@ func (p *process) stop(wait bool) error {
 	return err
 }
 
-// reconnect will setup a timer to restart the  process
+// reconnect will setup a timer to restart the process
 func (p *process) reconnect(delay time.Duration) {
 	if delay < time.Duration(0) {
 		return
@@ -828,8 +834,8 @@ func (p *process) staler(ctx context.Context) {
 
 			d := t.Sub(last)
 			if d.Seconds() > timeout.Seconds() {
-				p.logger.Info().Log("Stale timeout after %s (%.2f).", timeout, d.Seconds())
-				p.stop(false)
+				p.logger.Info().Log("Stale timeout after %s (%.2fs).", timeout, d.Seconds())
+				p.stop(false, fmt.Sprintf("Stale timeout after %s, no output received from process", timeout))
 				return
 			}
 		}
@@ -872,7 +878,15 @@ func (p *process) reader() {
 
 	if err := scanner.Err(); err != nil {
 		p.logger.Debug().WithError(err).Log("")
+		p.parser.Parse(err.Error())
 	}
+
+	p.stopReasonLock.Lock()
+	if len(p.stopReason) != 0 {
+		p.parser.Parse(p.stopReason)
+		p.stopReason = ""
+	}
+	p.stopReasonLock.Unlock()
 
 	// Wait for the process to finish
 	p.waiter()

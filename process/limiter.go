@@ -30,9 +30,21 @@ type LimitFunc func(cpu float64, memory uint64)
 
 type LimitMode int
 
+func (m LimitMode) String() string {
+	if m == LimitModeHard {
+		return "hard"
+	}
+
+	if m == LimitModeSoft {
+		return "soft"
+	}
+
+	return "undefined"
+}
+
 const (
-	LimitModeHard LimitMode = 0 // Killing the process if either CPU or memory is above the limit (for a certain time)
-	LimitModeSoft LimitMode = 1 // Throttling the CPU if activated, killing the process if memory is above the limit
+	LimitModeHard LimitMode = 0 // Killing the process if either CPU or memory is above the limit for a certain time
+	LimitModeSoft LimitMode = 1 // Throttling the CPU if activated, killing the process if memory is above the limit for a certain time
 )
 
 type LimiterConfig struct {
