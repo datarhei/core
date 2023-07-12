@@ -736,6 +736,10 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 
 	data, err := h.restream.GetProcessMetadata(tid, key)
 	if err != nil {
+		if err == restream.ErrMetadataKeyNotFound {
+			return api.Err(http.StatusNotFound, "", "unknown key: %s", err.Error())
+		}
+
 		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 

@@ -700,14 +700,16 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
 		v3.GET("/cluster/db/locks", s.v3handler.cluster.ListStoreLocks)
 		v3.GET("/cluster/db/kv", s.v3handler.cluster.ListStoreKV)
-		v3.GET("/cluster/db/map/process", s.v3handler.cluster.GetProcessNodeMap)
+		v3.GET("/cluster/db/map/process", s.v3handler.cluster.GetStoreProcessNodeMap)
 
 		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
 		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.ListIdentity)
 		v3.GET("/cluster/iam/policies", s.v3handler.cluster.ListPolicies)
 
-		v3.GET("/cluster/process", s.v3handler.cluster.ListAllNodesProcesses)
-		v3.GET("/cluster/process/:id", s.v3handler.cluster.GetAllNodesProcess)
+		v3.GET("/cluster/process", s.v3handler.cluster.GetAllProcesses)
+		v3.GET("/cluster/process/:id", s.v3handler.cluster.GetProcess)
+		v3.GET("/cluster/process/:id/metadata", s.v3handler.cluster.GetProcessMetadata)
+		v3.GET("/cluster/process/:id/metadata/:key", s.v3handler.cluster.GetProcessMetadata)
 
 		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
 		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)

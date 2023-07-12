@@ -2929,7 +2929,7 @@ paths:
   /api/v3/cluster/map/process:
     get:
       description: Retrieve a map of which process is running on which node
-      operationId: cluster-3-process-node-map
+      operationId: cluster-3-db-process-node-map
       produces:
       - application/json
       responses:
@@ -3117,7 +3117,7 @@ paths:
   /api/v3/cluster/process:
     get:
       description: List of processes in the cluster
-      operationId: cluster-3-list-all-node-processes
+      operationId: cluster-3-get-all-processes
       parameters:
       - description: Domain to act on
         in: query
@@ -3366,6 +3366,48 @@ paths:
       tags:
       - v16.?.?
   /api/v3/cluster/process/{id}/metadata/{key}:
+    get:
+      description: Retrieve the previously stored JSON metadata under the given key.
+        If the key is empty, all metadata will be returned.
+      operationId: cluster-3-get-process-metadata
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Key for data store
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema: {}
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve JSON metadata stored with a process under a key
+      tags:
+      - v16.?.?
     put:
       description: Add arbitrary JSON metadata under the given key. If the key exists,
         all already stored metadata with this key will be overwritten. If the key

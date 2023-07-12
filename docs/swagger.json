@@ -821,7 +821,7 @@
                     "v16.?.?"
                 ],
                 "summary": "Retrieve a map of which process is running on which node",
-                "operationId": "cluster-3-process-node-map",
+                "operationId": "cluster-3-db-process-node-map",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1103,7 +1103,7 @@
                     "v16.?.?"
                 ],
                 "summary": "List of processes in the cluster",
-                "operationId": "cluster-3-list-all-node-processes",
+                "operationId": "cluster-3-get-all-processes",
                 "parameters": [
                     {
                         "type": "string",
@@ -1462,6 +1462,68 @@
             }
         },
         "/api/v3/cluster/process/{id}/metadata/{key}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve JSON metadata stored with a process under a key",
+                "operationId": "cluster-3-get-process-metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Key for data store",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {}
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {

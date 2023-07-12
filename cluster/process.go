@@ -123,6 +123,28 @@ func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string
 	return c.applyCommand(cmd)
 }
 
+func (c *cluster) GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error) {
+	if ok, _ := c.IsDegraded(); ok {
+		return nil, ErrDegraded
+	}
+
+	p, err := c.store.GetProcess(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(key) == 0 {
+		return p.Metadata, nil
+	}
+
+	data, ok := p.Metadata[key]
+	if !ok {
+		return nil, fmt.Errorf("unknown key")
+	}
+
+	return data, nil
+}
+
 func (c *cluster) GetProcessNodeMap() map[string]string {
 	return c.store.GetProcessNodeMap()
 }
