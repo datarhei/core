@@ -251,6 +251,16 @@ func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter
 		process.State = &api.ProcessState{
 			Order:   p.Order,
 			LastLog: p.Error,
+			Resources: api.ProcessUsage{
+				CPU: api.ProcessUsageCPU{
+					NCPU:  api.ToNumber(1),
+					Limit: api.ToNumber(p.Config.LimitCPU),
+				},
+				Memory: api.ProcessUsageMemory{
+					Limit: p.Config.LimitMemory,
+				},
+			},
+			Command: []string{},
 		}
 
 		if len(p.Error) != 0 {
