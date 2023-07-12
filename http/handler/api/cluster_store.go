@@ -33,27 +33,7 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 			continue
 		}
 
-		process := api.Process{
-			ID:        p.Config.ID,
-			Owner:     p.Config.Owner,
-			Domain:    p.Config.Domain,
-			Type:      "ffmpeg",
-			Reference: p.Config.Reference,
-			CreatedAt: p.CreatedAt.Unix(),
-			UpdatedAt: p.UpdatedAt.Unix(),
-			Metadata:  p.Metadata,
-		}
-
-		config := &api.ProcessConfig{}
-		config.Unmarshal(p.Config)
-
-		process.Config = config
-
-		process.State = &api.ProcessState{
-			State:   "failed",
-			Order:   p.Order,
-			LastLog: p.Error,
-		}
+		process := h.convertStoreProcessToAPIProcess(p, newFilter(""))
 
 		processes = append(processes, process)
 	}
@@ -91,27 +71,7 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
-	process := api.Process{
-		ID:        p.Config.ID,
-		Owner:     p.Config.Owner,
-		Domain:    p.Config.Domain,
-		Type:      "ffmpeg",
-		Reference: p.Config.Reference,
-		CreatedAt: p.CreatedAt.Unix(),
-		UpdatedAt: p.UpdatedAt.Unix(),
-		Metadata:  p.Metadata,
-	}
-
-	config := &api.ProcessConfig{}
-	config.Unmarshal(p.Config)
-
-	process.Config = config
-
-	process.State = &api.ProcessState{
-		State:   "failed",
-		Order:   p.Order,
-		LastLog: p.Error,
-	}
+	process := h.convertStoreProcessToAPIProcess(p, newFilter(""))
 
 	return c.JSON(http.StatusOK, process)
 }

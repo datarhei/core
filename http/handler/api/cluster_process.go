@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	clientapi "github.com/datarhei/core-client-go/v16/api"
@@ -89,38 +90,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 				continue
 			}
 
-			process := api.Process{
-				ID:        p.Config.ID,
-				Owner:     p.Config.Owner,
-				Domain:    p.Config.Domain,
-				Type:      "ffmpeg",
-				Reference: p.Config.Reference,
-				CreatedAt: p.CreatedAt.Unix(),
-				UpdatedAt: p.UpdatedAt.Unix(),
-			}
-
-			if filter.metadata {
-				process.Metadata = p.Metadata
-			}
-
-			if filter.config {
-				config := &api.ProcessConfig{}
-				config.Unmarshal(p.Config)
-
-				process.Config = config
-			}
-
-			if filter.state {
-				process.State = &api.ProcessState{
-					State:   "failed",
-					Order:   p.Order,
-					LastLog: p.Error,
-				}
-			}
-
-			if filter.report {
-				process.Report = &api.ProcessReport{}
-			}
+			process := h.convertStoreProcessToAPIProcess(p, filter)
 
 			missing = append(missing, process)
 		}
@@ -255,6 +225,64 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 	return final
 }
 
+func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter filter) api.Process {
+	process := api.Process{
+		ID:        p.Config.ID,
+		Owner:     p.Config.Owner,
+		Domain:    p.Config.Domain,
+		Type:      "ffmpeg",
+		Reference: p.Config.Reference,
+		CreatedAt: p.CreatedAt.Unix(),
+		UpdatedAt: p.UpdatedAt.Unix(),
+	}
+
+	if filter.metadata {
+		process.Metadata = p.Metadata
+	}
+
+	if filter.config {
+		config := &api.ProcessConfig{}
+		config.Unmarshal(p.Config)
+
+		process.Config = config
+	}
+
+	if filter.state {
+		process.State = &api.ProcessState{
+			Order:   p.Order,
+			LastLog: p.Error,
+		}
+
+		if len(p.Error) != 0 {
+			process.State.State = "failed"
+		} else {
+			process.State.State = "finished"
+		}
+	}
+
+	if filter.report {
+		process.Report = &api.ProcessReport{
+			ProcessReportEntry: api.ProcessReportEntry{
+				CreatedAt: p.CreatedAt.Unix(),
+				Prelude:   []string{},
+				Log:       [][2]string{},
+				Matches:   []string{},
+			},
+		}
+
+		if len(p.Error) != 0 {
+			process.Report.Prelude = []string{p.Error}
+			process.Report.Log = [][2]string{
+				{strconv.FormatInt(p.CreatedAt.Unix(), 10), p.Error},
+			}
+			process.Report.ExitedAt = p.CreatedAt.Unix()
+			process.Report.ExitState = "failed"
+		}
+	}
+
+	return process
+}
+
 // GetProcess returns the process with the given ID whereever it's running on the cluster
 // @Summary List a process by its ID
 // @Description List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.
@@ -292,38 +320,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
 		}
 
-		process := api.Process{
-			ID:        p.Config.ID,
-			Owner:     p.Config.Owner,
-			Domain:    p.Config.Domain,
-			Type:      "ffmpeg",
-			Reference: p.Config.Reference,
-			CreatedAt: p.CreatedAt.Unix(),
-			UpdatedAt: p.UpdatedAt.Unix(),
-		}
-
-		if filter.metadata {
-			process.Metadata = p.Metadata
-		}
-
-		if filter.config {
-			config := &api.ProcessConfig{}
-			config.Unmarshal(p.Config)
-
-			process.Config = config
-		}
-
-		if filter.state {
-			process.State = &api.ProcessState{
-				State:   "failed",
-				Order:   p.Order,
-				LastLog: p.Error,
-			}
-		}
-
-		if filter.report {
-			process.Report = &api.ProcessReport{}
-		}
+		process := h.convertStoreProcessToAPIProcess(p, filter)
 
 		return c.JSON(http.StatusOK, process)
 	}
