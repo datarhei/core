@@ -584,7 +584,7 @@ func (p *process) start() error {
 
 			p.reconnect(p.delay(stateFailed))
 
-			return nil
+			return err
 		}
 	}
 

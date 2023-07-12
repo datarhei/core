@@ -685,7 +685,7 @@ func TestProcessCallbacksOnBeforeStart(t *testing.T) {
 	require.NoError(t, err)
 
 	err = p.Start()
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	require.Eventually(t, func() bool {
 		return p.Status().State == "failed"
