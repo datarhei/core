@@ -13,6 +13,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/maps"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -679,8 +680,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 
 	opStack, _, reality := synchronize(wish, want, have, nodesMap, c.nodeRecoverTimeout)
 
-	if !emergency && len(opStack) != 0 {
-		// TODO: only apply a new map if there are actually changes
+	if !emergency && !maps.Equal(wish, reality) {
 		cmd := &store.Command{
 			Operation: store.OpSetProcessNodeMap,
 			Data: store.CommandSetProcessNodeMap{
