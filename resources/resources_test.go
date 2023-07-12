@@ -165,3 +165,25 @@ func TestRequest(t *testing.T) {
 	err = r.Request(10, 10)
 	require.NoError(t, err)
 }
+
+func TestHasLimits(t *testing.T) {
+	r, err := New(Config{
+		MaxCPU:    70.,
+		MaxMemory: 170. / 200. * 100,
+		PSUtil:    &util{},
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+
+	require.True(t, r.HasLimits())
+
+	r, err = New(Config{
+		MaxCPU:    0,
+		MaxMemory: 0,
+		PSUtil:    &util{},
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+
+	require.False(t, r.HasLimits())
+}

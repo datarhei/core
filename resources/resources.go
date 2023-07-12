@@ -72,7 +72,7 @@ func New(config Config) (Resources, error) {
 		logger: config.Logger,
 	}
 
-	if config.MaxCPU == 1000 && config.MaxMemory == 1000 {
+	if config.MaxCPU == 100 && config.MaxMemory == 100 {
 		r.isUnlimited = true
 	}
 
@@ -217,7 +217,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 }
 
 func (r *resources) HasLimits() bool {
-	return r.isUnlimited
+	return !r.isUnlimited
 }
 
 func (r *resources) Limits() (float64, uint64) {
