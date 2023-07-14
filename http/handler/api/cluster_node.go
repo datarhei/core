@@ -24,16 +24,12 @@ import (
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node [get]
 func (h *ClusterHandler) GetNodes(c echo.Context) error {
-	nodes := h.proxy.ListNodes()
+	about, _ := h.cluster.About()
 
 	list := []api.ClusterNode{}
 
-	for _, node := range nodes {
-		about := node.About()
-		n := api.ClusterNode{}
-		n.Marshal(about)
-
-		list = append(list, n)
+	for _, node := range about.Nodes {
+		list = append(list, h.marshalClusterNode(node))
 	}
 
 	return c.JSON(http.StatusOK, list)
@@ -53,26 +49,17 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 func (h *ClusterHandler) GetNode(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNodeReader(id)
-	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+	about, _ := h.cluster.About()
+
+	for _, node := range about.Nodes {
+		if node.ID != id {
+			continue
+		}
+
+		return c.JSON(http.StatusOK, h.marshalClusterNode(node))
 	}
 
-	about := peer.About()
-
-	node := api.ClusterNode{
-		ID:          about.ID,
-		Name:        about.Name,
-		Address:     about.Address,
-		CreatedAt:   about.CreatedAt.Format(time.RFC3339),
-		Uptime:      int64(about.Uptime.Seconds()),
-		LastContact: about.LastContact.Unix(),
-		Latency:     about.Latency.Seconds() * 1000,
-		State:       about.State,
-		Resources:   api.ClusterNodeResources(about.Resources),
-	}
-
-	return c.JSON(http.StatusOK, node)
+	return api.Err(http.StatusNotFound, "", "node not found")
 }
 
 // GetNodeVersion returns the proxy node version with the given ID

@@ -4437,12 +4437,6 @@ const docTemplate = `{
                 "address": {
                     "type": "string"
                 },
-                "cluster_api_address": {
-                    "type": "string"
-                },
-                "core_api_address": {
-                    "type": "string"
-                },
                 "degraded": {
                     "type": "boolean"
                 },
@@ -4450,6 +4444,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "leader": {
+                    "type": "boolean"
+                },
+                "name": {
                     "type": "string"
                 },
                 "nodes": {
@@ -4500,19 +4500,27 @@ const docTemplate = `{
                 "address": {
                     "type": "string"
                 },
+                "core": {
+                    "$ref": "#/definitions/api.ClusterNodeCore"
+                },
                 "created_at": {
+                    "description": "RFC 3339",
+                    "type": "string"
+                },
+                "error": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
-                "last_contact": {
-                    "description": "unix timestamp",
-                    "type": "integer"
+                "last_contact_ms": {
+                    "type": "number"
                 },
                 "latency_ms": {
-                    "description": "milliseconds",
                     "type": "number"
+                },
+                "leader": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"
@@ -4520,11 +4528,37 @@ const docTemplate = `{
                 "resources": {
                     "$ref": "#/definitions/api.ClusterNodeResources"
                 },
-                "state": {
+                "status": {
                     "type": "string"
                 },
                 "uptime_seconds": {
                     "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "voter": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.ClusterNodeCore": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "last_contact_ms": {
+                    "type": "number"
+                },
+                "latency_ms": {
+                    "type": "number"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -4582,40 +4616,17 @@ const docTemplate = `{
         "api.ClusterRaft": {
             "type": "object",
             "properties": {
-                "server": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterRaftServer"
-                    }
-                },
-                "stats": {
-                    "$ref": "#/definitions/api.ClusterRaftStats"
-                }
-            }
-        },
-        "api.ClusterRaftServer": {
-            "type": "object",
-            "properties": {
                 "address": {
-                    "description": "raft address",
                     "type": "string"
                 },
-                "id": {
-                    "type": "string"
-                },
-                "leader": {
-                    "type": "boolean"
-                },
-                "voter": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "api.ClusterRaftStats": {
-            "type": "object",
-            "properties": {
                 "last_contact_ms": {
                     "type": "number"
+                },
+                "log_index": {
+                    "type": "integer"
+                },
+                "log_term": {
+                    "type": "integer"
                 },
                 "num_peers": {
                     "type": "integer"

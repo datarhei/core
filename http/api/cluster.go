@@ -3,32 +3,31 @@ package api
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/datarhei/core/v16/cluster/proxy"
 )
 
 type ClusterNode struct {
 	ID          string               `json:"id"`
 	Name        string               `json:"name"`
+	Version     string               `json:"version"`
+	Status      string               `json:"status"`
+	Error       string               `json:"error"`
+	Voter       bool                 `json:"voter"`
+	Leader      bool                 `json:"leader"`
 	Address     string               `json:"address"`
-	CreatedAt   string               `json:"created_at"`
+	CreatedAt   string               `json:"created_at"` // RFC 3339
 	Uptime      int64                `json:"uptime_seconds"`
-	LastContact int64                `json:"last_contact"` // unix timestamp
-	Latency     float64              `json:"latency_ms"`   // milliseconds
-	State       string               `json:"state"`
+	LastContact float64              `json:"last_contact_ms"`
+	Latency     float64              `json:"latency_ms"`
+	Core        ClusterNodeCore      `json:"core"`
 	Resources   ClusterNodeResources `json:"resources"`
 }
 
-func (n *ClusterNode) Marshal(about proxy.NodeAbout) {
-	n.ID = about.ID
-	n.Name = about.Name
-	n.Address = about.Address
-	n.CreatedAt = about.CreatedAt.Format(time.RFC3339)
-	n.Uptime = int64(about.Uptime.Seconds())
-	n.LastContact = about.LastContact.Unix()
-	n.Latency = about.Latency.Seconds() * 1000
-	n.State = about.State
-	n.Resources = ClusterNodeResources(about.Resources)
+type ClusterNodeCore struct {
+	Address     string  `json:"address"`
+	Status      string  `json:"status"`
+	Error       string  `json:"error"`
+	LastContact float64 `json:"last_contact_ms"`
+	Latency     float64 `json:"latency_ms"`
 }
 
 type ClusterNodeResources struct {
@@ -40,39 +39,30 @@ type ClusterNodeResources struct {
 	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
 }
 
-type ClusterNodeFiles struct {
-	LastUpdate int64               `json:"last_update"` // unix timestamp
-	Files      map[string][]string `json:"files"`
-}
-
-type ClusterRaftServer struct {
-	ID      string `json:"id"`
-	Address string `json:"address"` // raft address
-	Voter   bool   `json:"voter"`
-	Leader  bool   `json:"leader"`
-}
-
-type ClusterRaftStats struct {
+type ClusterRaft struct {
+	Address     string  `json:"address"`
 	State       string  `json:"state"`
 	LastContact float64 `json:"last_contact_ms"`
 	NumPeers    uint64  `json:"num_peers"`
-}
-
-type ClusterRaft struct {
-	Server []ClusterRaftServer `json:"server"`
-	Stats  ClusterRaftStats    `json:"stats"`
+	LogTerm     uint64  `json:"log_term"`
+	LogIndex    uint64  `json:"log_index"`
 }
 
 type ClusterAbout struct {
-	ID                string        `json:"id"`
-	Address           string        `json:"address"`
-	ClusterAPIAddress string        `json:"cluster_api_address"`
-	CoreAPIAddress    string        `json:"core_api_address"`
-	Raft              ClusterRaft   `json:"raft"`
-	Nodes             []ClusterNode `json:"nodes"`
-	Version           string        `json:"version"`
-	Degraded          bool          `json:"degraded"`
-	DegradedErr       string        `json:"degraded_error"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Leader      bool          `json:"leader"`
+	Address     string        `json:"address"`
+	Raft        ClusterRaft   `json:"raft"`
+	Nodes       []ClusterNode `json:"nodes"`
+	Version     string        `json:"version"`
+	Degraded    bool          `json:"degraded"`
+	DegradedErr string        `json:"degraded_error"`
+}
+
+type ClusterNodeFiles struct {
+	LastUpdate int64               `json:"last_update"` // unix timestamp
+	Files      map[string][]string `json:"files"`
 }
 
 type ClusterProcess struct {

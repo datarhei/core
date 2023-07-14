@@ -1301,34 +1301,59 @@ func (c *cluster) applyCommand(cmd *store.Command) error {
 	return nil
 }
 
-type ClusterRaftServer struct {
-	ID      string
-	Address string
-	Voter   bool
-	Leader  bool
-}
-
-type ClusterRaftStats struct {
+type ClusterRaft struct {
+	Address     string
 	State       string
 	LastContact time.Duration
 	NumPeers    uint64
+	LogTerm     uint64
+	LogIndex    uint64
 }
 
-type ClusterRaft struct {
-	Server []ClusterRaftServer
-	Stats  ClusterRaftStats
+type ClusterNodeResources struct {
+	IsThrottling bool    // Whether this core is currently throttling
+	NCPU         float64 // Number of CPU on this node
+	CPU          float64 // Current CPU load, 0-100*ncpu
+	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
+	Mem          uint64  // Currently used memory in bytes
+	MemLimit     uint64  // Defined memory limit in bytes
+}
+
+type ClusterNode struct {
+	ID          string
+	Name        string
+	Version     string
+	Status      string
+	Error       error
+	Voter       bool
+	Leader      bool
+	Address     string
+	CreatedAt   time.Time
+	Uptime      time.Duration
+	LastContact time.Duration
+	Latency     time.Duration
+	Core        ClusterNodeCore
+	Resources   ClusterNodeResources
+}
+
+type ClusterNodeCore struct {
+	Address     string
+	Status      string
+	Error       error
+	LastContact time.Duration
+	Latency     time.Duration
 }
 
 type ClusterAbout struct {
-	ID                string
-	Address           string
-	ClusterAPIAddress string
-	CoreAPIAddress    string
-	Raft              ClusterRaft
-	Nodes             []proxy.NodeAbout
-	Version           ClusterVersion
-	Degraded          bool
-	DegradedErr       error
+	ID          string
+	Name        string
+	Leader      bool
+	Address     string
+	Raft        ClusterRaft
+	Nodes       []ClusterNode
+	Version     ClusterVersion
+	Degraded    bool
+	DegradedErr error
 }
 
 func (c *cluster) About() (ClusterAbout, error) {
@@ -1336,48 +1361,79 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	about := ClusterAbout{
 		ID:          c.id,
-		Address:     c.Address(),
 		Degraded:    degraded,
 		DegradedErr: degradedErr,
+		Version:     Version,
 	}
 
 	if address, err := c.ClusterAPIAddress(""); err == nil {
-		about.ClusterAPIAddress = address
-	}
-
-	if address, err := c.CoreAPIAddress(""); err == nil {
-		about.CoreAPIAddress = address
+		about.Address = address
 	}
 
 	stats := c.raft.Stats()
 
-	about.Raft.Stats.State = stats.State
-	about.Raft.Stats.LastContact = stats.LastContact
-	about.Raft.Stats.NumPeers = stats.NumPeers
+	about.Raft.Address = stats.Address
+	about.Raft.State = stats.State
+	about.Raft.LastContact = stats.LastContact
+	about.Raft.NumPeers = stats.NumPeers
+	about.Raft.LogIndex = stats.LogIndex
+	about.Raft.LogTerm = stats.LogTerm
 
 	servers, err := c.raft.Servers()
 	if err != nil {
-		c.logger.Error().WithError(err).Log("Raft configuration")
-		return ClusterAbout{}, err
+		c.logger.Warn().WithError(err).Log("Raft configuration")
 	}
 
-	for _, server := range servers {
-		node := ClusterRaftServer{
-			ID:      server.ID,
-			Address: server.Address,
-			Voter:   server.Voter,
-			Leader:  server.Leader,
+	serversMap := map[string]raft.Server{}
+
+	for _, s := range servers {
+		serversMap[s.ID] = s
+	}
+
+	c.nodesLock.Lock()
+	for id, node := range c.nodes {
+		nodeAbout := node.About()
+
+		node := ClusterNode{
+			ID:          id,
+			Name:        nodeAbout.Name,
+			Version:     nodeAbout.Version,
+			Status:      nodeAbout.Status,
+			Error:       nodeAbout.Error,
+			Address:     nodeAbout.Address,
+			LastContact: nodeAbout.LastContact,
+			Latency:     nodeAbout.Latency,
+			CreatedAt:   nodeAbout.Core.CreatedAt,
+			Uptime:      nodeAbout.Core.Uptime,
+			Core: ClusterNodeCore{
+				Address:     nodeAbout.Core.Address,
+				Status:      nodeAbout.Core.Status,
+				Error:       nodeAbout.Core.Error,
+				LastContact: nodeAbout.Core.LastContact,
+				Latency:     nodeAbout.Core.Latency,
+			},
+			Resources: ClusterNodeResources{
+				IsThrottling: nodeAbout.Resources.IsThrottling,
+				NCPU:         nodeAbout.Resources.NCPU,
+				CPU:          nodeAbout.Resources.CPU,
+				CPULimit:     nodeAbout.Resources.CPULimit,
+				Mem:          nodeAbout.Resources.Mem,
+				MemLimit:     nodeAbout.Resources.MemLimit,
+			},
 		}
 
-		about.Raft.Server = append(about.Raft.Server, node)
-	}
+		if id == c.id {
+			about.Name = nodeAbout.Name
+		}
 
-	about.Version = Version
+		if s, ok := serversMap[id]; ok {
+			node.Voter = s.Voter
+			node.Leader = s.Leader
+		}
 
-	nodes := c.ProxyReader().ListNodes()
-	for _, node := range nodes {
-		about.Nodes = append(about.Nodes, node.About())
+		about.Nodes = append(about.Nodes, node)
 	}
+	c.nodesLock.Unlock()
 
 	return about, nil
 }

@@ -83,9 +83,12 @@ type Server struct {
 }
 
 type Stats struct {
+	Address     string
 	State       string
 	LastContact time.Duration
 	NumPeers    uint64
+	LogTerm     uint64
+	LogIndex    uint64
 }
 
 type Config struct {
@@ -194,7 +197,9 @@ func (r *raft) Servers() ([]Server, error) {
 }
 
 func (r *raft) Stats() Stats {
-	stats := Stats{}
+	stats := Stats{
+		Address: r.raftAddress,
+	}
 
 	s := r.raft.Stats()
 
@@ -217,6 +222,14 @@ func (r *raft) Stats() Stats {
 
 	if x, err := strconv.ParseUint(s["num_peers"], 10, 64); err == nil {
 		stats.NumPeers = x
+	}
+
+	if x, err := strconv.ParseUint(s["last_log_term"], 10, 64); err == nil {
+		stats.LogTerm = x
+	}
+
+	if x, err := strconv.ParseUint(s["last_log_index"], 10, 64); err == nil {
+		stats.LogIndex = x
 	}
 
 	return stats

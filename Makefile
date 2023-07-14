@@ -90,7 +90,7 @@ coverage:
 	go tool cover -html=test/cover.out -o test/cover.html
 
 ## commit: Prepare code for commit (vet, fmt, test)
-commit: vet fmt lint test build
+commit: vet fmt lint test vulncheck build
 	@echo "No errors found. Ready for a commit."
 
 ## release: Build a release binary of core

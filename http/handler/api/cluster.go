@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
@@ -56,18 +57,19 @@ func (h *ClusterHandler) About(c echo.Context) error {
 	state, _ := h.cluster.About()
 
 	about := api.ClusterAbout{
-		ID:                state.ID,
-		Address:           state.Address,
-		ClusterAPIAddress: state.ClusterAPIAddress,
-		CoreAPIAddress:    state.CoreAPIAddress,
+		ID:      state.ID,
+		Name:    state.Name,
+		Leader:  state.Leader,
+		Address: state.Address,
 		Raft: api.ClusterRaft{
-			Server: []api.ClusterRaftServer{},
-			Stats: api.ClusterRaftStats{
-				State:       state.Raft.Stats.State,
-				LastContact: state.Raft.Stats.LastContact.Seconds() * 1000,
-				NumPeers:    state.Raft.Stats.NumPeers,
-			},
+			Address:     state.Raft.Address,
+			State:       state.Raft.State,
+			LastContact: state.Raft.LastContact.Seconds() * 1000,
+			NumPeers:    state.Raft.NumPeers,
+			LogTerm:     state.Raft.LogTerm,
+			LogIndex:    state.Raft.LogIndex,
 		},
+		Nodes:    []api.ClusterNode{},
 		Version:  state.Version.String(),
 		Degraded: state.Degraded,
 	}
@@ -76,23 +78,51 @@ func (h *ClusterHandler) About(c echo.Context) error {
 		about.DegradedErr = state.DegradedErr.Error()
 	}
 
-	for _, n := range state.Raft.Server {
-		about.Raft.Server = append(about.Raft.Server, api.ClusterRaftServer{
-			ID:      n.ID,
-			Address: n.Address,
-			Voter:   n.Voter,
-			Leader:  n.Leader,
-		})
-	}
-
 	for _, node := range state.Nodes {
-		n := api.ClusterNode{}
-		n.Marshal(node)
-
-		about.Nodes = append(about.Nodes, n)
+		about.Nodes = append(about.Nodes, h.marshalClusterNode(node))
 	}
 
 	return c.JSON(http.StatusOK, about)
+}
+
+func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.ClusterNode {
+	n := api.ClusterNode{
+		ID:          node.ID,
+		Name:        node.Name,
+		Version:     node.Version,
+		Status:      node.Status,
+		Voter:       node.Voter,
+		Leader:      node.Leader,
+		Address:     node.Address,
+		CreatedAt:   node.CreatedAt.Format(time.RFC3339),
+		Uptime:      int64(node.Uptime.Seconds()),
+		LastContact: node.LastContact.Seconds() * 1000,
+		Latency:     node.Latency.Seconds() * 1000,
+		Core: api.ClusterNodeCore{
+			Address:     node.Core.Address,
+			Status:      node.Core.Status,
+			LastContact: node.Core.LastContact.Seconds() * 1000,
+			Latency:     node.Core.Latency.Seconds() * 1000,
+		},
+		Resources: api.ClusterNodeResources{
+			IsThrottling: node.Resources.IsThrottling,
+			NCPU:         node.Resources.NCPU,
+			CPU:          node.Resources.CPU,
+			CPULimit:     node.Resources.CPULimit,
+			Mem:          node.Resources.Mem,
+			MemLimit:     node.Resources.MemLimit,
+		},
+	}
+
+	if node.Error != nil {
+		n.Error = node.Error.Error()
+	}
+
+	if node.Core.Error != nil {
+		n.Core.Error = node.Core.Error.Error()
+	}
+
+	return n
 }
 
 // Healthy returns whether the cluster is healthy

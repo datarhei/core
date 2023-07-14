@@ -69,15 +69,15 @@ definitions:
     properties:
       address:
         type: string
-      cluster_api_address:
-        type: string
-      core_api_address:
-        type: string
       degraded:
         type: boolean
       degraded_error:
         type: string
       id:
+        type: string
+      leader:
+        type: boolean
+      name:
         type: string
       nodes:
         items:
@@ -110,24 +110,46 @@ definitions:
     properties:
       address:
         type: string
+      core:
+        $ref: '#/definitions/api.ClusterNodeCore'
       created_at:
+        description: RFC 3339
+        type: string
+      error:
         type: string
       id:
         type: string
-      last_contact:
-        description: unix timestamp
-        type: integer
-      latency_ms:
-        description: milliseconds
+      last_contact_ms:
         type: number
+      latency_ms:
+        type: number
+      leader:
+        type: boolean
       name:
         type: string
       resources:
         $ref: '#/definitions/api.ClusterNodeResources'
-      state:
+      status:
         type: string
       uptime_seconds:
         type: integer
+      version:
+        type: string
+      voter:
+        type: boolean
+    type: object
+  api.ClusterNodeCore:
+    properties:
+      address:
+        type: string
+      error:
+        type: string
+      last_contact_ms:
+        type: number
+      latency_ms:
+        type: number
+      status:
+        type: string
     type: object
   api.ClusterNodeFiles:
     properties:
@@ -166,29 +188,14 @@ definitions:
     type: object
   api.ClusterRaft:
     properties:
-      server:
-        items:
-          $ref: '#/definitions/api.ClusterRaftServer'
-        type: array
-      stats:
-        $ref: '#/definitions/api.ClusterRaftStats'
-    type: object
-  api.ClusterRaftServer:
-    properties:
       address:
-        description: raft address
         type: string
-      id:
-        type: string
-      leader:
-        type: boolean
-      voter:
-        type: boolean
-    type: object
-  api.ClusterRaftStats:
-    properties:
       last_contact_ms:
         type: number
+      log_index:
+        type: integer
+      log_term:
+        type: integer
       num_peers:
         type: integer
       state:

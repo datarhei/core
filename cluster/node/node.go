@@ -16,6 +16,7 @@ import (
 
 type Node interface {
 	Stop() error
+	About() About
 	Version() string
 	IPs() []string
 	Status() (string, error)
@@ -42,7 +43,7 @@ type node struct {
 	lastContactErr     error
 	lastCoreContact    time.Time
 	lastCoreContactErr error
-	latency            time.Duration
+	latency            float64
 	pingLock           sync.RWMutex
 
 	runLock    sync.Mutex
@@ -96,8 +97,9 @@ func (n *node) start(id string) error {
 	address, config, err := n.CoreEssentials()
 	n.proxyNode = proxy.NewNode(id, address, config)
 
+	n.lastCoreContactErr = err
+
 	if err != nil {
-		n.lastCoreContactErr = err
 		go func(ctx context.Context) {
 			ticker := time.NewTicker(5 * time.Second)
 			defer ticker.Stop()
@@ -143,6 +145,74 @@ func (n *node) Stop() error {
 	return nil
 }
 
+var maxLastContact time.Duration = 5 * time.Second
+
+type AboutCore struct {
+	Address     string
+	State       string
+	StateError  error
+	Status      string
+	Error       error
+	CreatedAt   time.Time
+	Uptime      time.Duration
+	LastContact time.Duration
+	Latency     time.Duration
+}
+
+type About struct {
+	ID          string
+	Name        string
+	Version     string
+	Address     string
+	Status      string
+	LastContact time.Duration
+	Latency     time.Duration
+	Error       error
+	Core        AboutCore
+	Resources   proxy.NodeResources
+}
+
+func (n *node) About() About {
+	a := About{
+		ID:      n.id,
+		Version: n.Version(),
+		Address: n.address,
+	}
+
+	n.pingLock.RLock()
+	a.LastContact = time.Since(n.lastContact)
+	if a.LastContact > maxLastContact {
+		a.Status = "offline"
+	} else {
+		a.Status = "online"
+	}
+	a.Latency = time.Duration(n.latency * float64(time.Second))
+	a.Error = n.lastContactErr
+
+	coreError := n.lastCoreContactErr
+	n.pingLock.RUnlock()
+
+	about := n.CoreAbout()
+
+	a.Name = about.Name
+	a.Core.Address = about.Address
+	a.Core.State = about.State
+	a.Core.StateError = about.Error
+	a.Core.CreatedAt = about.CreatedAt
+	a.Core.Uptime = about.Uptime
+	a.Core.LastContact = time.Since(about.LastContact)
+	if a.Core.LastContact > maxLastContact {
+		a.Core.Status = "offline"
+	} else {
+		a.Core.Status = "online"
+	}
+	a.Core.Error = coreError
+	a.Core.Latency = about.Latency
+	a.Resources = about.Resources
+
+	return a
+}
+
 func (n *node) Version() string {
 	n.pingLock.RLock()
 	defer n.pingLock.RUnlock()
@@ -159,7 +229,7 @@ func (n *node) Status() (string, error) {
 	defer n.pingLock.RUnlock()
 
 	since := time.Since(n.lastContact)
-	if since > 5*time.Second {
+	if since > maxLastContact {
 		return "offline", fmt.Errorf("the cluster API didn't respond for %s because: %w", since, n.lastContactErr)
 	}
 
@@ -171,7 +241,7 @@ func (n *node) CoreStatus() (string, error) {
 	defer n.pingLock.RUnlock()
 
 	since := time.Since(n.lastCoreContact)
-	if since > 5*time.Second {
+	if since > maxLastContact {
 		return "offline", fmt.Errorf("the core API didn't respond for %s because: %w", since, n.lastCoreContactErr)
 	}
 
@@ -211,6 +281,10 @@ func (n *node) CoreAPIAddress() (string, error) {
 	return n.client.CoreAPIAddress()
 }
 
+func (n *node) CoreAbout() proxy.NodeAbout {
+	return n.proxyNode.About()
+}
+
 func (n *node) Barrier(name string) (bool, error) {
 	return n.client.Barrier(name)
 }
@@ -232,7 +306,8 @@ func (n *node) ping(ctx context.Context) {
 				n.pingLock.Lock()
 				n.version = version
 				n.lastContact = time.Now()
-				n.latency = time.Since(start)
+				n.lastContactErr = nil
+				n.latency = n.latency*0.2 + time.Since(start).Seconds()*0.8
 				n.pingLock.Unlock()
 			} else {
 				n.pingLock.Lock()

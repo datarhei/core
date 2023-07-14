@@ -541,6 +541,7 @@ func (n *node) About() NodeAbout {
 		Name:        about.Name,
 		Address:     n.address,
 		State:       state.String(),
+		Error:       n.peerErr,
 		CreatedAt:   createdAt,
 		Uptime:      time.Since(createdAt),
 		LastContact: n.lastContact,
