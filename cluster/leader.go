@@ -760,10 +760,14 @@ func (c *cluster) doRebalance(emergency bool) {
 			continue
 		}
 
+		var errmessage string = ""
+
 		if e.err != nil {
 			if process.Error == e.err.Error() {
 				continue
 			}
+
+			errmessage = e.err.Error()
 		} else {
 			if len(process.Error) == 0 {
 				continue
@@ -774,7 +778,7 @@ func (c *cluster) doRebalance(emergency bool) {
 			Operation: store.OpSetProcessError,
 			Data: store.CommandSetProcessError{
 				ID:    e.processid,
-				Error: e.err.Error(),
+				Error: errmessage,
 			},
 		}
 
@@ -1192,12 +1196,13 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 			// reference currently reside.
 			if len(p.Config.Reference) != 0 {
 				for _, count := range haveReferenceAffinityMap[p.Config.Reference+"@"+p.Config.Domain] {
+					// Do not move the process to the node it is currently on
 					if count.nodeid == overloadedNodeid {
 						continue
 					}
 
 					r := resources[count.nodeid]
-					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit && !r.IsThrottling {
+					if hasNodeEnoughResources(r, p.CPU, p.Mem) {
 						availableNodeid = count.nodeid
 						break
 					}
@@ -1214,7 +1219,7 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 
 					r := node.Resources
 
-					if r.CPU+p.CPU < r.CPULimit && r.Mem+p.Mem < r.MemLimit && !r.IsThrottling {
+					if hasNodeEnoughResources(r, p.CPU, p.Mem) {
 						availableNodeid = id
 						break
 					}
