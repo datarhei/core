@@ -928,6 +928,7 @@ func (h *RestreamHandler) getProcess(id app.ProcessID, filter filter) (api.Proce
 		Domain:    process.Domain,
 		Reference: process.Reference,
 		Type:      "ffmpeg",
+		CoreID:    h.restream.ID(),
 		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,
 	}

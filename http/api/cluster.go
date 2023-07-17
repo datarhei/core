@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -63,19 +62,6 @@ type ClusterAbout struct {
 type ClusterNodeFiles struct {
 	LastUpdate int64               `json:"last_update"` // unix timestamp
 	Files      map[string][]string `json:"files"`
-}
-
-type ClusterProcess struct {
-	ID        string      `json:"id"`
-	Owner     string      `json:"owner"`
-	Domain    string      `json:"domain"`
-	NodeID    string      `json:"node_id"`
-	Reference string      `json:"reference"`
-	Order     string      `json:"order"`
-	State     string      `json:"state"`
-	CPU       json.Number `json:"cpu" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
-	Memory    uint64      `json:"memory_bytes"`                                      // bytes
-	Runtime   int64       `json:"runtime_seconds"`                                   // seconds
 }
 
 type ClusterLock struct {

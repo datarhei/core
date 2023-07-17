@@ -15,6 +15,7 @@ type Process struct {
 	Domain    string         `json:"domain"`
 	Type      string         `json:"type" jsonschema:"enum=ffmpeg"`
 	Reference string         `json:"reference"`
+	CoreID    string         `json:"core_id"`
 	CreatedAt int64          `json:"created_at" format:"int64"`
 	UpdatedAt int64          `json:"updated_at" format:"int64"`
 	Config    *ProcessConfig `json:"config,omitempty"`
