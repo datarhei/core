@@ -4415,6 +4415,7 @@ const docTemplate = `{
                     }
                 },
                 "created_at": {
+                    "description": "RFC3339",
                     "type": "string"
                 },
                 "id": {
@@ -4552,9 +4553,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "last_contact_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "latency_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "status": {
@@ -4620,6 +4623,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "last_contact_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "log_index": {
@@ -5830,6 +5834,9 @@ const docTemplate = `{
             "properties": {
                 "config": {
                     "$ref": "#/definitions/api.ProcessConfig"
+                },
+                "core_id": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "integer",
@@ -7732,6 +7739,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "build_date": {
+                    "description": "RFC3339",
                     "type": "string"
                 },
                 "compiler": {

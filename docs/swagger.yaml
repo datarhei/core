@@ -55,6 +55,7 @@ definitions:
           type: string
         type: array
       created_at:
+        description: RFC3339
         type: string
       id:
         type: string
@@ -145,8 +146,10 @@ definitions:
       error:
         type: string
       last_contact_ms:
+        description: milliseconds
         type: number
       latency_ms:
+        description: milliseconds
         type: number
       status:
         type: string
@@ -191,6 +194,7 @@ definitions:
       address:
         type: string
       last_contact_ms:
+        description: milliseconds
         type: number
       log_index:
         type: integer
@@ -1004,6 +1008,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/api.ProcessConfig'
+      core_id:
+        type: string
       created_at:
         format: int64
         type: integer
@@ -2352,6 +2358,7 @@ definitions:
       arch:
         type: string
       build_date:
+        description: RFC3339
         type: string
       compiler:
         type: string

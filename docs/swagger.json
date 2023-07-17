@@ -4407,6 +4407,7 @@
                     }
                 },
                 "created_at": {
+                    "description": "RFC3339",
                     "type": "string"
                 },
                 "id": {
@@ -4544,9 +4545,11 @@
                     "type": "string"
                 },
                 "last_contact_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "latency_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "status": {
@@ -4612,6 +4615,7 @@
                     "type": "string"
                 },
                 "last_contact_ms": {
+                    "description": "milliseconds",
                     "type": "number"
                 },
                 "log_index": {
@@ -5822,6 +5826,9 @@
             "properties": {
                 "config": {
                     "$ref": "#/definitions/api.ProcessConfig"
+                },
+                "core_id": {
+                    "type": "string"
                 },
                 "created_at": {
                     "type": "integer",
@@ -7724,6 +7731,7 @@
                     "type": "string"
                 },
                 "build_date": {
+                    "description": "RFC3339",
                     "type": "string"
                 },
                 "compiler": {
