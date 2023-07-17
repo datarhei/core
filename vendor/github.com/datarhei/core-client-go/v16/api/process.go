@@ -68,16 +68,18 @@ type ProcessState struct {
 	Progress  *Progress    `json:"progress"`
 	Memory    uint64       `json:"memory_bytes" format:"uint64"`                            // bytes
 	CPU       float64      `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
+	LimitMode string       `json:"limit_mode"`
 	Resources ProcessUsage `json:"resources"`
 	Command   []string     `json:"command"`
 }
 
 type ProcessUsageCPU struct {
-	NCPU    float64 `json:"ncpu" swaggertype:"number" jsonschema:"type=number"`
-	Current float64 `json:"cur" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
-	Average float64 `json:"avg" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
-	Max     float64 `json:"max" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
-	Limit   float64 `json:"limit" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
+	NCPU         float64 `json:"ncpu" swaggertype:"number" jsonschema:"type=number"`
+	Current      float64 `json:"cur" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
+	Average      float64 `json:"avg" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
+	Max          float64 `json:"max" swaggertype:"number" jsonschema:"type=number"`   // percent 0-100*ncpu
+	Limit        float64 `json:"limit" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
+	IsThrottling bool    `json:"throttling"`
 }
 
 type ProcessUsageMemory struct {
