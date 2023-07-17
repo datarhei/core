@@ -499,7 +499,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 	require.Equal(t, []interface{}{
 		processOpReject{
 			processid: app.ProcessID{ID: "foobar"},
-			err:       errNotEnoughResources,
+			err:       errNotEnoughResourcesForDeployment,
 		},
 	}, stack)
 }
@@ -549,7 +549,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 	require.Equal(t, []interface{}{
 		processOpReject{
 			processid: app.ProcessID{ID: "foobar"},
-			err:       errNotEnoughResources,
+			err:       errNotEnoughResourcesForDeployment,
 		},
 	}, stack)
 }
@@ -1750,6 +1750,30 @@ func TestCreateNodeProcessMap(t *testing.T) {
 		{
 			NodeID:  "node1",
 			Order:   "start",
+			State:   "finished",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 1,
+			Config: &app.Config{
+				ID:        "foobar7",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "failed",
+			CPU:     1,
+			Mem:     1,
+			Runtime: 1,
+			Config: &app.Config{
+				ID:        "foobar8",
+				Reference: "ref1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
 			State:   "running",
 			CPU:     1,
 			Mem:     1,
@@ -1790,7 +1814,7 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			Mem:     1,
 			Runtime: 42,
 			Config: &app.Config{
-				ID:        "foobar3",
+				ID:        "foobar6",
 				Reference: "ref2",
 			},
 		},
@@ -1857,7 +1881,7 @@ func TestCreateNodeProcessMap(t *testing.T) {
 				Mem:     1,
 				Runtime: 42,
 				Config: &app.Config{
-					ID:        "foobar3",
+					ID:        "foobar6",
 					Reference: "ref2",
 				},
 			},
