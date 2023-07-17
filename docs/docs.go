@@ -6147,6 +6147,9 @@ const docTemplate = `{
                 "last_logline": {
                     "type": "string"
                 },
+                "limit_mode": {
+                    "type": "string"
+                },
                 "memory_bytes": {
                     "description": "deprecated, use Resources.CPU.Current",
                     "type": "integer",
@@ -6199,6 +6202,9 @@ const docTemplate = `{
                 },
                 "ncpu": {
                     "type": "number"
+                },
+                "throttling": {
+                    "type": "boolean"
                 }
             }
         },

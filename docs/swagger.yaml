@@ -1220,6 +1220,8 @@ definitions:
         type: string
       last_logline:
         type: string
+      limit_mode:
+        type: string
       memory_bytes:
         description: deprecated, use Resources.CPU.Current
         format: uint64
@@ -1256,6 +1258,8 @@ definitions:
         type: number
       ncpu:
         type: number
+      throttling:
+        type: boolean
     type: object
   api.ProcessUsageMemory:
     properties:

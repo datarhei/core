@@ -248,16 +248,18 @@ type State struct {
 	Progress  Progress      // Progress data of the process
 	Memory    uint64        // Current memory consumption in bytes
 	CPU       float64       // Current CPU consumption in percent
+	LimitMode string        // How the process is limited (hard or soft)
 	Resources ProcessUsage  // Current resource usage, include CPU and memory consumption
 	Command   []string      // ffmpeg command line parameters
 }
 
 type ProcessUsageCPU struct {
-	NCPU    float64 // Number of logical CPUs
-	Current float64 // percent 0-100*ncpu
-	Average float64 // percent 0-100*ncpu
-	Max     float64 // percent 0-100*ncpu
-	Limit   float64 // percent 0-100*ncpu
+	NCPU         float64 // Number of logical CPUs
+	Current      float64 // percent 0-100*ncpu
+	Average      float64 // percent 0-100*ncpu
+	Max          float64 // percent 0-100*ncpu
+	Limit        float64 // percent 0-100*ncpu
+	IsThrottling bool
 }
 
 type ProcessUsageMemory struct {

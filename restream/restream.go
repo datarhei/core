@@ -1576,6 +1576,7 @@ func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 	state.Time = status.Time.Unix()
 	state.Memory = status.Memory.Current
 	state.CPU = status.CPU.Current / status.CPU.NCPU
+	state.LimitMode = status.LimitMode
 	state.Resources.CPU = status.CPU
 	state.Resources.Memory = status.Memory
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()

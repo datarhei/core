@@ -12,11 +12,12 @@ import (
 
 type Usage struct {
 	CPU struct {
-		NCPU    float64 // number of logical processors
-		Current float64 // percent 0-100*ncpu
-		Average float64 // percent 0-100*ncpu
-		Max     float64 // percent 0-100*ncpu
-		Limit   float64 // percent 0-100*ncpu
+		NCPU         float64 // number of logical processors
+		Current      float64 // percent 0-100*ncpu
+		Average      float64 // percent 0-100*ncpu
+		Max          float64 // percent 0-100*ncpu
+		Limit        float64 // percent 0-100*ncpu
+		IsThrottling bool
 	}
 	Memory struct {
 		Current uint64  // bytes
@@ -79,6 +80,9 @@ type Limiter interface {
 	// Limit enables or disables the throttling of the CPU or killing because of to much
 	// memory consumption.
 	Limit(cpu, memory bool) error
+
+	// Mode returns in which mode the limiter is running in.
+	Mode() LimitMode
 }
 
 type limiter struct {
@@ -99,7 +103,8 @@ type limiter struct {
 	cpuAvg         float64   // Average CPU load of this process
 	cpuAvgCounter  uint64    // Counter for average calculation
 	cpuLimitSince  time.Time // Time when the CPU limit has been reached (hard limiter mode)
-	cpuLimitEnable bool      // Whether CPU limiting is enabled (soft limiter mode)
+	cpuLimitEnable bool      // Whether CPU throttling is enabled (soft limiter mode)
+	cpuThrottling  bool      // Whether CPU throttling is currently active (soft limiter mode)
 
 	memory            uint64    // Memory limit (bytes)
 	memoryCurrent     uint64    // Current memory usage
@@ -177,6 +182,7 @@ func (l *limiter) reset() {
 	l.cpuMax = 0
 	l.cpuTop = 0
 	l.cpuLimitEnable = false
+	l.cpuThrottling = false
 
 	l.memoryCurrent = 0
 	l.memoryLast = 0
@@ -399,6 +405,7 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 		if l.proc != nil {
 			l.proc.Resume()
 		}
+		l.cpuThrottling = false
 		l.lock.Unlock()
 
 		l.logger.Debug().Log("CPU throttler disabled")
@@ -426,6 +433,7 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 				if l.proc != nil {
 					l.proc.Resume()
 				}
+				l.cpuThrottling = false
 				l.lock.Unlock()
 				time.Sleep(100 * time.Millisecond)
 				continue
@@ -433,6 +441,7 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 		} else {
 			factorTopLimit = 100
 			topLimit = l.cpuTop - limit
+			l.cpuThrottling = true
 		}
 
 		lim := limit
@@ -509,6 +518,7 @@ func (l *limiter) Usage() Usage {
 	usage.CPU.Current = l.cpuCurrent * l.ncpu * 100
 	usage.CPU.Average = l.cpuAvg * l.ncpu * 100
 	usage.CPU.Max = l.cpuMax * l.ncpu * 100
+	usage.CPU.IsThrottling = l.cpuThrottling
 
 	usage.Memory.Limit = l.memory
 	usage.Memory.Current = l.memoryCurrent
@@ -520,4 +530,8 @@ func (l *limiter) Usage() Usage {
 
 func (l *limiter) Limits() (cpu float64, memory uint64) {
 	return l.cpu * 100, l.memory
+}
+
+func (l *limiter) Mode() LimitMode {
+	return l.mode
 }

@@ -80,12 +80,14 @@ type Status struct {
 	Duration    time.Duration // Duration is the time since the last change of the state
 	Time        time.Time     // Time is the time of the last change of the state
 	CommandArgs []string      // Currently running command arguments
+	LimitMode   string        // The limiting mode
 	CPU         struct {
-		NCPU    float64 // Number of logical CPUs
-		Current float64 // Currently consumed CPU in percent
-		Average float64 // Average consumed CPU in percent
-		Max     float64 // Max. consumed CPU in percent
-		Limit   float64 // Usage limit in percent
+		NCPU         float64 // Number of logical CPUs
+		Current      float64 // Currently consumed CPU in percent
+		Average      float64 // Average consumed CPU in percent
+		Max          float64 // Max. consumed CPU in percent
+		Limit        float64 // Usage limit in percent
+		IsThrottling bool    // Whether the CPU is currently limited
 	} // Used CPU in percent
 	Memory struct {
 		Current uint64  // Currently consumed memory in bytes
@@ -461,6 +463,7 @@ func (p *process) Status() Status {
 		Reconnect: time.Duration(-1),
 		Duration:  time.Since(stateTime),
 		Time:      stateTime,
+		LimitMode: p.limits.Mode().String(),
 		CPU:       usage.CPU,
 		Memory:    usage.Memory,
 	}

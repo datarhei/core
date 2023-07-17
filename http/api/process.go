@@ -227,6 +227,7 @@ type ProcessState struct {
 	Progress  *Progress    `json:"progress"`
 	Memory    uint64       `json:"memory_bytes" format:"uint64"`                            // deprecated, use Resources.CPU.Current
 	CPU       json.Number  `json:"cpu_usage" swaggertype:"number" jsonschema:"type=number"` // deprecated, use Resources.Memory.Current
+	LimitMode string       `json:"limit_mode"`
 	Resources ProcessUsage `json:"resources"`
 	Command   []string     `json:"command"`
 }
@@ -245,12 +246,14 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
 	s.CPU = ToNumber(state.CPU)
+	s.LimitMode = state.LimitMode
 	s.Resources.CPU = ProcessUsageCPU{
-		NCPU:    ToNumber(state.Resources.CPU.NCPU),
-		Current: ToNumber(state.Resources.CPU.Current),
-		Average: ToNumber(state.Resources.CPU.Average),
-		Max:     ToNumber(state.Resources.CPU.Max),
-		Limit:   ToNumber(state.Resources.CPU.Limit),
+		NCPU:         ToNumber(state.Resources.CPU.NCPU),
+		Current:      ToNumber(state.Resources.CPU.Current),
+		Average:      ToNumber(state.Resources.CPU.Average),
+		Max:          ToNumber(state.Resources.CPU.Max),
+		Limit:        ToNumber(state.Resources.CPU.Limit),
+		IsThrottling: state.Resources.CPU.IsThrottling,
 	}
 	s.Resources.Memory = ProcessUsageMemory{
 		Current: state.Resources.Memory.Current,
@@ -264,11 +267,12 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 }
 
 type ProcessUsageCPU struct {
-	NCPU    json.Number `json:"ncpu" swaggertype:"number" jsonschema:"type=number"`
-	Current json.Number `json:"cur" swaggertype:"number" jsonschema:"type=number"`
-	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
-	Max     json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`
-	Limit   json.Number `json:"limit" swaggertype:"number" jsonschema:"type=number"`
+	NCPU         json.Number `json:"ncpu" swaggertype:"number" jsonschema:"type=number"`
+	Current      json.Number `json:"cur" swaggertype:"number" jsonschema:"type=number"`
+	Average      json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max          json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`
+	Limit        json.Number `json:"limit" swaggertype:"number" jsonschema:"type=number"`
+	IsThrottling bool        `json:"throttling"`
 }
 
 type ProcessUsageMemory struct {
