@@ -38,7 +38,7 @@ type ProxyReader interface {
 	FindNodeFromProcess(id app.ProcessID) (string, error)
 
 	Resources() map[string]NodeResources
-	ListProcesses(ProcessListOptions) []clientapi.Process
+	ListProcesses(ProcessListOptions) map[string][]clientapi.Process
 	ListProxyProcesses() []Process
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
 
@@ -463,9 +463,14 @@ func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
 	return nodeid, nil
 }
 
-func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
-	processChan := make(chan clientapi.Process, 64)
-	processList := []clientapi.Process{}
+type processList struct {
+	nodeid    string
+	processes []clientapi.Process
+}
+
+func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi.Process {
+	processChan := make(chan processList, 64)
+	processMap := map[string][]clientapi.Process{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -473,8 +478,8 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 	go func() {
 		defer wgList.Done()
 
-		for process := range processChan {
-			processList = append(processList, process)
+		for list := range processChan {
+			processMap[list.nodeid] = list.processes
 		}
 	}()
 
@@ -484,7 +489,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 	for _, node := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- clientapi.Process) {
+		go func(node Node, p chan<- processList) {
 			defer wg.Done()
 
 			processes, err := node.ProcessList(options)
@@ -492,9 +497,11 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 				return
 			}
 
-			for _, process := range processes {
-				p <- process
+			p <- processList{
+				nodeid:    node.About().ID,
+				processes: processes,
 			}
+
 		}(node, processChan)
 	}
 	p.nodesLock.RUnlock()
@@ -505,7 +512,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 
 	wgList.Wait()
 
-	return processList
+	return processMap
 }
 
 func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error {

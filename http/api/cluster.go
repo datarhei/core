@@ -42,7 +42,7 @@ type ClusterNodeResources struct {
 type ClusterRaft struct {
 	Address     string  `json:"address"`
 	State       string  `json:"state"`
-	LastContact float64 `json:"last_contact_ms"`
+	LastContact float64 `json:"last_contact_ms"` // milliseconds
 	NumPeers    uint64  `json:"num_peers"`
 	LogTerm     uint64  `json:"log_term"`
 	LogIndex    uint64  `json:"log_index"`
