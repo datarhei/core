@@ -195,7 +195,6 @@ func (m *manager) AcquireCertificates(ctx context.Context, hostnames []string) e
 
 	if len(removed) != 0 {
 		m.logger.WithField("hostnames", removed).Info().Log("Unmanage certificates")
-		m.config.Unmanage(removed)
 	}
 
 	m.lock.Lock()
@@ -216,7 +215,6 @@ func (m *manager) ManageCertificates(ctx context.Context, hostnames []string) er
 
 	if len(removed) != 0 {
 		m.logger.WithField("hostnames", removed).Info().Log("Unmanage certificates")
-		m.config.Unmanage(removed)
 	}
 
 	if len(added) == 0 {

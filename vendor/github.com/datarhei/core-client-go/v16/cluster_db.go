@@ -100,3 +100,16 @@ func (r *restclient) ClusterDBKeyValues() (api.ClusterKVS, error) {
 
 	return kvs, err
 }
+
+func (r *restclient) ClusterDBProcessMap() (api.ClusterProcessMap, error) {
+	var m api.ClusterProcessMap
+
+	data, err := r.call("GET", "/v3/cluster/db/map/process", nil, nil, "", nil)
+	if err != nil {
+		return m, err
+	}
+
+	err = json.Unmarshal(data, &m)
+
+	return m, err
+}

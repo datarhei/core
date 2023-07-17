@@ -99,10 +99,11 @@ type RestClient interface {
 	IdentitySetPolicies(name string, p []api.IAMPolicy) error // PUT /v3/iam/user/{name}/policy
 	IdentityDelete(name string) error                         // DELETE /v3/iam/user/{name}
 
-	Cluster() (api.ClusterAbout, error)      // GET /v3/cluster
-	ClusterHealthy() (bool, error)           // GET /v3/cluster/healthy
-	ClusterSnapshot() (io.ReadCloser, error) // GET /v3/cluster/snapshot
-	ClusterLeave() error                     // PUT /v3/cluster/leave
+	Cluster() (api.ClusterAbout, error)        // GET /v3/cluster
+	ClusterHealthy() (bool, error)             // GET /v3/cluster/healthy
+	ClusterSnapshot() (io.ReadCloser, error)   // GET /v3/cluster/snapshot
+	ClusterLeave() error                       // PUT /v3/cluster/leave
+	ClusterTransferLeadership(id string) error // PUT /v3/cluster/transfer/{id}
 
 	ClusterNodeList() ([]api.ClusterNode, error)                                      // GET /v3/cluster/node
 	ClusterNode(id string) (api.ClusterNode, error)                                   // GET /v3/cluster/node/{id}
@@ -110,13 +111,14 @@ type RestClient interface {
 	ClusterNodeProcessList(id string, opts ProcessListOptions) ([]api.Process, error) // GET /v3/cluster/node/{id}/process
 	ClusterNodeVersion(id string) (api.Version, error)                                // GET /v3/cluster/node/{id}/version
 
-	ClusterDBProcessList() ([]api.Process, error)       // GET /v3/cluster/db/process
-	ClusterDBProcess(id ProcessID) (api.Process, error) // GET /v3/cluster/db/process/{id}
-	ClusterDBUserList() ([]api.IAMUser, error)          // GET /v3/cluster/db/user
-	ClusterDBUser(name string) (api.IAMUser, error)     // GET /v3/cluster/db/user/{name}
-	ClusterDBPolicies() ([]api.IAMPolicy, error)        // GET /v3/cluster/db/policies
-	ClusterDBLocks() ([]api.ClusterLock, error)         // GET /v3/cluster/db/locks
-	ClusterDBKeyValues() (api.ClusterKVS, error)        // GET /v3/cluster/db/kv
+	ClusterDBProcessList() ([]api.Process, error)        // GET /v3/cluster/db/process
+	ClusterDBProcess(id ProcessID) (api.Process, error)  // GET /v3/cluster/db/process/{id}
+	ClusterDBUserList() ([]api.IAMUser, error)           // GET /v3/cluster/db/user
+	ClusterDBUser(name string) (api.IAMUser, error)      // GET /v3/cluster/db/user/{name}
+	ClusterDBPolicies() ([]api.IAMPolicy, error)         // GET /v3/cluster/db/policies
+	ClusterDBLocks() ([]api.ClusterLock, error)          // GET /v3/cluster/db/locks
+	ClusterDBKeyValues() (api.ClusterKVS, error)         // GET /v3/cluster/db/kv
+	ClusterDBProcessMap() (api.ClusterProcessMap, error) // GET /v3/cluster/db/map/process
 
 	ClusterProcessList(opts ProcessListOptions) ([]api.Process, error)               // GET /v3/cluster/process
 	ClusterProcess(id ProcessID, filter []string) (api.Process, error)               // POST /v3/cluster/process
@@ -415,6 +417,10 @@ func New(config Config) (RestClient, error) {
 				path:       mustNewGlob("/v3/cluster/node/*/version"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
+			{
+				path:       mustNewGlob("/v3/cluster/db/map/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
 		},
 		"POST": {
 			{
@@ -469,6 +475,10 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/session/token/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/transfer/*"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},

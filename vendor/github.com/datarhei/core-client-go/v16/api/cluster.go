@@ -7,13 +7,26 @@ import (
 type ClusterNode struct {
 	ID          string               `json:"id"`
 	Name        string               `json:"name"`
+	Version     string               `json:"version"`
+	Status      string               `json:"status"`
+	Error       string               `json:"error"`
+	Voter       bool                 `json:"voter"`
+	Leader      bool                 `json:"leader"`
 	Address     string               `json:"address"`
-	CreatedAt   string               `json:"created_at"`
-	Uptime      int64                `json:"uptime_seconds"`
-	LastContact int64                `json:"last_contact"` // unix timestamp
-	Latency     float64              `json:"latency_ms"`   // milliseconds
-	State       string               `json:"state"`
+	CreatedAt   string               `json:"created_at"`      // RFC 3339
+	Uptime      int64                `json:"uptime_seconds"`  // seconds
+	LastContact float64              `json:"last_contact_ms"` // milliseconds
+	Latency     float64              `json:"latency_ms"`      // milliseconds
+	Core        ClusterNodeCore      `json:"core"`
 	Resources   ClusterNodeResources `json:"resources"`
+}
+
+type ClusterNodeCore struct {
+	Address     string  `json:"address"`
+	Status      string  `json:"status"`
+	Error       string  `json:"error"`
+	LastContact float64 `json:"last_contact_ms"` // milliseconds
+	Latency     float64 `json:"latency_ms"`      // milliseconds
 }
 
 type ClusterNodeResources struct {
@@ -25,52 +38,30 @@ type ClusterNodeResources struct {
 	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
 }
 
-type ClusterNodeFiles struct {
-	LastUpdate int64               `json:"last_update"` // unix timestamp
-	Files      map[string][]string `json:"files"`
-}
-
-type ClusterRaftServer struct {
-	ID      string `json:"id"`
-	Address string `json:"address"` // raft address
-	Voter   bool   `json:"voter"`
-	Leader  bool   `json:"leader"`
-}
-
-type ClusterRaftStats struct {
-	State       string  `json:"state"`
-	LastContact float64 `json:"last_contact_ms"`
-	NumPeers    uint64  `json:"num_peers"`
-}
-
 type ClusterRaft struct {
-	Server []ClusterRaftServer `json:"server"`
-	Stats  ClusterRaftStats    `json:"stats"`
+	Address     string  `json:"address"`
+	State       string  `json:"state"`
+	LastContact float64 `json:"last_contact_ms"` // milliseconds
+	NumPeers    uint64  `json:"num_peers"`
+	LogTerm     uint64  `json:"log_term"`
+	LogIndex    uint64  `json:"log_index"`
 }
 
 type ClusterAbout struct {
-	ID                string        `json:"id"`
-	Address           string        `json:"address"`
-	ClusterAPIAddress string        `json:"cluster_api_address"`
-	CoreAPIAddress    string        `json:"core_api_address"`
-	Raft              ClusterRaft   `json:"raft"`
-	Nodes             []ClusterNode `json:"nodes"`
-	Version           string        `json:"version"`
-	Degraded          bool          `json:"degraded"`
-	DegradedErr       string        `json:"degraded_error"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Leader      bool          `json:"leader"`
+	Address     string        `json:"address"`
+	Raft        ClusterRaft   `json:"raft"`
+	Nodes       []ClusterNode `json:"nodes"`
+	Version     string        `json:"version"`
+	Degraded    bool          `json:"degraded"`
+	DegradedErr string        `json:"degraded_error"`
 }
 
-type ClusterProcess struct {
-	ID        string  `json:"id"`
-	Owner     string  `json:"owner"`
-	Domain    string  `json:"domain"`
-	NodeID    string  `json:"node_id"`
-	Reference string  `json:"reference"`
-	Order     string  `json:"order"`
-	State     string  `json:"state"`
-	CPU       float64 `json:"cpu" swaggertype:"number" jsonschema:"type=number"` // percent 0-100*ncpu
-	Memory    uint64  `json:"memory_bytes"`                                      // bytes
-	Runtime   int64   `json:"runtime_seconds"`                                   // seconds
+type ClusterNodeFiles struct {
+	LastUpdate int64               `json:"last_update"` // unix timestamp
+	Files      map[string][]string `json:"files"`
 }
 
 type ClusterLock struct {
@@ -84,3 +75,5 @@ type ClusterKVSValue struct {
 }
 
 type ClusterKVS map[string]ClusterKVSValue
+
+type ClusterProcessMap map[string]string

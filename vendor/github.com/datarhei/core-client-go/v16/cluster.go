@@ -3,6 +3,7 @@ package coreclient
 import (
 	"encoding/json"
 	"io"
+	"net/url"
 
 	"github.com/datarhei/core-client-go/v16/api"
 )
@@ -39,6 +40,12 @@ func (r *restclient) ClusterSnapshot() (io.ReadCloser, error) {
 
 func (r *restclient) ClusterLeave() error {
 	_, err := r.call("PUT", "/v3/cluster/leave", nil, nil, "", nil)
+
+	return err
+}
+
+func (r *restclient) ClusterTransferLeadership(id string) error {
+	_, err := r.call("PUT", "/v3/cluster/transfer/"+url.PathEscape(id), nil, nil, "", nil)
 
 	return err
 }
