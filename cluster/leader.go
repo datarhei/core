@@ -294,7 +294,7 @@ WAIT:
 }
 
 func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error {
-	c.logger.Debug().WithField("emergency", emergency).Log("Establishing leadership")
+	c.logger.Info().WithField("emergency", emergency).Log("Establishing leadership")
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelLeaderShip = cancel
@@ -309,7 +309,7 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 }
 
 func (c *cluster) revokeLeadership() {
-	c.logger.Debug().Log("Revoking leadership")
+	c.logger.Info().Log("Revoking leadership")
 
 	if c.cancelLeaderShip != nil {
 		c.cancelLeaderShip()
@@ -665,6 +665,8 @@ func (c *cluster) doSynchronize(emergency bool) {
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
+	c.logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
+
 	nodesMap := map[string]proxy.NodeAbout{}
 
 	for _, node := range nodes {
@@ -733,6 +735,8 @@ func (c *cluster) doRebalance(emergency bool) {
 		// Don't rebalance in emergency mode
 		return
 	}
+
+	c.logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
 
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()

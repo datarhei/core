@@ -6,7 +6,7 @@ type About struct {
 	Auths     []string `json:"auths"`
 	Name      string   `json:"name"`
 	ID        string   `json:"id"`
-	CreatedAt string   `json:"created_at"`
+	CreatedAt string   `json:"created_at"` // RFC3339
 	Uptime    uint64   `json:"uptime_seconds"`
 	Version   Version  `json:"version"`
 }
@@ -16,7 +16,7 @@ type Version struct {
 	Number   string `json:"number"`
 	Commit   string `json:"repository_commit"`
 	Branch   string `json:"repository_branch"`
-	Build    string `json:"build_date"`
+	Build    string `json:"build_date"` // RFC3339
 	Arch     string `json:"arch"`
 	Compiler string `json:"compiler"`
 }

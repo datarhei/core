@@ -514,12 +514,21 @@ func (n *node) AboutPeer() (clientapi.About, error) {
 
 func (n *node) About() NodeAbout {
 	about, err := n.AboutPeer()
+
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
+
 	if err != nil {
 		return NodeAbout{
-			ID:      n.id,
-			Address: n.address,
-			State:   stateDisconnected.String(),
-			Error:   err,
+			ID:          n.id,
+			Address:     n.address,
+			State:       stateDisconnected.String(),
+			Error:       err,
+			LastContact: n.lastContact,
+			Resources: NodeResources{
+				IsThrottling: true,
+				NCPU:         1,
+			},
 		}
 	}
 
@@ -527,9 +536,6 @@ func (n *node) About() NodeAbout {
 	if err != nil {
 		createdAt = time.Now()
 	}
-
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
 
 	state := n.state
 	if time.Since(n.lastContact) > 3*time.Second {
@@ -559,25 +565,17 @@ func (n *node) About() NodeAbout {
 	if state == stateDisconnected {
 		nodeAbout.Uptime = 0
 		nodeAbout.Latency = 0
+		nodeAbout.Resources.IsThrottling = true
+		nodeAbout.Resources.NCPU = 1
 	}
 
 	return nodeAbout
 }
 
 func (n *node) Resources() NodeResources {
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
+	about := n.About()
 
-	r := NodeResources{
-		IsThrottling: n.resources.throttling,
-		NCPU:         n.resources.ncpu,
-		CPU:          n.resources.cpu,
-		CPULimit:     n.resources.cpuLimit,
-		Mem:          n.resources.mem,
-		MemLimit:     n.resources.memLimit,
-	}
-
-	return r
+	return about.Resources
 }
 
 func (n *node) Version() NodeVersion {
