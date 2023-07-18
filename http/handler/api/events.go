@@ -13,13 +13,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// The EventsHandler type provides handler functions for retrieving details
-// about the API version and build infos.
+// The EventsHandler type provides handler functions for retrieving event.
 type EventsHandler struct {
 	events log.ChannelWriter
 }
 
-// NewEvents returns a new About type
+// NewEvents returns a new EventsHandler type
 func NewEvents(events log.ChannelWriter) *EventsHandler {
 	return &EventsHandler{
 		events: events,
