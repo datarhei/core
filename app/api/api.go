@@ -329,7 +329,7 @@ func (a *api) start(ctx context.Context) error {
 			Addr:                   cfg.Debug.AgentAddress,
 			ReuseSocketAddrAndPort: true,
 		}); err != nil {
-			a.log.logger.main.Error().WithError(err).Log("")
+			a.log.logger.core.Error().WithError(err).Log("")
 		}
 	}
 
@@ -350,7 +350,7 @@ func (a *api) start(ctx context.Context) error {
 					/*
 						var mem runtime.MemStats
 						runtime.ReadMemStats(&mem)
-						a.log.logger.main.WithComponent("memory").Debug().WithFields(log.Fields{
+						a.log.logger.core.WithComponent("memory").Debug().WithFields(log.Fields{
 							"Sys":          float64(mem.Sys) / (1 << 20),
 							"HeapSys":      float64(mem.HeapSys) / (1 << 20),
 							"HeapAlloc":    float64(mem.HeapAlloc) / (1 << 20),
@@ -1368,8 +1368,10 @@ func (a *api) start(ctx context.Context) error {
 	}
 
 	logcontext := "HTTP"
+	logaddress := cfg.Address
 	if cfg.TLS.Enable {
 		logcontext = "HTTPS"
+		logaddress = cfg.TLS.Address
 	}
 
 	var iplimiter net.IPLimitValidator
@@ -1395,7 +1397,7 @@ func (a *api) start(ctx context.Context) error {
 		return fmt.Errorf("incorrect routes provided: %w", err)
 	}
 
-	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", cfg.Address)
+	a.log.logger.main = a.log.logger.core.WithComponent(logcontext).WithField("address", logaddress)
 
 	httpfilesystems := []httpfs.FS{
 		{

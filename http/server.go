@@ -522,6 +522,11 @@ func (s *server) setRoutes() {
 			fs.PUT("", filesystem.handler.PutFile)
 			fs.DELETE("", filesystem.handler.DeleteFile)
 		}
+
+		s.logger.Info().WithFields(log.Fields{
+			"name":       filesystem.Name,
+			"mountpoint": filesystem.Mountpoint,
+		}).Log("Mount filesystem")
 	}
 
 	// Prometheus metrics
