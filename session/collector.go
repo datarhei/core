@@ -313,6 +313,9 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 		},
 	}
 
+	c.sessions = make(map[string]*session)
+	c.history.Sessions = make(map[string]totals)
+
 	c.staleCallback = func(sess *session) {
 		defer func() {
 			c.sessionsWG.Done()
@@ -386,10 +389,6 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 
 		c.currentActiveSessions--
 	}
-
-	c.sessions = make(map[string]*session)
-
-	c.history.Sessions = make(map[string]totals)
 
 	c.start()
 
