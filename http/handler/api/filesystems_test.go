@@ -519,7 +519,7 @@ func TestFilesystemsPurgeCache(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.MkdirAll("/path", 0744)
+	memfs.MkdirAll("/path", 0755)
 
 	cache, err := cache.NewLRUCache(cache.LRUConfig{
 		TTL: 5 * time.Minute,

@@ -16,7 +16,7 @@ import (
 var ErrNoMinio = errors.New("minio binary not found")
 
 func startMinio(t *testing.T, path string) (*exec.Cmd, error) {
-	err := os.MkdirAll(path, 0700)
+	err := os.MkdirAll(path, 0755)
 	require.NoError(t, err)
 
 	minio, err := exec.LookPath("minio")
@@ -255,7 +255,7 @@ func testFiles(t *testing.T, fs Filesystem) {
 
 	require.Equal(t, int64(1), fs.Files())
 
-	fs.MkdirAll("/path/to/foo", 0777)
+	fs.MkdirAll("/path/to/foo", 0755)
 
 	require.Equal(t, int64(1), fs.Files())
 

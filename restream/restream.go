@@ -903,7 +903,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 				}
 
 				dir := filepath.Dir(strings.TrimPrefix(io.Address, "file:"+basedir))
-				fs.MkdirAll(dir, 0744)
+				fs.MkdirAll(dir, 0755)
 			}
 		}
 

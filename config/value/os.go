@@ -42,7 +42,7 @@ func (u *MustDir) Validate() error {
 		return fmt.Errorf("path name must not be empty")
 	}
 
-	if err := u.fs.MkdirAll(val, 0750); err != nil {
+	if err := u.fs.MkdirAll(val, 0755); err != nil {
 		return fmt.Errorf("%s can't be created (%w)", val, err)
 	}
 

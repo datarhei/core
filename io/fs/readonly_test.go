@@ -26,7 +26,7 @@ func TestReadOnly(t *testing.T) {
 	_, _, err = ro.WriteFileSafe("/readonly.go", []byte("foobar"))
 	require.Error(t, err)
 
-	err = ro.MkdirAll("/foobar/baz", 0700)
+	err = ro.MkdirAll("/foobar/baz", 0755)
 	require.Error(t, err)
 
 	res := ro.Remove("/readonly.go")

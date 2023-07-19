@@ -47,7 +47,7 @@ func Location(filepath string) string {
 		configfile = "./config/config.js"
 	}
 
-	os.MkdirAll(path.Dir(configfile), 0740)
+	os.MkdirAll(path.Dir(configfile), 0755)
 
 	return configfile
 }

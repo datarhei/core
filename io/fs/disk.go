@@ -196,7 +196,7 @@ func NewRootedDiskFilesystem(config RootedDiskConfig) (Filesystem, error) {
 		fs.root = root
 	}
 
-	err := os.MkdirAll(fs.root, 0700)
+	err := os.MkdirAll(fs.root, 0755)
 	if err != nil {
 		return nil, err
 	}
