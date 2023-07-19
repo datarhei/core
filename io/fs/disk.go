@@ -203,7 +203,7 @@ func NewRootedDiskFilesystem(config RootedDiskConfig) (Filesystem, error) {
 
 	info, err := os.Stat(fs.root)
 	if err != nil {
-		return nil, err
+		return nil, os.ErrNotExist
 	}
 
 	if !info.IsDir() {
@@ -285,7 +285,7 @@ func (fs *diskFilesystem) Symlink(oldname, newname string) error {
 
 	info, err := os.Lstat(oldname)
 	if err != nil {
-		return err
+		return os.ErrNotExist
 	}
 
 	if info.Mode()&os.ModeSymlink != 0 {
@@ -494,7 +494,7 @@ func (fs *diskFilesystem) Stat(path string) (FileInfo, error) {
 
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil, err
+		return nil, os.ErrNotExist
 	}
 
 	dif.mode = info.Mode()
@@ -502,7 +502,7 @@ func (fs *diskFilesystem) Stat(path string) (FileInfo, error) {
 	if info.Mode()&os.ModeSymlink != 0 {
 		info, err = os.Stat(path)
 		if err != nil {
-			return nil, err
+			return nil, os.ErrNotExist
 		}
 	}
 

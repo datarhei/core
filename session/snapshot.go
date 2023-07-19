@@ -2,6 +2,7 @@ package session
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 
@@ -39,8 +40,12 @@ func NewHistorySource(fs fs.Filesystem, path string) (SnapshotSource, error) {
 		path: path,
 	}
 
-	if _, err := s.fs.Stat(s.path); err == os.ErrNotExist {
-		return nil, nil
+	if _, err := s.fs.Stat(s.path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+
+		return nil, err
 	}
 
 	data, err := s.fs.ReadFile(s.path)
