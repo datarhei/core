@@ -313,8 +313,8 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 		},
 	}
 
-	c.sessions = make(map[string]*session)
-	c.history.Sessions = make(map[string]totals)
+	c.sessions = map[string]*session{}
+	c.history.Sessions = map[string]totals{}
 
 	c.staleCallback = func(sess *session) {
 		defer func() {
@@ -494,6 +494,10 @@ func (c *collector) Restore(snapshot io.ReadCloser) error {
 
 	c.lock.history.Lock()
 	defer c.lock.history.Unlock()
+
+	if data.Sessions == nil {
+		data.Sessions = map[string]totals{}
+	}
 
 	c.history = data
 

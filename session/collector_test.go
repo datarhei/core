@@ -4,18 +4,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/stretchr/testify/require"
 )
 
-func createCollector(inactive, session time.Duration) (*collector, error) {
-	return newCollector("", nil, nil, CollectorConfig{
+func createCollector(inactive, session time.Duration, sessionsCh chan<- Session) (*collector, error) {
+	return newCollector("", sessionsCh, nil, CollectorConfig{
 		InactiveTimeout: inactive,
 		SessionTimeout:  session,
 	})
 }
 
 func TestRegisterSession(t *testing.T) {
-	c, err := createCollector(time.Hour, time.Hour)
+	c, err := createCollector(time.Hour, time.Hour, nil)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -35,7 +36,7 @@ func TestRegisterSession(t *testing.T) {
 }
 
 func TestInactiveSession(t *testing.T) {
-	c, err := createCollector(time.Second, time.Hour)
+	c, err := createCollector(time.Second, time.Hour, nil)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -53,7 +54,7 @@ func TestInactiveSession(t *testing.T) {
 }
 
 func TestActivateSession(t *testing.T) {
-	c, err := createCollector(time.Second, time.Second)
+	c, err := createCollector(time.Second, time.Second, nil)
 	require.Equal(t, nil, err)
 
 	b := c.IsKnownSession("foobar")
@@ -71,7 +72,7 @@ func TestActivateSession(t *testing.T) {
 }
 
 func TestIngress(t *testing.T) {
-	c, err := createCollector(time.Second, time.Hour)
+	c, err := createCollector(time.Second, time.Hour, nil)
 	require.Equal(t, nil, err)
 
 	c.RegisterAndActivate("foobar", "", "", "")
@@ -87,7 +88,7 @@ func TestIngress(t *testing.T) {
 }
 
 func TestEgress(t *testing.T) {
-	c, err := createCollector(time.Second, time.Hour)
+	c, err := createCollector(time.Second, time.Hour, nil)
 	require.Equal(t, nil, err)
 
 	c.RegisterAndActivate("foobar", "", "", "")
@@ -103,7 +104,7 @@ func TestEgress(t *testing.T) {
 }
 
 func TestNbSessions(t *testing.T) {
-	c, err := createCollector(time.Hour, time.Hour)
+	c, err := createCollector(time.Hour, time.Hour, nil)
 	require.Equal(t, nil, err)
 
 	nsessions := c.Sessions()
@@ -130,4 +131,28 @@ func TestNbSessions(t *testing.T) {
 
 	nsessions = c.Sessions()
 	require.Equal(t, uint64(0), nsessions)
+}
+
+func TestHistoryRestore(t *testing.T) {
+	sessions := make(chan Session, 1)
+
+	c, err := createCollector(time.Hour, time.Hour, sessions)
+	require.Equal(t, nil, err)
+
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFile("/foobar.json", []byte("{}"))
+	require.NoError(t, err)
+
+	snapshot, err := NewHistorySource(memfs, "/foobar.json")
+	require.NoError(t, err)
+
+	err = c.Restore(snapshot)
+	require.NoError(t, err)
+
+	c.RegisterAndActivate("foo", "", "", "")
+	c.Close("foo")
+
+	<-sessions
 }
