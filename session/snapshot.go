@@ -2,9 +2,7 @@ package session
 
 import (
 	"bytes"
-	"errors"
 	"io"
-	"os"
 
 	"github.com/datarhei/core/v16/io/fs"
 )
@@ -34,14 +32,14 @@ type historySource struct {
 // session history. If there's no data, a nil source with a nil error will be returned.
 // If there's data, a non-nil source with a nil error will be returned. Otherwise
 // the source will be nil and the error non-nil.
-func NewHistorySource(fs fs.Filesystem, path string) (SnapshotSource, error) {
+func NewHistorySource(filesystem fs.Filesystem, path string) (SnapshotSource, error) {
 	s := &historySource{
-		fs:   fs,
+		fs:   filesystem,
 		path: path,
 	}
 
 	if _, err := s.fs.Stat(s.path); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if err == fs.ErrNotExist {
 			return nil, nil
 		}
 

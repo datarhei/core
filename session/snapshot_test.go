@@ -11,7 +11,7 @@ func TestHistorySource(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	s, err := NewHistorySource(memfs, "/foobar.json")
+	s, err := NewHistorySource(memfs, "./foobar.json")
 	require.NoError(t, err)
 	require.Nil(t, s)
 }

@@ -270,7 +270,7 @@ func (fs *s3Filesystem) ReadFile(path string) ([]byte, error) {
 	path = fs.cleanPath(path)
 	file := fs.Open(path)
 	if file == nil {
-		return nil, os.ErrNotExist
+		return nil, ErrNotExist
 	}
 
 	defer file.Close()
@@ -403,7 +403,7 @@ func (fs *s3Filesystem) MkdirAll(path string, perm os.FileMode) error {
 	info, err := fs.Stat(path)
 	if err == nil {
 		if !info.IsDir() {
-			return os.ErrExist
+			return ErrExist
 		}
 
 		return nil
@@ -624,11 +624,11 @@ func (fs *s3Filesystem) LookPath(file string) (string, error) {
 		info, err := fs.Stat(file)
 		if err == nil {
 			if !info.Mode().IsRegular() {
-				return file, os.ErrNotExist
+				return file, ErrNotExist
 			}
 			return file, nil
 		}
-		return "", os.ErrNotExist
+		return "", ErrNotExist
 	}
 	path := os.Getenv("PATH")
 	for _, dir := range filepath.SplitList(path) {
@@ -640,15 +640,15 @@ func (fs *s3Filesystem) LookPath(file string) (string, error) {
 		path = fs.cleanPath(path)
 		if info, err := fs.Stat(path); err == nil {
 			if !filepath.IsAbs(path) {
-				return path, os.ErrNotExist
+				return path, ErrNotExist
 			}
 			if !info.Mode().IsRegular() {
-				return path, os.ErrNotExist
+				return path, ErrNotExist
 			}
 			return path, nil
 		}
 	}
-	return "", os.ErrNotExist
+	return "", ErrNotExist
 }
 
 func (fs *s3Filesystem) isDir(path string) bool {

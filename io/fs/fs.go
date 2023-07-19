@@ -2,11 +2,15 @@
 package fs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"time"
 )
+
+var ErrExist = errors.New("file or directory already exists")
+var ErrNotExist = errors.New("file or directory does not exist")
 
 // FileInfo describes a file and is returned by Stat.
 type FileInfo interface {
@@ -67,9 +71,9 @@ type ReadFilesystem interface {
 	// the number of bytes read or an error.
 	ReadFile(path string) ([]byte, error)
 
-	// Stat returns info about the file at path. If the file doesn't exist, an error
-	// will be returned. If the file is a symlink, the info reports the name and mode
-	// of the link itself, but the modification time and size are of the linked file.
+	// Stat returns info about the file at path. If the file doesn't exist, the error
+	// ErrNotExist will be returned. If the file is a symlink, the info reports the name
+	// and mode of the link itself, but the modification time and size are of the linked file.
 	Stat(path string) (FileInfo, error)
 
 	// List lists all files that are currently on the filesystem.
@@ -78,12 +82,13 @@ type ReadFilesystem interface {
 	// LookPath searches for an executable named file in the directories named by the PATH environment
 	// variable. If file contains a slash, it is tried directly and the PATH is not consulted. Otherwise,
 	// on success, the result is an absolute path. On non-disk filesystems. Only the mere existence
-	// of that file is verfied.
+	// of that file is verfied. In case the file is not found, the error ErrNotExist will be returned.
 	LookPath(file string) (string, error)
 }
 
 type WriteFilesystem interface {
-	// Symlink creates newname as a symbolic link to oldname.
+	// Symlink creates newname as a symbolic link to oldname. Return ErrNotExist if oldname doesn't exist.
+	// If newname already exists, ErrExits will be returned.
 	Symlink(oldname, newname string) error
 
 	// WriteFileReader adds a file to the filesystem. Returns the size of the data that has been
@@ -105,6 +110,7 @@ type WriteFilesystem interface {
 	// MkdirAll creates a directory named path, along with any necessary parents, and returns nil,
 	// or else returns an error. The permission bits perm (before umask) are used for all directories
 	// that MkdirAll creates. If path is already a directory, MkdirAll does nothing and returns nil.
+	// If the path already exists and is a regular file, ErrExists will be returned.
 	MkdirAll(path string, perm os.FileMode) error
 
 	// Rename renames the file from src to dst. If src and dst can't be renamed

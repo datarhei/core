@@ -289,13 +289,13 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	fs.filesLock.RUnlock()
 
 	if !ok {
-		return nil, os.ErrNotExist
+		return nil, ErrNotExist
 	}
 
 	if len(file.linkTo) != 0 {
 		file, ok = fs.files[file.linkTo]
 		if !ok {
-			return nil, os.ErrNotExist
+			return nil, ErrNotExist
 		}
 	}
 
@@ -310,11 +310,11 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	defer fs.filesLock.Unlock()
 
 	if _, ok := fs.files[oldname]; !ok {
-		return os.ErrNotExist
+		return ErrNotExist
 	}
 
 	if _, ok := fs.files[newname]; ok {
-		return os.ErrExist
+		return ErrExist
 	}
 
 	if file, ok := fs.files[oldname]; ok {
@@ -465,7 +465,7 @@ func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 			return nil
 		}
 
-		return os.ErrExist
+		return ErrExist
 	}
 
 	f := &internalMemFile{
@@ -495,7 +495,7 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 
 	srcFile, ok := fs.files[src]
 	if !ok {
-		return os.ErrNotExist
+		return ErrNotExist
 	}
 
 	dstFile, ok := fs.files[dst]
@@ -524,11 +524,11 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 
 	srcFile, ok := fs.files[src]
 	if !ok {
-		return os.ErrNotExist
+		return ErrNotExist
 	}
 
 	if srcFile.dir {
-		return os.ErrNotExist
+		return ErrNotExist
 	}
 
 	if fs.isDir(dst) {
@@ -582,7 +582,7 @@ func (fs *memFilesystem) stat(path string) (FileInfo, error) {
 		if len(f.linkTo) != 0 {
 			file, ok := fs.files[f.linkTo]
 			if !ok {
-				return nil, os.ErrNotExist
+				return nil, ErrNotExist
 			}
 
 			f.lastMod = file.lastMod
@@ -594,7 +594,7 @@ func (fs *memFilesystem) stat(path string) (FileInfo, error) {
 
 	// Check for directories
 	if !fs.isDir(path) {
-		return nil, os.ErrNotExist
+		return nil, ErrNotExist
 	}
 
 	f := &memFileInfo{
@@ -799,11 +799,11 @@ func (fs *memFilesystem) LookPath(file string) (string, error) {
 		info, err := fs.Stat(file)
 		if err == nil {
 			if !info.Mode().IsRegular() {
-				return file, os.ErrNotExist
+				return file, ErrNotExist
 			}
 			return file, nil
 		}
-		return "", os.ErrNotExist
+		return "", ErrNotExist
 	}
 	path := os.Getenv("PATH")
 	for _, dir := range filepath.SplitList(path) {
@@ -815,15 +815,15 @@ func (fs *memFilesystem) LookPath(file string) (string, error) {
 		path = fs.cleanPath(path)
 		if info, err := fs.Stat(path); err == nil {
 			if !filepath.IsAbs(path) {
-				return path, os.ErrNotExist
+				return path, ErrNotExist
 			}
 			if !info.Mode().IsRegular() {
-				return path, os.ErrNotExist
+				return path, ErrNotExist
 			}
 			return path, nil
 		}
 	}
-	return "", os.ErrNotExist
+	return "", ErrNotExist
 }
 
 func (fs *memFilesystem) cleanPath(path string) string {

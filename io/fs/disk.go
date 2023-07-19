@@ -203,7 +203,7 @@ func NewRootedDiskFilesystem(config RootedDiskConfig) (Filesystem, error) {
 
 	info, err := os.Stat(fs.root)
 	if err != nil {
-		return nil, os.ErrNotExist
+		return nil, ErrNotExist
 	}
 
 	if !info.IsDir() {
@@ -285,7 +285,7 @@ func (fs *diskFilesystem) Symlink(oldname, newname string) error {
 
 	info, err := os.Lstat(oldname)
 	if err != nil {
-		return os.ErrNotExist
+		return ErrNotExist
 	}
 
 	if info.Mode()&os.ModeSymlink != 0 {
@@ -494,7 +494,7 @@ func (fs *diskFilesystem) Stat(path string) (FileInfo, error) {
 
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil, os.ErrNotExist
+		return nil, ErrNotExist
 	}
 
 	dif.mode = info.Mode()
@@ -502,7 +502,7 @@ func (fs *diskFilesystem) Stat(path string) (FileInfo, error) {
 	if info.Mode()&os.ModeSymlink != 0 {
 		info, err = os.Stat(path)
 		if err != nil {
-			return nil, os.ErrNotExist
+			return nil, ErrNotExist
 		}
 	}
 
@@ -674,7 +674,7 @@ func (fs *diskFilesystem) LookPath(file string) (string, error) {
 		if err == nil {
 			return file, nil
 		}
-		return "", os.ErrNotExist
+		return "", ErrNotExist
 	}
 	path := os.Getenv("PATH")
 	for _, dir := range filepath.SplitList(path) {
@@ -686,12 +686,12 @@ func (fs *diskFilesystem) LookPath(file string) (string, error) {
 		path = fs.cleanPath(path)
 		if err := fs.findExecutable(path); err == nil {
 			if !filepath.IsAbs(path) {
-				return path, os.ErrNotExist
+				return path, ErrNotExist
 			}
 			return path, nil
 		}
 	}
-	return "", os.ErrNotExist
+	return "", ErrNotExist
 }
 
 func (fs *diskFilesystem) findExecutable(file string) error {
