@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -35,7 +36,7 @@ func main() {
 	}
 }
 
-func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) error {
+func doImport(logger log.Logger, filesystem fs.Filesystem, configstore cfgstore.Store) error {
 	if logger == nil {
 		logger = log.New("")
 	}
@@ -74,8 +75,8 @@ func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) e
 
 	logger = logger.WithField("database", v1filename)
 
-	if _, err := fs.Stat(v1filename); err != nil {
-		if os.IsNotExist(err) {
+	if _, err := filesystem.Stat(v1filename); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			logger.Info().Log("Database doesn't exist and nothing will be imported")
 			return nil
 		}
@@ -88,7 +89,7 @@ func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) e
 
 	// Load an existing DB
 	datastore, err := jsonstore.New(jsonstore.Config{
-		Filesystem: fs,
+		Filesystem: filesystem,
 		Filepath:   cfg.DB.Dir + "/db.json",
 	})
 	if err != nil {
@@ -116,7 +117,7 @@ func doImport(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) e
 	importConfig.binary = cfg.FFmpeg.Binary
 
 	// Rewrite the old database to the new database
-	r, err := importV1(fs, v1filename, importConfig)
+	r, err := importV1(filesystem, v1filename, importConfig)
 	if err != nil {
 		logger.Error().WithError(err).Log("Importing database failed")
 		return fmt.Errorf("importing database failed: %w", err)

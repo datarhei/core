@@ -853,9 +853,9 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	// A map from the process ID to the process config of the processes
 	// we want to be running on the nodes.
 	wantMap := map[string]store.Process{}
-	for _, process := range want {
-		pid := process.Config.ProcessID().String()
-		wantMap[pid] = process
+	for _, wantP := range want {
+		pid := wantP.Config.ProcessID().String()
+		wantMap[pid] = wantP
 	}
 
 	opStack := []interface{}{}
@@ -1007,16 +1007,29 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	}
 
 	// The wantMap now contains only those processes that need to be installed on a node.
+	// We will rebuild the "want" array from the wantMap in the same order as the original
+	// "want" array to make the resulting opStack deterministic.
+	wantReduced := []store.Process{}
+	for _, wantP := range want {
+		pid := wantP.Config.ProcessID().String()
+		if _, ok := wantMap[pid]; !ok {
+			continue
+		}
+
+		wantReduced = append(wantReduced, wantP)
+	}
 
 	// Create a map from the process reference to the node it is running on.
 	haveReferenceAffinityMap := createReferenceAffinityMap(have)
 
 	// Now, all remaining processes in the wantMap must be added to one of the nodes.
-	for pid, process := range wantMap {
+	for _, wantP := range wantReduced {
+		pid := wantP.Config.ProcessID().String()
+
 		// If a process doesn't have any limits defined, reject that process
-		if process.Config.LimitCPU <= 0 || process.Config.LimitMemory <= 0 {
+		if wantP.Config.LimitCPU <= 0 || wantP.Config.LimitMemory <= 0 {
 			opStack = append(opStack, processOpReject{
-				processid: process.Config.ProcessID(),
+				processid: wantP.Config.ProcessID(),
 				err:       errNoLimitsDefined,
 			})
 
@@ -1029,9 +1042,9 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		nodeid := ""
 
 		// Try to add the process to a node where other processes with the same reference currently reside.
-		if len(process.Config.Reference) != 0 {
-			for _, count := range haveReferenceAffinityMap[process.Config.Reference+"@"+process.Config.Domain] {
-				if hasNodeEnoughResources(resources[count.nodeid], process.Config.LimitCPU, process.Config.LimitMemory) {
+		if len(wantP.Config.Reference) != 0 {
+			for _, count := range haveReferenceAffinityMap[wantP.Config.Reference+"@"+wantP.Config.Domain] {
+				if hasNodeEnoughResources(resources[count.nodeid], wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
 					nodeid = count.nodeid
 					break
 				}
@@ -1040,29 +1053,29 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 
 		// Find the node with the most resources available
 		if len(nodeid) == 0 {
-			nodeid = findBestNodeForProcess(resources, process.Config.LimitCPU, process.Config.LimitMemory)
+			nodeid = findBestNodeForProcess(resources, wantP.Config.LimitCPU, wantP.Config.LimitMemory)
 		}
 
 		if len(nodeid) != 0 {
 			opStack = append(opStack, processOpAdd{
 				nodeid:   nodeid,
-				config:   process.Config,
-				metadata: process.Metadata,
-				order:    process.Order,
+				config:   wantP.Config,
+				metadata: wantP.Metadata,
+				order:    wantP.Order,
 			})
 
 			// Consume the resources
 			r, ok := resources[nodeid]
 			if ok {
-				r.CPU += process.Config.LimitCPU
-				r.Mem += process.Config.LimitMemory
+				r.CPU += wantP.Config.LimitCPU
+				r.Mem += wantP.Config.LimitMemory
 				resources[nodeid] = r
 			}
 
 			reality[pid] = nodeid
 		} else {
 			opStack = append(opStack, processOpReject{
-				processid: process.Config.ProcessID(),
+				processid: wantP.Config.ProcessID(),
 				err:       errNotEnoughResourcesForDeployment,
 			})
 		}

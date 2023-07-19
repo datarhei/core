@@ -2,8 +2,8 @@ package json
 
 import (
 	gojson "encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/datarhei/core/v16/encoding/json"
@@ -180,9 +180,8 @@ type storeVersion struct {
 func (s *jsonStore) load(filepath string, version uint64) (Data, error) {
 	r := NewData()
 
-	_, err := s.fs.Stat(filepath)
-	if err != nil {
-		if os.IsNotExist(err) {
+	if _, err := s.fs.Stat(filepath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
 			return r, nil
 		}
 

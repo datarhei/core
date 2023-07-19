@@ -2,8 +2,8 @@ package store
 
 import (
 	gojson "encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/datarhei/core/v16/config"
@@ -121,8 +121,12 @@ func (c *jsonStore) load(cfg *config.Config) error {
 		return nil
 	}
 
-	if _, err := c.fs.Stat(c.path); os.IsNotExist(err) {
-		return nil
+	if _, err := c.fs.Stat(c.path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+
+		return err
 	}
 
 	jsondata, err := c.fs.ReadFile(c.path)

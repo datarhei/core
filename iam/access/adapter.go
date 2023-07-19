@@ -2,8 +2,8 @@ package access
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -63,9 +63,13 @@ func (a *adapter) LoadPolicy(model model.Model) error {
 }
 
 func (a *adapter) loadPolicyFile(model model.Model) error {
-	if _, err := a.fs.Stat(a.filePath); os.IsNotExist(err) {
-		a.domains = []Domain{}
-		return nil
+	if _, err := a.fs.Stat(a.filePath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			a.domains = []Domain{}
+			return nil
+		}
+
+		return err
 	}
 
 	data, err := a.fs.ReadFile(a.filePath)

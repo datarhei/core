@@ -2,8 +2,8 @@ package identity
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/datarhei/core/v16/io/fs"
@@ -48,8 +48,12 @@ func (a *fileAdapter) LoadIdentities() ([]User, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if _, err := a.fs.Stat(a.filePath); os.IsNotExist(err) {
-		return nil, nil
+	if _, err := a.fs.Stat(a.filePath); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+
+		return nil, err
 	}
 
 	data, err := a.fs.ReadFile(a.filePath)
