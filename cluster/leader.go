@@ -1025,6 +1025,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	// Now, all remaining processes in the wantMap must be added to one of the nodes.
 	for _, wantP := range wantReduced {
 		pid := wantP.Config.ProcessID().String()
+		reference := wantP.Config.Reference + "@" + wantP.Config.Domain
 
 		// If a process doesn't have any limits defined, reject that process
 		if wantP.Config.LimitCPU <= 0 || wantP.Config.LimitMemory <= 0 {
@@ -1043,7 +1044,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 
 		// Try to add the process to a node where other processes with the same reference currently reside.
 		if len(wantP.Config.Reference) != 0 {
-			for _, count := range haveReferenceAffinityMap[wantP.Config.Reference+"@"+wantP.Config.Domain] {
+			for _, count := range haveReferenceAffinityMap[reference] {
 				if hasNodeEnoughResources(resources[count.nodeid], wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
 					nodeid = count.nodeid
 					break
@@ -1073,6 +1074,8 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 			}
 
 			reality[pid] = nodeid
+
+			haveReferenceAffinityMap = updateReferenceAffinityMap(haveReferenceAffinityMap, reference, nodeid)
 		} else {
 			opStack = append(opStack, processOpReject{
 				processid: wantP.Config.ProcessID(),
@@ -1166,6 +1169,41 @@ func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenc
 	}
 
 	return referenceAffinityMap
+}
+
+func updateReferenceAffinityMap(raMap map[string][]referenceAffinityNodeCount, reference, nodeid string) map[string][]referenceAffinityNodeCount {
+	counts, ok := raMap[reference]
+	if !ok {
+		raMap[reference] = []referenceAffinityNodeCount{
+			{
+				nodeid: nodeid,
+				count:  1,
+			},
+		}
+
+		return raMap
+	}
+
+	found := false
+	for i, count := range counts {
+		if count.nodeid == nodeid {
+			count.count++
+			counts[i] = count
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		counts = append(counts, referenceAffinityNodeCount{
+			nodeid: nodeid,
+			count:  1,
+		})
+	}
+
+	raMap[reference] = counts
+
+	return raMap
 }
 
 // rebalance returns a list of operations that will move running processes away from nodes that are overloaded.

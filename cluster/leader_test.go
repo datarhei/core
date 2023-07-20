@@ -378,6 +378,193 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 	}, reality)
 }
 
+func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
+	wish := map[string]string{}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar3",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+	}
+
+	have := []proxy.Process{
+		{
+			NodeID:    "node2",
+			Order:     "start",
+			State:     "running",
+			CPU:       1,
+			Mem:       1,
+			Runtime:   42,
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Equal(t, []interface{}{
+		processOpAdd{
+			nodeid: "node2",
+			config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			order: "start",
+		},
+		processOpAdd{
+			nodeid: "node2",
+			config: &app.Config{
+				ID:          "foobar3",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			order: "start",
+		},
+	}, stack)
+
+	require.Equal(t, map[string]string{
+		"foobar1@": "node2",
+		"foobar2@": "node2",
+		"foobar3@": "node2",
+	}, reality)
+}
+
+func TestSynchronizeAddReferenceAffinityMultipleEmptyNodes(t *testing.T) {
+	wish := map[string]string{}
+
+	now := time.Now()
+
+	want := []store.Process{
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar1",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar2",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+		{
+			UpdatedAt: now,
+			Config: &app.Config{
+				ID:          "foobar3",
+				Reference:   "barfoo",
+				LimitCPU:    10,
+				LimitMemory: 10,
+			},
+			Order: "start",
+		},
+	}
+
+	have := []proxy.Process{}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      1,
+				Mem:      1,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+	}
+
+	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
+
+	require.Equal(t, 3, len(stack))
+
+	nodeid := reality["foobar1@"]
+
+	require.Equal(t, map[string]string{
+		"foobar1@": nodeid,
+		"foobar2@": nodeid,
+		"foobar3@": nodeid,
+	}, reality)
+}
+
 func TestSynchronizeAddLimit(t *testing.T) {
 	wish := map[string]string{}
 
@@ -2022,6 +2209,132 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 			},
 		},
 		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+	}, affinityMap)
+}
+
+func TestUpdateReferenceAffinityNodeMap(t *testing.T) {
+	affinityMap := map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+	}
+
+	affinityMap = updateReferenceAffinityMap(affinityMap, "ref3@", "node1")
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+	}, affinityMap)
+
+	affinityMap = updateReferenceAffinityMap(affinityMap, "ref2@", "node2")
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node2",
+				count:  2,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+	}, affinityMap)
+
+	affinityMap = updateReferenceAffinityMap(affinityMap, "ref4@", "node2")
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node2",
+				count:  2,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref4@": {
 			{
 				nodeid: "node2",
 				count:  1,
