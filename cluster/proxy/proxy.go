@@ -58,9 +58,10 @@ type proxy struct {
 	nodes     map[string]Node // List of known nodes
 	nodesLock sync.RWMutex
 
-	lock sync.RWMutex
-
+	lock    sync.RWMutex
 	running bool
+
+	cache *Cache[string]
 
 	logger log.Logger
 }
@@ -71,6 +72,7 @@ func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{
 		id:     config.ID,
 		nodes:  map[string]Node{},
+		cache:  NewCache[string](nil),
 		logger: config.Logger,
 	}
 
@@ -323,10 +325,20 @@ func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
 }
 
 func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
-	id, err := p.getNodeIDForFile(prefix, path)
+	id, err := p.cache.Get(prefix + ":" + path)
+	if err == nil {
+		node, err := p.GetNode(id)
+		if err == nil {
+			return node, nil
+		}
+	}
+
+	id, err = p.getNodeIDForFile(prefix, path)
 	if err != nil {
 		return nil, err
 	}
+
+	p.cache.Put(prefix+":"+path, id, 5*time.Second)
 
 	return p.GetNode(id)
 }
