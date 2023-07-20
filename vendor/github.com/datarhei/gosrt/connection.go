@@ -54,6 +54,9 @@ type Conn interface {
 
 	// Stats returns accumulated and instantaneous statistics of the connection.
 	Stats(s *Statistics)
+
+	// Version returns the connection version, either 4 or 5. With version 4, the streamid is not available
+	Version() uint32
 }
 
 type connStats struct {
@@ -80,6 +83,9 @@ type connStats struct {
 var _ net.Conn = &srtConn{}
 
 type srtConn struct {
+	version  uint32
+	isCaller bool // Only relevant if version == 4
+
 	localAddr  net.Addr
 	remoteAddr net.Addr
 
@@ -155,9 +161,15 @@ type srtConn struct {
 		expectedRcvPacketSequenceNumber  circular.Number
 		expectedReadPacketSequenceNumber circular.Number
 	}
+
+	// HSv4
+	stopHSRequests context.CancelFunc
+	stopKMRequests context.CancelFunc
 }
 
 type srtConnConfig struct {
+	version                     uint32
+	isCaller                    bool
 	localAddr                   net.Addr
 	remoteAddr                  net.Addr
 	config                      Config
@@ -177,6 +189,8 @@ type srtConnConfig struct {
 
 func newSRTConn(config srtConnConfig) *srtConn {
 	c := &srtConn{
+		version:                     config.version,
+		isCaller:                    config.isCaller,
 		localAddr:                   config.localAddr,
 		remoteAddr:                  config.remoteAddr,
 		config:                      config.config,
@@ -217,7 +231,14 @@ func newSRTConn(config srtConnConfig) *srtConn {
 	c.networkQueue = make(chan packet.Packet, 1024)
 
 	c.writeQueue = make(chan packet.Packet, 1024)
-	c.writeData = make([]byte, int(c.config.PayloadSize))
+	if c.version == 4 {
+		// libsrt-1.2.3 receiver doesn't like it when the payload is larger than 7*188 bytes.
+		// Here we just take a multiple of a mpegts chunk size.
+		c.writeData = make([]byte, int(c.config.PayloadSize/188*188))
+	} else {
+		// For v5 we use the max. payload size: https://github.com/Haivision/srt/issues/876
+		c.writeData = make([]byte, int(c.config.PayloadSize))
+	}
 
 	c.readQueue = make(chan packet.Packet, 1024)
 
@@ -281,6 +302,18 @@ func newSRTConn(config srtConnConfig) *srtConn {
 		c.statistics.headerSize += 40 // 40 bytes IPv6 header
 	}
 
+	if c.version == 4 && c.isCaller {
+		var hsrequestsCtx context.Context
+		hsrequestsCtx, c.stopHSRequests = context.WithCancel(context.Background())
+		go c.sendHSRequests(hsrequestsCtx)
+
+		if c.crypto != nil {
+			var kmrequestsCtx context.Context
+			kmrequestsCtx, c.stopKMRequests = context.WithCancel(context.Background())
+			go c.sendKMRequests(kmrequestsCtx)
+		}
+	}
+
 	return c
 }
 
@@ -304,6 +337,10 @@ func (c *srtConn) PeerSocketId() uint32 {
 
 func (c *srtConn) StreamId() string {
 	return c.config.StreamId
+}
+
+func (c *srtConn) Version() uint32 {
+	return c.version
 }
 
 // ticker invokes the congestion control in regular intervals with
@@ -475,7 +512,7 @@ func (c *srtConn) pop(p packet.Packet) {
 			c.kmRefreshCountdown--
 
 			if c.kmPreAnnounceCountdown == 0 && !c.kmConfirmed {
-				c.sendKMRequest()
+				c.sendKMRequest(c.keyBaseEncryption.Opposite())
 
 				// Resend the request until we get a response
 				c.kmPreAnnounceCountdown = c.config.KMPreAnnounce/10 + 1
@@ -578,6 +615,17 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 		} else if header.ControlType == packet.CTRLTYPE_ACKACK {
 			c.handleACKACK(p)
 		} else if header.ControlType == packet.CTRLTYPE_USER {
+			c.log("connection:recv:ctrl:user", func() string {
+				return fmt.Sprintf("got CTRLTYPE_USER packet, subType: %s", header.SubType)
+			})
+
+			// HSv4 Extension
+			if header.SubType == packet.EXTTYPE_HSREQ {
+				c.handleHSRequest(p)
+			} else if header.SubType == packet.EXTTYPE_HSRSP {
+				c.handleHSResponse(p)
+			}
+
 			// 3.2.2.  Key Material
 			if header.SubType == packet.EXTTYPE_KMREQ {
 				c.handleKMRequest(p)
@@ -585,69 +633,71 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 				c.handleKMResponse(p)
 			}
 		}
+
+		return
+	}
+
+	if header.PacketSequenceNumber.Gt(c.debug.expectedRcvPacketSequenceNumber) {
+		c.log("connection:error", func() string {
+			return fmt.Sprintf("recv lost packets. got: %d, expected: %d (%d)\n", header.PacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Distance(header.PacketSequenceNumber))
+		})
+	}
+
+	c.debug.expectedRcvPacketSequenceNumber = header.PacketSequenceNumber.Inc()
+
+	//fmt.Printf("%s\n", p.String())
+
+	// Ignore FEC filter control packets
+	// https://github.com/Haivision/srt/blob/master/docs/features/packet-filtering-and-fec.md
+	// "An FEC control packet is distinguished from a regular data packet by having
+	// its message number equal to 0. This value isn't normally used in SRT (message
+	// numbers start from 1, increment to a maximum, and then roll back to 1)."
+	if header.MessageNumber == 0 {
+		c.log("connection:filter", func() string { return "dropped FEC filter control packet" })
+		return
+	}
+
+	// 4.5.1.1.  TSBPD Time Base Calculation
+	if !c.tsbpdWrapPeriod {
+		if header.Timestamp > packet.MAX_TIMESTAMP-(30*1000000) {
+			c.tsbpdWrapPeriod = true
+			c.log("connection:tsbpd", func() string { return "TSBPD wrapping period started" })
+		}
 	} else {
-		if header.PacketSequenceNumber.Gt(c.debug.expectedRcvPacketSequenceNumber) {
-			c.log("connection:error", func() string {
-				return fmt.Sprintf("recv lost packets. got: %d, expected: %d (%d)\n", header.PacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Val(), c.debug.expectedRcvPacketSequenceNumber.Distance(header.PacketSequenceNumber))
-			})
+		if header.Timestamp >= (30*1000000) && header.Timestamp <= (60*1000000) {
+			c.tsbpdWrapPeriod = false
+			c.tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
+			c.log("connection:tsbpd", func() string { return "TSBPD wrapping period finished" })
 		}
+	}
 
-		c.debug.expectedRcvPacketSequenceNumber = header.PacketSequenceNumber.Inc()
-
-		//fmt.Printf("%s\n", p.String())
-
-		// Ignore FEC filter control packets
-		// https://github.com/Haivision/srt/blob/master/docs/features/packet-filtering-and-fec.md
-		// "An FEC control packet is distinguished from a regular data packet by having
-		// its message number equal to 0. This value isn't normally used in SRT (message
-		// numbers start from 1, increment to a maximum, and then roll back to 1)."
-		if header.MessageNumber == 0 {
-			c.log("connection:filter", func() string { return "dropped FEC filter control packet" })
-			return
+	tsbpdTimeBaseOffset := c.tsbpdTimeBaseOffset
+	if c.tsbpdWrapPeriod {
+		if header.Timestamp < (30 * 1000000) {
+			tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
 		}
+	}
 
-		// 4.5.1.1.  TSBPD Time Base Calculation
-		if !c.tsbpdWrapPeriod {
-			if header.Timestamp > packet.MAX_TIMESTAMP-(30*1000000) {
-				c.tsbpdWrapPeriod = true
-				c.log("connection:tsbpd", func() string { return "TSBPD wrapping period started" })
-			}
-		} else {
-			if header.Timestamp >= (30*1000000) && header.Timestamp <= (60*1000000) {
-				c.tsbpdWrapPeriod = false
-				c.tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
-				c.log("connection:tsbpd", func() string { return "TSBPD wrapping period finished" })
-			}
-		}
+	header.PktTsbpdTime = c.tsbpdTimeBase + tsbpdTimeBaseOffset + uint64(header.Timestamp) + c.tsbpdDelay + c.tsbpdDrift
 
-		tsbpdTimeBaseOffset := c.tsbpdTimeBaseOffset
-		if c.tsbpdWrapPeriod {
-			if header.Timestamp < (30 * 1000000) {
-				tsbpdTimeBaseOffset += uint64(packet.MAX_TIMESTAMP) + 1
-			}
-		}
+	c.log("data:recv:dump", func() string { return p.Dump() })
 
-		header.PktTsbpdTime = c.tsbpdTimeBase + tsbpdTimeBaseOffset + uint64(header.Timestamp) + c.tsbpdDelay + c.tsbpdDrift
-
-		c.log("data:recv:dump", func() string { return p.Dump() })
-
-		c.cryptoLock.Lock()
-		if c.crypto != nil {
-			if header.KeyBaseEncryptionFlag != 0 {
-				if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
-					c.statistics.pktRecvUndecrypt++
-					c.statistics.byteRecvUndecrypt += p.Len()
-				}
-			} else {
+	c.cryptoLock.Lock()
+	if c.crypto != nil {
+		if header.KeyBaseEncryptionFlag != 0 {
+			if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
 				c.statistics.pktRecvUndecrypt++
 				c.statistics.byteRecvUndecrypt += p.Len()
 			}
+		} else {
+			c.statistics.pktRecvUndecrypt++
+			c.statistics.byteRecvUndecrypt += p.Len()
 		}
-		c.cryptoLock.Unlock()
-
-		// Put the packet into receive congestion control
-		c.recv.Push(p)
 	}
+	c.cryptoLock.Unlock()
+
+	// Put the packet into receive congestion control
+	c.recv.Push(p)
 }
 
 // handleKeepAlive resets the idle timeout and sends a keepalive to the peer.
@@ -775,35 +825,221 @@ func (c *srtConn) recalculateRTT(rtt time.Duration) {
 	})
 }
 
-// handleKMRequest checks if the key material is valid and responds with a KM response.
-func (c *srtConn) handleKMRequest(p packet.Packet) {
-	c.log("control:recv:KM:dump", func() string { return p.Dump() })
+// handleHSRequest handles the HSv4 handshake extension request and sends the response
+func (c *srtConn) handleHSRequest(p packet.Packet) {
+	c.log("control:recv:HSReq:dump", func() string { return p.Dump() })
 
-	c.statistics.pktRecvKM++
-
-	c.cryptoLock.Lock()
-
-	if c.crypto == nil {
-		c.log("control:recv:KM:error", func() string { return "connection is not encrypted" })
-		c.cryptoLock.Unlock()
-		return
-	}
-
-	cif := &packet.CIFKM{}
+	cif := &packet.CIFHandshakeExtension{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
 		c.statistics.pktRecvInvalid++
-		c.log("control:recv:KM:error", func() string { return fmt.Sprintf("invalid KM: %s", err) })
+		c.log("control:recv:HSReq:error", func() string { return fmt.Sprintf("invalid HSReq: %s", err) })
+		return
+	}
+
+	c.log("control:recv:HSReq:cif", func() string { return cif.String() })
+
+	// Check for version
+	if cif.SRTVersion < 0x010200 || cif.SRTVersion >= 0x010300 {
+		c.log("control:recv:HSReq:error", func() string { return fmt.Sprintf("unsupported version: %#08x", cif.SRTVersion) })
+		c.close()
+		return
+	}
+
+	// Check the required SRT flags
+	if !cif.SRTFlags.TSBPDSND {
+		c.log("control:recv:HSRes:error", func() string { return "TSBPDSND flag must be set" })
+		c.close()
+
+		return
+	}
+
+	if !cif.SRTFlags.TLPKTDROP {
+		c.log("control:recv:HSRes:error", func() string { return "TLPKTDROP flag must be set" })
+		c.close()
+
+		return
+	}
+
+	if !cif.SRTFlags.CRYPT {
+		c.log("control:recv:HSRes:error", func() string { return "CRYPT flag must be set" })
+		c.close()
+
+		return
+	}
+
+	if !cif.SRTFlags.REXMITFLG {
+		c.log("control:recv:HSRes:error", func() string { return "REXMITFLG flag must be set" })
+		c.close()
+
+		return
+	}
+
+	// we as receiver don't need this
+	cif.SRTFlags.TSBPDSND = false
+
+	// we as receiver are supporting these
+	cif.SRTFlags.TSBPDRCV = true
+	cif.SRTFlags.PERIODICNAK = true
+
+	// These flag was introduced in HSv5 and should not be set in HSv4
+	if cif.SRTFlags.STREAM {
+		c.log("control:recv:HSReq:error", func() string { return "STREAM flag is set" })
+		c.close()
+		return
+	}
+
+	if cif.SRTFlags.PACKET_FILTER {
+		c.log("control:recv:HSReq:error", func() string { return "PACKET_FILTER flag is set" })
+		c.close()
+		return
+	}
+
+	recvTsbpdDelay := uint16(c.config.ReceiverLatency.Milliseconds())
+
+	if cif.SendTSBPDDelay > recvTsbpdDelay {
+		recvTsbpdDelay = cif.SendTSBPDDelay
+	}
+
+	c.tsbpdDelay = uint64(recvTsbpdDelay) * 1000
+
+	cif.RecvTSBPDDelay = 0
+	cif.SendTSBPDDelay = recvTsbpdDelay
+
+	p.MarshalCIF(cif)
+
+	// Send HS Response
+	p.Header().SubType = packet.EXTTYPE_HSRSP
+
+	c.pop(p)
+}
+
+// handleHSResponse handles the HSv4 handshake extension response
+func (c *srtConn) handleHSResponse(p packet.Packet) {
+	c.log("control:recv:HSRes:dump", func() string { return p.Dump() })
+
+	cif := &packet.CIFHandshakeExtension{}
+
+	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statistics.pktRecvInvalid++
+		c.log("control:recv:HSRes:error", func() string { return fmt.Sprintf("invalid HSRes: %s", err) })
+		return
+	}
+
+	c.log("control:recv:HSRes:cif", func() string { return cif.String() })
+
+	if c.version == 4 {
+		// Check for version
+		if cif.SRTVersion < 0x010200 || cif.SRTVersion >= 0x010300 {
+			c.log("control:recv:HSRes:error", func() string { return fmt.Sprintf("unsupported version: %#08x", cif.SRTVersion) })
+			c.close()
+			return
+		}
+
+		// TSBPDSND is not relevant from the receiver
+		// PERIODICNAK is the sender's decision, we don't care, but will handle them
+
+		// Check the required SRT flags
+		if !cif.SRTFlags.TSBPDRCV {
+			c.log("control:recv:HSRes:error", func() string { return "TSBPDRCV flag must be set" })
+			c.close()
+
+			return
+		}
+
+		if !cif.SRTFlags.TLPKTDROP {
+			c.log("control:recv:HSRes:error", func() string { return "TLPKTDROP flag must be set" })
+			c.close()
+
+			return
+		}
+
+		if !cif.SRTFlags.CRYPT {
+			c.log("control:recv:HSRes:error", func() string { return "CRYPT flag must be set" })
+			c.close()
+
+			return
+		}
+
+		if !cif.SRTFlags.REXMITFLG {
+			c.log("control:recv:HSRes:error", func() string { return "REXMITFLG flag must be set" })
+			c.close()
+
+			return
+		}
+
+		// These flag was introduced in HSv5 and should not be set in HSv4
+		if cif.SRTFlags.STREAM {
+			c.log("control:recv:HSReq:error", func() string { return "STREAM flag is set" })
+			c.close()
+			return
+		}
+
+		if cif.SRTFlags.PACKET_FILTER {
+			c.log("control:recv:HSReq:error", func() string { return "PACKET_FILTER flag is set" })
+			c.close()
+			return
+		}
+
+		sendTsbpdDelay := uint16(c.config.PeerLatency.Milliseconds())
+
+		if cif.SendTSBPDDelay > sendTsbpdDelay {
+			sendTsbpdDelay = cif.SendTSBPDDelay
+		}
+
+		c.dropThreshold = uint64(float64(sendTsbpdDelay)*1.25) + uint64(c.config.SendDropDelay.Microseconds())
+		if c.dropThreshold < uint64(time.Second.Microseconds()) {
+			c.dropThreshold = uint64(time.Second.Microseconds())
+		}
+		c.dropThreshold += 20_000
+
+		c.snd.SetDropThreshold(c.dropThreshold)
+
+		c.stopHSRequests()
+	}
+}
+
+// handleKMRequest checks if the key material is valid and responds with a KM response.
+func (c *srtConn) handleKMRequest(p packet.Packet) {
+	c.log("control:recv:KMReq:dump", func() string { return p.Dump() })
+
+	c.statistics.pktRecvKM++
+
+	cif := &packet.CIFKeyMaterialExtension{}
+
+	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statistics.pktRecvInvalid++
+		c.log("control:recv:KMReq:error", func() string { return fmt.Sprintf("invalid KMReq: %s", err) })
+		return
+	}
+
+	c.log("control:recv:KMReq:cif", func() string { return cif.String() })
+
+	c.cryptoLock.Lock()
+
+	if c.version == 4 && c.crypto == nil {
+		cr, err := crypto.New(int(cif.KLen))
+		if err != nil {
+			c.log("control:recv:KMReq:error", func() string { return fmt.Sprintf("crypto: %s", err) })
+			c.cryptoLock.Unlock()
+			c.close()
+			return
+		}
+
+		c.keyBaseEncryption = cif.KeyBasedEncryption.Opposite()
+		c.crypto = cr
+	}
+
+	if c.crypto == nil {
+		c.log("control:recv:KMReq:error", func() string { return "connection is not encrypted" })
 		c.cryptoLock.Unlock()
 		return
 	}
 
-	c.log("control:recv:KM:cif", func() string { return cif.String() })
-
 	if cif.KeyBasedEncryption == c.keyBaseEncryption {
 		c.statistics.pktRecvInvalid++
-		c.log("control:recv:KM:error", func() string {
-			return "invalid KM. wants to reset the key that is already in use"
+		c.log("control:recv:KMReq:error", func() string {
+			return "invalid KM request. wants to reset the key that is already in use"
 		})
 		c.cryptoLock.Unlock()
 		return
@@ -811,7 +1047,7 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 
 	if err := c.crypto.UnmarshalKM(cif, c.config.Passphrase); err != nil {
 		c.statistics.pktRecvInvalid++
-		c.log("control:recv:KM:error", func() string { return fmt.Sprintf("invalid KM: %s", err) })
+		c.log("control:recv:KMReq:error", func() string { return fmt.Sprintf("invalid KMReq: %s", err) })
 		c.cryptoLock.Unlock()
 		return
 	}
@@ -831,20 +1067,44 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 
 // handleKMResponse confirms the change of encryption keys.
 func (c *srtConn) handleKMResponse(p packet.Packet) {
-	c.log("control:recv:KM:dump", func() string { return p.Dump() })
+	c.log("control:recv:KMRes:dump", func() string { return p.Dump() })
 
 	c.statistics.pktRecvKM++
+
+	cif := &packet.CIFKeyMaterialExtension{}
+
+	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statistics.pktRecvInvalid++
+		c.log("control:recv:KMRes:error", func() string { return fmt.Sprintf("invalid KMRes: %s", err) })
+		return
+	}
 
 	c.cryptoLock.Lock()
 	defer c.cryptoLock.Unlock()
 
 	if c.crypto == nil {
-		c.log("control:recv:KM:error", func() string { return "connection is not encrypted" })
+		c.log("control:recv:KMRes:error", func() string { return "connection is not encrypted" })
 		return
 	}
 
+	if c.version == 4 {
+		c.stopKMRequests()
+
+		if cif.Error != 0 {
+			if cif.Error == packet.KM_NOSECRET {
+				c.log("control:recv:KMRes:error", func() string { return "peer didn't enabled encryption" })
+			} else if cif.Error == packet.KM_BADSECRET {
+				c.log("control:recv:KMRes:error", func() string { return "peer has a different passphrase" })
+			}
+			c.close()
+			return
+		}
+	}
+
+	c.log("control:recv:KMRes:cif", func() string { return cif.String() })
+
 	if c.kmPreAnnounceCountdown >= c.config.KMPreAnnounce {
-		c.log("control:recv:KM:error", func() string { return "not in pre-announce period" })
+		c.log("control:recv:KMRes:error", func() string { return "not in pre-announce period, ignored" })
 		// Ignore the response, we're not in the pre-announce period
 		return
 	}
@@ -964,16 +1224,73 @@ func (c *srtConn) sendACKACK(ackSequence uint32) {
 	c.pop(p)
 }
 
+func (c *srtConn) sendHSRequests(ctx context.Context) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-ticker.C:
+		c.sendHSRequest()
+	}
+}
+
+func (c *srtConn) sendHSRequest() {
+	cif := &packet.CIFHandshakeExtension{
+		SRTVersion: 0x00010203,
+		SRTFlags: packet.CIFHandshakeExtensionFlags{
+			TSBPDSND:      true,  // we send in TSBPD mode
+			TSBPDRCV:      false, // not relevant for us as sender
+			CRYPT:         true,  // must be always set
+			TLPKTDROP:     true,  // must be set in live mode
+			PERIODICNAK:   false, // not relevant for us as sender
+			REXMITFLG:     true,  // must alwasy be set
+			STREAM:        false, // has been introducet in HSv5
+			PACKET_FILTER: false, // has been introducet in HSv5
+		},
+		RecvTSBPDDelay: 0,
+		SendTSBPDDelay: uint16(c.config.ReceiverLatency.Milliseconds()),
+	}
+
+	p := packet.NewPacket(c.remoteAddr, nil)
+
+	p.Header().IsControlPacket = true
+
+	p.Header().ControlType = packet.CTRLTYPE_USER
+	p.Header().SubType = packet.EXTTYPE_HSREQ
+	p.Header().Timestamp = c.getTimestampForPacket()
+
+	p.MarshalCIF(cif)
+
+	c.log("control:send:HSReq:dump", func() string { return p.Dump() })
+	c.log("control:send:HSReq:cif", func() string { return cif.String() })
+
+	c.pop(p)
+}
+
+func (c *srtConn) sendKMRequests(ctx context.Context) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-ticker.C:
+		c.sendKMRequest(c.keyBaseEncryption)
+	}
+}
+
 // sendKMRequest sends a KM request to the peer.
-func (c *srtConn) sendKMRequest() {
+func (c *srtConn) sendKMRequest(key packet.PacketEncryption) {
 	if c.crypto == nil {
-		c.log("control:send:KM:error", func() string { return "connection is not encrypted" })
+		c.log("control:send:KMReq:error", func() string { return "connection is not encrypted" })
 		return
 	}
 
-	cif := &packet.CIFKM{}
+	cif := &packet.CIFKeyMaterialExtension{}
 
-	c.crypto.MarshalKM(cif, c.config.Passphrase, c.keyBaseEncryption.Opposite())
+	c.crypto.MarshalKM(cif, c.config.Passphrase, key)
 
 	p := packet.NewPacket(c.remoteAddr, nil)
 
@@ -985,8 +1302,8 @@ func (c *srtConn) sendKMRequest() {
 
 	p.MarshalCIF(cif)
 
-	c.log("control:send:KM:dump", func() string { return p.Dump() })
-	c.log("control:send:KM:cif", func() string { return cif.String() })
+	c.log("control:send:KMReq:dump", func() string { return p.Dump() })
+	c.log("control:send:KMReq:cif", func() string { return cif.String() })
 
 	c.statistics.pktSentKM++
 

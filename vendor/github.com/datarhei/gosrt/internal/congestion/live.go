@@ -115,8 +115,12 @@ func (s *liveSend) Push(p packet.Packet) {
 		return
 	}
 
-	// give to the packet a sequence number
+	// Give to the packet a sequence number
 	p.Header().PacketSequenceNumber = s.nextSequenceNumber
+	p.Header().PacketPositionFlag = packet.SinglePacket
+	p.Header().OrderFlag = false
+	p.Header().MessageNumber = 1
+
 	s.nextSequenceNumber = s.nextSequenceNumber.Inc()
 
 	pktLen := p.Len()
@@ -124,7 +128,7 @@ func (s *liveSend) Push(p packet.Packet) {
 	s.statistics.PktBuf++
 	s.statistics.ByteBuf += pktLen
 
-	// input bandwidth calculation
+	// Input bandwidth calculation
 	s.rate.bytes += pktLen
 
 	p.Header().Timestamp = uint32(p.Header().PktTsbpdTime & uint64(packet.MAX_TIMESTAMP))
@@ -148,7 +152,7 @@ func (s *liveSend) Push(p packet.Packet) {
 }
 
 func (s *liveSend) Tick(now uint64) {
-	// deliver packets whose PktTsbpdTime is ripe
+	// Deliver packets whose PktTsbpdTime is ripe
 	s.lock.Lock()
 	removeList := make([]*list.Element, 0, s.packetList.Len())
 	for e := s.packetList.Front(); e != nil; e = e.Next() {
@@ -188,7 +192,7 @@ func (s *liveSend) Tick(now uint64) {
 		p := e.Value.(packet.Packet)
 
 		if p.Header().PktTsbpdTime+s.dropThreshold <= now {
-			// dropped packet because too old
+			// Dropped packet because too old
 			s.statistics.PktDrop++
 			s.statistics.PktLoss++
 			s.statistics.ByteDrop += p.Len()
@@ -241,7 +245,7 @@ func (s *liveSend) ACK(sequenceNumber circular.Number) {
 	for e := s.lossList.Front(); e != nil; e = e.Next() {
 		p := e.Value.(packet.Packet)
 		if p.Header().PacketSequenceNumber.Lt(sequenceNumber) {
-			// remove packet from buffer because it has been successfully transmitted
+			// Remove packet from buffer because it has been successfully transmitted
 			removeList = append(removeList, e)
 		} else {
 			break
@@ -466,7 +470,7 @@ func (r *liveReceive) Push(pkt packet.Packet) {
 	r.avgPayloadSize = 0.875*r.avgPayloadSize + 0.125*float64(pktLen)
 
 	if pkt.Header().PacketSequenceNumber.Lte(r.lastDeliveredSequenceNumber) {
-		// too old, because up until r.lastDeliveredSequenceNumber, we already delivered
+		// Too old, because up until r.lastDeliveredSequenceNumber, we already delivered
 		r.statistics.PktBelated++
 		r.statistics.ByteBelated += pktLen
 
@@ -477,7 +481,7 @@ func (r *liveReceive) Push(pkt packet.Packet) {
 	}
 
 	if pkt.Header().PacketSequenceNumber.Lt(r.lastACKSequenceNumber) {
-		// already acknowledged, ignoring
+		// Already acknowledged, ignoring
 		r.statistics.PktDrop++
 		r.statistics.ByteDrop += pktLen
 
@@ -485,21 +489,21 @@ func (r *liveReceive) Push(pkt packet.Packet) {
 	}
 
 	if pkt.Header().PacketSequenceNumber.Equals(r.maxSeenSequenceNumber.Inc()) {
-		// in order, the packet we expected
+		// In order, the packet we expected
 		r.maxSeenSequenceNumber = pkt.Header().PacketSequenceNumber
 	} else if pkt.Header().PacketSequenceNumber.Lte(r.maxSeenSequenceNumber) {
-		// out of order, is it a missing piece? put it in the correct position
+		// Out of order, is it a missing piece? put it in the correct position
 		for e := r.packetList.Front(); e != nil; e = e.Next() {
 			p := e.Value.(packet.Packet)
 
 			if p.Header().PacketSequenceNumber == pkt.Header().PacketSequenceNumber {
-				// already received (has been sent more than once), ignoring
+				// Already received (has been sent more than once), ignoring
 				r.statistics.PktDrop++
 				r.statistics.ByteDrop += pktLen
 
 				break
 			} else if p.Header().PacketSequenceNumber.Gt(pkt.Header().PacketSequenceNumber) {
-				// late arrival, this fills a gap
+				// Late arrival, this fills a gap
 				r.statistics.PktBuf++
 				r.statistics.PktUnique++
 
@@ -514,7 +518,7 @@ func (r *liveReceive) Push(pkt packet.Packet) {
 
 		return
 	} else {
-		// too far ahead, there are some missing sequence numbers, immediate NAK report
+		// Too far ahead, there are some missing sequence numbers, immediate NAK report
 		// here we can prevent a possibly unnecessary NAK with SRTO_LOXXMAXTTL
 		r.sendNAK(r.maxSeenSequenceNumber.Inc(), pkt.Header().PacketSequenceNumber.Dec())
 
@@ -541,7 +545,7 @@ func (r *liveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circular.
 	// 4.8.1. Packet Acknowledgement (ACKs, ACKACKs)
 	if now-r.lastPeriodicACK < r.periodicACKInterval {
 		if r.nPackets >= 64 {
-			lite = true // send light ACK
+			lite = true // Send light ACK
 		} else {
 			return
 		}
@@ -551,14 +555,34 @@ func (r *liveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circular.
 
 	ackSequenceNumber := r.lastDeliveredSequenceNumber
 
-	// find the sequence number up until we have all in a row.
-	// where the first gap is (or at the end of the list) is where we can ACK to.
+	// Find the sequence number up until we have all in a row.
+	// Where the first gap is (or at the end of the list) is where we can ACK to.
+
 	e := r.packetList.Front()
 	if e != nil {
 		p := e.Value.(packet.Packet)
 
 		minPktTsbpdTime = p.Header().PktTsbpdTime
 		maxPktTsbpdTime = p.Header().PktTsbpdTime
+
+		// If there are packets that should be delivered by now, move foward.
+		if p.Header().PktTsbpdTime <= now {
+			for e = e.Next(); e != nil; e = e.Next() {
+				p = e.Value.(packet.Packet)
+
+				if p.Header().PktTsbpdTime > now {
+					break
+				}
+			}
+
+			ackSequenceNumber = p.Header().PacketSequenceNumber
+			maxPktTsbpdTime = p.Header().PktTsbpdTime
+
+			if e != nil {
+				e = e.Next()
+				p = e.Value.(packet.Packet)
+			}
+		}
 
 		if p.Header().PacketSequenceNumber.Equals(ackSequenceNumber.Inc()) {
 			ackSequenceNumber = p.Header().PacketSequenceNumber
@@ -577,7 +601,7 @@ func (r *liveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circular.
 		ok = true
 		sequenceNumber = ackSequenceNumber.Inc()
 
-		// keep track of the last ACK's sequence. with this we can faster ignore
+		// Keep track of the last ACK's sequence. with this we can faster ignore
 		// packets that come in that have a lower sequence number.
 		r.lastACKSequenceNumber = ackSequenceNumber
 	}
@@ -598,12 +622,12 @@ func (r *liveReceive) periodicNAK(now uint64) (ok bool, from, to circular.Number
 		return
 	}
 
-	// send a periodic NAK
+	// Send a periodic NAK
 
 	ackSequenceNumber := r.lastDeliveredSequenceNumber
 
-	// send a NAK only for the first gap.
-	// alternatively send a NAK for max. X gaps because the size of the NAK packet is limited
+	// Send a NAK only for the first gap.
+	// Alternatively send a NAK for max. X gaps because the size of the NAK packet is limited.
 	for e := r.packetList.Front(); e != nil; e = e.Next() {
 		p := e.Value.(packet.Packet)
 
@@ -634,7 +658,7 @@ func (r *liveReceive) Tick(now uint64) {
 		r.sendNAK(from, to)
 	}
 
-	// deliver packets whose PktTsbpdTime is ripe
+	// Deliver packets whose PktTsbpdTime is ripe
 	r.lock.Lock()
 	removeList := make([]*list.Element, 0, r.packetList.Len())
 	for e := r.packetList.Front(); e != nil; e = e.Next() {
@@ -815,12 +839,12 @@ func (r *fakeLiveReceive) Push(pkt packet.Packet) {
 	r.avgPayloadSize = 0.875*r.avgPayloadSize + 0.125*float64(pktLen)
 
 	if pkt.Header().PacketSequenceNumber.Lte(r.lastDeliveredSequenceNumber) {
-		// too old, because up until r.lastDeliveredSequenceNumber, we already delivered
+		// Too old, because up until r.lastDeliveredSequenceNumber, we already delivered
 		return
 	}
 
 	if pkt.Header().PacketSequenceNumber.Lt(r.lastACKSequenceNumber) {
-		// already acknowledged, ignoring
+		// Already acknowledged, ignoring
 		return
 	}
 
@@ -838,7 +862,7 @@ func (r *fakeLiveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circu
 	// 4.8.1. Packet Acknowledgement (ACKs, ACKACKs)
 	if now-r.lastPeriodicACK < r.periodicACKInterval {
 		if r.nPackets >= 64 {
-			lite = true // send light ACK
+			lite = true // Send light ACK
 		} else {
 			return
 		}
@@ -860,7 +884,7 @@ func (r *fakeLiveReceive) Tick(now uint64) {
 		r.sendACK(sequenceNumber, lite)
 	}
 
-	// deliver packets whose PktTsbpdTime is ripe
+	// Deliver packets whose PktTsbpdTime is ripe
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
