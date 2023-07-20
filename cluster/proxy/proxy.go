@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -59,15 +58,7 @@ type proxy struct {
 	nodes     map[string]Node // List of known nodes
 	nodesLock sync.RWMutex
 
-	idfiles   map[string][]string  // Map from nodeid to list of files
-	idupdate  map[string]time.Time // Map from nodeid to time of last update
-	fileid    map[string]string    // Map from file name to nodeid
-	filesLock sync.RWMutex
-
-	updates chan NodeFiles
-
-	lock   sync.RWMutex
-	cancel context.CancelFunc
+	lock sync.RWMutex
 
 	running bool
 
@@ -78,13 +69,9 @@ var ErrNodeNotFound = errors.New("node not found")
 
 func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{
-		id:       config.ID,
-		nodes:    map[string]Node{},
-		idfiles:  map[string][]string{},
-		idupdate: map[string]time.Time{},
-		fileid:   map[string]string{},
-		updates:  make(chan NodeFiles, 64),
-		logger:   config.Logger,
+		id:     config.ID,
+		nodes:  map[string]Node{},
+		logger: config.Logger,
 	}
 
 	if p.logger == nil {
@@ -105,64 +92,6 @@ func (p *proxy) Start() {
 	p.running = true
 
 	p.logger.Debug().Log("Starting proxy")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	p.cancel = cancel
-
-	go func(ctx context.Context) {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				p.nodesLock.RLock()
-				for _, node := range p.nodes {
-					p.updates <- node.Files()
-				}
-				p.nodesLock.RUnlock()
-			}
-		}
-	}(ctx)
-
-	go func(ctx context.Context) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case update := <-p.updates:
-				p.logger.Debug().WithFields(log.Fields{
-					"node":  update.ID,
-					"files": len(update.Files),
-				}).Log("Got update")
-
-				if p.id == update.ID {
-					continue
-				}
-
-				p.filesLock.Lock()
-
-				// Cleanup
-				files := p.idfiles[update.ID]
-				for _, file := range files {
-					delete(p.fileid, file)
-				}
-				delete(p.idfiles, update.ID)
-				delete(p.idupdate, update.ID)
-
-				// Add files
-				for _, file := range update.Files {
-					p.fileid[file] = update.ID
-				}
-				p.idfiles[update.ID] = update.Files
-				p.idupdate[update.ID] = update.LastUpdate
-
-				p.filesLock.Unlock()
-			}
-		}
-	}(ctx)
 }
 
 func (p *proxy) Stop() {
@@ -176,9 +105,6 @@ func (p *proxy) Stop() {
 	p.running = false
 
 	p.logger.Debug().Log("Stopping proxy")
-
-	p.cancel()
-	p.cancel = nil
 
 	p.nodes = map[string]Node{}
 }
@@ -345,24 +271,55 @@ func (p *proxy) GetFileInfo(prefix, path string) (int64, time.Time, error) {
 }
 
 func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
-	p.filesLock.RLock()
-	defer p.filesLock.RUnlock()
+	// this is only for mem and disk prefixes
+	nodesChan := make(chan string, 16)
+	nodeids := []string{}
 
-	id, ok := p.fileid[prefix+":"+path]
-	if !ok {
+	wgList := sync.WaitGroup{}
+	wgList.Add(1)
+
+	go func() {
+		defer wgList.Done()
+
+		for nodeid := range nodesChan {
+			if len(nodeid) == 0 {
+				continue
+			}
+
+			nodeids = append(nodeids, nodeid)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+
+	p.nodesLock.RLock()
+	for id, node := range p.nodes {
+		wg.Add(1)
+
+		go func(nodeid string, node Node, p chan<- string) {
+			defer wg.Done()
+
+			_, _, err := node.GetResourceInfo(prefix, path)
+			if err != nil {
+				nodeid = ""
+			}
+
+			p <- nodeid
+		}(id, node, nodesChan)
+	}
+	p.nodesLock.RUnlock()
+
+	wg.Wait()
+
+	close(nodesChan)
+
+	wgList.Wait()
+
+	if len(nodeids) == 0 {
 		return "", fmt.Errorf("file not found")
 	}
 
-	ts, ok := p.idupdate[id]
-	if !ok {
-		return "", fmt.Errorf("no age information found")
-	}
-
-	if time.Since(ts) > 2*time.Second {
-		return "", fmt.Errorf("file too old")
-	}
-
-	return id, nil
+	return nodeids[0], nil
 }
 
 func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {

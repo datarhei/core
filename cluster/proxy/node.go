@@ -48,6 +48,8 @@ type NodeReader interface {
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
 	GetFileInfo(prefix, path string) (int64, time.Time, error)
 
+	GetResourceInfo(prefix, path string) (int64, time.Time, error)
+
 	ProcessList(ProcessListOptions) ([]clientapi.Process, error)
 	ProxyProcessList() ([]Process, error)
 }
@@ -125,11 +127,9 @@ type node struct {
 
 	config *config.Config
 
-	state      nodeState
-	latency    float64 // Seconds
-	stateLock  sync.RWMutex
-	filesList  []string
-	lastUpdate time.Time
+	state     nodeState
+	latency   float64 // Seconds
+	stateLock sync.RWMutex
 
 	secure      bool
 	httpAddress *url.URL
@@ -163,7 +163,7 @@ func NewNode(id, address string, config *config.Config) Node {
 		n.peerErr = err
 	}
 
-	n.peerWg.Add(4)
+	n.peerWg.Add(3)
 
 	go func(ctx context.Context) {
 		// This tries to reconnect to the core API. If everything's
@@ -188,7 +188,6 @@ func NewNode(id, address string, config *config.Config) Node {
 
 	go n.pingPeer(ctx, &n.peerWg)
 	go n.updateResources(ctx, &n.peerWg)
-	go n.updateFiles(ctx, &n.peerWg)
 
 	return n
 }
@@ -462,21 +461,6 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (n *node) updateFiles(ctx context.Context, wg *sync.WaitGroup) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	defer wg.Done()
-
-	for {
-		select {
-		case <-ticker.C:
-			n.files()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 func (n *node) Ping() (time.Duration, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
@@ -604,23 +588,21 @@ func (n *node) Version() NodeVersion {
 func (n *node) Files() NodeFiles {
 	id := n.About().ID
 
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
 	files := NodeFiles{
 		ID:         id,
-		LastUpdate: n.lastUpdate,
+		LastUpdate: time.Now(),
 	}
 
-	if n.state != stateDisconnected && time.Since(n.lastUpdate) <= 2*time.Second {
-		files.Files = make([]string, len(n.filesList))
-		copy(files.Files, n.filesList)
+	if ok, _ := n.IsConnected(); !ok {
+		return files
 	}
+
+	files.Files = n.files()
 
 	return files
 }
 
-func (n *node) files() {
+func (n *node) files() []string {
 	errorsChan := make(chan error, 8)
 	filesChan := make(chan string, 1024)
 	filesList := []string{}
@@ -747,16 +729,7 @@ func (n *node) files() {
 
 	wgList.Wait()
 
-	n.stateLock.Lock()
-
-	if len(errorList) == 0 {
-		n.filesList = make([]string, len(filesList))
-		copy(n.filesList, filesList)
-		n.lastUpdate = time.Now()
-		n.lastContact = n.lastUpdate
-	}
-
-	n.stateLock.Unlock()
+	return filesList
 }
 
 func cloneURL(src *url.URL) *url.URL {
@@ -838,6 +811,40 @@ func (n *node) GetFileInfo(prefix, path string) (int64, time.Time, error) {
 	}
 
 	return info[0].Size, time.Unix(info[0].LastMod, 0), nil
+}
+
+func (n *node) GetResourceInfo(prefix, path string) (int64, time.Time, error) {
+	if prefix == "disk" || prefix == "mem" {
+		return n.GetFileInfo(prefix, path)
+	} else if prefix == "rtmp" {
+		files, err := n.peer.RTMPChannels()
+		if err != nil {
+			return 0, time.Time{}, err
+		}
+
+		for _, file := range files {
+			if path == file.Name {
+				return 0, time.Now(), nil
+			}
+		}
+
+		return 0, time.Time{}, fmt.Errorf("resource not found")
+	} else if prefix == "srt" {
+		files, err := n.peer.SRTChannels()
+		if err != nil {
+			return 0, time.Time{}, err
+		}
+
+		for _, file := range files {
+			if path == file.Name {
+				return 0, time.Now(), nil
+			}
+		}
+
+		return 0, time.Time{}, fmt.Errorf("resource not found")
+	}
+
+	return 0, time.Time{}, fmt.Errorf("unknown prefix: %s", prefix)
 }
 
 func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, error) {
