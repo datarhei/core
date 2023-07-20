@@ -67,7 +67,7 @@ func (e *Event) Filter(ef *EventFilter) bool {
 	for k, r := range ef.reData {
 		v, ok := e.Data[k]
 		if !ok {
-			continue
+			return false
 		}
 
 		if !r.MatchString(v) {

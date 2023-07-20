@@ -80,6 +80,60 @@ func TestEventFilter(t *testing.T) {
 	require.False(t, res)
 }
 
+func TestEventFilterDataKey(t *testing.T) {
+	event := Event{
+		Timestamp: 1234,
+		Level:     3,
+		Component: "foobar",
+		Message:   "none",
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+
+	filter := EventFilter{
+		Component: "foobar",
+		Level:     "info",
+		Message:   "none",
+	}
+
+	err := filter.Compile()
+	require.NoError(t, err)
+
+	res := event.Filter(&filter)
+	require.True(t, res)
+
+	filter = EventFilter{
+		Component: "foobar",
+		Level:     "info",
+		Message:   "none",
+		Data: map[string]string{
+			"bar": "foo",
+		},
+	}
+
+	err = filter.Compile()
+	require.NoError(t, err)
+
+	res = event.Filter(&filter)
+	require.False(t, res)
+
+	filter = EventFilter{
+		Component: "foobar",
+		Level:     "info",
+		Message:   "none",
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+
+	err = filter.Compile()
+	require.NoError(t, err)
+
+	res = event.Filter(&filter)
+	require.True(t, res)
+}
+
 func BenchmarkEventFilters(b *testing.B) {
 	event := Event{
 		Timestamp: 1234,
