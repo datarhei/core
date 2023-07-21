@@ -145,5 +145,6 @@ type SessionTokenRequest struct {
 	Match  string                 `json:"match"`
 	Remote []string               `json:"remote"`
 	Extra  map[string]interface{} `json:"extra"`
+	TTL    int64                  `json:"ttl_sec"`
 	Token  string                 `json:"token,omitempty"`
 }

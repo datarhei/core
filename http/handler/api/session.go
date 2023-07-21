@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -124,7 +125,7 @@ func (s *SessionHandler) CreateToken(c echo.Context) error {
 			"extra":  req.Extra,
 		}
 
-		request[i].Token = identity.GetServiceSession(data)
+		request[i].Token = identity.GetServiceSession(data, time.Duration(req.TTL)*time.Second)
 	}
 
 	return c.JSON(http.StatusOK, request)

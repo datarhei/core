@@ -104,7 +104,7 @@ type Verifier interface {
 
 	GetServiceBasicAuth() string
 	GetServiceToken() string
-	GetServiceSession(interface{}) string
+	GetServiceSession(interface{}, time.Duration) string
 
 	IsSuperuser() bool
 }
@@ -427,7 +427,7 @@ func (i *identity) VerifyServiceSession(jwt string) (bool, interface{}, error) {
 	return true, claims["data"], nil
 }
 
-func (i *identity) GetServiceSession(data interface{}) string {
+func (i *identity) GetServiceSession(data interface{}, ttl time.Duration) string {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
@@ -440,7 +440,7 @@ func (i *identity) GetServiceSession(data interface{}) string {
 	}
 
 	now := time.Now()
-	accessExpires := now.Add(time.Minute * 10)
+	accessExpires := now.Add(ttl)
 
 	// Create access token
 	accessToken := jwtgo.NewWithClaims(jwtgo.SigningMethodHS256, jwtgo.MapClaims{
@@ -448,8 +448,6 @@ func (i *identity) GetServiceSession(data interface{}) string {
 		"sub":  i.user.Name,
 		"iat":  now.Unix(),
 		"exp":  accessExpires.Unix(),
-		"exi":  uint64(accessExpires.Sub(now).Seconds()),
-		"jti":  uuid.New().String(),
 		"data": data,
 	})
 
