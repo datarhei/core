@@ -2,6 +2,7 @@ package session
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -87,45 +88,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			req := c.Request()
 
 			path := req.URL.Path
+			referrer := req.Header.Get("Referer")
 
-			data := map[string]interface{}{}
-
-			e := util.DefaultContext[interface{}](c, "session", nil)
-			if e != nil {
-				var ok bool
-				data, ok = e.(map[string]interface{})
-				if !ok {
-					return api.Err(http.StatusForbidden, "", "invalid session data")
-				}
-
-				if match, ok := data["match"].(string); ok {
-					if ok, err := glob.Match(match, path, '/'); !ok {
-						if err != nil {
-							return api.Err(http.StatusForbidden, "", "no match for '%s' in %s: %s", match, path, err.Error())
-						}
-
-						return api.Err(http.StatusForbidden, "", "no match for '%s' in %s", match, path)
-					}
-				}
-
-				referrer := req.Header.Get("Referer")
-				if u, err := url.Parse(referrer); err == nil {
-					referrer = u.Host
-				}
-
-				if remote, ok := data["remote"].([]string); ok && len(remote) != 0 {
-					match := false
-					for _, r := range remote {
-						if ok, _ := glob.Match(r, referrer, '.'); ok {
-							match = true
-							break
-						}
-					}
-
-					if !match {
-						return api.Err(http.StatusForbidden, "", "remote not allowed")
-					}
-				}
+			data, err := verifySession(util.DefaultContext[interface{}](c, "session", nil), path, referrer)
+			if err != nil {
+				return api.Err(http.StatusForbidden, "", "invalid session data")
 			}
 
 			data["name"] = ctxuser
@@ -146,6 +113,64 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			return h.handleHTTP(c, ctxuser, data, next)
 		}
 	}
+}
+
+func verifySession(raw interface{}, path, referrer string) (map[string]interface{}, error) {
+	data := map[string]interface{}{}
+
+	if raw == nil {
+		return data, nil
+	}
+
+	var ok bool
+	data, ok = raw.(map[string]interface{})
+	if !ok {
+		return data, fmt.Errorf("invalid session data")
+	}
+
+	if match, ok := data["match"].(string); ok {
+		if ok, err := glob.Match(match, path, '/'); !ok {
+			if err != nil {
+				return data, fmt.Errorf("no match for '%s' in %s: %s", match, path, err.Error())
+			}
+
+			return data, fmt.Errorf("no match for '%s' in %s", match, path)
+		}
+	}
+
+	if u, err := url.Parse(referrer); err == nil {
+		referrer = u.Host
+	}
+
+	if remote, ok := data["remote"].([]interface{}); ok && len(remote) != 0 {
+		if len(referrer) == 0 {
+			return data, fmt.Errorf("remote not allowed")
+		}
+
+		remotes := []string{}
+		for _, r := range remote {
+			v, ok := r.(string)
+			if !ok {
+				continue
+			}
+
+			remotes = append(remotes, v)
+		}
+
+		match := false
+		for _, r := range remotes {
+			if ok, _ := glob.Match(r, referrer, '.'); ok {
+				match = true
+				break
+			}
+		}
+
+		if !match {
+			return data, fmt.Errorf("remote not allowed")
+		}
+	}
+
+	return data, nil
 }
 
 func headerSize(header http.Header) int64 {
