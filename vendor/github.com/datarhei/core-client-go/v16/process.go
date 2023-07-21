@@ -78,6 +78,22 @@ func (r *restclient) processList(where string, opts ProcessListOptions) ([]api.P
 
 	err = json.Unmarshal(data, &processes)
 
+	for i, p := range processes {
+		if p.Config == nil {
+			p.Config = &api.ProcessConfig{}
+		}
+
+		if p.State == nil {
+			p.State = &api.ProcessState{}
+		}
+
+		if p.Report == nil {
+			p.Report = &api.ProcessReport{}
+		}
+
+		processes[i] = p
+	}
+
 	return processes, err
 }
 

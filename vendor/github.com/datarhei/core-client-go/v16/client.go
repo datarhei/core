@@ -2,6 +2,7 @@ package coreclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,7 +72,8 @@ type RestClient interface {
 	FilesystemDeleteFile(name, path string) error                                   // DELETE /v3/fs/{name}/{path}
 	FilesystemAddFile(name, path string, data io.Reader) error                      // PUT /v3/fs/{name}/{path}
 
-	Log() ([]api.LogEvent, error) // GET /v3/log
+	Log() ([]api.LogEvent, error)                                                   // GET /v3/log
+	Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) // POST /v3/events
 
 	Metadata(key string) (api.Metadata, error)           // GET /v3/metadata/{key}
 	MetadataSet(key string, metadata api.Metadata) error // PUT /v3/metadata/{key}
@@ -306,7 +308,7 @@ func New(config Config) (RestClient, error) {
 
 	if r.client == nil {
 		r.client = &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 0,
 		}
 	}
 
@@ -433,6 +435,10 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/cluster/iam/user"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/events"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},
@@ -810,7 +816,7 @@ func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
 	return resp.StatusCode, resp.Body, nil
 }
 
-func (r *restclient) stream(method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) (io.ReadCloser, error) {
+func (r *restclient) stream(ctx context.Context, method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) (io.ReadCloser, error) {
 	if err := r.checkVersion(method, r.prefix+path); err != nil {
 		return nil, err
 	}
@@ -820,7 +826,7 @@ func (r *restclient) stream(method, path string, query *url.Values, header http.
 		u += "?" + query.Encode()
 	}
 
-	req, err := http.NewRequest(method, u, data)
+	req, err := http.NewRequestWithContext(ctx, method, u, data)
 	if err != nil {
 		return nil, err
 	}
@@ -882,7 +888,10 @@ func (r *restclient) stream(method, path string, query *url.Values, header http.
 }
 
 func (r *restclient) call(method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) ([]byte, error) {
-	body, err := r.stream(method, path, query, header, contentType, data)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	body, err := r.stream(ctx, method, path, query, header, contentType, data)
 	if err != nil {
 		return nil, err
 	}

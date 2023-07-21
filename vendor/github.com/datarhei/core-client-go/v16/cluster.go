@@ -1,6 +1,7 @@
 package coreclient
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/url"
@@ -35,7 +36,7 @@ func (r *restclient) ClusterHealthy() (bool, error) {
 }
 
 func (r *restclient) ClusterSnapshot() (io.ReadCloser, error) {
-	return r.stream("GET", "/v3/cluster/snapshot", nil, nil, "", nil)
+	return r.stream(context.Background(), "GET", "/v3/cluster/snapshot", nil, nil, "", nil)
 }
 
 func (r *restclient) ClusterLeave() error {

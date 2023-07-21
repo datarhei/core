@@ -1,6 +1,7 @@
 package coreclient
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -54,6 +55,23 @@ func (r *restclient) FilesystemGetFile(name, path string) (io.ReadCloser, error)
 	return r.FilesystemGetFileOffset(name, path, 0)
 }
 
+type ContextReadCloser struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func NewContextReadCloser(r io.ReadCloser, cancel context.CancelFunc) *ContextReadCloser {
+	return &ContextReadCloser{
+		ReadCloser: r,
+		cancel:     cancel,
+	}
+}
+
+func (r *ContextReadCloser) Close() error {
+	r.cancel()
+	return r.ReadCloser.Close()
+}
+
 func (r *restclient) FilesystemGetFileOffset(name, path string, offset int64) (io.ReadCloser, error) {
 	if !filepath.IsAbs(path) {
 		path = "/" + path
@@ -66,7 +84,7 @@ func (r *restclient) FilesystemGetFileOffset(name, path string, offset int64) (i
 		header.Set("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
 	}
 
-	return r.stream("GET", "/v3/fs/"+url.PathEscape(name)+path, nil, header, "", nil)
+	return r.stream(context.Background(), "GET", "/v3/fs/"+url.PathEscape(name)+path, nil, header, "", nil)
 }
 
 func (r *restclient) FilesystemDeleteFile(name, path string) error {
