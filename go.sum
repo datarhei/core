@@ -54,6 +54,8 @@ github.com/datarhei/core-client-go/v16 v16.11.1-0.20230717195052-016daa63407b h1
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230717195052-016daa63407b/go.mod h1:3eKfwhPKoW7faTn+luShRVNMqcIskvlIKjRJ7ShjyL8=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230721082756-e22b6cdac41f h1:qjb9P4HynN71QOwit5fdH/7lYeEaS9eVuH8+CDQu+xI=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20230721082756-e22b6cdac41f/go.mod h1:3eKfwhPKoW7faTn+luShRVNMqcIskvlIKjRJ7ShjyL8=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230721094901-3748188282ea h1:kkT23Ev6fn3tPCVJMZt+QALN8w6Hatv6tntZRYPjK/M=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20230721094901-3748188282ea/go.mod h1:3eKfwhPKoW7faTn+luShRVNMqcIskvlIKjRJ7ShjyL8=
 github.com/datarhei/gosrt v0.5.2 h1:eagqZwEIiGPNJW0rLep3gwceObyaZ17+iKRc+l4VEpc=
 github.com/datarhei/gosrt v0.5.2/go.mod h1:0308GQhAu5hxe2KYdbss901aKceSSKXnwCr8Vs++eiw=
 github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a h1:Tf4DSHY1xruBglr+yYP5Wct7czM86GKMYgbXH8a7OFo=
