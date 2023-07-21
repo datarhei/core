@@ -15,7 +15,10 @@ func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]int
 
 	path := req.URL.Path
 
-	location := path + req.URL.RawQuery
+	location := path
+	if len(req.URL.RawQuery) != 0 {
+		location += "?" + req.URL.RawQuery
+	}
 	remote := req.RemoteAddr
 
 	id := shortuuid.New()
