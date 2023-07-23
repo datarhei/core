@@ -998,6 +998,10 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		if nodeid, ok := wish[pid]; ok {
 			// Check for how long the node hasn't been contacted, or if it still exists.
 			if node, ok := nodes[nodeid]; ok {
+				if node.State != "disconnected" {
+					continue
+				}
+
 				if time.Since(node.LastContact) <= nodeRecoverTimeout {
 					reality[pid] = nodeid
 					delete(wantMap, pid)
