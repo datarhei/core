@@ -92,7 +92,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			data, err := verifySession(util.DefaultContext[interface{}](c, "session", nil), path, referrer)
 			if err != nil {
-				return api.Err(http.StatusForbidden, "", "invalid session data")
+				return api.Err(http.StatusForbidden, "", "verifying session failed: %s", err.Error())
 			}
 
 			data["name"] = ctxuser
