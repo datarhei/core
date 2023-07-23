@@ -880,6 +880,14 @@ func (n *node) ProxyProcessList() ([]Process, error) {
 	processes := []Process{}
 
 	for _, p := range list {
+		if p.State == nil {
+			p.State = &clientapi.ProcessState{}
+		}
+
+		if p.Config == nil {
+			p.Config = &clientapi.ProcessConfig{}
+		}
+
 		process := Process{
 			NodeID:    nodeid,
 			Order:     p.State.Order,
