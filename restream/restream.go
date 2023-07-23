@@ -713,7 +713,7 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 			}
 
 			if len(config.Domain) != 0 {
-				path = filepath.Join(config.Domain, path)
+				path = "/" + filepath.Join(config.Domain, path)
 			}
 
 			// Support legacy names
