@@ -37,7 +37,7 @@ type ProxyReader interface {
 	FindNodeFromProcess(id app.ProcessID) (string, error)
 
 	Resources() map[string]NodeResources
-	ListProcesses(ProcessListOptions) map[string][]clientapi.Process
+	ListProcesses(ProcessListOptions) []clientapi.Process
 	ListProxyProcesses() []Process
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
 
@@ -367,7 +367,7 @@ type ProcessListOptions struct {
 }
 
 func (p *proxy) ListProxyProcesses() []Process {
-	processChan := make(chan Process, 64)
+	processChan := make(chan []Process, 64)
 	processList := []Process{}
 
 	wgList := sync.WaitGroup{}
@@ -376,8 +376,8 @@ func (p *proxy) ListProxyProcesses() []Process {
 	go func() {
 		defer wgList.Done()
 
-		for process := range processChan {
-			processList = append(processList, process)
+		for list := range processChan {
+			processList = append(processList, list...)
 		}
 	}()
 
@@ -387,7 +387,7 @@ func (p *proxy) ListProxyProcesses() []Process {
 	for _, node := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- Process) {
+		go func(node Node, p chan<- []Process) {
 			defer wg.Done()
 
 			processes, err := node.ProxyProcessList()
@@ -395,9 +395,7 @@ func (p *proxy) ListProxyProcesses() []Process {
 				return
 			}
 
-			for _, process := range processes {
-				p <- process
-			}
+			p <- processes
 		}(node, processChan)
 	}
 	p.nodesLock.RUnlock()
@@ -432,14 +430,9 @@ func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
 	return nodeid, nil
 }
 
-type processList struct {
-	nodeid    string
-	processes []clientapi.Process
-}
-
-func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi.Process {
-	processChan := make(chan processList, 64)
-	processMap := map[string][]clientapi.Process{}
+func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
+	processChan := make(chan []clientapi.Process, 64)
+	processList := []clientapi.Process{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -448,7 +441,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi
 		defer wgList.Done()
 
 		for list := range processChan {
-			processMap[list.nodeid] = list.processes
+			processList = append(processList, list...)
 		}
 	}()
 
@@ -458,7 +451,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi
 	for _, node := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- processList) {
+		go func(node Node, p chan<- []clientapi.Process) {
 			defer wg.Done()
 
 			processes, err := node.ProcessList(options)
@@ -466,11 +459,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi
 				return
 			}
 
-			p <- processList{
-				nodeid:    node.About().ID,
-				processes: processes,
-			}
-
+			p <- processes
 		}(node, processChan)
 	}
 	p.nodesLock.RUnlock()
@@ -481,7 +470,7 @@ func (p *proxy) ListProcesses(options ProcessListOptions) map[string][]clientapi
 
 	wgList.Wait()
 
-	return processMap
+	return processList
 }
 
 func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error {

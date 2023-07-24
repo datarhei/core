@@ -50,7 +50,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	procsMap := h.proxy.ListProcesses(proxy.ProcessListOptions{
+	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
 		ID:            wantids,
 		Filter:        filter.Slice(),
 		Domain:        domain,
@@ -64,15 +64,13 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	processes := []clientapi.Process{}
 	pmap := map[app.ProcessID]struct{}{}
 
-	for _, procs := range procsMap {
-		for _, p := range procs {
-			if !h.iam.Enforce(ctxuser, domain, "process:"+p.ID, "read") {
-				continue
-			}
-
-			processes = append(processes, p)
-			pmap[app.NewProcessID(p.ID, p.Domain)] = struct{}{}
+	for _, p := range procs {
+		if !h.iam.Enforce(ctxuser, domain, "process:"+p.ID, "read") {
+			continue
 		}
+
+		processes = append(processes, p)
+		pmap[app.NewProcessID(p.ID, p.Domain)] = struct{}{}
 	}
 
 	missing := []api.Process{}
@@ -319,17 +317,11 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "")
 	}
 
-	procsMap := h.proxy.ListProcesses(proxy.ProcessListOptions{
+	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
 		ID:     []string{id},
 		Filter: filter.Slice(),
 		Domain: domain,
 	})
-
-	procs := []clientapi.Process{}
-
-	for _, processes := range procsMap {
-		procs = append(procs, processes...)
-	}
 
 	if len(procs) == 0 {
 		// Check the store in the store for an undeployed process
