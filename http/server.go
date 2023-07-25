@@ -722,6 +722,8 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.ListNodeProcesses)
 		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
 
+		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.ListFiles)
+
 		if !s.readOnly {
 			v3.PUT("/cluster/transfer/:id", s.v3handler.cluster.TransferLeadership)
 			v3.PUT("/cluster/leave", s.v3handler.cluster.Leave)

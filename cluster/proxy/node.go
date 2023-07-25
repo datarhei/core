@@ -37,12 +37,12 @@ type Node interface {
 }
 
 type NodeReader interface {
-	Ping() (time.Duration, error)
 	About() NodeAbout
 	Version() NodeVersion
 	Resources() NodeResources
 
-	Files() NodeFiles
+	FileList(storage, pattern string) ([]clientapi.FileInfo, error)
+	ProxyFileList() NodeFiles
 
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
@@ -67,6 +67,7 @@ type NodeResources struct {
 	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
 	Mem          uint64  // Currently used memory in bytes
 	MemLimit     uint64  // Defined memory limit in bytes
+	Error        error   // Last error
 }
 
 type NodeAbout struct {
@@ -112,6 +113,7 @@ type node struct {
 	peerErr    error
 	peerLock   sync.RWMutex
 	peerWg     sync.WaitGroup
+	peerAbout  clientapi.About
 	disconnect context.CancelFunc
 
 	lastContact time.Time
@@ -123,6 +125,7 @@ type node struct {
 		cpuLimit   float64
 		mem        uint64
 		memLimit   uint64
+		err        error
 	}
 
 	config *config.Config
@@ -154,6 +157,7 @@ func NewNode(id, address string, config *config.Config) Node {
 	n.resources.cpuLimit = 100
 	n.resources.mem = 0
 	n.resources.memLimit = 0
+	n.resources.err = fmt.Errorf("not initialized")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	n.disconnect = cancel
@@ -340,18 +344,18 @@ func (n *node) Disconnect() {
 }
 
 func (n *node) pingPeer(ctx context.Context, wg *sync.WaitGroup) {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	defer wg.Done()
 
 	for {
 		select {
 		case <-ticker.C:
-			// Ping
-			latency, err := n.Ping()
+			about, latency, err := n.AboutPeer()
 
 			n.peerLock.Lock()
 			n.peerErr = err
+			n.peerAbout = about
 			n.peerLock.Unlock()
 
 			n.stateLock.Lock()
@@ -391,10 +395,6 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 				},
 			})
 
-			n.peerLock.Lock()
-			n.peerErr = err
-			n.peerLock.Unlock()
-
 			if err != nil {
 				n.stateLock.Lock()
 				n.resources.throttling = true
@@ -403,7 +403,7 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 				n.resources.cpuLimit = 100
 				n.resources.mem = 0
 				n.resources.memLimit = 0
-				n.state = stateDisconnected
+				n.resources.err = err
 				n.stateLock.Unlock()
 
 				continue
@@ -453,25 +453,12 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 				n.resources.mem = 0
 				n.resources.memLimit = 0
 			}
-			n.lastContact = time.Now()
+			n.resources.err = nil
 			n.stateLock.Unlock()
 		case <-ctx.Done():
 			return
 		}
 	}
-}
-
-func (n *node) Ping() (time.Duration, error) {
-	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
-
-	if n.peer == nil {
-		return 0, ErrNoPeer
-	}
-
-	latency, err := n.peer.Ping()
-
-	return latency, err
 }
 
 func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse, error) {
@@ -485,41 +472,32 @@ func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse,
 	return n.peer.Metrics(query)
 }
 
-func (n *node) AboutPeer() (clientapi.About, error) {
+func (n *node) AboutPeer() (clientapi.About, time.Duration, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
 	if n.peer == nil {
-		return clientapi.About{}, ErrNoPeer
+		return clientapi.About{}, 0, ErrNoPeer
 	}
 
-	return n.peer.About(false)
+	start := time.Now()
+
+	about, err := n.peer.About(false)
+
+	return about, time.Since(start), err
 }
 
 func (n *node) About() NodeAbout {
-	about, err := n.AboutPeer()
-
-	n.stateLock.RLock()
-	defer n.stateLock.RUnlock()
-
-	if err != nil {
-		return NodeAbout{
-			ID:          n.id,
-			Address:     n.address,
-			State:       stateDisconnected.String(),
-			Error:       err,
-			LastContact: n.lastContact,
-			Resources: NodeResources{
-				IsThrottling: true,
-				NCPU:         1,
-			},
-		}
-	}
-
-	createdAt, err := time.Parse(time.RFC3339, about.CreatedAt)
+	n.peerLock.Lock()
+	createdAt, err := time.Parse(time.RFC3339, n.peerAbout.CreatedAt)
 	if err != nil {
 		createdAt = time.Now()
 	}
+	name := n.peerAbout.Name
+	n.peerLock.Unlock()
+
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 
 	state := n.state
 	if time.Since(n.lastContact) > 3*time.Second {
@@ -528,7 +506,7 @@ func (n *node) About() NodeAbout {
 
 	nodeAbout := NodeAbout{
 		ID:          n.id,
-		Name:        about.Name,
+		Name:        name,
 		Address:     n.address,
 		State:       state.String(),
 		Error:       n.peerErr,
@@ -543,6 +521,7 @@ func (n *node) About() NodeAbout {
 			CPULimit:     n.resources.cpuLimit,
 			Mem:          n.resources.mem,
 			MemLimit:     n.resources.memLimit,
+			Error:        n.resources.err,
 		},
 	}
 
@@ -563,29 +542,27 @@ func (n *node) Resources() NodeResources {
 }
 
 func (n *node) Version() NodeVersion {
-	about, err := n.AboutPeer()
-	if err != nil {
-		return NodeVersion{}
-	}
+	n.peerLock.Lock()
+	defer n.peerLock.Unlock()
 
-	build, err := time.Parse(time.RFC3339, about.Version.Build)
+	build, err := time.Parse(time.RFC3339, n.peerAbout.Version.Build)
 	if err != nil {
 		build = time.Time{}
 	}
 
 	version := NodeVersion{
-		Number:   about.Version.Number,
-		Commit:   about.Version.Commit,
-		Branch:   about.Version.Branch,
+		Number:   n.peerAbout.Version.Number,
+		Commit:   n.peerAbout.Version.Commit,
+		Branch:   n.peerAbout.Version.Branch,
 		Build:    build,
-		Arch:     about.Version.Arch,
-		Compiler: about.Version.Compiler,
+		Arch:     n.peerAbout.Version.Arch,
+		Compiler: n.peerAbout.Version.Compiler,
 	}
 
 	return version
 }
 
-func (n *node) Files() NodeFiles {
+func (n *node) ProxyFileList() NodeFiles {
 	id := n.About().ID
 
 	files := NodeFiles{
@@ -730,6 +707,17 @@ func (n *node) files() []string {
 	wgList.Wait()
 
 	return filesList
+}
+
+func (n *node) FileList(storage, pattern string) ([]clientapi.FileInfo, error) {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return nil, ErrNoPeer
+	}
+
+	return n.peer.FilesystemList(storage, pattern, "", "")
 }
 
 func cloneURL(src *url.URL) *url.URL {

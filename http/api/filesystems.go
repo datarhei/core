@@ -5,6 +5,7 @@ type FileInfo struct {
 	Name    string `json:"name" jsonschema:"minLength=1"`
 	Size    int64  `json:"size_bytes" jsonschema:"minimum=0" format:"int64"`
 	LastMod int64  `json:"last_modified" jsonschema:"minimum=0" format:"int64"`
+	CoreID  string `json:"core_id,omitempty"`
 }
 
 // FilesystemInfo represents information about a filesystem

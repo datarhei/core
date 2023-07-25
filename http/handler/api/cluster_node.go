@@ -118,7 +118,7 @@ func (h *ClusterHandler) GetNodeFiles(c echo.Context) error {
 		Files: make(map[string][]string),
 	}
 
-	peerFiles := peer.Files()
+	peerFiles := peer.ProxyFileList()
 
 	files.LastUpdate = peerFiles.LastUpdate.Unix()
 

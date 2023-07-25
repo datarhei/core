@@ -36,6 +36,7 @@ type ClusterNodeResources struct {
 	CPULimit     float64 `json:"cpu_limit"`          // percent 0-100*npcu
 	Mem          uint64  `json:"memory_used_bytes"`  // bytes
 	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
+	Error        string  `json:"error"`
 }
 
 type ClusterRaft struct {

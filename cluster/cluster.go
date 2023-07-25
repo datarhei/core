@@ -1317,6 +1317,7 @@ type ClusterNodeResources struct {
 	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
 	Mem          uint64  // Currently used memory in bytes
 	MemLimit     uint64  // Defined memory limit in bytes
+	Error        error
 }
 
 type ClusterNode struct {
@@ -1419,6 +1420,7 @@ func (c *cluster) About() (ClusterAbout, error) {
 				CPULimit:     nodeAbout.Resources.CPULimit,
 				Mem:          nodeAbout.Resources.Mem,
 				MemLimit:     nodeAbout.Resources.MemLimit,
+				Error:        nodeAbout.Resources.Error,
 			},
 		}
 

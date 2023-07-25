@@ -122,6 +122,10 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 		n.Core.Error = node.Core.Error.Error()
 	}
 
+	if node.Resources.Error != nil {
+		n.Resources.Error = node.Resources.Error.Error()
+	}
+
 	return n
 }
 

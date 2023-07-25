@@ -37,9 +37,12 @@ type ProxyReader interface {
 	FindNodeFromProcess(id app.ProcessID) (string, error)
 
 	Resources() map[string]NodeResources
+
 	ListProcesses(ProcessListOptions) []clientapi.Process
 	ListProxyProcesses() []Process
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
+
+	ListFiles(storage, patter string) []clientapi.FileInfo
 
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
@@ -341,6 +344,49 @@ func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
 	p.cache.Put(prefix+":"+path, id, 5*time.Second)
 
 	return p.GetNode(id)
+}
+
+func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
+	filesChan := make(chan []clientapi.FileInfo, 64)
+	filesList := []clientapi.FileInfo{}
+
+	wgList := sync.WaitGroup{}
+	wgList.Add(1)
+
+	go func() {
+		defer wgList.Done()
+
+		for list := range filesChan {
+			filesList = append(filesList, list...)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+
+	p.nodesLock.RLock()
+	for _, node := range p.nodes {
+		wg.Add(1)
+
+		go func(node Node, p chan<- []clientapi.FileInfo) {
+			defer wg.Done()
+
+			files, err := node.FileList(storage, pattern)
+			if err != nil {
+				return
+			}
+
+			p <- files
+		}(node, filesChan)
+	}
+	p.nodesLock.RUnlock()
+
+	wg.Wait()
+
+	close(filesChan)
+
+	wgList.Wait()
+
+	return filesList
 }
 
 type Process struct {
