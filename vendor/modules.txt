@@ -78,7 +78,7 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.2
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/datarhei/core-client-go/v16 v16.11.1-0.20230721094901-3748188282ea
+# github.com/datarhei/core-client-go/v16 v16.11.1-0.20230725151052-26252f73d23b
 ## explicit; go 1.18
 github.com/datarhei/core-client-go/v16
 github.com/datarhei/core-client-go/v16/api
