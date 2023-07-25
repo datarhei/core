@@ -1801,12 +1801,12 @@ func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
 }
 
 func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.LogHistorySearchResult {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-
 	result := []app.LogHistorySearchResult{}
 
 	ids := r.GetProcessIDs(idpattern, refpattern, "", "")
+
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	for _, id := range ids {
 		task, ok := r.tasks[id]
