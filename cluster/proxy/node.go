@@ -488,13 +488,13 @@ func (n *node) AboutPeer() (clientapi.About, time.Duration, error) {
 }
 
 func (n *node) About() NodeAbout {
-	n.peerLock.Lock()
+	n.peerLock.RLock()
 	createdAt, err := time.Parse(time.RFC3339, n.peerAbout.CreatedAt)
 	if err != nil {
 		createdAt = time.Now()
 	}
 	name := n.peerAbout.Name
-	n.peerLock.Unlock()
+	n.peerLock.RUnlock()
 
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -542,8 +542,8 @@ func (n *node) Resources() NodeResources {
 }
 
 func (n *node) Version() NodeVersion {
-	n.peerLock.Lock()
-	defer n.peerLock.Unlock()
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
 
 	build, err := time.Parse(time.RFC3339, n.peerAbout.Version.Build)
 	if err != nil {
