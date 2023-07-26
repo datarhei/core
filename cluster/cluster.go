@@ -686,9 +686,9 @@ func (c *cluster) IsClusterDegraded() (bool, error) {
 		return true, err
 	}
 
-	c.nodesLock.Lock()
+	c.nodesLock.RLock()
 	nodes := len(c.nodes)
-	c.nodesLock.Unlock()
+	c.nodesLock.RUnlock()
 
 	if len(servers) != nodes {
 		return true, fmt.Errorf("not all nodes are connected")
@@ -1391,7 +1391,7 @@ func (c *cluster) About() (ClusterAbout, error) {
 		serversMap[s.ID] = s
 	}
 
-	c.nodesLock.Lock()
+	c.nodesLock.RLock()
 	for id, node := range c.nodes {
 		nodeAbout := node.About()
 
@@ -1435,7 +1435,7 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 		about.Nodes = append(about.Nodes, node)
 	}
-	c.nodesLock.Unlock()
+	c.nodesLock.RUnlock()
 
 	return about, nil
 }
