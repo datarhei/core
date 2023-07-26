@@ -25,7 +25,7 @@ type FSHandler struct {
 	filesystems map[string]FSConfig
 }
 
-// NewFS return a new FSHanlder type. You have to provide a filesystem to act on.
+// NewFS return a new FSHandler type. You have to provide a filesystem to act on.
 func NewFS(filesystems map[string]FSConfig) *FSHandler {
 	return &FSHandler{
 		filesystems: filesystems,

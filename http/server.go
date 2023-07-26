@@ -160,6 +160,7 @@ type filesystem struct {
 	fs.FS
 
 	handler    *handler.FSHandler
+	apihandler *handler.FSHandler
 	middleware echo.MiddlewareFunc
 }
 
@@ -196,6 +197,8 @@ func NewServer(config Config) (Server, error) {
 
 		corsPrefixes[httpfs.Mountpoint] = config.Cors.Origins
 
+		apihttpfs := httpfs
+
 		if config.Cluster != nil {
 			if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
 				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
@@ -203,8 +206,9 @@ func NewServer(config Config) (Server, error) {
 		}
 
 		filesystem := &filesystem{
-			FS:      httpfs,
-			handler: handler.NewFS(httpfs),
+			FS:         httpfs,
+			handler:    handler.NewFS(httpfs),
+			apihandler: handler.NewFS(apihttpfs),
 		}
 
 		if httpfs.Filesystem.Type() == "disk" {
@@ -639,7 +643,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		fshandlers[fs.Name] = api.FSConfig{
 			Type:       fs.Filesystem.Type(),
 			Mountpoint: fs.Mountpoint,
-			Handler:    fs.handler,
+			Handler:    fs.apihandler,
 		}
 	}
 
