@@ -30,7 +30,9 @@ func TestUnmarshal(t *testing.T) {
 		{":xxx", "", "xxx"},
 		{"foo:xxx", "foo", "xxx"},
 		{"foo::bar:xxx", "foo:bar", "xxx"},
+		{"foo:::bar:xxx", "foo:", "bar:xxx"},
 		{"foo::::bar:xxx", "foo::bar", "xxx"},
+		{"foo-bar:%26%21%27", "foo-bar", "%26%21%27"},
 	}
 
 	for _, d := range data {

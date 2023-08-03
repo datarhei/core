@@ -220,8 +220,21 @@ func GetToken(u *url.URL) (string, string) {
 		return u.Path, ""
 	}
 
+	rawPath := "/" + strings.Join(pathElements[:nPathElements-1], "/")
+	rawToken := pathElements[nPathElements-1]
+
+	path, err := url.PathUnescape(rawPath)
+	if err != nil {
+		path = rawPath
+	}
+
+	token, err := url.PathUnescape(rawToken)
+	if err != nil {
+		token = rawToken
+	}
+
 	// Return the path without the token
-	return "/" + strings.Join(pathElements[:nPathElements-1], "/"), pathElements[nPathElements-1]
+	return path, token
 }
 
 func splitPath(path string) []string {

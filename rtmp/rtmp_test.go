@@ -12,6 +12,8 @@ func TestToken(t *testing.T) {
 		{"/foo/bar", "/foo", "bar"},
 		{"/foo/bar?token=abc", "/foo/bar", "abc"},
 		{"/foo/bar/abc", "/foo/bar", "abc"},
+		{"/foo/bar/&!'", "/foo/bar", "&!'"},
+		{"/foo/bar/%26%21%27", "/foo/bar", "&!'"},
 	}
 
 	for _, d := range data {
