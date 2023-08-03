@@ -1997,6 +1997,9 @@ const docTemplateClusterAPI = `{
         "identity.User": {
             "type": "object",
             "properties": {
+                "alias": {
+                    "type": "string"
+                },
                 "auth": {
                     "$ref": "#/definitions/identity.UserAuth"
                 },

@@ -174,6 +174,8 @@ definitions:
       cpu_used:
         description: percent 0-100*npcu
         type: number
+      error:
+        type: string
       is_throttling:
         type: boolean
       memory_limit_bytes:
@@ -668,6 +670,10 @@ definitions:
         type: object
       event:
         type: string
+      level:
+        type: string
+      message:
+        type: string
     type: object
   api.EventFilters:
     properties:
@@ -678,6 +684,8 @@ definitions:
     type: object
   api.FileInfo:
     properties:
+      core_id:
+        type: string
       last_modified:
         format: int64
         type: integer
@@ -765,6 +773,8 @@ definitions:
     type: object
   api.IAMUser:
     properties:
+      alias:
+        type: string
       auth:
         $ref: '#/definitions/api.IAMUserAuth'
       name:
@@ -1791,6 +1801,8 @@ definitions:
         type: array
       token:
         type: string
+      ttl_sec:
+        type: integer
     type: object
   api.SessionsActive:
     additionalProperties:
@@ -2662,6 +2674,63 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of identities in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/fs/{storage}:
+    get:
+      description: List all files on a filesystem. The listing can be ordered by name,
+        size, or date of last modification in ascending or descending order.
+      operationId: cluster-3-list-files
+      parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: glob pattern for file names
+        in: query
+        name: glob
+        type: string
+      - description: minimal size of files
+        in: query
+        name: size_min
+        type: integer
+      - description: maximal size of files
+        in: query
+        name: size_max
+        type: integer
+      - description: minimal last modification time
+        in: query
+        name: lastmod_start
+        type: integer
+      - description: maximal last modification time
+        in: query
+        name: lastmod_end
+        type: integer
+      - description: none, name, size, lastmod
+        in: query
+        name: sort
+        type: string
+      - description: asc, desc
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.FileInfo'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List all files on a filesystem
       tags:
       - v16.?.?
   /api/v3/cluster/healthy:

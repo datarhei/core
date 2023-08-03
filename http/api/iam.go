@@ -7,6 +7,7 @@ import (
 
 type IAMUser struct {
 	Name      string      `json:"name"`
+	Alias     string      `json:"alias"`
 	Superuser bool        `json:"superuser"`
 	Auth      IAMUserAuth `json:"auth"`
 	Policies  []IAMPolicy `json:"policies"`
@@ -14,6 +15,7 @@ type IAMUser struct {
 
 func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 	u.Name = user.Name
+	u.Alias = user.Alias
 	u.Superuser = user.Superuser
 	u.Auth = IAMUserAuth{
 		API: IAMUserAuthAPI{
@@ -46,6 +48,7 @@ func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
 	iamuser := identity.User{
 		Name:      u.Name,
+		Alias:     u.Alias,
 		Superuser: u.Superuser,
 		Auth: identity.UserAuth{
 			API: identity.UserAuthAPI{

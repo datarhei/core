@@ -583,6 +583,8 @@ definitions:
     type: object
   identity.User:
     properties:
+      alias:
+        type: string
       auth:
         $ref: '#/definitions/identity.UserAuth'
       name:

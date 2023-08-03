@@ -375,6 +375,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/fs/{storage}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List all files on a filesystem",
+                "operationId": "cluster-3-list-files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "glob pattern for file names",
+                        "name": "glob",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal size of files",
+                        "name": "size_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal size of files",
+                        "name": "size_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "minimal last modification time",
+                        "name": "lastmod_start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximal last modification time",
+                        "name": "lastmod_end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "none, name, size, lastmod",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "asc, desc",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.FileInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/healthy": {
             "get": {
                 "security": [
@@ -4594,6 +4680,9 @@ const docTemplate = `{
                     "description": "percent 0-100*npcu",
                     "type": "number"
                 },
+                "error": {
+                    "type": "string"
+                },
                 "is_throttling": {
                     "type": "boolean"
                 },
@@ -5327,6 +5416,12 @@ const docTemplate = `{
                 },
                 "event": {
                     "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
                 }
             }
         },
@@ -5344,6 +5439,9 @@ const docTemplate = `{
         "api.FileInfo": {
             "type": "object",
             "properties": {
+                "core_id": {
+                    "type": "string"
+                },
                 "last_modified": {
                     "type": "integer",
                     "format": "int64"
@@ -5475,6 +5573,9 @@ const docTemplate = `{
         "api.IAMUser": {
             "type": "object",
             "properties": {
+                "alias": {
+                    "type": "string"
+                },
                 "auth": {
                     "$ref": "#/definitions/api.IAMUserAuth"
                 },
@@ -6886,6 +6987,9 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                },
+                "ttl_sec": {
+                    "type": "integer"
                 }
             }
         },
