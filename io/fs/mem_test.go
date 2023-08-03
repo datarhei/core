@@ -2,6 +2,8 @@ package fs
 
 import (
 	"fmt"
+	gorand "math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/datarhei/core/v16/math/rand"
@@ -58,5 +60,27 @@ func BenchmarkMemRemoveList(b *testing.B) {
 		mem.RemoveList("/", ListOptions{
 			Pattern: "/5/**",
 		})
+	}
+}
+
+func BenchmarkMemReadFile(b *testing.B) {
+	mem, err := NewMemFilesystem(MemConfig{})
+	require.NoError(b, err)
+
+	nFiles := 1000
+
+	for i := 0; i < 1000; i++ {
+		path := fmt.Sprintf("/%d.dat", i)
+		mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+	}
+
+	r := gorand.New(gorand.NewSource(42))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		num := r.Intn(nFiles)
+		f := mem.Open("/" + strconv.Itoa(num) + ".dat")
+		f.Close()
 	}
 }
