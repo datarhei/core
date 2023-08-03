@@ -2,6 +2,7 @@ package identity
 
 import (
 	"testing"
+	"time"
 
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/stretchr/testify/require"
@@ -35,6 +36,23 @@ func TestUserName(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestUserAlias(t *testing.T) {
+	user := User{
+		Name: "foober",
+	}
+
+	err := user.Validate()
+	require.NoError(t, err)
+
+	user.Alias = "foobar"
+	err = user.Validate()
+	require.NoError(t, err)
+
+	user.Alias = "$foob:ar"
+	err = user.Validate()
+	require.Error(t, err)
+}
+
 func TestIdentity(t *testing.T) {
 	user := User{
 		Name: "foobar",
@@ -43,6 +61,9 @@ func TestIdentity(t *testing.T) {
 	identity := user.marshalIdentity()
 
 	require.Equal(t, "foobar", identity.Name())
+
+	identity.user.Alias = "raboof"
+	require.Equal(t, "raboof", identity.Name())
 
 	require.False(t, identity.isValid())
 	identity.valid = true
@@ -198,6 +219,32 @@ func TestIdentityServiceTokenAuth(t *testing.T) {
 	require.Equal(t, "foobar:terces", token)
 }
 
+func TestIdentityServiceSessionAuth(t *testing.T) {
+	user := User{
+		Name: "foobar",
+	}
+
+	identity := user.marshalIdentity()
+
+	session := identity.GetServiceSession(nil, time.Hour)
+	require.Empty(t, session)
+
+	identity.user.Auth.Services.Session = []string{"bla"}
+
+	session = identity.GetServiceSession(nil, time.Hour)
+	require.Empty(t, session)
+
+	identity.valid = true
+
+	session = identity.GetServiceSession(nil, time.Hour)
+	require.NotEmpty(t, session)
+
+	ok, data, err := identity.VerifyServiceSession(session)
+	require.True(t, ok)
+	require.Equal(t, nil, data)
+	require.NoError(t, err)
+}
+
 func TestJWT(t *testing.T) {
 	adapter, err := createAdapter()
 	require.NoError(t, err)
@@ -257,7 +304,7 @@ func TestCreateUser(t *testing.T) {
 
 	im, err := New(Config{
 		Adapter:   adapter,
-		Superuser: User{Name: "foobar"},
+		Superuser: User{Name: "foobar", Alias: "foobalias"},
 		JWTRealm:  "test-realm",
 		JWTSecret: "abc123",
 		Logger:    nil,
@@ -268,11 +315,55 @@ func TestCreateUser(t *testing.T) {
 	err = im.Create(User{Name: "foobar"})
 	require.Error(t, err)
 
-	err = im.Create(User{Name: "foobaz"})
+	err = im.Create(User{Name: "foobaz", Alias: "foobalias"})
+	require.Error(t, err)
+
+	err = im.Create(User{Name: "foobaz", Alias: "alias"})
 	require.NoError(t, err)
 
-	err = im.Create(User{Name: "foobaz"})
+	err = im.Create(User{Name: "fooboz", Alias: "alias"})
 	require.Error(t, err)
+
+	err = im.Create(User{Name: "foobaz", Alias: "somealias"})
+	require.Error(t, err)
+}
+
+func TestAlias(t *testing.T) {
+	adapter, err := createAdapter()
+	require.NoError(t, err)
+
+	im, err := New(Config{
+		Adapter:   adapter,
+		Superuser: User{Name: "foobar", Alias: "foobalias"},
+		JWTRealm:  "test-realm",
+		JWTSecret: "abc123",
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, im)
+
+	err = im.Create(User{Name: "foobaz", Alias: "alias"})
+	require.NoError(t, err)
+
+	identity, err := im.Get("foobar")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", identity.Name)
+	require.Equal(t, "foobalias", identity.Alias)
+
+	identity, err = im.Get("foobalias")
+	require.NoError(t, err)
+	require.Equal(t, "foobar", identity.Name)
+	require.Equal(t, "foobalias", identity.Alias)
+
+	identity, err = im.Get("foobaz")
+	require.NoError(t, err)
+	require.Equal(t, "foobaz", identity.Name)
+	require.Equal(t, "alias", identity.Alias)
+
+	identity, err = im.Get("alias")
+	require.NoError(t, err)
+	require.Equal(t, "foobaz", identity.Name)
+	require.Equal(t, "alias", identity.Alias)
 }
 
 func TestCreateUserAuth0(t *testing.T) {
@@ -421,10 +512,14 @@ func TestLoadAndSave(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("[]"), data)
 
-	err = im.Create(User{Name: "foobaz"})
+	err = im.Create(User{Name: "foobaz", Alias: "alias"})
 	require.NoError(t, err)
 
 	identity, err := im.GetVerifier("foobaz")
+	require.NoError(t, err)
+	require.NotNil(t, identity)
+
+	identity, err = im.GetVerifier("alias")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 
@@ -442,6 +537,10 @@ func TestLoadAndSave(t *testing.T) {
 	require.NotNil(t, im)
 
 	identity, err = im.GetVerifier("foobaz")
+	require.NoError(t, err)
+	require.NotNil(t, identity)
+
+	identity, err = im.GetVerifier("alias")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 }
@@ -492,6 +591,55 @@ func TestUpdateUser(t *testing.T) {
 
 	err = im.Update("fooboz", User{Name: "foobaz"})
 	require.NoError(t, err)
+}
+
+func TestUpdateUserAlias(t *testing.T) {
+	adapter, err := createAdapter()
+	require.NoError(t, err)
+
+	im, err := New(Config{
+		Adapter:   adapter,
+		Superuser: User{Name: "foobar", Alias: "superalias"},
+		JWTRealm:  "test-realm",
+		JWTSecret: "abc123",
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, im)
+
+	err = im.Create(User{Name: "fooboz"})
+	require.NoError(t, err)
+
+	identity, err := im.GetVerifier("fooboz")
+	require.NoError(t, err)
+	require.NotNil(t, identity)
+	require.Equal(t, "fooboz", identity.Name())
+
+	_, err = im.GetVerifier("alias")
+	require.Error(t, err)
+
+	err = im.Update("fooboz", User{Name: "fooboz", Alias: "alias"})
+	require.NoError(t, err)
+
+	identity, err = im.GetVerifier("fooboz")
+	require.NoError(t, err)
+	require.NotNil(t, identity)
+	require.Equal(t, "alias", identity.Name())
+
+	err = im.Create(User{Name: "barfoo", Alias: "alias2"})
+	require.NoError(t, err)
+
+	err = im.Update("fooboz", User{Name: "fooboz", Alias: "alias2"})
+	require.Error(t, err)
+
+	err = im.Update("fooboz", User{Name: "barfoo", Alias: "alias"})
+	require.Error(t, err)
+
+	err = im.Update("fooboz", User{Name: "fooboz", Alias: "superalias"})
+	require.Error(t, err)
+
+	err = im.Update("fooboz", User{Name: "foobar", Alias: ""})
+	require.Error(t, err)
 }
 
 func TestUpdateUserAuth0(t *testing.T) {
@@ -580,8 +728,9 @@ func TestRemoveUser(t *testing.T) {
 				Auth0:    UserAuthAPIAuth0{},
 			},
 			Services: UserAuthServices{
-				Basic: []string{"secret"},
-				Token: []string{"tokensecret"},
+				Basic:   []string{"secret"},
+				Token:   []string{"tokensecret"},
+				Session: []string{"sessionsecret"},
 			},
 		},
 	})
@@ -601,6 +750,13 @@ func TestRemoveUser(t *testing.T) {
 
 	ok, err = identity.VerifyServiceToken("tokensecret")
 	require.True(t, ok)
+	require.NoError(t, err)
+
+	session := identity.GetServiceSession(nil, time.Hour)
+
+	ok, data, err := identity.VerifyServiceSession(session)
+	require.True(t, ok)
+	require.Equal(t, nil, data)
 	require.NoError(t, err)
 
 	access, refresh, err := im.CreateJWT("foobaz")
@@ -627,6 +783,11 @@ func TestRemoveUser(t *testing.T) {
 
 	ok, err = identity.VerifyServiceToken("tokensecret")
 	require.False(t, ok)
+	require.Error(t, err)
+
+	ok, data, err = identity.VerifyServiceSession(session)
+	require.False(t, ok)
+	require.Equal(t, nil, data)
 	require.Error(t, err)
 
 	ok, err = identity.VerifyJWT(access)
