@@ -979,7 +979,7 @@ func (a *api) start(ctx context.Context) error {
 			}
 
 			if identity != nil {
-				u.User = url.UserPassword(identity.Name(), identity.GetServiceBasicAuth())
+				u.User = identity.GetServiceBasicAuth()
 			} else {
 				u.User = url.User(config.Owner)
 			}
@@ -1007,7 +1007,7 @@ func (a *api) start(ctx context.Context) error {
 			}
 
 			if identity != nil {
-				u.User = url.UserPassword(identity.Name(), identity.GetServiceBasicAuth())
+				u.User = identity.GetServiceBasicAuth()
 			} else {
 				u.User = url.User(config.Owner)
 			}
@@ -1037,7 +1037,9 @@ func (a *api) start(ctx context.Context) error {
 				}
 
 				if identity != nil {
-					u.User = url.UserPassword(identity.Name(), identity.GetServiceBasicAuth())
+					u.User = identity.GetServiceBasicAuth()
+				} else {
+					u.User = url.User(config.Owner)
 				}
 
 				if len(config.Domain) != 0 {

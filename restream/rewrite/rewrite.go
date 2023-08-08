@@ -115,13 +115,7 @@ func (g *rewrite) isLocal(u *url.URL) bool {
 }
 
 func (g *rewrite) httpURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
-	password := identity.GetServiceBasicAuth()
-
-	if len(password) == 0 {
-		u.User = nil
-	} else {
-		u.User = url.UserPassword(identity.Name(), password)
-	}
+	u.User = identity.GetServiceBasicAuth()
 
 	return u.String()
 }

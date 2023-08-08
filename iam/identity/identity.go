@@ -2,6 +2,7 @@ package identity
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -105,7 +106,7 @@ type Verifier interface {
 	VerifyServiceToken(token string) (bool, error)
 	VerifyServiceSession(jwt string) (bool, interface{}, error)
 
-	GetServiceBasicAuth() string
+	GetServiceBasicAuth() *url.Userinfo
 	GetServiceToken() string
 	GetServiceSession(interface{}, time.Duration) string
 
@@ -319,12 +320,17 @@ func (i *identity) VerifyServiceBasicAuth(password string) (bool, error) {
 	return false, nil
 }
 
-func (i *identity) GetServiceBasicAuth() string {
+func (i *identity) GetServiceBasicAuth() *url.Userinfo {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
 	if !i.isValid() {
-		return ""
+		return nil
+	}
+
+	name := i.Alias()
+	if len(name) == 0 {
+		name = i.Name()
 	}
 
 	for _, password := range i.user.Auth.Services.Basic {
@@ -332,10 +338,10 @@ func (i *identity) GetServiceBasicAuth() string {
 			continue
 		}
 
-		return password
+		return url.UserPassword(name, password)
 	}
 
-	return ""
+	return url.User(name)
 }
 
 func (i *identity) VerifyServiceToken(token string) (bool, error) {
@@ -368,7 +374,12 @@ func (i *identity) GetServiceToken() string {
 			continue
 		}
 
-		return enctoken.Marshal(i.Name(), token)
+		name := i.Alias()
+		if len(name) == 0 {
+			name = i.Name()
+		}
+
+		return enctoken.Marshal(name, token)
 	}
 
 	return ""

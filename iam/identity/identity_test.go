@@ -182,7 +182,8 @@ func TestIdentityServiceBasicAuth(t *testing.T) {
 	require.False(t, ok)
 	require.NoError(t, err)
 
-	password := identity.GetServiceBasicAuth()
+	userinfo := identity.GetServiceBasicAuth()
+	password, _ := userinfo.Password()
 	require.Equal(t, "terces", password)
 }
 

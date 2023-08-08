@@ -74,10 +74,10 @@ func TestRewriteHTTP(t *testing.T) {
 		{"http://example.com/live/stream.m3u8", "write", "http://example.com/live/stream.m3u8"},
 		{"http://localhost:8181/live/stream.m3u8", "read", "http://localhost:8181/live/stream.m3u8"},
 		{"http://localhost:8181/live/stream.m3u8", "write", "http://localhost:8181/live/stream.m3u8"},
-		{"http://localhost:8080/live/stream.m3u8", "read", "http://localhost:8080/live/stream.m3u8"},
-		{"http://localhost:8080/live/stream.m3u8", "write", "http://localhost:8080/live/stream.m3u8"},
-		{"http://admin:pass@localhost:8080/live/stream.m3u8", "read", "http://localhost:8080/live/stream.m3u8"},
-		{"http://admin:pass@localhost:8080/live/stream.m3u8", "write", "http://localhost:8080/live/stream.m3u8"},
+		{"http://localhost:8080/live/stream.m3u8", "read", "http://foobar@localhost:8080/live/stream.m3u8"},
+		{"http://localhost:8080/live/stream.m3u8", "write", "http://foobar@localhost:8080/live/stream.m3u8"},
+		{"http://admin:pass@localhost:8080/live/stream.m3u8", "read", "http://foobar@localhost:8080/live/stream.m3u8"},
+		{"http://admin:pass@localhost:8080/live/stream.m3u8", "write", "http://foobar@localhost:8080/live/stream.m3u8"},
 	}
 
 	for _, e := range samples {
