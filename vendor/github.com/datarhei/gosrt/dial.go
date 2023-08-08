@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"github.com/datarhei/gosrt/internal/circular"
 	"github.com/datarhei/gosrt/internal/crypto"
 	"github.com/datarhei/gosrt/internal/packet"
+	"github.com/datarhei/gosrt/internal/rand"
 )
 
 // ErrClientClosed is returned when the client connection has
@@ -99,6 +99,7 @@ func Dial(network, address string, config Config) (Conn, error) {
 
 	pc, ok := conn.(*net.UDPConn)
 	if !ok {
+		conn.Close()
 		return nil, fmt.Errorf("failed dialing: connection is not a UDP connection")
 	}
 
@@ -118,9 +119,18 @@ func Dial(network, address string, config Config) (Conn, error) {
 	dl.start = time.Now()
 
 	// create a new socket ID
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dl.socketId = r.Uint32()
-	dl.initialPacketSequenceNumber = circular.New(r.Uint32()&packet.MAX_SEQUENCENUMBER, packet.MAX_SEQUENCENUMBER)
+	dl.socketId, err = rand.Uint32()
+	if err != nil {
+		dl.Close()
+		return nil, err
+	}
+
+	seqNum, err := rand.Uint32()
+	if err != nil {
+		dl.Close()
+		return nil, err
+	}
+	dl.initialPacketSequenceNumber = circular.New(seqNum&packet.MAX_SEQUENCENUMBER, packet.MAX_SEQUENCENUMBER)
 
 	go func() {
 		buffer := make([]byte, MAX_MSS_SIZE) // MTU size

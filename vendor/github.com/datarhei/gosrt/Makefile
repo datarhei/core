@@ -5,7 +5,7 @@ all: build
 
 ## test: Run all tests
 test:
-	go test -race -coverprofile=/dev/null -v ./...
+	go test -race -coverprofile=/dev/null -covermode=atomic -v ./...
 
 ## fuzz: Run fuzz tests
 fuzz:

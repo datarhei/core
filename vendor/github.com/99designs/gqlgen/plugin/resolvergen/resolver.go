@@ -81,13 +81,18 @@ func (m *Plugin) generateSingleFile(data *codegen.Data) error {
 		OmitTemplateComment: data.Config.Resolver.OmitTemplateComment,
 	}
 
+	newResolverTemplate := resolverTemplate
+	if data.Config.Resolver.ResolverTemplate != "" {
+		newResolverTemplate = readResolverTemplate(data.Config.Resolver.ResolverTemplate)
+	}
+
 	return templates.Render(templates.Options{
 		PackageName: data.Config.Resolver.Package,
 		FileNotice:  `// THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.`,
 		Filename:    data.Config.Resolver.Filename,
 		Data:        resolverBuild,
 		Packages:    data.Config.Packages,
-		Template:    resolverTemplate,
+		Template:    newResolverTemplate,
 	})
 }
 
@@ -158,6 +163,10 @@ func (m *Plugin) generatePerSchema(data *codegen.Data) error {
 		file.imports = rewriter.ExistingImports(filename)
 		file.RemainingSource = rewriter.RemainingSource(filename)
 	}
+	newResolverTemplate := resolverTemplate
+	if data.Config.Resolver.ResolverTemplate != "" {
+		newResolverTemplate = readResolverTemplate(data.Config.Resolver.ResolverTemplate)
+	}
 
 	for filename, file := range files {
 		resolverBuild := &ResolverBuild{
@@ -186,7 +195,7 @@ func (m *Plugin) generatePerSchema(data *codegen.Data) error {
 			Filename:    filename,
 			Data:        resolverBuild,
 			Packages:    data.Config.Packages,
-			Template:    resolverTemplate,
+			Template:    newResolverTemplate,
 		})
 		if err != nil {
 			return err
@@ -256,4 +265,12 @@ func gqlToResolverName(base string, gqlname, filenameTmpl string) string {
 	}
 	filename := strings.ReplaceAll(filenameTmpl, "{name}", strings.TrimSuffix(gqlname, ext))
 	return filepath.Join(base, filename)
+}
+
+func readResolverTemplate(customResolverTemplate string) string {
+	contentBytes, err := os.ReadFile(customResolverTemplate)
+	if err != nil {
+		panic(err)
+	}
+	return string(contentBytes)
 }

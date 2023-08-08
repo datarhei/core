@@ -3,17 +3,17 @@ module github.com/datarhei/core/v16
 go 1.18
 
 require (
-	github.com/99designs/gqlgen v0.17.35
+	github.com/99designs/gqlgen v0.17.36
 	github.com/Masterminds/semver/v3 v3.2.1
-	github.com/adhocore/gronx v1.6.3
+	github.com/adhocore/gronx v1.6.5
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/caddyserver/certmagic v0.19.0
-	github.com/casbin/casbin/v2 v2.72.0
+	github.com/caddyserver/certmagic v0.19.1
+	github.com/casbin/casbin/v2 v2.73.1
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230725151052-26252f73d23b
-	github.com/datarhei/gosrt v0.5.2
+	github.com/datarhei/gosrt v0.5.4
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
-	github.com/go-playground/validator/v10 v10.14.1
+	github.com/go-playground/validator/v10 v10.15.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/gops v0.3.27
@@ -28,19 +28,19 @@ require (
 	github.com/lestrrat-go/strftime v1.0.6
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.19
-	github.com/minio/minio-go/v7 v7.0.60
+	github.com/minio/minio-go/v7 v7.0.61
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.16.0
-	github.com/shirou/gopsutil/v3 v3.23.6
+	github.com/shirou/gopsutil/v3 v3.23.7
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/echo-swagger v1.4.0
 	github.com/swaggo/swag v1.16.1
 	github.com/vektah/gqlparser/v2 v2.5.8
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/bbolt v1.3.7
-	go.uber.org/automaxprocs v1.5.2
-	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.11.0
+	go.uber.org/automaxprocs v1.5.3
+	go.uber.org/zap v1.25.0
+	golang.org/x/crypto v0.12.0
 	golang.org/x/mod v0.12.0
 )
 
@@ -97,13 +97,13 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.11.0 // indirect
+	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/swaggo/files/v2 v2.0.0 // indirect
-	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/gjson v1.15.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
@@ -116,14 +116,12 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
-	go.uber.org/goleak v1.1.12 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.12.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.11.0 // indirect
+	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

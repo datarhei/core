@@ -150,7 +150,7 @@ type listener struct {
 	rcvQueue chan packet.Packet
 	sndQueue chan packet.Packet
 
-	syncookie srtnet.SYNCookie
+	syncookie *srtnet.SYNCookie
 
 	shutdown     bool
 	shutdownLock sync.RWMutex
@@ -210,7 +210,11 @@ func Listen(network, address string, config Config) (Listener, error) {
 	ln.rcvQueue = make(chan packet.Packet, 2048)
 	ln.sndQueue = make(chan packet.Packet, 2048)
 
-	ln.syncookie = srtnet.NewSYNCookie(ln.addr.String(), time.Now().UnixNano(), nil)
+	ln.syncookie, err = srtnet.NewSYNCookie(ln.addr.String(), nil)
+	if err != nil {
+		ln.Close()
+		return nil, err
+	}
 
 	ln.doneChan = make(chan error)
 

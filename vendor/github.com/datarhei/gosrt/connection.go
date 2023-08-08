@@ -91,8 +91,6 @@ type srtConn struct {
 
 	start time.Time
 
-	shutdown     bool
-	shutdownLock sync.RWMutex
 	shutdownOnce sync.Once
 
 	socketId     uint32
@@ -129,20 +127,16 @@ type srtConn struct {
 	dropThreshold       uint64 // microseconds
 
 	// Queue for packets that are coming from the network
-	networkQueue     chan packet.Packet
-	stopNetworkQueue context.CancelFunc
+	networkQueue chan packet.Packet
 
 	// Queue for packets that are written with writePacket() and will be send to the network
-	writeQueue     chan packet.Packet
-	stopWriteQueue context.CancelFunc
-	writeBuffer    bytes.Buffer
-	writeData      []byte
+	writeQueue  chan packet.Packet
+	writeBuffer bytes.Buffer
+	writeData   []byte
 
 	// Queue for packets that will be read locally with ReadPacket()
 	readQueue  chan packet.Packet
 	readBuffer bytes.Buffer
-
-	stopTicker context.CancelFunc
 
 	onSend     func(p packet.Packet)
 	onShutdown func(socketId uint32)
@@ -153,7 +147,12 @@ type srtConn struct {
 	recv congestion.Receiver
 	snd  congestion.Sender
 
-	statistics connStats
+	// context of all channels and routines
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+
+	statistics     connStats
+	statisticsLock sync.RWMutex
 
 	logger Logger
 
@@ -280,17 +279,11 @@ func newSRTConn(config srtConnConfig) *srtConn {
 		OnDeliver:             c.pop,
 	})
 
-	var networkCtx context.Context
-	networkCtx, c.stopNetworkQueue = context.WithCancel(context.Background())
-	go c.networkQueueReader(networkCtx)
+	c.ctx, c.cancelCtx = context.WithCancel(context.Background())
 
-	var writeCtx context.Context
-	writeCtx, c.stopWriteQueue = context.WithCancel(context.Background())
-	go c.writeQueueReader(writeCtx)
-
-	var tickerCtx context.Context
-	tickerCtx, c.stopTicker = context.WithCancel(context.Background())
-	go c.ticker(tickerCtx)
+	go c.networkQueueReader()
+	go c.writeQueueReader()
+	go c.ticker()
 
 	c.debug.expectedRcvPacketSequenceNumber = c.initialPacketSequenceNumber
 	c.debug.expectedReadPacketSequenceNumber = c.initialPacketSequenceNumber
@@ -345,7 +338,7 @@ func (c *srtConn) Version() uint32 {
 
 // ticker invokes the congestion control in regular intervals with
 // the current connection time.
-func (c *srtConn) ticker(ctx context.Context) {
+func (c *srtConn) ticker() {
 	ticker := time.NewTicker(c.tick)
 	defer ticker.Stop()
 	defer func() {
@@ -354,7 +347,7 @@ func (c *srtConn) ticker(ctx context.Context) {
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case t := <-ticker.C:
 			tickTime := uint64(t.Sub(c.start).Microseconds())
@@ -368,13 +361,11 @@ func (c *srtConn) ticker(ctx context.Context) {
 // readPacket reads a packet from the queue of received packets. It blocks
 // if the queue is empty. Only data packets are returned.
 func (c *srtConn) readPacket() (packet.Packet, error) {
-	if c.isShutdown() {
+	var p packet.Packet
+	select {
+	case <-c.ctx.Done():
 		return nil, io.EOF
-	}
-
-	p := <-c.readQueue
-	if p == nil {
-		return nil, io.EOF
+	case p = <-c.readQueue:
 	}
 
 	if p.Header().PacketSequenceNumber.Gt(c.debug.expectedReadPacketSequenceNumber) {
@@ -416,10 +407,6 @@ func (c *srtConn) Read(b []byte) (int, error) {
 // writePacket writes a packet to the write queue. Packets on the write queue
 // will be sent to the peer of the connection. Only data packets will be sent.
 func (c *srtConn) writePacket(p packet.Packet) error {
-	if c.isShutdown() {
-		return io.EOF
-	}
-
 	if p.Header().IsControlPacket {
 		// Ignore control packets
 		return nil
@@ -450,12 +437,10 @@ func (c *srtConn) Write(b []byte) (int, error) {
 		// Give the packet a deliver timestamp
 		p.Header().PktTsbpdTime = c.getTimestamp()
 
-		if c.isShutdown() {
-			return 0, io.EOF
-		}
-
 		// Non-blocking write to the write queue
 		select {
+		case <-c.ctx.Done():
+			return 0, io.EOF
 		case c.writeQueue <- p:
 		default:
 			return 0, io.EOF
@@ -473,12 +458,9 @@ func (c *srtConn) Write(b []byte) (int, error) {
 
 // push puts a packet on the network queue. This is where packets go that came in from the network.
 func (c *srtConn) push(p packet.Packet) {
-	if c.isShutdown() {
-		return
-	}
-
 	// Non-blocking write to the network queue
 	select {
+	case <-c.ctx.Done():
 	case c.networkQueue <- p:
 	default:
 		c.log("connection:error", func() string { return "network queue is full" })
@@ -544,14 +526,14 @@ func (c *srtConn) pop(p packet.Packet) {
 }
 
 // networkQueueReader reads the packets from the network queue in order to process them.
-func (c *srtConn) networkQueueReader(ctx context.Context) {
+func (c *srtConn) networkQueueReader() {
 	defer func() {
 		c.log("connection:close", func() string { return "left network queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case p := <-c.networkQueue:
 			c.handlePacket(p)
@@ -561,14 +543,14 @@ func (c *srtConn) networkQueueReader(ctx context.Context) {
 
 // writeQueueReader reads the packets from the write queue and puts them into congestion
 // control for sending.
-func (c *srtConn) writeQueueReader(ctx context.Context) {
+func (c *srtConn) writeQueueReader() {
 	defer func() {
 		c.log("connection:close", func() string { return "left write queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.ctx.Done():
 			return
 		case p := <-c.writeQueue:
 			// Put the packet into the send congestion control
@@ -579,12 +561,9 @@ func (c *srtConn) writeQueueReader(ctx context.Context) {
 
 // deliver writes the packets to the read queue in order to be consumed by the Read function.
 func (c *srtConn) deliver(p packet.Packet) {
-	if c.isShutdown() {
-		return
-	}
-
 	// Non-blocking write to the read queue
 	select {
+	case <-c.ctx.Done():
 	case c.readQueue <- p:
 	default:
 		c.log("connection:error", func() string { return "readQueue was blocking, dropping packet" })
@@ -686,12 +665,16 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 	if c.crypto != nil {
 		if header.KeyBaseEncryptionFlag != 0 {
 			if err := c.crypto.EncryptOrDecryptPayload(p.Data(), header.KeyBaseEncryptionFlag, header.PacketSequenceNumber.Val()); err != nil {
+				c.statisticsLock.Lock()
 				c.statistics.pktRecvUndecrypt++
 				c.statistics.byteRecvUndecrypt += p.Len()
+				c.statisticsLock.Unlock()
 			}
 		} else {
+			c.statisticsLock.Lock()
 			c.statistics.pktRecvUndecrypt++
 			c.statistics.byteRecvUndecrypt += p.Len()
+			c.statisticsLock.Unlock()
 		}
 	}
 	c.cryptoLock.Unlock()
@@ -704,8 +687,10 @@ func (c *srtConn) handlePacket(p packet.Packet) {
 func (c *srtConn) handleKeepAlive(p packet.Packet) {
 	c.log("control:recv:keepalive:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvKeepalive++
 	c.statistics.pktSentKeepalive++
+	c.statisticsLock.Unlock()
 
 	c.peerIdleTimeout.Reset(c.config.PeerIdleTimeout)
 
@@ -718,7 +703,9 @@ func (c *srtConn) handleKeepAlive(p packet.Packet) {
 func (c *srtConn) handleShutdown(p packet.Packet) {
 	c.log("control:recv:shutdown:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvShutdown++
+	c.statisticsLock.Unlock()
 
 	go c.close()
 }
@@ -728,12 +715,16 @@ func (c *srtConn) handleShutdown(p packet.Packet) {
 func (c *srtConn) handleACK(p packet.Packet) {
 	c.log("control:recv:ACK:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvACK++
+	c.statisticsLock.Unlock()
 
 	cif := &packet.CIFACK{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:ACK:error", func() string { return fmt.Sprintf("invalid ACK: %s", err) })
 		return
 	}
@@ -747,7 +738,9 @@ func (c *srtConn) handleACK(p packet.Packet) {
 		c.recalculateRTT(time.Duration(int64(cif.RTT)) * time.Microsecond)
 
 		// Estimated Link Capacity (from packets/s to Mbps)
+		c.statisticsLock.Lock()
 		c.statistics.mbpsLinkCapacity = float64(cif.EstimatedLinkCapacity) * MAX_PAYLOAD_SIZE * 8 / 1024 / 1024
+		c.statisticsLock.Unlock()
 
 		c.sendACKACK(p.Header().TypeSpecific)
 	}
@@ -757,12 +750,16 @@ func (c *srtConn) handleACK(p packet.Packet) {
 func (c *srtConn) handleNAK(p packet.Packet) {
 	c.log("control:recv:NAK:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvNAK++
+	c.statisticsLock.Unlock()
 
 	cif := &packet.CIFNAK{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:NAK:error", func() string { return fmt.Sprintf("invalid NAK: %s", err) })
 		return
 	}
@@ -777,7 +774,9 @@ func (c *srtConn) handleNAK(p packet.Packet) {
 func (c *srtConn) handleACKACK(p packet.Packet) {
 	c.ackLock.RLock()
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvACKACK++
+	c.statisticsLock.Unlock()
 
 	c.log("control:recv:ACKACK:dump", func() string { return p.Dump() })
 
@@ -788,7 +787,9 @@ func (c *srtConn) handleACKACK(p packet.Packet) {
 		delete(c.ackNumbers, p.Header().TypeSpecific)
 	} else {
 		c.log("control:recv:ACKACK:error", func() string { return fmt.Sprintf("got unknown ACKACK (%d)", p.Header().TypeSpecific) })
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 	}
 
 	for i := range c.ackNumbers {
@@ -832,7 +833,9 @@ func (c *srtConn) handleHSRequest(p packet.Packet) {
 	cif := &packet.CIFHandshakeExtension{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:HSReq:error", func() string { return fmt.Sprintf("invalid HSReq: %s", err) })
 		return
 	}
@@ -921,7 +924,9 @@ func (c *srtConn) handleHSResponse(p packet.Packet) {
 	cif := &packet.CIFHandshakeExtension{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:HSRes:error", func() string { return fmt.Sprintf("invalid HSRes: %s", err) })
 		return
 	}
@@ -1003,12 +1008,16 @@ func (c *srtConn) handleHSResponse(p packet.Packet) {
 func (c *srtConn) handleKMRequest(p packet.Packet) {
 	c.log("control:recv:KMReq:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvKM++
+	c.statisticsLock.Unlock()
 
 	cif := &packet.CIFKeyMaterialExtension{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:KMReq:error", func() string { return fmt.Sprintf("invalid KMReq: %s", err) })
 		return
 	}
@@ -1037,7 +1046,9 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 	}
 
 	if cif.KeyBasedEncryption == c.keyBaseEncryption {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:KMReq:error", func() string {
 			return "invalid KM request. wants to reset the key that is already in use"
 		})
@@ -1046,7 +1057,9 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 	}
 
 	if err := c.crypto.UnmarshalKM(cif, c.config.Passphrase); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:KMReq:error", func() string { return fmt.Sprintf("invalid KMReq: %s", err) })
 		c.cryptoLock.Unlock()
 		return
@@ -1060,7 +1073,9 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 	// Send KM Response
 	p.Header().SubType = packet.EXTTYPE_KMRSP
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentKM++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1069,12 +1084,16 @@ func (c *srtConn) handleKMRequest(p packet.Packet) {
 func (c *srtConn) handleKMResponse(p packet.Packet) {
 	c.log("control:recv:KMRes:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktRecvKM++
+	c.statisticsLock.Unlock()
 
 	cif := &packet.CIFKeyMaterialExtension{}
 
 	if err := p.UnmarshalCIF(cif); err != nil {
+		c.statisticsLock.Lock()
 		c.statistics.pktRecvInvalid++
+		c.statisticsLock.Unlock()
 		c.log("control:recv:KMRes:error", func() string { return fmt.Sprintf("invalid KMRes: %s", err) })
 		return
 	}
@@ -1128,7 +1147,9 @@ func (c *srtConn) sendShutdown() {
 	c.log("control:send:shutdown:dump", func() string { return p.Dump() })
 	c.log("control:send:shutdown:cif", func() string { return cif.String() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentShutdown++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1152,7 +1173,9 @@ func (c *srtConn) sendNAK(from, to circular.Number) {
 	c.log("control:send:NAK:dump", func() string { return p.Dump() })
 	c.log("control:send:NAK:cif", func() string { return cif.String() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentNAK++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1201,7 +1224,9 @@ func (c *srtConn) sendACK(seq circular.Number, lite bool) {
 	c.log("control:send:ACK:dump", func() string { return p.Dump() })
 	c.log("control:send:ACK:cif", func() string { return cif.String() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentACK++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1219,7 +1244,9 @@ func (c *srtConn) sendACKACK(ackSequence uint32) {
 
 	c.log("control:send:ACKACK:dump", func() string { return p.Dump() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentACKACK++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1305,7 +1332,9 @@ func (c *srtConn) sendKMRequest(key packet.PacketEncryption) {
 	c.log("control:send:KMReq:dump", func() string { return p.Dump() })
 	c.log("control:send:KMReq:cif", func() string { return cif.String() })
 
+	c.statisticsLock.Lock()
 	c.statistics.pktSentKM++
+	c.statisticsLock.Unlock()
 
 	c.pop(p)
 }
@@ -1317,18 +1346,8 @@ func (c *srtConn) Close() error {
 	return nil
 }
 
-func (c *srtConn) isShutdown() bool {
-	c.shutdownLock.RLock()
-	defer c.shutdownLock.RUnlock()
-
-	return c.shutdown
-}
-
 // close closes the connection.
 func (c *srtConn) close() {
-	c.shutdownLock.Lock()
-	c.shutdown = true
-	c.shutdownLock.Unlock()
 
 	c.shutdownOnce.Do(func() {
 		c.log("connection:close", func() string { return "stopping peer idle timeout" })
@@ -1339,28 +1358,9 @@ func (c *srtConn) close() {
 
 		c.sendShutdown()
 
-		c.log("connection:close", func() string { return "stopping reader" })
+		c.log("connection:close", func() string { return "stopping all routines and channels" })
 
-		// send nil to the readQueue in order to abort any pending ReadPacket call
-		c.readQueue <- nil
-
-		c.log("connection:close", func() string { return "stopping network reader" })
-
-		c.stopNetworkQueue()
-
-		c.log("connection:close", func() string { return "stopping writer" })
-
-		c.stopWriteQueue()
-
-		c.log("connection:close", func() string { return "stopping ticker" })
-
-		c.stopTicker()
-
-		c.log("connection:close", func() string { return "closing queues" })
-
-		close(c.networkQueue)
-		close(c.readQueue)
-		close(c.writeQueue)
+		c.cancelCtx()
 
 		c.log("connection:close", func() string { return "flushing congestion" })
 
@@ -1384,6 +1384,10 @@ func (c *srtConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c *srtConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func (c *srtConn) Stats(s *Statistics) {
+	if s == nil {
+		return
+	}
+
 	now := uint64(time.Since(c.start).Milliseconds())
 
 	send := c.snd.Stats()
@@ -1391,6 +1395,9 @@ func (c *srtConn) Stats(s *Statistics) {
 
 	previous := s.Accumulated
 	interval := now - s.MsTimeStamp
+
+	c.statisticsLock.RLock()
+	defer c.statisticsLock.RUnlock()
 
 	// Accumulated
 	s.Accumulated = StatisticsAccumulated{
