@@ -7,7 +7,6 @@ import (
 	"time"
 
 	enctoken "github.com/datarhei/core/v16/encoding/token"
-	"github.com/datarhei/core/v16/iam/jwks"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/slices"
 	"github.com/google/uuid"
@@ -94,8 +93,8 @@ func (u *User) clone() User {
 }
 
 type Verifier interface {
-	// Name returns the name of the identity, if an alias is available the alias will be returned.
-	Name() string
+	Name() string  // Name returns the name of the identity.
+	Alias() string // Alias returns the alias of the identity, or an empty string if no alias has been set.
 
 	VerifyJWT(jwt string) (bool, error)
 
@@ -127,11 +126,11 @@ type identity struct {
 }
 
 func (i *identity) Name() string {
-	if len(i.user.Alias) != 0 {
-		return i.user.Alias
-	}
-
 	return i.user.Name
+}
+
+func (i *identity) Alias() string {
+	return i.user.Alias
 }
 
 func (i *identity) VerifyAPIPassword(password string) (bool, error) {
@@ -503,7 +502,6 @@ type identityManager struct {
 	root *identity
 
 	identities map[string]*identity
-	aliases    map[string]*identity
 	tenants    map[string]*auth0Tenant
 
 	auth0UserIdentityMap map[string]string
@@ -529,7 +527,6 @@ type Config struct {
 func New(config Config) (Manager, error) {
 	im := &identityManager{
 		identities:           map[string]*identity{},
-		aliases:              map[string]*identity{},
 		tenants:              map[string]*auth0Tenant{},
 		auth0UserIdentityMap: map[string]string{},
 		adapter:              config.Adapter,
@@ -571,7 +568,6 @@ func (im *identityManager) Close() {
 	im.adapter = nil
 	im.auth0UserIdentityMap = map[string]string{}
 	im.identities = map[string]*identity{}
-	im.aliases = map[string]*identity{}
 	im.root = nil
 
 	for _, t := range im.tenants {
@@ -606,24 +602,8 @@ func (im *identityManager) Reload() error {
 	}
 
 	for _, u := range users {
-		if im.root != nil && u.Name == im.root.user.Name {
+		if ok, _ := im.isNameAvailable(u.Name, u.Alias); !ok {
 			continue
-		}
-
-		_, ok := im.identities[u.Name]
-		if ok {
-			continue
-		}
-
-		if len(u.Alias) != 0 {
-			if im.root != nil && im.root.user.Alias == u.Alias {
-				continue
-			}
-
-			_, ok := im.aliases[u.Alias]
-			if ok {
-				continue
-			}
 		}
 
 		if err := u.Validate(); err != nil {
@@ -637,11 +617,45 @@ func (im *identityManager) Reload() error {
 
 		im.identities[identity.user.Name] = identity
 		if len(identity.user.Alias) != 0 {
-			im.aliases[identity.user.Alias] = identity
+			im.identities[identity.user.Alias] = identity
 		}
 	}
 
 	return nil
+}
+
+func (im *identityManager) isNameAvailable(name, alias string) (bool, error) {
+	if im.root == nil {
+		return true, nil
+	}
+
+	if name == im.root.user.Name {
+		return false, fmt.Errorf("name already exists")
+	}
+
+	if name == im.root.user.Alias {
+		return false, fmt.Errorf("name already exists")
+	}
+
+	if _, ok := im.identities[name]; ok {
+		return false, fmt.Errorf("name already exists")
+	}
+
+	if len(alias) != 0 {
+		if alias == im.root.user.Name {
+			return false, fmt.Errorf("alias already exists")
+		}
+
+		if alias == im.root.user.Alias {
+			return false, fmt.Errorf("alias already exists")
+		}
+
+		if _, ok := im.identities[alias]; ok {
+			return false, fmt.Errorf("alias already exists")
+		}
+	}
+
+	return true, nil
 }
 
 func (im *identityManager) Create(u User) error {
@@ -652,24 +666,8 @@ func (im *identityManager) Create(u User) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	if im.root != nil && im.root.user.Name == u.Name {
-		return fmt.Errorf("identity name already exists")
-	}
-
-	_, ok := im.identities[u.Name]
-	if ok {
-		return fmt.Errorf("identity name already exists")
-	}
-
-	if len(u.Alias) != 0 {
-		if im.root != nil && im.root.user.Alias == u.Alias {
-			return fmt.Errorf("identity alias already exists")
-		}
-
-		_, ok := im.aliases[u.Alias]
-		if ok {
-			return fmt.Errorf("identity alias already exists")
-		}
+	if ok, err := im.isNameAvailable(u.Name, u.Alias); !ok {
+		return err
 	}
 
 	identity, err := im.create(u)
@@ -679,7 +677,7 @@ func (im *identityManager) Create(u User) error {
 
 	im.identities[identity.user.Name] = identity
 	if len(identity.user.Alias) != 0 {
-		im.aliases[identity.user.Alias] = identity
+		im.identities[identity.user.Alias] = identity
 	}
 
 	if im.autosave {
@@ -731,45 +729,41 @@ func (im *identityManager) Update(name string, u User) error {
 	im.lock.Lock()
 	defer im.lock.Unlock()
 
-	if im.root.user.Name == name {
-		return fmt.Errorf("this identity can't be updated")
+	if im.root.user.Name == name || im.root.user.Alias == name {
+		return fmt.Errorf("this identity cannot be updated")
 	}
 
 	oldidentity, ok := im.identities[name]
 	if !ok {
-		return fmt.Errorf("not found")
+		return fmt.Errorf("identity not found")
 	}
 
-	if oldidentity.user.Name != u.Name {
-		_, err := im.getIdentity(u.Name)
-		if err == nil {
-			return fmt.Errorf("identity already exist")
-		}
+	delete(im.identities, oldidentity.user.Name)
+	delete(im.identities, oldidentity.user.Alias)
+
+	ok, err := im.isNameAvailable(u.Name, u.Alias)
+
+	im.identities[oldidentity.user.Name] = oldidentity
+	if len(oldidentity.user.Alias) != 0 {
+		im.identities[oldidentity.user.Alias] = oldidentity
 	}
 
-	if len(u.Alias) != 0 {
-		if oldidentity.user.Alias != u.Alias {
-			_, err := im.getIdentityFromAlias(u.Alias)
-			if err == nil {
-				return fmt.Errorf("identity alias already exist")
-			}
-		}
+	if !ok {
+		return err
 	}
 
-	err := im.delete(name)
+	err = im.delete(name)
 	if err != nil {
 		return err
 	}
 
 	identity, err := im.create(u)
 	if err != nil {
-		if identity, err := im.create(oldidentity.user); err != nil {
-			return err
-		} else {
-			im.identities[identity.user.Name] = identity
-			if len(identity.user.Alias) != 0 {
-				im.aliases[identity.user.Alias] = identity
-			}
+		// restore old identity
+		im.create(oldidentity.user)
+		im.identities[oldidentity.user.Name] = oldidentity
+		if len(oldidentity.user.Alias) != 0 {
+			im.identities[oldidentity.user.Alias] = oldidentity
 		}
 
 		return err
@@ -777,7 +771,7 @@ func (im *identityManager) Update(name string, u User) error {
 
 	im.identities[identity.user.Name] = identity
 	if len(identity.user.Alias) != 0 {
-		im.aliases[identity.user.Alias] = identity
+		im.identities[identity.user.Alias] = identity
 	}
 
 	im.logger.Debug().WithFields(log.Fields{
@@ -805,17 +799,17 @@ func (im *identityManager) Delete(name string) error {
 }
 
 func (im *identityManager) delete(name string) error {
-	if im.root.user.Name == name {
+	if im.root.user.Name == name || im.root.user.Alias == name {
 		return fmt.Errorf("this identity can't be removed")
 	}
 
 	identity, ok := im.identities[name]
 	if !ok {
-		return fmt.Errorf("not found")
+		return fmt.Errorf("identity not found")
 	}
 
-	delete(im.identities, name)
-	delete(im.aliases, identity.user.Alias)
+	delete(im.identities, identity.user.Name)
+	delete(im.identities, identity.user.Alias)
 
 	identity.lock.Lock()
 	identity.valid = false
@@ -880,14 +874,14 @@ func (im *identityManager) delete(name string) error {
 func (im *identityManager) getIdentity(name string) (*identity, error) {
 	var identity *identity = nil
 
-	if im.root.user.Name == name {
+	if im.root.user.Name == name || im.root.user.Alias == name {
 		identity = im.root
 	} else {
 		identity = im.identities[name]
 	}
 
 	if identity == nil {
-		return nil, fmt.Errorf("not found")
+		return nil, fmt.Errorf("identity not found")
 	}
 
 	identity.jwtRealm = im.jwtRealm
@@ -896,32 +890,13 @@ func (im *identityManager) getIdentity(name string) (*identity, error) {
 	return identity, nil
 }
 
-func (im *identityManager) getIdentityFromAlias(alias string) (*identity, error) {
-	var identity *identity = nil
-
-	if im.root.user.Alias == alias {
-		identity = im.root
-	} else {
-		identity = im.aliases[alias]
-	}
-
-	if identity == nil {
-		return nil, fmt.Errorf("not found")
-	}
-
-	return im.getIdentity(identity.user.Name)
-}
-
 func (im *identityManager) Get(name string) (User, error) {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
 	identity, err := im.getIdentity(name)
 	if err != nil {
-		identity, err = im.getIdentityFromAlias(name)
-		if err != nil {
-			return User{}, err
-		}
+		return User{}, err
 	}
 
 	user := identity.user.clone()
@@ -933,12 +908,7 @@ func (im *identityManager) GetVerifier(name string) (Verifier, error) {
 	im.lock.RLock()
 	defer im.lock.RUnlock()
 
-	identity, err := im.getIdentity(name)
-	if err != nil {
-		identity, err = im.getIdentityFromAlias(name)
-	}
-
-	return identity, err
+	return im.getIdentity(name)
 }
 
 func (im *identityManager) GetVerifierFromAuth0(name string) (Verifier, error) {
@@ -1057,84 +1027,4 @@ func (im *identityManager) CreateJWT(name string) (string, string, error) {
 	}
 
 	return at, rt, nil
-}
-
-type Auth0Tenant struct {
-	Domain   string `json:"domain"`
-	Audience string `json:"audience"`
-	ClientID string `json:"client_id"`
-}
-
-func (t *Auth0Tenant) key() string {
-	return t.Domain + t.Audience
-}
-
-type auth0Tenant struct {
-	domain    string
-	issuer    string
-	audience  string
-	clientIDs []string
-	certs     jwks.JWKS
-
-	lock sync.Mutex
-}
-
-func newAuth0Tenant(tenant Auth0Tenant) (*auth0Tenant, error) {
-	t := &auth0Tenant{
-		domain:    tenant.Domain,
-		issuer:    "https://" + tenant.Domain + "/",
-		audience:  tenant.Audience,
-		clientIDs: []string{tenant.ClientID},
-		certs:     nil,
-	}
-
-	url := t.issuer + ".well-known/jwks.json"
-	certs, err := jwks.NewFromURL(url, jwks.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	t.certs = certs
-
-	return t, nil
-}
-
-func (a *auth0Tenant) Cancel() {
-	a.certs.Cancel()
-}
-
-func (a *auth0Tenant) AddClientID(clientid string) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	found := false
-	for _, id := range a.clientIDs {
-		if id == clientid {
-			found = true
-			break
-		}
-	}
-
-	if found {
-		return
-	}
-
-	a.clientIDs = append(a.clientIDs, clientid)
-}
-
-func (a *auth0Tenant) RemoveClientID(clientid string) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	clientids := []string{}
-
-	for _, id := range a.clientIDs {
-		if id == clientid {
-			continue
-		}
-
-		clientids = append(clientids, id)
-	}
-
-	a.clientIDs = clientids
 }

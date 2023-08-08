@@ -63,7 +63,7 @@ func TestIdentity(t *testing.T) {
 	require.Equal(t, "foobar", identity.Name())
 
 	identity.user.Alias = "raboof"
-	require.Equal(t, "raboof", identity.Name())
+	require.Equal(t, "raboof", identity.Alias())
 
 	require.False(t, identity.isValid())
 	identity.valid = true
@@ -364,6 +364,9 @@ func TestAlias(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "foobaz", identity.Name)
 	require.Equal(t, "alias", identity.Alias)
+
+	err = im.Create(User{Name: "alias", Alias: "foobaz"})
+	require.Error(t, err)
 }
 
 func TestCreateUserAuth0(t *testing.T) {
@@ -624,7 +627,8 @@ func TestUpdateUserAlias(t *testing.T) {
 	identity, err = im.GetVerifier("fooboz")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
-	require.Equal(t, "alias", identity.Name())
+	require.Equal(t, "fooboz", identity.Name())
+	require.Equal(t, "alias", identity.Alias())
 
 	err = im.Create(User{Name: "barfoo", Alias: "alias2"})
 	require.NoError(t, err)
