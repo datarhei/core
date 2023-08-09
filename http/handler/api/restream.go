@@ -60,7 +60,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process")
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process, check the domain and process ID")
 	}
 
 	if !superuser {
@@ -633,8 +633,8 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// Probe probes a process
-// @Summary Probe a process
+// Probe probes a known process
+// @Summary Probe a known process
 // @Description Probe an existing process to get a detailed stream information on the inputs.
 // @Tags v16.7.2
 // @ID process-3-probe
@@ -643,6 +643,7 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 // @Param domain query string false "Domain to act on"
 // @Success 200 {object} api.Probe
 // @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/probe [get]
 func (h *RestreamHandler) Probe(c echo.Context) error {
@@ -665,6 +666,49 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 	}
 
 	probe := h.restream.Probe(process.Config, 20*time.Second)
+
+	apiprobe := api.Probe{}
+	apiprobe.Unmarshal(&probe)
+
+	return c.JSON(http.StatusOK, apiprobe)
+}
+
+// ProbeConfig probes a process
+// @Summary Add a new process
+// @Description Probe a process to get a detailed stream information on the inputs.
+// @Tags v16.?.?
+// @ID process-3-probe-config
+// @Accept json
+// @Produce json
+// @Param config body api.ProcessConfig true "Process config"
+// @Success 200 {object} api.Probe
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/process/probe [post]
+func (h *RestreamHandler) ProbeConfig(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+
+	process := api.ProcessConfig{
+		Owner: ctxuser,
+		Type:  "ffmpeg",
+	}
+
+	if err := util.ShouldBindJSON(c, &process); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+		return api.Err(http.StatusForbidden, "", "You are not allowed to probe this process, check the domain and process ID")
+	}
+
+	if process.Type != "ffmpeg" {
+		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
+	}
+
+	config, _ := process.Marshal()
+
+	probe := h.restream.Probe(config, 20*time.Second)
 
 	apiprobe := api.Probe{}
 	apiprobe.Unmarshal(&probe)

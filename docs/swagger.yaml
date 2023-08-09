@@ -4980,9 +4980,13 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Probe a process
+      summary: Probe a known process
       tags:
       - v16.7.2
   /api/v3/process/{id}/report:
@@ -5073,6 +5077,39 @@ paths:
       summary: Get the state of a process
       tags:
       - v16.7.2
+  /api/v3/process/probe:
+    post:
+      consumes:
+      - application/json
+      description: Probe a process to get a detailed stream information on the inputs.
+      operationId: process-3-probe-config
+      parameters:
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ProcessConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Probe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a new process
+      tags:
+      - v16.?.?
   /api/v3/report/process:
     get:
       description: Search log history of all processes by providing patterns for process

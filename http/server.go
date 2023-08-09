@@ -611,6 +611,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/metadata/:key", s.v3handler.restream.GetMetadata)
 
 		if !s.readOnly {
+			v3.POST("/process/probe", s.v3handler.restream.ProbeConfig)
 			v3.GET("/process/:id/probe", s.v3handler.restream.Probe)
 			v3.POST("/process", s.v3handler.restream.Add)
 			v3.PUT("/process/:id", s.v3handler.restream.Update)

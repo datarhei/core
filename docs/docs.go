@@ -3016,6 +3016,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/process/probe": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Probe a process to get a detailed stream information on the inputs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a new process",
+                "operationId": "process-3-probe-config",
+                "parameters": [
+                    {
+                        "description": "Process config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Probe"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/process/{id}": {
             "get": {
                 "security": [
@@ -3842,7 +3894,7 @@ const docTemplate = `{
                 "tags": [
                     "v16.7.2"
                 ],
-                "summary": "Probe a process",
+                "summary": "Probe a known process",
                 "operationId": "process-3-probe",
                 "parameters": [
                     {
@@ -3868,6 +3920,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
