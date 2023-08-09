@@ -58,10 +58,10 @@ type Restreamer interface {
 	GetProcessLog(id app.ProcessID) (*app.Log, error)                                                              // Get the logs of a process
 	SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.LogHistorySearchResult // Search the log history of all processes
 	GetPlayout(id app.ProcessID, inputid string) (string, error)                                                   // Get the URL of the playout API for a process
-	Probe(id app.ProcessID) app.Probe                                                                              // Probe a process
-	ProbeWithTimeout(id app.ProcessID, timeout time.Duration) app.Probe                                            // Probe a process with specific timeout
 	SetProcessMetadata(id app.ProcessID, key string, data interface{}) error                                       // Set metatdata to a process
 	GetProcessMetadata(id app.ProcessID, key string) (interface{}, error)                                          // Get previously set metadata from a process
+
+	Probe(config *app.Config, timeout time.Duration) app.Probe // Probe a process with specific timeout
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -85,8 +85,8 @@ type task struct {
 	domain    string
 	reference string
 	process   *app.Process
-	config    *app.Config
-	command   []string // The actual command parameter for ffmpeg
+	config    *app.Config // Process config with replaced static placeholders
+	command   []string    // The actual command parameter for ffmpeg
 	ffmpeg    process.Process
 	parser    parse.Parser
 	playout   map[string]int
@@ -1830,40 +1830,29 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 	return result
 }
 
-func (r *restream) Probe(id app.ProcessID) app.Probe {
-	return r.ProbeWithTimeout(id, 20*time.Second)
-}
-
-func (r *restream) ProbeWithTimeout(id app.ProcessID, timeout time.Duration) app.Probe {
+func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 	appprobe := app.Probe{}
 
-	r.lock.RLock()
+	config = config.Clone()
 
-	task, ok := r.tasks[id]
-	if !ok {
-		appprobe.Log = append(appprobe.Log, fmt.Sprintf("Unknown process ID (%s)", id))
-		r.lock.RUnlock()
-		return appprobe
-	}
-
-	r.lock.RUnlock()
-
-	if !task.valid {
-		return appprobe
-	}
+	resolveStaticPlaceholders(config, r.replace)
+	resolveDynamicPlaceholder(config, r.replace)
 
 	var command []string
 
 	// Copy global options
-	command = append(command, task.config.Options...)
+	command = append(command, config.Options...)
 
-	for _, input := range task.config.Input {
+	for _, input := range config.Input {
 		// Add the resolved input to the process command
 		command = append(command, input.Options...)
 		command = append(command, "-i", input.Address)
 	}
 
-	prober := r.ffmpeg.NewProbeParser(task.logger)
+	logbuffer := log.NewBufferWriter(log.Ldebug, 1000)
+	logger := log.New("").WithOutput(logbuffer)
+
+	prober := r.ffmpeg.NewProbeParser(logger)
 
 	var wg sync.WaitGroup
 
@@ -1875,14 +1864,21 @@ func (r *restream) ProbeWithTimeout(id app.ProcessID, timeout time.Duration) app
 		StaleTimeout:   timeout,
 		Args:           command,
 		Parser:         prober,
-		Logger:         task.logger,
+		Logger:         logger,
 		OnExit: func(string) {
 			wg.Done()
 		},
 	})
 
 	if err != nil {
+		formatter := log.NewConsoleFormatter(false)
+
+		for _, e := range logbuffer.Events() {
+			appprobe.Log = append(appprobe.Log, strings.TrimSpace(formatter.String(e)))
+		}
+
 		appprobe.Log = append(appprobe.Log, err.Error())
+
 		return appprobe
 	}
 

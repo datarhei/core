@@ -627,11 +627,7 @@ func TestProbeProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	process := getDummyProcess()
-	tid := app.ProcessID{ID: process.ID}
-
-	rs.AddProcess(process)
-
-	probe := rs.ProbeWithTimeout(tid, 5*time.Second)
+	probe := rs.Probe(process, 5*time.Second)
 
 	require.Equal(t, 3, len(probe.Streams))
 }

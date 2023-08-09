@@ -659,7 +659,12 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 		Domain: domain,
 	}
 
-	probe := h.restream.Probe(tid)
+	process, err := h.restream.GetProcess(tid)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "")
+	}
+
+	probe := h.restream.Probe(process.Config, 20*time.Second)
 
 	apiprobe := api.Probe{}
 	apiprobe.Unmarshal(&probe)

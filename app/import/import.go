@@ -1464,11 +1464,7 @@ func probeInput(binary string, config app.Config) app.Probe {
 		return app.Probe{}
 	}
 
-	rs.AddProcess(&config)
-
-	id := config.ProcessID()
-	probe := rs.Probe(id)
-	rs.DeleteProcess(id)
+	probe := rs.Probe(&config, 20*time.Second)
 
 	return probe
 }

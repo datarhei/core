@@ -7,6 +7,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/datarhei/core/v16/http/graph/models"
 	"github.com/datarhei/core/v16/restream/app"
@@ -64,7 +65,12 @@ func (r *queryResolver) Probe(ctx context.Context, id string, domain string) (*m
 		Domain: domain,
 	}
 
-	probe := r.Restream.Probe(tid)
+	process, err := r.Restream.GetProcess(tid)
+	if err != nil {
+		return nil, fmt.Errorf("not found")
+	}
+
+	probe := r.Restream.Probe(process.Config, 20*time.Second)
 
 	p := &models.Probe{}
 	p.UnmarshalRestream(probe)
