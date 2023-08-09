@@ -734,6 +734,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/cluster/leave", s.v3handler.cluster.Leave)
 
 			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
+			v3.POST("/cluster/process/probe", s.v3handler.cluster.ProbeProcessConfig)
 			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
 			v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProbeProcess)
 			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)

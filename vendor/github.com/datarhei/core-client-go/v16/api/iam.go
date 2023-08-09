@@ -2,6 +2,7 @@ package api
 
 type IAMUser struct {
 	Name      string      `json:"name"`
+	Alias     string      `json:"alias"`
 	Superuser bool        `json:"superuser"`
 	Auth      IAMUserAuth `json:"auth"`
 	Policies  []IAMPolicy `json:"policies"`

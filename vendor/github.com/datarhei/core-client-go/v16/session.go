@@ -15,7 +15,7 @@ func (r *restclient) Sessions(collectors []string) (api.SessionsSummary, error) 
 	query := &url.Values{}
 	query.Set("collectors", strings.Join(collectors, ","))
 
-	data, err := r.call("GET", "/v3/sessions", query, nil, "", nil)
+	data, err := r.call("GET", "/v3/session", query, nil, "", nil)
 	if err != nil {
 		return sessions, err
 	}
@@ -31,7 +31,7 @@ func (r *restclient) SessionsActive(collectors []string) (api.SessionsActive, er
 	query := &url.Values{}
 	query.Set("collectors", strings.Join(collectors, ","))
 
-	data, err := r.call("GET", "/v3/sessions/active", query, nil, "", nil)
+	data, err := r.call("GET", "/v3/session/active", query, nil, "", nil)
 	if err != nil {
 		return sessions, err
 	}
@@ -48,7 +48,7 @@ func (r *restclient) SessionToken(name string, req []api.SessionTokenRequest) ([
 	e := json.NewEncoder(&buf)
 	e.Encode(req)
 
-	data, err := r.call("PUT", "/session/token/"+url.PathEscape(name), nil, nil, "application/json", &buf)
+	data, err := r.call("PUT", "/v3/session/token/"+url.PathEscape(name), nil, nil, "application/json", &buf)
 	if err != nil {
 		return tokens, err
 	}

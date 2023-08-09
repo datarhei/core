@@ -706,6 +706,10 @@ func (h *RestreamHandler) ProbeConfig(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
 	}
 
+	if len(process.Input) == 0 {
+		return api.Err(http.StatusBadRequest, "", "At least one input must be defined")
+	}
+
 	config, _ := process.Marshal()
 
 	probe := h.restream.Probe(config, 20*time.Second)

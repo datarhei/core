@@ -32,6 +32,7 @@ type Node interface {
 	DeleteProcess(id app.ProcessID) error
 	UpdateProcess(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
 	ProbeProcess(id app.ProcessID) (clientapi.Probe, error)
+	ProbeProcessConfig(config *app.Config) (clientapi.Probe, error)
 
 	NodeReader
 }
@@ -1082,16 +1083,38 @@ func (n *node) UpdateProcess(id app.ProcessID, config *app.Config, metadata map[
 
 func (n *node) ProbeProcess(id app.ProcessID) (clientapi.Probe, error) {
 	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
+	peer := n.peer
+	n.peerLock.RUnlock()
 
-	if n.peer == nil {
+	if peer == nil {
 		probe := clientapi.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process %s resides, is not connected", n.id, id.String())},
 		}
 		return probe, ErrNoPeer
 	}
 
-	probe, err := n.peer.ProcessProbe(client.NewProcessID(id.ID, id.Domain))
+	probe, err := peer.ProcessProbe(client.NewProcessID(id.ID, id.Domain))
+
+	probe.Log = append([]string{fmt.Sprintf("probed on node: %s", n.id)}, probe.Log...)
+
+	return probe, err
+}
+
+func (n *node) ProbeProcessConfig(config *app.Config) (clientapi.Probe, error) {
+	n.peerLock.RLock()
+	peer := n.peer
+	n.peerLock.RUnlock()
+
+	if peer == nil {
+		probe := clientapi.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process config should be probed, is not connected", n.id)},
+		}
+		return probe, ErrNoPeer
+	}
+
+	cfg := convertConfig(config, nil)
+
+	probe, err := peer.ProcessProbeConfig(cfg)
 
 	probe.Log = append([]string{fmt.Sprintf("probed on node: %s", n.id)}, probe.Log...)
 

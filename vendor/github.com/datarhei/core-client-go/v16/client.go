@@ -88,6 +88,7 @@ type RestClient interface {
 	ProcessDelete(id ProcessID) error                                         // DELETE /v3/process/{id}
 	ProcessCommand(id ProcessID, command string) error                        // PUT /v3/process/{id}/command
 	ProcessProbe(id ProcessID) (api.Probe, error)                             // GET /v3/process/{id}/probe
+	ProcessProbeConfig(config api.ProcessConfig) (api.Probe, error)           // POST /v3/process/probe
 	ProcessConfig(id ProcessID) (api.ProcessConfig, error)                    // GET /v3/process/{id}/config
 	ProcessReport(id ProcessID) (api.ProcessReport, error)                    // GET /v3/process/{id}/report
 	ProcessState(id ProcessID) (api.ProcessState, error)                      // GET /v3/process/{id}/state
@@ -439,6 +440,10 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/events"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/process/probe"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},

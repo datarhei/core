@@ -35,12 +35,14 @@ type ProxyReader interface {
 	GetNodeReader(id string) (NodeReader, error)
 
 	FindNodeFromProcess(id app.ProcessID) (string, error)
+	FindNodeFromResources(nodeid string, cpu float64, memory uint64) string
 
 	Resources() map[string]NodeResources
 
 	ListProcesses(ProcessListOptions) []clientapi.Process
 	ListProxyProcesses() []Process
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
+	ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error)
 
 	ListFiles(storage, patter string) []clientapi.FileInfo
 
@@ -476,6 +478,30 @@ func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
 	return nodeid, nil
 }
 
+func (p *proxy) FindNodeFromResources(nodeid string, cpu float64, memory uint64) string {
+	p.nodesLock.RLock()
+	defer p.nodesLock.RUnlock()
+
+	if len(nodeid) != 0 {
+		node, ok := p.nodes[nodeid]
+		if ok {
+			r := node.Resources()
+			if r.CPU+cpu <= r.CPULimit && r.Mem+memory <= r.MemLimit && !r.IsThrottling {
+				return nodeid
+			}
+		}
+	}
+
+	for nodeid, node := range p.nodes {
+		r := node.Resources()
+		if r.CPU+cpu <= r.CPULimit && r.Mem+memory <= r.MemLimit && !r.IsThrottling {
+			return nodeid
+		}
+	}
+
+	return ""
+}
+
 func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
 	processChan := make(chan []clientapi.Process, 64)
 	processList := []clientapi.Process{}
@@ -578,4 +604,16 @@ func (p *proxy) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, 
 	}
 
 	return node.ProbeProcess(id)
+}
+
+func (p *proxy) ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error) {
+	node, err := p.GetNode(nodeid)
+	if err != nil {
+		probe := clientapi.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process config should be probed on, doesn't exist", nodeid)},
+		}
+		return probe, fmt.Errorf("node not found: %w", err)
+	}
+
+	return node.ProbeProcessConfig(config)
 }

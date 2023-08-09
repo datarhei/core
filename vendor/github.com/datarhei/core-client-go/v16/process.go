@@ -250,6 +250,29 @@ func (r *restclient) processProbe(where string, id ProcessID) (api.Probe, error)
 	return p, err
 }
 
+func (r *restclient) processProbeConfig(where string, config api.ProcessConfig) (api.Probe, error) {
+	var p api.Probe
+
+	path := "/v3/process/probe"
+	if where == "cluster" {
+		path = "/v3/cluster/process/probe"
+	}
+
+	var buf bytes.Buffer
+
+	e := json.NewEncoder(&buf)
+	e.Encode(config)
+
+	data, err := r.call("POST", path, nil, nil, "application/json", &buf)
+	if err != nil {
+		return p, err
+	}
+
+	err = json.Unmarshal(data, &p)
+
+	return p, err
+}
+
 func (r *restclient) ProcessList(opts ProcessListOptions) ([]api.Process, error) {
 	return r.processList("", opts)
 }
@@ -284,6 +307,10 @@ func (r *restclient) ProcessMetadataSet(id ProcessID, key string, metadata api.M
 
 func (r *restclient) ProcessProbe(id ProcessID) (api.Probe, error) {
 	return r.processProbe("", id)
+}
+
+func (r *restclient) ProcessProbeConfig(config api.ProcessConfig) (api.Probe, error) {
+	return r.processProbeConfig("", config)
 }
 
 func (r *restclient) ProcessConfig(id ProcessID) (api.ProcessConfig, error) {

@@ -618,7 +618,7 @@ func (h *ClusterHandler) GetProcessMetadata(c echo.Context) error {
 
 // Probe probes a process in the cluster
 // @Summary Probe a process in the cluster
-// @Description Probe an existing process to get a detailed stream information on the inputs.
+// @Description Probe an existing process to get a detailed stream information on the inputs. The probe is executed on the same node as the process.
 // @Tags v16.?.?
 // @ID cluster-3-process-probe
 // @Produce json
@@ -650,6 +650,64 @@ func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
 	}
 
 	probe, _ := h.proxy.ProbeProcess(nodeid, pid)
+
+	return c.JSON(http.StatusOK, probe)
+}
+
+// Probe probes a process in the cluster
+// @Summary Probe a process in the cluster
+// @Description Probe a process config to get a detailed stream information on the inputs.
+// @Tags v16.?.?
+// @ID cluster-3-probe-process-config
+// @Accept json
+// @Produce json
+// @Param config body api.ProcessConfig true "Process config"
+// @Param coreid query string false "Core to execute the probe on"
+// @Success 200 {object} api.Probe
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/probe [post]
+func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	coreid := util.DefaultQuery(c, "coreid", "")
+
+	process := api.ProcessConfig{
+		ID:        shortuuid.New(),
+		Owner:     ctxuser,
+		Type:      "ffmpeg",
+		Autostart: true,
+	}
+
+	if err := util.ShouldBindJSON(c, &process); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
+	}
+
+	if process.Type != "ffmpeg" {
+		return api.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
+	}
+
+	if len(process.Input) == 0 {
+		return api.Err(http.StatusBadRequest, "", "At least one input must be defined")
+	}
+
+	if process.Limits.CPU <= 0 || process.Limits.Memory == 0 {
+		return api.Err(http.StatusBadRequest, "", "Resource limit must be defined")
+	}
+
+	config, _ := process.Marshal()
+
+	coreid = h.proxy.FindNodeFromResources(coreid, config.LimitCPU, config.LimitMemory)
+	if len(coreid) == 0 {
+		return api.Err(http.StatusInternalServerError, "", "Not enough available resources available to execute probe")
+	}
+
+	probe, _ := h.proxy.ProbeProcessConfig(coreid, config)
 
 	return c.JSON(http.StatusOK, probe)
 }
