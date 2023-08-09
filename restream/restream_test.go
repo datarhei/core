@@ -632,6 +632,22 @@ func TestProbeProcess(t *testing.T) {
 	require.Equal(t, 3, len(probe.Streams))
 }
 
+func TestProbeProcessWithReference(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+
+	rs.AddProcess(process)
+
+	process = getDummyProcess()
+	process.ID = ""
+	process.Input[0].Address = "#process:output=out"
+	probe := rs.Probe(process, 5*time.Second)
+
+	require.Equal(t, 3, len(probe.Streams))
+}
+
 func TestProcessMetadata(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil)
 	require.NoError(t, err)

@@ -1836,7 +1836,20 @@ func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 	config = config.Clone()
 
 	resolveStaticPlaceholders(config, r.replace)
+
+	err := r.resolveAddresses(r.tasks, config)
+	if err != nil {
+		appprobe.Log = append(appprobe.Log, err.Error())
+		return appprobe
+	}
+
 	resolveDynamicPlaceholder(config, r.replace)
+
+	_, err = validateConfig(config, r.fs.list, r.ffmpeg)
+	if err != nil {
+		appprobe.Log = append(appprobe.Log, err.Error())
+		return appprobe
+	}
 
 	var command []string
 
