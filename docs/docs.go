@@ -1311,6 +1311,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/process/probe": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Probe a process config to get a detailed stream information on the inputs.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Probe a process in the cluster",
+                "operationId": "cluster-3-probe-process-config",
+                "parameters": [
+                    {
+                        "description": "Process config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Core to execute the probe on",
+                        "name": "coreid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Probe"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/process/{id}": {
             "get": {
                 "security": [
@@ -1695,7 +1759,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Probe an existing process to get a detailed stream information on the inputs.",
+                "description": "Probe an existing process to get a detailed stream information on the inputs. The probe is executed on the same node as the process.",
                 "produces": [
                     "application/json"
                 ],
