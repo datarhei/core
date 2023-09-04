@@ -12,7 +12,7 @@ import (
 	"github.com/datarhei/core/v16/slices"
 	"github.com/google/uuid"
 
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
 // Auth0
@@ -167,22 +167,18 @@ func (i *identity) VerifyAPIAuth0(jwt string) (bool, error) {
 		return false, err
 	}
 
-	var subject string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["sub"]; ok {
-			subject = sub.(string)
-		}
+	subject, err := token.Claims.GetSubject()
+	if err != nil {
+		return false, fmt.Errorf("invalid subject: %w", err)
 	}
 
 	if subject != i.user.Auth.API.Auth0.User {
 		return false, fmt.Errorf("wrong subject")
 	}
 
-	var issuer string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if iss, ok := claims["iss"]; ok {
-			issuer = iss.(string)
-		}
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return false, fmt.Errorf("invalid issuer: %w", err)
 	}
 
 	if issuer != i.tenant.issuer {
@@ -203,20 +199,24 @@ func (i *identity) VerifyAPIAuth0(jwt string) (bool, error) {
 
 func (i *identity) auth0KeyFunc(token *jwtgo.Token) (interface{}, error) {
 	// Verify 'aud' claim
-	checkAud := token.Claims.(jwtgo.MapClaims).VerifyAudience(i.tenant.audience, false)
-	if !checkAud {
-		return nil, fmt.Errorf("invalid audience")
+	if aud, err := token.Claims.GetAudience(); err != nil {
+		return nil, fmt.Errorf("invalid audience: %w", err)
+	} else if len(aud) == 0 {
+		return nil, fmt.Errorf("audience is not present")
 	}
 
 	// Verify 'iss' claim
-	checkIss := token.Claims.(jwtgo.MapClaims).VerifyIssuer(i.tenant.issuer, false)
-	if !checkIss {
-		return nil, fmt.Errorf("invalid issuer")
+	if iss, err := token.Claims.GetIssuer(); err != nil {
+		return nil, fmt.Errorf("invalid issuer: %w", err)
+	} else if len(iss) == 0 {
+		return nil, fmt.Errorf("issuer is not present")
 	}
 
 	// Verify 'sub' claim
-	if _, ok := token.Claims.(jwtgo.MapClaims)["sub"]; !ok {
-		return nil, fmt.Errorf("sub claim is required")
+	if sub, err := token.Claims.GetSubject(); err != nil {
+		return nil, fmt.Errorf("invalid subject: %w", err)
+	} else if len(sub) == 0 {
+		return nil, fmt.Errorf("subject is not present")
 	}
 
 	// find the key
@@ -265,22 +265,18 @@ func (i *identity) VerifyJWT(jwt string) (bool, error) {
 		return false, err
 	}
 
-	var subject string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["sub"]; ok {
-			subject = sub.(string)
-		}
+	subject, err := token.Claims.GetSubject()
+	if err != nil {
+		return false, fmt.Errorf("invalid subject: %w", err)
 	}
 
 	if subject != i.user.Name {
 		return false, fmt.Errorf("wrong subject")
 	}
 
-	var issuer string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["iss"]; ok {
-			issuer = sub.(string)
-		}
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return false, fmt.Errorf("invalid issuer: %w", err)
 	}
 
 	if issuer != i.jwtRealm {
@@ -408,18 +404,18 @@ func (i *identity) VerifyServiceSession(jwt string) (bool, interface{}, error) {
 		return false, nil, fmt.Errorf("invalid claims")
 	}
 
-	var subject string
-	if sub, ok := claims["sub"]; ok {
-		subject = sub.(string)
+	subject, err := claims.GetSubject()
+	if err != nil {
+		return false, nil, fmt.Errorf("invalid subject: %w", err)
 	}
 
 	if subject != i.user.Name && subject != i.user.Alias {
 		return false, nil, fmt.Errorf("wrong subject")
 	}
 
-	var issuer string
-	if sub, ok := claims["iss"]; ok {
-		issuer = sub.(string)
+	issuer, err := claims.GetIssuer()
+	if err != nil {
+		return false, nil, fmt.Errorf("invalid issuer: %w", err)
 	}
 
 	if issuer != i.jwtRealm {

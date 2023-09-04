@@ -48,7 +48,7 @@ import (
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -343,10 +343,7 @@ func (m *iammiddleware) findIdentityFromSession(c echo.Context) (iamidentity.Ver
 		return nil, fmt.Errorf("invalid claims in token")
 	}
 
-	var subject string
-	if sub, ok := claims["sub"]; ok {
-		subject = sub.(string)
-	}
+	subject, _ := claims.GetSubject()
 
 	identity, err := m.iam.GetVerifier(subject)
 	if err != nil {
@@ -410,10 +407,7 @@ func (m *iammiddleware) findIdentityFromJWT(c echo.Context) (iamidentity.Verifie
 		return nil, fmt.Errorf("invalid token")
 	}
 
-	var subject string
-	if sub, ok := claims["sub"]; ok {
-		subject = sub.(string)
-	}
+	subject, _ := claims.GetSubject()
 
 	var usefor string
 	if sub, ok := claims["usefor"]; ok {
@@ -499,12 +493,7 @@ func (m *iammiddleware) findIdentityFromAuth0(c echo.Context) (iamidentity.Verif
 		return nil, nil
 	}
 
-	var subject string
-	if claims, ok := token.Claims.(jwtgo.MapClaims); ok {
-		if sub, ok := claims["sub"]; ok {
-			subject = sub.(string)
-		}
-	}
+	subject, _ := token.Claims.GetSubject()
 
 	identity, err := m.iam.GetVerifierFromAuth0(subject)
 	if err != nil {
