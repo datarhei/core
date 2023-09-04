@@ -1229,6 +1229,11 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 	for id, node := range nodes {
 		r := node.Resources
 
+		// Ignore this node if the resource values are not reliable
+		if r.Error != nil {
+			continue
+		}
+
 		// Check if node is overloaded
 		if r.CPU < r.CPULimit && r.Mem < r.MemLimit && !r.IsThrottling {
 			continue
