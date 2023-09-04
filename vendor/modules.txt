@@ -57,7 +57,7 @@ github.com/boltdb/bolt
 # github.com/caddyserver/certmagic v0.19.2
 ## explicit; go 1.19
 github.com/caddyserver/certmagic
-# github.com/casbin/casbin/v2 v2.77.1
+# github.com/casbin/casbin/v2 v2.77.2
 ## explicit; go 1.13
 github.com/casbin/casbin/v2
 github.com/casbin/casbin/v2/config
@@ -348,7 +348,7 @@ github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/shirou/gopsutil/v3 v3.23.7
+# github.com/shirou/gopsutil/v3 v3.23.8
 ## explicit; go 1.15
 github.com/shirou/gopsutil/v3/common
 github.com/shirou/gopsutil/v3/cpu
@@ -489,7 +489,7 @@ golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/publicsuffix
-# golang.org/x/sys v0.11.0
+# golang.org/x/sys v0.12.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -497,7 +497,7 @@ golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.12.0
+# golang.org/x/text v0.13.0
 ## explicit; go 1.17
 golang.org/x/text/cases
 golang.org/x/text/internal

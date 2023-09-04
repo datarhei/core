@@ -8,7 +8,7 @@ require (
 	github.com/adhocore/gronx v1.6.5
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.19.2
-	github.com/casbin/casbin/v2 v2.77.1
+	github.com/casbin/casbin/v2 v2.77.2
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20230809104853-391c13f9d400
 	github.com/datarhei/gosrt v0.5.4
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
@@ -31,7 +31,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.63
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.16.0
-	github.com/shirou/gopsutil/v3 v3.23.7
+	github.com/shirou/gopsutil/v3 v3.23.8
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/echo-swagger v1.4.1
 	github.com/swaggo/swag v1.16.2
@@ -119,8 +119,8 @@ require (
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
