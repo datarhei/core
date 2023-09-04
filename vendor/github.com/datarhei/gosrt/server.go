@@ -33,6 +33,17 @@ var ErrServerClosed = errors.New("srt: server closed")
 // ListenAndServe starts the SRT server. It blocks until an error happens.
 // If the error is ErrServerClosed the server has shutdown normally.
 func (s *Server) ListenAndServe() error {
+	err := s.Listen()
+	if err != nil {
+		return err
+	}
+
+	return s.Serve()
+}
+
+// Listen opens the server listener.
+// It returns immediately after the listener is ready.
+func (s *Server) Listen() error {
 	// Set some defaults if required.
 	if s.HandlePublish == nil {
 		s.HandlePublish = s.defaultHandler
@@ -53,13 +64,18 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 
-	defer ln.Close()
-
 	s.ln = ln
 
+	return err
+}
+
+// Serve starts accepting connections. It must be called after Listen().
+// It blocks until an error happens.
+// If the error is ErrServerClosed the server has shutdown normally.
+func (s *Server) Serve() error {
 	for {
 		// Wait for connections.
-		conn, mode, err := ln.Accept(s.HandleConnect)
+		conn, mode, err := s.ln.Accept(s.HandleConnect)
 		if err != nil {
 			if err == ErrListenerClosed {
 				return ErrServerClosed
@@ -89,7 +105,6 @@ func (s *Server) Shutdown() {
 
 	// Close the listener
 	s.ln.Close()
-	s.ln = nil
 }
 
 func (s *Server) defaultHandler(conn Conn) {

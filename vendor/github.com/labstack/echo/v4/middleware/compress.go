@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -22,12 +22,30 @@ type (
 		// Gzip compression level.
 		// Optional. Default value -1.
 		Level int `yaml:"level"`
+
+		// Length threshold before gzip compression is applied.
+		// Optional. Default value 0.
+		//
+		// Most of the time you will not need to change the default. Compressing
+		// a short response might increase the transmitted data because of the
+		// gzip format overhead. Compressing the response will also consume CPU
+		// and time on the server and the client (for decompressing). Depending on
+		// your use case such a threshold might be useful.
+		//
+		// See also:
+		// https://webmasters.stackexchange.com/questions/31750/what-is-recommended-minimum-object-size-for-gzip-performance-benefits
+		MinLength int
 	}
 
 	gzipResponseWriter struct {
 		io.Writer
 		http.ResponseWriter
-		wroteBody bool
+		wroteHeader       bool
+		wroteBody         bool
+		minLength         int
+		minLengthExceeded bool
+		buffer            *bytes.Buffer
+		code              int
 	}
 )
 
@@ -38,8 +56,9 @@ const (
 var (
 	// DefaultGzipConfig is the default Gzip middleware config.
 	DefaultGzipConfig = GzipConfig{
-		Skipper: DefaultSkipper,
-		Level:   -1,
+		Skipper:   DefaultSkipper,
+		Level:     -1,
+		MinLength: 0,
 	}
 )
 
@@ -59,8 +78,12 @@ func GzipWithConfig(config GzipConfig) echo.MiddlewareFunc {
 	if config.Level == 0 {
 		config.Level = DefaultGzipConfig.Level
 	}
+	if config.MinLength < 0 {
+		config.MinLength = DefaultGzipConfig.MinLength
+	}
 
 	pool := gzipCompressPool(config)
+	bpool := bufferPool()
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -71,7 +94,6 @@ func GzipWithConfig(config GzipConfig) echo.MiddlewareFunc {
 			res := c.Response()
 			res.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
 			if strings.Contains(c.Request().Header.Get(echo.HeaderAcceptEncoding), gzipScheme) {
-				res.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
 				i := pool.Get()
 				w, ok := i.(*gzip.Writer)
 				if !ok {
@@ -79,19 +101,38 @@ func GzipWithConfig(config GzipConfig) echo.MiddlewareFunc {
 				}
 				rw := res.Writer
 				w.Reset(rw)
-				grw := &gzipResponseWriter{Writer: w, ResponseWriter: rw}
+
+				buf := bpool.Get().(*bytes.Buffer)
+				buf.Reset()
+
+				grw := &gzipResponseWriter{Writer: w, ResponseWriter: rw, minLength: config.MinLength, buffer: buf}
 				defer func() {
+					// There are different reasons for cases when we have not yet written response to the client and now need to do so.
+					// a) handler response had only response code and no response body (ala 404 or redirects etc). Response code need to be written now.
+					// b) body is shorter than our minimum length threshold and being buffered currently and needs to be written
 					if !grw.wroteBody {
 						if res.Header().Get(echo.HeaderContentEncoding) == gzipScheme {
 							res.Header().Del(echo.HeaderContentEncoding)
+						}
+						if grw.wroteHeader {
+							rw.WriteHeader(grw.code)
 						}
 						// We have to reset response to it's pristine state when
 						// nothing is written to body or error is returned.
 						// See issue #424, #407.
 						res.Writer = rw
-						w.Reset(ioutil.Discard)
+						w.Reset(io.Discard)
+					} else if !grw.minLengthExceeded {
+						// Write uncompressed response
+						res.Writer = rw
+						if grw.wroteHeader {
+							grw.ResponseWriter.WriteHeader(grw.code)
+						}
+						grw.buffer.WriteTo(rw)
+						w.Reset(io.Discard)
 					}
 					w.Close()
+					bpool.Put(buf)
 					pool.Put(w)
 				}()
 				res.Writer = grw
@@ -103,7 +144,11 @@ func GzipWithConfig(config GzipConfig) echo.MiddlewareFunc {
 
 func (w *gzipResponseWriter) WriteHeader(code int) {
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
-	w.ResponseWriter.WriteHeader(code)
+
+	w.wroteHeader = true
+
+	// Delay writing of the header until we know if we'll actually compress the response
+	w.code = code
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
@@ -111,10 +156,40 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 		w.Header().Set(echo.HeaderContentType, http.DetectContentType(b))
 	}
 	w.wroteBody = true
+
+	if !w.minLengthExceeded {
+		n, err := w.buffer.Write(b)
+
+		if w.buffer.Len() >= w.minLength {
+			w.minLengthExceeded = true
+
+			// The minimum length is exceeded, add Content-Encoding header and write the header
+			w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+			if w.wroteHeader {
+				w.ResponseWriter.WriteHeader(w.code)
+			}
+
+			return w.Writer.Write(w.buffer.Bytes())
+		}
+
+		return n, err
+	}
+
 	return w.Writer.Write(b)
 }
 
 func (w *gzipResponseWriter) Flush() {
+	if !w.minLengthExceeded {
+		// Enforce compression because we will not know how much more data will come
+		w.minLengthExceeded = true
+		w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+		if w.wroteHeader {
+			w.ResponseWriter.WriteHeader(w.code)
+		}
+
+		w.Writer.Write(w.buffer.Bytes())
+	}
+
 	w.Writer.(*gzip.Writer).Flush()
 	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
@@ -135,11 +210,20 @@ func (w *gzipResponseWriter) Push(target string, opts *http.PushOptions) error {
 func gzipCompressPool(config GzipConfig) sync.Pool {
 	return sync.Pool{
 		New: func() interface{} {
-			w, err := gzip.NewWriterLevel(ioutil.Discard, config.Level)
+			w, err := gzip.NewWriterLevel(io.Discard, config.Level)
 			if err != nil {
 				return err
 			}
 			return w
+		},
+	}
+}
+
+func bufferPool() sync.Pool {
+	return sync.Pool{
+		New: func() interface{} {
+			b := &bytes.Buffer{}
+			return b
 		},
 	}
 }

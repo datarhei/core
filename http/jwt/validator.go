@@ -8,7 +8,7 @@ import (
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/http/jwt/jwks"
 
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -148,23 +148,21 @@ func (v *auth0Validator) Validate(c echo.Context) (bool, string, error) {
 
 func (v *auth0Validator) keyFunc(token *jwtgo.Token) (interface{}, error) {
 	// Verify 'aud' claim
-	checkAud := token.Claims.(jwtgo.MapClaims).VerifyAudience(v.audience, false)
-	if !checkAud {
-		return nil, fmt.Errorf("invalid audience")
+	if _, err := token.Claims.GetAudience(); err != nil {
+		return nil, fmt.Errorf("invalid audience: %w", err)
 	}
 
 	// Verify 'iss' claim
-	checkIss := token.Claims.(jwtgo.MapClaims).VerifyIssuer(v.issuer, false)
-	if !checkIss {
-		return nil, fmt.Errorf("invalid issuer")
+	if _, err := token.Claims.GetIssuer(); err != nil {
+		return nil, fmt.Errorf("invalid issuer: %w", err)
 	}
 
 	// Verify 'sub' claim
-	if _, ok := token.Claims.(jwtgo.MapClaims)["sub"]; !ok {
-		return nil, fmt.Errorf("sub claim is required")
+	sub, err := token.Claims.GetSubject()
+	if err != nil {
+		return nil, fmt.Errorf("invalid subject: %w", err)
 	}
 
-	sub := token.Claims.(jwtgo.MapClaims)["sub"].(string)
 	found := false
 	for _, u := range v.users {
 		if sub == u {

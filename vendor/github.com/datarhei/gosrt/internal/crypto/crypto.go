@@ -261,14 +261,6 @@ func (c *crypto) calculateKEK(passphrase string, salt []byte, keyLength int) []b
 
 // prng generates a random sequence of byte into the given slice p.
 func (c *crypto) prng(p []byte) error {
-	n, err := rand.Read(p)
-	if err != nil {
-		return err
-	}
-
-	if n != len(p) {
-		return fmt.Errorf("crypto: random byte sequence is too short")
-	}
-
-	return nil
+	_, err := rand.Read(p)
+	return err
 }

@@ -3,9 +3,10 @@ package net
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"math/rand"
 	"strconv"
 	"time"
+
+	"github.com/datarhei/gosrt/internal/rand"
 )
 
 type SYNCookie struct {
@@ -19,8 +20,8 @@ func defaultCounter() int64 {
 	return time.Now().Unix() >> 6
 }
 
-func NewSYNCookie(daddr string, seed int64, counter func() int64) SYNCookie {
-	s := SYNCookie{
+func NewSYNCookie(daddr string, counter func() int64) (*SYNCookie, error) {
+	s := &SYNCookie{
 		daddr:   daddr,
 		counter: counter,
 	}
@@ -29,22 +30,18 @@ func NewSYNCookie(daddr string, seed int64, counter func() int64) SYNCookie {
 		s.counter = defaultCounter
 	}
 
-	// https://www.calhoun.io/creating-random-strings-in-go/
-	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewSource(seed))
-
-	stringWithCharset := func(length int, charset string) string {
-		b := make([]byte, length)
-		for i := range b {
-			b[i] = charset[seededRand.Intn(len(charset))]
-		}
-		return string(b)
+	var err error
+	s.secret1, err = rand.RandomString(32, rand.AlphaNumericCharset)
+	if err != nil {
+		return nil, err
 	}
 
-	s.secret1 = stringWithCharset(32, charset)
-	s.secret2 = stringWithCharset(32, charset)
+	s.secret2, err = rand.RandomString(32, rand.AlphaNumericCharset)
+	if err != nil {
+		return nil, err
+	}
 
-	return s
+	return s, nil
 }
 
 func (s *SYNCookie) Get(saddr string) uint32 {

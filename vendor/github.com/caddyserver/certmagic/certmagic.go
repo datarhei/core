@@ -270,7 +270,16 @@ type OnDemandConfig struct {
 	// request will be denied.
 	DecisionFunc func(name string) error
 
-	// List of whitelisted hostnames (SNI values) for
+	// Sources for getting new, unmanaged certificates.
+	// They will be invoked only during TLS handshakes
+	// before on-demand certificate management occurs,
+	// for certificates that are not already loaded into
+	// the in-memory cache.
+	//
+	// TODO: EXPERIMENTAL: subject to change and/or removal.
+	Managers []Manager
+
+	// List of allowed hostnames (SNI values) for
 	// deferred (on-demand) obtaining of certificates.
 	// Used only by higher-level functions in this
 	// package to persist the list of hostnames that
@@ -282,20 +291,15 @@ type OnDemandConfig struct {
 	// for higher-level convenience functions to be
 	// able to retain their convenience (alternative
 	// is: the user manually creates a DecisionFunc
-	// that whitelists the same names it already
-	// passed into Manage) and without letting clients
-	// have their run of any domain names they want.
-	// Only enforced if len > 0.
-	hostWhitelist []string
-}
-
-func (o *OnDemandConfig) whitelistContains(name string) bool {
-	for _, n := range o.hostWhitelist {
-		if strings.EqualFold(n, name) {
-			return true
-		}
-	}
-	return false
+	// that allows the same names it already passed
+	// into Manage) and without letting clients have
+	// their run of any domain names they want.
+	// Only enforced if len > 0. (This is a map to
+	// avoid O(n^2) performance; when it was a slice,
+	// we saw a 30s CPU profile for a config managing
+	// 110K names where 29s was spent checking for
+	// duplicates. Order is not important here.)
+	hostAllowlist map[string]struct{}
 }
 
 // isLoopback returns true if the hostname of addr looks
@@ -402,6 +406,23 @@ type KeyGenerator interface {
 	GenerateKey() (crypto.PrivateKey, error)
 }
 
+// IssuerPolicy is a type that enumerates how to
+// choose which issuer to use. EXPERIMENTAL and
+// subject to change.
+type IssuerPolicy string
+
+// Supported issuer policies. These are subject to change.
+const (
+	// UseFirstIssuer uses the first issuer that
+	// successfully returns a certificate.
+	UseFirstIssuer = "first"
+
+	// UseFirstRandomIssuer shuffles the list of
+	// configured issuers, then uses the first one
+	// that successfully returns a certificate.
+	UseFirstRandomIssuer = "first_random"
+)
+
 // IssuedCertificate represents a certificate that was just issued.
 type IssuedCertificate struct {
 	// The PEM-encoding of DER-encoded ASN.1 data.
@@ -433,7 +454,7 @@ type CertificateResource struct {
 
 	// The unique string identifying the issuer of the
 	// certificate; internally useful for storage access.
-	issuerKey string `json:"-"`
+	issuerKey string
 }
 
 // NamesKey returns the list of SANs as a single string,

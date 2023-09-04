@@ -10,8 +10,9 @@ import (
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/http/api"
 
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -47,10 +48,10 @@ type jwt struct {
 	skipLocalhost     bool
 	secret            []byte
 	accessValidFor    time.Duration
-	accessConfig      middleware.JWTConfig
+	accessConfig      echojwt.Config
 	accessMiddleware  echo.MiddlewareFunc
 	refreshValidFor   time.Duration
-	refreshConfig     middleware.JWTConfig
+	refreshConfig     echojwt.Config
 	refreshMiddleware echo.MiddlewareFunc
 	// Validators is a map of all recognized issuers to their specific validators. The key is the value of
 	// the "iss" field in the claims. Somewhat required because otherwise the token cannot be verified.
@@ -84,35 +85,31 @@ func New(config Config) (JWT, error) {
 		return false
 	}
 
-	j.accessConfig = middleware.JWTConfig{
-		Skipper:                 skipperFunc,
-		SigningMethod:           middleware.AlgorithmHS256,
-		ContextKey:              "user",
-		TokenLookup:             "header:" + echo.HeaderAuthorization,
-		AuthScheme:              "Bearer",
-		Claims:                  jwtgo.MapClaims{},
-		ErrorHandlerWithContext: j.ErrorHandler,
-		ParseTokenFunc:          j.parseToken("access"),
+	j.accessConfig = echojwt.Config{
+		Skipper:        skipperFunc,
+		SigningMethod:  middleware.AlgorithmHS256,
+		ContextKey:     "user",
+		TokenLookup:    "header:Authorization:Bearer ",
+		ErrorHandler:   j.ErrorHandler,
+		ParseTokenFunc: j.parseToken("access"),
 	}
 
-	j.refreshConfig = middleware.JWTConfig{
-		Skipper:                 skipperFunc,
-		SigningMethod:           middleware.AlgorithmHS256,
-		ContextKey:              "user",
-		TokenLookup:             "header:" + echo.HeaderAuthorization,
-		AuthScheme:              "Bearer",
-		Claims:                  jwtgo.MapClaims{},
-		ErrorHandlerWithContext: j.ErrorHandler,
-		ParseTokenFunc:          j.parseToken("refresh"),
+	j.refreshConfig = echojwt.Config{
+		Skipper:        skipperFunc,
+		SigningMethod:  middleware.AlgorithmHS256,
+		ContextKey:     "user",
+		TokenLookup:    "header:Authorization:Bearer ",
+		ErrorHandler:   j.ErrorHandler,
+		ParseTokenFunc: j.parseToken("refresh"),
 	}
 
 	return j, nil
 }
 
-func (j *jwt) parseToken(use string) func(auth string, c echo.Context) (interface{}, error) {
+func (j *jwt) parseToken(use string) func(c echo.Context, auth string) (interface{}, error) {
 	keyFunc := func(*jwtgo.Token) (interface{}, error) { return j.secret, nil }
 
-	return func(auth string, c echo.Context) (interface{}, error) {
+	return func(c echo.Context, auth string) (interface{}, error) {
 		var token *jwtgo.Token
 		var err error
 
@@ -184,7 +181,7 @@ func (j *jwt) ClearValidators() {
 	j.validators = nil
 }
 
-func (j *jwt) ErrorHandler(err error, c echo.Context) error {
+func (j *jwt) ErrorHandler(c echo.Context, err error) error {
 	if c.Request().URL.Path == "/api" {
 		return c.JSON(http.StatusOK, api.MinimalAbout{
 			App:   app.Name,
@@ -195,12 +192,12 @@ func (j *jwt) ErrorHandler(err error, c echo.Context) error {
 		})
 	}
 
-	return api.Err(http.StatusUnauthorized, "Missing or invalid JWT token")
+	return api.Err(http.StatusUnauthorized, "", "Missing or invalid JWT token")
 }
 
 func (j *jwt) AccessMiddleware() echo.MiddlewareFunc {
 	if j.accessMiddleware == nil {
-		j.accessMiddleware = middleware.JWTWithConfig(j.accessConfig)
+		j.accessMiddleware = echojwt.WithConfig(j.accessConfig)
 	}
 
 	return j.accessMiddleware
@@ -208,7 +205,7 @@ func (j *jwt) AccessMiddleware() echo.MiddlewareFunc {
 
 func (j *jwt) RefreshMiddleware() echo.MiddlewareFunc {
 	if j.refreshMiddleware == nil {
-		j.refreshMiddleware = middleware.JWTWithConfig(j.refreshConfig)
+		j.refreshMiddleware = echojwt.WithConfig(j.refreshConfig)
 	}
 
 	return j.refreshMiddleware
@@ -243,16 +240,16 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 	if ok {
 		if err != nil {
 			time.Sleep(5 * time.Second)
-			return api.Err(http.StatusUnauthorized, "Invalid authorization credentials", "%s", err)
+			return api.Err(http.StatusUnauthorized, "", "Invalid authorization credentials: %s", err.Error())
 		}
 	} else {
 		time.Sleep(5 * time.Second)
-		return api.Err(http.StatusBadRequest, "Missing authorization credentials")
+		return api.Err(http.StatusBadRequest, "", "Missing authorization credentials")
 	}
 
 	at, rt, err := j.createToken(subject)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "Failed to create JWT", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "Failed to create JWT: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, api.JWT{
@@ -273,14 +270,17 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 func (j *jwt) RefreshHandler(c echo.Context) error {
 	token, ok := c.Get("user").(*jwtgo.Token)
 	if !ok {
-		return api.Err(http.StatusForbidden, "Invalid token")
+		return api.Err(http.StatusForbidden, "", "Invalid token")
 	}
 
-	subject := token.Claims.(jwtgo.MapClaims)["sub"].(string)
+	subject, err := token.Claims.GetSubject()
+	if err != nil {
+		return api.Err(http.StatusForbidden, "", "Invalid subject: %s", err.Error())
+	}
 
 	at, _, err := j.createToken(subject)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "Failed to create JWT", "%s", err)
+		return api.Err(http.StatusInternalServerError, "", "Failed to create JWT: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, api.JWTRefresh{

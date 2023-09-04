@@ -15,11 +15,7 @@ type genericTypeSpec struct {
 	Name       string
 }
 
-func typeSpecFullName(typeSpecDef *TypeSpecDef) string {
-	return typeSpecDef.FullName()
-}
-
-func (pkgDefs *PackagesDefinitions) parametrizeGenericType(file *ast.File, original *TypeSpecDef, fullGenericForm string, parseDependency bool) *TypeSpecDef {
+func (pkgDefs *PackagesDefinitions) parametrizeGenericType(file *ast.File, original *TypeSpecDef, fullGenericForm string) *TypeSpecDef {
 	return original
 }
 

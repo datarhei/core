@@ -107,12 +107,12 @@ func formatFuncDoc(fileSet *token.FileSet, commentList []*ast.Comment, edits *ed
 	linesToComments := make(map[int]int, len(commentList))
 
 	buffer := &bytes.Buffer{}
-	w := tabwriter.NewWriter(buffer, 0, 0, 1, ' ', 0)
+	w := tabwriter.NewWriter(buffer, 1, 4, 1, '\t', 0)
 
 	for commentIndex, comment := range commentList {
 		text := comment.Text
 		if attr, body, found := swagComment(text); found {
-			formatted := "// " + attr
+			formatted := "//\t" + attr
 			if body != "" {
 				formatted += "\t" + splitComment2(attr, body)
 			}
@@ -145,12 +145,20 @@ func splitComment2(attr, body string) string {
 	if specialTagForSplit[strings.ToLower(attr)] {
 		for i := 0; i < len(body); i++ {
 			if skipEnd, ok := skipChar[body[i]]; ok {
-				if skipLen := strings.IndexByte(body[i+1:], skipEnd); skipLen > 0 {
-					i += skipLen
+				skipStart, n := body[i], 1
+				for i++; i < len(body); i++ {
+					if skipStart != skipEnd && body[i] == skipStart {
+						n++
+					} else if body[i] == skipEnd {
+						n--
+						if n == 0 {
+							break
+						}
+					}
 				}
-			} else if body[i] == ' ' {
+			} else if body[i] == ' ' || body[i] == '\t' {
 				j := i
-				for ; j < len(body) && body[j] == ' '; j++ {
+				for ; j < len(body) && (body[j] == ' ' || body[j] == '\t'); j++ {
 				}
 				body = replaceRange(body, i, j, "\t")
 			}

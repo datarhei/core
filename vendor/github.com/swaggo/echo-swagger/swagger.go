@@ -5,18 +5,17 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
-	"sync"
 
+	"github.com/ghodss/yaml"
 	"github.com/labstack/echo/v4"
-	swaggerFiles "github.com/swaggo/files"
+	swaggerFiles "github.com/swaggo/files/v2"
 	"github.com/swaggo/swag"
-	"golang.org/x/net/webdav"
 )
 
 // Config stores echoSwagger configuration variables.
 type Config struct {
 	// The url pointing to API definition (normally swagger.json or swagger.yaml). Default is `mockedSwag.json`.
-	URL                  string
+	URLs                 []string
 	DocExpansion         string
 	DomID                string
 	InstanceName         string
@@ -44,7 +43,7 @@ type OAuthConfig struct {
 // URL presents the url pointing to API definition (normally swagger.json or swagger.yaml).
 func URL(url string) func(*Config) {
 	return func(c *Config) {
-		c.URL = url
+		c.URLs = append(c.URLs, url)
 	}
 }
 
@@ -99,7 +98,7 @@ func OAuth(config *OAuthConfig) func(*Config) {
 
 func newConfig(configFns ...func(*Config)) *Config {
 	config := Config{
-		URL:                  "doc.json",
+		URLs:                 []string{"doc.json", "doc.yaml"},
 		DocExpansion:         "list",
 		DomID:                "swagger-ui",
 		InstanceName:         "swagger",
@@ -124,19 +123,12 @@ var WrapHandler = EchoWrapHandler()
 
 // EchoWrapHandler wraps `http.Handler` into `echo.HandlerFunc`.
 func EchoWrapHandler(options ...func(*Config)) echo.HandlerFunc {
-	var once sync.Once
-
 	config := newConfig(options...)
 
 	// create a template with name
 	index, _ := template.New("swagger_index.html").Parse(indexTemplate)
 
 	var re = regexp.MustCompile(`^(.*/)([^?].*)?[?|.]*$`)
-
-	h := webdav.Handler{
-		FileSystem: swaggerFiles.FS,
-		LockSystem: webdav.NewMemLS(),
-	}
 
 	return func(c echo.Context) error {
 		if c.Request().Method != http.MethodGet {
@@ -145,10 +137,6 @@ func EchoWrapHandler(options ...func(*Config)) echo.HandlerFunc {
 
 		matches := re.FindStringSubmatch(c.Request().RequestURI)
 		path := matches[2]
-
-		once.Do(func() {
-			h.Prefix = matches[1]
-		})
 
 		switch filepath.Ext(path) {
 		case ".html":
@@ -159,6 +147,8 @@ func EchoWrapHandler(options ...func(*Config)) echo.HandlerFunc {
 			c.Response().Header().Set("Content-Type", "application/javascript")
 		case ".json":
 			c.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+		case ".yaml":
+			c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
 		case ".png":
 			c.Response().Header().Set("Content-Type", "image/png")
 		}
@@ -171,7 +161,7 @@ func EchoWrapHandler(options ...func(*Config)) echo.HandlerFunc {
 
 		switch path {
 		case "":
-			_ = c.Redirect(http.StatusMovedPermanently, h.Prefix+"index.html")
+			_ = c.Redirect(http.StatusMovedPermanently, matches[1]+"/"+"index.html")
 		case "index.html":
 			_ = index.Execute(c.Response().Writer, config)
 		case "doc.json":
@@ -183,8 +173,23 @@ func EchoWrapHandler(options ...func(*Config)) echo.HandlerFunc {
 			}
 
 			_, _ = c.Response().Writer.Write([]byte(doc))
+		case "doc.yaml":
+			jsonString, err := swag.ReadDoc(config.InstanceName)
+			if err != nil {
+				c.Error(err)
+
+				return nil
+			}
+			doc, err := yaml.JSONToYAML([]byte(jsonString))
+			if err != nil {
+				c.Error(err)
+
+				return nil
+			}
+			_, _ = c.Response().Writer.Write(doc)
 		default:
-			h.ServeHTTP(c.Response().Writer, c.Request())
+			c.Request().URL.Path = matches[2]
+			http.FileServer(http.FS(swaggerFiles.FS)).ServeHTTP(c.Response(), c.Request())
 		}
 
 		return nil
@@ -265,7 +270,14 @@ const indexTemplate = `<!-- HTML for static distribution bundle build -->
 window.onload = function() {
   // Build a system
   const ui = SwaggerUIBundle({
-    url: "{{.URL}}",
+	urls: [
+	{{range $index, $url := .URLs}}
+		{
+			name: "{{$url}}",
+			url: "{{$url}}",
+		},
+	{{end}}
+	],
     syntaxHighlight: {{.SyntaxHighlight}},
     deepLinking: {{.DeepLinking}},
     docExpansion: "{{.DocExpansion}}",

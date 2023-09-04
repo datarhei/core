@@ -77,8 +77,8 @@ func NewLiveSend(config SendConfig) Sender {
 }
 
 func (s *liveSend) Stats() SendStats {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	s.statistics.UsPktSndPeriod = s.pktSndPeriod
 	s.statistics.BytePayload = uint64(s.avgPayloadSize)
@@ -389,8 +389,8 @@ func NewLiveReceive(config ReceiveConfig) Receiver {
 }
 
 func (r *liveReceive) Stats() ReceiveStats {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
 	r.statistics.BytePayload = uint64(r.avgPayloadSize)
 	r.statistics.MbpsEstimatedRecvBandwidth = r.rate.bytesPerSecond * 8 / 1024 / 1024
@@ -539,8 +539,8 @@ func (r *liveReceive) Push(pkt packet.Packet) {
 }
 
 func (r *liveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circular.Number, lite bool) {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
 	// 4.8.1. Packet Acknowledgement (ACKs, ACKACKs)
 	if now-r.lastPeriodicACK < r.periodicACKInterval {
@@ -579,8 +579,9 @@ func (r *liveReceive) periodicACK(now uint64) (ok bool, sequenceNumber circular.
 			maxPktTsbpdTime = p.Header().PktTsbpdTime
 
 			if e != nil {
-				e = e.Next()
-				p = e.Value.(packet.Packet)
+				if e = e.Next(); e != nil {
+					p = e.Value.(packet.Packet)
+				}
 			}
 		}
 

@@ -13,6 +13,9 @@ import (
 
 type IProcessReportHistoryEntry interface {
 	IsIProcessReportHistoryEntry()
+	GetCreatedAt() time.Time
+	GetPrelude() []string
+	GetLog() []*ProcessReportLogEntry
 }
 
 type AVStream struct {
@@ -55,24 +58,24 @@ type AboutVersion struct {
 
 type Metric struct {
 	Name   string                          `json:"name"`
-	Labels map[string]interface{}          `json:"labels"`
+	Labels map[string]interface{}          `json:"labels,omitempty"`
 	Values []*scalars.MetricsResponseValue `json:"values"`
 }
 
 type MetricInput struct {
 	Name   string                 `json:"name"`
-	Labels map[string]interface{} `json:"labels"`
+	Labels map[string]interface{} `json:"labels,omitempty"`
 }
 
 type Metrics struct {
-	TimerangeSeconds *int      `json:"timerange_seconds"`
-	IntervalSeconds  *int      `json:"interval_seconds"`
+	TimerangeSeconds *int      `json:"timerange_seconds,omitempty"`
+	IntervalSeconds  *int      `json:"interval_seconds,omitempty"`
 	Metrics          []*Metric `json:"metrics"`
 }
 
 type MetricsInput struct {
-	TimerangeSeconds *int           `json:"timerange_seconds"`
-	IntervalSeconds  *int           `json:"interval_seconds"`
+	TimerangeSeconds *int           `json:"timerange_seconds,omitempty"`
+	IntervalSeconds  *int           `json:"interval_seconds,omitempty"`
 	Metrics          []*MetricInput `json:"metrics"`
 }
 
@@ -108,7 +111,7 @@ type Process struct {
 	Config    *ProcessConfig         `json:"config"`
 	State     *ProcessState          `json:"state"`
 	Report    *ProcessReport         `json:"report"`
-	Metadata  map[string]interface{} `json:"metadata"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type ProcessConfig struct {
@@ -145,6 +148,27 @@ type ProcessReport struct {
 }
 
 func (ProcessReport) IsIProcessReportHistoryEntry() {}
+func (this ProcessReport) GetCreatedAt() time.Time  { return this.CreatedAt }
+func (this ProcessReport) GetPrelude() []string {
+	if this.Prelude == nil {
+		return nil
+	}
+	interfaceSlice := make([]string, 0, len(this.Prelude))
+	for _, concrete := range this.Prelude {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this ProcessReport) GetLog() []*ProcessReportLogEntry {
+	if this.Log == nil {
+		return nil
+	}
+	interfaceSlice := make([]*ProcessReportLogEntry, 0, len(this.Log))
+	for _, concrete := range this.Log {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
 
 type ProcessReportHistoryEntry struct {
 	CreatedAt time.Time                `json:"created_at"`
@@ -153,6 +177,27 @@ type ProcessReportHistoryEntry struct {
 }
 
 func (ProcessReportHistoryEntry) IsIProcessReportHistoryEntry() {}
+func (this ProcessReportHistoryEntry) GetCreatedAt() time.Time  { return this.CreatedAt }
+func (this ProcessReportHistoryEntry) GetPrelude() []string {
+	if this.Prelude == nil {
+		return nil
+	}
+	interfaceSlice := make([]string, 0, len(this.Prelude))
+	for _, concrete := range this.Prelude {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this ProcessReportHistoryEntry) GetLog() []*ProcessReportLogEntry {
+	if this.Log == nil {
+		return nil
+	}
+	interfaceSlice := make([]*ProcessReportLogEntry, 0, len(this.Log))
+	for _, concrete := range this.Log {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
 
 type ProcessReportLogEntry struct {
 	Timestamp time.Time `json:"timestamp"`
@@ -208,7 +253,7 @@ type ProgressIo struct {
 	Sampling    scalars.Uint64 `json:"sampling"`
 	Layout      string         `json:"layout"`
 	Channels    scalars.Uint64 `json:"channels"`
-	Avstream    *AVStream      `json:"avstream"`
+	Avstream    *AVStream      `json:"avstream,omitempty"`
 }
 
 type RawAVstream struct {
@@ -223,7 +268,7 @@ type RawAVstream struct {
 	Looping     bool             `json:"looping"`
 	Duplicating bool             `json:"duplicating"`
 	Gop         string           `json:"gop"`
-	Debug       interface{}      `json:"debug"`
+	Debug       interface{}      `json:"debug,omitempty"`
 	Input       *RawAVstreamIo   `json:"input"`
 	Output      *RawAVstreamIo   `json:"output"`
 	Swap        *RawAVstreamSwap `json:"swap"`
@@ -292,17 +337,17 @@ type State string
 
 const (
 	StateRunning State = "RUNNING"
-	StateIDLe    State = "IDLE"
+	StateIdle    State = "IDLE"
 )
 
 var AllState = []State{
 	StateRunning,
-	StateIDLe,
+	StateIdle,
 }
 
 func (e State) IsValid() bool {
 	switch e {
-	case StateRunning, StateIDLe:
+	case StateRunning, StateIdle:
 		return true
 	}
 	return false

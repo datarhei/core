@@ -56,14 +56,15 @@ func (r ReplicationStatus) Empty() bool {
 // AdvancedPutOptions for internal use - to be utilized by replication, ILM transition
 // implementation on MinIO server
 type AdvancedPutOptions struct {
-	SourceVersionID    string
-	SourceETag         string
-	ReplicationStatus  ReplicationStatus
-	SourceMTime        time.Time
-	ReplicationRequest bool
-	RetentionTimestamp time.Time
-	TaggingTimestamp   time.Time
-	LegalholdTimestamp time.Time
+	SourceVersionID          string
+	SourceETag               string
+	ReplicationStatus        ReplicationStatus
+	SourceMTime              time.Time
+	ReplicationRequest       bool
+	RetentionTimestamp       time.Time
+	TaggingTimestamp         time.Time
+	LegalholdTimestamp       time.Time
+	ReplicationValidityCheck bool
 }
 
 // PutObjectOptions represents options specified by user for PutObject call
@@ -93,6 +94,28 @@ type PutObjectOptions struct {
 	// This can be used for faster uploads on non-seekable or slow-to-seek input.
 	ConcurrentStreamParts bool
 	Internal              AdvancedPutOptions
+
+	customHeaders http.Header
+}
+
+// SetMatchETag if etag matches while PUT MinIO returns an error
+// this is a MinIO specific extension to support optimistic locking
+// semantics.
+func (opts *PutObjectOptions) SetMatchETag(etag string) {
+	if opts.customHeaders == nil {
+		opts.customHeaders = http.Header{}
+	}
+	opts.customHeaders.Set("If-Match", "\""+etag+"\"")
+}
+
+// SetMatchETagExcept if etag does not match while PUT MinIO returns an
+// error this is a MinIO specific extension to support optimistic locking
+// semantics.
+func (opts *PutObjectOptions) SetMatchETagExcept(etag string) {
+	if opts.customHeaders == nil {
+		opts.customHeaders = http.Header{}
+	}
+	opts.customHeaders.Set("If-None-Match", "\""+etag+"\"")
 }
 
 // getNumThreads - gets the number of threads to be used in the multipart
@@ -166,6 +189,9 @@ func (opts PutObjectOptions) Header() (header http.Header) {
 	if opts.Internal.ReplicationRequest {
 		header.Set(minIOBucketReplicationRequest, "true")
 	}
+	if opts.Internal.ReplicationValidityCheck {
+		header.Set(minIOBucketReplicationCheck, "true")
+	}
 	if !opts.Internal.LegalholdTimestamp.IsZero() {
 		header.Set(minIOBucketReplicationObjectLegalHoldTimestamp, opts.Internal.LegalholdTimestamp.Format(time.RFC3339Nano))
 	}
@@ -187,6 +213,12 @@ func (opts PutObjectOptions) Header() (header http.Header) {
 			header.Set("x-amz-meta-"+k, v)
 		}
 	}
+
+	// set any other additional custom headers.
+	for k, v := range opts.customHeaders {
+		header[k] = v
+	}
+
 	return
 }
 

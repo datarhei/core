@@ -115,6 +115,10 @@ type ACMEIssuer struct {
 	// desired, set this to zap.NewNop().
 	Logger *zap.Logger
 
+	// Set a http proxy to use when issuing a certificate.
+	// Default is http.ProxyFromEnvironment
+	HTTPProxy func(*http.Request) (*url.URL, error)
+
 	config     *Config
 	httpClient *http.Client
 
@@ -128,7 +132,7 @@ type ACMEIssuer struct {
 	// synchronize properly.
 	email  string
 	agreed bool
-	mu     *sync.Mutex // protects the above grouped fields
+	mu     *sync.Mutex // protects the above grouped fields, as well as entire struct during NewAccountFunc calls
 }
 
 // NewACMEIssuer constructs a valid ACMEIssuer based on a template
@@ -204,6 +208,13 @@ func NewACMEIssuer(cfg *Config, template ACMEIssuer) *ACMEIssuer {
 		template.Logger = defaultLogger
 	}
 
+	if template.HTTPProxy == nil {
+		template.HTTPProxy = DefaultACME.HTTPProxy
+	}
+	if template.HTTPProxy == nil {
+		template.HTTPProxy = http.ProxyFromEnvironment
+	}
+
 	template.config = cfg
 	template.mu = new(sync.Mutex)
 
@@ -223,7 +234,7 @@ func NewACMEIssuer(cfg *Config, template ACMEIssuer) *ACMEIssuer {
 		}
 	}
 	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
+		Proxy:                 template.HTTPProxy,
 		DialContext:           dialer.DialContext,
 		TLSHandshakeTimeout:   30 * time.Second, // increase to 30s requested in #175
 		ResponseHeaderTimeout: 30 * time.Second, // increase to 30s requested in #175
@@ -288,7 +299,7 @@ func (iss *ACMEIssuer) isAgreed() bool {
 // batch is eligible for certificates if using Let's Encrypt.
 // It also ensures that an email address is available.
 func (am *ACMEIssuer) PreCheck(ctx context.Context, names []string, interactive bool) error {
-	publicCA := strings.Contains(am.CA, "api.letsencrypt.org") || strings.Contains(am.CA, "acme.zerossl.com")
+	publicCA := strings.Contains(am.CA, "api.letsencrypt.org") || strings.Contains(am.CA, "acme.zerossl.com") || strings.Contains(am.CA, "api.pki.goog")
 	if publicCA {
 		for _, name := range names {
 			if !SubjectQualifiesForPublicCert(name) {
@@ -506,9 +517,10 @@ type ChainPreference struct {
 // DefaultACME specifies default settings to use for ACMEIssuers.
 // Using this value is optional but can be convenient.
 var DefaultACME = ACMEIssuer{
-	CA:     LetsEncryptProductionCA,
-	TestCA: LetsEncryptStagingCA,
-	Logger: defaultLogger,
+	CA:        LetsEncryptProductionCA,
+	TestCA:    LetsEncryptStagingCA,
+	Logger:    defaultLogger,
+	HTTPProxy: http.ProxyFromEnvironment,
 }
 
 // Some well-known CA endpoints available to use.
