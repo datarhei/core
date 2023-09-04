@@ -342,6 +342,8 @@ func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Dur
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	term := uint64(0)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -352,12 +354,14 @@ func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Dur
 					break
 				}
 
-				c.doSynchronize(emergency)
-				c.doRebalance(emergency)
+				c.doSynchronize(emergency, term)
+				c.doRebalance(emergency, term)
 			} else {
-				c.doSynchronize(emergency)
+				c.doSynchronize(emergency, term)
 			}
 		}
+
+		term++
 	}
 }
 
@@ -449,8 +453,10 @@ type processOpError struct {
 	err       error
 }
 
-func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
+func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpError {
 	errors := []processOpError{}
+
+	logger := c.logger.WithField("term", term)
 
 	for _, op := range stack {
 		switch v := op.(type) {
@@ -461,7 +467,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.config.ProcessID(),
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.config.ProcessID(),
 					"nodeid":    v.nodeid,
 				}).Log("Adding process")
@@ -475,7 +481,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 						processid: v.config.ProcessID(),
 						err:       err,
 					})
-					c.logger.Info().WithError(err).WithFields(log.Fields{
+					logger.Info().WithError(err).WithFields(log.Fields{
 						"processid": v.config.ProcessID(),
 						"nodeid":    v.nodeid,
 					}).Log("Starting process")
@@ -488,7 +494,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid": v.config.ProcessID(),
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
@@ -499,7 +505,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.processid,
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Updating process")
@@ -511,7 +517,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid": v.config.ProcessID(),
 				"nodeid":    v.nodeid,
 			}).Log("Updating process")
@@ -522,7 +528,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.processid,
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Removing process")
@@ -534,7 +540,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Removing process")
@@ -545,7 +551,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.config.ProcessID(),
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
@@ -559,7 +565,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.config.ProcessID(),
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
@@ -573,7 +579,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.config.ProcessID(),
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
@@ -586,7 +592,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid":  v.config.ProcessID(),
 				"fromnodeid": v.fromNodeid,
 				"tonodeid":   v.toNodeid,
@@ -598,7 +604,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.processid,
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Starting process")
@@ -610,7 +616,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Starting process")
@@ -621,7 +627,7 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 					processid: v.processid,
 					err:       err,
 				})
-				c.logger.Info().WithError(err).WithFields(log.Fields{
+				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid": v.processid,
 					"nodeid":    v.nodeid,
 				}).Log("Stopping process")
@@ -633,39 +639,41 @@ func (c *cluster) applyOpStack(stack []interface{}) []processOpError {
 				err:       nil,
 			})
 
-			c.logger.Info().WithFields(log.Fields{
+			logger.Info().WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Stopping process")
 		case processOpReject:
 			errors = append(errors, processOpError(v))
-			c.logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
+			logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
 		case processOpSkip:
 			errors = append(errors, processOpError{
 				processid: v.processid,
 				err:       v.err,
 			})
-			c.logger.Warn().WithError(v.err).WithFields(log.Fields{
+			logger.Warn().WithError(v.err).WithFields(log.Fields{
 				"nodeid":    v.nodeid,
 				"processid": v.processid,
 			}).Log("Process skipped")
 		case processOpError:
 			errors = append(errors, v)
 		default:
-			c.logger.Warn().Log("Unknown operation on stack: %+v", v)
+			logger.Warn().Log("Unknown operation on stack: %+v", v)
 		}
 	}
 
 	return errors
 }
 
-func (c *cluster) doSynchronize(emergency bool) {
+func (c *cluster) doSynchronize(emergency bool, term uint64) {
 	wish := c.store.GetProcessNodeMap()
 	want := c.store.ListProcesses()
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
-	c.logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
+	logger := c.logger.WithField("term", term)
+
+	logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
 
 	nodesMap := map[string]proxy.NodeAbout{}
 
@@ -674,7 +682,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 		nodesMap[about.ID] = about
 	}
 
-	c.logger.Debug().WithFields(log.Fields{
+	logger.Debug().WithFields(log.Fields{
 		"want":  want,
 		"have":  have,
 		"nodes": nodesMap,
@@ -693,7 +701,7 @@ func (c *cluster) doSynchronize(emergency bool) {
 		c.applyCommand(cmd)
 	}
 
-	errors := c.applyOpStack(opStack)
+	errors := c.applyOpStack(opStack, term)
 
 	if !emergency {
 		for _, e := range errors {
@@ -730,13 +738,15 @@ func (c *cluster) doSynchronize(emergency bool) {
 	}
 }
 
-func (c *cluster) doRebalance(emergency bool) {
+func (c *cluster) doRebalance(emergency bool, term uint64) {
 	if emergency {
 		// Don't rebalance in emergency mode
 		return
 	}
 
-	c.logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
+	logger := c.logger.WithField("term", term)
+
+	logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
 
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
@@ -748,14 +758,14 @@ func (c *cluster) doRebalance(emergency bool) {
 		nodesMap[about.ID] = about
 	}
 
-	c.logger.Debug().WithFields(log.Fields{
+	logger.Debug().WithFields(log.Fields{
 		"have":  have,
 		"nodes": nodesMap,
 	}).Log("Rebalance")
 
 	opStack, _ := rebalance(have, nodesMap)
 
-	errors := c.applyOpStack(opStack)
+	errors := c.applyOpStack(opStack, term)
 
 	for _, e := range errors {
 		// Only apply the command if the error is different.
