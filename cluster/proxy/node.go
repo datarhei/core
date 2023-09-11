@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 
 	client "github.com/datarhei/core-client-go/v16"
@@ -141,15 +142,30 @@ type node struct {
 	rtmpAddress *url.URL
 	hasSRT      bool
 	srtAddress  *url.URL
+
+	logger log.Logger
 }
 
-func NewNode(id, address string, config *config.Config) Node {
+type NodeConfig struct {
+	ID      string
+	Address string
+	Config  *config.Config
+
+	Logger log.Logger
+}
+
+func NewNode(config NodeConfig) Node {
 	n := &node{
-		id:      id,
-		address: address,
-		config:  config,
+		id:      config.ID,
+		address: config.Address,
+		config:  config.Config,
 		state:   stateDisconnected,
-		secure:  strings.HasPrefix(address, "https://"),
+		secure:  strings.HasPrefix(config.Address, "https://"),
+		logger:  config.Logger,
+	}
+
+	if n.logger == nil {
+		n.logger = log.New("")
 	}
 
 	n.resources.throttling = true
@@ -362,6 +378,8 @@ func (n *node) pingPeer(ctx context.Context, wg *sync.WaitGroup) {
 			n.stateLock.Lock()
 			if err != nil {
 				n.state = stateDisconnected
+
+				n.logger.Warn().WithError(err).Log("Failed to retrieve about")
 			} else {
 				n.lastContact = time.Now()
 				n.state = stateConnected
@@ -406,6 +424,8 @@ func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
 				n.resources.memLimit = 0
 				n.resources.err = err
 				n.stateLock.Unlock()
+
+				n.logger.Warn().WithError(err).Log("Failed to retrieve metrics")
 
 				continue
 			}

@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
+	"github.com/datarhei/core/v16/log"
 )
 
 type Node interface {
@@ -50,22 +51,36 @@ type node struct {
 	cancelPing context.CancelFunc
 
 	proxyNode proxy.Node
+
+	logger log.Logger
 }
 
-func New(id, address string) Node {
+type Config struct {
+	ID      string
+	Address string
+
+	Logger log.Logger
+}
+
+func New(config Config) Node {
 	n := &node{
-		id:      id,
-		address: address,
+		id:      config.ID,
+		address: config.Address,
 		version: "0.0.0",
 		client: client.APIClient{
-			Address: address,
+			Address: config.Address,
 			Client: &http.Client{
 				Timeout: 5 * time.Second,
 			},
 		},
+		logger: config.Logger,
 	}
 
-	if host, _, err := net.SplitHostPort(address); err == nil {
+	if n.logger == nil {
+		n.logger = log.New("")
+	}
+
+	if host, _, err := net.SplitHostPort(n.address); err == nil {
 		if addrs, err := net.LookupHost(host); err == nil {
 			n.ips = addrs
 		}
@@ -75,7 +90,7 @@ func New(id, address string) Node {
 		n.version = version
 	}
 
-	n.start(id)
+	n.start(n.id)
 
 	return n
 }
@@ -95,7 +110,12 @@ func (n *node) start(id string) error {
 	n.lastContactErr = fmt.Errorf("not started yet")
 
 	address, config, err := n.CoreEssentials()
-	n.proxyNode = proxy.NewNode(id, address, config)
+	n.proxyNode = proxy.NewNode(proxy.NodeConfig{
+		ID:      id,
+		Address: address,
+		Config:  config,
+		Logger:  n.logger.WithComponent("ClusterProxyNode").WithField("address", address),
+	})
 
 	n.lastCoreContactErr = err
 
@@ -114,6 +134,7 @@ func (n *node) start(id string) error {
 						n.lastCoreContactErr = nil
 					} else {
 						n.lastCoreContactErr = err
+						n.logger.Error().WithError(err).Log("Failed to retrieve core essentials")
 					}
 					n.pingLock.Unlock()
 				case <-ctx.Done():
@@ -313,6 +334,8 @@ func (n *node) ping(ctx context.Context) {
 				n.pingLock.Lock()
 				n.lastContactErr = err
 				n.pingLock.Unlock()
+
+				n.logger.Warn().WithError(err).Log("Failed to ping cluster API")
 			}
 		case <-ctx.Done():
 			return
@@ -338,6 +361,8 @@ func (n *node) pingCore(ctx context.Context) {
 				n.pingLock.Lock()
 				n.lastCoreContactErr = fmt.Errorf("not connected to core api: %w", err)
 				n.pingLock.Unlock()
+
+				n.logger.Warn().WithError(err).Log("not connected to core API")
 			}
 		case <-ctx.Done():
 			return

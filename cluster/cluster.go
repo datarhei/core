@@ -960,7 +960,14 @@ func (c *cluster) trackNodeChanges() {
 						logger.Warn().WithError(err).Log("Discovering cluster API address")
 					}
 
-					node := clusternode.New(id, address)
+					node := clusternode.New(clusternode.Config{
+						ID:      id,
+						Address: address,
+						Logger: c.logger.WithComponent("ClusterNode").WithFields(log.Fields{
+							"id":      id,
+							"address": address,
+						}),
+					})
 
 					if err := verifyClusterVersion(node.Version()); err != nil {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
