@@ -1056,7 +1056,7 @@ func (c *cluster) checkClusterNodes() ([]string, error) {
 
 		version := node.Version()
 		if err := verifyClusterVersion(version); err != nil {
-			return nil, fmt.Errorf("node %s has a different version: %s: %w", id, version, err)
+			return nil, fmt.Errorf("node %s has a different cluster version: %s: %w", id, version, err)
 		}
 
 		config, err := node.CoreConfig()
