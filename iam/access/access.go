@@ -1,6 +1,7 @@
 package access
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/datarhei/core/v16/log"
@@ -12,12 +13,13 @@ import (
 type Policy struct {
 	Name     string
 	Domain   string
+	Types    []string
 	Resource string
 	Actions  []string
 }
 
 type Enforcer interface {
-	Enforce(name, domain, resource, action string) (bool, string)
+	Enforce(name, domain, rtype, resource, action string) (bool, string)
 
 	HasDomain(name string) bool
 	ListDomains() []string
@@ -26,10 +28,10 @@ type Enforcer interface {
 type Manager interface {
 	Enforcer
 
-	HasPolicy(name, domain, resource string, actions []string) bool
-	AddPolicy(name, domain, resource string, actions []string) error
-	RemovePolicy(name, domain, resource string, actions []string) error
-	ListPolicies(name, domain, resource string, actions []string) []Policy
+	HasPolicy(name, domain string, types []string, resource string, actions []string) bool
+	AddPolicy(name, domain string, types []string, resource string, actions []string) error
+	RemovePolicy(name, domain string, types []string, resource string, actions []string) error
+	ListPolicies(name, domain string, types []string, resource string, actions []string) []Policy
 	ReloadPolicies() error
 }
 
@@ -77,14 +79,14 @@ func New(config Config) (Manager, error) {
 	return am, nil
 }
 
-func (am *access) HasPolicy(name, domain, resource string, actions []string) bool {
-	policy := []string{name, domain, resource, strings.Join(actions, "|")}
+func (am *access) HasPolicy(name, domain string, types []string, resource string, actions []string) bool {
+	policy := []string{name, domain, encodeResource(types, resource), encodeActions(actions)}
 
 	return am.enforcer.HasPolicy(policy)
 }
 
-func (am *access) AddPolicy(name, domain, resource string, actions []string) error {
-	policy := []string{name, domain, resource, strings.Join(actions, "|")}
+func (am *access) AddPolicy(name, domain string, types []string, resource string, actions []string) error {
+	policy := []string{name, domain, encodeResource(types, resource), encodeActions(actions)}
 
 	if am.enforcer.HasPolicy(policy) {
 		return nil
@@ -95,24 +97,26 @@ func (am *access) AddPolicy(name, domain, resource string, actions []string) err
 	return err
 }
 
-func (am *access) RemovePolicy(name, domain, resource string, actions []string) error {
-	policies := am.enforcer.GetFilteredPolicy(0, name, domain, resource, strings.Join(actions, "|"))
+func (am *access) RemovePolicy(name, domain string, types []string, resource string, actions []string) error {
+	policies := am.enforcer.GetFilteredPolicy(0, name, domain, encodeResource(types, resource), encodeActions(actions))
 	_, err := am.enforcer.RemovePolicies(policies)
 
 	return err
 }
 
-func (am *access) ListPolicies(name, domain, resource string, actions []string) []Policy {
+func (am *access) ListPolicies(name, domain string, types []string, resource string, actions []string) []Policy {
 	policies := []Policy{}
 
-	ps := am.enforcer.GetFilteredPolicy(0, name, domain, resource, strings.Join(actions, "|"))
+	ps := am.enforcer.GetFilteredPolicy(0, name, domain, encodeResource(types, resource), encodeActions(actions))
 
 	for _, p := range ps {
+		types, resource := decodeResource(p[2])
 		policies = append(policies, Policy{
 			Name:     p[0],
 			Domain:   p[1],
-			Resource: p[2],
-			Actions:  strings.Split(p[3], "|"),
+			Types:    types,
+			Resource: resource,
+			Actions:  decodeActions(p[3]),
 		})
 	}
 
@@ -133,8 +137,37 @@ func (am *access) ListDomains() []string {
 	return am.adapter.AllDomains()
 }
 
-func (am *access) Enforce(name, domain, resource, action string) (bool, string) {
+func (am *access) Enforce(name, domain, rtype, resource, action string) (bool, string) {
+	resource = rtype + ":" + resource
+
 	ok, rule, _ := am.enforcer.EnforceEx(name, domain, resource, action)
 
 	return ok, strings.Join(rule, ", ")
+}
+
+func encodeActions(actions []string) string {
+	return strings.Join(actions, "|")
+}
+
+func decodeActions(actions string) []string {
+	return strings.Split(actions, "|")
+}
+
+func encodeResource(types []string, resource string) string {
+	if len(types) == 0 {
+		return resource
+	}
+
+	sort.Strings(types)
+
+	return strings.Join(types, "|") + ":" + resource
+}
+
+func decodeResource(resource string) ([]string, string) {
+	before, after, found := strings.Cut(resource, ":")
+	if !found {
+		return []string{}, resource
+	}
+
+	return strings.Split(before, "|"), after
 }

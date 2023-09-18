@@ -61,9 +61,9 @@ func getDummyRestreamHandler() (*RestreamHandler, error) {
 		return nil, err
 	}
 
-	iam.AddPolicy("$anon", "$none", "api:/**", []string{"ANY"})
-	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
-	iam.AddPolicy("$anon", "$none", "process:**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", []string{"api"}, "/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", []string{"fs"}, "/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", []string{"process"}, "**", []string{"ANY"})
 
 	handler := NewRestream(rs, iam)
 

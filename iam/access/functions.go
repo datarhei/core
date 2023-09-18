@@ -10,14 +10,28 @@ func resourceMatch(request, policy string) bool {
 	reqPrefix, reqResource := getPrefix(request)
 	polPrefix, polResource := getPrefix(policy)
 
-	if reqPrefix != polPrefix {
+	var match bool = false
+	var err error = nil
+
+	reqType := strings.ToLower(reqPrefix)
+	polTypes := strings.Split(strings.ToLower(polPrefix), "|")
+
+	for _, polType := range polTypes {
+		if reqType != polType {
+			continue
+		}
+
+		match = true
+		break
+	}
+
+	if !match {
 		return false
 	}
 
-	var match bool
-	var err error
+	match = false
 
-	if reqPrefix == "api" || reqPrefix == "fs" || reqPrefix == "rtmp" || reqPrefix == "srt" {
+	if reqType == "api" || reqType == "fs" || reqType == "rtmp" || reqType == "srt" {
 		match, err = glob.Match(polResource, reqResource, rune('/'))
 		if err != nil {
 			return false

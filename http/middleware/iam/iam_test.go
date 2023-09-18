@@ -101,7 +101,7 @@ func TestBasicAuth(t *testing.T) {
 	iam, err := getIAM()
 	require.NoError(t, err)
 
-	iam.AddPolicy("foobar", "$none", "fs:/**", []string{"ANY"})
+	iam.AddPolicy("foobar", "$none", []string{"fs"}, "/**", []string{"ANY"})
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -160,7 +160,7 @@ func TestBasicAuthEncoding(t *testing.T) {
 	iam, err := getIAM()
 	require.NoError(t, err)
 
-	iam.AddPolicy("foobar:2", "$none", "fs:/**", []string{"ANY"})
+	iam.AddPolicy("foobar:2", "$none", []string{"fs"}, "/**", []string{"ANY"})
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -196,9 +196,9 @@ func TestFindDomainFromFilesystem(t *testing.T) {
 	iam, err := getIAM()
 	require.NoError(t, err)
 
-	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
-	iam.AddPolicy("foobar", "group", "fs:/group/**", []string{"ANY"})
-	iam.AddPolicy("foobar", "anothergroup", "fs:/memfs/anothergroup/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", []string{"fs"}, "/**", []string{"ANY"})
+	iam.AddPolicy("foobar", "group", []string{"fs"}, "/group/**", []string{"ANY"})
+	iam.AddPolicy("foobar", "anothergroup", []string{"fs"}, "/memfs/anothergroup/**", []string{"ANY"})
 
 	mw := &iammiddleware{
 		iam:    iam,
@@ -222,8 +222,8 @@ func TestBasicAuthDomain(t *testing.T) {
 	iam, err := getIAM()
 	require.NoError(t, err)
 
-	iam.AddPolicy("$anon", "$none", "fs:/**", []string{"ANY"})
-	iam.AddPolicy("foobar", "group", "fs:/group/**", []string{"ANY"})
+	iam.AddPolicy("$anon", "$none", []string{"fs"}, "/**", []string{"ANY"})
+	iam.AddPolicy("foobar", "group", []string{"fs"}, "/group/**", []string{"ANY"})
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -255,7 +255,7 @@ func TestBasicAuthDomain(t *testing.T) {
 	require.NoError(t, h(c))
 
 	// Allow anonymous group read access
-	iam.AddPolicy("$anon", "group", "fs:/group/**", []string{"GET"})
+	iam.AddPolicy("$anon", "group", []string{"fs"}, "/group/**", []string{"GET"})
 
 	req.Header.Del(echo.HeaderAuthorization)
 	require.NoError(t, h(c))
@@ -265,7 +265,7 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	iam, err := getIAM()
 	require.NoError(t, err)
 
-	iam.AddPolicy("foobar", "$none", "api:/**", []string{"ANY"})
+	iam.AddPolicy("foobar", "$none", []string{"api"}, "/**", []string{"ANY"})
 
 	jwthandler := apihandler.NewJWT(iam)
 

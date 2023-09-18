@@ -7,7 +7,7 @@ import (
 )
 
 type Enforcer interface {
-	Enforce(name, domain, resource, action string) bool
+	Enforce(name, domain, rtype, resource, action string) bool
 }
 
 type IAM interface {
@@ -16,10 +16,10 @@ type IAM interface {
 	HasDomain(domain string) bool
 	ListDomains() []string
 
-	HasPolicy(name, domain, resource string, actions []string) bool
-	AddPolicy(name, domain, resource string, actions []string) error
-	RemovePolicy(name, domain, resource string, actions []string) error
-	ListPolicies(name, domain, resource string, actions []string) []access.Policy
+	HasPolicy(name, domain string, types []string, resource string, actions []string) bool
+	AddPolicy(name, domain string, types []string, resource string, actions []string) error
+	RemovePolicy(name, domain string, types []string, resource string, actions []string) error
+	ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy
 	ReloadPolicies() error
 
 	Validators() []string
@@ -96,7 +96,7 @@ func (i *iam) Close() {
 	i.am = nil
 }
 
-func (i *iam) Enforce(name, domain, resource, action string) bool {
+func (i *iam) Enforce(name, domain, rtype, resource, action string) bool {
 	if len(name) == 0 {
 		name = "$anon"
 	}
@@ -116,6 +116,7 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 	l := i.logger.Debug().WithFields(log.Fields{
 		"subject":   name,
 		"domain":    domain,
+		"type":      rtype,
 		"resource":  resource,
 		"action":    action,
 		"superuser": superuser,
@@ -125,7 +126,7 @@ func (i *iam) Enforce(name, domain, resource, action string) bool {
 		name = "$superuser"
 	}
 
-	ok, rule := i.am.Enforce(name, domain, resource, action)
+	ok, rule := i.am.Enforce(name, domain, rtype, resource, action)
 
 	if !ok {
 		l.Log("no match")
@@ -194,7 +195,7 @@ func (i *iam) Validators() []string {
 	return i.im.Validators()
 }
 
-func (i *iam) HasPolicy(name, domain, resource string, actions []string) bool {
+func (i *iam) HasPolicy(name, domain string, types []string, resource string, actions []string) bool {
 	if len(name) == 0 {
 		name = "$anon"
 	}
@@ -203,10 +204,10 @@ func (i *iam) HasPolicy(name, domain, resource string, actions []string) bool {
 		domain = "$none"
 	}
 
-	return i.am.HasPolicy(name, domain, resource, actions)
+	return i.am.HasPolicy(name, domain, types, resource, actions)
 }
 
-func (i *iam) AddPolicy(name, domain, resource string, actions []string) error {
+func (i *iam) AddPolicy(name, domain string, types []string, resource string, actions []string) error {
 	if len(name) == 0 {
 		name = "$anon"
 	}
@@ -222,10 +223,10 @@ func (i *iam) AddPolicy(name, domain, resource string, actions []string) error {
 		}
 	}
 
-	return i.am.AddPolicy(name, domain, resource, actions)
+	return i.am.AddPolicy(name, domain, types, resource, actions)
 }
 
-func (i *iam) RemovePolicy(name, domain, resource string, actions []string) error {
+func (i *iam) RemovePolicy(name, domain string, types []string, resource string, actions []string) error {
 	if len(name) != 0 && name != "$anon" {
 		if user, err := i.im.Get(name); err == nil {
 			// Update the "updatedAt" field
@@ -233,11 +234,11 @@ func (i *iam) RemovePolicy(name, domain, resource string, actions []string) erro
 		}
 	}
 
-	return i.am.RemovePolicy(name, domain, resource, actions)
+	return i.am.RemovePolicy(name, domain, types, resource, actions)
 }
 
-func (i *iam) ListPolicies(name, domain, resource string, actions []string) []access.Policy {
-	return i.am.ListPolicies(name, domain, resource, actions)
+func (i *iam) ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy {
+	return i.am.ListPolicies(name, domain, types, resource, actions)
 }
 
 func (i *iam) ReloadPolicies() error {

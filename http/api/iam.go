@@ -45,6 +45,7 @@ func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 	for _, p := range policies {
 		u.Policies = append(u.Policies, IAMPolicy{
 			Domain:   p.Domain,
+			Types:    p.Types,
 			Resource: p.Resource,
 			Actions:  p.Actions,
 		})
@@ -84,6 +85,7 @@ func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
 		iampolicies = append(iampolicies, access.Policy{
 			Name:     u.Name,
 			Domain:   p.Domain,
+			Types:    p.Types,
 			Resource: p.Resource,
 			Actions:  p.Actions,
 		})
@@ -122,6 +124,7 @@ type IAMAuth0Tenant struct {
 type IAMPolicy struct {
 	Name     string   `json:"name,omitempty"`
 	Domain   string   `json:"domain"`
+	Types    []string `json:"types"`
 	Resource string   `json:"resource"`
 	Actions  []string `json:"actions"`
 }

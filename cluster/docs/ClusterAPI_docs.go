@@ -1142,6 +1142,12 @@ const docTemplateClusterAPI = `{
                 },
                 "resource": {
                     "type": "string"
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

@@ -696,19 +696,22 @@ func (a *api) start(ctx context.Context) error {
 					{
 						Name:     "$anon",
 						Domain:   "$none",
-						Resource: "fs:/**",
+						Types:    []string{"fs"},
+						Resource: "/**",
 						Actions:  []string{"GET", "HEAD", "OPTIONS"},
 					},
 					{
 						Name:     "$anon",
 						Domain:   "$none",
-						Resource: "api:/api",
+						Types:    []string{"api"},
+						Resource: "/api",
 						Actions:  []string{"GET", "HEAD", "OPTIONS"},
 					},
 					{
 						Name:     "$anon",
 						Domain:   "$none",
-						Resource: "api:/api/v3/widget/process/**",
+						Types:    []string{"api"},
+						Resource: "/api/v3/widget/process/**",
 						Actions:  []string{"GET", "HEAD", "OPTIONS"},
 					},
 				}
@@ -728,7 +731,8 @@ func (a *api) start(ctx context.Context) error {
 					policies = append(policies, iamaccess.Policy{
 						Name:     cfg.Storage.Memory.Auth.Username,
 						Domain:   "$none",
-						Resource: "fs:/memfs/**",
+						Types:    []string{"fs"},
+						Resource: "/memfs/**",
 						Actions:  []string{"ANY"},
 					})
 				}
@@ -753,7 +757,8 @@ func (a *api) start(ctx context.Context) error {
 						policies = append(policies, iamaccess.Policy{
 							Name:     s.Auth.Username,
 							Domain:   "$none",
-							Resource: "fs:" + s.Mountpoint + "/**",
+							Types:    []string{"fs"},
+							Resource: s.Mountpoint + "/**",
 							Actions:  []string{"ANY"},
 						})
 					}
@@ -763,7 +768,8 @@ func (a *api) start(ctx context.Context) error {
 					policies = append(policies, iamaccess.Policy{
 						Name:     "$anon",
 						Domain:   "$none",
-						Resource: "rtmp:/**",
+						Types:    []string{"rtmp"},
+						Resource: "/**",
 						Actions:  []string{"ANY"},
 					})
 				}
@@ -772,7 +778,8 @@ func (a *api) start(ctx context.Context) error {
 					policies = append(policies, iamaccess.Policy{
 						Name:     "$anon",
 						Domain:   "$none",
-						Resource: "srt:**",
+						Types:    []string{"srt"},
+						Resource: "**",
 						Actions:  []string{"ANY"},
 					})
 				}
@@ -789,7 +796,7 @@ func (a *api) start(ctx context.Context) error {
 				}
 
 				for _, policy := range policies {
-					manager.AddPolicy(policy.Name, policy.Domain, policy.Resource, policy.Actions)
+					manager.AddPolicy(policy.Name, policy.Domain, policy.Types, policy.Resource, policy.Actions)
 				}
 			}
 		}

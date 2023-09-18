@@ -21,7 +21,7 @@ func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpat
 	procs := []*models.Process{}
 
 	for _, id := range ids {
-		if !r.IAM.Enforce(user, id.Domain, "process:"+id.ID, "read") {
+		if !r.IAM.Enforce(user, id.Domain, "process", id.ID, "read") {
 			continue
 		}
 
@@ -40,7 +40,7 @@ func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpat
 func (r *queryResolver) Process(ctx context.Context, id string, domain string) (*models.Process, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
 
-	if !r.IAM.Enforce(user, domain, "process:"+id, "read") {
+	if !r.IAM.Enforce(user, domain, "process", id, "read") {
 		return nil, fmt.Errorf("forbidden")
 	}
 
@@ -56,7 +56,7 @@ func (r *queryResolver) Process(ctx context.Context, id string, domain string) (
 func (r *queryResolver) Probe(ctx context.Context, id string, domain string) (*models.Probe, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
 
-	if !r.IAM.Enforce(user, domain, "process:"+id, "write") {
+	if !r.IAM.Enforce(user, domain, "process", id, "write") {
 		return nil, fmt.Errorf("forbidden")
 	}
 

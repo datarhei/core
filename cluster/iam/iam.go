@@ -60,8 +60,8 @@ func (m *manager) apply(op store.Operation) {
 	}
 }
 
-func (m *manager) Enforce(name, domain, resource, action string) bool {
-	return m.iam.Enforce(name, domain, resource, action)
+func (m *manager) Enforce(name, domain, rtype, resource, action string) bool {
+	return m.iam.Enforce(name, domain, rtype, resource, action)
 }
 
 func (m *manager) HasDomain(domain string) bool {
@@ -72,20 +72,20 @@ func (m *manager) ListDomains() []string {
 	return m.iam.ListDomains()
 }
 
-func (m *manager) HasPolicy(name, domain, resource string, actions []string) bool {
-	return m.iam.HasPolicy(name, domain, resource, actions)
+func (m *manager) HasPolicy(name, domain string, types []string, resource string, actions []string) bool {
+	return m.iam.HasPolicy(name, domain, types, resource, actions)
 }
 
-func (m *manager) AddPolicy(name, domain, resource string, actions []string) error {
+func (m *manager) AddPolicy(name, domain string, types []string, resource string, actions []string) error {
 	return ErrClusterMode
 }
 
-func (m *manager) RemovePolicy(name, domain, resource string, actions []string) error {
+func (m *manager) RemovePolicy(name, domain string, types []string, resource string, actions []string) error {
 	return ErrClusterMode
 }
 
-func (m *manager) ListPolicies(name, domain, resource string, actions []string) []access.Policy {
-	return m.iam.ListPolicies(name, domain, resource, actions)
+func (m *manager) ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy {
+	return m.iam.ListPolicies(name, domain, types, resource, actions)
 }
 
 func (m *manager) ReloadPolicies() error {

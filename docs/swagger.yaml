@@ -770,6 +770,10 @@ definitions:
         type: string
       resource:
         type: string
+      types:
+        items:
+          type: string
+        type: array
     type: object
   api.IAMUser:
     properties:

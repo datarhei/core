@@ -59,12 +59,12 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process, check the domain and process ID")
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
 			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process", process.Owner)
 		}
 	}
@@ -131,7 +131,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 	ids := []app.ProcessID{}
 
 	for _, id := range preids {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+id.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process", id.ID, "read") {
 			continue
 		}
 
@@ -184,7 +184,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 	filter := util.DefaultQuery(c, "filter", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -226,7 +226,7 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+		if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 			return api.Err(http.StatusForbidden, "")
 		}
 	}
@@ -271,7 +271,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		Autostart: true,
 	}
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
 	}
 
@@ -292,12 +292,12 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", process.ID)
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
 			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process: %s", process.Owner, process.ID)
 		}
 	}
@@ -352,7 +352,7 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -406,7 +406,7 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -445,7 +445,7 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -507,7 +507,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 		}
 	}
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -651,7 +651,7 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -698,7 +698,7 @@ func (h *RestreamHandler) ProbeConfig(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to probe this process, check the domain and process ID")
 	}
 
@@ -778,7 +778,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -821,7 +821,7 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 

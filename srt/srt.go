@@ -330,13 +330,13 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	}
 
 	domain := s.findDomainFromPlaypath(si.Resource)
-	resource := "srt:" + si.Resource
+	resource := si.Resource
 	action := "PLAY"
 	if mode == srt.PUBLISH {
 		action = "PUBLISH"
 	}
 
-	if !s.iam.Enforce(identity, domain, resource, action) {
+	if !s.iam.Enforce(identity, domain, "srt", resource, action) {
 		s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
 		return srt.REJECT
 	}

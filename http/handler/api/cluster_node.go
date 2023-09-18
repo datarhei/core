@@ -194,7 +194,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	processes := []clientapi.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process", p.Config.ID, "read") {
 			continue
 		}
 

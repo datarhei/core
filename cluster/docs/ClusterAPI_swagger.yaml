@@ -12,6 +12,10 @@ definitions:
         type: string
       resource:
         type: string
+      types:
+        items:
+          type: string
+        type: array
     type: object
   app.Config:
     properties:

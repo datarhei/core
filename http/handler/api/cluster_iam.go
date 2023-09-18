@@ -36,12 +36,12 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 
 	iamuser, iampolicies := user.Unmarshal()
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
 		return api.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
-		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
+		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
 			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
@@ -84,7 +84,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
 		return api.Err(http.StatusForbidden, "", "not allowed to modify this user")
 	}
 
@@ -102,7 +102,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 		}
 	}
 
-	iampolicies := h.iam.ListPolicies(name, "", "", nil)
+	iampolicies := h.iam.ListPolicies(name, "", nil, "", nil)
 
 	user := api.IAMUser{}
 	user.Marshal(iamuser, iampolicies)
@@ -113,12 +113,12 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 
 	iamuser, iampolicies = user.Unmarshal()
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
 		return api.Err(http.StatusForbidden, "", "not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
-		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
+		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
 			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 	}
@@ -165,7 +165,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
 		return api.Err(http.StatusForbidden, "", "not allowed to modify this user")
 	}
 
@@ -199,7 +199,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 	accessPolicies := []access.Policy{}
 
 	for _, p := range policies {
-		if !h.iam.Enforce(ctxuser, p.Domain, "iam:"+iamuser.Name, "write") {
+		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
 			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 
@@ -265,17 +265,17 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 	users := make([]api.IAMUser, len(identities)+1)
 
 	for i, iamuser := range identities {
-		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "read") {
 			continue
 		}
 
-		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
+		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
 			iamuser = identity.User{
 				Name: iamuser.Name,
 			}
 		}
 
-		policies := h.iam.ListPolicies(iamuser.Name, "", "", nil)
+		policies := h.iam.ListPolicies(iamuser.Name, "", nil, "", nil)
 
 		users[i].Marshal(iamuser, policies)
 	}
@@ -284,7 +284,7 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 		Name: "$anon",
 	}
 
-	policies := h.iam.ListPolicies("$anon", "", "", nil)
+	policies := h.iam.ListPolicies("$anon", "", nil, "", nil)
 
 	users[len(users)-1].Marshal(anon, policies)
 
@@ -307,7 +307,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", name, "read") {
 		return api.Err(http.StatusForbidden, "", "Not allowed to access this user")
 	}
 
@@ -321,7 +321,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 		}
 
 		if ctxuser != iamuser.Name {
-			if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+			if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
 				iamuser = identity.User{
 					Name: iamuser.Name,
 				}
@@ -333,7 +333,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 		}
 	}
 
-	iampolicies := h.iam.ListPolicies(name, "", "", nil)
+	iampolicies := h.iam.ListPolicies(name, "", nil, "", nil)
 
 	user := api.IAMUser{}
 	user.Marshal(iamuser, iampolicies)
@@ -351,7 +351,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/policies [get]
 func (h *ClusterHandler) ListPolicies(c echo.Context) error {
-	iampolicies := h.iam.ListPolicies("", "", "", nil)
+	iampolicies := h.iam.ListPolicies("", "", nil, "", nil)
 
 	policies := []api.IAMPolicy{}
 
@@ -385,7 +385,7 @@ func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "$none")
 	name := util.PathParam(c, "name")
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
 		return api.Err(http.StatusForbidden, "", "Not allowed to delete this user")
 	}
 

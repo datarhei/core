@@ -19,7 +19,7 @@ import (
 func (r *queryResolver) PlayoutStatus(ctx context.Context, id string, domain string, input string) (*models.RawAVstream, error) {
 	user, _ := ctx.Value("user").(string)
 
-	if !r.IAM.Enforce(user, domain, "process:"+id, "read") {
+	if !r.IAM.Enforce(user, domain, "process", id, "read") {
 		return nil, fmt.Errorf("forbidden")
 	}
 

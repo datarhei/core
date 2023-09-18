@@ -48,7 +48,7 @@ func TestFormatActions(t *testing.T) {
 	}
 
 	for _, d := range data {
-		require.Equal(t, d[1], formatActions(d[0]), d[0])
+		require.Equal(t, d[1], formatList(d[0]), d[0])
 	}
 }
 

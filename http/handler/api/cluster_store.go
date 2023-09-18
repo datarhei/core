@@ -29,7 +29,7 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	processes := []api.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, p.Config.Domain, "process:"+p.Config.ID, "read") {
+		if !h.iam.Enforce(ctxuser, p.Config.Domain, "process", p.Config.ID, "read") {
 			continue
 		}
 
@@ -62,7 +62,7 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 		Domain: domain,
 	}
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
 	}
 
@@ -109,11 +109,11 @@ func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
 	users := make([]api.IAMUser, len(identities))
 
 	for i, iamuser := range identities {
-		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "read") {
 			continue
 		}
 
-		if !h.iam.Enforce(ctxuser, domain, "iam:"+iamuser.Name, "write") {
+		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
 			iamuser = identity.User{
 				Name: iamuser.Name,
 			}
@@ -144,7 +144,7 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
 
-	if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "iam", name, "read") {
 		return api.Err(http.StatusForbidden, "", "Not allowed to access this user")
 	}
 
@@ -159,7 +159,7 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 		}
 
 		if ctxuser != iamuser.Name {
-			if !h.iam.Enforce(ctxuser, domain, "iam:"+name, "write") {
+			if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
 				iamuser = identity.User{
 					Name: iamuser.Name,
 				}

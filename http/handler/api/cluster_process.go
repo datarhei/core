@@ -65,7 +65,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	pmap := map[app.ProcessID]struct{}{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process:"+p.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process", p.ID, "read") {
 			continue
 		}
 
@@ -81,7 +81,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 		filtered := h.getFilteredStoreProcesses(processes, wantids, domain, reference, idpattern, refpattern, ownerpattern, domainpattern)
 
 		for _, p := range filtered {
-			if !h.iam.Enforce(ctxuser, domain, "process:"+p.Config.ID, "read") {
+			if !h.iam.Enforce(ctxuser, domain, "process", p.Config.ID, "read") {
 				continue
 			}
 
@@ -313,7 +313,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -370,12 +370,12 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
 			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process in domain %s", process.Owner, process.Domain)
 		}
 	}
@@ -431,7 +431,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		Autostart: true,
 	}
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
@@ -449,12 +449,12 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
 	}
 
 	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process:"+process.ID, "write") {
+		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
 			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process", process.Owner)
 		}
 	}
@@ -499,7 +499,7 @@ func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
@@ -552,7 +552,7 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
@@ -599,7 +599,7 @@ func (h *ClusterHandler) GetProcessMetadata(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -633,7 +633,7 @@ func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -684,7 +684,7 @@ func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	if !h.iam.Enforce(ctxuser, process.Domain, "process:"+process.ID, "write") {
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
 	}
 
@@ -729,7 +729,7 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
 
-	if !h.iam.Enforce(ctxuser, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 

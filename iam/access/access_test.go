@@ -26,42 +26,47 @@ func TestAccessManager(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	policies := am.ListPolicies("", "", "", nil)
+	policies := am.ListPolicies("", "", nil, "", nil)
 	require.ElementsMatch(t, []Policy{
 		{
 			Name:     "ingo",
 			Domain:   "$none",
-			Resource: "rtmp:/bla-*",
+			Types:    []string{"rtmp"},
+			Resource: "/bla-*",
 			Actions:  []string{"play", "publish"},
 		},
 		{
 			Name:     "ingo",
 			Domain:   "igelcamp",
-			Resource: "rtmp:/igelcamp/**",
+			Types:    []string{"rtmp"},
+			Resource: "/igelcamp/**",
 			Actions:  []string{"publish"},
 		},
 	}, policies)
 
-	am.AddPolicy("foobar", "group", "bla:/", []string{"write"})
+	am.AddPolicy("foobar", "group", []string{"bla"}, "/", []string{"write"})
 
-	policies = am.ListPolicies("", "", "", nil)
+	policies = am.ListPolicies("", "", nil, "", nil)
 	require.ElementsMatch(t, []Policy{
 		{
 			Name:     "ingo",
 			Domain:   "$none",
-			Resource: "rtmp:/bla-*",
+			Types:    []string{"rtmp"},
+			Resource: "/bla-*",
 			Actions:  []string{"play", "publish"},
 		},
 		{
 			Name:     "ingo",
 			Domain:   "igelcamp",
-			Resource: "rtmp:/igelcamp/**",
+			Types:    []string{"rtmp"},
+			Resource: "/igelcamp/**",
 			Actions:  []string{"publish"},
 		},
 		{
 			Name:     "foobar",
 			Domain:   "group",
-			Resource: "bla:/",
+			Types:    []string{"bla"},
+			Resource: "/",
 			Actions:  []string{"write"},
 		},
 	}, policies)
@@ -70,14 +75,15 @@ func TestAccessManager(t *testing.T) {
 	require.True(t, am.HasDomain("group"))
 	require.False(t, am.HasDomain("$none"))
 
-	am.RemovePolicy("ingo", "", "", nil)
+	am.RemovePolicy("ingo", "", nil, "", nil)
 
-	policies = am.ListPolicies("", "", "", nil)
+	policies = am.ListPolicies("", "", nil, "", nil)
 	require.ElementsMatch(t, []Policy{
 		{
 			Name:     "foobar",
 			Domain:   "group",
-			Resource: "bla:/",
+			Types:    []string{"bla"},
+			Resource: "/",
 			Actions:  []string{"write"},
 		},
 	}, policies)
@@ -86,9 +92,9 @@ func TestAccessManager(t *testing.T) {
 	require.True(t, am.HasDomain("group"))
 	require.False(t, am.HasDomain("$none"))
 
-	ok, _ := am.Enforce("foobar", "group", "bla:/", "read")
+	ok, _ := am.Enforce("foobar", "group", "bla", "/", "read")
 	require.False(t, ok)
 
-	ok, _ = am.Enforce("foobar", "group", "bla:/", "write")
+	ok, _ = am.Enforce("foobar", "group", "bla", "/", "write")
 	require.True(t, ok)
 }

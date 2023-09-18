@@ -92,7 +92,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 			rule[1] = "role:" + name
 			for _, role := range roles {
 				rule[3] = role.Resource
-				rule[4] = formatActions(role.Actions)
+				rule[4] = formatList(role.Actions)
 
 				if err := a.importPolicy(model, rule[0:5]); err != nil {
 					return err
@@ -103,7 +103,7 @@ func (a *adapter) loadPolicyFile(model model.Model) error {
 		for _, policy := range domain.Policies {
 			rule[1] = policy.Username
 			rule[3] = policy.Resource
-			rule[4] = formatActions(policy.Actions)
+			rule[4] = formatList(policy.Actions)
 
 			if err := a.importPolicy(model, rule[0:5]); err != nil {
 				return err
@@ -220,7 +220,7 @@ func (a *adapter) addPolicy(ptype string, rule []string) error {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = formatActions(rule[3])
+		actions = formatList(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
 			"subject":  username,
@@ -307,7 +307,7 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = formatActions(rule[3])
+		actions = formatList(rule[3])
 	} else if ptype == "g" {
 		if len(rule) < 3 {
 			return false, fmt.Errorf("invalid rule length. must be 'user, role, domain'")
@@ -348,13 +348,13 @@ func (a *adapter) hasPolicy(ptype string, rule []string) (bool, error) {
 			}
 
 			for _, role := range roles {
-				if role.Resource == resource && formatActions(role.Actions) == actions {
+				if role.Resource == resource && formatList(role.Actions) == actions {
 					return true, nil
 				}
 			}
 		} else {
 			for _, p := range dom.Policies {
-				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
+				if p.Username == username && p.Resource == resource && formatList(p.Actions) == actions {
 					return true, nil
 				}
 			}
@@ -420,7 +420,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 		username = rule[0]
 		domain = rule[1]
 		resource = rule[2]
-		actions = formatActions(rule[3])
+		actions = formatList(rule[3])
 
 		a.logger.Debug().WithFields(log.Fields{
 			"subject":  username,
@@ -463,7 +463,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			newRoles := []Role{}
 
 			for _, role := range roles {
-				if role.Resource == resource && formatActions(role.Actions) == actions {
+				if role.Resource == resource && formatList(role.Actions) == actions {
 					continue
 				}
 
@@ -475,7 +475,7 @@ func (a *adapter) removePolicy(ptype string, rule []string) error {
 			policies := []DomainPolicy{}
 
 			for _, p := range dom.Policies {
-				if p.Username == username && p.Resource == resource && formatActions(p.Actions) == actions {
+				if p.Username == username && p.Resource == resource && formatList(p.Actions) == actions {
 					continue
 				}
 
@@ -579,8 +579,8 @@ type DomainPolicy struct {
 	Role
 }
 
-func formatActions(actions string) string {
-	a := strings.Split(actions, "|")
+func formatList(list string) string {
+	a := strings.Split(list, "|")
 
 	sort.Strings(a)
 

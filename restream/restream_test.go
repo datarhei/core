@@ -69,7 +69,7 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
-	iam.AddPolicy("$anon", "$none", "process:*", []string{"CREATE", "GET", "DELETE", "UPDATE", "COMMAND", "PROBE", "METADATA", "PLAYOUT"})
+	iam.AddPolicy("$anon", "$none", []string{"process"}, "*", []string{"CREATE", "GET", "DELETE", "UPDATE", "COMMAND", "PROBE", "METADATA", "PLAYOUT"})
 
 	rewriter, err := rewrite.New(rewrite.Config{
 		IAM: iam,

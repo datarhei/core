@@ -35,7 +35,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(user, domain, "process:", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -104,7 +104,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "read") {
+	if !h.iam.Enforce(user, domain, "process:", id, "read") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -162,7 +162,7 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(user, domain, "process:", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -217,7 +217,7 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(user, domain, "process:", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 
@@ -273,7 +273,7 @@ func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(user, domain, "process:", id, "write") {
 		return api.Err(http.StatusForbidden, "Forbidden")
 	}
 
@@ -327,7 +327,7 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 	user := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	if !h.iam.Enforce(user, domain, "process:"+id, "write") {
+	if !h.iam.Enforce(user, domain, "process:", id, "write") {
 		return api.Err(http.StatusForbidden, "")
 	}
 

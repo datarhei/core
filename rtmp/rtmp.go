@@ -273,9 +273,9 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 	}
 
 	domain := s.findDomainFromPlaypath(playpath)
-	resource := "rtmp:" + playpath
+	resource := playpath
 
-	if !s.iam.Enforce(identity, domain, resource, "PLAY") {
+	if !s.iam.Enforce(identity, domain, "rtmp", resource, "PLAY") {
 		s.log(identity, "PLAY", "FORBIDDEN", playpath, "access denied", remote)
 		return
 	}
@@ -402,9 +402,9 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 	}
 
 	domain := s.findDomainFromPlaypath(playpath)
-	resource := "rtmp:" + playpath
+	resource := playpath
 
-	if !s.iam.Enforce(identity, domain, resource, "PUBLISH") {
+	if !s.iam.Enforce(identity, domain, "rtmp", resource, "PUBLISH") {
 		s.log(identity, "PUBLISH", "FORBIDDEN", playpath, "access denied", remote)
 		return
 	}

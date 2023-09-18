@@ -5689,6 +5689,12 @@ const docTemplate = `{
                 },
                 "resource": {
                     "type": "string"
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

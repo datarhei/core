@@ -124,6 +124,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			username := "$anon"
 			resource := c.Request().URL.Path
+			rtype := "fs"
 			var domain string
 
 			c.Set("user", username)
@@ -184,7 +185,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				}
 
 				domain = c.QueryParam("domain")
-				resource = "api:" + resource
+				rtype = "api"
 			} else {
 				identity, err = mw.findIdentityFromSession(c)
 				if err != nil {
@@ -215,7 +216,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				}
 
 				domain = mw.findDomainFromFilesystem(resource)
-				resource = "fs:" + resource
+				rtype = "fs"
 			}
 
 			superuser := false
@@ -234,11 +235,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			action := c.Request().Method
 
-			if username == "$anon" && resource == "api:/api" {
+			if username == "$anon" && rtype == "api" && resource == "/api" {
 				return next(c)
 			}
 
-			if !config.IAM.Enforce(username, domain, resource, action) {
+			if !config.IAM.Enforce(username, domain, rtype, resource, action) {
 				return api.Err(http.StatusForbidden, "Forbidden", "access denied")
 			}
 
@@ -263,7 +264,7 @@ func (m *iammiddleware) findIdentityFromBasicAuth(c echo.Context) (iamidentity.V
 			domain = "$none"
 		}
 
-		if !m.iam.Enforce("$anon", domain, "fs:"+path, c.Request().Method) {
+		if !m.iam.Enforce("$anon", domain, "fs", path, c.Request().Method) {
 			return nil, ErrAuthRequired
 		}
 
