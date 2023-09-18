@@ -12,12 +12,12 @@ import (
 
 type Manager interface {
 	Create(identity User) error
-	Update(name string, identity User) error
-	Delete(name string) error
+	Update(nameOrAlias string, identity User) error
+	Delete(nameOrAlias string) error
 
-	Get(name string) (User, error)
-	GetVerifier(name string) (Verifier, error)
-	GetVerifierFromAuth0(name string) (Verifier, error)
+	Get(nameOrAlias string) (User, error)
+	GetVerifier(nameOrAlias string) (Verifier, error)
+	GetVerifierFromAuth0(auth0Name string) (Verifier, error)
 	GetDefaultVerifier() (Verifier, error)
 
 	Reload() error // Reload users from adapter
@@ -25,7 +25,7 @@ type Manager interface {
 	List() []User  // List all users
 
 	Validators() []string
-	CreateJWT(name string) (string, string, error)
+	CreateJWT(nameOrAlias string) (string, string, error)
 
 	Close()
 }
