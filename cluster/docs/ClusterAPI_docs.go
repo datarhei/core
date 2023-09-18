@@ -2003,11 +2003,17 @@ const docTemplateClusterAPI = `{
                 "auth": {
                     "$ref": "#/definitions/identity.UserAuth"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
                 "superuser": {
                     "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },

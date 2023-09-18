@@ -587,10 +587,14 @@ definitions:
         type: string
       auth:
         $ref: '#/definitions/identity.UserAuth'
+      created_at:
+        type: string
       name:
         type: string
       superuser:
         type: boolean
+      updated_at:
+        type: string
     type: object
   identity.UserAuth:
     properties:

@@ -777,6 +777,9 @@ definitions:
         type: string
       auth:
         $ref: '#/definitions/api.IAMUserAuth'
+      created_at:
+        format: int64
+        type: integer
       name:
         type: string
       policies:
@@ -785,6 +788,9 @@ definitions:
         type: array
       superuser:
         type: boolean
+      updated_at:
+        format: int64
+        type: integer
     type: object
   api.IAMUserAuth:
     properties:

@@ -215,10 +215,24 @@ func (i *iam) AddPolicy(name, domain, resource string, actions []string) error {
 		domain = "$none"
 	}
 
+	if name != "$anon" {
+		if user, err := i.im.Get(name); err == nil {
+			// Update the "updatedAt" field
+			i.im.Update(name, user)
+		}
+	}
+
 	return i.am.AddPolicy(name, domain, resource, actions)
 }
 
 func (i *iam) RemovePolicy(name, domain, resource string, actions []string) error {
+	if len(name) != 0 && name != "$anon" {
+		if user, err := i.im.Get(name); err == nil {
+			// Update the "updatedAt" field
+			i.im.Update(name, user)
+		}
+	}
+
 	return i.am.RemovePolicy(name, domain, resource, actions)
 }
 

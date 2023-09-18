@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
-	"strings"
 	"sync"
 	"time"
 
@@ -167,6 +165,7 @@ type storeData struct {
 	Users struct {
 		UpdatedAt time.Time
 		Users     map[string]identity.User
+		userlist  identity.UserList
 	}
 
 	Policies struct {
@@ -187,6 +186,7 @@ func (s *storeData) init() {
 	s.ProcessNodeMap = map[string]string{}
 	s.Users.UpdatedAt = now
 	s.Users.Users = map[string]identity.User{}
+	s.Users.userlist = identity.NewUserList()
 	s.Policies.UpdatedAt = now
 	s.Policies.Policies = map[string][]access.Policy{}
 	s.Locks = map[string]time.Time{}
@@ -244,7 +244,6 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	logger.Debug().WithField("operation", c.Operation).Log("")
 
 	err = s.applyCommand(c)
-
 	if err != nil {
 		logger.Debug().WithError(err).WithField("operation", c.Operation).Log("")
 		return err
@@ -410,342 +409,6 @@ func (s *store) applyCommand(c Command) error {
 	return err
 }
 
-func (s *store) addProcess(cmd CommandAddProcess) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	id := cmd.Config.ProcessID().String()
-
-	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return fmt.Errorf("the process with the ID '%s' must have limits defined", id)
-	}
-
-	_, ok := s.data.Process[id]
-	if ok {
-		return fmt.Errorf("the process with the ID '%s' already exists", id)
-	}
-
-	order := "stop"
-	if cmd.Config.Autostart {
-		order = "start"
-		cmd.Config.Autostart = false
-	}
-
-	now := time.Now()
-	s.data.Process[id] = Process{
-		CreatedAt: now,
-		UpdatedAt: now,
-		Config:    cmd.Config,
-		Order:     order,
-		Metadata:  map[string]interface{}{},
-	}
-
-	return nil
-}
-
-func (s *store) removeProcess(cmd CommandRemoveProcess) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	id := cmd.ID.String()
-
-	_, ok := s.data.Process[id]
-	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exist", id)
-	}
-
-	delete(s.data.Process, id)
-
-	return nil
-}
-
-func (s *store) updateProcess(cmd CommandUpdateProcess) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	srcid := cmd.ID.String()
-	dstid := cmd.Config.ProcessID().String()
-
-	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return fmt.Errorf("the process with the ID '%s' must have limits defined", dstid)
-	}
-
-	p, ok := s.data.Process[srcid]
-	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", srcid)
-	}
-
-	if p.Config.Equal(cmd.Config) {
-		return nil
-	}
-
-	if srcid == dstid {
-		p.UpdatedAt = time.Now()
-		p.Config = cmd.Config
-
-		s.data.Process[srcid] = p
-
-		return nil
-	}
-
-	_, ok = s.data.Process[dstid]
-	if ok {
-		return fmt.Errorf("the process with the ID '%s' already exists", dstid)
-	}
-
-	now := time.Now()
-
-	p.CreatedAt = now
-	p.UpdatedAt = now
-	p.Config = cmd.Config
-
-	delete(s.data.Process, srcid)
-	s.data.Process[dstid] = p
-
-	return nil
-}
-
-func (s *store) setProcessOrder(cmd CommandSetProcessOrder) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	id := cmd.ID.String()
-
-	p, ok := s.data.Process[id]
-	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
-	}
-
-	p.Order = cmd.Order
-	p.UpdatedAt = time.Now()
-
-	s.data.Process[id] = p
-
-	return nil
-}
-
-func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	id := cmd.ID.String()
-
-	p, ok := s.data.Process[id]
-	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
-	}
-
-	if p.Metadata == nil {
-		p.Metadata = map[string]interface{}{}
-	}
-
-	if cmd.Data == nil {
-		delete(p.Metadata, cmd.Key)
-	} else {
-		p.Metadata[cmd.Key] = cmd.Data
-	}
-	p.UpdatedAt = time.Now()
-
-	s.data.Process[id] = p
-
-	return nil
-}
-
-func (s *store) setProcessError(cmd CommandSetProcessError) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	id := cmd.ID.String()
-
-	p, ok := s.data.Process[id]
-	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
-	}
-
-	p.Error = cmd.Error
-
-	s.data.Process[id] = p
-
-	return nil
-}
-
-func (s *store) addIdentity(cmd CommandAddIdentity) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if cmd.Identity.Name == "$anon" {
-		return fmt.Errorf("the identity with the name '%s' can't be created", cmd.Identity.Name)
-	}
-
-	_, ok := s.data.Users.Users[cmd.Identity.Name]
-	if ok {
-		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
-	}
-
-	s.data.Users.UpdatedAt = time.Now()
-	s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
-
-	return nil
-}
-
-func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if cmd.Name == "$anon" {
-		return fmt.Errorf("the identity with the name '%s' can't be updated", cmd.Name)
-	}
-
-	_, ok := s.data.Users.Users[cmd.Name]
-	if !ok {
-		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
-	}
-
-	if cmd.Name == cmd.Identity.Name {
-		s.data.Users.UpdatedAt = time.Now()
-		s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
-
-		return nil
-	}
-
-	_, ok = s.data.Users.Users[cmd.Identity.Name]
-	if ok {
-		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
-	}
-
-	now := time.Now()
-
-	s.data.Users.UpdatedAt = now
-	s.data.Users.Users[cmd.Identity.Name] = cmd.Identity
-	s.data.Policies.UpdatedAt = now
-	s.data.Policies.Policies[cmd.Identity.Name] = s.data.Policies.Policies[cmd.Name]
-
-	delete(s.data.Users.Users, cmd.Name)
-	delete(s.data.Policies.Policies, cmd.Name)
-
-	return nil
-}
-
-func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	delete(s.data.Users.Users, cmd.Name)
-	s.data.Users.UpdatedAt = time.Now()
-	delete(s.data.Policies.Policies, cmd.Name)
-	s.data.Policies.UpdatedAt = time.Now()
-
-	return nil
-}
-
-func (s *store) setPolicies(cmd CommandSetPolicies) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if cmd.Name != "$anon" {
-		if _, ok := s.data.Users.Users[cmd.Name]; !ok {
-			return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
-		}
-	}
-
-	for i, p := range cmd.Policies {
-		if len(p.Domain) != 0 {
-			continue
-		}
-
-		p.Domain = "$none"
-		cmd.Policies[i] = p
-	}
-
-	delete(s.data.Policies.Policies, cmd.Name)
-	s.data.Policies.Policies[cmd.Name] = cmd.Policies
-	s.data.Policies.UpdatedAt = time.Now()
-
-	return nil
-}
-
-func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.data.ProcessNodeMap = cmd.Map
-
-	return nil
-}
-
-func (s *store) createLock(cmd CommandCreateLock) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	validUntil, ok := s.data.Locks[cmd.Name]
-
-	if ok {
-		if time.Now().Before(validUntil) {
-			return fmt.Errorf("the lock with the ID '%s' already exists", cmd.Name)
-		}
-	}
-
-	s.data.Locks[cmd.Name] = cmd.ValidUntil
-
-	return nil
-}
-
-func (s *store) deleteLock(cmd CommandDeleteLock) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if _, ok := s.data.Locks[cmd.Name]; !ok {
-		return nil
-	}
-
-	delete(s.data.Locks, cmd.Name)
-
-	return nil
-}
-
-func (s *store) clearLocks(cmd CommandClearLocks) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	for name, validUntil := range s.data.Locks {
-		if time.Now().Before(validUntil) {
-			// Lock is still valid
-			continue
-		}
-
-		delete(s.data.Locks, name)
-	}
-
-	return nil
-}
-
-func (s *store) setKV(cmd CommandSetKV) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	value := s.data.KVS[cmd.Key]
-
-	value.Value = cmd.Value
-	value.UpdatedAt = time.Now()
-
-	s.data.KVS[cmd.Key] = value
-
-	return nil
-}
-
-func (s *store) unsetKV(cmd CommandUnsetKV) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if _, ok := s.data.KVS[cmd.Key]; !ok {
-		return fs.ErrNotExist
-	}
-
-	delete(s.data.KVS, cmd.Key)
-
-	return nil
-}
-
 func (s *store) OnApply(fn func(op Operation)) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -794,6 +457,22 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 		data.Process[id] = p
 	}
 
+	now := time.Now()
+
+	for name, u := range data.Users.Users {
+		data.Users.userlist.Add(u)
+
+		if u.CreatedAt.IsZero() {
+			u.CreatedAt = now
+		}
+
+		if u.UpdatedAt.IsZero() {
+			u.UpdatedAt = now
+		}
+
+		data.Users.Users[name] = u
+	}
+
 	if data.Version == 0 {
 		data.Version = 1
 	}
@@ -801,167 +480,6 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	s.data = data
 
 	return nil
-}
-
-func (s *store) ListProcesses() []Process {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	processes := []Process{}
-
-	for _, p := range s.data.Process {
-		processes = append(processes, Process{
-			CreatedAt: p.CreatedAt,
-			UpdatedAt: p.UpdatedAt,
-			Config:    p.Config.Clone(),
-			Order:     p.Order,
-			Metadata:  p.Metadata,
-			Error:     p.Error,
-		})
-	}
-
-	return processes
-}
-
-func (s *store) GetProcess(id app.ProcessID) (Process, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	process, ok := s.data.Process[id.String()]
-	if !ok {
-		return Process{}, fmt.Errorf("not found")
-	}
-
-	return Process{
-		CreatedAt: process.CreatedAt,
-		UpdatedAt: process.UpdatedAt,
-		Config:    process.Config.Clone(),
-		Order:     process.Order,
-		Metadata:  process.Metadata,
-		Error:     process.Error,
-	}, nil
-}
-
-func (s *store) ListUsers() Users {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	u := Users{
-		UpdatedAt: s.data.Users.UpdatedAt,
-	}
-
-	for _, user := range s.data.Users.Users {
-		u.Users = append(u.Users, user)
-	}
-
-	return u
-}
-
-func (s *store) GetUser(name string) Users {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	u := Users{
-		UpdatedAt: s.data.Users.UpdatedAt,
-	}
-
-	if user, ok := s.data.Users.Users[name]; ok {
-		u.Users = append(u.Users, user)
-	}
-
-	return u
-}
-
-func (s *store) ListPolicies() Policies {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	p := Policies{
-		UpdatedAt: s.data.Policies.UpdatedAt,
-	}
-
-	for _, policies := range s.data.Policies.Policies {
-		p.Policies = append(p.Policies, policies...)
-	}
-
-	return p
-}
-
-func (s *store) ListUserPolicies(name string) Policies {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	p := Policies{
-		UpdatedAt: s.data.Policies.UpdatedAt,
-	}
-
-	p.Policies = append(p.Policies, s.data.Policies.Policies[name]...)
-
-	return p
-}
-
-func (s *store) GetProcessNodeMap() map[string]string {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	m := map[string]string{}
-
-	for key, value := range s.data.ProcessNodeMap {
-		m[key] = value
-	}
-
-	return m
-}
-
-func (s *store) HasLock(name string) bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	_, ok := s.data.Locks[name]
-
-	return ok
-}
-
-func (s *store) ListLocks() map[string]time.Time {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	m := map[string]time.Time{}
-
-	for key, value := range s.data.Locks {
-		m[key] = value
-	}
-
-	return m
-}
-
-func (s *store) ListKVS(prefix string) map[string]Value {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	m := map[string]Value{}
-
-	for key, value := range s.data.KVS {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-
-		m[key] = value
-	}
-
-	return m
-}
-
-func (s *store) GetFromKVS(key string) (Value, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	value, ok := s.data.KVS[key]
-	if !ok {
-		return Value{}, fs.ErrNotExist
-	}
-
-	return value, nil
 }
 
 type fsmSnapshot struct {

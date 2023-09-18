@@ -1,11 +1,15 @@
 package api
 
 import (
+	"time"
+
 	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
 )
 
 type IAMUser struct {
+	CreatedAt int64       `json:"created_at" format:"int64"`
+	UpdatedAt int64       `json:"updated_at" format:"int64"`
 	Name      string      `json:"name"`
 	Alias     string      `json:"alias"`
 	Superuser bool        `json:"superuser"`
@@ -14,6 +18,8 @@ type IAMUser struct {
 }
 
 func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
+	u.CreatedAt = user.CreatedAt.Unix()
+	u.UpdatedAt = user.UpdatedAt.Unix()
 	u.Name = user.Name
 	u.Alias = user.Alias
 	u.Superuser = user.Superuser
@@ -47,6 +53,8 @@ func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 
 func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
 	iamuser := identity.User{
+		CreatedAt: time.Unix(u.CreatedAt, 0),
+		UpdatedAt: time.Unix(u.UpdatedAt, 0),
 		Name:      u.Name,
 		Alias:     u.Alias,
 		Superuser: u.Superuser,

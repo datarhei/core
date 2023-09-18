@@ -5701,6 +5701,10 @@ const docTemplate = `{
                 "auth": {
                     "$ref": "#/definitions/api.IAMUserAuth"
                 },
+                "created_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -5712,6 +5716,10 @@ const docTemplate = `{
                 },
                 "superuser": {
                     "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
