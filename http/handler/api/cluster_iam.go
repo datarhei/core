@@ -206,6 +206,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 		accessPolicies = append(accessPolicies, access.Policy{
 			Name:     name,
 			Domain:   p.Domain,
+			Types:    p.Types,
 			Resource: p.Resource,
 			Actions:  p.Actions,
 		})
@@ -359,6 +360,7 @@ func (h *ClusterHandler) ListPolicies(c echo.Context) error {
 		policies = append(policies, api.IAMPolicy{
 			Name:     pol.Name,
 			Domain:   pol.Domain,
+			Types:    pol.Types,
 			Resource: pol.Resource,
 			Actions:  pol.Actions,
 		})

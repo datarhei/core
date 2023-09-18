@@ -473,6 +473,14 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 		data.Users.Users[name] = u
 	}
 
+	for name, policies := range data.Policies.Policies {
+		for i, p := range policies {
+			policies[i] = s.updatePolicy(p)
+		}
+
+		data.Policies.Policies[name] = policies
+	}
+
 	if data.Version == 0 {
 		data.Version = 1
 	}

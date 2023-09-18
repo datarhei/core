@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 	"time"
+
+	"github.com/datarhei/core/v16/iam/access"
 )
 
 func (s *store) setPolicies(cmd CommandSetPolicies) error {
@@ -27,11 +29,12 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	}
 
 	for i, p := range cmd.Policies {
-		if len(p.Domain) != 0 {
-			continue
+		p = s.updatePolicy(p)
+
+		if len(p.Domain) == 0 {
+			p.Domain = "$none"
 		}
 
-		p.Domain = "$none"
 		cmd.Policies[i] = p
 	}
 
@@ -72,6 +75,15 @@ func (s *store) ListUserPolicies(name string) Policies {
 
 	p.UpdatedAt = user.UpdatedAt
 	p.Policies = append(p.Policies, s.data.Policies.Policies[user.Name]...)
+
+	return p
+}
+
+// updatePolicy updates a policy such that the resource type is split off the resource
+func (s *store) updatePolicy(p access.Policy) access.Policy {
+	if len(p.Types) == 0 {
+		p.Types, p.Resource = access.DecodeResource(p.Resource)
+	}
 
 	return p
 }

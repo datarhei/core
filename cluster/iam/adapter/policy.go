@@ -1,7 +1,6 @@
 package adapter
 
 import (
-	"strings"
 	"sync"
 
 	"github.com/datarhei/core/v16/cluster/store"
@@ -36,11 +35,15 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 			p.Domain = "$none"
 		}
 
+		if len(p.Types) == 0 {
+			p.Types = []string{"$none"}
+		}
+
 		rule := []string{
 			p.Name,
 			p.Domain,
-			p.Resource,
-			strings.Join(p.Actions, "|"),
+			iamaccess.EncodeResource(p.Types, p.Resource),
+			iamaccess.EncodeActions(p.Actions),
 		}
 
 		domains[p.Domain] = struct{}{}

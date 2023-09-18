@@ -44,7 +44,7 @@ func TestAccessManager(t *testing.T) {
 		},
 	}, policies)
 
-	am.AddPolicy("foobar", "group", []string{"bla"}, "/", []string{"write"})
+	am.AddPolicy("foobar", "group", []string{"bla", "blubb"}, "/", []string{"write"})
 
 	policies = am.ListPolicies("", "", nil, "", nil)
 	require.ElementsMatch(t, []Policy{
@@ -65,7 +65,7 @@ func TestAccessManager(t *testing.T) {
 		{
 			Name:     "foobar",
 			Domain:   "group",
-			Types:    []string{"bla"},
+			Types:    []string{"bla", "blubb"},
 			Resource: "/",
 			Actions:  []string{"write"},
 		},
@@ -82,7 +82,7 @@ func TestAccessManager(t *testing.T) {
 		{
 			Name:     "foobar",
 			Domain:   "group",
-			Types:    []string{"bla"},
+			Types:    []string{"bla", "blubb"},
 			Resource: "/",
 			Actions:  []string{"write"},
 		},
@@ -96,5 +96,8 @@ func TestAccessManager(t *testing.T) {
 	require.False(t, ok)
 
 	ok, _ = am.Enforce("foobar", "group", "bla", "/", "write")
+	require.True(t, ok)
+
+	ok, _ = am.Enforce("foobar", "group", "blubb", "/", "write")
 	require.True(t, ok)
 }

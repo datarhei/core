@@ -80,13 +80,13 @@ func New(config Config) (Manager, error) {
 }
 
 func (am *access) HasPolicy(name, domain string, types []string, resource string, actions []string) bool {
-	policy := []string{name, domain, encodeResource(types, resource), encodeActions(actions)}
+	policy := []string{name, domain, EncodeResource(types, resource), EncodeActions(actions)}
 
 	return am.enforcer.HasPolicy(policy)
 }
 
 func (am *access) AddPolicy(name, domain string, types []string, resource string, actions []string) error {
-	policy := []string{name, domain, encodeResource(types, resource), encodeActions(actions)}
+	policy := []string{name, domain, EncodeResource(types, resource), EncodeActions(actions)}
 
 	if am.enforcer.HasPolicy(policy) {
 		return nil
@@ -98,7 +98,7 @@ func (am *access) AddPolicy(name, domain string, types []string, resource string
 }
 
 func (am *access) RemovePolicy(name, domain string, types []string, resource string, actions []string) error {
-	policies := am.enforcer.GetFilteredPolicy(0, name, domain, encodeResource(types, resource), encodeActions(actions))
+	policies := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
 	_, err := am.enforcer.RemovePolicies(policies)
 
 	return err
@@ -107,16 +107,16 @@ func (am *access) RemovePolicy(name, domain string, types []string, resource str
 func (am *access) ListPolicies(name, domain string, types []string, resource string, actions []string) []Policy {
 	policies := []Policy{}
 
-	ps := am.enforcer.GetFilteredPolicy(0, name, domain, encodeResource(types, resource), encodeActions(actions))
+	ps := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
 
 	for _, p := range ps {
-		types, resource := decodeResource(p[2])
+		types, resource := DecodeResource(p[2])
 		policies = append(policies, Policy{
 			Name:     p[0],
 			Domain:   p[1],
 			Types:    types,
 			Resource: resource,
-			Actions:  decodeActions(p[3]),
+			Actions:  DecodeActions(p[3]),
 		})
 	}
 
@@ -145,15 +145,15 @@ func (am *access) Enforce(name, domain, rtype, resource, action string) (bool, s
 	return ok, strings.Join(rule, ", ")
 }
 
-func encodeActions(actions []string) string {
+func EncodeActions(actions []string) string {
 	return strings.Join(actions, "|")
 }
 
-func decodeActions(actions string) []string {
+func DecodeActions(actions string) []string {
 	return strings.Split(actions, "|")
 }
 
-func encodeResource(types []string, resource string) string {
+func EncodeResource(types []string, resource string) string {
 	if len(types) == 0 {
 		return resource
 	}
@@ -163,10 +163,10 @@ func encodeResource(types []string, resource string) string {
 	return strings.Join(types, "|") + ":" + resource
 }
 
-func decodeResource(resource string) ([]string, string) {
+func DecodeResource(resource string) ([]string, string) {
 	before, after, found := strings.Cut(resource, ":")
 	if !found {
-		return []string{}, resource
+		return []string{"$none"}, resource
 	}
 
 	return strings.Split(before, "|"), after
