@@ -37,3 +37,7 @@ func (r *restclient) ClusterProcessMetadataSet(id ProcessID, key string, metadat
 func (r *restclient) ClusterProcessProbe(id ProcessID) (api.Probe, error) {
 	return r.processProbe("cluster", id)
 }
+
+func (r *restclient) ClusterProcessProbeConfig(config api.ProcessConfig, coreid string) (api.Probe, error) {
+	return r.processProbeConfig("cluster", config, coreid)
+}

@@ -250,12 +250,18 @@ func (r *restclient) processProbe(where string, id ProcessID) (api.Probe, error)
 	return p, err
 }
 
-func (r *restclient) processProbeConfig(where string, config api.ProcessConfig) (api.Probe, error) {
+func (r *restclient) processProbeConfig(where string, config api.ProcessConfig, coreid string) (api.Probe, error) {
 	var p api.Probe
+
+	query := &url.Values{}
 
 	path := "/v3/process/probe"
 	if where == "cluster" {
 		path = "/v3/cluster/process/probe"
+
+		if len(coreid) != 0 {
+			query.Set("coreid", coreid)
+		}
 	}
 
 	var buf bytes.Buffer
@@ -263,7 +269,7 @@ func (r *restclient) processProbeConfig(where string, config api.ProcessConfig) 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
 
-	data, err := r.call("POST", path, nil, nil, "application/json", &buf)
+	data, err := r.call("POST", path, query, nil, "application/json", &buf)
 	if err != nil {
 		return p, err
 	}
@@ -310,7 +316,7 @@ func (r *restclient) ProcessProbe(id ProcessID) (api.Probe, error) {
 }
 
 func (r *restclient) ProcessProbeConfig(config api.ProcessConfig) (api.Probe, error) {
-	return r.processProbeConfig("", config)
+	return r.processProbeConfig("", config, "")
 }
 
 func (r *restclient) ProcessConfig(id ProcessID) (api.ProcessConfig, error) {

@@ -368,8 +368,12 @@ type ConfigV3 struct {
 				Username string `json:"username"` // Deprecated, use IAM
 				Password string `json:"password"` // Deprecated, use IAM
 			} `json:"auth"` // Deprecated, use IAM
-			Size  int64 `json:"max_size_mbytes" format:"int64"`
-			Purge bool  `json:"purge"`
+			Size   int64 `json:"max_size_mbytes" format:"int64"`
+			Purge  bool  `json:"purge"`
+			Backup struct {
+				Dir      string   `json:"dir"`
+				Patterns []string `json:"patterns"`
+			} `json:"backup"`
 		} `json:"memory"`
 		S3   []S3Storage `json:"s3"`
 		CORS struct {

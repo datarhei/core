@@ -19,4 +19,5 @@ type AVstream struct {
 	LoopingRuntime uint64     `json:"looping_runtime" format:"uint64"`
 	Duplicating    bool       `json:"duplicating"`
 	GOP            string     `json:"gop"`
+	Mode           string     `json:"mode"`
 }

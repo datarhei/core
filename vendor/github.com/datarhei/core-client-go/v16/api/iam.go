@@ -1,6 +1,8 @@
 package api
 
 type IAMUser struct {
+	CreatedAt int64       `json:"created_at" format:"int64"`
+	UpdatedAt int64       `json:"updated_at" format:"int64"`
 	Name      string      `json:"name"`
 	Alias     string      `json:"alias"`
 	Superuser bool        `json:"superuser"`
@@ -38,6 +40,7 @@ type IAMAuth0Tenant struct {
 type IAMPolicy struct {
 	Name     string   `json:"name,omitempty"`
 	Domain   string   `json:"domain"`
+	Types    []string `json:"types"`
 	Resource string   `json:"resource"`
 	Actions  []string `json:"actions"`
 }

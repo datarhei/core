@@ -102,9 +102,9 @@ func (r *restclient) identitySetPolicies(where, name string, p []api.IAMPolicy) 
 }
 
 func (r *restclient) identityDelete(where, name string) error {
-	path := "/v3/iam/user" + url.PathEscape(name)
+	path := "/v3/iam/user/" + url.PathEscape(name)
 	if where == "cluster" {
-		path = "/v3/cluster/iam/user" + url.PathEscape(name)
+		path = "/v3/cluster/iam/user/" + url.PathEscape(name)
 	}
 
 	_, err := r.call("DELETE", path, nil, nil, "", nil)

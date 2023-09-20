@@ -123,15 +123,16 @@ type RestClient interface {
 	ClusterDBKeyValues() (api.ClusterKVS, error)         // GET /v3/cluster/db/kv
 	ClusterDBProcessMap() (api.ClusterProcessMap, error) // GET /v3/cluster/db/map/process
 
-	ClusterProcessList(opts ProcessListOptions) ([]api.Process, error)               // GET /v3/cluster/process
-	ClusterProcess(id ProcessID, filter []string) (api.Process, error)               // POST /v3/cluster/process
-	ClusterProcessAdd(p api.ProcessConfig) error                                     // GET /v3/cluster/process/{id}
-	ClusterProcessUpdate(id ProcessID, p api.ProcessConfig) error                    // PUT /v3/cluster/process/{id}
-	ClusterProcessDelete(id ProcessID) error                                         // DELETE /v3/cluster/process/{id}
-	ClusterProcessCommand(id ProcessID, command string) error                        // PUT /v3/cluster/process/{id}/command
-	ClusterProcessMetadata(id ProcessID, key string) (api.Metadata, error)           // GET /v3/cluster/process/{id}/metadata/{key}
-	ClusterProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error // PUT /v3/cluster/process/{id}/metadata/{key}
-	ClusterProcessProbe(id ProcessID) (api.Probe, error)                             // GET /v3/cluster/process/{id}/probe
+	ClusterProcessList(opts ProcessListOptions) ([]api.Process, error)                    // GET /v3/cluster/process
+	ClusterProcess(id ProcessID, filter []string) (api.Process, error)                    // POST /v3/cluster/process
+	ClusterProcessAdd(p api.ProcessConfig) error                                          // GET /v3/cluster/process/{id}
+	ClusterProcessUpdate(id ProcessID, p api.ProcessConfig) error                         // PUT /v3/cluster/process/{id}
+	ClusterProcessDelete(id ProcessID) error                                              // DELETE /v3/cluster/process/{id}
+	ClusterProcessCommand(id ProcessID, command string) error                             // PUT /v3/cluster/process/{id}/command
+	ClusterProcessMetadata(id ProcessID, key string) (api.Metadata, error)                // GET /v3/cluster/process/{id}/metadata/{key}
+	ClusterProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error      // PUT /v3/cluster/process/{id}/metadata/{key}
+	ClusterProcessProbe(id ProcessID) (api.Probe, error)                                  // GET /v3/cluster/process/{id}/probe
+	ClusterProcessProbeConfig(config api.ProcessConfig, coreid string) (api.Probe, error) // POST /v3/cluster/process/probe
 
 	ClusterIdentitiesList() ([]api.IAMUser, error)                   // GET /v3/cluster/iam/user
 	ClusterIdentity(name string) (api.IAMUser, error)                // GET /v3/cluster/iam/user/{name}
@@ -444,6 +445,10 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/process/probe"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/process/probe"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},
