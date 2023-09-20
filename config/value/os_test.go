@@ -55,7 +55,7 @@ func TestDirValue(t *testing.T) {
 	val := NewDir(&x, "/foobar", memfs)
 
 	require.Equal(t, "/foobar", val.String())
-	require.Error(t, val.Validate())
+	require.NoError(t, val.Validate())
 	require.Equal(t, false, val.IsEmpty())
 
 	err = memfs.MkdirAll("/foobar", 0755)
