@@ -211,6 +211,8 @@ func (d *Config) init() {
 	d.vars.Register(value.NewString(&d.Storage.Memory.Auth.Password, rand.StringAlphanumeric(18)), "storage.memory.auth.password", "CORE_STORAGE_MEMORY_AUTH_PASSWORD", nil, "Password for Basic-Auth of /memfs", false, true)
 	d.vars.Register(value.NewInt64(&d.Storage.Memory.Size, 0), "storage.memory.max_size_mbytes", "CORE_STORAGE_MEMORY_MAX_SIZE_MBYTES", []string{"CORE_STORAGE_MEMORY_MAXSIZEMBYTES"}, "Max. allowed megabytes for /memfs, 0 for unlimited", false, false)
 	d.vars.Register(value.NewBool(&d.Storage.Memory.Purge, false), "storage.memory.purge", "CORE_STORAGE_MEMORY_PURGE", nil, "Automatically remove the oldest files if /memfs is full", false, false)
+	d.vars.Register(value.NewDir(&d.Storage.Memory.Backup.Dir, "", d.fs), "storage.memory.backup.dir", "CORE_STORAGE_MEMORY_BACKUP_DIR", nil, "Directory for writing backups of /memfs to", false, false)
+	d.vars.Register(value.NewStringList(&d.Storage.Memory.Backup.Patterns, []string{}, " "), "storage.memory.backup.patterns", "CORE_STORAGE_MEMORY_BACKUP_PATTERNS", nil, "Glob patterns for files to backup", false, false)
 
 	// Storage (S3)
 	d.vars.Register(value.NewS3StorageListValue(&d.Storage.S3, []value.S3Storage{}, "|"), "storage.s3", "CORE_STORAGE_S3", nil, "List of S3 storage URLS", false, false)

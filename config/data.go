@@ -89,8 +89,12 @@ type Data struct {
 				Username string `json:"username"` // Deprecated, use IAM
 				Password string `json:"password"` // Deprecated, use IAM
 			} `json:"auth"` // Deprecated, use IAM
-			Size  int64 `json:"max_size_mbytes" format:"int64"`
-			Purge bool  `json:"purge"`
+			Size   int64 `json:"max_size_mbytes" format:"int64"`
+			Purge  bool  `json:"purge"`
+			Backup struct {
+				Dir      string   `json:"dir"`
+				Patterns []string `json:"patterns"`
+			} `json:"backup"`
 		} `json:"memory"`
 		S3   []value.S3Storage `json:"s3"`
 		CORS struct {
@@ -259,8 +263,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.CORS = d.Storage.CORS
 	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
 
-	data.Storage.Memory = d.Storage.Memory
-
 	// Actual changes
 	data.Debug.Profiling = d.Debug.Profiling
 	data.Debug.ForceGC = d.Debug.ForceGC
@@ -280,6 +282,12 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Disk.Cache.FileSize = d.Storage.Disk.Cache.FileSize
 	data.Storage.Disk.Cache.TTL = d.Storage.Disk.Cache.TTL
 	data.Storage.Disk.Cache.Types.Allow = slices.Copy(d.Storage.Disk.Cache.Types)
+
+	data.Storage.Memory.Auth.Enable = d.Storage.Memory.Auth.Enable
+	data.Storage.Memory.Auth.Username = d.Storage.Memory.Auth.Username
+	data.Storage.Memory.Auth.Password = d.Storage.Memory.Auth.Password
+	data.Storage.Memory.Size = d.Storage.Memory.Size
+	data.Storage.Memory.Purge = d.Storage.Memory.Purge
 
 	data.Storage.S3 = []value.S3Storage{}
 
@@ -363,7 +371,11 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Storage.CORS = d.Storage.CORS
 	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
 
-	data.Storage.Memory = d.Storage.Memory
+	data.Storage.Memory.Auth.Enable = d.Storage.Memory.Auth.Enable
+	data.Storage.Memory.Auth.Username = d.Storage.Memory.Auth.Username
+	data.Storage.Memory.Auth.Password = d.Storage.Memory.Auth.Password
+	data.Storage.Memory.Size = d.Storage.Memory.Size
+	data.Storage.Memory.Purge = d.Storage.Memory.Purge
 
 	data.Storage.Disk.Dir = d.Storage.Disk.Dir
 	data.Storage.Disk.Size = d.Storage.Disk.Size

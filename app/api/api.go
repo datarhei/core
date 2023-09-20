@@ -840,12 +840,19 @@ func (a *api) start(ctx context.Context) error {
 	}
 
 	if a.memfs == nil {
-		memfs, _ := fs.NewMemFilesystem(fs.MemConfig{
+		config := fs.MemConfig{
 			Logger: a.log.logger.core.WithComponent("Filesystem").WithFields(log.Fields{
 				"type": "mem",
 				"name": "mem",
 			}),
-		})
+		}
+		var memfs fs.Filesystem = nil
+		if len(cfg.Storage.Memory.Backup.Dir) != 0 {
+			config.Logger.Info().WithField("dir", cfg.Storage.Memory.Backup.Dir).Log("Loading backup")
+			memfs, _ = fs.NewMemFilesystemFromDir(cfg.Storage.Memory.Backup.Dir, config)
+		} else {
+			memfs, _ = fs.NewMemFilesystem(config)
+		}
 
 		memfs.SetMetadata("base", baseMemFS.String())
 
@@ -1758,6 +1765,26 @@ func (a *api) stop() {
 		a.cluster.Shutdown()
 	}
 
+	if a.memfs != nil {
+		cfg := a.config.store.GetActive()
+		if len(cfg.Storage.Memory.Backup.Dir) != 0 {
+			diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+				Root:   cfg.Storage.Memory.Backup.Dir,
+				Logger: logger,
+			})
+			if err == nil {
+				err = backupMemFS(diskfs, a.memfs, cfg.Storage.Memory.Backup.Patterns)
+				if err != nil {
+					logger.Error().WithError(err).WithField("dir", cfg.Storage.Memory.Backup.Dir).Log("Failed to create backup from memfs")
+				} else {
+					logger.Info().WithField("dir", cfg.Storage.Memory.Backup.Dir).Log("Created backup from memfs")
+				}
+			} else {
+				logger.Error().WithError(err).WithField("dir", cfg.Storage.Memory.Backup.Dir).Log("Failed to create rooted disk filesystem")
+			}
+		}
+	}
+
 	// Stop all restream processes
 	if a.restream != nil {
 		logger.Info().Log("Stopping all processes ...")
@@ -1906,4 +1933,38 @@ func (a *api) Destroy() {
 		a.memfs.RemoveList("/", fs.ListOptions{})
 		a.memfs = nil
 	}
+}
+
+func backupMemFS(target, source fs.Filesystem, patterns []string) error {
+	// Clean the backup directory
+	target.RemoveList("/", fs.ListOptions{
+		Pattern: "**",
+	})
+
+	filelist := map[string]struct{}{}
+
+	for _, p := range patterns {
+		// For each pattern get the file list and store the names
+		files := source.List("/", fs.ListOptions{
+			Pattern: p,
+		})
+
+		for _, f := range files {
+			filelist[f.Name()] = struct{}{}
+		}
+	}
+
+	// Write each file from source to target
+	for name := range filelist {
+		file := source.Open(name)
+		if file == nil {
+			continue
+		}
+
+		target.WriteFileReader(name, file)
+
+		file.Close()
+	}
+
+	return nil
 }

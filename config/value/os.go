@@ -96,6 +96,10 @@ func (u *Dir) Validate() error {
 		return nil
 	}
 
+	if err := u.fs.MkdirAll(val, 0755); err != nil {
+		return fmt.Errorf("%s can't be created (%w)", val, err)
+	}
+
 	finfo, err := u.fs.Stat(val)
 	if err != nil {
 		return fmt.Errorf("%s does not exist", val)
