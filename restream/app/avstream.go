@@ -19,4 +19,5 @@ type AVstream struct {
 	LoopingRuntime uint64 // sec
 	Duplicating    bool
 	GOP            string
+	Mode           string // "file" or "live"
 }

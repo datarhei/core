@@ -4579,6 +4579,9 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
+                "mode": {
+                    "type": "string"
+                },
                 "output": {
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
@@ -5415,6 +5418,20 @@ const docTemplate = `{
                                         "username": {
                                             "description": "Deprecated, use IAM",
                                             "type": "string"
+                                        }
+                                    }
+                                },
+                                "backup": {
+                                    "type": "object",
+                                    "properties": {
+                                        "dir": {
+                                            "type": "string"
+                                        },
+                                        "patterns": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 },
@@ -7691,6 +7708,20 @@ const docTemplate = `{
                                         "username": {
                                             "description": "Deprecated, use IAM",
                                             "type": "string"
+                                        }
+                                    }
+                                },
+                                "backup": {
+                                    "type": "object",
+                                    "properties": {
+                                        "dir": {
+                                            "type": "string"
+                                        },
+                                        "patterns": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 },

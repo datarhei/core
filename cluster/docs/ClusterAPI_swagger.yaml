@@ -538,6 +538,15 @@ definitions:
                     description: Deprecated, use IAM
                     type: string
                 type: object
+              backup:
+                properties:
+                  dir:
+                    type: string
+                  patterns:
+                    items:
+                      type: string
+                    type: array
+                type: object
               max_size_mbytes:
                 format: int64
                 type: integer

@@ -34,6 +34,7 @@ type AVstream struct {
 	LoopingRuntime uint64     `json:"looping_runtime" format:"uint64"`
 	Duplicating    bool       `json:"duplicating"`
 	GOP            string     `json:"gop"`
+	Mode           string     `json:"mode"`
 }
 
 func (a *AVstream) Unmarshal(av *app.AVstream) {
@@ -50,6 +51,7 @@ func (a *AVstream) Unmarshal(av *app.AVstream) {
 	a.LoopingRuntime = av.LoopingRuntime
 	a.Duplicating = av.Duplicating
 	a.GOP = av.GOP
+	a.Mode = av.Mode
 
 	a.Input.Unmarshal(&av.Input)
 	a.Output.Unmarshal(&av.Output)

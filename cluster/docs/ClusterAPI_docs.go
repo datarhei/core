@@ -1928,6 +1928,20 @@ const docTemplateClusterAPI = `{
                                         }
                                     }
                                 },
+                                "backup": {
+                                    "type": "object",
+                                    "properties": {
+                                        "dir": {
+                                            "type": "string"
+                                        },
+                                        "patterns": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                },
                                 "max_size_mbytes": {
                                     "type": "integer",
                                     "format": "int64"

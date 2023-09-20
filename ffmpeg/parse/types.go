@@ -71,6 +71,7 @@ type ffmpegAVstream struct {
 	LoopingRuntime uint64           `json:"looping_runtime"`
 	Duplicating    bool             `json:"duplicating"`
 	GOP            string           `json:"gop"`
+	Mode           string           `json:"mode"`
 }
 
 func (av *ffmpegAVstream) export() *AVstream {
@@ -84,6 +85,7 @@ func (av *ffmpegAVstream) export() *AVstream {
 		LoopingRuntime: av.LoopingRuntime,
 		Duplicating:    av.Duplicating,
 		GOP:            av.GOP,
+		Mode:           av.Mode,
 		Input:          av.Input.export(),
 		Output:         av.Output.export(),
 	}
@@ -323,6 +325,7 @@ type AVstream struct {
 	LoopingRuntime uint64
 	Duplicating    bool
 	GOP            string
+	Mode           string
 }
 
 type Usage struct {

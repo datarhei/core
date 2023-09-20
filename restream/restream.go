@@ -1674,6 +1674,7 @@ func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress)
 				LoopingRuntime: pinput.AVstream.LoopingRuntime,
 				Duplicating:    pinput.AVstream.Duplicating,
 				GOP:            pinput.AVstream.GOP,
+				Mode:           pinput.AVstream.Mode,
 			}
 
 			input.AVstream = avstream
