@@ -2,6 +2,7 @@ package session
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"sort"
 	"sync"
@@ -481,15 +482,12 @@ func (c *collector) Restore(snapshot io.ReadCloser) error {
 
 	c.logger.Debug().Log("Restoring history snapshot")
 
-	jsondata, err := io.ReadAll(snapshot)
-	if err != nil {
-		return err
-	}
+	decoder := json.NewDecoder(snapshot)
 
 	data := history{}
 
-	if err = json.Unmarshal(jsondata, &data); err != nil {
-		return err
+	if err := decoder.Decode(&data); err != nil {
+		return fmt.Errorf("%s: failed to read snapshot: %w", c.id, err)
 	}
 
 	c.lock.history.Lock()

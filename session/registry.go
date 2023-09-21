@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -321,12 +322,13 @@ func (r *registry) Register(id string, conf CollectorConfig) (Collector, error) 
 
 	if r.persist.fs != nil {
 		s, err := NewHistorySource(r.persist.fs, "/"+id+".json")
-		if err != nil {
-			return nil, err
+		if err == nil {
+			err = m.Restore(s)
 		}
 
-		if err := m.Restore(s); err != nil {
-			return nil, err
+		if err != nil {
+			r.logger.Warn().WithError(err).WithField("file", "/"+id+".json").Log("Can't restore history")
+			r.persist.fs.Rename("/"+id+".json", "/"+id+"."+strconv.FormatInt(time.Now().Unix(), 10)+".json")
 		}
 	}
 

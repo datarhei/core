@@ -115,6 +115,59 @@ func TestUnregisterAll(t *testing.T) {
 	require.Equal(t, []string{}, c)
 }
 
+func TestRestoreHistory(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFile("/foobar.json", []byte("{}"))
+	require.NoError(t, err)
+
+	r, err := New(Config{
+		PersistFS: memfs,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+	})
+
+	c, err := r.Register("foobar", CollectorConfig{})
+	require.NoError(t, err)
+
+	c.RegisterAndActivate("foo", "ref", "location", "peer")
+	c.Egress("foo", 42)
+
+	err = r.Unregister("foobar")
+	require.NoError(t, err)
+}
+
+func TestRestoreInvalidHistory(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFile("/foobar.json", []byte(""))
+	require.NoError(t, err)
+
+	r, err := New(Config{
+		PersistFS: memfs,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+	})
+
+	c, err := r.Register("foobar", CollectorConfig{})
+	require.NoError(t, err)
+
+	c.RegisterAndActivate("foo", "ref", "location", "peer")
+	c.Egress("foo", 42)
+
+	err = r.Unregister("foobar")
+	require.NoError(t, err)
+
+	files := memfs.List("/", fs.ListOptions{})
+	require.Equal(t, 2, len(files))
+}
+
 func TestPersistHistory(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)

@@ -9,7 +9,7 @@ import (
 )
 
 func createCollector(inactive, session time.Duration, sessionsCh chan<- Session) (*collector, error) {
-	return newCollector("", sessionsCh, nil, CollectorConfig{
+	return newCollector("test", sessionsCh, nil, CollectorConfig{
 		InactiveTimeout: inactive,
 		SessionTimeout:  session,
 	})
@@ -150,6 +150,30 @@ func TestHistoryRestore(t *testing.T) {
 
 	err = c.Restore(snapshot)
 	require.NoError(t, err)
+
+	c.RegisterAndActivate("foo", "", "", "")
+	c.Close("foo")
+
+	<-sessions
+}
+
+func TestHistoryRestoreInvalid(t *testing.T) {
+	sessions := make(chan Session, 1)
+
+	c, err := createCollector(time.Hour, time.Hour, sessions)
+	require.Equal(t, nil, err)
+
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = memfs.WriteFile("/foobar.json", []byte(""))
+	require.NoError(t, err)
+
+	snapshot, err := NewHistorySource(memfs, "/foobar.json")
+	require.NoError(t, err)
+
+	err = c.Restore(snapshot)
+	require.Error(t, err)
 
 	c.RegisterAndActivate("foo", "", "", "")
 	c.Close("foo")
