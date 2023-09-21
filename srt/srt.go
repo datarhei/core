@@ -359,7 +359,7 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	s.lock.Lock()
 	ch := s.channels[si.Resource]
 	if ch == nil {
-		ch = newChannel(conn, si.Resource, isProxy, s.collector)
+		ch = newChannel(conn, si.Resource, isProxy, identity, s.collector)
 		s.channels[si.Resource] = ch
 	} else {
 		ch = nil
@@ -471,7 +471,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 	if ch != nil {
 		s.log(identity, "PLAY", "START", si.Resource, "", client)
 
-		id := ch.AddSubscriber(conn, si.Resource)
+		id := ch.AddSubscriber(conn, si.Resource, identity)
 
 		// Blocks until connection closes
 		err := ch.pubsub.Subscribe(conn)

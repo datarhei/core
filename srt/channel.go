@@ -84,7 +84,7 @@ type channel struct {
 	isProxy bool
 }
 
-func newChannel(conn srt.Conn, resource string, isProxy bool, collector session.Collector) *channel {
+func newChannel(conn srt.Conn, resource string, isProxy bool, identity string, collector session.Collector) *channel {
 	ch := &channel{
 		pubsub:     srt.NewPubSub(srt.PubSubConfig{}),
 		path:       resource,
@@ -98,7 +98,12 @@ func newChannel(conn srt.Conn, resource string, isProxy bool, collector session.
 	ip, _, _ := net.SplitHostPort(addr)
 
 	if collector.IsCollectableIP(ip) {
-		collector.RegisterAndActivate(resource, resource, "publish:"+resource, addr)
+		extra := map[string]interface{}{
+			"name":   identity,
+			"method": "publish",
+		}
+		collector.RegisterAndActivate(resource, resource, resource, addr)
+		collector.Extra(resource, extra)
 	}
 
 	return ch
@@ -113,14 +118,19 @@ func (ch *channel) Close() {
 	ch.publisher = nil
 }
 
-func (ch *channel) AddSubscriber(conn srt.Conn, resource string) string {
+func (ch *channel) AddSubscriber(conn srt.Conn, resource, identity string) string {
 	addr := conn.RemoteAddr().String()
 	ip, _, _ := net.SplitHostPort(addr)
 
 	client := newClient(conn, addr, ch.collector)
 
 	if ch.collector.IsCollectableIP(ip) {
-		ch.collector.RegisterAndActivate(addr, resource, "play:"+resource, addr)
+		extra := map[string]interface{}{
+			"name":   identity,
+			"method": "play",
+		}
+		ch.collector.RegisterAndActivate(addr, resource, resource, addr)
+		ch.collector.Extra(addr, extra)
 	}
 
 	ch.lock.Lock()
