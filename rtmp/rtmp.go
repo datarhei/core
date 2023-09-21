@@ -346,7 +346,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		// Send the metadata to the client
 		conn.WriteHeader(ch.streams)
 
-		s.log(identity, "PLAY", "START", conn.URL.Path, "", remote)
+		s.log(identity, "PLAY", "START", playpath, "", remote)
 
 		// Get a cursor and apply filters
 		cursor := ch.queue.Oldest()
@@ -366,7 +366,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 			Demuxer: cursor,
 		}
 
-		id := ch.AddSubscriber(conn)
+		id := ch.AddSubscriber(conn, playpath, identity)
 
 		// Transfer the data, blocks until done
 		avutil.CopyFile(conn, demuxer)
@@ -431,7 +431,7 @@ func (s *server) publish(src connection, playpath string, remote net.Addr, ident
 		reference := strings.TrimPrefix(strings.TrimSuffix(playpath, filepath.Ext(playpath)), s.app+"/")
 
 		// Create a new channel
-		ch = newChannel(src, playpath, reference, remote, streams, isProxy, s.collector)
+		ch = newChannel(src, playpath, reference, remote, streams, isProxy, identity, s.collector)
 
 		for _, stream := range streams {
 			typ := stream.Type()

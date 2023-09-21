@@ -94,7 +94,7 @@ type channel struct {
 	isProxy bool
 }
 
-func newChannel(conn connection, playPath, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, collector session.Collector) *channel {
+func newChannel(conn connection, playPath, reference string, remote net.Addr, streams []av.CodecData, isProxy bool, identity string, collector session.Collector) *channel {
 	ch := &channel{
 		path:       playPath,
 		reference:  reference,
@@ -112,7 +112,12 @@ func newChannel(conn connection, playPath, reference string, remote net.Addr, st
 	ip, _, _ := net.SplitHostPort(addr)
 
 	if collector.IsCollectableIP(ip) {
-		collector.RegisterAndActivate(ch.path, ch.reference, "publish:"+ch.path, addr)
+		extra := map[string]interface{}{
+			"name":   identity,
+			"method": "publish",
+		}
+		collector.RegisterAndActivate(ch.path, ch.reference, ch.path, addr)
+		collector.Extra(ch.path, extra)
 	}
 
 	return ch
@@ -129,14 +134,19 @@ func (ch *channel) Close() {
 	ch.queue.Close()
 }
 
-func (ch *channel) AddSubscriber(conn *rtmp.Conn) string {
+func (ch *channel) AddSubscriber(conn *rtmp.Conn, playPath, identity string) string {
 	addr := conn.NetConn().RemoteAddr().String()
 	ip, _, _ := net.SplitHostPort(addr)
 
 	client := newClient(conn, addr, ch.collector)
 
 	if ch.collector.IsCollectableIP(ip) {
-		ch.collector.RegisterAndActivate(addr, ch.reference, "play:"+conn.URL.Path, addr)
+		extra := map[string]interface{}{
+			"name":   identity,
+			"method": "play",
+		}
+		ch.collector.RegisterAndActivate(addr, ch.reference, playPath, addr)
+		ch.collector.Extra(addr, extra)
 	}
 
 	ch.lock.Lock()
