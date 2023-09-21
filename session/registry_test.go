@@ -204,6 +204,58 @@ func TestPersistHistory(t *testing.T) {
 	require.Equal(t, uint64(42), totals.TotalTxBytes)
 }
 
+type slowMemFilesystem struct {
+	fs.Filesystem
+}
+
+func newSlowMemFilesystem(config fs.MemConfig) (fs.Filesystem, error) {
+	memfs, err := fs.NewMemFilesystem(config)
+	if err != nil {
+		return nil, err
+	}
+
+	f := &slowMemFilesystem{
+		Filesystem: memfs,
+	}
+
+	return f, nil
+}
+
+func (c *slowMemFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
+	if path != "/foobar.json" {
+		return 0, true, nil
+	}
+	time.Sleep(2 * time.Second)
+
+	return c.Filesystem.WriteFileSafe(path, data)
+}
+
+func TestPersistHistorySlowSnapshot(t *testing.T) {
+	memfs, err := newSlowMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	r, err := New(Config{
+		PersistFS: memfs,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+	})
+
+	c, err := r.Register("foobar", CollectorConfig{})
+	require.NoError(t, err)
+
+	c.RegisterAndActivate("foo", "ref", "location", "peer")
+	c.Egress("foo", 42)
+	c.Close("foo")
+
+	err = r.Unregister("foobar")
+	require.NoError(t, err)
+
+	_, err = memfs.Stat("/foobar.json")
+	require.NoError(t, err)
+}
+
 func TestPeriodicPersistHistory(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
