@@ -19,4 +19,4 @@ fi
 
 # Now run the core with the possibly converted configuration.
 
-./bin/core
+exec ./bin/core
