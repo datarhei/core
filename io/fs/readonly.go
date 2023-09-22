@@ -49,6 +49,6 @@ func (r *readOnlyFilesystem) Purge(size int64) int64 {
 	return 0
 }
 
-func (r *readOnlyFilesystem) Resize(size int64) error {
+func (r *readOnlyFilesystem) Resize(size int64, purge bool) error {
 	return os.ErrPermission
 }

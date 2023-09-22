@@ -35,13 +35,33 @@ func TestSizedResize(t *testing.T) {
 	require.Equal(t, int64(0), cur)
 	require.Equal(t, int64(10), max)
 
-	err := fs.Resize(20)
+	err := fs.Resize(20, false)
 	require.NoError(t, err)
 
 	cur, max = fs.Size()
 
 	require.Equal(t, int64(0), cur)
 	require.Equal(t, int64(20), max)
+}
+
+func TestSizedResizeSetPurge(t *testing.T) {
+	fs, _ := NewSizedFilesystem(newMemFS(), 10, false)
+
+	_, _, err := fs.WriteFileReader("/foobar1", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFileReader("/foobar2", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFileReader("/foobar3", strings.NewReader("xxxxx"))
+	require.Error(t, err)
+
+	fs.Resize(10, true)
+
+	_, _, err = fs.WriteFileReader("/foobar3", strings.NewReader("xxxxx"))
+	require.NoError(t, err)
+
+	require.Equal(t, int64(2), fs.Files())
 }
 
 func TestSizedResizePurge(t *testing.T) {
@@ -59,7 +79,7 @@ func TestSizedResizePurge(t *testing.T) {
 	require.Equal(t, int64(10), cur)
 	require.Equal(t, int64(10), max)
 
-	err := fs.Resize(5)
+	err := fs.Resize(5, false)
 	require.NoError(t, err)
 
 	cur, max = fs.Size()
@@ -132,6 +152,31 @@ func TestSizedReplaceNoPurge(t *testing.T) {
 	cur = fs.Files()
 
 	require.Equal(t, int64(1), cur)
+
+	data = strings.NewReader("zzzzzzz")
+
+	size, created, err = fs.WriteFileReader("/foobar", data)
+
+	require.Nil(t, err)
+	require.Equal(t, int64(7), size)
+	require.Equal(t, false, created)
+
+	cur, max = fs.Size()
+
+	require.Equal(t, int64(7), cur)
+	require.Equal(t, int64(10), max)
+
+	cur = fs.Files()
+
+	require.Equal(t, int64(1), cur)
+
+	data = strings.NewReader("zzzzzzzz")
+
+	size, created, err = fs.WriteFileReader("/foobar", data)
+
+	require.Nil(t, err)
+	require.Equal(t, int64(8), size)
+	require.Equal(t, false, created)
 }
 
 func TestSizedReplacePurge(t *testing.T) {

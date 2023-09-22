@@ -45,6 +45,6 @@ func TestReadOnly(t *testing.T) {
 	ros, ok := ro.(SizedFilesystem)
 	require.True(t, ok, "must implement SizedFilesystem")
 
-	err = ros.Resize(100)
+	err = ros.Resize(100, false)
 	require.Error(t, err)
 }

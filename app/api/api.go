@@ -426,7 +426,7 @@ func (a *api) start() error {
 	} else {
 		a.memfs.SetMetadata("base", baseMemFS.String())
 		if sizedfs, ok := a.memfs.(fs.SizedFilesystem); ok {
-			sizedfs.Resize(cfg.Storage.Memory.Size * 1024 * 1024)
+			sizedfs.Resize(cfg.Storage.Memory.Size*1024*1024, cfg.Storage.Memory.Purge)
 		}
 	}
 

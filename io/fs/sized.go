@@ -10,7 +10,7 @@ type SizedFilesystem interface {
 	Filesystem
 
 	// Resize resizes the filesystem to the new size. Files may need to be deleted.
-	Resize(size int64) error
+	Resize(size int64, purge bool) error
 }
 
 type PurgeFilesystem interface {
@@ -48,7 +48,9 @@ func (r *sizedFilesystem) Size() (int64, int64) {
 	return currentSize, r.maxSize
 }
 
-func (r *sizedFilesystem) Resize(size int64) error {
+func (r *sizedFilesystem) Resize(size int64, purge bool) error {
+	r.purge = purge
+
 	currentSize, _ := r.Size()
 	if size >= currentSize {
 		// If the new size is the same or larger than the current size,
@@ -82,8 +84,14 @@ func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader) (int64, boo
 		return -1, false, fmt.Errorf("File is too big")
 	}
 
-	// Calculate the new size of the filesystem
 	newSize := currentSize + size
+
+	// Calculate the new size of the filesystem
+	finfo, err := r.Filesystem.Stat(path)
+	if err == nil {
+		// If the file already exist, take it's size into account
+		newSize -= finfo.Size()
+	}
 
 	// If the the new size is larger than the allowed size, we have to free
 	// some space.
@@ -117,8 +125,14 @@ func (r *sizedFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, 
 		return -1, false, fmt.Errorf("File is too big")
 	}
 
-	// Calculate the new size of the filesystem
 	newSize := currentSize + size
+
+	// Calculate the new size of the filesystem
+	finfo, err := r.Filesystem.Stat(path)
+	if err == nil {
+		// If the file already exist, take it's size into account
+		newSize -= finfo.Size()
+	}
 
 	// If the the new size is larger than the allowed size, we have to free
 	// some space.
