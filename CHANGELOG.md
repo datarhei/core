@@ -1,5 +1,14 @@
 # Core
 
+### Core v16.13.0 > vx.x.x
+
+-   Fix transfer of reports to updated process
+-   Fix calling Wait after process has been read
+-   Fix 509 return code if non-existing stream is requested
+-   Fix default search paths for config file
+-   Fix sized filesystem
+-   Update dependencies
+
 ### Core v16.12.0 > v16.13.0
 
 -   Add updated_at field in process infos
