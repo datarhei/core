@@ -252,6 +252,8 @@ func (p *parser) Parse(line string) uint64 {
 					"error": err,
 				}).Error().Log("Failed parsing HSL stream mapping")
 			}
+
+			return 0
 		}
 
 		if isFFmpegOutputs {

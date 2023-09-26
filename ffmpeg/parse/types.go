@@ -242,46 +242,16 @@ type ffmpegGraphElement struct {
 	Height    uint64 `json:"height"`
 }
 
-func (f *ffmpegGraphElement) Export() GraphElement {
-	return GraphElement{
-		SrcName:   f.SrcName,
-		SrcFilter: f.SrcFilter,
-		DstName:   f.DstName,
-		DstFilter: f.DstFilter,
-		Inpad:     f.Inpad,
-		Outpad:    f.Outpad,
-		Timebase:  f.Timebase,
-		Type:      f.Type,
-		Format:    f.Format,
-		Sampling:  f.Sampling,
-		Layout:    f.Layout,
-		Width:     f.Width,
-		Height:    f.Height,
-	}
-}
-
 type ffmpegGraph struct {
-	Index uint64               `json:"index"`
+	Index int                  `json:"index"`
 	Graph []ffmpegGraphElement `json:"graph"`
 }
 
-func (f *ffmpegGraph) Export() Graph {
-	g := Graph{
-		Index: f.Index,
-	}
-
-	for _, e := range f.Graph {
-		g.Graph = append(g.Graph, e.Export())
-	}
-
-	return g
-}
-
-type ffmpegMapping struct {
+type ffmpegGraphMapping struct {
 	Input  *ffmpegMappingIO `json:"input"`
 	Output *ffmpegMappingIO `json:"output"`
 	Graph  struct {
-		Index uint64 `json:"index"`
+		Index int    `json:"index"`
 		Name  string `json:"name"`
 	} `json:"graph"`
 	Copy bool `json:"copy"`
@@ -293,8 +263,8 @@ type ffmpegMappingIO struct {
 }
 
 type ffmpegStreamMapping struct {
-	Graphs  []ffmpegGraph   `json:"graphs"`
-	Mapping []ffmpegMapping `json:"mapping"`
+	Graphs  []ffmpegGraph        `json:"graphs"`
+	Mapping []ffmpegGraphMapping `json:"mapping"`
 }
 
 type ffmpegProcess struct {
@@ -307,23 +277,40 @@ type ffmpegProcess struct {
 func (f *ffmpegProcess) ExportMapping() StreamMapping {
 	sm := StreamMapping{}
 
-	for _, g := range f.mapping.Graphs {
-		sm.Graphs = append(sm.Graphs, g.Export())
+	for _, graph := range f.mapping.Graphs {
+		for _, g := range graph.Graph {
+			e := GraphElement{
+				Index:     graph.Index,
+				Name:      g.SrcName,
+				Filter:    g.SrcFilter,
+				DstName:   g.DstName,
+				DstFilter: g.DstFilter,
+				Inpad:     g.Inpad,
+				Outpad:    g.Outpad,
+				Timebase:  g.Timebase,
+				Type:      g.Type,
+				Format:    g.Format,
+				Sampling:  g.Sampling,
+				Layout:    g.Layout,
+				Width:     g.Width,
+				Height:    g.Height,
+			}
+
+			sm.Graphs = append(sm.Graphs, e)
+		}
 	}
 
 	for _, fm := range f.mapping.Mapping {
-		m := Mapping{
+		m := GraphMapping{
 			Input:  -1,
 			Output: -1,
-			Graph: MappingGraph{
-				Index: int(fm.Graph.Index),
-				Name:  fm.Graph.Name,
-			},
-			Copy: fm.Copy,
+			Index:  fm.Graph.Index,
+			Name:   fm.Graph.Name,
+			Copy:   fm.Copy,
 		}
 
-		if len(m.Graph.Name) == 0 {
-			m.Graph.Index = -1
+		if len(m.Name) == 0 {
+			m.Index = -1
 		}
 
 		if fm.Input != nil {
@@ -496,8 +483,9 @@ type Usage struct {
 }
 
 type GraphElement struct {
-	SrcName   string
-	SrcFilter string
+	Index     int
+	Name      string
+	Filter    string
 	DstName   string
 	DstFilter string
 	Inpad     string
@@ -511,24 +499,15 @@ type GraphElement struct {
 	Height    uint64
 }
 
-type Graph struct {
-	Index uint64
-	Graph []GraphElement
-}
-
-type MappingGraph struct {
-	Index int
-	Name  string
-}
-
-type Mapping struct {
+type GraphMapping struct {
 	Input  int
 	Output int
-	Graph  MappingGraph
+	Index  int
+	Name   string
 	Copy   bool
 }
 
 type StreamMapping struct {
-	Graphs  []Graph
-	Mapping []Mapping
+	Graphs  []GraphElement
+	Mapping []GraphMapping
 }

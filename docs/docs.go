@@ -5656,6 +5656,75 @@ const docTemplate = `{
                 }
             }
         },
+        "api.GraphElement": {
+            "type": "object",
+            "properties": {
+                "dst_filter": {
+                    "type": "string"
+                },
+                "dst_name": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "inpad": {
+                    "type": "string"
+                },
+                "layout": {
+                    "type": "string"
+                },
+                "outpad": {
+                    "type": "string"
+                },
+                "sampling": {
+                    "description": "Hz",
+                    "type": "integer"
+                },
+                "src_filter": {
+                    "type": "string"
+                },
+                "src_name": {
+                    "type": "string"
+                },
+                "timebase": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "audio or video",
+                    "type": "string"
+                },
+                "width": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.GraphMapping": {
+            "type": "object",
+            "properties": {
+                "copy": {
+                    "type": "boolean"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "input": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "output": {
+                    "type": "integer"
+                }
+            }
+        },
         "api.GraphQuery": {
             "type": "object",
             "properties": {
@@ -6509,6 +6578,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/api.ProgressIO"
                     }
+                },
+                "mapping": {
+                    "$ref": "#/definitions/api.StreamMapping"
                 },
                 "outputs": {
                     "type": "array",
@@ -8006,6 +8078,23 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "api.StreamMapping": {
+            "type": "object",
+            "properties": {
+                "graphs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GraphElement"
+                    }
+                },
+                "mapping": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.GraphMapping"
+                    }
                 }
             }
         },

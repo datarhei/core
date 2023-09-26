@@ -939,95 +939,68 @@ func TestParserStreamMapping(t *testing.T) {
 	require.Equal(t, 4, len(progress.Output))
 
 	require.Equal(t, StreamMapping{
-		Graphs: []Graph{
-			{
-				Index: 0,
-				Graph: []GraphElement{
-					{SrcName: "Parsed_null_0", SrcFilter: "null", DstName: "format", DstFilter: "format", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
-					{SrcName: "graph 0 input from stream 0:0", SrcFilter: "buffer", DstName: "Parsed_null_0", DstFilter: "null", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
-					{SrcName: "format", SrcFilter: "format", DstName: "out_0_0", DstFilter: "buffersink", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
-				},
-			}, {
-				Index: 1,
-				Graph: []GraphElement{
-					{SrcName: "Parsed_anull_0", SrcFilter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "graph_1_in_2_0", SrcFilter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "format_out_0_2", SrcFilter: "aformat", DstName: "out_0_2", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "auto_aresample_0", SrcFilter: "aresample", DstName: "format_out_0_2", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-				},
-			}, {
-				Index: 2,
-				Graph: []GraphElement{
-					{SrcName: "Parsed_anull_0", SrcFilter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "graph_2_in_2_0", SrcFilter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "format_out_0_3", SrcFilter: "aformat", DstName: "out_0_3", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-					{SrcName: "auto_aresample_0", SrcFilter: "aresample", DstName: "format_out_0_3", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
-				},
-			},
+		Graphs: []GraphElement{
+			{Index: 0, Name: "Parsed_null_0", Filter: "null", DstName: "format", DstFilter: "format", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+			{Index: 0, Name: "graph 0 input from stream 0:0", Filter: "buffer", DstName: "Parsed_null_0", DstFilter: "null", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+			{Index: 0, Name: "format", Filter: "format", DstName: "out_0_0", DstFilter: "buffersink", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+			{Index: 1, Name: "Parsed_anull_0", Filter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 1, Name: "graph_1_in_2_0", Filter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 1, Name: "format_out_0_2", Filter: "aformat", DstName: "out_0_2", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 1, Name: "auto_aresample_0", Filter: "aresample", DstName: "format_out_0_2", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 2, Name: "Parsed_anull_0", Filter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 2, Name: "graph_2_in_2_0", Filter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 2, Name: "format_out_0_3", Filter: "aformat", DstName: "out_0_3", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+			{Index: 2, Name: "auto_aresample_0", Filter: "aresample", DstName: "format_out_0_3", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
 		},
-		Mapping: []Mapping{
+		Mapping: []GraphMapping{
 			{
 				Input:  0,
 				Output: -1,
-				Graph: MappingGraph{
-					Index: 0,
-					Name:  "graph 0 input from stream 0:0",
-				},
-				Copy: false,
+				Index:  0,
+				Name:   "graph 0 input from stream 0:0",
+				Copy:   false,
 			},
 			{
 				Input:  2,
 				Output: -1,
-				Graph: MappingGraph{
-					Index: 1,
-					Name:  "graph_1_in_2_0",
-				},
-				Copy: false,
+				Index:  1,
+				Name:   "graph_1_in_2_0",
+				Copy:   false,
 			},
 			{
 				Input:  2,
 				Output: -1,
-				Graph: MappingGraph{
-					Index: 2,
-					Name:  "graph_2_in_2_0",
-				},
-				Copy: false,
+				Index:  2,
+				Name:   "graph_2_in_2_0",
+				Copy:   false,
 			},
 			{
 				Input:  -1,
 				Output: 0,
-				Graph: MappingGraph{
-					Index: 0,
-					Name:  "out_0_0",
-				},
-				Copy: false,
+				Index:  0,
+				Name:   "out_0_0",
+				Copy:   false,
 			},
 			{
 				Input:  1,
 				Output: 1,
-				Graph: MappingGraph{
-					Index: -1,
-					Name:  "",
-				},
-				Copy: true,
+				Index:  -1,
+				Name:   "",
+				Copy:   true,
 			},
 			{
 				Input:  -1,
 				Output: 2,
-				Graph: MappingGraph{
-					Index: 1,
-					Name:  "out_0_2",
-				},
-				Copy: false,
+				Index:  1,
+				Name:   "out_0_2",
+				Copy:   false,
 			},
 			{
 				Input:  -1,
 				Output: 3,
-				Graph: MappingGraph{
-					Index: 2,
-					Name:  "out_0_3",
-				},
-				Copy: false,
+				Index:  2,
+				Name:   "out_0_3",
+				Copy:   false,
 			},
 		},
 	}, progress.Mapping)

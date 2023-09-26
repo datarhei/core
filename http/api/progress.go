@@ -91,18 +91,19 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 
 // Progress represents the progress of an ffmpeg process
 type Progress struct {
-	Input     []ProgressIO `json:"inputs"`
-	Output    []ProgressIO `json:"outputs"`
-	Frame     uint64       `json:"frame" format:"uint64"`
-	Packet    uint64       `json:"packet" format:"uint64"`
-	FPS       json.Number  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Quantizer json.Number  `json:"q" swaggertype:"number" jsonschema:"type=number"`
-	Size      uint64       `json:"size_kb" format:"uint64"` // kbytes
-	Time      json.Number  `json:"time" swaggertype:"number" jsonschema:"type=number"`
-	Bitrate   json.Number  `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	Speed     json.Number  `json:"speed" swaggertype:"number" jsonschema:"type=number"`
-	Drop      uint64       `json:"drop" format:"uint64"`
-	Dup       uint64       `json:"dup" format:"uint64"`
+	Input     []ProgressIO  `json:"inputs"`
+	Output    []ProgressIO  `json:"outputs"`
+	Mapping   StreamMapping `json:"mapping"`
+	Frame     uint64        `json:"frame" format:"uint64"`
+	Packet    uint64        `json:"packet" format:"uint64"`
+	FPS       json.Number   `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	Quantizer json.Number   `json:"q" swaggertype:"number" jsonschema:"type=number"`
+	Size      uint64        `json:"size_kb" format:"uint64"` // kbytes
+	Time      json.Number   `json:"time" swaggertype:"number" jsonschema:"type=number"`
+	Bitrate   json.Number   `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	Speed     json.Number   `json:"speed" swaggertype:"number" jsonschema:"type=number"`
+	Drop      uint64        `json:"drop" format:"uint64"`
+	Dup       uint64        `json:"dup" format:"uint64"`
 }
 
 // Unmarshal converts a restreamer Progress to a Progress in API representation
@@ -133,5 +134,75 @@ func (progress *Progress) Unmarshal(p *app.Progress) {
 
 	for i, io := range p.Output {
 		progress.Output[i].Unmarshal(&io)
+	}
+
+	progress.Mapping.Unmarshal(&p.Mapping)
+}
+
+type GraphElement struct {
+	Index     int    `json:"index"`
+	Name      string `json:"name"`
+	Filter    string `json:"filter"`
+	DstName   string `json:"dst_name"`
+	DstFilter string `json:"dst_filter"`
+	Inpad     string `json:"inpad"`
+	Outpad    string `json:"outpad"`
+	Timebase  string `json:"timebase"`
+	Type      string `json:"type"` // audio or video
+	Format    string `json:"format"`
+	Sampling  uint64 `json:"sampling"` // Hz
+	Layout    string `json:"layout"`
+	Width     uint64 `json:"width"`
+	Height    uint64 `json:"height"`
+}
+
+type GraphMapping struct {
+	Input  int    `json:"input"`
+	Output int    `json:"output"`
+	Index  int    `json:"index"`
+	Name   string `json:"name"`
+	Copy   bool   `json:"copy"`
+}
+
+type StreamMapping struct {
+	Graphs  []GraphElement `json:"graphs"`
+	Mapping []GraphMapping `json:"mapping"`
+}
+
+// Unmarshal converts a restreamer StreamMapping to a StreamMapping in API representation
+func (s *StreamMapping) Unmarshal(m *app.StreamMapping) {
+	s.Graphs = make([]GraphElement, 0, len(m.Graphs))
+	for _, mge := range m.Graphs {
+		ge := GraphElement{
+			Index:     mge.Index,
+			Name:      mge.Name,
+			Filter:    mge.Filter,
+			DstName:   mge.DstName,
+			DstFilter: mge.DstFilter,
+			Inpad:     mge.Inpad,
+			Outpad:    mge.Outpad,
+			Timebase:  mge.Timebase,
+			Type:      mge.Type,
+			Format:    mge.Format,
+			Sampling:  mge.Sampling,
+			Layout:    mge.Layout,
+			Width:     mge.Width,
+			Height:    mge.Height,
+		}
+
+		s.Graphs = append(s.Graphs, ge)
+	}
+
+	s.Mapping = make([]GraphMapping, 0, len(m.Mapping))
+	for _, mmapping := range m.Mapping {
+		mapping := GraphMapping{
+			Input:  mmapping.Input,
+			Output: mmapping.Output,
+			Index:  mmapping.Index,
+			Name:   mmapping.Name,
+			Copy:   mmapping.Copy,
+		}
+
+		s.Mapping = append(s.Mapping, mapping)
 	}
 }

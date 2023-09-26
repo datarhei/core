@@ -43,6 +43,7 @@ type ProgressIO struct {
 type Progress struct {
 	Input     []ProgressIO
 	Output    []ProgressIO
+	Mapping   StreamMapping
 	Frame     uint64  // counter
 	Packet    uint64  // counter
 	FPS       float64 // rate, frames per second
@@ -54,4 +55,34 @@ type Progress struct {
 	Speed     float64 // gauge
 	Drop      uint64  // counter
 	Dup       uint64  // counter
+}
+
+type GraphElement struct {
+	Index     int
+	Name      string
+	Filter    string
+	DstName   string
+	DstFilter string
+	Inpad     string
+	Outpad    string
+	Timebase  string
+	Type      string // audio or video
+	Format    string
+	Sampling  uint64 // Hz
+	Layout    string
+	Width     uint64
+	Height    uint64
+}
+
+type GraphMapping struct {
+	Input  int    // Index of input stream, negative if output element
+	Output int    // Index of output stream, negative if input element
+	Index  int    // Index of the graph, negative if streamcopy
+	Name   string // Name of the source resp. destination, empty if streamcopy
+	Copy   bool   // Whether it's a streamcopy i.e. there's no graph
+}
+
+type StreamMapping struct {
+	Graphs  []GraphElement
+	Mapping []GraphMapping
 }

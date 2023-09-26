@@ -45,16 +45,47 @@ type ProgressIO struct {
 
 // Progress represents the progress of an ffmpeg process
 type Progress struct {
-	Input     []ProgressIO `json:"inputs"`
-	Output    []ProgressIO `json:"outputs"`
-	Frame     uint64       `json:"frame" format:"uint64"`
-	Packet    uint64       `json:"packet" format:"uint64"`
-	FPS       float64      `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Quantizer float64      `json:"q" swaggertype:"number" jsonschema:"type=number"`
-	Size      uint64       `json:"size_kb" format:"uint64"` // kbytes
-	Time      float64      `json:"time" swaggertype:"number" jsonschema:"type=number"`
-	Bitrate   float64      `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	Speed     float64      `json:"speed" swaggertype:"number" jsonschema:"type=number"`
-	Drop      uint64       `json:"drop" format:"uint64"`
-	Dup       uint64       `json:"dup" format:"uint64"`
+	Input     []ProgressIO  `json:"inputs"`
+	Output    []ProgressIO  `json:"outputs"`
+	Mapping   StreamMapping `json:"mapping"`
+	Frame     uint64        `json:"frame" format:"uint64"`
+	Packet    uint64        `json:"packet" format:"uint64"`
+	FPS       float64       `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	Quantizer float64       `json:"q" swaggertype:"number" jsonschema:"type=number"`
+	Size      uint64        `json:"size_kb" format:"uint64"` // kbytes
+	Time      float64       `json:"time" swaggertype:"number" jsonschema:"type=number"`
+	Bitrate   float64       `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	Speed     float64       `json:"speed" swaggertype:"number" jsonschema:"type=number"`
+	Drop      uint64        `json:"drop" format:"uint64"`
+	Dup       uint64        `json:"dup" format:"uint64"`
+}
+
+type GraphElement struct {
+	Index     int    `json:"index"`
+	Name      string `json:"name"`
+	Filter    string `json:"filter"`
+	DstName   string `json:"dst_name"`
+	DstFilter string `json:"dst_filter"`
+	Inpad     string `json:"inpad"`
+	Outpad    string `json:"outpad"`
+	Timebase  string `json:"timebase"`
+	Type      string `json:"type"` // audio or video
+	Format    string `json:"format"`
+	Sampling  uint64 `json:"sampling"` // Hz
+	Layout    string `json:"layout"`
+	Width     uint64 `json:"width"`
+	Height    uint64 `json:"height"`
+}
+
+type GraphMapping struct {
+	Input  int    `json:"input"`
+	Output int    `json:"output"`
+	Index  int    `json:"index"`
+	Name   string `json:"name"`
+	Copy   bool   `json:"copy"`
+}
+
+type StreamMapping struct {
+	Graphs  []GraphElement `json:"graphs"`
+	Mapping []GraphMapping `json:"mapping"`
 }

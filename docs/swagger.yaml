@@ -747,6 +747,52 @@ definitions:
       updated_at:
         type: string
     type: object
+  api.GraphElement:
+    properties:
+      dst_filter:
+        type: string
+      dst_name:
+        type: string
+      format:
+        type: string
+      height:
+        type: integer
+      index:
+        type: integer
+      inpad:
+        type: string
+      layout:
+        type: string
+      outpad:
+        type: string
+      sampling:
+        description: Hz
+        type: integer
+      src_filter:
+        type: string
+      src_name:
+        type: string
+      timebase:
+        type: string
+      type:
+        description: audio or video
+        type: string
+      width:
+        type: integer
+    type: object
+  api.GraphMapping:
+    properties:
+      copy:
+        type: boolean
+      index:
+        type: integer
+      input:
+        type: integer
+      name:
+        type: string
+      output:
+        type: integer
+    type: object
   api.GraphQuery:
     properties:
       query:
@@ -1326,6 +1372,8 @@ definitions:
         items:
           $ref: '#/definitions/api.ProgressIO'
         type: array
+      mapping:
+        $ref: '#/definitions/api.StreamMapping'
       outputs:
         items:
           $ref: '#/definitions/api.ProgressIO'
@@ -2398,6 +2446,17 @@ definitions:
         type: string
       name:
         type: string
+    type: object
+  api.StreamMapping:
+    properties:
+      graphs:
+        items:
+          $ref: '#/definitions/api.GraphElement'
+        type: array
+      mapping:
+        items:
+          $ref: '#/definitions/api.GraphMapping'
+        type: array
     type: object
   api.Version:
     properties:

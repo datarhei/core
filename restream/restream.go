@@ -1713,6 +1713,39 @@ func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress)
 
 		progress.Output = append(progress.Output, output)
 	}
+
+	for _, pgraph := range pprogress.Mapping.Graphs {
+		graph := app.GraphElement{
+			Index:     pgraph.Index,
+			Name:      pgraph.Name,
+			Filter:    pgraph.Filter,
+			DstName:   pgraph.DstName,
+			DstFilter: pgraph.DstFilter,
+			Inpad:     pgraph.Inpad,
+			Outpad:    pgraph.Outpad,
+			Timebase:  pgraph.Timebase,
+			Type:      pgraph.Type,
+			Format:    pgraph.Format,
+			Sampling:  pgraph.Sampling,
+			Layout:    pgraph.Layout,
+			Width:     pgraph.Width,
+			Height:    pgraph.Height,
+		}
+
+		progress.Mapping.Graphs = append(progress.Mapping.Graphs, graph)
+	}
+
+	for _, pmapping := range pprogress.Mapping.Mapping {
+		mapping := app.GraphMapping{
+			Input:  pmapping.Input,
+			Output: pmapping.Output,
+			Index:  pmapping.Index,
+			Name:   pmapping.Name,
+			Copy:   pmapping.Copy,
+		}
+
+		progress.Mapping.Mapping = append(progress.Mapping.Mapping, mapping)
+	}
 }
 
 func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
