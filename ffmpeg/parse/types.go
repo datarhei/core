@@ -115,8 +115,6 @@ type ffmpegProgressIO struct {
 }
 
 func (io *ffmpegProgressIO) exportTo(progress *ProgressIO) {
-	progress.Index = io.Index
-	progress.Stream = io.Stream
 	progress.Frame = io.Frame
 	progress.Keyframe = io.Keyframe
 	progress.Framerate.Min = io.Framerate.Min
@@ -228,9 +226,132 @@ func (io *ffmpegProcessIO) export() ProgressIO {
 	}
 }
 
+type ffmpegGraphElement struct {
+	SrcName   string `json:"src_name"`
+	SrcFilter string `json:"src_filter"`
+	DstName   string `json:"dst_name"`
+	DstFilter string `json:"dst_filter"`
+	Inpad     string `json:"inpad"`
+	Outpad    string `json:"outpad"`
+	Timebase  string `json:"timebase"`
+	Type      string `json:"type"`
+	Format    string `json:"format"`
+	Sampling  uint64 `json:"sampling_hz"`
+	Layout    string `json:"layout"`
+	Width     uint64 `json:"width"`
+	Height    uint64 `json:"height"`
+}
+
+func (f *ffmpegGraphElement) Export() GraphElement {
+	return GraphElement{
+		SrcName:   f.SrcName,
+		SrcFilter: f.SrcFilter,
+		DstName:   f.DstName,
+		DstFilter: f.DstFilter,
+		Inpad:     f.Inpad,
+		Outpad:    f.Outpad,
+		Timebase:  f.Timebase,
+		Type:      f.Type,
+		Format:    f.Format,
+		Sampling:  f.Sampling,
+		Layout:    f.Layout,
+		Width:     f.Width,
+		Height:    f.Height,
+	}
+}
+
+type ffmpegGraph struct {
+	Index uint64               `json:"index"`
+	Graph []ffmpegGraphElement `json:"graph"`
+}
+
+func (f *ffmpegGraph) Export() Graph {
+	g := Graph{
+		Index: f.Index,
+	}
+
+	for _, e := range f.Graph {
+		g.Graph = append(g.Graph, e.Export())
+	}
+
+	return g
+}
+
+type ffmpegMapping struct {
+	Input  *ffmpegMappingIO `json:"input"`
+	Output *ffmpegMappingIO `json:"output"`
+	Graph  struct {
+		Index uint64 `json:"index"`
+		Name  string `json:"name"`
+	} `json:"graph"`
+	Copy bool `json:"copy"`
+}
+
+type ffmpegMappingIO struct {
+	Index  uint64 `json:"index"`
+	Stream uint64 `json:"stream"`
+}
+
+type ffmpegStreamMapping struct {
+	Graphs  []ffmpegGraph   `json:"graphs"`
+	Mapping []ffmpegMapping `json:"mapping"`
+}
+
 type ffmpegProcess struct {
-	input  []ffmpegProcessIO
-	output []ffmpegProcessIO
+	input      []ffmpegProcessIO
+	output     []ffmpegProcessIO
+	mapping    ffmpegStreamMapping
+	hlsMapping *ffmpegHLSStreamMap
+}
+
+func (f *ffmpegProcess) ExportMapping() StreamMapping {
+	sm := StreamMapping{}
+
+	for _, g := range f.mapping.Graphs {
+		sm.Graphs = append(sm.Graphs, g.Export())
+	}
+
+	for _, fm := range f.mapping.Mapping {
+		m := Mapping{
+			Input:  -1,
+			Output: -1,
+			Graph: MappingGraph{
+				Index: int(fm.Graph.Index),
+				Name:  fm.Graph.Name,
+			},
+			Copy: fm.Copy,
+		}
+
+		if len(m.Graph.Name) == 0 {
+			m.Graph.Index = -1
+		}
+
+		if fm.Input != nil {
+			for i, in := range f.input {
+				if in.Index != fm.Input.Index || in.Stream != fm.Input.Stream {
+					continue
+				}
+
+				m.Input = i
+				break
+			}
+		}
+
+		if fm.Output != nil {
+			for i, out := range f.output {
+				if out.Index != fm.Output.Index || out.Stream != fm.Output.Stream {
+					continue
+				}
+
+				m.Output = i
+				break
+			}
+		}
+
+		sm.Mapping = append(sm.Mapping, m)
+	}
+
+	return sm
 }
 
 func (p *ffmpegProcess) export() Progress {
@@ -248,7 +369,38 @@ func (p *ffmpegProcess) export() Progress {
 		progress.Output = append(progress.Output, aio)
 	}
 
+	progress.Mapping = p.ExportMapping()
+
+	if p.hlsMapping != nil {
+		for _, variant := range p.hlsMapping.Variants {
+			for s, stream := range variant.Streams {
+				if stream >= len(progress.Output) {
+					continue
+				}
+
+				output := progress.Output[stream]
+
+				output.Address = variant.Address
+				output.Index = variant.Variant
+				output.Stream = uint64(s)
+
+				progress.Output[stream] = output
+			}
+		}
+	}
+
 	return progress
+}
+
+type ffmpegHLSStreamMap struct {
+	Address  string             `json:"address"`
+	Variants []ffmpegHLSVariant `json:"variants"`
+}
+
+type ffmpegHLSVariant struct {
+	Variant uint64 `json:"variant"`
+	Address string `json:"address"`
+	Streams []int  `json:"streams"`
 }
 
 type ProgressIO struct {
@@ -293,6 +445,7 @@ type ProgressIO struct {
 type Progress struct {
 	Input     []ProgressIO
 	Output    []ProgressIO
+	Mapping   StreamMapping
 	Frame     uint64
 	Packet    uint64
 	FPS       float64
@@ -340,4 +493,42 @@ type Usage struct {
 		Max     uint64
 		Limit   uint64
 	}
+}
+
+type GraphElement struct {
+	SrcName   string
+	SrcFilter string
+	DstName   string
+	DstFilter string
+	Inpad     string
+	Outpad    string
+	Timebase  string
+	Type      string // audio or video
+	Format    string
+	Sampling  uint64 // Hz
+	Layout    string
+	Width     uint64
+	Height    uint64
+}
+
+type Graph struct {
+	Index uint64
+	Graph []GraphElement
+}
+
+type MappingGraph struct {
+	Index int
+	Name  string
+}
+
+type Mapping struct {
+	Input  int
+	Output int
+	Graph  MappingGraph
+	Copy   bool
+}
+
+type StreamMapping struct {
+	Graphs  []Graph
+	Mapping []Mapping
 }

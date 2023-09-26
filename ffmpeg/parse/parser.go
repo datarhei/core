@@ -204,7 +204,9 @@ func (p *parser) Parse(line string) uint64 {
 	isDefaultProgress := strings.HasPrefix(line, "frame=")
 	isFFmpegInputs := strings.HasPrefix(line, "ffmpeg.inputs:")
 	isFFmpegOutputs := strings.HasPrefix(line, "ffmpeg.outputs:")
+	isFFmpegMapping := strings.HasPrefix(line, "ffmpeg.mapping:")
 	isFFmpegProgress := strings.HasPrefix(line, "ffmpeg.progress:")
+	isHLSStreamMap := strings.HasPrefix(line, "hls.streammap:")
 	isAVstreamProgress := strings.HasPrefix(line, "avstream.progress:")
 
 	p.lock.log.Lock()
@@ -233,7 +235,7 @@ func (p *parser) Parse(line string) uint64 {
 		}
 
 		if isFFmpegInputs {
-			if err := p.parseIO("input", strings.TrimPrefix(line, "ffmpeg.inputs:")); err != nil {
+			if err := p.parseFFmpegIO("input", strings.TrimPrefix(line, "ffmpeg.inputs:")); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -243,8 +245,17 @@ func (p *parser) Parse(line string) uint64 {
 			return 0
 		}
 
+		if isHLSStreamMap {
+			if err := p.parseHLSStreamMap(strings.TrimPrefix(line, "hls.streammap:")); err != nil {
+				p.logger.WithFields(log.Fields{
+					"line":  line,
+					"error": err,
+				}).Error().Log("Failed parsing HSL stream mapping")
+			}
+		}
+
 		if isFFmpegOutputs {
-			if err := p.parseIO("output", strings.TrimPrefix(line, "ffmpeg.outputs:")); err != nil {
+			if err := p.parseFFmpegIO("output", strings.TrimPrefix(line, "ffmpeg.outputs:")); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -271,6 +282,17 @@ func (p *parser) Parse(line string) uint64 {
 			p.prelude.done = true
 			p.lock.prelude.Unlock()
 		}
+	}
+
+	if isFFmpegMapping {
+		if err := p.parseFFmpegMapping(strings.TrimPrefix(line, "ffmpeg.mapping:")); err != nil {
+			p.logger.WithFields(log.Fields{
+				"line":  line,
+				"error": err,
+			}).Error().Log("Failed parsing mapping")
+		}
+
+		return 0
 	}
 
 	if !isDefaultProgress && !isFFmpegProgress && !isAVstreamProgress {
@@ -491,7 +513,7 @@ func (p *parser) parseDefaultProgress(line string) error {
 	return nil
 }
 
-func (p *parser) parseIO(kind, line string) error {
+func (p *parser) parseFFmpegIO(kind, line string) error {
 	processIO := []ffmpegProcessIO{}
 
 	err := json.Unmarshal([]byte(line), &processIO)
@@ -514,6 +536,32 @@ func (p *parser) parseIO(kind, line string) error {
 	} else if kind == "output" {
 		p.process.output = processIO
 	}
+
+	return nil
+}
+
+func (p *parser) parseFFmpegMapping(line string) error {
+	mapping := ffmpegStreamMapping{}
+
+	err := json.Unmarshal([]byte(line), &mapping)
+	if err != nil {
+		return err
+	}
+
+	p.process.mapping = mapping
+
+	return nil
+}
+
+func (p *parser) parseHLSStreamMap(line string) error {
+	mapping := ffmpegHLSStreamMap{}
+
+	err := json.Unmarshal([]byte(line), &mapping)
+	if err != nil {
+		return err
+	}
+
+	p.process.hlsMapping = &mapping
 
 	return nil
 }

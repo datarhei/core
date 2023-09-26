@@ -922,6 +922,165 @@ func TestParserProgressPlayout(t *testing.T) {
 	}, progress)
 }
 
+func TestParserStreamMapping(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
+	parser.Parse(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`)
+	parser.Parse(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
+	parser.Parse(`ffmpeg.mapping:{"graphs":[{"index":0,"graph":[{"src_name":"Parsed_null_0","src_filter":"null","dst_name":"format","dst_filter":"format","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"graph 0 input from stream 0:0","src_filter":"buffer","dst_name":"Parsed_null_0","dst_filter":"null","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"format","src_filter":"format","dst_name":"out_0_0","dst_filter":"buffersink","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720}]},{"index":1,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_1_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_2","src_filter":"aformat","dst_name":"out_0_2","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_2","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]},{"index":2,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_2_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_3","src_filter":"aformat","dst_name":"out_0_3","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_3","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]}],"mapping":[{"input":{"index":0,"stream":0},"graph":{"index":0,"name":"graph 0 input from stream 0:0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":1,"name":"graph_1_in_2_0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":2,"name":"graph_2_in_2_0"},"output":null},{"input":null,"graph":{"index":0,"name":"out_0_0"},"output":{"index":0,"stream":0}},{"input":{"index":1,"stream":0},"output":{"index":0,"stream":1},"copy":true},{"input":null,"graph":{"index":1,"name":"out_0_2"},"output":{"index":0,"stream":2}},{"input":null,"graph":{"index":2,"name":"out_0_3"},"output":{"index":0,"stream":3}}]}`)
+	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`)
+
+	progress := parser.Progress()
+
+	require.Equal(t, 3, len(progress.Input))
+	require.Equal(t, 4, len(progress.Output))
+
+	require.Equal(t, StreamMapping{
+		Graphs: []Graph{
+			{
+				Index: 0,
+				Graph: []GraphElement{
+					{SrcName: "Parsed_null_0", SrcFilter: "null", DstName: "format", DstFilter: "format", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+					{SrcName: "graph 0 input from stream 0:0", SrcFilter: "buffer", DstName: "Parsed_null_0", DstFilter: "null", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+					{SrcName: "format", SrcFilter: "format", DstName: "out_0_0", DstFilter: "buffersink", Inpad: "default", Outpad: "default", Timebase: "1/90000", Type: "video", Format: "yuvj420p", Sampling: 0, Layout: "", Width: 1280, Height: 720},
+				},
+			}, {
+				Index: 1,
+				Graph: []GraphElement{
+					{SrcName: "Parsed_anull_0", SrcFilter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "graph_1_in_2_0", SrcFilter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "format_out_0_2", SrcFilter: "aformat", DstName: "out_0_2", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "auto_aresample_0", SrcFilter: "aresample", DstName: "format_out_0_2", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+				},
+			}, {
+				Index: 2,
+				Graph: []GraphElement{
+					{SrcName: "Parsed_anull_0", SrcFilter: "anull", DstName: "auto_aresample_0", DstFilter: "aresample", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "graph_2_in_2_0", SrcFilter: "abuffer", DstName: "Parsed_anull_0", DstFilter: "anull", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "u8", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "format_out_0_3", SrcFilter: "aformat", DstName: "out_0_3", DstFilter: "abuffersink", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+					{SrcName: "auto_aresample_0", SrcFilter: "aresample", DstName: "format_out_0_3", DstFilter: "aformat", Inpad: "default", Outpad: "default", Timebase: "1/44100", Type: "audio", Format: "fltp", Sampling: 44100, Layout: "mono", Width: 0, Height: 0},
+				},
+			},
+		},
+		Mapping: []Mapping{
+			{
+				Input:  0,
+				Output: -1,
+				Graph: MappingGraph{
+					Index: 0,
+					Name:  "graph 0 input from stream 0:0",
+				},
+				Copy: false,
+			},
+			{
+				Input:  2,
+				Output: -1,
+				Graph: MappingGraph{
+					Index: 1,
+					Name:  "graph_1_in_2_0",
+				},
+				Copy: false,
+			},
+			{
+				Input:  2,
+				Output: -1,
+				Graph: MappingGraph{
+					Index: 2,
+					Name:  "graph_2_in_2_0",
+				},
+				Copy: false,
+			},
+			{
+				Input:  -1,
+				Output: 0,
+				Graph: MappingGraph{
+					Index: 0,
+					Name:  "out_0_0",
+				},
+				Copy: false,
+			},
+			{
+				Input:  1,
+				Output: 1,
+				Graph: MappingGraph{
+					Index: -1,
+					Name:  "",
+				},
+				Copy: true,
+			},
+			{
+				Input:  -1,
+				Output: 2,
+				Graph: MappingGraph{
+					Index: 1,
+					Name:  "out_0_2",
+				},
+				Copy: false,
+			},
+			{
+				Input:  -1,
+				Output: 3,
+				Graph: MappingGraph{
+					Index: 2,
+					Name:  "out_0_3",
+				},
+				Copy: false,
+			},
+		},
+	}, progress.Mapping)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[0].Address)
+	require.Equal(t, uint64(0), progress.Output[0].Index)
+	require.Equal(t, uint64(0), progress.Output[0].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[1].Address)
+	require.Equal(t, uint64(1), progress.Output[1].Index)
+	require.Equal(t, uint64(0), progress.Output[1].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[2].Address)
+	require.Equal(t, uint64(0), progress.Output[2].Index)
+	require.Equal(t, uint64(1), progress.Output[2].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[3].Address)
+	require.Equal(t, uint64(1), progress.Output[3].Index)
+	require.Equal(t, uint64(1), progress.Output[3].Stream)
+}
+
+func TestParserHLSMapping(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
+	parser.Parse(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`)
+	parser.Parse(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
+	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`)
+
+	progress := parser.Progress()
+
+	require.Equal(t, 3, len(progress.Input))
+	require.Equal(t, 4, len(progress.Output))
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[0].Address)
+	require.Equal(t, uint64(0), progress.Output[0].Index)
+	require.Equal(t, uint64(0), progress.Output[0].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[1].Address)
+	require.Equal(t, uint64(1), progress.Output[1].Index)
+	require.Equal(t, uint64(0), progress.Output[1].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[2].Address)
+	require.Equal(t, uint64(0), progress.Output[2].Index)
+	require.Equal(t, uint64(1), progress.Output[2].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[3].Address)
+	require.Equal(t, uint64(1), progress.Output[3].Index)
+	require.Equal(t, uint64(1), progress.Output[3].Stream)
+}
+
 func TestParserPatterns(t *testing.T) {
 	p := New(Config{
 		LogHistory: 3,
