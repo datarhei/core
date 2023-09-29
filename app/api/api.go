@@ -1558,6 +1558,9 @@ func (a *api) start(ctx context.Context) error {
 			a.sidecarserver.Handler = autocertManager.HTTPChallengeHandler(sidecarserverhandler)
 		}
 
+		metrics.Register(monitor.NewHTTPCollector("HTTPS", mainserverhandler))
+		metrics.Register(monitor.NewHTTPCollector("HTTP", sidecarserverhandler))
+
 		wgStart.Add(1)
 		a.wgStop.Add(1)
 
@@ -1583,6 +1586,8 @@ func (a *api) start(ctx context.Context) error {
 
 			sendError(err)
 		}()
+	} else {
+		metrics.Register(monitor.NewHTTPCollector("HTTP", mainserverhandler))
 	}
 
 	if a.rtmpserver != nil {

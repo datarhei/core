@@ -16,11 +16,13 @@ type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
 	Logger  log.Logger
+	Status  func(code int)
 }
 
 var DefaultConfig = Config{
 	Skipper: middleware.DefaultSkipper,
-	Logger:  log.New("HTTP"),
+	Logger:  log.New(""),
+	Status:  nil,
 }
 
 func New() echo.MiddlewareFunc {
@@ -75,6 +77,10 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			req.Body = reader
 
 			latency := time.Since(start)
+
+			if config.Status != nil {
+				config.Status(res.Status)
+			}
 
 			if raw != "" {
 				path = path + "?" + raw

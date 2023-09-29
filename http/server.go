@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
@@ -43,6 +44,7 @@ import (
 	api "github.com/datarhei/core/v16/http/handler/api"
 	httplog "github.com/datarhei/core/v16/http/log"
 	"github.com/datarhei/core/v16/http/router"
+	serverhandler "github.com/datarhei/core/v16/http/server"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/log"
@@ -104,10 +106,6 @@ type CorsConfig struct {
 	Origins []string
 }
 
-type Server interface {
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
-}
-
 type server struct {
 	logger log.Logger
 
@@ -154,6 +152,11 @@ type server struct {
 	profiling     bool
 
 	readOnly bool
+
+	metrics struct {
+		lock   sync.Mutex
+		status map[int]uint64
+	}
 }
 
 type filesystem struct {
@@ -164,13 +167,15 @@ type filesystem struct {
 	middleware echo.MiddlewareFunc
 }
 
-func NewServer(config Config) (Server, error) {
+func NewServer(config Config) (serverhandler.Server, error) {
 	s := &server{
 		logger:        config.Logger,
 		mimeTypesFile: config.MimeTypesFile,
 		profiling:     config.Profiling,
 		readOnly:      config.ReadOnly,
 	}
+
+	s.metrics.status = map[int]uint64{}
 
 	s.filesystems = map[string]*filesystem{}
 
@@ -327,6 +332,12 @@ func NewServer(config Config) (Server, error) {
 
 	s.middleware.log = mwlog.NewWithConfig(mwlog.Config{
 		Logger: s.logger,
+		Status: func(code int) {
+			s.metrics.lock.Lock()
+			defer s.metrics.lock.Unlock()
+
+			s.metrics.status[code]++
+		},
 	})
 
 	s.v3handler.widget = api.NewWidget(api.WidgetConfig{
@@ -456,6 +467,19 @@ func NewServer(config Config) (Server, error) {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+func (s *server) HTTPStatus() map[int]uint64 {
+	status := map[int]uint64{}
+
+	s.metrics.lock.Lock()
+	defer s.metrics.lock.Unlock()
+
+	for code, value := range s.metrics.status {
+		status[code] = value
+	}
+
+	return status
 }
 
 func (s *server) setRoutes() {
