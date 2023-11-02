@@ -1,7 +1,9 @@
 package session
 
 import (
+	"io"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -323,6 +325,120 @@ func TestPersistSession(t *testing.T) {
 	info, err := memfs.Stat(path)
 	require.NoError(t, err)
 	require.Greater(t, info.Size(), int64(0))
+}
+
+func TestPersistSessionDelayed(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	pattern := "/log/%Y-%m-%d-%H.log"
+
+	r, err := New(Config{
+		PersistFS:         memfs,
+		LogPattern:        pattern,
+		LogBufferDuration: 5 * time.Second,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		r.Close()
+	})
+
+	c, err := r.Register("foobar", CollectorConfig{
+		SessionTimeout: 3 * time.Second,
+	})
+	require.NoError(t, err)
+
+	ce, ok := c.(*collector)
+	require.True(t, ok)
+
+	start, err := time.Parse(time.RFC3339, "2023-11-01T15:04:00Z")
+	require.NoError(t, err)
+
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(5 * time.Minute),
+	}
+
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(6 * time.Minute),
+	}
+
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(7 * time.Minute),
+	}
+
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(1 * time.Hour),
+	}
+
+	// late entry
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(8 * time.Minute),
+	}
+
+	ce.sessionsCh <- Session{
+		Collector: "foobar",
+		CreatedAt: start,
+		ClosedAt:  start.Add(61 * time.Minute),
+	}
+
+	require.Eventually(t, func() bool {
+		path, err := strftime.Format(pattern, start)
+		if err != nil {
+			return false
+		}
+		_, err = memfs.Stat(path)
+		return err == nil
+	}, 10*time.Second, time.Second)
+
+	path, err := strftime.Format(pattern, start)
+	require.NoError(t, err)
+
+	file := memfs.Open(path)
+	require.NotNil(t, file)
+
+	data, err := io.ReadAll(file)
+	require.NoError(t, err)
+
+	file.Close()
+
+	lines := strings.Split(string(data), "\n")
+	require.Equal(t, 3, len(lines)-1)
+
+	require.Eventually(t, func() bool {
+		path, err := strftime.Format(pattern, start.Add(1*time.Hour))
+		if err != nil {
+			return false
+		}
+		_, err = memfs.Stat(path)
+		return err == nil
+	}, 10*time.Second, time.Second)
+
+	path, err = strftime.Format(pattern, start.Add(1*time.Hour))
+	require.NoError(t, err)
+
+	file = memfs.Open(path)
+	require.NotNil(t, file)
+
+	data, err = io.ReadAll(file)
+	require.NoError(t, err)
+
+	file.Close()
+
+	lines = strings.Split(string(data), "\n")
+	require.Equal(t, 3, len(lines)-1)
+
+	err = r.Unregister("foobar")
+	require.NoError(t, err)
 }
 
 func TestPersistSessionSlpit(t *testing.T) {

@@ -210,6 +210,8 @@ func (r *registry) sessionPersister(pattern *strftime.Strftime, bufferDuration t
 	ticker := time.NewTicker(bufferDuration)
 	defer ticker.Stop()
 
+	splitTime := time.Time{}
+
 loop:
 	for {
 		select {
@@ -218,7 +220,7 @@ loop:
 				break loop
 			}
 			currentPath := pattern.FormatString(session.ClosedAt)
-			if currentPath != path {
+			if currentPath != path && session.ClosedAt.After(splitTime) {
 				if buffer.Len() > 0 {
 					_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
 					if err != nil {
@@ -231,6 +233,7 @@ loop:
 					"current":  currentPath,
 				}).Log("Creating new session log file")
 				path = currentPath
+				splitTime = session.ClosedAt
 			}
 
 			enc.Encode(&session)
@@ -244,13 +247,14 @@ loop:
 				}
 			}
 			currentPath := pattern.FormatString(t)
-			if currentPath != path {
+			if currentPath != path && t.After(splitTime) {
 				buffer.Reset()
 				r.logger.Info().WithFields(log.Fields{
 					"previous": path,
 					"current":  currentPath,
 				}).Log("Creating new session log file")
 				path = currentPath
+				splitTime = t
 			}
 		}
 	}
