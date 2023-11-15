@@ -321,6 +321,10 @@ func New(config Config) (Cluster, error) {
 	peers := []raft.Peer{}
 
 	for _, p := range config.Peers {
+		if p.ID == config.ID && p.Address == config.Address {
+			continue
+		}
+
 		peers = append(peers, raft.Peer{
 			ID:      p.ID,
 			Address: p.Address,
