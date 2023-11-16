@@ -172,38 +172,42 @@ func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[strin
 		res.Writer = rewriter
 	}
 
-	defer func() {
-		// Restore the original writer
-		res.Writer = writer
+	err := next(c)
 
-		if rewrite {
-			if res.Status < 200 || res.Status >= 300 {
-				res.Write(rewriter.buffer.Bytes())
-				return
-			}
+	// Restore the original writer
+	res.Writer = writer
 
-			// Rewrite the data befor sending it to the client
-			rewriter.rewriteHLS(sessionID, c.Request().URL)
+	if err != nil {
+		return err
+	}
 
-			res.Header().Set("Cache-Control", "private")
+	if rewrite {
+		if res.Status < 200 || res.Status >= 300 {
 			res.Write(rewriter.buffer.Bytes())
+			return nil
 		}
 
-		if isM3U8 || isTS {
-			if res.Status >= 200 && res.Status < 300 {
-				// Collect how many bytes we've written in this session
-				h.hlsEgressCollector.Egress(sessionID, headerSize(res.Header()))
-				h.hlsEgressCollector.Egress(sessionID, res.Size)
+		// Rewrite the data befor sending it to the client
+		rewriter.rewriteHLS(sessionID, c.Request().URL)
 
-				if isTS {
-					// Activate the session. If the session is already active, this is a noop
-					h.hlsEgressCollector.Activate(sessionID)
-				}
+		res.Header().Set("Cache-Control", "private")
+		res.Write(rewriter.buffer.Bytes())
+	}
+
+	if isM3U8 || isTS {
+		if res.Status >= 200 && res.Status < 300 {
+			// Collect how many bytes we've written in this session
+			h.hlsEgressCollector.Egress(sessionID, headerSize(res.Header()))
+			h.hlsEgressCollector.Egress(sessionID, res.Size)
+
+			if isTS {
+				// Activate the session. If the session is already active, this is a noop
+				h.hlsEgressCollector.Activate(sessionID)
 			}
 		}
-	}()
+	}
 
-	return next(c)
+	return nil
 }
 
 type bodyReader struct {
