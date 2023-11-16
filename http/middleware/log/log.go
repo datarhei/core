@@ -40,7 +40,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) (err error) {
+		return func(c echo.Context) error {
 			if config.Skipper(c) {
 				return next(c)
 			}
@@ -69,7 +69,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			path := req.URL.Path
 			raw := req.URL.RawQuery
 
-			if err = next(c); err != nil {
+			if err := next(c); err != nil {
 				c.Error(err)
 			}
 
@@ -109,7 +109,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			logger.Log("")
 
-			return
+			return nil
 		}
 	}
 }
