@@ -14,6 +14,7 @@ type Event struct {
 	Level     int    `json:"level"`
 	Component string `json:"event"`
 	Message   string `json:"message"`
+	Caller    string `json:"caller"`
 
 	Data map[string]string `json:"data"`
 }
@@ -23,6 +24,7 @@ func (e *Event) Marshal(le *log.Event) {
 	e.Level = int(le.Level)
 	e.Component = strings.ToLower(le.Component)
 	e.Message = le.Message
+	e.Caller = le.Caller
 
 	e.Data = make(map[string]string)
 
@@ -64,6 +66,12 @@ func (e *Event) Filter(ef *EventFilter) bool {
 		}
 	}
 
+	if ef.reCaller != nil {
+		if !ef.reCaller.MatchString(e.Caller) {
+			return false
+		}
+	}
+
 	for k, r := range ef.reData {
 		v, ok := e.Data[k]
 		if !ok {
@@ -82,10 +90,12 @@ type EventFilter struct {
 	Component string            `json:"event"`
 	Message   string            `json:"message"`
 	Level     string            `json:"level"`
+	Caller    string            `json:"caller"`
 	Data      map[string]string `json:"data"`
 
 	reMessage *regexp.Regexp
 	reLevel   *regexp.Regexp
+	reCaller  *regexp.Regexp
 	reData    map[string]*regexp.Regexp
 }
 
@@ -110,6 +120,15 @@ func (ef *EventFilter) Compile() error {
 		}
 
 		ef.reLevel = r
+	}
+
+	if len(ef.Caller) != 0 {
+		r, err := regexp.Compile("(?i)" + ef.Caller)
+		if err != nil {
+			return err
+		}
+
+		ef.reCaller = r
 	}
 
 	ef.reData = make(map[string]*regexp.Regexp)
