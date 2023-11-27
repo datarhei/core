@@ -44,7 +44,7 @@ type ProxyReader interface {
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
 	ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error)
 
-	ListFiles(storage, patter string) []clientapi.FileInfo
+	ListFiles(storage, pattern string) []clientapi.FileInfo
 
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)

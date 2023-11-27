@@ -738,7 +738,16 @@ func (n *node) FileList(storage, pattern string) ([]clientapi.FileInfo, error) {
 		return nil, ErrNoPeer
 	}
 
-	return n.peer.FilesystemList(storage, pattern, "", "")
+	files, err := n.peer.FilesystemList(storage, pattern, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range files {
+		files[i].CoreID = n.id
+	}
+
+	return files, nil
 }
 
 func cloneURL(src *url.URL) *url.URL {
