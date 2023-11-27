@@ -46,13 +46,13 @@ A Go version of 1.18+ is required.
 
 ## Installation
 
-```
+```shell
 go get github.com/datarhei/gosrt
 ```
 
 ## Caller example
 
-```
+```go
 import "github.com/datarhei/gosrt"
 
 conn, err := srt.Dial("srt", "golang.org:6000", srt.Config{
@@ -80,7 +80,7 @@ In the `contrib/client` directory you'll find a complete example of a SRT client
 
 ## Listener example
 
-```
+```go
 import "github.com/datarhei/gosrt"
 
 ln, err := srt.Listen("srt", ":6000", srt.Config{...})
@@ -128,7 +128,7 @@ In the `contrib/client` directory you'll find an example implementation of a SRT
 
 Build the client application with
 
-```
+```shell
 cd contrib/client && go build
 ```
 
@@ -187,31 +187,45 @@ known options (similar to [srt-live-transmit](https://github.com/Haivision/srt/b
 
 Reading from a SRT sender and play with `ffplay`:
 
-```
+```shell
 ./client -from "srt://127.0.0.1:6001/?mode=listener&streamid=..." -to - | ffplay -f mpegts -i -
 ```
 
 Reading from UDP and sending to a SRT server:
 
-```
+```shell
 ./client -from udp://:6000 -to "srt://127.0.0.1:6001/?mode=caller&streamid=..."
 ```
 
 Simulate point-to-point transfer on localhost. Open one console and start `ffmpeg` (you need at least version 4.3.2, built with SRT enabled) to send to an UDP address:
 
-```
-ffmpeg -f lavfi -re -i testsrc2=rate=25:size=640x360 -codec:v libx264 -b:v 1024k -maxrate:v 1024k -bufsize:v 1024k -preset ultrafast -r 25 -g 50 -pix_fmt yuv420p -vsync 1 -flags2 local_header -f mpegts "udp://127.0.0.1:6000?pkt_size=1316"
+```shell
+ffmpeg \
+    -f lavfi \
+    -re \
+    -i testsrc2=rate=25:size=640x360 \
+    -codec:v libx264 \
+    -b:v 1024k \
+    -maxrate:v 1024k \
+    -bufsize:v 1024k \
+    -preset ultrafast \
+    -r 25 \
+    -g 50 \
+    -pix_fmt yuv420p \
+    -flags2 local_header \
+    -f mpegts \
+    "udp://127.0.0.1:6000?pkt_size=1316"
 ```
 
 In another console read from the UDP and start a SRT listenr:
 
-```
+```shell
 ./client -from udp://:6000 -to "srt://127.0.0.1:6001/?mode=listener&streamid=foobar"
 ```
 
 In the third console connect to that stream and play the video with `ffplay`:
 
-```
+```shell
 ./client -from "srt://127.0.0.1:6001/?mode=caller&streamid=foobar" -to - | ffplay -f mpegts -i -
 ```
 
@@ -222,7 +236,7 @@ a stream that can be read by many clients.
 
 Build the client application with
 
-```
+```shell
 cd contrib/server && go build
 ```
 
@@ -264,27 +278,42 @@ If you implement your own server you are free to interpret the streamID as you w
 
 Running a server listening on port 6001 with defaults:
 
-```
+```shell
 ./server -addr ":6001"
 ```
 
 Now you can use the contributed client to publish a stream:
 
-```
+```shell
 ./client -from ... -to "srt://127.0.0.1:6001/?mode=caller&streamid=publish:/live/stream"
 ```
 
 or directly from `ffmpeg`:
 
-```
-ffmpeg -f lavfi -re -i testsrc2=rate=25:size=640x360 -codec:v libx264 -b:v 1024k -maxrate:v 1024k -bufsize:v 1024k -preset ultrafast -r 25 -g 50 -pix_fmt yuv420p -vsync 1 -flags2 local_header -f mpegts -transtype live "srt://127.0.0.1:6001?streamid=publish:/live/stream"
+```shell
+ffmpeg \
+    -f lavfi \
+    -re \
+    -i testsrc2=rate=25:size=640x360 \
+    -codec:v libx264 \
+    -b:v 1024k \
+    -maxrate:v 1024k \
+    -bufsize:v 1024k \
+    -preset ultrafast \
+    -r 25 \
+    -g 50 \
+    -pix_fmt yuv420p \
+    -flags2 local_header \
+    -f mpegts \
+    -transtype live \
+    "srt://127.0.0.1:6001?streamid=publish:/live/stream"
 ```
 
 If the server is not on localhost, you might adjust the `peerlatency` in order to avoid packet loss: `-peerlatency 1000000`.
 
 Now you can play the stream:
 
-```
+```shell
 ffplay -f mpegts -transtype live -i "srt://127.0.0.1:6001?streamid=/live/stream"
 ```
 
@@ -295,19 +324,34 @@ get more errors during playback, you might increase the receive buffer by adding
 
 The stream can be encrypted with a passphrase. First start the server with a passphrase. If you are using `srt-live-transmit`, the passphrase has to be at least 10 characters long otherwise it will not be accepted.
 
-```
+```shell
 ./server -addr :6001 -passphrase foobarfoobar
 ```
 
 Send an encrpyted stream to the server:
 
-```
-ffmpeg -f lavfi -re -i testsrc2=rate=25:size=640x360 -codec:v libx264 -b:v 1024k -maxrate:v 1024k -bufsize:v 1024k -preset ultrafast -r 25 -g 50 -pix_fmt yuv420p -vsync 1 -flags2 local_header -f mpegts -transtype live "srt://127.0.0.1:6001?streamid=publish:/live/stream&passphrase=foobarfoobar"
+```shell
+ffmpeg \
+    -f lavfi \
+    -re \
+    -i testsrc2=rate=25:size=640x360 \
+    -codec:v libx264 \
+    -b:v 1024k \
+    -maxrate:v 1024k \
+    -bufsize:v 1024k \
+    -preset ultrafast \
+    -r 25 \
+    -g 50 \
+    -pix_fmt yuv420p \
+    -flags2 local_header \
+    -f mpegts \
+    -transtype live \
+    "srt://127.0.0.1:6001?streamid=publish:/live/stream&passphrase=foobarfoobar"
 ```
 
 Receive an encrypted stream from the server:
 
-```
+```shell
 ffplay -f mpegts -transtype live -i "srt://127.0.0.1:6001?streamid=/live/stream&passphrase=foobarfoobar"
 ```
 
@@ -320,7 +364,7 @@ This SRT module has a built-in logging facility for debugging purposes. Check th
 
 In the contributed server you see an example of how logging is used. Here's the essence:
 
-```
+```go
 logger := srt.NewLogger([]string{"connection", "handshake"})
 
 config := srt.DefaultConfig

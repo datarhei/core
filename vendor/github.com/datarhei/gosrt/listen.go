@@ -148,7 +148,9 @@ type listener struct {
 	start time.Time
 
 	rcvQueue chan packet.Packet
-	sndQueue chan packet.Packet
+
+	sndMutex sync.Mutex
+	sndData  bytes.Buffer
 
 	syncookie *srtnet.SYNCookie
 
@@ -157,7 +159,6 @@ type listener struct {
 	shutdownOnce sync.Once
 
 	stopReader context.CancelFunc
-	stopWriter context.CancelFunc
 
 	doneChan chan error
 }
@@ -208,7 +209,6 @@ func Listen(network, address string, config Config) (Listener, error) {
 	ln.backlog = make(chan connRequest, 128)
 
 	ln.rcvQueue = make(chan packet.Packet, 2048)
-	ln.sndQueue = make(chan packet.Packet, 2048)
 
 	ln.syncookie, err = srtnet.NewSYNCookie(ln.addr.String(), nil)
 	if err != nil {
@@ -223,10 +223,6 @@ func Listen(network, address string, config Config) (Listener, error) {
 	var readerCtx context.Context
 	readerCtx, ln.stopReader = context.WithCancel(context.Background())
 	go ln.reader(readerCtx)
-
-	var writerCtx context.Context
-	writerCtx, ln.stopWriter = context.WithCancel(context.Background())
-	go ln.writer(writerCtx)
 
 	go func() {
 		buffer := make([]byte, config.MSS) // MTU size
@@ -436,7 +432,6 @@ func (ln *listener) Close() {
 		ln.lock.RUnlock()
 
 		ln.stopReader()
-		ln.stopWriter()
 
 		ln.log("listen", func() string { return "closing socket" })
 
@@ -489,49 +484,29 @@ func (ln *listener) reader(ctx context.Context) {
 	}
 }
 
+// Send a packet to the wire. This function must be synchronous in order to allow to safely call Packet.Decommission() afterward.
 func (ln *listener) send(p packet.Packet) {
-	// non-blocking
-	select {
-	case ln.sndQueue <- p:
-	default:
-		ln.log("listen", func() string { return "send queue is full" })
+	ln.sndMutex.Lock()
+	defer ln.sndMutex.Unlock()
+
+	ln.sndData.Reset()
+
+	if err := p.Marshal(&ln.sndData); err != nil {
+		p.Decommission()
+		ln.log("packet:send:error", func() string { return "marshalling packet failed" })
+		return
 	}
-}
 
-func (ln *listener) writer(ctx context.Context) {
-	defer func() {
-		ln.log("listen", func() string { return "left writer loop" })
-	}()
+	buffer := ln.sndData.Bytes()
 
-	ln.log("listen", func() string { return "writer loop started" })
+	ln.log("packet:send:dump", func() string { return p.Dump() })
 
-	var data bytes.Buffer
+	// Write the packet's contents to the wire
+	ln.pc.WriteTo(buffer, p.Header().Addr)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case p := <-ln.sndQueue:
-			data.Reset()
-
-			if err := p.Marshal(&data); err != nil {
-				p.Decommission()
-				ln.log("packet:send:error", func() string { return "marshalling packet failed" })
-				continue
-			}
-
-			buffer := data.Bytes()
-
-			ln.log("packet:send:dump", func() string { return p.Dump() })
-
-			// Write the packet's contents to the wire
-			ln.pc.WriteTo(buffer, p.Header().Addr)
-
-			if p.Header().IsControlPacket {
-				// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)
-				p.Decommission()
-			}
-		}
+	if p.Header().IsControlPacket {
+		// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)
+		p.Decommission()
 	}
 }
 
