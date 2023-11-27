@@ -40,7 +40,7 @@ type access struct {
 
 	adapter  Adapter
 	model    model.Model
-	enforcer *casbin.Enforcer
+	enforcer *casbin.SyncedEnforcer
 }
 
 type Config struct {
@@ -65,7 +65,7 @@ func New(config Config) (Manager, error) {
 	m.AddDef("e", "e", "some(where (p.eft == allow))")
 	m.AddDef("m", "m", `g(r.sub, p.sub, r.dom) && r.dom == p.dom && ResourceMatch(r.obj, p.obj) && ActionMatch(r.act, p.act) || r.sub == "$superuser"`)
 
-	e, err := casbin.NewEnforcer(m, am.adapter)
+	e, err := casbin.NewSyncedEnforcer(m, am.adapter)
 	if err != nil {
 		return nil, err
 	}
