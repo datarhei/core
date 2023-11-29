@@ -119,10 +119,18 @@ func (s *SessionHandler) CreateToken(c echo.Context) error {
 	}
 
 	for i, req := range request {
-		data := map[string]interface{}{
-			"match":  req.Match,
-			"remote": req.Remote,
-			"extra":  req.Extra,
+		data := map[string]interface{}{}
+
+		if len(req.Match) != 0 {
+			data["match"] = req.Match
+		}
+
+		if len(req.Remote) != 0 {
+			data["remote"] = req.Remote
+		}
+
+		if len(req.Extra) != 0 {
+			data["extra"] = req.Extra
 		}
 
 		request[i].Token = identity.GetServiceSession(data, time.Duration(req.TTL)*time.Second)
