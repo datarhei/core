@@ -1,6 +1,6 @@
 # Core
 
-### Core v16.13.0 > vx.x.x
+### Core v16.13.0 > v16.13.1
 
 -   Fix transfer of reports to updated process
 -   Fix calling Wait after process has been read
