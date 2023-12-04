@@ -855,6 +855,12 @@ func TestParserProgressPlayout(t *testing.T) {
 					Duplicating: true,
 					GOP:         "key",
 					Mode:        "live",
+					Swap: AVStreamSwap{
+						URL:       "",
+						Status:    "waiting",
+						LastURL:   "",
+						LastError: "",
+					},
 				},
 			},
 		},
