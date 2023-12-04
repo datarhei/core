@@ -242,7 +242,8 @@ type collector struct {
 	rxBitrate *average.SlidingWindow
 	txBitrate *average.SlidingWindow
 
-	history history
+	collectHistory bool
+	history        history
 
 	inactiveTimeout time.Duration
 	sessionTimeout  time.Duration
@@ -269,7 +270,7 @@ const (
 // NewCollector returns a new collector according to the provided configuration. If such a
 // collector can't be created, a NullCollector is returned.
 func NewCollector(config CollectorConfig) Collector {
-	collector, err := newCollector("", nil, nil, config)
+	collector, err := newCollector("", nil, nil, false, config)
 	if err != nil {
 		return NewNullCollector()
 	}
@@ -279,7 +280,7 @@ func NewCollector(config CollectorConfig) Collector {
 	return collector
 }
 
-func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, config CollectorConfig) (*collector, error) {
+func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, history bool, config CollectorConfig) (*collector, error) {
 	c := &collector{
 		id:              id,
 		logger:          logger,
@@ -290,6 +291,7 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 		inactiveTimeout: config.InactiveTimeout,
 		sessionTimeout:  config.SessionTimeout,
 		limiter:         config.Limiter,
+		collectHistory:  history,
 	}
 
 	if c.logger == nil {
@@ -347,25 +349,27 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, confi
 		// Only log session that have been active
 		logger.Info().Log("Closed")
 
-		c.lock.history.Lock()
+		if c.collectHistory {
+			c.lock.history.Lock()
 
-		key := sess.location + ":" + sess.peer + ":" + sess.reference
+			key := sess.location + ":" + sess.peer + ":" + sess.reference
 
-		// Update history totals per key
-		t, ok := c.history.Sessions[key]
-		t.TotalSessions++
-		t.TotalRxBytes += sess.rxBytes
-		t.TotalTxBytes += sess.txBytes
+			// Update history totals per key
+			t, ok := c.history.Sessions[key]
+			t.TotalSessions++
+			t.TotalRxBytes += sess.rxBytes
+			t.TotalTxBytes += sess.txBytes
 
-		if !ok {
-			t.Location = sess.location
-			t.Peer = sess.peer
-			t.Reference = sess.reference
+			if !ok {
+				t.Location = sess.location
+				t.Peer = sess.peer
+				t.Reference = sess.reference
+			}
+
+			c.history.Sessions[key] = t
+
+			c.lock.history.Unlock()
 		}
-
-		c.history.Sessions[key] = t
-
-		c.lock.history.Unlock()
 
 		if c.sessionsCh != nil {
 			c.sessionsCh <- Session{
@@ -458,6 +462,11 @@ func (s *historySnapshot) Release() {
 func (c *collector) Snapshot() (Snapshot, error) {
 	c.logger.Debug().Log("Creating history snapshot")
 
+	if !c.collectHistory {
+		c.logger.Debug().Log("Not creating history snapshot because collector history is disabled")
+		return nil, fmt.Errorf("collecting history is disabled")
+	}
+
 	c.lock.history.Lock()
 	defer c.lock.history.Unlock()
 
@@ -475,6 +484,11 @@ func (c *collector) Snapshot() (Snapshot, error) {
 
 func (c *collector) Restore(snapshot io.ReadCloser) error {
 	if snapshot == nil {
+		return nil
+	}
+
+	if !c.collectHistory {
+		c.logger.Debug().Log("Not restoring history snapshot because collector history is disabled")
 		return nil
 	}
 

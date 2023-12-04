@@ -21,12 +21,12 @@ type Config struct {
 	// history will not be persisted.
 	PersistFS fs.Filesystem
 
-	// PersistInterval is the duration between persisting the history. Can be 0. Then the history will
-	// only be persisted at stopping the collector.
+	// PersistInterval is the duration between persisting the history. If 0 the history will
+	// only be persisted at stopping the collector. If negative, the history will not be persisted.
 	PersistInterval time.Duration
 
 	// SessionLogPattern is a path inside the PersistFS where the individual sessions will
-	// be logged. The path can contain strftime-plateholders in order to split the log files.
+	// be logged. The path can contain strftime-placeholders in order to split the log files.
 	// If this string is empty or PersistFS is nil, the sessions will not be logged.
 	LogPattern string
 
@@ -319,7 +319,9 @@ func (r *registry) Register(id string, conf CollectorConfig) (Collector, error) 
 		return nil, fmt.Errorf("a collector with the ID '%s' already exists", id)
 	}
 
-	m, err := newCollector(id, r.persist.sessionsCh, r.logger, conf)
+	collectHistory := r.persist.fs != nil && r.persist.interval >= 0
+
+	m, err := newCollector(id, r.persist.sessionsCh, r.logger, collectHistory, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +362,7 @@ func (r *registry) unregister(id string) error {
 
 	delete(r.collector, id)
 
-	if r.persist.fs != nil {
+	if r.persist.fs != nil && r.persist.interval >= 0 {
 		s, err := m.Snapshot()
 		if err != nil {
 			return err

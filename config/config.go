@@ -271,8 +271,8 @@ func (d *Config) init() {
 	d.vars.Register(value.NewInt(&d.Sessions.SessionTimeout, 30), "sessions.session_timeout_sec", "CORE_SESSIONS_SESSION_TIMEOUT_SEC", nil, "Timeout for an idle session", false, false)
 	d.vars.Register(value.NewStrftime(&d.Sessions.SessionLogPathPattern, ""), "sessions.session_log_path_pattern", "CORE_SESSIONS_SESSION_LOG_PATH_PATTERN", nil, "Path to where the sessions will be logged, may contain strftime-patterns, leave empty for no session logging, persist must be enabled", false, false)
 	d.vars.Register(value.NewInt(&d.Sessions.SessionLogBuffer, 15), "sessions.session_log_buffer_sec", "CORE_SESSIONS_SESSION_LOG_BUFFER_SEC", nil, "Maximum duration to buffer session logs in memory before persisting on disk", false, false)
-	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history. Will be stored in /sessions/[collector].json in db.dir", false, false)
-	d.vars.Register(value.NewInt(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history", false, false)
+	d.vars.Register(value.NewBool(&d.Sessions.Persist, false), "sessions.persist", "CORE_SESSIONS_PERSIST", nil, "Whether to persist session history or logs. Will be stored in /sessions in db.dir", false, false)
+	d.vars.Register(value.NewInt(&d.Sessions.PersistInterval, 300), "sessions.persist_interval_sec", "CORE_SESSIONS_PERSIST_INTERVAL_SEC", nil, "Interval in seconds in which to persist the current session history, 0 only on shutdown, negative never", false, false)
 	d.vars.Register(value.NewUint64(&d.Sessions.MaxBitrate, 0), "sessions.max_bitrate_mbit", "CORE_SESSIONS_MAXBITRATE_MBIT", nil, "Max. allowed outgoing bitrate in mbit/s, 0 for unlimited", false, false)
 	d.vars.Register(value.NewUint64(&d.Sessions.MaxSessions, 0), "sessions.max_sessions", "CORE_SESSIONS_MAX_SESSIONS", []string{"CORE_SESSIONS_MAXSESSIONS"}, "Max. allowed number of simultaneous sessions, 0 for unlimited", false, false)
 
@@ -446,11 +446,6 @@ func (d *Config) Validate(resetLogs bool) {
 	// If the stats are enabled, the session timeout has to be set to a useful value
 	if d.Sessions.Enable && d.Sessions.SessionTimeout < 1 {
 		d.vars.Log("error", "stats.session_timeout_sec", "must be equal or greater than 1")
-	}
-
-	// If the stats and their persistence are enabled, the persist interval has to be set to a useful value
-	if d.Sessions.Enable && d.Sessions.PersistInterval < 0 {
-		d.vars.Log("error", "stats.persist_interval_sec", "must be at equal or greater than 0")
 	}
 
 	// If the service is enabled, the token and enpoint have to be defined

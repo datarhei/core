@@ -9,7 +9,7 @@ import (
 )
 
 func createCollector(inactive, session time.Duration, sessionsCh chan<- Session) (*collector, error) {
-	return newCollector("test", sessionsCh, nil, CollectorConfig{
+	return newCollector("test", sessionsCh, nil, true, CollectorConfig{
 		InactiveTimeout: inactive,
 		SessionTimeout:  session,
 	})
