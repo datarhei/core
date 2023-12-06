@@ -56,35 +56,6 @@ func (avio *ffmpegAVstreamIO) export() AVstreamIO {
 	}
 }
 
-type ffmpegAVStreamDebug struct {
-	Sentinel struct {
-		Reopen uint64 `json:"reopen"`
-	} `json:"sentinel"`
-	Track struct {
-		FPS     int    `json:"fps"`
-		Bitrate uint64 `json:"bitrate"`
-	} `json:"track"`
-	Counter []uint64 `json:"counter"`
-	Locks   []int    `json:"locks"`
-	Version string   `json:"version"`
-}
-
-func (avdebug *ffmpegAVStreamDebug) export() AVStreamDebug {
-	debug := AVStreamDebug{
-		Version: avdebug.Version,
-	}
-
-	debug.Counter = append(debug.Counter, avdebug.Counter...)
-	debug.Locks = append(debug.Locks, avdebug.Locks...)
-
-	debug.Sentinel.Reopen = avdebug.Sentinel.Reopen
-
-	debug.Track.FPS = avdebug.Track.FPS
-	debug.Track.Bitrate = avdebug.Track.Bitrate
-
-	return debug
-}
-
 type ffmpegAVStreamSwap struct {
 	URL       string `json:"url"`
 	Status    string `json:"status"`
@@ -102,23 +73,23 @@ func (avswap *ffmpegAVStreamSwap) export() AVStreamSwap {
 }
 
 type ffmpegAVstream struct {
-	Input          ffmpegAVstreamIO    `json:"input"`
-	Output         ffmpegAVstreamIO    `json:"output"`
-	Address        string              `json:"id"`
-	URL            string              `json:"url"`
-	Stream         uint64              `json:"stream"`
-	Aqueue         uint64              `json:"aqueue"`
-	Queue          uint64              `json:"queue"`
-	Dup            uint64              `json:"dup"`
-	Drop           uint64              `json:"drop"`
-	Enc            uint64              `json:"enc"`
-	Looping        bool                `json:"looping"`
-	LoopingRuntime uint64              `json:"looping_runtime"`
-	Duplicating    bool                `json:"duplicating"`
-	GOP            string              `json:"gop"`
-	Mode           string              `json:"mode"`
-	Debug          ffmpegAVStreamDebug `json:"debug"`
-	Swap           ffmpegAVStreamSwap  `json:"swap"`
+	Input          ffmpegAVstreamIO   `json:"input"`
+	Output         ffmpegAVstreamIO   `json:"output"`
+	Address        string             `json:"id"`
+	URL            string             `json:"url"`
+	Stream         uint64             `json:"stream"`
+	Aqueue         uint64             `json:"aqueue"`
+	Queue          uint64             `json:"queue"`
+	Dup            uint64             `json:"dup"`
+	Drop           uint64             `json:"drop"`
+	Enc            uint64             `json:"enc"`
+	Looping        bool               `json:"looping"`
+	LoopingRuntime uint64             `json:"looping_runtime"`
+	Duplicating    bool               `json:"duplicating"`
+	GOP            string             `json:"gop"`
+	Mode           string             `json:"mode"`
+	Debug          interface{}        `json:"debug"`
+	Swap           ffmpegAVStreamSwap `json:"swap"`
 }
 
 func (av *ffmpegAVstream) export() *AVstream {
@@ -135,7 +106,7 @@ func (av *ffmpegAVstream) export() *AVstream {
 		Mode:           av.Mode,
 		Input:          av.Input.export(),
 		Output:         av.Output.export(),
-		Debug:          av.Debug.export(),
+		Debug:          av.Debug,
 		Swap:           av.Swap.export(),
 	}
 }
@@ -502,19 +473,6 @@ type AVstreamIO struct {
 	Size   uint64
 }
 
-type AVStreamDebug struct {
-	Sentinel struct {
-		Reopen uint64
-	}
-	Track struct {
-		FPS     int
-		Bitrate uint64
-	}
-	Counter []uint64
-	Locks   []int
-	Version string
-}
-
 type AVStreamSwap struct {
 	URL       string
 	Status    string
@@ -535,7 +493,7 @@ type AVstream struct {
 	Duplicating    bool
 	GOP            string
 	Mode           string
-	Debug          AVStreamDebug
+	Debug          interface{}
 	Swap           AVStreamSwap
 }
 

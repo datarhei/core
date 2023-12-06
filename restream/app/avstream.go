@@ -7,19 +7,6 @@ type AVstreamIO struct {
 	Size   uint64 // bytes
 }
 
-type AVStreamDebug struct {
-	Sentinel struct {
-		Reopen uint64
-	}
-	Track struct {
-		FPS     int
-		Bitrate uint64
-	}
-	Counter []uint64
-	Locks   []int
-	Version string
-}
-
 type AVStreamSwap struct {
 	URL       string
 	Status    string
@@ -40,6 +27,6 @@ type AVstream struct {
 	Duplicating    bool
 	GOP            string
 	Mode           string // "file" or "live"
-	Debug          AVStreamDebug
+	Debug          interface{}
 	Swap           AVStreamSwap
 }
