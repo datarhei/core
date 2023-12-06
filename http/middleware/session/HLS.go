@@ -154,6 +154,10 @@ func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[strin
 			}
 		}
 
+		// Remove any Range request headers, because the rewrite will mess up any lengths.
+		req.Header.Del("Range")
+		req.Header.Del("If-Range")
+
 		rewrite = true
 	}
 
