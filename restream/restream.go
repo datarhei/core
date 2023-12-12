@@ -251,11 +251,24 @@ func (r *restream) Stop() {
 
 		// Stop the currently running processes without altering their order such that on a subsequent
 		// Start() they will get restarted.
-		for id, t := range r.tasks {
-			if t.ffmpeg != nil {
-				t.ffmpeg.Stop(true)
+
+		wg := sync.WaitGroup{}
+
+		for _, t := range r.tasks {
+			if t.ffmpeg == nil {
+				continue
 			}
 
+			wg.Add(1)
+			go func(p process.Process) {
+				defer wg.Done()
+				p.Stop(true)
+			}(t.ffmpeg)
+		}
+
+		wg.Wait()
+
+		for id := range r.tasks {
 			r.unsetCleanup(id)
 		}
 
