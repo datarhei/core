@@ -1,4 +1,5 @@
 testhelper/ignoresigint/ignoresigint
 testhelper/sigint/sigint
 testhelper/sigintwait/sigintwait
+testhelper/sigpropagate/sigpropagate
 testhelper/ffmpeg/ffmpeg

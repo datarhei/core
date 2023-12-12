@@ -564,6 +564,7 @@ func (p *process) start() error {
 	}
 
 	p.cmd = exec.Command(p.binary, args...)
+	p.cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	p.cmd.Env = []string{}
 
 	p.stdout, err = p.cmd.StderrPipe()
