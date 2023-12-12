@@ -1790,13 +1790,6 @@ func (a *api) stop() {
 		}
 	}
 
-	// Stop all restream processes
-	if a.restream != nil {
-		logger.Info().Log("Stopping all processes ...")
-		a.restream.Stop()
-		a.restream = nil
-	}
-
 	// Stop the SRT server
 	if a.srtserver != nil {
 		a.log.logger.srt.Info().Log("Stopping ...")
@@ -1843,6 +1836,13 @@ func (a *api) stop() {
 		}
 
 		a.sidecarserver = nil
+	}
+
+	// Stop all restream processes
+	if a.restream != nil {
+		logger.Info().Log("Stopping all processes ...")
+		a.restream.Stop()
+		a.restream = nil
 	}
 
 	if a.iam != nil {
