@@ -58,13 +58,24 @@ var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
       const wsProto = location.protocol == 'https:' ? 'wss:' : 'ws:';
       const subscriptionUrl = wsProto + '//' + location.host + {{.endpoint}};
 {{- end}}
+{{- if .fetcherHeaders}}
+      const fetcherHeaders = {{.fetcherHeaders}};
+{{- else}}
+      const fetcherHeaders = undefined;
+{{- end}}
+{{- if .uiHeaders}}
+      const uiHeaders = {{.uiHeaders}};
+{{- else}}
+      const uiHeaders = undefined;
+{{- end}}
 
-      const fetcher = GraphiQL.createFetcher({ url, subscriptionUrl });
+      const fetcher = GraphiQL.createFetcher({ url, subscriptionUrl, headers: fetcherHeaders });
       ReactDOM.render(
         React.createElement(GraphiQL, {
           fetcher: fetcher,
           isHeadersEditorEnabled: true,
-          shouldPersistHeaders: true
+          shouldPersistHeaders: true,
+		  headers: JSON.stringify(uiHeaders, null, 2)
         }),
         document.getElementById('graphiql'),
       );
@@ -75,16 +86,25 @@ var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
 
 // Handler responsible for setting up the playground
 func Handler(title string, endpoint string) http.HandlerFunc {
+	return HandlerWithHeaders(title, endpoint, nil, nil)
+}
+
+// HandlerWithHeaders sets up the playground.
+// fetcherHeaders are used by the playground's fetcher instance and will not be visible in the UI.
+// uiHeaders are default headers that will show up in the UI headers editor.
+func HandlerWithHeaders(title string, endpoint string, fetcherHeaders map[string]string, uiHeaders map[string]string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html; charset=UTF-8")
 		err := page.Execute(w, map[string]interface{}{
 			"title":                title,
 			"endpoint":             endpoint,
+			"fetcherHeaders":       fetcherHeaders,
+			"uiHeaders":            uiHeaders,
 			"endpointIsAbsolute":   endpointHasScheme(endpoint),
 			"subscriptionEndpoint": getSubscriptionEndpoint(endpoint),
-			"version":              "3.0.1",
+			"version":              "3.0.6",
 			"cssSRI":               "sha256-wTzfn13a+pLMB5rMeysPPR1hO7x0SwSeQI+cnw7VdbE=",
-			"jsSRI":                "sha256-dLnxjV+d2rFUCtYKjbPy413/8O+Ahy7QqAhaPNlL8fk=",
+			"jsSRI":                "sha256-eNxH+Ah7Z9up9aJYTQycgyNuy953zYZwE9Rqf5rH+r4=",
 			"reactSRI":             "sha256-S0lp+k7zWUMk2ixteM6HZvu8L9Eh//OVrt+ZfbCpmgY=",
 			"reactDOMSRI":          "sha256-IXWO0ITNDjfnNXIu5POVfqlgYoop36bDzhodR6LW5Pc=",
 		})

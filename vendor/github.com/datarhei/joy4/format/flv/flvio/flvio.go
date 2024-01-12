@@ -2,10 +2,11 @@ package flvio
 
 import (
 	"fmt"
-	"github.com/datarhei/joy4/av"
-	"github.com/datarhei/joy4/utils/bits/pio"
 	"io"
 	"time"
+
+	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/utils/bits/pio"
 )
 
 func TsToTime(ts int32) time.Duration {
@@ -59,6 +60,27 @@ const (
 
 	VIDEO_H264 = 7
 )
+
+const (
+	PKTTYPE_SEQUENCE_START         = 0
+	PKTTYPE_CODED_FRAMES           = 1
+	PKTTYPE_SEQUENCE_END           = 2
+	PKTTYPE_CODED_FRAMESX          = 3
+	PKTTYPE_METADATA               = 4
+	PKTTYPE_MPEG2TS_SEQUENCE_START = 5
+)
+
+var (
+	FOURCC_AV1  = [4]byte{'a', 'v', '0', '1'}
+	FOURCC_VP9  = [4]byte{'v', 'p', '0', '9'}
+	FOURCC_HEVC = [4]byte{'h', 'v', 'c', '1'}
+)
+
+func FourCCToFloat(fourcc [4]byte) float64 {
+	i := int(fourcc[0])<<24 | int(fourcc[1])<<16 | int(fourcc[2])<<8 | int(fourcc[3])
+
+	return float64(i)
+}
 
 type Tag struct {
 	/*
@@ -126,13 +148,21 @@ type Tag struct {
 	AACPacketType uint8
 
 	/*
+		0: reserved
 		1: keyframe (for AVC, a seekable frame)
 		2: inter frame (for AVC, a non- seekable frame)
 		3: disposable inter frame (H.263 only)
 		4: generated keyframe (reserved for server use only)
 		5: video info/command frame
+		6: reserved
+		7: reserved
 	*/
 	FrameType uint8
+
+	/*
+		FrameType & 0b1000 != 0
+	*/
+	IsExHeader bool
 
 	/*
 		1: JPEG (currently unused)
@@ -146,6 +176,16 @@ type Tag struct {
 	CodecID uint8
 
 	/*
+		0: PacketTypeSequenceStart
+		1: PacketTypeCodedFrames
+		2: PacketTypeSequenceEnd
+		3: PacketTypeCodedFramesX
+		4: PacketTypeMetadata
+		5: PacketTypeMPEG2TSSequenceStart
+	*/
+	PacketType uint8
+
+	/*
 		0: AVC sequence header
 		1: AVC NALU
 		2: AVC end of sequence (lower level NALU sequence ender is not required or supported)
@@ -154,18 +194,20 @@ type Tag struct {
 
 	CompositionTime int32
 
+	FourCC [4]byte
+
 	Data []byte
 }
 
-func (self Tag) ChannelLayout() av.ChannelLayout {
-	if self.SoundType == SOUND_MONO {
+func (t Tag) ChannelLayout() av.ChannelLayout {
+	if t.SoundType == SOUND_MONO {
 		return av.CH_MONO
 	} else {
 		return av.CH_STEREO
 	}
 }
 
-func (self *Tag) audioParseHeader(b []byte) (n int, err error) {
+func (t *Tag) audioParseHeader(b []byte) (n int, err error) {
 	if len(b) < n+1 {
 		err = fmt.Errorf("audiodata: parse invalid")
 		return
@@ -173,97 +215,163 @@ func (self *Tag) audioParseHeader(b []byte) (n int, err error) {
 
 	flags := b[n]
 	n++
-	self.SoundFormat = flags >> 4
-	self.SoundRate = (flags >> 2) & 0x3
-	self.SoundSize = (flags >> 1) & 0x1
-	self.SoundType = flags & 0x1
+	t.SoundFormat = flags >> 4
+	t.SoundRate = (flags >> 2) & 0x3
+	t.SoundSize = (flags >> 1) & 0x1
+	t.SoundType = flags & 0x1
 
-	switch self.SoundFormat {
+	switch t.SoundFormat {
 	case SOUND_AAC:
 		if len(b) < n+1 {
 			err = fmt.Errorf("audiodata: parse invalid")
 			return
 		}
-		self.AACPacketType = b[n]
+		t.AACPacketType = b[n]
 		n++
 	}
 
 	return
 }
 
-func (self Tag) audioFillHeader(b []byte) (n int) {
+func (t Tag) audioFillHeader(b []byte) (n int) {
 	var flags uint8
-	flags |= self.SoundFormat << 4
-	flags |= self.SoundRate << 2
-	flags |= self.SoundSize << 1
-	flags |= self.SoundType
+	flags |= t.SoundFormat << 4
+	flags |= t.SoundRate << 2
+	flags |= t.SoundSize << 1
+	flags |= t.SoundType
 	b[n] = flags
 	n++
 
-	switch self.SoundFormat {
+	switch t.SoundFormat {
 	case SOUND_AAC:
-		b[n] = self.AACPacketType
+		b[n] = t.AACPacketType
 		n++
 	}
 
 	return
 }
 
-func (self *Tag) videoParseHeader(b []byte) (n int, err error) {
+func (t *Tag) videoParseHeader(b []byte) (n int, err error) {
 	if len(b) < n+1 {
 		err = fmt.Errorf("videodata: parse invalid")
 		return
 	}
 	flags := b[n]
-	self.FrameType = flags >> 4
-	self.CodecID = flags & 0xf
+	t.FrameType = flags >> 4
+	t.CodecID = flags & 0b1111
+
+	//fmt.Printf("%#8b\n", flags)
 	n++
 
-	if self.FrameType == FRAME_INTER || self.FrameType == FRAME_KEY {
+	if (t.FrameType & 0b1000) != 0 {
+		t.IsExHeader = true
+		t.PacketType = t.CodecID
+		t.CodecID = 0
+
+		if t.PacketType != PKTTYPE_METADATA {
+			t.FrameType = t.FrameType & 0b0111
+		}
+	}
+
+	if !t.IsExHeader {
+		if t.FrameType == FRAME_INTER || t.FrameType == FRAME_KEY {
+			if len(b) < n+4 {
+				err = fmt.Errorf("videodata: parse invalid: neither interframe nor keyframe")
+				return
+			}
+			t.AVCPacketType = b[n]
+			switch t.AVCPacketType {
+			case AVC_SEQHDR:
+				t.PacketType = PKTTYPE_SEQUENCE_START
+			case AVC_NALU:
+				t.PacketType = PKTTYPE_CODED_FRAMES
+			case AVC_EOS:
+				t.PacketType = PKTTYPE_SEQUENCE_END
+			}
+			n++
+
+			t.CompositionTime = pio.I24BE(b[n:])
+			n += 3
+		}
+	} else {
 		if len(b) < n+4 {
-			err = fmt.Errorf("videodata: parse invalid")
+			err = fmt.Errorf("videodata: parse invalid: not enough bytes for the fourCC value")
 			return
 		}
-		self.AVCPacketType = b[n]
-		n++
 
-		self.CompositionTime = pio.I24BE(b[n:])
+		t.FourCC[0] = b[n]
+		t.FourCC[1] = b[n+1]
+		t.FourCC[2] = b[n+2]
+		t.FourCC[3] = b[n+3]
+
+		n += 4
+
+		t.CompositionTime = 0
+
+		if t.FourCC == FOURCC_HEVC {
+			if t.PacketType == PKTTYPE_CODED_FRAMES {
+				t.CompositionTime = pio.I24BE(b[n:])
+				n += 3
+			}
+		}
+	}
+
+	//fmt.Printf("parseVideoHeader: PacketType: %d\n", t.PacketType)
+
+	return
+}
+
+func (t Tag) videoFillHeader(b []byte) (n int) {
+	if t.IsExHeader {
+		flags := t.FrameType<<4 | t.PacketType | 0b10000000
+		b[n] = flags
+		n++
+		b[n] = t.FourCC[0]
+		b[n+1] = t.FourCC[1]
+		b[n+2] = t.FourCC[2]
+		b[n+3] = t.FourCC[3]
+		n += 4
+
+		if t.FourCC == FOURCC_HEVC {
+			if t.PacketType == PKTTYPE_CODED_FRAMES {
+				pio.PutI24BE(b[n:], t.CompositionTime)
+				n += 3
+			}
+		}
+	} else {
+		flags := t.FrameType<<4 | t.CodecID
+		b[n] = flags
+		n++
+		b[n] = t.AVCPacketType
+		n++
+		pio.PutI24BE(b[n:], t.CompositionTime)
 		n += 3
 	}
 
+	//fmt.Printf("videoFillHeader: PacketType: %d\n%s\n", t.PacketType, hex.Dump(b[:n]))
+
 	return
 }
 
-func (self Tag) videoFillHeader(b []byte) (n int) {
-	flags := self.FrameType<<4 | self.CodecID
-	b[n] = flags
-	n++
-	b[n] = self.AVCPacketType
-	n++
-	pio.PutI24BE(b[n:], self.CompositionTime)
-	n += 3
-	return
-}
-
-func (self Tag) FillHeader(b []byte) (n int) {
-	switch self.Type {
+func (t Tag) FillHeader(b []byte) (n int) {
+	switch t.Type {
 	case TAG_AUDIO:
-		return self.audioFillHeader(b)
+		return t.audioFillHeader(b)
 
 	case TAG_VIDEO:
-		return self.videoFillHeader(b)
+		return t.videoFillHeader(b)
 	}
 
 	return
 }
 
-func (self *Tag) ParseHeader(b []byte) (n int, err error) {
-	switch self.Type {
+func (t *Tag) ParseHeader(b []byte) (n int, err error) {
+	switch t.Type {
 	case TAG_AUDIO:
-		return self.audioParseHeader(b)
+		return t.audioParseHeader(b)
 
 	case TAG_VIDEO:
-		return self.videoParseHeader(b)
+		return t.videoParseHeader(b)
 	}
 
 	return

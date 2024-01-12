@@ -9,10 +9,11 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/vektah/gqlparser/v2/ast"
+
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/plugin"
-	"github.com/vektah/gqlparser/v2/ast"
 )
 
 //go:embed models.gotpl
@@ -52,6 +53,7 @@ type Interface struct {
 	Fields      []*Field
 	Implements  []string
 	OmitCheck   bool
+	Models      []*Object
 }
 
 type Object struct {
@@ -129,9 +131,18 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 				OmitCheck:   cfg.OmitInterfaceChecks,
 			}
 
+			// if the interface has a key directive as an entity interface, allow it to implement _Entity
+			if schemaType.Directives.ForName("key") != nil {
+				it.Implements = append(it.Implements, "_Entity")
+			}
+
 			b.Interfaces = append(b.Interfaces, it)
 		case ast.Object, ast.InputObject:
-			if schemaType == cfg.Schema.Query || schemaType == cfg.Schema.Mutation || schemaType == cfg.Schema.Subscription {
+			if cfg.IsRoot(schemaType) {
+				b.Models = append(b.Models, &Object{
+					Description: schemaType.Description,
+					Name:        schemaType.Name,
+				})
 				continue
 			}
 
@@ -162,6 +173,7 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 						uniqueMap[iface] = true
 					}
 				}
+
 			}
 
 			b.Models = append(b.Models, it)
@@ -200,6 +212,18 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 		cfg.Models.Add(it.Name, cfg.Model.ImportPath()+"."+templates.ToGo(it.Name))
 	}
 	for _, it := range b.Interfaces {
+		// On a given interface we want to keep a reference to all the models that implement it
+		for _, model := range b.Models {
+			for _, impl := range model.Implements {
+				if impl == it.Name {
+					// check if this isn't an implementation of an entity interface
+					if impl != "_Entity" {
+						// If this model has an implementation, add it to the Interface's Models
+						it.Models = append(it.Models, model)
+					}
+				}
+			}
+		}
 		cfg.Models.Add(it.Name, cfg.Model.ImportPath()+"."+templates.ToGo(it.Name))
 	}
 	for _, it := range b.Scalars {
@@ -558,17 +582,19 @@ func removeDuplicateTags(t string) string {
 			continue
 		}
 
-		processed[kv[0]] = true
+		key := kv[0]
+		value := strings.Join(kv[1:], ":")
+		processed[key] = true
 		if len(returnTags) > 0 {
 			returnTags = " " + returnTags
 		}
 
-		isContained := containsInvalidSpace(kv[1])
+		isContained := containsInvalidSpace(value)
 		if isContained {
-			panic(fmt.Errorf("tag value should not contain any leading or trailing spaces: %s", kv[1]))
+			panic(fmt.Errorf("tag value should not contain any leading or trailing spaces: %s", value))
 		}
 
-		returnTags = kv[0] + ":" + kv[1] + returnTags
+		returnTags = key + ":" + value + returnTags
 	}
 
 	return returnTags
