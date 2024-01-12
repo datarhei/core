@@ -394,7 +394,7 @@ func newCollector(id string, persistFS fs.Filesystem, logger log.Logger, config 
 
 func (c *collector) start() {
 	c.startOnce.Do(func() {
-		if c.persist.enable && c.persist.interval != 0 {
+		if c.persist.enable && c.persist.interval > 0 {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.persist.done = cancel
 			go c.persister(ctx, c.persist.interval)
@@ -409,7 +409,7 @@ func (c *collector) start() {
 
 func (c *collector) Stop() {
 	c.stopOnce.Do(func() {
-		if c.persist.enable && c.persist.interval != 0 {
+		if c.persist.enable && c.persist.interval > 0 {
 			c.persist.done()
 		}
 
