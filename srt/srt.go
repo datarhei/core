@@ -468,15 +468,44 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	client := req.RemoteAddr()
 	streamId := req.StreamId()
 
-	si, err := parseStreamId(streamId)
-	if err != nil {
-		s.log("CONNECT", "INVALID", "", err.Error(), client)
-		return srt.REJECT
-	}
+	var si streamInfo
+	var err error
 
-	if len(si.resource) == 0 {
-		s.log("CONNECT", "INVALID", "", "stream resource not provided", client)
-		return srt.REJECT
+	if req.Version() == 4 {
+		si.mode = "publish"
+		si.resource = client.String()
+
+		if len(s.passphrase) != 0 {
+			req.SetPassphrase(s.passphrase)
+		}
+	} else if req.Version() == 5 {
+		si, err = parseStreamId(streamId)
+		if err != nil {
+			s.log("CONNECT", "INVALID", "", err.Error(), client)
+			return srt.REJECT
+		}
+
+		if len(si.resource) == 0 {
+			s.log("CONNECT", "INVALID", "", "stream resource not provided", client)
+			return srt.REJECT
+		}
+
+		if len(s.passphrase) != 0 {
+			if !req.IsEncrypted() {
+				s.log("CONNECT", "FORBIDDEN", si.resource, "connection has to be encrypted", client)
+				return srt.REJECT
+			}
+
+			if err := req.SetPassphrase(s.passphrase); err != nil {
+				s.log("CONNECT", "FORBIDDEN", si.resource, err.Error(), client)
+				return srt.REJECT
+			}
+		} else {
+			if req.IsEncrypted() {
+				s.log("CONNECT", "INVALID", si.resource, "connection must not be encrypted", client)
+				return srt.REJECT
+			}
+		}
 	}
 
 	if si.mode == "publish" {
@@ -488,26 +517,13 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 		return srt.REJECT
 	}
 
-	if len(s.passphrase) != 0 {
-		if !req.IsEncrypted() {
-			s.log("CONNECT", "FORBIDDEN", si.resource, "connection has to be encrypted", client)
-			return srt.REJECT
-		}
-
-		if err := req.SetPassphrase(s.passphrase); err != nil {
-			s.log("CONNECT", "FORBIDDEN", si.resource, err.Error(), client)
-			return srt.REJECT
-		}
-	} else {
-		if req.IsEncrypted() {
-			s.log("CONNECT", "INVALID", si.resource, "connection must not be encrypted", client)
-			return srt.REJECT
-		}
-	}
-
 	// Check the token
 	if len(s.token) != 0 && s.token != si.token {
-		s.log("CONNECT", "FORBIDDEN", si.resource, "invalid token ("+si.token+")", client)
+		if len(si.token) == 0 {
+			s.log("CONNECT", "FORBIDDEN", si.resource, "token required", client)
+		} else {
+			s.log("CONNECT", "FORBIDDEN", si.resource, "invalid token ("+si.token+")", client)
+		}
 		return srt.REJECT
 	}
 
@@ -532,7 +548,13 @@ func (s *server) handlePublish(conn srt.Conn) {
 	streamId := conn.StreamId()
 	client := conn.RemoteAddr()
 
-	si, _ := parseStreamId(streamId)
+	var si streamInfo
+
+	if len(streamId) == 0 {
+		si.resource = client.String()
+	} else {
+		si, _ = parseStreamId(streamId)
+	}
 
 	// Look for the stream
 	s.lock.Lock()
