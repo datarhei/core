@@ -3,6 +3,7 @@
 ### Core v16.13.1 > v16.14.0
 
 -   Add support for SRTv4 clients
+-   Add support for Enhanced RTMP in internal RTMP server
 -   Fix require positive persist interval (session)
 -   Fix race condition (process)
 -   Update dependencies
