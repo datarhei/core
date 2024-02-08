@@ -553,23 +553,34 @@ func (h *RestreamHandler) getProcess(id, filterString string) (api.Process, erro
 	}
 
 	if wants["state"] {
-		if state, err := h.restream.GetProcessState(id); err == nil {
-			info.State = &api.ProcessState{}
-			info.State.Unmarshal(state)
+		state, err := h.restream.GetProcessState(id)
+		if err != nil {
+			return api.Process{}, err
 		}
+
+		info.State = &api.ProcessState{}
+		info.State.Unmarshal(state)
+
 	}
 
 	if wants["report"] {
-		if log, err := h.restream.GetProcessLog(id); err == nil {
-			info.Report = &api.ProcessReport{}
-			info.Report.Unmarshal(log)
+		log, err := h.restream.GetProcessLog(id)
+		if err != nil {
+			return api.Process{}, err
 		}
+
+		info.Report = &api.ProcessReport{}
+		info.Report.Unmarshal(log)
 	}
 
 	if wants["metadata"] {
-		if data, err := h.restream.GetProcessMetadata(id, ""); err == nil {
-			info.Metadata = api.NewMetadata(data)
+		data, err := h.restream.GetProcessMetadata(id, "")
+		if err != nil {
+			return api.Process{}, err
 		}
+
+		info.Metadata = api.NewMetadata(data)
+
 	}
 
 	return info, nil
