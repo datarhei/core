@@ -61,7 +61,7 @@ jobs:
                   file: ./Dockerfile.bundle
                   build-args: |
                       CORE_IMAGE=datarhei/base:${{ env.OS_NAME }}-core-${{ env.OS_VERSION }}-${{ env.CORE_VERSION }}
-                      FFMPEG_IMAGE=datarhei/base:${{ env.OS_NAME }}-ffmpeg-rpi-${{ env.OS_VERSION }}-${{ env.FFMPEG_VERSION }}
+                      FFMPEG_IMAGE=datarhei/base:${{ env.OS_NAME }}-ffmpeg-rpi-${{ env.OS_VERSION_FFMPEG }}-${{ env.FFMPEG_VERSION }}
                   platforms: linux/arm/v7,linux/arm64
                   push: true
                   tags: |
