@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	cfgvars "github.com/datarhei/core/v16/config/vars"
@@ -11,6 +14,7 @@ import (
 	"github.com/datarhei/core/v16/io/file"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/restream/app"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/Masterminds/semver/v3"
@@ -18,10 +22,7 @@ import (
 )
 
 func main() {
-	logger := log.New("Migration").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true)).WithFields(log.Fields{
-		"from": "ffmpeg4",
-		"to":   "ffmpeg5",
-	})
+	logger := log.New("Migration").WithOutput(log.NewConsoleWriter(os.Stderr, log.Linfo, true))
 
 	configfile := cfgstore.Location(os.Getenv("CORE_CONFIGFILE"))
 
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	if err := doMigration(logger, configstore); err != nil {
+		logger.Error().WithError(err).Log("Migration failed")
 		os.Exit(1)
 	}
 }
@@ -82,17 +84,6 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 		return fmt.Errorf("parsing FFmpeg version failed: %w", err)
 	}
 
-	// The current FFmpeg version is 4. Nothing to do.
-	if version.Major() == 4 {
-		return nil
-	}
-
-	if version.Major() != 5 {
-		err := fmt.Errorf("unknown FFmpeg version found: %d", version.Major())
-		logger.Error().WithError(err).Log("Unsupported FFmpeg version found")
-		return fmt.Errorf("unsupported FFmpeg version found: %w", err)
-	}
-
 	// Check if there's a DB file
 	dbFilepath := cfg.DB.Dir + "/db.json"
 
@@ -102,29 +93,13 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 		return nil
 	}
 
-	// Check if we already have a backup
-	backupFilepath := cfg.DB.Dir + "/db_ff4.json"
-
-	if _, err = os.Stat(backupFilepath); err == nil {
-		// Yes, we have a backup. The migration already happened
-		logger.Info().WithField("backup", backupFilepath).Log("Migration already done")
-		return nil
-	}
-
-	// Create a backup
-	if err := file.Copy(dbFilepath, backupFilepath); err != nil {
-		logger.Error().WithError(err).Log("Creating backup file failed")
-		return fmt.Errorf("creating backup file failed: %w", err)
-	}
-
-	logger.Info().WithField("backup", backupFilepath).Log("Backup created")
-
 	// Load the existing DB
 	datastore, err := jsonstore.New(jsonstore.Config{
 		Filepath: cfg.DB.Dir + "/db.json",
 	})
 	if err != nil {
-		return err
+		logger.Error().WithField("db", dbFilepath).WithError(err).Log("Creating JSON store failed")
+		return fmt.Errorf("creating JSON store failed: %w", err)
 	}
 
 	data, err := datastore.Load()
@@ -133,46 +108,137 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 		return fmt.Errorf("loading database failed: %w", err)
 	}
 
+	// Migrate processes
 	logger.Info().Log("Migrating processes ...")
 
-	// Migrate the processes to FFmpeg version 5
-	// Only this happens:
-	// - for RTSP inputs, replace -stimeout with -timeout
+	migrated := false
 
-	reRTSP := regexp.MustCompile(`^rtsps?://`)
-	for name, domain := range data.Process {
-		for id, p := range domain {
-			logger.Info().WithField("processid", p.Process.ID).Log("")
-
-			for index, input := range p.Process.Config.Input {
-				if !reRTSP.MatchString(input.Address) {
-					continue
-				}
-
-				for i, o := range input.Options {
-					if o != "-stimeout" {
-						continue
-					}
-
-					input.Options[i] = "-timeout"
-				}
-
-				p.Process.Config.Input[index] = input
+	for domain, procs := range data.Process {
+		for id, p := range procs {
+			ok, err := migrateProcessConfig(logger.WithField("processid", p.Process.ID), p.Process.Config, version.String())
+			if err != nil {
+				logger.Info().WithField("processid", p.Process.ID).WithError(err).Log("Migrating process failed")
+				return fmt.Errorf("migrating process failed: %w", err)
 			}
-			p.Process.Config.FFVersion = version.String()
-			data.Process[name][id] = p
+
+			data.Process[domain][id] = p
+
+			if ok {
+				migrated = true
+			}
 		}
 	}
 
 	logger.Info().Log("Migrating processes done")
 
-	// Store the modified DB
-	if err := datastore.Store(data); err != nil {
-		logger.Error().WithError(err).Log("Storing database failed")
-		return fmt.Errorf("storing database failed: %w", err)
+	if migrated {
+		// Create backup if something has been changed.
+		backupFilepath := cfg.DB.Dir + "/db." + strconv.FormatInt(time.Now().UnixMilli(), 10) + ".json"
+
+		if _, err = os.Stat(backupFilepath); err == nil {
+			// Yes, we have a backup. The migration already happened
+			logger.Info().WithField("backup", backupFilepath).Log("Migration already done")
+			return nil
+		}
+
+		// Create a backup
+		if err := file.Copy(dbFilepath, backupFilepath); err != nil {
+			logger.Error().WithError(err).Log("Creating backup file failed")
+			return fmt.Errorf("creating backup file failed: %w", err)
+		}
+
+		logger.Info().WithField("backup", backupFilepath).Log("Backup created")
+
+		// Store the modified DB
+		if err := datastore.Store(data); err != nil {
+			logger.Error().WithError(err).Log("Storing database failed")
+			return fmt.Errorf("storing database failed: %w", err)
+		}
 	}
 
 	logger.Info().Log("Completed")
 
 	return nil
+}
+
+func migrateProcessConfig(logger log.Logger, config *app.Config, version string) (bool, error) {
+	migrated := false
+
+	vtarget, err := semver.NewVersion(version)
+	if err != nil {
+		logger.Error().WithError(err).Log("Parsing target FFmpeg version failed")
+		return false, fmt.Errorf("parsing target FFmpeg version failed: %w", err)
+	}
+
+	targetmajor := vtarget.Major()
+	currentmajor := uint64(4)
+
+	if len(config.FFVersion) != 0 {
+		vcurrent, err := semver.NewVersion(strings.TrimPrefix(config.FFVersion, "^"))
+		if err != nil {
+			logger.Error().WithError(err).Log("Parsing current FFmpeg version failed")
+			return false, fmt.Errorf("parsing current FFmpeg version failed: %w", err)
+		}
+
+		currentmajor = vcurrent.Major()
+	}
+
+	if currentmajor < 4 {
+		err := fmt.Errorf("unknown FFmpeg version found: %d", currentmajor)
+		logger.Error().WithError(err).Log("Unsupported FFmpeg version")
+		return false, fmt.Errorf("unsupported FFmpeg version: %w", err)
+	}
+
+	if targetmajor > 6 {
+		err := fmt.Errorf("unknown FFmpeg version found: %d", targetmajor)
+		logger.Error().WithError(err).Log("Unsupported FFmpeg version")
+		return false, fmt.Errorf("unsupported FFmpeg version: %w", err)
+	}
+
+	if currentmajor != targetmajor {
+		migrated = true
+	}
+
+	if currentmajor == 4 && targetmajor > 4 {
+		// Migration from version 4 to version 5
+		// Only this happens:
+		// - for RTSP inputs, replace -stimeout with -timeout
+		reRTSP := regexp.MustCompile(`^rtsps?://`)
+
+		for index, input := range config.Input {
+			if !reRTSP.MatchString(input.Address) {
+				continue
+			}
+
+			for i, o := range input.Options {
+				if o != "-stimeout" {
+					continue
+				}
+
+				input.Options[i] = "-timeout"
+			}
+
+			config.Input[index] = input
+		}
+
+		currentmajor = 5
+	}
+
+	if currentmajor == 5 && targetmajor > 5 {
+		// Migration from version 5 to version 6
+		// Nothing happens
+
+		currentmajor = 6
+	}
+
+	if migrated {
+		logger.Info().WithFields(log.Fields{
+			"from": config.FFVersion,
+			"to":   "^" + version,
+		}).Log("Migrated")
+	}
+
+	config.FFVersion = "^" + version
+
+	return migrated, nil
 }
