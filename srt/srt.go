@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -514,8 +515,22 @@ func (s *server) findIdentityFromToken(key string) (string, error) {
 	return identity.Name(), nil
 }
 
+func splitPath(path string) []string {
+	pathElements := strings.Split(filepath.Clean(path), "/")
+
+	if len(pathElements) == 0 {
+		return pathElements
+	}
+
+	if len(pathElements[0]) == 0 {
+		pathElements = pathElements[1:]
+	}
+
+	return pathElements
+}
+
 func (s *server) findDomainFromPlaypath(path string) string {
-	elements := strings.Split(path, "/")
+	elements := splitPath(path)
 	if len(elements) == 1 {
 		return "$none"
 	}
