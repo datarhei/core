@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -281,19 +282,46 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	client := req.RemoteAddr()
 	streamId := req.StreamId()
 
-	if req.Version() != 5 {
-		s.log("", "CONNECT", "INVALID", streamId, "unsupported version", client)
-		return srt.REJECT
-	}
+	var si url.StreamInfo
+	var err error
 
-	si, err := url.ParseStreamId(streamId)
-	if err != nil {
-		s.log("", "CONNECT", "INVALID", streamId, err.Error(), client)
-		return srt.REJECT
-	}
+	if req.Version() == 4 {
+		si.Mode = "publish"
+		si.Resource = client.String()
 
-	if len(si.Resource) == 0 {
-		s.log("", "CONNECT", "INVALID", streamId, "stream resource not provided", client)
+		if len(s.passphrase) != 0 {
+			req.SetPassphrase(s.passphrase)
+		}
+	} else if req.Version() == 5 {
+		si, err := url.ParseStreamId(streamId)
+		if err != nil {
+			s.log("", "CONNECT", "INVALID", streamId, err.Error(), client)
+			return srt.REJECT
+		}
+
+		if len(si.Resource) == 0 {
+			s.log("", "CONNECT", "INVALID", streamId, "stream resource not provided", client)
+			return srt.REJECT
+		}
+
+		if len(s.passphrase) != 0 {
+			if !req.IsEncrypted() {
+				s.log("", "CONNECT", "FORBIDDEN", si.Resource, "connection has to be encrypted", client)
+				return srt.REJECT
+			}
+
+			if err := req.SetPassphrase(s.passphrase); err != nil {
+				s.log("", "CONNECT", "FORBIDDEN", si.Resource, err.Error(), client)
+				return srt.REJECT
+			}
+		} else {
+			if req.IsEncrypted() {
+				s.log("", "CONNECT", "INVALID", si.Resource, "connection must not be encrypted", client)
+				return srt.REJECT
+			}
+		}
+	} else {
+		s.log("", "CONNECT", "INVALID", streamId, "unsupported handshake version: "+strconv.FormatUint(uint64(req.Version()), 10), client)
 		return srt.REJECT
 	}
 
@@ -302,25 +330,8 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	} else if si.Mode == "request" {
 		mode = srt.SUBSCRIBE
 	} else {
-		s.log("", "CONNECT", "INVALID", si.Resource, "invalid connection mode", client)
+		s.log("", "CONNECT", "INVALID", si.Resource, "invalid connection mode: "+si.Mode, client)
 		return srt.REJECT
-	}
-
-	if len(s.passphrase) != 0 {
-		if !req.IsEncrypted() {
-			s.log("", "CONNECT", "FORBIDDEN", si.Resource, "connection has to be encrypted", client)
-			return srt.REJECT
-		}
-
-		if err := req.SetPassphrase(s.passphrase); err != nil {
-			s.log("", "CONNECT", "FORBIDDEN", si.Resource, err.Error(), client)
-			return srt.REJECT
-		}
-	} else {
-		if req.IsEncrypted() {
-			s.log("", "CONNECT", "INVALID", si.Resource, "connection must not be encrypted", client)
-			return srt.REJECT
-		}
 	}
 
 	identity, err := s.findIdentityFromToken(si.Token)
