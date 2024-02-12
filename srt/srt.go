@@ -405,7 +405,12 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 	ch := s.channels[si.Resource]
 	s.lock.RUnlock()
 
-	if ch == nil && s.proxy != nil {
+	if ch == nil {
+		if s.proxy == nil {
+			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
+			return
+		}
+
 		// Check in the cluster for the stream and proxy it
 		srturl, err := s.proxy.GetURL("srt", si.Resource)
 		if err != nil {
