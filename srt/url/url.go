@@ -2,6 +2,7 @@ package url
 
 import (
 	"fmt"
+	"net/url"
 	neturl "net/url"
 	"regexp"
 	"strings"
@@ -101,14 +102,18 @@ func (si *StreamInfo) String() string {
 }
 
 // ParseStreamId parses a streamid. If the streamid is in the old format
-// it is detected and parsed accordingly. Otherwith the new simplified
+// it is detected and parsed accordingly. Otherwise the new simplified
 // format will be assumed.
 //
 // resource[,token:{token}]?[,mode:(publish|*request)]?
 //
 // If the mode is not provided, "request" will be assumed.
 func ParseStreamId(streamid string) (StreamInfo, error) {
-	si := StreamInfo{}
+	si := StreamInfo{Mode: "request"}
+
+	if decodedStreamid, err := url.QueryUnescape(streamid); err == nil {
+		streamid = decodedStreamid
+	}
 
 	if strings.HasPrefix(streamid, "#!:") {
 		return ParseDeprecatedStreamId(streamid)
