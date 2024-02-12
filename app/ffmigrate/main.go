@@ -34,13 +34,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := doMigration(logger, configstore); err != nil {
+	if err := doMigration(logger, diskfs, configstore); err != nil {
 		logger.Error().WithError(err).Log("Migration failed")
 		os.Exit(1)
 	}
 }
 
-func doMigration(logger log.Logger, configstore cfgstore.Store) error {
+func doMigration(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) error {
 	if logger == nil {
 		logger = log.New("")
 	}
@@ -94,14 +94,8 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 	}
 
 	// Load the existing DB
-	diskfs, err := fs.NewDiskFilesystem(fs.DiskConfig{})
-	if err != nil {
-		logger.Error().WithError(err).Log("Accessing disk filesystem failed")
-		return fmt.Errorf("accessing disk filesystem failed: %w", err)
-	}
-
 	datastore, err := store.NewJSON(store.JSONConfig{
-		Filesystem: diskfs,
+		Filesystem: fs,
 		Filepath:   cfg.DB.Dir + "/db.json",
 	})
 	if err != nil {
