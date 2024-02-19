@@ -56,6 +56,7 @@ jobs:
                   platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
                   push: true
                   tags: |
+                      datarhei/base:core${{ env.CORE_VERSION }}-${{ env.OS_NAME }}${{ env.OS_VERSION }}
                       datarhei/base:${{ env.OS_NAME }}-core-${{ env.OS_VERSION }}-${{ env.CORE_VERSION }}
                       datarhei/base:${{ env.OS_NAME }}-core-latest
                   cache-from: type=local,src=/tmp/.buildx-cache
