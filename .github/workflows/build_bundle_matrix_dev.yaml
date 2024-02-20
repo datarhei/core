@@ -1,4 +1,4 @@
-name: "Build core dev bundles"
+name: "Build dev bundles"
 
 on:
     workflow_dispatch:

@@ -1,4 +1,4 @@
-name: "Build core vod"
+name: "Build vod base"
 
 on:
     workflow_dispatch:
