@@ -1,0 +1,80 @@
+name: "Build core vod"
+
+on:
+    workflow_dispatch:
+    workflow_call:
+    push:
+        branches:
+            - vod
+
+jobs:
+    docker:
+        runs-on: [self-hosted]
+        strategy:
+            matrix:
+                include:
+                    - os: alpine
+                      os_version: "3.19"
+                      golang: golang:1.22-alpine3.19
+                      platforms: linux/amd64,linux/arm64
+                      branch: vod
+                    - os: alpine
+                      os_version: "3.16"
+                      golang: golang:1.21-alpine3.16
+                      platforms: linux/amd64,linux/arm64
+                      branch: vod
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v2
+              with:
+                  ref: ${{ matrix.branch }}
+
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v4
+              with:
+                  images: |
+                      datarhei/base
+                  tags: |
+                      type=raw,value=core-${{ matrix.branch }}-${{ matrix.os }}${{ matrix.os_version }}
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@master
+              with:
+                  platforms: all
+
+            - name: Set up Docker Buildx
+              id: buildx
+              uses: docker/setup-buildx-action@master
+
+            - name: Cache Docker layers
+              uses: actions/cache@v4
+              with:
+                  path: /tmp/.buildx-cache
+                  key: ${{ runner.os }}-buildx-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-buildx-
+
+            - name: Login to DockerHub
+              if: github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Build Multi-Arch
+              uses: docker/build-push-action@v5
+              with:
+                  builder: ${{ steps.buildx.outputs.name }}
+                  context: .
+                  file: ./Dockerfile
+                  build-args: |
+                      BUILD_IMAGE=${{ matrix.os }}:${{ matrix.os_version }}
+                      GOLANG_IMAGE=${{ matrix.golang }}
+                  platforms: ${{ matrix.platforms }}
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=local,src=/tmp/.buildx-cache
+                  cache-to: type=local,dest=/tmp/.buildx-cache-new
