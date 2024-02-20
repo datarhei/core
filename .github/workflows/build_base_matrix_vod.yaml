@@ -18,6 +18,11 @@ jobs:
                       golang: golang:1.22-alpine3.19
                       platforms: linux/amd64,linux/arm64
                       branch: vod
+                    - os: alpine
+                      os_version: "3.16"
+                      golang: golang:1.19-alpine3.16
+                      platforms: linux/amd64,linux/arm64
+                      branch: vod
 
         steps:
             - name: Checkout
