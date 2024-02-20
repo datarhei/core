@@ -1,4 +1,4 @@
-name: "Build core base"
+name: "Build main base"
 
 on:
     workflow_dispatch:
@@ -42,8 +42,8 @@ jobs:
                       datarhei/base
                   tags: |
                       type=raw,value=core${{ matrix.core }}-${{ matrix.os }}${{ matrix.os_version }}
-            #         type=raw,value=${{ matrix.os }}-core-${{ matrix.os_version }}-${{ matrix.core}},enable=${{ matrix.latest == 'yes' }}
-            #         type=raw,value=${{ matrix.os }}-core-latest,enable=${{ matrix.latest == 'yes' }}
+                      type=raw,value=${{ matrix.os }}-core-${{ matrix.os_version }}-${{ matrix.core}},enable=${{ matrix.latest == 'yes' }}
+                      type=raw,value=${{ matrix.os }}-core-latest,enable=${{ matrix.latest == 'yes' }}
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@master
