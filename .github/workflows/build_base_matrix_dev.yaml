@@ -1,7 +1,8 @@
-name: "Build core base"
+name: "Build core dev"
 
 on:
     workflow_dispatch:
+    workflow_call:
     push:
         branches:
             - dev
@@ -77,7 +78,6 @@ jobs:
                   labels: ${{ steps.meta.outputs.labels }}
                   cache-from: type=local,src=/tmp/.buildx-cache
                   cache-to: type=local,dest=/tmp/.buildx-cache-new
-
-    bundle:
-        uses: ./.github/workflows/build_bundle_matrix_dev.yaml
-        secrets: inherit
+#    bundle:
+#        uses: ./.github/workflows/build_bundle_matrix_dev.yaml
+#        secrets: inherit
