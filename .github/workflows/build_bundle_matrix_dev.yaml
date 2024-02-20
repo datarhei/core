@@ -57,7 +57,7 @@ jobs:
                       datarhei/core
                   tags: |
                       type=raw,value=${{ matrix.branch }}-ffmpeg${{ matrix.ffmpeg }}${{ matrix.ffmpeg_tags }}-${{ matrix.core_os }}
-                  #  type=raw,value=${{ matrix.prefix }}${{ matrix.branch }},enable=${{ matrix.latest == 'yes' }}
+                      type=raw,value=${{ matrix.prefix }}${{ matrix.branch }},enable=${{ matrix.latest == 'yes' }}
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@master
