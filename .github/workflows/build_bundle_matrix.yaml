@@ -14,7 +14,7 @@ jobs:
         runs-on: [self-hosted]
         strategy:
             matrix:
-                include:
+                exclude:
                     - core: "16.14.0"
                       core_os: alpine3.19
                       ffmpeg: "6.1.1"
@@ -48,6 +48,7 @@ jobs:
                       branch: main
                       prefix: cuda-
                       latest: no
+                include:
                     - core: "16.14.0"
                       core_os: alpine3.19
                       ffmpeg: "5.1.3"
@@ -96,8 +97,8 @@ jobs:
                       datarhei/core
                   tags: |
                       type=raw,value=${{ matrix.core }}-ffmpeg${{ matrix.ffmpeg }}${{ matrix.ffmpeg_tags }}-${{ matrix.core_os }}
-            #         type=raw,value=${{ matrix.prefix }}${{ matrix.core }},enable=${{ matrix.latest == 'yes' }}
-            #         type=raw,value=${{ matrix.prefix }}latest,enable=${{ matrix.latest == 'yes' }}
+                      type=raw,value=${{ matrix.prefix }}${{ matrix.core }},enable=${{ matrix.latest == 'yes' }}
+                      type=raw,value=${{ matrix.prefix }}latest,enable=${{ matrix.latest == 'yes' }}
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@master
