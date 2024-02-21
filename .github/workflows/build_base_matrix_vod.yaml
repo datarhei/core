@@ -21,11 +21,13 @@ jobs:
                       golang: golang:1.22-alpine3.19
                       platforms: linux/amd64,linux/arm64
                       branch: vod
+                      key: alpine3.19
                     - os: alpine
                       os_version: "3.16"
                       golang: golang:1.19-alpine3.16
                       platforms: linux/amd64,linux/arm64
                       branch: vod
+                      key: alpine3.16
 
         steps:
             - name: Checkout
@@ -54,7 +56,7 @@ jobs:
             - name: Cache Docker layers
               uses: actions/cache@v4
               with:
-                  path: ${{ env.cachedir }}
+                  path: ${{ env.cachedir }}-${{ matrix.key }}
                   key: ${{ runner.os }}-buildx-${{ github.sha }}
                   restore-keys: |
                       ${{ runner.os }}-buildx-
@@ -79,12 +81,12 @@ jobs:
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=local,src=${{ env.cachedir }}
-                  cache-to: type=local,dest=${{ env.cachedir }}-new,mode=max
+                  cache-from: type=local,src=${{ env.cachedir }}-${{ matrix.key }}
+                  cache-to: type=local,dest=${{ env.cachedir }}-${{ matrix.key }}-new,mode=max
             - # Temp fix
               # https://github.com/docker/build-push-action/issues/252
               # https://github.com/moby/buildkit/issues/1896
               name: Move cache
               run: |
-                  rm -rf ${{ env.cachedir }}
-                  mv ${{ env.cachedir }}-new ${{ env.cachedir }}
+                  rm -rf ${{ env.cachedir }}-${{ matrix.key }}
+                  mv ${{ env.cachedir }}-${{ matrix.key }}-new ${{ env.cachedir }}-${{ matrix.key }}
