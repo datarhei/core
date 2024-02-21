@@ -1,4 +1,4 @@
-name: "Build base:alpine-core:dev"
+name: "Build dev base"
 
 on:
     workflow_dispatch:
@@ -12,35 +12,32 @@ jobs:
         runs-on: [self-hosted]
         strategy:
             matrix:
-                branch:
-                    - dev
+                include:
+                    - os: alpine
+                      os_version: "3.19"
+                      golang: golang:1.22-alpine3.19
+                      platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+                      branch: dev
+                    - os: ubuntu
+                      os_version: "20.04"
+                      golang: golang:1.22-alpine3.19
+                      platforms: linux/amd64
+                      branch: dev
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
               with:
                   ref: ${{ matrix.branch }}
 
-            - uses: actions-ecosystem/action-get-latest-tag@v1
-              id: get-latest-tag
-              with:
-                  semver_only: true
-
-            - uses: cardinalby/export-env-action@v1
-              with:
-                  envFile: ".github_build/Build.alpine.dev.env"
-                  export: "true"
-                  expandWithJobEnv: "true"
-                  expand: "true"
-
             - name: Docker meta
               id: meta
-              uses: docker/metadata-action@v4
+              uses: docker/metadata-action@v5
               with:
                   images: |
                       datarhei/base
                   tags: |
-                      type=raw,value=${{ env.OS_NAME }}-core-dev,enable=${{ matrix.branch == 'dev' }}
+                      type=raw,value=core-${{ matrix.branch }}-${{ matrix.os }}${{ matrix.os_version }}
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@master
@@ -52,7 +49,7 @@ jobs:
               uses: docker/setup-buildx-action@master
 
             - name: Cache Docker layers
-              uses: actions/cache@v2
+              uses: actions/cache@v4
               with:
                   path: /tmp/.buildx-cache
                   key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -61,29 +58,26 @@ jobs:
 
             - name: Login to DockerHub
               if: github.event_name != 'pull_request'
-              uses: docker/login-action@v1
+              uses: docker/login-action@v3
               with:
                   username: ${{ secrets.DOCKER_USERNAME }}
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
             - name: Build Multi-Arch
-              uses: docker/build-push-action@v2
+              uses: docker/build-push-action@v5
               with:
                   builder: ${{ steps.buildx.outputs.name }}
                   context: .
                   file: ./Dockerfile
                   build-args: |
-                      BUILD_IMAGE=${{ env.OS_NAME }}:${{ env.OS_VERSION }}
-                      GOLANG_IMAGE=${{ env.GOLANG_IMAGE }}
-                  platforms: linux/amd64,linux/arm64,linux/arm/v7
+                      BUILD_IMAGE=${{ matrix.os }}:${{ matrix.os_version }}
+                      GOLANG_IMAGE=${{ matrix.golang }}
+                  platforms: ${{ matrix.platforms }}
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
                   cache-from: type=local,src=/tmp/.buildx-cache
                   cache-to: type=local,dest=/tmp/.buildx-cache-new
-    dockerBundle:
-        uses: ./.github/workflows/build_bundle_dev.yaml
-        secrets: inherit
-    dockerBundleRpi:
-        uses: ./.github/workflows/build_bundle-rpi_dev.yaml
+    bundle:
+        uses: ./.github/workflows/build_bundle_matrix_dev.yaml
         secrets: inherit
