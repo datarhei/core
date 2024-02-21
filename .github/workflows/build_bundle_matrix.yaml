@@ -14,40 +14,6 @@ jobs:
         runs-on: [self-hosted]
         strategy:
             matrix:
-                exclude:
-                    - core: "16.14.0"
-                      core_os: alpine3.19
-                      ffmpeg: "6.1.1"
-                      ffmpeg_os: alpine3.19
-                      platforms: linux/amd64,linux/arm64,linux/arm/v7
-                      branch: main
-                      prefix:
-                      latest: no
-                    - core: "16.14.0"
-                      core_os: alpine3.19
-                      ffmpeg: "6.1.1-rpi"
-                      ffmpeg_os: alpine3.19
-                      platforms: linux/arm64,linux/arm/v7
-                      branch: main
-                      prefix: rpi-
-                      latest: no
-                    - core: "16.14.0"
-                      core_os: ubuntu20.04
-                      ffmpeg: "6.1.1-vaapi"
-                      ffmpeg_os: ubuntu20.04
-                      platforms: linux/amd64
-                      branch: main
-                      prefix: vaapi-
-                      latest: no
-                    - core: "16.14.0"
-                      core_os: ubuntu20.04
-                      ffmpeg: "6.1.1-cuda"
-                      ffmpeg_os: ubuntu20.04
-                      ffmpeg_tags: "-cuda11.7.1"
-                      platforms: linux/amd64
-                      branch: main
-                      prefix: cuda-
-                      latest: no
                 include:
                     - core: "16.14.0"
                       core_os: alpine3.19
