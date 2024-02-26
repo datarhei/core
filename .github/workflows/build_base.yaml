@@ -8,19 +8,39 @@ on:
             - "**"
 
 jobs:
+    versions:
+        runs-on: ubuntu-latest
+        outputs:
+            coreversion: ${{ steps.core.outputs.version }}
+        steps:
+            - name: Checkout core repo
+              uses: actions/checkout@v4
+              with:
+                  repository: datarhei/core
+                  path: ./core
+
+            - name: Get latest version from core
+              id: core
+              run: |
+                  echo "version=$(cat ./core/app/version.go | grep -E -o '(Major|Minor|Patch): [0-9]+,' | sed -E 's/^.*: ([0-9]+),.*$/\1/g' | paste -sd '.' - )" >> "$GITHUB_OUTPUT"
+
+            - name: Show versions
+              run: |
+                  echo "core: ${{ steps.core.outputs.version }}"
+
     docker:
         runs-on: [self-hosted]
         strategy:
             matrix:
                 include:
-                    - core: "16.14.0"
+                    - core: ${{ needs.versions.outputs.coreversion }}
                       os: alpine
                       os_version: "3.19"
                       golang: golang:1.21-alpine3.19
                       platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
                       branch: main
                       latest: yes
-                    - core: "16.14.0"
+                    - core: ${{ needs.versions.outputs.coreversion }}
                       os: ubuntu
                       os_version: "20.04"
                       golang: golang:1.21-alpine3.19
