@@ -79,5 +79,6 @@ jobs:
                   cache-from: type=local,src=/tmp/.buildx-cache
                   cache-to: type=local,dest=/tmp/.buildx-cache-new
     bundle:
+        needs: docker
         uses: ./.github/workflows/build_bundle_dev.yaml
         secrets: inherit
