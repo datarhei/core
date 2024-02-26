@@ -3,6 +3,8 @@ name: "Build dev base"
 on:
     workflow_dispatch:
     workflow_call:
+    schedule:
+        - cron: "7 4 * * *"
     push:
         branches:
             - dev
