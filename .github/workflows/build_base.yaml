@@ -29,6 +29,7 @@ jobs:
                   echo "core: ${{ steps.core.outputs.version }}"
 
     docker:
+        needs: versions
         runs-on: [self-hosted]
         strategy:
             matrix:
