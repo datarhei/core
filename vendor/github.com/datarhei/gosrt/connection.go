@@ -281,9 +281,9 @@ func newSRTConn(config srtConnConfig) *srtConn {
 
 	c.ctx, c.cancelCtx = context.WithCancel(context.Background())
 
-	go c.networkQueueReader()
-	go c.writeQueueReader()
-	go c.ticker()
+	go c.networkQueueReader(c.ctx)
+	go c.writeQueueReader(c.ctx)
+	go c.ticker(c.ctx)
 
 	c.debug.expectedRcvPacketSequenceNumber = c.initialPacketSequenceNumber
 	c.debug.expectedReadPacketSequenceNumber = c.initialPacketSequenceNumber
@@ -311,11 +311,19 @@ func newSRTConn(config srtConnConfig) *srtConn {
 }
 
 func (c *srtConn) LocalAddr() net.Addr {
+	if c.localAddr == nil {
+		return nil
+	}
+
 	addr, _ := net.ResolveUDPAddr("udp", c.localAddr.String())
 	return addr
 }
 
 func (c *srtConn) RemoteAddr() net.Addr {
+	if c.remoteAddr == nil {
+		return nil
+	}
+
 	addr, _ := net.ResolveUDPAddr("udp", c.remoteAddr.String())
 	return addr
 }
@@ -338,7 +346,7 @@ func (c *srtConn) Version() uint32 {
 
 // ticker invokes the congestion control in regular intervals with
 // the current connection time.
-func (c *srtConn) ticker() {
+func (c *srtConn) ticker(ctx context.Context) {
 	ticker := time.NewTicker(c.tick)
 	defer ticker.Stop()
 	defer func() {
@@ -347,7 +355,7 @@ func (c *srtConn) ticker() {
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case t := <-ticker.C:
 			tickTime := uint64(t.Sub(c.start).Microseconds())
@@ -429,7 +437,7 @@ func (c *srtConn) Write(b []byte) (int, error) {
 			return 0, err
 		}
 
-		p := packet.NewPacket(nil, nil)
+		p := packet.NewPacket(nil)
 
 		p.SetData(c.writeData[:n])
 
@@ -526,14 +534,14 @@ func (c *srtConn) pop(p packet.Packet) {
 }
 
 // networkQueueReader reads the packets from the network queue in order to process them.
-func (c *srtConn) networkQueueReader() {
+func (c *srtConn) networkQueueReader(ctx context.Context) {
 	defer func() {
 		c.log("connection:close", func() string { return "left network queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case p := <-c.networkQueue:
 			c.handlePacket(p)
@@ -543,14 +551,14 @@ func (c *srtConn) networkQueueReader() {
 
 // writeQueueReader reads the packets from the write queue and puts them into congestion
 // control for sending.
-func (c *srtConn) writeQueueReader() {
+func (c *srtConn) writeQueueReader(ctx context.Context) {
 	defer func() {
 		c.log("connection:close", func() string { return "left write queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case p := <-c.writeQueue:
 			// Put the packet into the send congestion control
@@ -1133,7 +1141,7 @@ func (c *srtConn) handleKMResponse(p packet.Packet) {
 
 // sendShutdown sends a shutdown packet to the peer.
 func (c *srtConn) sendShutdown() {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1156,7 +1164,7 @@ func (c *srtConn) sendShutdown() {
 
 // sendNAK sends a NAK to the peer with the given range of sequence numbers.
 func (c *srtConn) sendNAK(from, to circular.Number) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1182,7 +1190,7 @@ func (c *srtConn) sendNAK(from, to circular.Number) {
 
 // sendACK sends an ACK to the peer with the given sequence number.
 func (c *srtConn) sendACK(seq circular.Number, lite bool) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1233,7 +1241,7 @@ func (c *srtConn) sendACK(seq circular.Number, lite bool) {
 
 // sendACKACK sends an ACKACK to the peer with the given ACK sequence.
 func (c *srtConn) sendACKACK(ackSequence uint32) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1280,7 +1288,7 @@ func (c *srtConn) sendHSRequest() {
 		SendTSBPDDelay: uint16(c.config.ReceiverLatency.Milliseconds()),
 	}
 
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1319,7 +1327,7 @@ func (c *srtConn) sendKMRequest(key packet.PacketEncryption) {
 
 	c.crypto.MarshalKM(cif, c.config.Passphrase, key)
 
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 

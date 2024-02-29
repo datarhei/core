@@ -113,11 +113,22 @@ func (c *crypto) generateSEK(keyLength int) ([]byte, error) {
 var ErrInvalidKey = errors.New("crypto: invalid key for encryption. Must be even, odd, or both")
 
 // ErrInvalidWrap is returned when the packet encryption indicates a different length of the wrapped key
-var ErrInvalidWrap = errors.New("crypto: the unwrapped key has the wrong length")
+var ErrInvalidWrap = errors.New("crypto: the un/wrapped key has the wrong length")
 
 func (c *crypto) UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string) error {
 	if km.KeyBasedEncryption == packet.UnencryptedPacket || !km.KeyBasedEncryption.IsValid() {
 		return ErrInvalidKey
+	}
+
+	n := 1
+	if km.KeyBasedEncryption == packet.EvenAndOddKey {
+		n = 2
+	}
+
+	wrapLength := n * c.keyLength
+
+	if len(km.Wrap)-8 != wrapLength {
+		return ErrInvalidWrap
 	}
 
 	if len(km.Salt) != 0 {
@@ -131,12 +142,7 @@ func (c *crypto) UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase stri
 		return err
 	}
 
-	n := 1
-	if km.KeyBasedEncryption == packet.EvenAndOddKey {
-		n = 2
-	}
-
-	if len(unwrap) != n*c.keyLength {
+	if len(unwrap) != wrapLength {
 		return ErrInvalidWrap
 	}
 
@@ -222,6 +228,10 @@ func (c *crypto) EncryptOrDecryptPayload(data []byte, key packet.PacketEncryptio
 	// nonce (112 bit): 14 most significant bytes of the salt
 	//
 	// CTR = (MSB(112, Salt) XOR psn) << 16
+
+	if len(c.salt) != 16 {
+		return fmt.Errorf("crypto: invalid salt. Must be of length 16 bytes")
+	}
 
 	ctr := make([]byte, 16)
 

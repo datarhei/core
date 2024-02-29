@@ -12,11 +12,11 @@ type IP struct {
 }
 
 func (i *IP) setDefault() {
-	i.ip = net.ParseIP("127.0.0.1")
+	i.ip = net.IPv4(127, 0, 0, 1)
 }
 
 func (i *IP) isValid() bool {
-	if i.ip.String() == "<nil>" || i.ip.IsUnspecified() {
+	if i.ip == nil || i.ip.String() == "<nil>" || i.ip.IsUnspecified() {
 		return false
 	}
 
@@ -24,11 +24,22 @@ func (i *IP) isValid() bool {
 }
 
 func (i IP) String() string {
+	if i.ip == nil {
+		return ""
+	}
+
 	return i.ip.String()
 }
 
 func (i *IP) Parse(ip string) {
-	i.ip = net.ParseIP(ip)
+	i.setDefault()
+
+	iip := net.ParseIP(ip)
+	if iip == nil {
+		return
+	}
+
+	i.ip = iip
 
 	if !i.isValid() {
 		i.setDefault()
@@ -36,7 +47,16 @@ func (i *IP) Parse(ip string) {
 }
 
 func (i *IP) FromNetIP(ip net.IP) {
-	i.ip = net.ParseIP(ip.String())
+	if ip == nil {
+		return
+	}
+
+	iip := net.ParseIP(ip.String())
+	if iip == nil {
+		return
+	}
+
+	i.ip = iip
 
 	if !i.isValid() {
 		i.setDefault()
@@ -44,12 +64,22 @@ func (i *IP) FromNetIP(ip net.IP) {
 }
 
 func (i *IP) FromNetAddr(addr net.Addr) {
+	if addr == nil {
+		i.setDefault()
+		return
+	}
+
 	if addr.Network() != "udp" {
 		i.setDefault()
+		return
 	}
 
 	if a, err := net.ResolveUDPAddr("udp", addr.String()); err == nil {
-		i.ip = a.IP
+		if a == nil || a.IP == nil {
+			i.setDefault()
+		} else {
+			i.ip = a.IP
+		}
 	} else {
 		i.setDefault()
 	}
@@ -85,7 +115,12 @@ func (i *IP) Unmarshal(data []byte) error {
 			fmt.Fprintf(&b, "%04x:", (ip3&0xffff0000)>>16)
 			fmt.Fprintf(&b, "%04x", ip3&0x0000ffff)
 
-			i.ip = net.ParseIP(b.String())
+			iip := net.ParseIP(b.String())
+			if iip == nil {
+				return fmt.Errorf("invalid ip")
+			}
+
+			i.ip = iip
 		}
 	}
 
@@ -98,6 +133,14 @@ func (i *IP) Unmarshal(data []byte) error {
 
 // Marshal converts an IP to 16 byte host byte order
 func (i *IP) Marshal(data []byte) {
+	if i.ip == nil || !i.isValid() {
+		i.setDefault()
+	}
+
+	if len([]byte(i.ip)) == 4 {
+		i.ip = net.IPv4(i.ip[0], i.ip[1], i.ip[2], i.ip[3])
+	}
+
 	if len(data) < 16 {
 		return
 	}

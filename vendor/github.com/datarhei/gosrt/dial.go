@@ -157,8 +157,8 @@ func Dial(network, address string, config Config) (Conn, error) {
 				return
 			}
 
-			p := packet.NewPacket(dl.remoteAddr, buffer[:n])
-			if p == nil {
+			p, err := packet.NewPacketFromData(dl.remoteAddr, buffer[:n])
+			if err != nil {
 				continue
 			}
 
@@ -532,7 +532,7 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 }
 
 func (dl *dialer) sendInduction() {
-	p := packet.NewPacket(dl.remoteAddr, nil)
+	p := packet.NewPacket(dl.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -567,7 +567,7 @@ func (dl *dialer) sendInduction() {
 }
 
 func (dl *dialer) sendShutdown(peerSocketId uint32) {
-	p := packet.NewPacket(dl.remoteAddr, nil)
+	p := packet.NewPacket(dl.remoteAddr)
 
 	data := [4]byte{}
 	binary.BigEndian.PutUint32(data[0:], 0)
@@ -588,26 +588,68 @@ func (dl *dialer) sendShutdown(peerSocketId uint32) {
 }
 
 func (dl *dialer) LocalAddr() net.Addr {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return nil
+	}
+
 	return dl.conn.LocalAddr()
 }
 
 func (dl *dialer) RemoteAddr() net.Addr {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return nil
+	}
+
 	return dl.conn.RemoteAddr()
 }
 
 func (dl *dialer) SocketId() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.SocketId()
 }
 
 func (dl *dialer) PeerSocketId() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.PeerSocketId()
 }
 
 func (dl *dialer) StreamId() string {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return ""
+	}
+
 	return dl.conn.StreamId()
 }
 
 func (dl *dialer) Version() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.Version()
 }
 
@@ -652,6 +694,10 @@ func (dl *dialer) Read(p []byte) (n int, err error) {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
+	if dl.conn == nil {
+		return 0, fmt.Errorf("no connection")
+	}
+
 	return dl.conn.Read(p)
 }
 
@@ -662,6 +708,10 @@ func (dl *dialer) readPacket() (packet.Packet, error) {
 
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return nil, fmt.Errorf("no connection")
+	}
 
 	return dl.conn.readPacket()
 }
@@ -674,6 +724,10 @@ func (dl *dialer) Write(p []byte) (n int, err error) {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
+	if dl.conn == nil {
+		return 0, fmt.Errorf("no connection")
+	}
+
 	return dl.conn.Write(p)
 }
 
@@ -685,14 +739,32 @@ func (dl *dialer) writePacket(p packet.Packet) error {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
+	if dl.conn == nil {
+		return fmt.Errorf("no connection")
+	}
+
 	return dl.conn.writePacket(p)
 }
 
 func (dl *dialer) SetDeadline(t time.Time) error      { return dl.conn.SetDeadline(t) }
 func (dl *dialer) SetReadDeadline(t time.Time) error  { return dl.conn.SetReadDeadline(t) }
 func (dl *dialer) SetWriteDeadline(t time.Time) error { return dl.conn.SetWriteDeadline(t) }
-func (dl *dialer) Stats(s *Statistics)                { dl.conn.Stats(s) }
+
+func (dl *dialer) Stats(s *Statistics) {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return
+	}
+
+	dl.conn.Stats(s)
+}
 
 func (dl *dialer) log(topic string, message func() string) {
+	if dl.config.Logger == nil {
+		return
+	}
+
 	dl.config.Logger.Print(topic, dl.socketId, 2, message)
 }
