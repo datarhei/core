@@ -20,7 +20,7 @@ func TestToken(t *testing.T) {
 		u, err := url.Parse(d[0])
 		require.NoError(t, err)
 
-		path, token := GetToken(u)
+		path, token, _ := GetToken(u)
 
 		require.Equal(t, d[1], path, "url=%s", u.String())
 		require.Equal(t, d[2], token, "url=%s", u.String())

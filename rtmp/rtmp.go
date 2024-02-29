@@ -203,21 +203,22 @@ func (s *server) log(who, handler, action, resource, message string, client net.
 	}).Log(message)
 }
 
-// GetToken returns the path without the token and the token found in the URL. If the token
-// was part of the path, the token is removed from the path. The token in the query string
-// takes precedence. The token in the path is assumed to be the last path element.
-func GetToken(u *url.URL) (string, string) {
+// GetToken returns the path without the token and the token found in the URL and whether
+// it was found in the path. If the token was part of the path, the token is removed from
+// the path. The token in the query string takes precedence. The token in the path is
+// assumed to be the last path element.
+func GetToken(u *url.URL) (string, string, bool) {
 	q := u.Query()
 	if q.Has("token") {
 		// The token was in the query. Return the unmomdified path and the token.
-		return u.Path, q.Get("token")
+		return u.Path, q.Get("token"), false
 	}
 
 	pathElements := splitPath(u.EscapedPath())
 	nPathElements := len(pathElements)
 
 	if nPathElements <= 1 {
-		return u.Path, ""
+		return u.Path, "", false
 	}
 
 	rawPath := "/" + strings.Join(pathElements[:nPathElements-1], "/")
@@ -234,7 +235,7 @@ func GetToken(u *url.URL) (string, string) {
 	}
 
 	// Return the path without the token
-	return path, token
+	return path, token, true
 }
 
 func splitPath(path string) []string {
@@ -261,7 +262,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 	defer conn.Close()
 
 	remote := conn.NetConn().RemoteAddr()
-	playpath, token := GetToken(conn.URL)
+	playpath, token, isStreamkey := GetToken(conn.URL)
 
 	playpath, _ = removePathPrefix(playpath, s.app)
 
@@ -270,6 +271,11 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		s.logger.Debug().WithError(err).Log("invalid streamkey")
 		s.log("", "PLAY", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
 		return
+	}
+
+	if identity == "$anon" && isStreamkey {
+		// If the token was part of the path, we add it back
+		playpath = filepath.Join(playpath, token)
 	}
 
 	domain := s.findDomainFromPlaypath(playpath)
@@ -384,7 +390,7 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 	defer conn.Close()
 
 	remote := conn.NetConn().RemoteAddr()
-	playpath, token := GetToken(conn.URL)
+	playpath, token, isStreamkey := GetToken(conn.URL)
 
 	playpath, app := removePathPrefix(playpath, s.app)
 
@@ -393,6 +399,11 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 		s.logger.Debug().WithError(err).Log("invalid streamkey")
 		s.log(identity, "PUBLISH", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
 		return
+	}
+
+	if identity == "$anon" && isStreamkey {
+		// If the token was part of the path, we add it back
+		playpath = filepath.Join(playpath, token)
 	}
 
 	// Check the app patch
@@ -483,12 +494,16 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 
 	var identity iamidentity.Verifier = nil
 	var err error = nil
+	var isDefaultIdentity bool = false
 
 	var token string
 
 	username, token := enctoken.Unmarshal(key)
 	if len(username) == 0 {
+		// Legacy compatibility. If the key is only the token, then it
+		// is assumed that it belongs to the superuser.
 		identity = s.iam.GetDefaultVerifier()
+		isDefaultIdentity = true
 	} else {
 		identity, err = s.iam.GetVerifier(username)
 	}
@@ -500,11 +515,15 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 	if ok, err := identity.VerifyServiceToken(token); !ok {
 		if err != nil {
 			err = fmt.Errorf("invalid token: %w", err)
-		} else {
-			err = fmt.Errorf("invalid token")
 		}
 
-		return "$anon", err
+		if isDefaultIdentity {
+			// If verifying the token fails and if this is the superuser,
+			// then assume anonymous access
+			return "$anon", nil
+		}
+
+		return identity.Name(), err
 	}
 
 	return identity.Name(), nil

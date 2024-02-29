@@ -124,7 +124,7 @@ func (g *rewrite) rtmpURL(u *url.URL, mode Access, identity iamidentity.Verifier
 	token := identity.GetServiceToken()
 
 	// Remove the existing token from the path
-	path, _ := rtmp.GetToken(u)
+	path, _, _ := rtmp.GetToken(u)
 	u.Path = path
 
 	q := u.Query()
