@@ -34,13 +34,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := doMigration(logger, configstore); err != nil {
+	if err := doMigration(logger, diskfs, configstore); err != nil {
 		logger.Error().WithError(err).Log("Migration failed")
 		os.Exit(1)
 	}
 }
 
-func doMigration(logger log.Logger, configstore cfgstore.Store) error {
+func doMigration(logger log.Logger, fs fs.Filesystem, configstore cfgstore.Store) error {
 	if logger == nil {
 		logger = log.New("")
 	}
@@ -95,7 +95,8 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 
 	// Load the existing DB
 	datastore, err := jsonstore.New(jsonstore.Config{
-		Filepath: cfg.DB.Dir + "/db.json",
+		Filesystem: fs,
+		Filepath:   cfg.DB.Dir + "/db.json",
 	})
 	if err != nil {
 		logger.Error().WithField("db", dbFilepath).WithError(err).Log("Creating JSON store failed")
@@ -115,7 +116,10 @@ func doMigration(logger log.Logger, configstore cfgstore.Store) error {
 
 	for domain, procs := range data.Process {
 		for id, p := range procs {
-			ok, err := migrateProcessConfig(logger.WithField("processid", p.Process.ID), p.Process.Config, version.String())
+			ok, err := migrateProcessConfig(logger.WithFields(log.Fields{
+				"processid": p.Process.ID,
+				"domain":    domain,
+			}), p.Process.Config, version.String())
 			if err != nil {
 				logger.Info().WithField("processid", p.Process.ID).WithError(err).Log("Migrating process failed")
 				return fmt.Errorf("migrating process failed: %w", err)
