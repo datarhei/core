@@ -897,6 +897,9 @@ func (r *restream) UpdateProcess(id string, config *app.Config) error {
 	t.process.UpdatedAt = time.Now().Unix()
 	task.parser.TransferReportHistory(t.parser)
 
+	// Transfer the metadata to the new process
+	t.metadata = task.metadata
+
 	r.tasks[t.id] = t
 
 	// set filesystem cleanup rules
