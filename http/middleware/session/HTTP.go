@@ -1,6 +1,8 @@
 package session
 
 import (
+	"net/url"
+
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
 )
@@ -19,7 +21,11 @@ func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]int
 	if len(req.URL.RawQuery) != 0 {
 		location += "?" + req.URL.RawQuery
 	}
-	remote := req.RemoteAddr
+
+	referrer := req.Header.Get("Referer")
+	if u, err := url.Parse(referrer); err == nil {
+		referrer = u.Host
+	}
 
 	id := shortuuid.New()
 
@@ -35,7 +41,7 @@ func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]int
 	}
 	res.Writer = w
 
-	h.httpCollector.RegisterAndActivate(id, "", location, remote)
+	h.httpCollector.RegisterAndActivate(id, "", location, referrer)
 	h.httpCollector.Extra(id, data)
 
 	defer h.httpCollector.Close(id)
