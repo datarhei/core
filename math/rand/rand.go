@@ -4,6 +4,7 @@ package rand
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -12,12 +13,17 @@ const (
 	CharsetNumbers = "1234567890"
 	CharsetSymbols = "#@+*%&/<>[]()=?!$.,:;-_"
 
-	CharsetAll = CharsetLetters + CharsetNumbers + CharsetSymbols
+	CharsetAlphanumeric = CharsetLetters + CharsetNumbers
+	CharsetAll          = CharsetLetters + CharsetNumbers + CharsetSymbols
 )
 
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+var lock sync.Mutex
 
 func StringWithCharset(length int, charset string) string {
+	lock.Lock()
+	defer lock.Unlock()
+
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[seededRand.Intn(len(charset))]
@@ -35,7 +41,7 @@ func StringNumbers(length int) string {
 }
 
 func StringAlphanumeric(length int) string {
-	return StringWithCharset(length, CharsetLetters+CharsetNumbers)
+	return StringWithCharset(length, CharsetAlphanumeric)
 }
 
 func String(length int) string {
