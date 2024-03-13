@@ -372,7 +372,7 @@ func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
 		go func(node Node, p chan<- []clientapi.FileInfo) {
 			defer wg.Done()
 
-			files, err := node.FileList(storage, pattern)
+			files, err := node.ListFiles(storage, pattern)
 			if err != nil {
 				return
 			}

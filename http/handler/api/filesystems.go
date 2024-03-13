@@ -70,7 +70,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 // @Param data body []byte true "File data"
 // @Success 201 {string} string
 // @Success 204 {string} string
-// @Failure 507 {object} api.Error
+// @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage}/{filepath} [put]
 func (h *FSHandler) PutFile(c echo.Context) error {

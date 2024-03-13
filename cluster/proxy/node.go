@@ -43,8 +43,10 @@ type NodeReader interface {
 	Version() NodeVersion
 	Resources() NodeResources
 
-	FileList(storage, pattern string) ([]clientapi.FileInfo, error)
-	ProxyFileList() NodeFiles
+	ListFiles(storage, pattern string) ([]clientapi.FileInfo, error)
+	DeleteFile(storage, path string) error
+	PutFile(storage, path string, data io.Reader) error
+	ListResources() NodeFiles
 
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
@@ -583,7 +585,7 @@ func (n *node) Version() NodeVersion {
 	return version
 }
 
-func (n *node) ProxyFileList() NodeFiles {
+func (n *node) ListResources() NodeFiles {
 	id := n.About().ID
 
 	files := NodeFiles{
@@ -730,7 +732,7 @@ func (n *node) files() []string {
 	return filesList
 }
 
-func (n *node) FileList(storage, pattern string) ([]clientapi.FileInfo, error) {
+func (n *node) ListFiles(storage, pattern string) ([]clientapi.FileInfo, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -748,6 +750,28 @@ func (n *node) FileList(storage, pattern string) ([]clientapi.FileInfo, error) {
 	}
 
 	return files, nil
+}
+
+func (n *node) PutFile(storage, path string, data io.Reader) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return ErrNoPeer
+	}
+
+	return n.peer.FilesystemAddFile(storage, path, data)
+}
+
+func (n *node) DeleteFile(storage, path string) error {
+	n.peerLock.RLock()
+	defer n.peerLock.RUnlock()
+
+	if n.peer == nil {
+		return ErrNoPeer
+	}
+
+	return n.peer.FilesystemDeleteFile(storage, path)
 }
 
 func cloneURL(src *url.URL) *url.URL {
