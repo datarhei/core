@@ -26,7 +26,7 @@ type Response struct {
 	Data    interface{}
 }
 
-func getDummyRestreamHandler() (*RestreamHandler, error) {
+func getDummyRestreamHandler() (*ProcessHandler, error) {
 	rs, err := mock.DummyRestreamer("../../mock")
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func getDummyRestreamHandler() (*RestreamHandler, error) {
 	iam.AddPolicy("$anon", "$none", []string{"fs"}, "/**", []string{"ANY"})
 	iam.AddPolicy("$anon", "$none", []string{"process"}, "**", []string{"ANY"})
 
-	handler := NewRestream(rs, iam)
+	handler := NewProcess(rs, iam)
 
 	return handler, nil
 }

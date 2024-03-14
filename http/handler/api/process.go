@@ -17,15 +17,15 @@ import (
 	"github.com/lithammer/shortuuid/v4"
 )
 
-// The RestreamHandler type provides functions to interact with a Restreamer instance
-type RestreamHandler struct {
+// The ProcessHandler type provides functions to interact with a Restreamer instance
+type ProcessHandler struct {
 	restream restream.Restreamer
 	iam      iam.Enforcer
 }
 
-// NewRestream return a new Restream type. You have to provide a valid Restreamer instance.
-func NewRestream(restream restream.Restreamer, iam iam.IAM) *RestreamHandler {
-	return &RestreamHandler{
+// NewProcess return a new Restream type. You have to provide a valid Restreamer instance.
+func NewProcess(restream restream.Restreamer, iam iam.IAM) *ProcessHandler {
+	return &ProcessHandler{
 		restream: restream,
 		iam:      iam,
 	}
@@ -44,7 +44,7 @@ func NewRestream(restream restream.Restreamer, iam iam.IAM) *RestreamHandler {
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process [post]
-func (h *RestreamHandler) Add(c echo.Context) error {
+func (h *ProcessHandler) Add(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 
@@ -114,7 +114,7 @@ func (h *RestreamHandler) Add(c echo.Context) error {
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/process [get]
-func (h *RestreamHandler) GetAll(c echo.Context) error {
+func (h *ProcessHandler) GetAll(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	reference := util.DefaultQuery(c, "reference", "")
@@ -178,7 +178,7 @@ func (h *RestreamHandler) GetAll(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [get]
-func (h *RestreamHandler) Get(c echo.Context) error {
+func (h *ProcessHandler) Get(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
 	filter := util.DefaultQuery(c, "filter", "")
@@ -214,7 +214,7 @@ func (h *RestreamHandler) Get(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [delete]
-func (h *RestreamHandler) Delete(c echo.Context) error {
+func (h *ProcessHandler) Delete(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	id := util.PathParam(c, "id")
@@ -258,7 +258,7 @@ func (h *RestreamHandler) Delete(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [put]
-func (h *RestreamHandler) Update(c echo.Context) error {
+func (h *ProcessHandler) Update(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
@@ -347,7 +347,7 @@ func (h *RestreamHandler) Update(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/command [put]
-func (h *RestreamHandler) Command(c echo.Context) error {
+func (h *ProcessHandler) Command(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -401,7 +401,7 @@ func (h *RestreamHandler) Command(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/config [get]
-func (h *RestreamHandler) GetConfig(c echo.Context) error {
+func (h *ProcessHandler) GetConfig(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -440,7 +440,7 @@ func (h *RestreamHandler) GetConfig(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/state [get]
-func (h *RestreamHandler) GetState(c echo.Context) error {
+func (h *ProcessHandler) GetState(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -481,7 +481,7 @@ func (h *RestreamHandler) GetState(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
-func (h *RestreamHandler) GetReport(c echo.Context) error {
+func (h *ProcessHandler) GetReport(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
@@ -592,7 +592,7 @@ func (h *RestreamHandler) GetReport(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/report/process [get]
-func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
+func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	state := util.DefaultQuery(c, "state", "")
@@ -646,7 +646,7 @@ func (h *RestreamHandler) SearchReportHistory(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/probe [get]
-func (h *RestreamHandler) Probe(c echo.Context) error {
+func (h *ProcessHandler) Probe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -686,7 +686,7 @@ func (h *RestreamHandler) Probe(c echo.Context) error {
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/probe [post]
-func (h *RestreamHandler) ProbeConfig(c echo.Context) error {
+func (h *ProcessHandler) ProbeConfig(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 
 	process := api.ProcessConfig{
@@ -729,7 +729,7 @@ func (h *RestreamHandler) ProbeConfig(c echo.Context) error {
 // @Success 200 {object} api.Skills
 // @Security ApiKeyAuth
 // @Router /api/v3/skills [get]
-func (h *RestreamHandler) Skills(c echo.Context) error {
+func (h *ProcessHandler) Skills(c echo.Context) error {
 	skills := h.restream.Skills()
 
 	apiskills := api.Skills{}
@@ -747,7 +747,7 @@ func (h *RestreamHandler) Skills(c echo.Context) error {
 // @Success 200 {object} api.Skills
 // @Security ApiKeyAuth
 // @Router /api/v3/skills/reload [get]
-func (h *RestreamHandler) ReloadSkills(c echo.Context) error {
+func (h *ProcessHandler) ReloadSkills(c echo.Context) error {
 	h.restream.ReloadSkills()
 	skills := h.restream.Skills()
 
@@ -772,7 +772,7 @@ func (h *RestreamHandler) ReloadSkills(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [get]
-func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
+func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
 	ctxuser := util.DefaultContext(c, "user", "")
@@ -815,7 +815,7 @@ func (h *RestreamHandler) GetProcessMetadata(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [put]
-func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
+func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
 	ctxuser := util.DefaultContext(c, "user", "")
@@ -859,7 +859,7 @@ func (h *RestreamHandler) SetProcessMetadata(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [get]
-func (h *RestreamHandler) GetMetadata(c echo.Context) error {
+func (h *ProcessHandler) GetMetadata(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	data, err := h.restream.GetMetadata(key)
@@ -882,7 +882,7 @@ func (h *RestreamHandler) GetMetadata(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [put]
-func (h *RestreamHandler) SetMetadata(c echo.Context) error {
+func (h *ProcessHandler) SetMetadata(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	if len(key) == 0 {
@@ -969,7 +969,7 @@ func (f filter) String() string {
 	return strings.Join(f.Slice(), ",")
 }
 
-func (h *RestreamHandler) getProcess(id app.ProcessID, filter filter) (api.Process, error) {
+func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Process, error) {
 	process, err := h.restream.GetProcess(id)
 	if err != nil {
 		return api.Process{}, err

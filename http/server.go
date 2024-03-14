@@ -121,7 +121,7 @@ type server struct {
 	v3handler struct {
 		log       *api.LogHandler
 		events    *api.EventsHandler
-		restream  *api.RestreamHandler
+		restream  *api.ProcessHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
@@ -267,7 +267,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	)
 
 	if config.Restream != nil {
-		s.v3handler.restream = api.NewRestream(
+		s.v3handler.restream = api.NewProcess(
 			config.Restream,
 			config.IAM,
 		)

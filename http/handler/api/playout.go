@@ -29,7 +29,7 @@ import (
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/status [get]
-func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
+func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	user := util.DefaultContext(c, "user", "")
@@ -97,7 +97,7 @@ func (h *RestreamHandler) PlayoutStatus(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/keyframe/{name} [get]
-func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
+func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	name := util.PathWildcardParam(c)
@@ -156,7 +156,7 @@ func (h *RestreamHandler) PlayoutKeyframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/encode [get]
-func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
+func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	user := util.DefaultContext(c, "user", "")
@@ -211,7 +211,7 @@ func (h *RestreamHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/{name} [post]
-func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
+func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	user := util.DefaultContext(c, "user", "")
@@ -267,7 +267,7 @@ func (h *RestreamHandler) PlayoutSetErrorframe(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/reopen [get]
-func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
+func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	user := util.DefaultContext(c, "user", "")
@@ -321,7 +321,7 @@ func (h *RestreamHandler) PlayoutReopenInput(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/stream [put]
-func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
+func (h *ProcessHandler) PlayoutSetStream(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	inputid := util.PathParam(c, "inputid")
 	user := util.DefaultContext(c, "user", "")
@@ -364,7 +364,7 @@ func (h *RestreamHandler) PlayoutSetStream(c echo.Context) error {
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
 }
 
-func (h *RestreamHandler) request(method, addr, path, contentType string, data []byte) (*http.Response, error) {
+func (h *ProcessHandler) request(method, addr, path, contentType string, data []byte) (*http.Response, error) {
 	endpoint := "http://" + addr + path
 
 	body := bytes.NewBuffer(data)
