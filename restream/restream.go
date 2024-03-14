@@ -930,7 +930,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 }
 
 // validateInputAddress checks whether the given input address is valid and is allowed to be used.
-func validateInputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (string, error) {
+func validateInputAddress(address, _ string, ffmpeg ffmpeg.FFmpeg) (string, error) {
 	if ok := url.HasScheme(address); ok {
 		if err := url.Validate(address); err != nil {
 			return address, err

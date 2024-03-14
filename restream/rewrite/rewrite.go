@@ -114,13 +114,13 @@ func (g *rewrite) isLocal(u *url.URL) bool {
 	return host == base.Host
 }
 
-func (g *rewrite) httpURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
+func (g *rewrite) httpURL(u *url.URL, _ Access, identity iamidentity.Verifier) string {
 	u.User = identity.GetServiceBasicAuth()
 
 	return u.String()
 }
 
-func (g *rewrite) rtmpURL(u *url.URL, mode Access, identity iamidentity.Verifier) string {
+func (g *rewrite) rtmpURL(u *url.URL, _ Access, identity iamidentity.Verifier) string {
 	token := identity.GetServiceToken()
 
 	// Remove the existing token from the path
