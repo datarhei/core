@@ -91,7 +91,7 @@ func TestDescription(t *testing.T) {
 	require.Equal(t, "name: blabla (label)", d.String())
 }
 
-func TestMetri(t *testing.T) {
+func TestMetrics(t *testing.T) {
 	m := NewMetrics()
 
 	require.Equal(t, "", m.String())
