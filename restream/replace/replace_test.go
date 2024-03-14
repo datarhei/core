@@ -138,7 +138,8 @@ func TestReplaceGlob(t *testing.T) {
 	r := New()
 	r.RegisterTemplate("foo:bar", "Hello foobar", nil)
 	r.RegisterTemplate("foo:baz", "Hello foobaz", nil)
+	r.RegisterTemplate("foo:123", "Hello 456", nil)
 
-	replaced := r.Replace("{foo:baz}, {foo:bar}", "foo:*", "", nil, nil, "")
-	require.Equal(t, "Hello foobaz, Hello foobar", replaced)
+	replaced := r.Replace("{foo:baz}, {foo:bar}, {foo:123}", "foo:*", "", nil, nil, "")
+	require.Equal(t, "Hello foobaz, Hello foobar, Hello 456", replaced)
 }
