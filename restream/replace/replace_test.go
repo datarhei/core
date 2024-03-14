@@ -148,9 +148,16 @@ func TestReplaceGlob(t *testing.T) {
 		},
 		nil,
 	)
+	r.RegisterReplaceFunc(
+		"foo:123",
+		func(params map[string]string, config *app.Config, section string) string {
+			return "Hello 456"
+		},
+		nil,
+	)
 
-	replaced := r.Replace("{foo:baz}, {foo:bar}", "foo:*", "", nil, nil, "")
-	require.Equal(t, "Hello foobaz, Hello foobar", replaced)
+	replaced := r.Replace("{foo:baz}, {foo:bar}, {foo:123}", "foo:*", "", nil, nil, "")
+	require.Equal(t, "Hello foobaz, Hello foobar, Hello 456", replaced)
 }
 
 func TestParseParams(t *testing.T) {

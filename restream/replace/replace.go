@@ -42,7 +42,7 @@ type replacer struct {
 func New() Replacer {
 	r := &replacer{
 		replacers:  make(map[string]replace),
-		re:         regexp.MustCompile(`{([a-z:]+)(?:\^(.))?(?:,(.*?))?}`),
+		re:         regexp.MustCompile(`{([a-z]+(?::[0-9A-Za-z]+)?)(?:\^(.))?(?:,(.*?))?}`),
 		templateRe: regexp.MustCompile(`{([a-z:]+)}`),
 	}
 
