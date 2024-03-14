@@ -268,7 +268,9 @@ func (fs *memFilesystem) Open(path string) File {
 	}
 
 	if len(file.linkTo) != 0 {
+		fs.filesLock.RLock()
 		file, ok = fs.files[file.linkTo]
+		fs.filesLock.RUnlock()
 		if !ok {
 			return nil
 		}
@@ -293,7 +295,9 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	}
 
 	if len(file.linkTo) != 0 {
+		fs.filesLock.RLock()
 		file, ok = fs.files[file.linkTo]
+		fs.filesLock.RUnlock()
 		if !ok {
 			return nil, ErrNotExist
 		}
