@@ -1,10 +1,13 @@
 package fs
 
 import (
+	"context"
 	"fmt"
 	gorand "math/rand"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/datarhei/core/v16/math/rand"
 	"github.com/stretchr/testify/require"
@@ -69,7 +72,7 @@ func BenchmarkMemReadFile(b *testing.B) {
 
 	nFiles := 1000
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < nFiles; i++ {
 		path := fmt.Sprintf("/%d.dat", i)
 		mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
 	}
@@ -83,4 +86,67 @@ func BenchmarkMemReadFile(b *testing.B) {
 		f := mem.Open("/" + strconv.Itoa(num) + ".dat")
 		f.Close()
 	}
+}
+
+func BenchmarkMemReadFileWhileWriting(b *testing.B) {
+	mem, err := NewMemFilesystem(MemConfig{})
+	require.NoError(b, err)
+
+	nReaders := 100
+	nWriters := 1000
+	nFiles := 30
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	writerWg := sync.WaitGroup{}
+
+	for i := 0; i < nWriters; i++ {
+		writerWg.Add(1)
+
+		go func(ctx context.Context, from int) {
+			for i := 0; i < nFiles; i++ {
+				path := fmt.Sprintf("/%d.dat", i+from)
+				mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+			}
+
+			ticker := time.NewTicker(40 * time.Millisecond)
+			defer ticker.Stop()
+
+			writerWg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					num := gorand.Intn(nFiles) + from
+					path := fmt.Sprintf("/%d.dat", num)
+					mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+				}
+			}
+		}(ctx, i*nFiles)
+	}
+
+	// Wait for all writers to be started
+	writerWg.Wait()
+
+	b.ResetTimer()
+
+	readerWg := sync.WaitGroup{}
+
+	for i := 0; i < nReaders; i++ {
+		readerWg.Add(1)
+		go func() {
+			defer readerWg.Done()
+
+			for i := 0; i < b.N; i++ {
+				num := gorand.Intn(nWriters * nFiles)
+				f := mem.Open("/" + strconv.Itoa(num) + ".dat")
+				f.Close()
+			}
+		}()
+	}
+
+	readerWg.Wait()
 }
