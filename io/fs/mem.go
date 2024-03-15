@@ -118,11 +118,9 @@ type memFilesystem struct {
 	metadata map[string]string
 	metaLock sync.RWMutex
 
-	// Mutex for the files map
-	filesLock sync.RWMutex
-
-	// Current size of the filesystem in bytes
+	// Current size of the filesystem in bytes and its mutex
 	currentSize int64
+	sizeLock    sync.RWMutex
 
 	// Logger from the config
 	logger log.Logger
@@ -226,8 +224,8 @@ func (fs *memFilesystem) SetMetadata(key, data string) {
 }
 
 func (fs *memFilesystem) Size() (int64, int64) {
-	fs.filesLock.RLock()
-	defer fs.filesLock.RUnlock()
+	fs.sizeLock.RLock()
+	defer fs.sizeLock.RUnlock()
 
 	return fs.currentSize, -1
 }
@@ -331,8 +329,8 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 
 	oldFile, loaded := fs.storage.Store(newname, newFile)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	if loaded {
 		oldFile.Close()
@@ -379,8 +377,8 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 
 	oldFile, replace := fs.storage.Store(path, newFile)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	if replace {
 		oldFile.Close()
@@ -432,9 +430,9 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 		size -= f.size
 		freed += f.size
 
-		fs.filesLock.Lock()
+		fs.sizeLock.Lock()
 		fs.currentSize -= f.size
-		fs.filesLock.Unlock()
+		fs.sizeLock.Unlock()
 
 		f.Close()
 
@@ -496,8 +494,8 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 	dstFile, replace := fs.storage.Store(dst, srcFile)
 	fs.storage.Delete(src)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	if replace {
 		dstFile.Close()
@@ -542,8 +540,8 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 
 	f, replace := fs.storage.Store(dst, dstFile)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	if replace {
 		f.Close()
@@ -640,8 +638,8 @@ func (fs *memFilesystem) remove(path string) int64 {
 	if ok {
 		file.Close()
 
-		fs.filesLock.Lock()
-		defer fs.filesLock.Unlock()
+		fs.sizeLock.Lock()
+		defer fs.sizeLock.Unlock()
 
 		fs.currentSize -= file.size
 	} else {
@@ -727,8 +725,8 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 		file.Close()
 	}
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	fs.currentSize -= size
 
