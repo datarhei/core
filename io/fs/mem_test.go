@@ -3,6 +3,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"io"
 	gorand "math/rand"
 	"strconv"
 	"sync"
@@ -88,6 +89,24 @@ func BenchmarkMemReadFile(b *testing.B) {
 	}
 }
 
+func TestWriteWhileRead(t *testing.T) {
+	fs, err := NewMemFilesystem(MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFile("/foobar", []byte("xxxxx"))
+	require.NoError(t, err)
+
+	file := fs.Open("/foobar")
+	require.NotNil(t, file)
+
+	_, _, err = fs.WriteFile("/foobar", []byte("yyyyy"))
+	require.NoError(t, err)
+
+	data, err := io.ReadAll(file)
+	require.NoError(t, err)
+	require.Equal(t, []byte("xxxxx"), data)
+}
+
 func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 	mem, err := NewMemFilesystem(MemConfig{})
 	require.NoError(b, err)
@@ -108,7 +127,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 
 		go func(ctx context.Context, from int) {
 			for i := 0; i < nFiles; i++ {
-				path := fmt.Sprintf("/%d.dat", i+from)
+				path := fmt.Sprintf("/%d.dat", from+i)
 				mem.WriteFile(path, data)
 			}
 

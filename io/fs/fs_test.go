@@ -542,8 +542,7 @@ func testStatDir(t *testing.T, fs Filesystem) {
 	require.NotNil(t, info)
 	require.Equal(t, true, info.IsDir())
 
-	data := strings.NewReader("gduwotoxqb")
-	fs.WriteFileReader("/these/are/some/directories/foobar", data)
+	fs.WriteFileReader("/these/are/some/directories/foobar", strings.NewReader("gduwotoxqb"))
 
 	info, err = fs.Stat("/foobar")
 	require.Error(t, err)

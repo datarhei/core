@@ -31,6 +31,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.63
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.16.0
+	github.com/puzpuzpuz/xsync/v3 v3.1.0
 	github.com/shirou/gopsutil/v3 v3.23.8
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/echo-swagger v1.4.1
