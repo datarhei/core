@@ -92,7 +92,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 	mem, err := NewMemFilesystem(MemConfig{})
 	require.NoError(b, err)
 
-	nReaders := 100
+	nReaders := 500
 	nWriters := 1000
 	nFiles := 30
 
@@ -101,13 +101,15 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 
 	writerWg := sync.WaitGroup{}
 
+	data := []byte(rand.StringAlphanumeric(2 * 1024))
+
 	for i := 0; i < nWriters; i++ {
 		writerWg.Add(1)
 
 		go func(ctx context.Context, from int) {
 			for i := 0; i < nFiles; i++ {
 				path := fmt.Sprintf("/%d.dat", i+from)
-				mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+				mem.WriteFile(path, data)
 			}
 
 			ticker := time.NewTicker(40 * time.Millisecond)
@@ -122,7 +124,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 				case <-ticker.C:
 					num := gorand.Intn(nFiles) + from
 					path := fmt.Sprintf("/%d.dat", num)
-					mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+					mem.WriteFile(path, data)
 				}
 			}
 		}(ctx, i*nFiles)
