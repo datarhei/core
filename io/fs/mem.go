@@ -108,16 +108,11 @@ type memFilesystem struct {
 	metaLock sync.RWMutex
 
 	// Mapping of path to file
-	files map[string]*memFile
+	files *memStorage
 
-	// Mutex for the files map
-	filesLock sync.RWMutex
-
-	// Pool for the storage of the contents of files
-	dataPool sync.Pool
-
-	// Current size of the filesystem in bytes
+	// Current size of the filesystem in bytes and its mutes
 	currentSize int64
+	sizeLock    sync.RWMutex
 
 	// Logger from the config
 	logger log.Logger
@@ -137,13 +132,7 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 
 	fs.logger = fs.logger.WithField("type", "mem")
 
-	fs.files = make(map[string]*memFile)
-
-	fs.dataPool = sync.Pool{
-		New: func() interface{} {
-			return new(bytes.Buffer)
-		},
-	}
+	fs.files = newMemStorage()
 
 	fs.logger.Debug().Log("Created")
 
@@ -218,25 +207,24 @@ func (fs *memFilesystem) SetMetadata(key, data string) {
 }
 
 func (fs *memFilesystem) Size() (int64, int64) {
-	fs.filesLock.RLock()
-	defer fs.filesLock.RUnlock()
+	fs.sizeLock.RLock()
+	defer fs.sizeLock.RUnlock()
 
 	return fs.currentSize, -1
 }
 
 func (fs *memFilesystem) Files() int64 {
-	fs.filesLock.RLock()
-	defer fs.filesLock.RUnlock()
-
 	nfiles := int64(0)
 
-	for _, f := range fs.files {
+	fs.files.Range(func(key string, f *memFile) bool {
 		if f.dir {
-			continue
+			return true
 		}
 
 		nfiles++
-	}
+
+		return true
+	})
 
 	return nfiles
 }
@@ -244,9 +232,7 @@ func (fs *memFilesystem) Files() int64 {
 func (fs *memFilesystem) Open(path string) File {
 	path = fs.cleanPath(path)
 
-	fs.filesLock.RLock()
-	file, ok := fs.files[path]
-	fs.filesLock.RUnlock()
+	file, ok := fs.files.LoadAndCopy(path)
 
 	if !ok {
 		return nil
@@ -262,7 +248,9 @@ func (fs *memFilesystem) Open(path string) File {
 	}
 
 	if len(file.linkTo) != 0 {
-		file, ok = fs.files[file.linkTo]
+		file.Close()
+
+		file, ok = fs.files.LoadAndCopy(file.linkTo)
 		if !ok {
 			return nil
 		}
@@ -280,20 +268,22 @@ func (fs *memFilesystem) Open(path string) File {
 func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	path = fs.cleanPath(path)
 
-	fs.filesLock.RLock()
-	file, ok := fs.files[path]
-	fs.filesLock.RUnlock()
+	file, ok := fs.files.LoadAndCopy(path)
 
 	if !ok {
 		return nil, os.ErrNotExist
 	}
 
 	if len(file.linkTo) != 0 {
-		file, ok = fs.files[file.linkTo]
+		file.Close()
+
+		file, ok = fs.files.LoadAndCopy(file.linkTo)
 		if !ok {
 			return nil, os.ErrNotExist
 		}
 	}
+
+	defer file.Close()
 
 	if file.data != nil {
 		return file.data.Bytes(), nil
@@ -306,21 +296,17 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	oldname = fs.cleanPath(oldname)
 	newname = fs.cleanPath(newname)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
-
-	if _, ok := fs.files[oldname]; !ok {
-		return os.ErrNotExist
-	}
-
-	if _, ok := fs.files[newname]; ok {
+	if fs.files.Has(newname) {
 		return os.ErrExist
 	}
 
-	if file, ok := fs.files[oldname]; ok {
-		if len(file.linkTo) != 0 {
-			return fmt.Errorf("%s can't link to another link (%s)", newname, oldname)
-		}
+	oldFile, ok := fs.files.Load(oldname)
+	if !ok {
+		return os.ErrNotExist
+	}
+
+	if len(oldFile.linkTo) != 0 {
+		return fmt.Errorf("%s can't link to another link (%s)", newname, oldname)
 	}
 
 	newFile := &memFile{
@@ -334,7 +320,17 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 		data: nil,
 	}
 
-	fs.files[newname] = newFile
+	oldFile, loaded := fs.files.Store(newname, newFile)
+
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
+	if loaded {
+		oldFile.Close()
+		fs.currentSize -= oldFile.size
+	}
+
+	fs.currentSize += newFile.size
 
 	return nil
 }
@@ -349,10 +345,9 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 			size:    0,
 			lastMod: time.Now(),
 		},
-		data: fs.dataPool.Get().(*bytes.Buffer),
+		data: &bytes.Buffer{},
 	}
 
-	newFile.data.Reset()
 	size, err := newFile.data.ReadFrom(r)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
@@ -364,20 +359,16 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 
 	newFile.size = size
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	oldFile, replace := fs.files.Store(path, newFile)
 
-	file, replace := fs.files[path]
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
 	if replace {
-		delete(fs.files, path)
+		oldFile.Close()
 
-		fs.currentSize -= file.size
-
-		fs.dataPool.Put(file.data)
-		file.data = nil
+		fs.currentSize -= oldFile.size
 	}
-
-	fs.files[path] = newFile
 
 	fs.currentSize += newFile.size
 
@@ -405,14 +396,12 @@ func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, e
 }
 
 func (fs *memFilesystem) Purge(size int64) int64 {
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
-
 	files := []*memFile{}
 
-	for _, f := range fs.files {
-		files = append(files, f)
-	}
+	fs.files.Range(func(_ string, file *memFile) bool {
+		files = append(files, file)
+		return true
+	})
 
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].lastMod.Before(files[j].lastMod)
@@ -421,13 +410,15 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 	var freed int64 = 0
 
 	for _, f := range files {
-		delete(fs.files, f.name)
+		fs.files.Delete(f.name)
 		size -= f.size
 		freed += f.size
-		fs.currentSize -= f.size
 
-		fs.dataPool.Put(f.data)
-		f.data = nil
+		fs.sizeLock.Lock()
+		fs.currentSize -= f.size
+		fs.sizeLock.Unlock()
+
+		f.Close()
 
 		fs.logger.WithFields(log.Fields{
 			"path":           f.name,
@@ -448,8 +439,8 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 	path = fs.cleanPath(path)
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	info, err := fs.stat(path)
 	if err == nil {
@@ -470,7 +461,7 @@ func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 		data: nil,
 	}
 
-	fs.files[path] = f
+	fs.files.Store(path, f)
 
 	return nil
 }
@@ -483,24 +474,22 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 		return nil
 	}
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
-
-	srcFile, ok := fs.files[src]
+	srcFile, ok := fs.files.Load(src)
 	if !ok {
 		return os.ErrNotExist
 	}
 
-	dstFile, ok := fs.files[dst]
-	if ok {
+	dstFile, replace := fs.files.Store(dst, srcFile)
+	fs.files.Delete(src)
+
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
+	if replace {
+		dstFile.Close()
+
 		fs.currentSize -= dstFile.size
-
-		fs.dataPool.Put(dstFile.data)
-		dstFile.data = nil
 	}
-
-	fs.files[dst] = srcFile
-	delete(fs.files, src)
 
 	return nil
 }
@@ -513,43 +502,41 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 		return nil
 	}
 
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	if fs.isDir(dst) {
+		return os.ErrInvalid
+	}
 
-	srcFile, ok := fs.files[src]
+	srcFile, ok := fs.files.LoadAndCopy(src)
 	if !ok {
 		return os.ErrNotExist
 	}
 
 	if srcFile.dir {
+		srcFile.Close()
 		return os.ErrNotExist
 	}
 
-	if fs.isDir(dst) {
-		return os.ErrInvalid
+	dstFile := &memFile{
+		memFileInfo: memFileInfo{
+			name:    dst,
+			dir:     false,
+			size:    srcFile.size,
+			lastMod: time.Now(),
+		},
+		data: srcFile.data,
 	}
 
-	dstFile, ok := fs.files[dst]
-	if ok {
-		fs.currentSize -= dstFile.size
-	} else {
-		dstFile = &memFile{
-			memFileInfo: memFileInfo{
-				name:    dst,
-				dir:     false,
-				size:    srcFile.size,
-				lastMod: time.Now(),
-			},
-			data: fs.dataPool.Get().(*bytes.Buffer),
-		}
-	}
+	f, replace := fs.files.Store(dst, dstFile)
 
-	dstFile.data.Reset()
-	dstFile.data.Write(srcFile.data.Bytes())
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
+	if replace {
+		f.Close()
+		fs.currentSize -= f.size
+	}
 
 	fs.currentSize += dstFile.size
-
-	fs.files[dst] = dstFile
 
 	return nil
 }
@@ -557,14 +544,11 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 func (fs *memFilesystem) Stat(path string) (FileInfo, error) {
 	path = fs.cleanPath(path)
 
-	fs.filesLock.RLock()
-	defer fs.filesLock.RUnlock()
-
 	return fs.stat(path)
 }
 
 func (fs *memFilesystem) stat(path string) (FileInfo, error) {
-	file, ok := fs.files[path]
+	file, ok := fs.files.Load(path)
 	if ok {
 		f := &memFileInfo{
 			name:    file.name,
@@ -575,7 +559,7 @@ func (fs *memFilesystem) stat(path string) (FileInfo, error) {
 		}
 
 		if len(f.linkTo) != 0 {
-			file, ok := fs.files[f.linkTo]
+			file, ok := fs.files.Load(f.linkTo)
 			if !ok {
 				return nil, os.ErrNotExist
 			}
@@ -604,7 +588,7 @@ func (fs *memFilesystem) stat(path string) (FileInfo, error) {
 }
 
 func (fs *memFilesystem) isDir(path string) bool {
-	file, ok := fs.files[path]
+	file, ok := fs.files.Load(path)
 	if ok {
 		return file.dir
 	}
@@ -617,28 +601,29 @@ func (fs *memFilesystem) isDir(path string) bool {
 		return true
 	}
 
-	for k := range fs.files {
-		if strings.HasPrefix(k, path) {
-			return true
-		}
-	}
+	found := false
 
-	return false
+	fs.files.Range(func(k string, _ *memFile) bool {
+		if strings.HasPrefix(k, path) {
+			found = true
+			return false
+		}
+
+		return true
+	})
+
+	return found
 }
 
 func (fs *memFilesystem) Remove(path string) int64 {
-	path = fs.cleanPath(path)
-
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
-
-	file, ok := fs.files[path]
+	file, ok := fs.files.Delete(path)
 	if ok {
-		delete(fs.files, path)
-		fs.currentSize -= file.size
+		file.Close()
 
-		fs.dataPool.Put(file.data)
-		file.data = nil
+		fs.sizeLock.Lock()
+		defer fs.sizeLock.Unlock()
+
+		fs.currentSize -= file.size
 	} else {
 		return -1
 	}
@@ -653,12 +638,12 @@ func (fs *memFilesystem) Remove(path string) int64 {
 }
 
 func (fs *memFilesystem) RemoveAll() int64 {
-	fs.filesLock.Lock()
-	defer fs.filesLock.Unlock()
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
 
 	size := fs.currentSize
 
-	fs.files = make(map[string]*memFile)
+	fs.files = newMemStorage()
 	fs.currentSize = 0
 
 	return size
@@ -668,22 +653,29 @@ func (fs *memFilesystem) List(path, pattern string) []FileInfo {
 	path = fs.cleanPath(path)
 	files := []FileInfo{}
 
-	fs.filesLock.RLock()
-	defer fs.filesLock.RUnlock()
+	var compiledPattern glob.Glob
+	var err error
 
-	for _, file := range fs.files {
-		if !strings.HasPrefix(file.name, path) {
-			continue
+	if len(pattern) != 0 {
+		compiledPattern, err = glob.Compile(pattern, '/')
+		if err != nil {
+			return nil
 		}
+	}
 
-		if len(pattern) != 0 {
-			if ok, _ := glob.Match(pattern, file.name, '/'); !ok {
-				continue
-			}
-		}
-
+	fs.files.Range(func(key string, file *memFile) bool {
 		if file.dir {
-			continue
+			return true
+		}
+
+		if !strings.HasPrefix(file.name, path) {
+			return true
+		}
+
+		if compiledPattern != nil {
+			if !compiledPattern.Match(file.name) {
+				return true
+			}
 		}
 
 		files = append(files, &memFileInfo{
@@ -692,7 +684,9 @@ func (fs *memFilesystem) List(path, pattern string) []FileInfo {
 			lastMod: file.lastMod,
 			linkTo:  file.linkTo,
 		})
-	}
+
+		return true
+	})
 
 	return files
 }

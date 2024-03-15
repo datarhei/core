@@ -27,6 +27,7 @@ func TestMemFromDir(t *testing.T) {
 		"/disk.go",
 		"/fs_test.go",
 		"/fs.go",
+		"/mem_storage.go",
 		"/mem_test.go",
 		"/mem.go",
 		"/readonly_test.go",

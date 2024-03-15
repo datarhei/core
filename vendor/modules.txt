@@ -279,6 +279,9 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/puzpuzpuz/xsync/v3 v3.1.0
+## explicit; go 1.18
+github.com/puzpuzpuz/xsync/v3
 # github.com/rs/xid v1.5.0
 ## explicit; go 1.12
 github.com/rs/xid
