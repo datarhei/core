@@ -37,6 +37,45 @@ func TestMemFromDir(t *testing.T) {
 	}, names)
 }
 
+func BenchmarkMemList(b *testing.B) {
+	mem, err := NewMemFilesystem(MemConfig{})
+	require.NoError(b, err)
+
+	for i := 0; i < 1000; i++ {
+		id := rand.StringAlphanumeric(8)
+		path := fmt.Sprintf("/%d/%s.dat", i, id)
+		mem.WriteFile(path, []byte("foobar"))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		mem.List("/", "/5/**")
+	}
+}
+
+func BenchmarkMemReadFile(b *testing.B) {
+	mem, err := NewMemFilesystem(MemConfig{})
+	require.NoError(b, err)
+
+	nFiles := 1000
+
+	for i := 0; i < nFiles; i++ {
+		path := fmt.Sprintf("/%d.dat", i)
+		mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+	}
+
+	r := gorand.New(gorand.NewSource(42))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		num := r.Intn(nFiles)
+		f := mem.Open("/" + strconv.Itoa(num) + ".dat")
+		f.Close()
+	}
+}
+
 func TestWriteWhileRead(t *testing.T) {
 	fs, err := NewMemFilesystem(MemConfig{})
 	require.NoError(t, err)
