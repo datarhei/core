@@ -1,8 +1,12 @@
 ARG GOLANG_IMAGE=golang:1.20-alpine3.16
-
 ARG BUILD_IMAGE=alpine:3.16
 
-FROM $GOLANG_IMAGE as builder
+# Cross-Compilation
+# https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
+FROM --platform=$BUILDPLATFORM $GOLANG_IMAGE as builder
+
+ARG TARGETOS TARGETARCH
+ENV GOOS=$TARGETOS GOARCH=$TARGETARCH
 
 COPY . /dist/core
 
