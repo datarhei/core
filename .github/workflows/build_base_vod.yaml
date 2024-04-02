@@ -16,13 +16,13 @@ jobs:
                     - os: alpine
                       os_version: "3.19"
                       golang: golang:1.22-alpine3.19
-                      platforms: linux/amd64,linux/arm64
+                      platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                       key: alpine3.19
                     - os: alpine
                       os_version: "3.16"
                       golang: golang:1.19-alpine3.16
-                      platforms: linux/amd64,linux/arm64
+                      platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                       key: alpine3.16
 
@@ -50,14 +50,6 @@ jobs:
               id: buildx
               uses: docker/setup-buildx-action@master
 
-            - name: Cache Docker layers
-              uses: actions/cache@v4
-              with:
-                  path: /tmp/.buildx-cache
-                  key: ${{ runner.os }}-buildx-${{ github.sha }}
-                  restore-keys: |
-                      ${{ runner.os }}-buildx-
-
             - name: Login to DockerHub
               if: github.event_name != 'pull_request'
               uses: docker/login-action@v3
@@ -78,5 +70,3 @@ jobs:
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
-                  cache-from: type=local,src=/tmp/.buildx-cache
-                  cache-to: type=local,dest=/tmp/.buildx-cache-new
