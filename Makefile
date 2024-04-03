@@ -85,9 +85,6 @@ commit: vet fmt lint test build
 release:
 	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} GOARM=$(GOARM) go build -o core -trimpath -ldflags="-s -w -X github.com/datarhei/core/v16/app.Commit=$(COMMIT) -X github.com/datarhei/core/v16/app.Branch=$(BRANCH) -X github.com/datarhei/core/v16/app.Build=$(BUILD)"
 
-release2:
-	@echo "Hallo"
-
 ## docker: Build standard Docker image
 docker:
 	docker build -t core:$(SHORTCOMMIT) .

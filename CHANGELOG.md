@@ -1,5 +1,14 @@
 # Core
 
+### Core v16.14.0 > v16.15.0
+
+-   Add migrating to ffmpeg 6
+-   Fix missing process data if process has been deleted meanwhile
+-   Fix maintaining the metadata on process config update (datarhei/restreamer#698)
+-   Fix placeholder parsing
+-   Fix concurrent memfs accesses
+-   Fix memfs concurrent read and write performance
+
 ### Core v16.13.1 > v16.14.0
 
 -   Add support for SRTv4 clients
