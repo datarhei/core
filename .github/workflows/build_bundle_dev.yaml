@@ -27,16 +27,16 @@ jobs:
                       branch: dev
                       prefix: rpi-
                       latest: yes
-                    - core_os: ubuntu20.04
+                    - core_os: ubuntu22.04
                       ffmpeg: "6.1.1-vaapi"
-                      ffmpeg_os: ubuntu20.04
+                      ffmpeg_os: ubuntu22.04
                       platforms: linux/amd64
                       branch: dev
                       prefix: vaapi-
                       latest: yes
-                    - core_os: ubuntu20.04
+                    - core_os: ubuntu22.04
                       ffmpeg: "6.1.1-cuda"
-                      ffmpeg_os: ubuntu20.04
+                      ffmpeg_os: ubuntu22.04
                       ffmpeg_tags: "-cuda11.7.1"
                       platforms: linux/amd64
                       branch: dev
