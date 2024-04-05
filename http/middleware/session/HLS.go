@@ -54,6 +54,10 @@ func NewHLSWithConfig(config HLSConfig) echo.MiddlewareFunc {
 		config.Skipper = DefaultHLSConfig.Skipper
 	}
 
+	if config.EgressCollector == nil && config.IngressCollector == nil {
+		config.Skipper = func(c echo.Context) bool { return true }
+	}
+
 	if config.EgressCollector == nil {
 		config.EgressCollector = DefaultHLSConfig.EgressCollector
 	}

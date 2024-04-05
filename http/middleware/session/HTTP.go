@@ -35,6 +35,7 @@ func NewHTTPWithConfig(config HTTPConfig) echo.MiddlewareFunc {
 
 	if config.Collector == nil {
 		config.Collector = DefaultHTTPConfig.Collector
+		config.Skipper = func(c echo.Context) bool { return true }
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
