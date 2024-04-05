@@ -25,6 +25,10 @@ type WidgetHandler struct {
 
 // NewWidget return a new Widget type
 func NewWidget(config WidgetConfig) *WidgetHandler {
+	if config.Registry == nil {
+		config.Registry, _ = session.New(session.Config{})
+	}
+
 	return &WidgetHandler{
 		restream: config.Restream,
 		registry: config.Registry,
