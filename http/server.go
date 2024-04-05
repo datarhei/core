@@ -287,6 +287,7 @@ func NewServer(config Config) (Server, error) {
 	s.v3handler.session = api.NewSession(
 		config.Sessions,
 	)
+
 	s.middleware.session = mwsession.NewHLSWithConfig(mwsession.HLSConfig{
 		EgressCollector:  config.Sessions.Collector("hls"),
 		IngressCollector: config.Sessions.Collector("hlsingress"),
