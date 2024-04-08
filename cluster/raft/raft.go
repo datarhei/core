@@ -64,8 +64,9 @@ type raft struct {
 	leadershipNotifyCh  chan bool
 	leaderObservationCh chan string
 
-	isLeader   bool
-	leaderLock sync.Mutex
+	isLeader              bool
+	lastLeaderObservation time.Time
+	leaderLock            sync.RWMutex
 
 	logger log.Logger
 }
@@ -76,10 +77,11 @@ type Peer struct {
 }
 
 type Server struct {
-	ID      string
-	Address string
-	Voter   bool
-	Leader  bool
+	ID         string
+	Address    string
+	Voter      bool
+	Leader     bool
+	LastChange time.Duration
 }
 
 type Stats struct {
@@ -160,8 +162,8 @@ func (r *raft) Shutdown() {
 }
 
 func (r *raft) IsLeader() bool {
-	r.leaderLock.Lock()
-	defer r.leaderLock.Unlock()
+	r.leaderLock.RLock()
+	defer r.leaderLock.RUnlock()
 
 	return r.isLeader
 }
@@ -188,6 +190,12 @@ func (r *raft) Servers() ([]Server, error) {
 			Address: string(server.Address),
 			Voter:   server.Suffrage == hcraft.Voter,
 			Leader:  string(server.ID) == leaderID,
+		}
+
+		if node.Leader {
+			r.leaderLock.RLock()
+			node.LastChange = time.Since(r.lastLeaderObservation)
+			r.leaderLock.RUnlock()
 		}
 
 		servers = append(servers, node)
@@ -540,6 +548,10 @@ func (r *raft) trackLeaderChanges() {
 					"id":      leaderObs.LeaderID,
 					"address": leaderObs.LeaderAddr,
 				}).Log("New leader observation")
+
+				r.leaderLock.Lock()
+				r.lastLeaderObservation = time.Now()
+				r.leaderLock.Unlock()
 
 				leaderAddress := string(leaderObs.LeaderAddr)
 

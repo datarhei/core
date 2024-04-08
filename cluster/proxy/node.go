@@ -85,6 +85,7 @@ type NodeAbout struct {
 	LastContact time.Time
 	Latency     time.Duration
 	Resources   NodeResources
+	Version     string
 }
 
 type NodeVersion struct {
@@ -517,6 +518,7 @@ func (n *node) About() NodeAbout {
 		createdAt = time.Now()
 	}
 	name := n.peerAbout.Name
+	version := n.peerAbout.Version.Number
 	n.peerLock.RUnlock()
 
 	n.stateLock.RLock()
@@ -546,6 +548,7 @@ func (n *node) About() NodeAbout {
 			MemLimit:     n.resources.memLimit,
 			Error:        n.resources.err,
 		},
+		Version: version,
 	}
 
 	if state == stateDisconnected {

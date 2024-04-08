@@ -184,6 +184,7 @@ type Data struct {
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`
+		ID                     string   `json:"id"`
 		Address                string   `json:"address"` // ip:port
 		Peers                  []string `json:"peers"`
 		StartupTimeout         int64    `json:"startup_timeout_sec" format:"int64"`          // seconds

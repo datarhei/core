@@ -292,6 +292,7 @@ func (d *Config) init() {
 
 	// Cluster
 	d.vars.Register(value.NewBool(&d.Cluster.Enable, false), "cluster.enable", "CORE_CLUSTER_ENABLE", nil, "Enable cluster mode", false, false)
+	d.vars.Register(value.NewString(&d.Cluster.ID, ""), "cluster.id", "CORE_CLUSTER_ID", nil, "Cluster ID", false, false)
 	d.vars.Register(value.NewFullAddress(&d.Cluster.Address, "127.0.0.1:8000"), "cluster.address", "CORE_CLUSTER_ADDRESS", nil, "Raft listen address", true, false)
 	d.vars.Register(value.NewClusterPeerList(&d.Cluster.Peers, []string{""}, ","), "cluster.peers", "CORE_CLUSTER_PEERS", nil, "Raft addresses of cores that are part of the cluster", false, false)
 	d.vars.Register(value.NewInt64(&d.Cluster.StartupTimeout, 300), "cluster.startup_timeout_sec", "CORE_CLUSTER_STARTUP_TIMEOUT_SEC", nil, "Timeout for the cluster startup (leader election, acquiring certificates)", true, false)

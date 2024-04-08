@@ -189,7 +189,7 @@ func (c *cluster) monitorLeadership() {
 // leadershipTransfer tries to transfer the leadership to another node e.g. in order
 // to do a graceful shutdown.
 func (c *cluster) leadershipTransfer(id string) error {
-	if id == c.id {
+	if id == c.nodeID {
 		return nil
 	}
 

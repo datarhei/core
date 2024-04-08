@@ -48,16 +48,23 @@ type ClusterRaft struct {
 	LogIndex    uint64  `json:"log_index"`
 }
 
+type ClusterAboutLeader struct {
+	ID           string `json:"id"`
+	Address      string `json:"address"`
+	ElectedSince uint64 `json:"elected_seconds"`
+}
+
 type ClusterAbout struct {
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	Leader      bool          `json:"leader"`
-	Address     string        `json:"address"`
-	Raft        ClusterRaft   `json:"raft"`
-	Nodes       []ClusterNode `json:"nodes"`
-	Version     string        `json:"version"`
-	Degraded    bool          `json:"degraded"`
-	DegradedErr string        `json:"degraded_error"`
+	ID          string             `json:"id"`
+	NodeID      string             `json:"node_id"`
+	Domains     []string           `json:"public_domains"`
+	Leader      ClusterAboutLeader `json:"leader"`
+	Status      string             `json:"status"`
+	Raft        ClusterRaft        `json:"raft"`
+	Nodes       []ClusterNode      `json:"nodes"`
+	Version     string             `json:"version"`
+	Degraded    bool               `json:"degraded"`
+	DegradedErr string             `json:"degraded_error"`
 }
 
 type ClusterNodeFiles struct {

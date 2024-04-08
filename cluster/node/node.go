@@ -178,6 +178,7 @@ type AboutCore struct {
 	Uptime      time.Duration
 	LastContact time.Duration
 	Latency     time.Duration
+	Version     string
 }
 
 type About struct {
@@ -229,6 +230,7 @@ func (n *node) About() About {
 	}
 	a.Core.Error = coreError
 	a.Core.Latency = about.Latency
+	a.Core.Version = about.Version
 	a.Resources = about.Resources
 
 	return a

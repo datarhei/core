@@ -30,6 +30,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/slices"
 )
 
 type Cluster interface {
@@ -102,7 +103,8 @@ type DebugConfig struct {
 }
 
 type Config struct {
-	ID      string // ID of the node
+	ID      string // ID of the cluster
+	NodeID  string // ID of the node
 	Name    string // Name of the node
 	Path    string // Path where to store all cluster data
 	Address string // Listen address for the raft protocol
@@ -122,9 +124,10 @@ type Config struct {
 }
 
 type cluster struct {
-	id   string
-	name string
-	path string
+	id     string
+	nodeID string
+	name   string
+	path   string
 
 	logger log.Logger
 
@@ -159,7 +162,8 @@ type cluster struct {
 	isDegradedErr     error
 	isCoreDegraded    bool
 	isCoreDegradedErr error
-	stateLock         sync.Mutex
+	hostnames         []string
+	stateLock         sync.RWMutex
 
 	isRaftLeader  bool
 	hasRaftLeader bool
@@ -186,6 +190,7 @@ var ErrDegraded = errors.New("cluster is currently degraded")
 func New(config Config) (Cluster, error) {
 	c := &cluster{
 		id:     config.ID,
+		nodeID: config.NodeID,
 		name:   config.Name,
 		path:   config.Path,
 		logger: config.Logger,
@@ -277,7 +282,7 @@ func New(config Config) (Cluster, error) {
 	c.store = store
 
 	api, err := NewAPI(APIConfig{
-		ID:      c.id,
+		ID:      c.nodeID,
 		Cluster: c,
 		Logger:  c.logger.WithField("logname", "api"),
 	})
@@ -292,7 +297,7 @@ func New(config Config) (Cluster, error) {
 	c.api = api
 
 	nodeproxy, err := proxy.NewProxy(proxy.ProxyConfig{
-		ID:     c.id,
+		ID:     c.nodeID,
 		Logger: c.logger.WithField("logname", "proxy"),
 	})
 	if err != nil {
@@ -307,7 +312,7 @@ func New(config Config) (Cluster, error) {
 	c.proxy = nodeproxy
 
 	if forwarder, err := forwarder.New(forwarder.ForwarderConfig{
-		ID:     c.id,
+		ID:     c.nodeID,
 		Logger: c.logger.WithField("logname", "forwarder"),
 	}); err != nil {
 		c.Shutdown()
@@ -321,7 +326,7 @@ func New(config Config) (Cluster, error) {
 	peers := []raft.Peer{}
 
 	for _, p := range config.Peers {
-		if p.ID == config.ID && p.Address == config.Address {
+		if p.ID == config.NodeID && p.Address == config.Address {
 			continue
 		}
 
@@ -336,7 +341,7 @@ func New(config Config) (Cluster, error) {
 	c.raftEmergencyNotifyCh = make(chan bool, 16)
 
 	raft, err := raft.New(raft.Config{
-		ID:                  config.ID,
+		ID:                  config.NodeID,
 		Path:                config.Path,
 		Address:             config.Address,
 		Peers:               peers,
@@ -352,9 +357,9 @@ func New(config Config) (Cluster, error) {
 
 	c.raft = raft
 
-	if len(config.Peers) != 0 {
-		for i := 0; i < len(config.Peers); i++ {
-			peerAddress, err := c.ClusterAPIAddress(config.Peers[i].Address)
+	if len(peers) != 0 {
+		for _, p := range peers {
+			peerAddress, err := c.ClusterAPIAddress(p.Address)
 			if err != nil {
 				c.Shutdown()
 				return nil, err
@@ -369,7 +374,7 @@ func New(config Config) (Cluster, error) {
 					case <-c.shutdownCh:
 						return
 					case <-ticker.C:
-						err := c.Join("", c.id, c.raftAddress, peerAddress)
+						err := c.Join("", c.nodeID, c.raftAddress, peerAddress)
 						if err != nil {
 							c.logger.Warn().WithError(err).Log("Join cluster")
 							continue
@@ -666,8 +671,8 @@ func (c *cluster) IsRaftLeader() bool {
 }
 
 func (c *cluster) IsDegraded() (bool, error) {
-	c.stateLock.Lock()
-	defer c.stateLock.Unlock()
+	c.stateLock.RLock()
+	defer c.stateLock.RUnlock()
 
 	if c.isDegraded {
 		return c.isDegraded, c.isDegradedErr
@@ -707,7 +712,7 @@ func (c *cluster) Leave(origin, id string) error {
 	}
 
 	if len(id) == 0 {
-		id = c.id
+		id = c.nodeID
 	}
 
 	c.logger.Debug().WithFields(log.Fields{
@@ -762,7 +767,7 @@ func (c *cluster) Leave(origin, id string) error {
 
 	numPeers := len(servers)
 
-	if id == c.id {
+	if id == c.nodeID {
 		// We're going to remove ourselves
 		if numPeers <= 1 {
 			// Don't do so if we're the only server in the cluster
@@ -1014,15 +1019,17 @@ func (c *cluster) trackNodeChanges() {
 			c.nodesLock.Unlock()
 
 			// Put the cluster in "degraded" mode in case there's a mismatch in expected values
-			_, err = c.checkClusterNodes()
+			hostnames, err := c.checkClusterNodes()
 
 			c.stateLock.Lock()
 			if err != nil {
 				c.isDegraded = true
 				c.isDegradedErr = err
+				c.hostnames = []string{}
 			} else {
 				c.isDegraded = false
 				c.isDegradedErr = nil
+				c.hostnames = hostnames
 			}
 			c.stateLock.Unlock()
 
@@ -1044,11 +1051,11 @@ func (c *cluster) trackNodeChanges() {
 	}
 }
 
-// checkClusterNodes returns a list of all hostnames configured on all nodes. The
+// checkClusterNodes returns a list of hostnames that are configured on all nodes. The
 // returned list will not contain any duplicates. An error is returned in case the
 // node is not compatible.
 func (c *cluster) checkClusterNodes() ([]string, error) {
-	hostnames := map[string]struct{}{}
+	hostnames := map[string]int{}
 
 	c.nodesLock.RLock()
 	defer c.nodesLock.RUnlock()
@@ -1082,13 +1089,17 @@ func (c *cluster) checkClusterNodes() ([]string, error) {
 		}
 
 		for _, name := range config.Host.Name {
-			hostnames[name] = struct{}{}
+			hostnames[name]++
 		}
 	}
 
 	names := []string{}
 
-	for key := range hostnames {
+	for key, value := range hostnames {
+		if value != len(c.nodes) {
+			continue
+		}
+
 		names = append(names, key)
 	}
 
@@ -1175,6 +1186,10 @@ func verifyClusterConfig(local, remote *config.Config) error {
 
 	if local.Cluster.Enable != remote.Cluster.Enable {
 		return fmt.Errorf("cluster.enable is different")
+	}
+
+	if local.Cluster.ID != remote.Cluster.ID {
+		return fmt.Errorf("cluster.id is different")
 	}
 
 	if local.Cluster.SyncInterval != remote.Cluster.SyncInterval {
@@ -1356,11 +1371,18 @@ type ClusterNodeCore struct {
 	Latency     time.Duration
 }
 
+type ClusterAboutLeader struct {
+	ID           string
+	Address      string
+	ElectedSince time.Duration
+}
+
 type ClusterAbout struct {
 	ID          string
-	Name        string
-	Leader      bool
-	Address     string
+	NodeID      string
+	Domains     []string
+	Leader      ClusterAboutLeader
+	Status      string
 	Raft        ClusterRaft
 	Nodes       []ClusterNode
 	Version     ClusterVersion
@@ -1373,14 +1395,21 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	about := ClusterAbout{
 		ID:          c.id,
+		NodeID:      c.nodeID,
+		Leader:      ClusterAboutLeader{},
+		Status:      "online",
+		Version:     Version,
 		Degraded:    degraded,
 		DegradedErr: degradedErr,
-		Version:     Version,
 	}
 
-	if address, err := c.ClusterAPIAddress(""); err == nil {
-		about.Address = address
+	if about.Degraded {
+		about.Status = "offline"
 	}
+
+	c.stateLock.RLock()
+	about.Domains = slices.Copy(c.hostnames)
+	c.stateLock.RUnlock()
 
 	stats := c.raft.Stats()
 
@@ -1400,6 +1429,12 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	for _, s := range servers {
 		serversMap[s.ID] = s
+
+		if s.Leader {
+			about.Leader.ID = s.ID
+			about.Leader.Address = s.Address
+			about.Leader.ElectedSince = s.LastChange
+		}
 	}
 
 	c.nodesLock.RLock()
@@ -1433,10 +1468,6 @@ func (c *cluster) About() (ClusterAbout, error) {
 				MemLimit:     nodeAbout.Resources.MemLimit,
 				Error:        nodeAbout.Resources.Error,
 			},
-		}
-
-		if id == c.id {
-			about.Name = nodeAbout.Name
 		}
 
 		if s, ok := serversMap[id]; ok {

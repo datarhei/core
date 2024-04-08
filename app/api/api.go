@@ -530,7 +530,8 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		cluster, err := cluster.New(cluster.Config{
-			ID:                     cfg.ID,
+			ID:                     cfg.Cluster.ID,
+			NodeID:                 cfg.ID,
 			Name:                   cfg.Name,
 			Path:                   filepath.Join(cfg.DB.Dir, "cluster"),
 			Address:                cfg.Cluster.Address,
