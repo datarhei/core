@@ -242,6 +242,8 @@ definitions:
             type: integer
           enable:
             type: boolean
+          id:
+            type: string
           node_recover_timeout_sec:
             description: seconds
             format: int64
@@ -880,24 +882,6 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: The cluster version
-      tags:
-      - v1.0.0
-  /v1/about:
-    get:
-      description: Cluster info
-      operationId: cluster-1-about
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/cluster.Error'
-      summary: Cluster info
       tags:
       - v1.0.0
   /v1/barrier/{name}:

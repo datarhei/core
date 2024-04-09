@@ -406,30 +406,6 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "minimal size of files",
-                        "name": "size_min",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "maximal size of files",
-                        "name": "size_max",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "minimal last modification time",
-                        "name": "lastmod_start",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "maximal last modification time",
-                        "name": "lastmod_end",
-                        "in": "query"
-                    },
-                    {
                         "type": "string",
                         "description": "none, name, size, lastmod",
                         "name": "sort",
@@ -1009,14 +985,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "List the files of a proxy node by its ID",
+                "description": "List the resources of a proxy node by its ID",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "List the files of a proxy node by its ID",
+                "summary": "List the resources of a proxy node by its ID",
                 "operationId": "cluster-3-get-node-files",
                 "parameters": [
                     {
@@ -1032,6 +1008,259 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.ClusterNodeFiles"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/fs/{storage}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all files on a filesystem on a node. The listing can be ordered by name, size, or date of last modification in ascending or descending order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List all files on a filesystem on a node",
+                "operationId": "cluster-3-node-fs-list-files",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "glob pattern for file names",
+                        "name": "glob",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "none, name, size, lastmod",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "asc, desc",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.FileInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/fs/{storage}/{filepath}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Fetch a file from a filesystem on a node",
+                "produces": [
+                    "application/data",
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Fetch a file from a filesystem on a node",
+                "operationId": "cluster-3-node-fs-get-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Path to file",
+                        "name": "filepath",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "301": {
+                        "description": "Moved Permanently",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Writes or overwrites a file on a filesystem on a node",
+                "consumes": [
+                    "application/data"
+                ],
+                "produces": [
+                    "text/plain",
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Add a file to a filesystem on a node",
+                "operationId": "cluster-3-node-fs-put-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Path to file",
+                        "name": "filepath",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "File data",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Remove a file from a filesystem on a node",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Remove a file from a filesystem on a node",
+                "operationId": "cluster-3-node-fs-delete-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Path to file",
+                        "name": "filepath",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "404": {
@@ -2338,8 +2567,8 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
-                    "507": {
-                        "description": "Insufficient Storage",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -4646,9 +4875,6 @@ const docTemplate = `{
         "api.ClusterAbout": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
                 "degraded": {
                     "type": "boolean"
                 },
@@ -4659,9 +4885,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "leader": {
-                    "type": "boolean"
+                    "$ref": "#/definitions/api.ClusterAboutLeader"
                 },
-                "name": {
+                "node_id": {
                     "type": "string"
                 },
                 "nodes": {
@@ -4670,10 +4896,33 @@ const docTemplate = `{
                         "$ref": "#/definitions/api.ClusterNode"
                     }
                 },
+                "public_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "raft": {
                     "$ref": "#/definitions/api.ClusterRaft"
                 },
+                "status": {
+                    "type": "string"
+                },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterAboutLeader": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "elected_seconds": {
+                    "type": "integer"
+                },
+                "id": {
                     "type": "string"
                 }
             }
@@ -4772,6 +5021,9 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "version": {
                     "type": "string"
                 }
             }
@@ -4985,6 +5237,9 @@ const docTemplate = `{
                         },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "id": {
+                            "type": "string"
                         },
                         "node_recover_timeout_sec": {
                             "description": "seconds",
@@ -5523,6 +5778,9 @@ const docTemplate = `{
         "api.Event": {
             "type": "object",
             "properties": {
+                "caller": {
+                    "type": "string"
+                },
                 "data": {
                     "type": "object",
                     "additionalProperties": {
@@ -5547,6 +5805,9 @@ const docTemplate = `{
         "api.EventFilter": {
             "type": "object",
             "properties": {
+                "caller": {
+                    "type": "string"
+                },
                 "data": {
                     "type": "object",
                     "additionalProperties": {
@@ -5665,6 +5926,9 @@ const docTemplate = `{
                 "dst_name": {
                     "type": "string"
                 },
+                "filter": {
+                    "type": "string"
+                },
                 "format": {
                     "type": "string"
                 },
@@ -5680,18 +5944,15 @@ const docTemplate = `{
                 "layout": {
                     "type": "string"
                 },
+                "name": {
+                    "type": "string"
+                },
                 "outpad": {
                     "type": "string"
                 },
                 "sampling": {
                     "description": "Hz",
                     "type": "integer"
-                },
-                "src_filter": {
-                    "type": "string"
-                },
-                "src_name": {
-                    "type": "string"
                 },
                 "timebase": {
                     "type": "string"
@@ -7347,6 +7608,9 @@ const docTemplate = `{
                         },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "id": {
+                            "type": "string"
                         },
                         "node_recover_timeout_sec": {
                             "description": "seconds",

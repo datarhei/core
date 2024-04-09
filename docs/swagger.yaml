@@ -70,8 +70,6 @@ definitions:
     type: object
   api.ClusterAbout:
     properties:
-      address:
-        type: string
       degraded:
         type: boolean
       degraded_error:
@@ -79,16 +77,31 @@ definitions:
       id:
         type: string
       leader:
-        type: boolean
-      name:
+        $ref: '#/definitions/api.ClusterAboutLeader'
+      node_id:
         type: string
       nodes:
         items:
           $ref: '#/definitions/api.ClusterNode'
         type: array
+      public_domains:
+        items:
+          type: string
+        type: array
       raft:
         $ref: '#/definitions/api.ClusterRaft'
+      status:
+        type: string
       version:
+        type: string
+    type: object
+  api.ClusterAboutLeader:
+    properties:
+      address:
+        type: string
+      elected_seconds:
+        type: integer
+      id:
         type: string
     type: object
   api.ClusterKVS:
@@ -154,6 +167,8 @@ definitions:
         description: milliseconds
         type: number
       status:
+        type: string
+      version:
         type: string
     type: object
   api.ClusterNodeFiles:
@@ -296,6 +311,8 @@ definitions:
             type: integer
           enable:
             type: boolean
+          id:
+            type: string
           node_recover_timeout_sec:
             description: seconds
             format: int64
@@ -659,6 +676,8 @@ definitions:
     type: object
   api.Event:
     properties:
+      caller:
+        type: string
       data:
         additionalProperties:
           type: string
@@ -675,6 +694,8 @@ definitions:
     type: object
   api.EventFilter:
     properties:
+      caller:
+        type: string
       data:
         additionalProperties:
           type: string
@@ -753,6 +774,8 @@ definitions:
         type: string
       dst_name:
         type: string
+      filter:
+        type: string
       format:
         type: string
       height:
@@ -763,15 +786,13 @@ definitions:
         type: string
       layout:
         type: string
+      name:
+        type: string
       outpad:
         type: string
       sampling:
         description: Hz
         type: integer
-      src_filter:
-        type: string
-      src_name:
-        type: string
       timebase:
         type: string
       type:
@@ -1958,6 +1979,8 @@ definitions:
             type: integer
           enable:
             type: boolean
+          id:
+            type: string
           node_recover_timeout_sec:
             description: seconds
             format: int64
@@ -2780,22 +2803,6 @@ paths:
         in: query
         name: glob
         type: string
-      - description: minimal size of files
-        in: query
-        name: size_min
-        type: integer
-      - description: maximal size of files
-        in: query
-        name: size_max
-        type: integer
-      - description: minimal last modification time
-        in: query
-        name: lastmod_start
-        type: integer
-      - description: maximal last modification time
-        in: query
-        name: lastmod_end
-        type: integer
       - description: none, name, size, lastmod
         in: query
         name: sort
@@ -3168,7 +3175,7 @@ paths:
       - v16.?.?
   /api/v3/cluster/node/{id}/files:
     get:
-      description: List the files of a proxy node by its ID
+      description: List the resources of a proxy node by its ID
       operationId: cluster-3-get-node-files
       parameters:
       - description: Node ID
@@ -3189,7 +3196,175 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: List the files of a proxy node by its ID
+      summary: List the resources of a proxy node by its ID
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/fs/{storage}:
+    get:
+      description: List all files on a filesystem on a node. The listing can be ordered
+        by name, size, or date of last modification in ascending or descending order.
+      operationId: cluster-3-node-fs-list-files
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: glob pattern for file names
+        in: query
+        name: glob
+        type: string
+      - description: none, name, size, lastmod
+        in: query
+        name: sort
+        type: string
+      - description: asc, desc
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.FileInfo'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: List all files on a filesystem on a node
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/fs/{storage}/{filepath}:
+    delete:
+      description: Remove a file from a filesystem on a node
+      operationId: cluster-3-node-fs-delete-file
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: Path to file
+        in: path
+        name: filepath
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Remove a file from a filesystem on a node
+      tags:
+      - v16.?.?
+    get:
+      description: Fetch a file from a filesystem on a node
+      operationId: cluster-3-node-fs-get-file
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: Path to file
+        in: path
+        name: filepath
+        required: true
+        type: string
+      produces:
+      - application/data
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "301":
+          description: Moved Permanently
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Fetch a file from a filesystem on a node
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/data
+      description: Writes or overwrites a file on a filesystem on a node
+      operationId: cluster-3-node-fs-put-file
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: Path to file
+        in: path
+        name: filepath
+        required: true
+        type: string
+      - description: File data
+        in: body
+        name: data
+        required: true
+        schema:
+          items:
+            type: integer
+          type: array
+      produces:
+      - text/plain
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a file to a filesystem on a node
       tags:
       - v16.?.?
   /api/v3/cluster/node/{id}/process:
@@ -4081,8 +4256,8 @@ paths:
           description: No Content
           schema:
             type: string
-        "507":
-          description: Insufficient Storage
+        "400":
+          description: Bad Request
           schema:
             $ref: '#/definitions/api.Error'
       security:

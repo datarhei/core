@@ -51,33 +51,6 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
-        "/v1/about": {
-            "get": {
-                "description": "Cluster info",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v1.0.0"
-                ],
-                "summary": "Cluster info",
-                "operationId": "cluster-1-about",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/cluster.Error"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/barrier/{name}": {
             "get": {
                 "description": "Has the barrier already has been passed",
@@ -1492,6 +1465,9 @@ const docTemplateClusterAPI = `{
                         },
                         "enable": {
                             "type": "boolean"
+                        },
+                        "id": {
+                            "type": "string"
                         },
                         "node_recover_timeout_sec": {
                             "description": "seconds",

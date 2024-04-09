@@ -96,7 +96,6 @@ func NewAPI(config APIConfig) (API, error) {
 	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
 	a.router.GET("/", a.Version)
-	a.router.GET("/v1/about", a.About)
 
 	a.router.GET("/v1/barrier/:name", a.Barrier)
 
@@ -153,24 +152,6 @@ func (a *api) Shutdown(ctx context.Context) error {
 // @Router / [get]
 func (a *api) Version(c echo.Context) error {
 	return c.JSON(http.StatusOK, Version.String())
-}
-
-// About returns info about the cluster
-// @Summary Cluster info
-// @Description Cluster info
-// @Tags v1.0.0
-// @ID cluster-1-about
-// @Produce json
-// @Success 200 {string} string
-// @Success 500 {object} Error
-// @Router /v1/about [get]
-func (a *api) About(c echo.Context) error {
-	about, err := a.cluster.About()
-	if err != nil {
-		return Err(http.StatusInternalServerError, "", "%s", err.Error())
-	}
-
-	return c.JSON(http.StatusOK, about)
 }
 
 // Barrier returns if the barrier already has been passed
