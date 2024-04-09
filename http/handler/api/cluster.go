@@ -108,6 +108,7 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 			Status:      node.Core.Status,
 			LastContact: node.Core.LastContact.Seconds() * 1000,
 			Latency:     node.Core.Latency.Seconds() * 1000,
+			Version:     node.Core.Version,
 		},
 		Resources: api.ClusterNodeResources{
 			IsThrottling: node.Resources.IsThrottling,

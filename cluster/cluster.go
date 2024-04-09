@@ -1369,6 +1369,7 @@ type ClusterNodeCore struct {
 	Error       error
 	LastContact time.Duration
 	Latency     time.Duration
+	Version     string
 }
 
 type ClusterAboutLeader struct {
@@ -1458,6 +1459,7 @@ func (c *cluster) About() (ClusterAbout, error) {
 				Error:       nodeAbout.Core.Error,
 				LastContact: nodeAbout.Core.LastContact,
 				Latency:     nodeAbout.Core.Latency,
+				Version:     nodeAbout.Core.Version,
 			},
 			Resources: ClusterNodeResources{
 				IsThrottling: nodeAbout.Resources.IsThrottling,

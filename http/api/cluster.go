@@ -27,6 +27,7 @@ type ClusterNodeCore struct {
 	Error       string  `json:"error"`
 	LastContact float64 `json:"last_contact_ms"` // milliseconds
 	Latency     float64 `json:"latency_ms"`      // milliseconds
+	Version     string  `json:"version"`
 }
 
 type ClusterNodeResources struct {
