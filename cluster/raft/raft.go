@@ -146,6 +146,8 @@ func (r *raft) Shutdown() {
 		return
 	}
 
+	r.logger.Info().Log("Stopping ...")
+
 	r.shutdown = true
 	close(r.shutdownCh)
 
@@ -154,6 +156,8 @@ func (r *raft) Shutdown() {
 		future := r.raft.Shutdown()
 		if err := future.Error(); err != nil {
 			r.logger.Warn().WithError(err).Log("Shutting down raft")
+		} else {
+			r.logger.Info().Log("Server exited")
 		}
 		if r.raftStore != nil {
 			r.raftStore.Close()
@@ -454,7 +458,7 @@ func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
 			return fmt.Errorf("bootstrapping cluster: %w", err)
 		}
 
-		r.logger.Debug().Log("Raft node bootstrapped")
+		r.logger.Info().Log("Raft node bootstrapped")
 	} else {
 		// Recover cluster
 		fsm, err := store.NewStore(store.Config{})
@@ -486,7 +490,7 @@ func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
 			return fmt.Errorf("recovering cluster: %w", err)
 		}
 
-		r.logger.Debug().Log("Raft node recoverd")
+		r.logger.Info().Log("Raft node recoverd")
 	}
 
 	// Set up a channel for reliable leader notifications.
@@ -504,7 +508,7 @@ func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
 	go r.trackLeaderChanges()
 	go r.monitorLeadership()
 
-	r.logger.Debug().Log("Raft started")
+	r.logger.Info().Log("Raft started")
 
 	return nil
 }
@@ -524,7 +528,7 @@ func (r *raft) monitorLeadership() {
 				}
 			}
 
-			r.logger.Debug().WithField("leader", isLeader).Log("leader notification")
+			r.logger.Info().WithField("leader", isLeader).Log("Leader notification")
 		case <-r.shutdownCh:
 			return
 		}
@@ -544,7 +548,7 @@ func (r *raft) trackLeaderChanges() {
 		select {
 		case obs := <-obsCh:
 			if leaderObs, ok := obs.Data.(hcraft.LeaderObservation); ok {
-				r.logger.Debug().WithFields(log.Fields{
+				r.logger.Info().WithFields(log.Fields{
 					"id":      leaderObs.LeaderID,
 					"address": leaderObs.LeaderAddr,
 				}).Log("New leader observation")

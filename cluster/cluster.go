@@ -348,7 +348,7 @@ func New(config Config) (Cluster, error) {
 		Store:               store,
 		LeadershipNotifyCh:  c.raftNotifyCh,
 		LeaderObservationCh: c.raftLeaderObservationCh,
-		Logger:              c.logger.WithComponent("Raft"),
+		Logger:              c.logger.WithComponent("Raft").WithField("address", config.Address),
 	})
 	if err != nil {
 		c.Shutdown()
