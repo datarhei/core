@@ -58,7 +58,6 @@ func (h *ClusterHandler) About(c echo.Context) error {
 
 	about := api.ClusterAbout{
 		ID:      state.ID,
-		NodeID:  state.NodeID,
 		Domains: state.Domains,
 		Leader: api.ClusterAboutLeader{
 			ID:           state.Leader.ID,

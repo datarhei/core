@@ -1380,7 +1380,6 @@ type ClusterAboutLeader struct {
 
 type ClusterAbout struct {
 	ID          string
-	NodeID      string
 	Domains     []string
 	Leader      ClusterAboutLeader
 	Status      string
@@ -1396,7 +1395,6 @@ func (c *cluster) About() (ClusterAbout, error) {
 
 	about := ClusterAbout{
 		ID:          c.id,
-		NodeID:      c.nodeID,
 		Leader:      ClusterAboutLeader{},
 		Status:      "online",
 		Version:     Version,

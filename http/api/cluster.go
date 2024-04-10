@@ -57,7 +57,6 @@ type ClusterAboutLeader struct {
 
 type ClusterAbout struct {
 	ID          string             `json:"id"`
-	NodeID      string             `json:"node_id"`
 	Domains     []string           `json:"public_domains"`
 	Leader      ClusterAboutLeader `json:"leader"`
 	Status      string             `json:"status"`
