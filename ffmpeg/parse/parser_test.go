@@ -184,15 +184,16 @@ func TestParserLogHistory(t *testing.T) {
 
 		d, _ := time.ParseDuration("3m58s440ms")
 		require.Equal(t, Progress{
-			Frame:     5968,
-			FPS:       0, // is calculated with averager
-			Quantizer: 19.4,
-			Size:      453632,
-			Time:      d.Seconds(),
-			Bitrate:   0, // is calculated with averager
-			Speed:     0.999,
-			Drop:      3522,
-			Dup:       87463,
+			Initialized: true,
+			Frame:       5968,
+			FPS:         0, // is calculated with averager
+			Quantizer:   19.4,
+			Size:        453632,
+			Time:        d.Seconds(),
+			Bitrate:     0, // is calculated with averager
+			Speed:       0.999,
+			Drop:        3522,
+			Dup:         87463,
 		}, history[i].Progress)
 
 		if i != 0 {
@@ -250,15 +251,16 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 
 		d, _ := time.ParseDuration("3m58s440ms")
 		require.Equal(t, Progress{
-			Frame:     5968,
-			FPS:       0, // is calculated with averager
-			Quantizer: 19.4,
-			Size:      453632,
-			Time:      d.Seconds(),
-			Bitrate:   0, // is calculated with averager
-			Speed:     0.999,
-			Drop:      3522,
-			Dup:       87463,
+			Initialized: true,
+			Frame:       5968,
+			FPS:         0, // is calculated with averager
+			Quantizer:   19.4,
+			Size:        453632,
+			Time:        d.Seconds(),
+			Bitrate:     0, // is calculated with averager
+			Speed:       0.999,
+			Drop:        3522,
+			Dup:         87463,
 		}, history[i].Progress)
 	}
 
@@ -267,15 +269,16 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 
 		d, _ := time.ParseDuration("3m58s440ms")
 		require.Equal(t, Progress{
-			Frame:     5968,
-			FPS:       0, // is calculated with averager
-			Quantizer: 19.4,
-			Size:      453632,
-			Time:      d.Seconds(),
-			Bitrate:   0, // is calculated with averager
-			Speed:     0.999,
-			Drop:      3522,
-			Dup:       87463,
+			Initialized: true,
+			Frame:       5968,
+			FPS:         0, // is calculated with averager
+			Quantizer:   19.4,
+			Size:        453632,
+			Time:        d.Seconds(),
+			Bitrate:     0, // is calculated with averager
+			Speed:       0.999,
+			Drop:        3522,
+			Dup:         87463,
 		}, history[i].Progress)
 	}
 }
@@ -810,6 +813,7 @@ func TestParserProgressPlayout(t *testing.T) {
 	progress := parser.Progress()
 
 	require.Equal(t, Progress{
+		Initialized: true,
 		Input: []ProgressIO{
 			{
 				Address:   "playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
