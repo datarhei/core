@@ -655,6 +655,8 @@ func (p *parser) Progress() Progress {
 		progress.Input[i].AVstream = av.export()
 	}
 
+	progress.Initialized = p.stats.initialized
+
 	return progress
 }
 

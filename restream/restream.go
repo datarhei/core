@@ -1624,6 +1624,7 @@ func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 
 // convertProgressFromParser converts a ffmpeg/parse.Progress type into a restream/app.Progress type.
 func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress) {
+	progress.Initialized = pprogress.Initialized
 	progress.Frame = pprogress.Frame
 	progress.Packet = pprogress.Packet
 	progress.FPS = pprogress.FPS

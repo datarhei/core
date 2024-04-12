@@ -4887,9 +4887,6 @@ const docTemplate = `{
                 "leader": {
                     "$ref": "#/definitions/api.ClusterAboutLeader"
                 },
-                "node_id": {
-                    "type": "string"
-                },
                 "nodes": {
                     "type": "array",
                     "items": {
@@ -6833,6 +6830,9 @@ const docTemplate = `{
                 "frame": {
                     "type": "integer",
                     "format": "uint64"
+                },
+                "initialized": {
+                    "type": "boolean"
                 },
                 "inputs": {
                     "type": "array",

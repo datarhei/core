@@ -78,8 +78,6 @@ definitions:
         type: string
       leader:
         $ref: '#/definitions/api.ClusterAboutLeader'
-      node_id:
-        type: string
       nodes:
         items:
           $ref: '#/definitions/api.ClusterNode'
@@ -1389,6 +1387,8 @@ definitions:
       frame:
         format: uint64
         type: integer
+      initialized:
+        type: boolean
       inputs:
         items:
           $ref: '#/definitions/api.ProgressIO'

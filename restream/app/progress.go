@@ -41,20 +41,21 @@ type ProgressIO struct {
 }
 
 type Progress struct {
-	Input     []ProgressIO
-	Output    []ProgressIO
-	Mapping   StreamMapping
-	Frame     uint64  // counter
-	Packet    uint64  // counter
-	FPS       float64 // rate, frames per second
-	PPS       float64 // rate, packets per second
-	Quantizer float64 // gauge
-	Size      uint64  // bytes
-	Time      float64 // seconds with fractions
-	Bitrate   float64 // bit/s
-	Speed     float64 // gauge
-	Drop      uint64  // counter
-	Dup       uint64  // counter
+	Initialized bool
+	Input       []ProgressIO
+	Output      []ProgressIO
+	Mapping     StreamMapping
+	Frame       uint64  // counter
+	Packet      uint64  // counter
+	FPS         float64 // rate, frames per second
+	PPS         float64 // rate, packets per second
+	Quantizer   float64 // gauge
+	Size        uint64  // bytes
+	Time        float64 // seconds with fractions
+	Bitrate     float64 // bit/s
+	Speed       float64 // gauge
+	Drop        uint64  // counter
+	Dup         uint64  // counter
 }
 
 type GraphElement struct {

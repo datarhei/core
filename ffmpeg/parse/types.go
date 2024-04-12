@@ -450,20 +450,21 @@ type ProgressIO struct {
 }
 
 type Progress struct {
-	Input     []ProgressIO
-	Output    []ProgressIO
-	Mapping   StreamMapping
-	Frame     uint64
-	Packet    uint64
-	FPS       float64
-	PPS       float64
-	Quantizer float64
-	Size      uint64 // bytes
-	Time      float64
-	Bitrate   float64 // bit/s
-	Speed     float64
-	Drop      uint64
-	Dup       uint64
+	Initialized bool
+	Input       []ProgressIO
+	Output      []ProgressIO
+	Mapping     StreamMapping
+	Frame       uint64
+	Packet      uint64
+	FPS         float64
+	PPS         float64
+	Quantizer   float64
+	Size        uint64 // bytes
+	Time        float64
+	Bitrate     float64 // bit/s
+	Speed       float64
+	Drop        uint64
+	Dup         uint64
 }
 
 type AVstreamIO struct {
