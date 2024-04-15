@@ -1387,8 +1387,6 @@ definitions:
       frame:
         format: uint64
         type: integer
-      initialized:
-        type: boolean
       inputs:
         items:
           $ref: '#/definitions/api.ProgressIO'
@@ -1410,6 +1408,8 @@ definitions:
         type: integer
       speed:
         type: number
+      started:
+        type: boolean
       time:
         type: number
     type: object

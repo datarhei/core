@@ -91,20 +91,20 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 
 // Progress represents the progress of an ffmpeg process
 type Progress struct {
-	Initialized bool          `json:"initialized"`
-	Input       []ProgressIO  `json:"inputs"`
-	Output      []ProgressIO  `json:"outputs"`
-	Mapping     StreamMapping `json:"mapping"`
-	Frame       uint64        `json:"frame" format:"uint64"`
-	Packet      uint64        `json:"packet" format:"uint64"`
-	FPS         json.Number   `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Quantizer   json.Number   `json:"q" swaggertype:"number" jsonschema:"type=number"`
-	Size        uint64        `json:"size_kb" format:"uint64"` // kbytes
-	Time        json.Number   `json:"time" swaggertype:"number" jsonschema:"type=number"`
-	Bitrate     json.Number   `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	Speed       json.Number   `json:"speed" swaggertype:"number" jsonschema:"type=number"`
-	Drop        uint64        `json:"drop" format:"uint64"`
-	Dup         uint64        `json:"dup" format:"uint64"`
+	Started   bool          `json:"started"`
+	Input     []ProgressIO  `json:"inputs"`
+	Output    []ProgressIO  `json:"outputs"`
+	Mapping   StreamMapping `json:"mapping"`
+	Frame     uint64        `json:"frame" format:"uint64"`
+	Packet    uint64        `json:"packet" format:"uint64"`
+	FPS       json.Number   `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	Quantizer json.Number   `json:"q" swaggertype:"number" jsonschema:"type=number"`
+	Size      uint64        `json:"size_kb" format:"uint64"` // kbytes
+	Time      json.Number   `json:"time" swaggertype:"number" jsonschema:"type=number"`
+	Bitrate   json.Number   `json:"bitrate_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	Speed     json.Number   `json:"speed" swaggertype:"number" jsonschema:"type=number"`
+	Drop      uint64        `json:"drop" format:"uint64"`
+	Dup       uint64        `json:"dup" format:"uint64"`
 }
 
 // Unmarshal converts a restreamer Progress to a Progress in API representation
@@ -116,7 +116,7 @@ func (progress *Progress) Unmarshal(p *app.Progress) {
 		return
 	}
 
-	progress.Initialized = p.Initialized
+	progress.Started = p.Started
 	progress.Input = make([]ProgressIO, len(p.Input))
 	progress.Output = make([]ProgressIO, len(p.Output))
 	progress.Frame = p.Frame

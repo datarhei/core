@@ -6831,9 +6831,6 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
-                "initialized": {
-                    "type": "boolean"
-                },
                 "inputs": {
                     "type": "array",
                     "items": {
@@ -6863,6 +6860,9 @@ const docTemplate = `{
                 },
                 "speed": {
                     "type": "number"
+                },
+                "started": {
+                    "type": "boolean"
                 },
                 "time": {
                     "type": "number"
