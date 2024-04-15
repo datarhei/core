@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/gosrt/internal/crypto"
-	srtnet "github.com/datarhei/gosrt/internal/net"
-	"github.com/datarhei/gosrt/internal/packet"
+	"github.com/datarhei/gosrt/crypto"
+	srtnet "github.com/datarhei/gosrt/net"
+	"github.com/datarhei/gosrt/packet"
 )
 
 // ConnType represents the kind of connection as returned

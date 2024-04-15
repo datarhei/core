@@ -11,10 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/gosrt/internal/circular"
-	"github.com/datarhei/gosrt/internal/congestion"
-	"github.com/datarhei/gosrt/internal/crypto"
-	"github.com/datarhei/gosrt/internal/packet"
+	"github.com/datarhei/gosrt/circular"
+	"github.com/datarhei/gosrt/congestion"
+	"github.com/datarhei/gosrt/congestion/live"
+	"github.com/datarhei/gosrt/crypto"
+	"github.com/datarhei/gosrt/packet"
 )
 
 // Conn is a SRT network connection.
@@ -24,10 +25,19 @@ type Conn interface {
 	// time limit; see SetDeadline and SetReadDeadline.
 	Read(p []byte) (int, error)
 
+	// ReadPacket reads a packet from the queue of received packets. It blocks
+	// if the queue is empty. Only data packets are returned. Using ReadPacket
+	// and Read at the same time may lead to data loss.
+	ReadPacket() (packet.Packet, error)
+
 	// Write writes data to the connection.
 	// Write can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetWriteDeadline.
 	Write(p []byte) (int, error)
+
+	// WritePacket writes a packet to the write queue. Packets on the write queue
+	// will be sent to the peer of the connection. Only data packets will be sent.
+	WritePacket(p packet.Packet) error
 
 	// Close closes the connection.
 	// Any blocked Read or Write operations will be unblocked and return errors.
@@ -252,7 +262,7 @@ func newSRTConn(config srtConnConfig) *srtConn {
 
 	// 4.8.1.  Packet Acknowledgement (ACKs, ACKACKs) -> periodicACK = 10 milliseconds
 	// 4.8.2.  Packet Retransmission (NAKs) -> periodicNAK at least 20 milliseconds
-	c.recv = congestion.NewLiveReceive(congestion.ReceiveConfig{
+	c.recv = live.NewReceiver(live.ReceiveConfig{
 		InitialSequenceNumber: c.initialPacketSequenceNumber,
 		PeriodicACKInterval:   10_000,
 		PeriodicNAKInterval:   20_000,
@@ -269,7 +279,7 @@ func newSRTConn(config srtConnConfig) *srtConn {
 	}
 	c.dropThreshold += 20_000
 
-	c.snd = congestion.NewLiveSend(congestion.SendConfig{
+	c.snd = live.NewSender(live.SendConfig{
 		InitialSequenceNumber: c.initialPacketSequenceNumber,
 		DropThreshold:         c.dropThreshold,
 		MaxBW:                 c.config.MaxBW,
@@ -366,9 +376,7 @@ func (c *srtConn) ticker(ctx context.Context) {
 	}
 }
 
-// readPacket reads a packet from the queue of received packets. It blocks
-// if the queue is empty. Only data packets are returned.
-func (c *srtConn) readPacket() (packet.Packet, error) {
+func (c *srtConn) ReadPacket() (packet.Packet, error) {
 	var p packet.Packet
 	select {
 	case <-c.ctx.Done():
@@ -399,7 +407,7 @@ func (c *srtConn) Read(b []byte) (int, error) {
 
 	c.readBuffer.Reset()
 
-	p, err := c.readPacket()
+	p, err := c.ReadPacket()
 	if err != nil {
 		return 0, err
 	}
@@ -412,9 +420,9 @@ func (c *srtConn) Read(b []byte) (int, error) {
 	return c.readBuffer.Read(b)
 }
 
-// writePacket writes a packet to the write queue. Packets on the write queue
+// WritePacket writes a packet to the write queue. Packets on the write queue
 // will be sent to the peer of the connection. Only data packets will be sent.
-func (c *srtConn) writePacket(p packet.Packet) error {
+func (c *srtConn) WritePacket(p packet.Packet) error {
 	if p.Header().IsControlPacket {
 		// Ignore control packets
 		return nil
