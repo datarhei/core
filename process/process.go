@@ -454,6 +454,10 @@ func (p *process) Status() Status {
 	states := p.state.states
 	p.state.lock.Unlock()
 
+	if state == stateRunning && !p.parser.IsRunning() {
+		state = stateStarting
+	}
+
 	order := p.getOrder()
 
 	s := Status{

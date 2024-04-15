@@ -26,8 +26,11 @@ type Parser interface {
 	// before the process starts.
 	ResetLog()
 
-	// Log returns a slice of collected log lines
+	// Log returns a slice of collected log lines.
 	Log() []Line
+
+	// IsRunning returns whether the process is producing output.
+	IsRunning() bool
 }
 
 // Line represents a line from the output with its timestamp. The
@@ -52,6 +55,7 @@ func (p *nullParser) Stop(string, Usage)  {}
 func (p *nullParser) ResetStats()         {}
 func (p *nullParser) ResetLog()           {}
 func (p *nullParser) Log() []Line         { return []Line{} }
+func (p *nullParser) IsRunning() bool     { return true }
 
 type bufferParser struct {
 	log []Line
@@ -77,4 +81,5 @@ func (p *bufferParser) ResetStats()        {}
 func (p *bufferParser) ResetLog() {
 	p.log = []Line{}
 }
-func (p *bufferParser) Log() []Line { return p.log }
+func (p *bufferParser) Log() []Line     { return p.log }
+func (p *bufferParser) IsRunning() bool { return true }

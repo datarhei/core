@@ -660,6 +660,13 @@ func (p *parser) Progress() Progress {
 	return progress
 }
 
+func (p *parser) IsRunning() bool {
+	p.lock.progress.RLock()
+	defer p.lock.progress.RUnlock()
+
+	return p.stats.initialized
+}
+
 func (p *parser) Prelude() []string {
 	p.lock.prelude.RLock()
 	if p.prelude.data == nil {

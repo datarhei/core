@@ -141,3 +141,7 @@ func (p *prober) ResetLog() {
 	p.data = []process.Line{}
 	p.inputs = []probeIO{}
 }
+
+func (p *prober) IsRunning() bool {
+	return true
+}
