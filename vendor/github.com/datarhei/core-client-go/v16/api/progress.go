@@ -45,6 +45,7 @@ type ProgressIO struct {
 
 // Progress represents the progress of an ffmpeg process
 type Progress struct {
+	Started   bool          `json:"started"`
 	Input     []ProgressIO  `json:"inputs"`
 	Output    []ProgressIO  `json:"outputs"`
 	Mapping   StreamMapping `json:"mapping"`

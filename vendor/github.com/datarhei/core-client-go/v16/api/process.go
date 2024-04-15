@@ -21,7 +21,7 @@ type ProcessConfigIO struct {
 	ID      string                   `json:"id"`
 	Address string                   `json:"address" validate:"required" jsonschema:"minLength=1"`
 	Options []string                 `json:"options"`
-	Cleanup []ProcessConfigIOCleanup `json:"cleanup,omitempty"`
+	Cleanup []ProcessConfigIOCleanup `json:"cleanup"`
 }
 
 type ProcessConfigIOCleanup struct {

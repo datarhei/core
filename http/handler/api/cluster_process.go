@@ -324,7 +324,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 	})
 
 	if len(procs) == 0 {
-		// Check the store in the store for an undeployed process
+		// Check the store in the cluster for an undeployed process
 		p, err := h.cluster.GetProcess(app.NewProcessID(id, domain))
 		if err != nil {
 			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)

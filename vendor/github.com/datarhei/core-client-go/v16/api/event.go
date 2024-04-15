@@ -5,6 +5,7 @@ type Event struct {
 	Level     int    `json:"level"`
 	Component string `json:"event"`
 	Message   string `json:"message"`
+	Caller    string `json:"caller"`
 
 	Data map[string]string `json:"data"`
 }

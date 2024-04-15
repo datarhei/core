@@ -27,6 +27,7 @@ type ClusterNodeCore struct {
 	Error       string  `json:"error"`
 	LastContact float64 `json:"last_contact_ms"` // milliseconds
 	Latency     float64 `json:"latency_ms"`      // milliseconds
+	Version     string  `json:"version"`
 }
 
 type ClusterNodeResources struct {
@@ -48,16 +49,34 @@ type ClusterRaft struct {
 	LogIndex    uint64  `json:"log_index"`
 }
 
+type ClusterAboutLeader struct {
+	ID           string `json:"id"`
+	Address      string `json:"address"`
+	ElectedSince uint64 `json:"elected_seconds"`
+}
+
 type ClusterAbout struct {
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	Leader      bool          `json:"leader"`
-	Address     string        `json:"address"`
 	Raft        ClusterRaft   `json:"raft"`
 	Nodes       []ClusterNode `json:"nodes"`
 	Version     string        `json:"version"`
 	Degraded    bool          `json:"degraded"`
 	DegradedErr string        `json:"degraded_error"`
+}
+
+type ClusterAboutV1 struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Leader  bool   `json:"leader"`
+	Address string `json:"address"`
+	ClusterAbout
+}
+
+type ClusterAboutV2 struct {
+	ID      string             `json:"id"`
+	Domains []string           `json:"public_domains"`
+	Leader  ClusterAboutLeader `json:"leader"`
+	Status  string             `json:"status"`
+	ClusterAbout
 }
 
 type ClusterNodeFiles struct {

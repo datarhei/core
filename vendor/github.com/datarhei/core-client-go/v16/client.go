@@ -65,12 +65,12 @@ type RestClient interface {
 	MemFSDeleteFile(path string) error                    // DELETE /v3/fs/mem/{path}
 	MemFSAddFile(path string, data io.Reader) error       // PUT /v3/fs/mem/{path}
 
-	FilesystemList(name, pattern, sort, order string) ([]api.FileInfo, error)       // GET /v3/fs/{name}
-	FilesystemHasFile(name, path string) bool                                       // HEAD /v3/fs/{name}/{path}
-	FilesystemGetFile(name, path string) (io.ReadCloser, error)                     // GET /v3/fs/{name}/{path}
-	FilesystemGetFileOffset(name, path string, offset int64) (io.ReadCloser, error) // GET /v3/fs/{name}/{path}
-	FilesystemDeleteFile(name, path string) error                                   // DELETE /v3/fs/{name}/{path}
-	FilesystemAddFile(name, path string, data io.Reader) error                      // PUT /v3/fs/{name}/{path}
+	FilesystemList(storage, pattern, sort, order string) ([]api.FileInfo, error)       // GET /v3/fs/{storage}
+	FilesystemHasFile(storage, path string) bool                                       // HEAD /v3/fs/{storage}/{path}
+	FilesystemGetFile(storage, path string) (io.ReadCloser, error)                     // GET /v3/fs/{storage}/{path}
+	FilesystemGetFileOffset(storage, path string, offset int64) (io.ReadCloser, error) // GET /v3/fs/{storage}/{path}
+	FilesystemDeleteFile(storage, path string) error                                   // DELETE /v3/fs/{storage}/{path}
+	FilesystemAddFile(storage, path string, data io.Reader) error                      // PUT /v3/fs/{storage}/{path}
 
 	Log() ([]api.LogEvent, error)                                                   // GET /v3/log
 	Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) // POST /v3/events
@@ -95,6 +95,8 @@ type RestClient interface {
 	ProcessMetadata(id ProcessID, key string) (api.Metadata, error)           // GET /v3/process/{id}/metadata/{key}
 	ProcessMetadataSet(id ProcessID, key string, metadata api.Metadata) error // PUT /v3/process/{id}/metadata/{key}
 
+	PlayoutStatus(id ProcessID, inputID string) (api.PlayoutStatus, error) // GET /v3/process/{id}/playout/{inputid}/status
+
 	IdentitiesList() ([]api.IAMUser, error)                   // GET /v3/iam/user
 	Identity(name string) (api.IAMUser, error)                // GET /v3/iam/user/{name}
 	IdentityAdd(u api.IAMUser) error                          // POST /v3/iam/user
@@ -102,17 +104,21 @@ type RestClient interface {
 	IdentitySetPolicies(name string, p []api.IAMPolicy) error // PUT /v3/iam/user/{name}/policy
 	IdentityDelete(name string) error                         // DELETE /v3/iam/user/{name}
 
-	Cluster() (api.ClusterAbout, error)        // GET /v3/cluster
-	ClusterHealthy() (bool, error)             // GET /v3/cluster/healthy
-	ClusterSnapshot() (io.ReadCloser, error)   // GET /v3/cluster/snapshot
-	ClusterLeave() error                       // PUT /v3/cluster/leave
-	ClusterTransferLeadership(id string) error // PUT /v3/cluster/transfer/{id}
+	Cluster() (*api.ClusterAboutV1, *api.ClusterAboutV2, error) // GET /v3/cluster
+	ClusterHealthy() (bool, error)                              // GET /v3/cluster/healthy
+	ClusterSnapshot() (io.ReadCloser, error)                    // GET /v3/cluster/snapshot
+	ClusterLeave() error                                        // PUT /v3/cluster/leave
+	ClusterTransferLeadership(id string) error                  // PUT /v3/cluster/transfer/{id}
 
-	ClusterNodeList() ([]api.ClusterNode, error)                                      // GET /v3/cluster/node
-	ClusterNode(id string) (api.ClusterNode, error)                                   // GET /v3/cluster/node/{id}
-	ClusterNodeFiles(id string) (api.ClusterNodeFiles, error)                         // GET /v3/cluster/node/{id}/files
-	ClusterNodeProcessList(id string, opts ProcessListOptions) ([]api.Process, error) // GET /v3/cluster/node/{id}/process
-	ClusterNodeVersion(id string) (api.Version, error)                                // GET /v3/cluster/node/{id}/version
+	ClusterNodeList() ([]api.ClusterNode, error)                                                // GET /v3/cluster/node
+	ClusterNode(id string) (api.ClusterNode, error)                                             // GET /v3/cluster/node/{id}
+	ClusterNodeFiles(id string) (api.ClusterNodeFiles, error)                                   // GET /v3/cluster/node/{id}/files
+	ClusterNodeProcessList(id string, opts ProcessListOptions) ([]api.Process, error)           // GET /v3/cluster/node/{id}/process
+	ClusterNodeVersion(id string) (api.Version, error)                                          // GET /v3/cluster/node/{id}/version
+	ClusterNodeFilesystemList(id, storage, pattern, sort, order string) ([]api.FileInfo, error) // GET /v3/cluster/node/{id}/fs/{storage}
+	ClusterNodeFilesystemDeleteFile(id, storage, path string) error                             // DELETE /v3/cluster/node/{id}/fs/{storage}/{path}
+	ClusterNodeFilesystemPutFile(id, storage, path string, data io.Reader) error                // PUT /v3/cluster/node/{id}/fs/{storage}/{path}
+	ClusterNodeFilesystemGetFile(id, storage, path string) (io.ReadCloser, error)               // GET /v3/cluster/node/{id}/fs/{storage}/{path}
 
 	ClusterDBProcessList() ([]api.Process, error)        // GET /v3/cluster/db/process
 	ClusterDBProcess(id ProcessID) (api.Process, error)  // GET /v3/cluster/db/process/{id}
@@ -122,6 +128,8 @@ type RestClient interface {
 	ClusterDBLocks() ([]api.ClusterLock, error)          // GET /v3/cluster/db/locks
 	ClusterDBKeyValues() (api.ClusterKVS, error)         // GET /v3/cluster/db/kv
 	ClusterDBProcessMap() (api.ClusterProcessMap, error) // GET /v3/cluster/db/map/process
+
+	ClusterFilesystemList(name, pattern, sort, order string) ([]api.FileInfo, error) // GET /v3/cluster/fs/{storage}
 
 	ClusterProcessList(opts ProcessListOptions) ([]api.Process, error)                    // GET /v3/cluster/process
 	ClusterProcess(id ProcessID, filter []string) (api.Process, error)                    // POST /v3/cluster/process
@@ -144,6 +152,7 @@ type RestClient interface {
 
 	RTMPChannels() ([]api.RTMPChannel, error) // GET /v3/rtmp
 	SRTChannels() ([]api.SRTChannel, error)   // GET /v3/srt
+	SRTChannelsRaw() ([]byte, error)          // GET /v3/srt
 
 	Sessions(collectors []string) (api.SessionsSummary, error)                                  // GET /v3/session
 	SessionsActive(collectors []string) (api.SessionsActive, error)                             // GET /v3/session/active
@@ -378,6 +387,10 @@ func New(config Config) (RestClient, error) {
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 			{
+				path:       mustNewGlob("/v3/cluster/fs/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
 				path:       mustNewGlob("/v3/cluster/process"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
@@ -423,6 +436,13 @@ func New(config Config) (RestClient, error) {
 			},
 			{
 				path:       mustNewGlob("/v3/cluster/db/map/process"),
+				constraint: mustNewConstraint("^16.14.0"),
+			}, {
+				path:       mustNewGlob("/v3/cluster/node/*/fs/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/fs/*/**"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},
@@ -497,6 +517,10 @@ func New(config Config) (RestClient, error) {
 				path:       mustNewGlob("/v3/cluster/transfer/*"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/fs/*/**"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
 		},
 		"DELETE": {
 			{
@@ -504,11 +528,15 @@ func New(config Config) (RestClient, error) {
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 			{
-				path:       mustNewGlob("/v3/cluster/process/{id}"),
+				path:       mustNewGlob("/v3/cluster/process/*"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 			{
-				path:       mustNewGlob("/v3/cluster/iam/user/{name}"),
+				path:       mustNewGlob("/v3/cluster/iam/user/*"),
+				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/cluster/node/*/fs/*/**"),
 				constraint: mustNewConstraint("^16.14.0"),
 			},
 		},
@@ -765,10 +793,6 @@ func (r *restclient) refresh() error {
 	req.Header.Add("Authorization", "Bearer "+r.refreshToken.String())
 
 	status, body, err := r.request(req)
-	if err != nil {
-		return err
-	}
-
 	if err != nil {
 		return err
 	}

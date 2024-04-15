@@ -23,7 +23,7 @@ const (
 	ORDER_DESC    = "desc"
 )
 
-func (r *restclient) FilesystemList(name, pattern, sort, order string) ([]api.FileInfo, error) {
+func (r *restclient) FilesystemList(storage, pattern, sort, order string) ([]api.FileInfo, error) {
 	var files []api.FileInfo
 
 	query := &url.Values{}
@@ -31,7 +31,7 @@ func (r *restclient) FilesystemList(name, pattern, sort, order string) ([]api.Fi
 	query.Set("sort", sort)
 	query.Set("order", order)
 
-	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(name), query, nil, "", nil)
+	data, err := r.call("GET", "/v3/fs/"+url.PathEscape(storage), query, nil, "", nil)
 	if err != nil {
 		return files, err
 	}
@@ -51,8 +51,8 @@ func (r *restclient) FilesystemHasFile(name, path string) bool {
 	return err == nil
 }
 
-func (r *restclient) FilesystemGetFile(name, path string) (io.ReadCloser, error) {
-	return r.FilesystemGetFileOffset(name, path, 0)
+func (r *restclient) FilesystemGetFile(storage, path string) (io.ReadCloser, error) {
+	return r.FilesystemGetFileOffset(storage, path, 0)
 }
 
 type ContextReadCloser struct {
@@ -72,7 +72,7 @@ func (r *ContextReadCloser) Close() error {
 	return r.ReadCloser.Close()
 }
 
-func (r *restclient) FilesystemGetFileOffset(name, path string, offset int64) (io.ReadCloser, error) {
+func (r *restclient) FilesystemGetFileOffset(storage, path string, offset int64) (io.ReadCloser, error) {
 	if !filepath.IsAbs(path) {
 		path = "/" + path
 	}
@@ -84,25 +84,25 @@ func (r *restclient) FilesystemGetFileOffset(name, path string, offset int64) (i
 		header.Set("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
 	}
 
-	return r.stream(context.Background(), "GET", "/v3/fs/"+url.PathEscape(name)+path, nil, header, "", nil)
+	return r.stream(context.Background(), "GET", "/v3/fs/"+url.PathEscape(storage)+path, nil, header, "", nil)
 }
 
-func (r *restclient) FilesystemDeleteFile(name, path string) error {
+func (r *restclient) FilesystemDeleteFile(storage, path string) error {
 	if !filepath.IsAbs(path) {
 		path = "/" + path
 	}
 
-	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(name)+path, nil, nil, "", nil)
+	_, err := r.call("DELETE", "/v3/fs/"+url.PathEscape(storage)+path, nil, nil, "", nil)
 
 	return err
 }
 
-func (r *restclient) FilesystemAddFile(name, path string, data io.Reader) error {
+func (r *restclient) FilesystemAddFile(storage, path string, data io.Reader) error {
 	if !filepath.IsAbs(path) {
 		path = "/" + path
 	}
 
-	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(name)+path, nil, nil, "application/data", data)
+	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(storage)+path, nil, nil, "application/data", data)
 
 	return err
 }

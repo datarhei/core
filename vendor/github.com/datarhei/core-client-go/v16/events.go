@@ -32,7 +32,7 @@ func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-ch
 
 		decoder := json.NewDecoder(stream)
 
-		for {
+		for decoder.More() {
 			var event api.Event
 			if err := decoder.Decode(&event); err == io.EOF {
 				return
@@ -46,14 +46,9 @@ func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-ch
 				continue
 			}
 
-			select {
-			case ch <- event:
-			default:
-				// Abort if channel is not drained
-				return
-			}
+			ch <- event
 
-			if event.Component == "error" {
+			if event.Component == "" || event.Component == "error" {
 				return
 			}
 		}
