@@ -99,15 +99,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				"user_agent":    req.Header.Get("User-Agent"),
 			})
 
-			if res.Status >= 500 {
-				logger = logger.Error()
-			} else if res.Status >= 400 {
-				logger = logger.Warn()
-			} else {
-				logger = logger.Debug()
-			}
-
-			logger.Log("")
+			logger.Debug().Log("")
 
 			return nil
 		}
