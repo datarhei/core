@@ -449,12 +449,12 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 		path, token := getToken(conn.URL)
 
 		if len(token) == 0 {
-			s.log("PLAY", "FORBIDDEN", path, "no streamkey provided", client)
+			s.log("PUBLISH", "FORBIDDEN", path, "no streamkey provided", client)
 			return
 		}
 
 		if s.token != token {
-			s.log("PLAY", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
+			s.log("PUBLISH", "FORBIDDEN", path, "invalid streamkey ("+token+")", client)
 			return
 		}
 
