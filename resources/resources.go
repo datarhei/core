@@ -10,6 +10,31 @@ import (
 	"github.com/datarhei/core/v16/psutil"
 )
 
+type Info struct {
+	Mem MemoryInfo
+	CPU CPUInfo
+}
+
+type MemoryInfo struct {
+	Total      uint64 // bytes
+	Available  uint64 // bytes
+	Used       uint64 // bytes
+	Limit      uint64 // bytes
+	Throttling bool
+	Error      error
+}
+
+type CPUInfo struct {
+	NCPU       float64 // number of cpus
+	System     float64 // percent 0-100
+	User       float64 // percent 0-100
+	Idle       float64 // percent 0-100
+	Other      float64 // percent 0-100
+	Limit      float64 // percent 0-100
+	Throttling bool
+	Error      error
+}
+
 type resources struct {
 	psutil psutil.Util
 
@@ -34,16 +59,20 @@ type Resources interface {
 	Start()
 	Stop()
 
-	// HasLimits returns whether any limits have been set
+	// HasLimits returns whether any limits have been set.
 	HasLimits() bool
 
-	// Limits returns the CPU (percent 0-100) and memory (bytes) limits
+	// Limits returns the CPU (percent 0-100) and memory (bytes) limits.
 	Limits() (float64, uint64)
 
-	// ShouldLimit returns whether cpu and/or memory is currently limited
+	// ShouldLimit returns whether cpu and/or memory is currently limited.
 	ShouldLimit() (bool, bool)
 
+	// Request checks whether the requested resources are available.
 	Request(cpu float64, memory uint64) error
+
+	// Info returns the current resource usage
+	Info() Info
 }
 
 type Config struct {
@@ -289,4 +318,39 @@ func (r *resources) Request(cpu float64, memory uint64) error {
 	}).Log("Acquiring approved")
 
 	return nil
+}
+
+func (r *resources) Info() Info {
+	cpulimit, memlimit := r.Limits()
+	cputhrottling, memthrottling := r.ShouldLimit()
+
+	cpustat, cpuerr := r.psutil.CPUPercent()
+	memstat, memerr := r.psutil.VirtualMemory()
+
+	cpuinfo := CPUInfo{
+		NCPU:       r.ncpu,
+		System:     cpustat.System,
+		User:       cpustat.User,
+		Idle:       cpustat.Idle,
+		Other:      cpustat.Other,
+		Limit:      cpulimit,
+		Throttling: cputhrottling,
+		Error:      cpuerr,
+	}
+
+	meminfo := MemoryInfo{
+		Total:      memstat.Total,
+		Available:  memstat.Available,
+		Used:       memstat.Used,
+		Limit:      memlimit,
+		Throttling: memthrottling,
+		Error:      memerr,
+	}
+
+	i := Info{
+		CPU: cpuinfo,
+		Mem: meminfo,
+	}
+
+	return i
 }
