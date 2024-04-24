@@ -1,10 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/monitor"
 )
 

@@ -1,7 +1,6 @@
 package json
 
 import (
-	gojson "encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -158,7 +157,7 @@ func (s *jsonStore) store(filepath string, data Data) error {
 		return fmt.Errorf("invalid version (have: %d, want: %d)", data.Version, version)
 	}
 
-	jsondata, err := gojson.MarshalIndent(&data, "", "    ")
+	jsondata, err := json.MarshalIndent(&data, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -195,12 +194,12 @@ func (s *jsonStore) load(filepath string, version uint64) (Data, error) {
 
 	var db storeVersion
 
-	if err = gojson.Unmarshal(jsondata, &db); err != nil {
+	if err = json.Unmarshal(jsondata, &db); err != nil {
 		return r, json.FormatError(jsondata, err)
 	}
 
 	if db.Version == version {
-		if err = gojson.Unmarshal(jsondata, &r); err != nil {
+		if err = json.Unmarshal(jsondata, &r); err != nil {
 			return r, json.FormatError(jsondata, err)
 		}
 	} else {

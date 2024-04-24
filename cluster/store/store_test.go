@@ -1,11 +1,11 @@
 package store
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/hashicorp/raft"
+	"github.com/datarhei/core/v16/encoding/json"
 
+	"github.com/hashicorp/raft"
 	"github.com/stretchr/testify/require"
 )
 

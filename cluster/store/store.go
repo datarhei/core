@@ -1,12 +1,12 @@
 package store
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"

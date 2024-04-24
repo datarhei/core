@@ -1,9 +1,10 @@
 package parse
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 // Duration represents a time.Duration

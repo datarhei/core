@@ -383,6 +383,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	}
 
 	s.router = echo.New()
+	s.router.JSONSerializer = &GoJSONSerializer{}
 	s.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
 	s.router.Validator = validator.New()
 	s.router.Use(s.middleware.log)

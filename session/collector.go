@@ -1,13 +1,13 @@
 package session
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 

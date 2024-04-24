@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/config/store"
 	v1 "github.com/datarhei/core/v16/config/v1"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/mock"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/labstack/echo/v4"

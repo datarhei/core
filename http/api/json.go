@@ -1,8 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 func ToNumber(f float64) json.Number {

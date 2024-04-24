@@ -3,7 +3,6 @@ package update
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor/metric"
 	"golang.org/x/mod/semver"

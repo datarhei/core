@@ -6,10 +6,10 @@ package resolver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/graph/models"
 	"github.com/datarhei/core/v16/playout"
 	"github.com/datarhei/core/v16/restream/app"

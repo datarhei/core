@@ -1,8 +1,9 @@
 package session
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/datarhei/core/v16/encoding/json"
 
 	"github.com/stretchr/testify/require"
 )

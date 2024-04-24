@@ -3,7 +3,6 @@ package raft
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	gonet "net"
@@ -15,6 +14,7 @@ import (
 
 	raftlogger "github.com/datarhei/core/v16/cluster/logger"
 	"github.com/datarhei/core/v16/cluster/store"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 	"go.etcd.io/bbolt"
 

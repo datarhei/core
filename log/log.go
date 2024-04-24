@@ -2,13 +2,14 @@
 package log
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 // LogLevel represents a log level

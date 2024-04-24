@@ -2,7 +2,6 @@ package parse
 
 import (
 	"container/ring"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/prelude"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net/url"

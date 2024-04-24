@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 var (

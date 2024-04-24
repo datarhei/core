@@ -1,10 +1,10 @@
 package probe
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/prelude"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/process"

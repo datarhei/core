@@ -1,9 +1,10 @@
 package log
 
 import (
-	"encoding/json"
 	"io"
 	"strings"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 type logwrapper struct {

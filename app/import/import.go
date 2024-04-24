@@ -4,7 +4,6 @@ package main
 // TODO: import von internal RTMP (external.stream), wenn jemand z.B. von OBS reinschiesst
 
 import (
-	gojson "encoding/json"
 	"fmt"
 	"math"
 	"net/url"
@@ -511,7 +510,7 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 
 	var v1data storeDataV1
 
-	if err := gojson.Unmarshal(jsondata, &v1data); err != nil {
+	if err := json.Unmarshal(jsondata, &v1data); err != nil {
 		return r, json.FormatError(jsondata, err)
 	}
 
@@ -1196,9 +1195,9 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 		Metadata: map[string]interface{}{},
 	}
 
-	if metadata, err := gojson.Marshal(ui); err == nil {
+	if metadata, err := json.Marshal(ui); err == nil {
 		m := map[string]interface{}{}
-		gojson.Unmarshal(metadata, &m)
+		json.Unmarshal(metadata, &m)
 		p.Metadata["restreamer-ui"] = m
 	}
 
@@ -1426,9 +1425,9 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 			Metadata: map[string]interface{}{},
 		}
 
-		if metadata, err := gojson.Marshal(egress); err == nil {
+		if metadata, err := json.Marshal(egress); err == nil {
 			m := map[string]interface{}{}
-			gojson.Unmarshal(metadata, &m)
+			json.Unmarshal(metadata, &m)
 			p.Metadata["restreamer-ui"] = m
 		}
 
