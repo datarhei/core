@@ -2,12 +2,13 @@ package coreclient
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"strconv"
+
+	"github.com/goccy/go-json"
 
 	"github.com/datarhei/core-client-go/v16/api"
 )

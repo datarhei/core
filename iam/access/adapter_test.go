@@ -1,10 +1,11 @@
 package access
 
 import (
-	"encoding/json"
 	"testing"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/fs"
+
 	"github.com/stretchr/testify/require"
 )
 

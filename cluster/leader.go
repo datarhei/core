@@ -3,7 +3,6 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/store"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/maps"
 	"github.com/datarhei/core/v16/restream/app"

@@ -3,13 +3,13 @@ package gzip
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )

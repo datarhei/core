@@ -1,11 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/log"

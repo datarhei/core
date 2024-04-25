@@ -2,10 +2,11 @@ package value
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 // array of auth0 tenants

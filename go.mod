@@ -9,12 +9,13 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.19.2
 	github.com/casbin/casbin/v2 v2.77.2
-	github.com/datarhei/core-client-go/v16 v16.11.1-0.20240415125433-2e78b4319e8e
+	github.com/datarhei/core-client-go/v16 v16.11.1-0.20240424105158-86a7f261b92c
 	github.com/datarhei/gosrt v0.5.4
 	github.com/datarhei/joy4 v0.0.0-20230505074825-fde05957445a
 	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.15.3
 	github.com/gobwas/glob v0.2.3
+	github.com/goccy/go-json v0.10.2
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/gops v0.3.28
 	github.com/google/uuid v1.3.1
@@ -23,6 +24,7 @@ require (
 	github.com/hashicorp/raft-boltdb/v2 v2.2.2
 	github.com/invopop/jsonschema v0.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/klauspost/compress v1.16.7
 	github.com/klauspost/cpuid/v2 v2.2.5
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/lestrrat-go/strftime v1.0.6
@@ -80,7 +82,6 @@ require (
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect

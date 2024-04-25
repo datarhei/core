@@ -2,7 +2,6 @@ package mock
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"

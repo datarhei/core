@@ -1,7 +1,6 @@
 package store
 
 import (
-	gojson "encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -155,7 +154,7 @@ func (c *jsonStore) store(data *config.Config) error {
 		return nil
 	}
 
-	jsondata, err := gojson.MarshalIndent(data, "", "    ")
+	jsondata, err := json.MarshalIndent(data, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -169,14 +168,14 @@ func migrate(jsondata []byte) (*config.Data, error) {
 	data := &config.Data{}
 	version := DataVersion{}
 
-	if err := gojson.Unmarshal(jsondata, &version); err != nil {
+	if err := json.Unmarshal(jsondata, &version); err != nil {
 		return nil, json.FormatError(jsondata, err)
 	}
 
 	if version.Version == 1 {
 		dataV1 := &v1.New(nil).Data
 
-		if err := gojson.Unmarshal(jsondata, dataV1); err != nil {
+		if err := json.Unmarshal(jsondata, dataV1); err != nil {
 			return nil, json.FormatError(jsondata, err)
 		}
 
@@ -194,7 +193,7 @@ func migrate(jsondata []byte) (*config.Data, error) {
 	} else if version.Version == 2 {
 		dataV2 := &v2.New(nil).Data
 
-		if err := gojson.Unmarshal(jsondata, dataV2); err != nil {
+		if err := json.Unmarshal(jsondata, dataV2); err != nil {
 			return nil, json.FormatError(jsondata, err)
 		}
 
@@ -207,7 +206,7 @@ func migrate(jsondata []byte) (*config.Data, error) {
 	} else if version.Version == 3 {
 		dataV3 := &config.New(nil).Data
 
-		if err := gojson.Unmarshal(jsondata, dataV3); err != nil {
+		if err := json.Unmarshal(jsondata, dataV3); err != nil {
 			return nil, json.FormatError(jsondata, err)
 		}
 

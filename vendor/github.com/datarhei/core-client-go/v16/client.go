@@ -3,7 +3,6 @@ package coreclient
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/datarhei/core-client-go/v16/api"
 

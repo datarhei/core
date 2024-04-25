@@ -2,15 +2,16 @@ package gzip
 
 import (
 	"bytes"
-	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGzip(t *testing.T) {
@@ -225,6 +226,31 @@ func BenchmarkGzip(b *testing.B) {
 
 	h := New()(func(c echo.Context) error {
 		c.Response().Write([]byte("test")) // For Content-Type sniffing
+		return nil
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Gzip
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		h(c)
+	}
+}
+
+func BenchmarkGzipLarge(b *testing.B) {
+	data, err := os.ReadFile("./fixtures/processList.json")
+	require.NoError(b, err)
+
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set(echo.HeaderAcceptEncoding, gzipScheme)
+
+	h := New()(func(c echo.Context) error {
+		c.Response().Write(data) // For Content-Type sniffing
 		return nil
 	})
 

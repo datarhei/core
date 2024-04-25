@@ -3,13 +3,13 @@ package iam
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	apihandler "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/validator"

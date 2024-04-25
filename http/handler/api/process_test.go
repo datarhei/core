@@ -2,13 +2,13 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
 	"github.com/datarhei/core/v16/iam"

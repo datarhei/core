@@ -1,12 +1,12 @@
 package store
 
 import (
-	"encoding/json"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/encoding/json"
 
 	"github.com/stretchr/testify/require"
 )

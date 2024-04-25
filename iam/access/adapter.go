@@ -1,13 +1,13 @@
 package access
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 

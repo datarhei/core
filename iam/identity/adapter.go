@@ -1,11 +1,11 @@
 package identity
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 )

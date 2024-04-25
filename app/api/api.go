@@ -50,8 +50,8 @@ import (
 	"github.com/datarhei/core/v16/srt"
 	srturl "github.com/datarhei/core/v16/srt/url"
 	"github.com/datarhei/core/v16/update"
-	"github.com/google/gops/agent"
 
+	"github.com/google/gops/agent"
 	"github.com/lestrrat-go/strftime"
 	"go.uber.org/automaxprocs/maxprocs"
 )

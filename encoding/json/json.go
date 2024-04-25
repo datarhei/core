@@ -2,13 +2,37 @@
 package json
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
+
+	"github.com/goccy/go-json"
 )
+
+type UnmarshalTypeError = json.UnmarshalTypeError
+type SyntaxError = json.SyntaxError
+type Number = json.Number
 
 // Unmarshal is a wrapper for json.Unmarshal
 func Unmarshal(data []byte, v interface{}) error {
 	return json.Unmarshal(data, v)
+}
+
+// Marshal is a wrapper for json.Marshal
+func Marshal(v interface{}) ([]byte, error) {
+	return json.Marshal(v)
+}
+
+// MarshalIndent is a wrapper for json.MarshalIndent
+func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+	return json.MarshalIndent(v, prefix, indent)
+}
+
+func NewDecoder(r io.Reader) *json.Decoder {
+	return json.NewDecoder(r)
+}
+
+func NewEncoder(w io.Writer) *json.Encoder {
+	return json.NewEncoder(w)
 }
 
 // FormatError takes the marshalled data and the error from Unmarshal and returns a detailed

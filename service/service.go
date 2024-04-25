@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/monitor/metric"
 	"github.com/datarhei/core/v16/service/api"

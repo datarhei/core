@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	httpapi "github.com/datarhei/core/v16/http/api"
 	iamaccess "github.com/datarhei/core/v16/iam/access"

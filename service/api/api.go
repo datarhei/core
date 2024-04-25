@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
 )
 

@@ -1,8 +1,7 @@
 package api
 
 import (
-	"encoding/json"
-
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/session"
 )
 

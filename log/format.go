@@ -1,11 +1,12 @@
 package log
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/datarhei/core/v16/encoding/json"
 )
 
 type Formatter interface {
