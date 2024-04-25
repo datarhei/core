@@ -57,8 +57,8 @@ import (
 	"github.com/datarhei/core/v16/srt"
 
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
+	mwcompress "github.com/datarhei/core/v16/http/middleware/compress"
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
-	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
 	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
 	mwiam "github.com/datarhei/core/v16/http/middleware/iam"
 	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
@@ -484,10 +484,10 @@ func (s *server) HTTPStatus() map[int]uint64 {
 }
 
 func (s *server) setRoutes() {
-	gzipMiddleware := mwgzip.NewWithConfig(mwgzip.Config{
-		Level:     mwgzip.BestSpeed,
+	gzipMiddleware := mwcompress.NewWithConfig(mwcompress.Config{
+		Level:     mwcompress.BestSpeed,
 		MinLength: 1000,
-		Skipper:   mwgzip.ContentTypeSkipper(nil),
+		Skipper:   mwcompress.ContentTypeSkipper(nil),
 	})
 
 	// API router grouo
@@ -525,9 +525,9 @@ func (s *server) setRoutes() {
 		}))
 
 		if filesystem.Gzip {
-			fs.Use(mwgzip.NewWithConfig(mwgzip.Config{
-				Skipper:   mwgzip.ContentTypeSkipper(s.gzip.mimetypes),
-				Level:     mwgzip.BestSpeed,
+			fs.Use(mwcompress.NewWithConfig(mwcompress.Config{
+				Skipper:   mwcompress.ContentTypeSkipper(s.gzip.mimetypes),
+				Level:     mwcompress.BestSpeed,
 				MinLength: 1000,
 			}))
 		}
