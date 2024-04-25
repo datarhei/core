@@ -324,10 +324,10 @@ func (n *node) ping(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			start := time.Now()
-			version, err := n.client.Version()
+			about, err := n.client.About()
 			if err == nil {
 				n.pingLock.Lock()
-				n.version = version
+				n.version = about.Version
 				n.lastContact = time.Now()
 				n.lastContactErr = nil
 				n.latency = n.latency*0.2 + time.Since(start).Seconds()*0.8

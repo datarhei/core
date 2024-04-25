@@ -162,11 +162,28 @@ func (a *api) Version(c echo.Context) error {
 // @Tags v1.0.0
 // @ID cluster-1-about
 // @Produce json
-// @Success 200 {string} string
+// @Success 200 {string} About
 // @Success 500 {object} Error
-// @Router / [get]
+// @Router /about [get]
 func (a *api) About(c echo.Context) error {
+	resources, err := a.cluster.Resources()
 
+	about := client.AboutResponse{
+		ID:      a.id,
+		Version: Version.String(),
+		Address: a.cluster.Address(),
+		Resources: client.AboutResponseResources{
+			IsThrottling: resources.CPU.Throttling,
+			NCPU:         resources.CPU.NCPU,
+			CPU:          (100 - resources.CPU.Idle) * resources.CPU.NCPU,
+			CPULimit:     resources.CPU.Limit * resources.CPU.NCPU,
+			Mem:          resources.Mem.Total - resources.Mem.Available,
+			MemLimit:     resources.Mem.Total,
+			Error:        err,
+		},
+	}
+
+	return c.JSON(http.StatusOK, about)
 }
 
 // Barrier returns if the barrier already has been passed

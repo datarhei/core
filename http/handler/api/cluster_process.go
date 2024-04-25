@@ -704,7 +704,7 @@ func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
 
 	coreid = h.proxy.FindNodeFromResources(coreid, config.LimitCPU, config.LimitMemory)
 	if len(coreid) == 0 {
-		return api.Err(http.StatusInternalServerError, "", "Not enough available resources available to execute probe")
+		return api.Err(http.StatusInternalServerError, "", "Not enough resources available to execute probe")
 	}
 
 	probe, _ := h.proxy.ProbeProcessConfig(coreid, config)

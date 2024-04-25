@@ -29,6 +29,7 @@ import (
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/slices"
 )
@@ -91,6 +92,8 @@ type Cluster interface {
 
 	ProxyReader() proxy.ProxyReader
 	CertManager() autocert.Manager
+
+	Resources() (resources.Info, error)
 }
 
 type Peer struct {
@@ -118,6 +121,7 @@ type Config struct {
 	CoreSkills skills.Skills
 
 	IPLimiter net.IPLimiter
+	Resources resources.Resources
 	Logger    log.Logger
 
 	Debug DebugConfig
@@ -181,6 +185,8 @@ type cluster struct {
 	barrierLock sync.RWMutex
 
 	limiter net.IPLimiter
+
+	resources resources.Resources
 
 	debugDisableFFmpegCheck bool
 }
@@ -1521,4 +1527,11 @@ func (c *cluster) sentinel() {
 
 func (c *cluster) ProxyReader() proxy.ProxyReader {
 	return c.proxy.Reader()
+}
+
+func (c *cluster) Resources() (resources.Info, error) {
+	if c.resources == nil {
+		return resources.Info{}, fmt.Errorf("not available")
+	}
+	return c.resources.Info(), nil
 }

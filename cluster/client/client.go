@@ -66,6 +66,23 @@ type GetKVResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type AboutResponse struct {
+	ID        string
+	Version   string
+	Address   string
+	Resources AboutResponseResources
+}
+
+type AboutResponseResources struct {
+	IsThrottling bool    // Whether this core is currently throttling
+	NCPU         float64 // Number of CPU on this node
+	CPU          float64 // Current CPU load, 0-100*ncpu
+	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
+	Mem          uint64  // Currently used memory in bytes
+	MemLimit     uint64  // Defined memory limit in bytes
+	Error        error   // Last error
+}
+
 type APIClient struct {
 	Address string
 	Client  *http.Client
@@ -86,8 +103,23 @@ func (c *APIClient) Version() (string, error) {
 	return version, nil
 }
 
+func (c *APIClient) About() (AboutResponse, error) {
+	data, err := c.call(http.MethodGet, "/about", "", nil, "")
+	if err != nil {
+		return AboutResponse{}, err
+	}
+
+	var about AboutResponse
+	err = json.Unmarshal(data, &about)
+	if err != nil {
+		return AboutResponse{}, err
+	}
+
+	return about, nil
+}
+
 func (c *APIClient) Barrier(name string) (bool, error) {
-	data, err := c.call(http.MethodGet, "/v1/barrier/"+url.PathEscape(name), "application/json", nil, "")
+	data, err := c.call(http.MethodGet, "/v1/barrier/"+url.PathEscape(name), "", nil, "")
 	if err != nil {
 		return false, err
 	}

@@ -543,6 +543,7 @@ func (a *api) start(ctx context.Context) error {
 			CoreSkills:             a.ffmpeg.Skills(),
 			IPLimiter:              a.sessionsLimiter,
 			Logger:                 a.log.logger.core.WithComponent("Cluster"),
+			Resources:              a.resources,
 			Debug: cluster.DebugConfig{
 				DisableFFmpegCheck: cfg.Cluster.Debug.DisableFFmpegCheck,
 			},

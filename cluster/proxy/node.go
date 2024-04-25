@@ -41,7 +41,6 @@ type Node interface {
 type NodeReader interface {
 	About() NodeAbout
 	Version() NodeVersion
-	Resources() NodeResources
 
 	ListFiles(storage, pattern string) ([]clientapi.FileInfo, error)
 	DeleteFile(storage, path string) error
@@ -64,16 +63,6 @@ type NodeFiles struct {
 	LastUpdate time.Time
 }
 
-type NodeResources struct {
-	IsThrottling bool    // Whether this core is currently throttling
-	NCPU         float64 // Number of CPU on this node
-	CPU          float64 // Current CPU load, 0-100*ncpu
-	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
-	Mem          uint64  // Currently used memory in bytes
-	MemLimit     uint64  // Defined memory limit in bytes
-	Error        error   // Last error
-}
-
 type NodeAbout struct {
 	ID          string
 	Name        string
@@ -84,7 +73,6 @@ type NodeAbout struct {
 	Uptime      time.Duration
 	LastContact time.Time
 	Latency     time.Duration
-	Resources   NodeResources
 	Version     string
 }
 
@@ -122,16 +110,6 @@ type node struct {
 	disconnect context.CancelFunc
 
 	lastContact time.Time
-
-	resources struct {
-		throttling bool
-		ncpu       float64
-		cpu        float64
-		cpuLimit   float64
-		mem        uint64
-		memLimit   uint64
-		err        error
-	}
 
 	config *config.Config
 
@@ -171,14 +149,6 @@ func NewNode(config NodeConfig) Node {
 		n.logger = log.New("")
 	}
 
-	n.resources.throttling = true
-	n.resources.cpu = 100
-	n.resources.ncpu = 1
-	n.resources.cpuLimit = 100
-	n.resources.mem = 0
-	n.resources.memLimit = 0
-	n.resources.err = fmt.Errorf("not initialized")
-
 	ctx, cancel := context.WithCancel(context.Background())
 	n.disconnect = cancel
 
@@ -187,7 +157,7 @@ func NewNode(config NodeConfig) Node {
 		n.peerErr = err
 	}
 
-	n.peerWg.Add(3)
+	n.peerWg.Add(2)
 
 	go func(ctx context.Context) {
 		// This tries to reconnect to the core API. If everything's
@@ -211,7 +181,6 @@ func NewNode(config NodeConfig) Node {
 	}(ctx)
 
 	go n.pingPeer(ctx, &n.peerWg)
-	go n.updateResources(ctx, &n.peerWg)
 
 	return n
 }
@@ -395,107 +364,6 @@ func (n *node) pingPeer(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (n *node) updateResources(ctx context.Context, wg *sync.WaitGroup) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	defer wg.Done()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Metrics
-			metrics, err := n.Metrics(clientapi.MetricsQuery{
-				Metrics: []clientapi.MetricsQueryMetric{
-					{Name: "cpu_ncpu"},
-					{Name: "cpu_idle"},
-					{Name: "cpu_limit"},
-					{Name: "cpu_throttling"},
-					{Name: "mem_total"},
-					{Name: "mem_free"},
-					{Name: "mem_limit"},
-					{Name: "mem_throttling"},
-				},
-			})
-
-			if err != nil {
-				n.stateLock.Lock()
-				n.resources.throttling = true
-				n.resources.cpu = 100
-				n.resources.ncpu = 1
-				n.resources.cpuLimit = 100
-				n.resources.mem = 0
-				n.resources.memLimit = 0
-				n.resources.err = err
-				n.stateLock.Unlock()
-
-				n.logger.Warn().WithError(err).Log("Failed to retrieve metrics")
-
-				continue
-			}
-
-			cpu_ncpu := .0
-			cpu_idle := .0
-			cpu_limit := .0
-			mem_total := uint64(0)
-			mem_free := uint64(0)
-			mem_limit := uint64(0)
-			throttling := .0
-
-			for _, x := range metrics.Metrics {
-				if x.Name == "cpu_idle" {
-					cpu_idle = x.Values[0].Value
-				} else if x.Name == "cpu_ncpu" {
-					cpu_ncpu = x.Values[0].Value
-				} else if x.Name == "cpu_limit" {
-					cpu_limit = x.Values[0].Value
-				} else if x.Name == "cpu_throttling" {
-					throttling += x.Values[0].Value
-				} else if x.Name == "mem_total" {
-					mem_total = uint64(x.Values[0].Value)
-				} else if x.Name == "mem_free" {
-					mem_free = uint64(x.Values[0].Value)
-				} else if x.Name == "mem_limit" {
-					mem_limit = uint64(x.Values[0].Value)
-				} else if x.Name == "mem_throttling" {
-					throttling += x.Values[0].Value
-				}
-			}
-
-			n.stateLock.Lock()
-			if throttling > 0 {
-				n.resources.throttling = true
-			} else {
-				n.resources.throttling = false
-			}
-			n.resources.ncpu = cpu_ncpu
-			n.resources.cpu = (100 - cpu_idle) * cpu_ncpu
-			n.resources.cpuLimit = cpu_limit * cpu_ncpu
-			if mem_total != 0 {
-				n.resources.mem = mem_total - mem_free
-				n.resources.memLimit = mem_limit
-			} else {
-				n.resources.mem = 0
-				n.resources.memLimit = 0
-			}
-			n.resources.err = nil
-			n.stateLock.Unlock()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (n *node) Metrics(query clientapi.MetricsQuery) (clientapi.MetricsResponse, error) {
-	n.peerLock.RLock()
-	defer n.peerLock.RUnlock()
-
-	if n.peer == nil {
-		return clientapi.MetricsResponse{}, ErrNoPeer
-	}
-
-	return n.peer.Metrics(query)
-}
-
 func (n *node) AboutPeer() (clientapi.About, time.Duration, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
@@ -539,32 +407,15 @@ func (n *node) About() NodeAbout {
 		Uptime:      time.Since(createdAt),
 		LastContact: n.lastContact,
 		Latency:     time.Duration(n.latency * float64(time.Second)),
-		Resources: NodeResources{
-			IsThrottling: n.resources.throttling,
-			NCPU:         n.resources.ncpu,
-			CPU:          n.resources.cpu,
-			CPULimit:     n.resources.cpuLimit,
-			Mem:          n.resources.mem,
-			MemLimit:     n.resources.memLimit,
-			Error:        n.resources.err,
-		},
-		Version: version,
+		Version:     version,
 	}
 
 	if state == stateDisconnected {
 		nodeAbout.Uptime = 0
 		nodeAbout.Latency = 0
-		nodeAbout.Resources.IsThrottling = true
-		nodeAbout.Resources.NCPU = 1
 	}
 
 	return nodeAbout
-}
-
-func (n *node) Resources() NodeResources {
-	about := n.About()
-
-	return about.Resources
 }
 
 func (n *node) Version() NodeVersion {
