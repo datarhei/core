@@ -1,35 +1,47 @@
-package gzip
+package compress
 
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 
-	"github.com/klauspost/compress/gzip"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-// Config defines the config for Gzip middleware.
+// Config defines the config for compress middleware.
 type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
 
-	// Gzip compression level.
+	// Compression level.
 	// Optional. Default value -1.
-	Level int
+	Level Level
 
-	// Length threshold before gzip compression
+	// Length threshold before compression
 	// is used. Optional. Default value 0
 	MinLength int
 }
 
-type gzipResponseWriter struct {
-	io.Writer
+type Compression interface {
+	Acquire() Compressor
+	Release(c Compressor)
+}
+
+type Compressor interface {
+	Write(p []byte) (int, error)
+	Flush() error
+	Reset(w io.Writer)
+	Close() error
+}
+
+type compressResponseWriter struct {
+	Compressor
 	http.ResponseWriter
 	wroteHeader         bool
 	wroteBody           bool
@@ -38,15 +50,27 @@ type gzipResponseWriter struct {
 	buffer              *bytes.Buffer
 	code                int
 	headerContentLength string
+	scheme              string
 }
 
-const gzipScheme = "gzip"
+type Scheme string
+
+func (s Scheme) String() string {
+	return string(s)
+}
 
 const (
-	BestCompression    = gzip.BestCompression
-	BestSpeed          = gzip.BestSpeed
-	DefaultCompression = gzip.DefaultCompression
-	NoCompression      = gzip.NoCompression
+	GzipScheme   Scheme = "gzip"
+	BrotliScheme Scheme = "br"
+	ZstdScheme   Scheme = "zstd"
+)
+
+type Level int
+
+const (
+	DefaultCompression Level = 0
+	BestCompression    Level = 1
+	BestSpeed          Level = 2
 )
 
 // DefaultConfig is the default Gzip middleware config.
@@ -79,13 +103,13 @@ func ContentTypeSkipper(contentTypes []string) middleware.Skipper {
 	}
 }
 
-// New returns a middleware which compresses HTTP response using gzip compression
+// New returns a middleware which compresses HTTP response using a compression
 // scheme.
 func New() echo.MiddlewareFunc {
 	return NewWithConfig(DefaultConfig)
 }
 
-// NewWithConfig return Gzip middleware with config.
+// NewWithConfig return compress middleware with config.
 // See: `New()`.
 func NewWithConfig(config Config) echo.MiddlewareFunc {
 	// Defaults
@@ -101,7 +125,9 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.MinLength = DefaultConfig.MinLength
 	}
 
-	pool := gzipPool(config)
+	gzipPool := NewGzip(config.Level)
+	brotliPool := NewBrotli(config.Level)
+	zstdPool := NewZstd(config.Level)
 	bpool := bufferPool()
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -112,12 +138,26 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			res := c.Response()
 			res.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
+			encodings := c.Request().Header.Get(echo.HeaderAcceptEncoding)
 
-			if strings.Contains(c.Request().Header.Get(echo.HeaderAcceptEncoding), gzipScheme) {
-				i := pool.Get()
-				w, ok := i.(*gzip.Writer)
-				if !ok {
-					return echo.NewHTTPError(http.StatusInternalServerError, i.(error).Error())
+			var pool Compression
+			var scheme Scheme
+
+			if strings.Contains(encodings, ZstdScheme.String()) {
+				pool = zstdPool
+				scheme = ZstdScheme
+			} else if strings.Contains(encodings, BrotliScheme.String()) {
+				pool = brotliPool
+				scheme = BrotliScheme
+			} else if strings.Contains(encodings, GzipScheme.String()) {
+				pool = gzipPool
+				scheme = GzipScheme
+			}
+
+			if pool != nil {
+				w := pool.Acquire()
+				if w == nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, fmt.Errorf("failed to acquire compressor for %s", scheme))
 				}
 				rw := res.Writer
 				w.Reset(rw)
@@ -125,11 +165,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				buf := bpool.Get().(*bytes.Buffer)
 				buf.Reset()
 
-				grw := &gzipResponseWriter{Writer: w, ResponseWriter: rw, minLength: config.MinLength, buffer: buf}
+				grw := &compressResponseWriter{Compressor: w, ResponseWriter: rw, minLength: config.MinLength, buffer: buf, scheme: scheme.String()}
 
 				defer func() {
 					if !grw.wroteBody {
-						if res.Header().Get(echo.HeaderContentEncoding) == gzipScheme {
+						if res.Header().Get(echo.HeaderContentEncoding) == scheme.String() {
 							res.Header().Del(echo.HeaderContentEncoding)
 						}
 						// We have to reset response to it's pristine state when
@@ -152,7 +192,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					}
 					w.Close()
 					bpool.Put(buf)
-					pool.Put(w)
+					pool.Release(w)
 				}()
 
 				res.Writer = grw
@@ -163,7 +203,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 }
 
-func (w *gzipResponseWriter) WriteHeader(code int) {
+func (w *compressResponseWriter) WriteHeader(code int) {
 	if code == http.StatusNoContent { // Issue #489
 		w.ResponseWriter.Header().Del(echo.HeaderContentEncoding)
 	}
@@ -176,7 +216,7 @@ func (w *gzipResponseWriter) WriteHeader(code int) {
 	w.code = code
 }
 
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+func (w *compressResponseWriter) Write(b []byte) (int, error) {
 	if w.Header().Get(echo.HeaderContentType) == "" {
 		w.Header().Set(echo.HeaderContentType, http.DetectContentType(b))
 	}
@@ -190,59 +230,47 @@ func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 			w.minLengthExceeded = true
 
 			// The minimum length is exceeded, add Content-Encoding header and write the header
-			w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+			w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
 			if w.wroteHeader {
 				w.ResponseWriter.WriteHeader(w.code)
 			}
 
-			return w.Writer.Write(w.buffer.Bytes())
+			return w.Compressor.Write(w.buffer.Bytes())
 		} else {
 			return n, err
 		}
 	}
 
-	return w.Writer.Write(b)
+	return w.Compressor.Write(b)
 }
 
-func (w *gzipResponseWriter) Flush() {
+func (w *compressResponseWriter) Flush() {
 	if !w.minLengthExceeded {
 		// Enforce compression
 		w.minLengthExceeded = true
-		w.Header().Set(echo.HeaderContentEncoding, gzipScheme) // Issue #806
+		w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
 		if w.wroteHeader {
 			w.ResponseWriter.WriteHeader(w.code)
 		}
 
-		w.Writer.Write(w.buffer.Bytes())
+		w.Compressor.Write(w.buffer.Bytes())
 	}
 
-	w.Writer.(*gzip.Writer).Flush()
+	w.Compressor.Flush()
 	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }
 
-func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (w *compressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return w.ResponseWriter.(http.Hijacker).Hijack()
 }
 
-func (w *gzipResponseWriter) Push(target string, opts *http.PushOptions) error {
+func (w *compressResponseWriter) Push(target string, opts *http.PushOptions) error {
 	if p, ok := w.ResponseWriter.(http.Pusher); ok {
 		return p.Push(target, opts)
 	}
 	return http.ErrNotSupported
-}
-
-func gzipPool(config Config) sync.Pool {
-	return sync.Pool{
-		New: func() interface{} {
-			w, err := gzip.NewWriterLevel(io.Discard, config.Level)
-			if err != nil {
-				return err
-			}
-			return w
-		},
-	}
 }
 
 func bufferPool() sync.Pool {
