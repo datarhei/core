@@ -20,12 +20,15 @@ type Config struct {
 	Skipper middleware.Skipper
 
 	// Compression level.
-	// Optional. Default value -1.
+	// Optional. Default value 0.
 	Level Level
 
 	// Length threshold before compression
 	// is used. Optional. Default value 0
 	MinLength int
+
+	// Schemes is a list of enabled compressiond. Optional. Default [GzipScheme, ZstdScheme]
+	Schemes []Scheme
 }
 
 type Compression interface {
@@ -78,6 +81,7 @@ var DefaultConfig = Config{
 	Skipper:   middleware.DefaultSkipper,
 	Level:     DefaultCompression,
 	MinLength: 0,
+	Schemes:   []Scheme{GzipScheme, ZstdScheme},
 }
 
 // ContentTypesSkipper returns a Skipper based on the list of content types
@@ -125,9 +129,41 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.MinLength = DefaultConfig.MinLength
 	}
 
-	gzipPool := NewGzip(config.Level)
-	brotliPool := NewBrotli(config.Level)
-	zstdPool := NewZstd(config.Level)
+	if len(config.Schemes) == 0 {
+		config.Schemes = DefaultConfig.Schemes
+	}
+
+	gzipEnable := false
+	brotliEnable := false
+	zstdEnable := false
+
+	for _, s := range config.Schemes {
+		switch s {
+		case GzipScheme:
+			gzipEnable = true
+		case BrotliScheme:
+			brotliEnable = true
+		case ZstdScheme:
+			zstdEnable = true
+		}
+	}
+
+	var gzipPool Compression
+	var brotliPool Compression
+	var zstdPool Compression
+
+	if gzipEnable {
+		gzipPool = NewGzip(config.Level)
+	}
+
+	if brotliEnable {
+		brotliPool = NewBrotli(config.Level)
+	}
+
+	if zstdEnable {
+		zstdPool = NewZstd(config.Level)
+	}
+
 	bpool := bufferPool()
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -143,13 +179,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			var pool Compression
 			var scheme Scheme
 
-			if strings.Contains(encodings, ZstdScheme.String()) {
+			if zstdEnable && strings.Contains(encodings, ZstdScheme.String()) {
 				pool = zstdPool
 				scheme = ZstdScheme
-			} else if strings.Contains(encodings, BrotliScheme.String()) {
+			} else if brotliEnable && strings.Contains(encodings, BrotliScheme.String()) {
 				pool = brotliPool
 				scheme = BrotliScheme
-			} else if strings.Contains(encodings, GzipScheme.String()) {
+			} else if gzipEnable && strings.Contains(encodings, GzipScheme.String()) {
 				pool = gzipPool
 				scheme = GzipScheme
 			}
