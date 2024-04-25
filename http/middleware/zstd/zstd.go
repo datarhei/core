@@ -194,15 +194,15 @@ func (w *zstdResponseWriter) Write(b []byte) (int, error) {
 				w.ResponseWriter.WriteHeader(w.code)
 			}
 
-			//return w.Encoder.Write(w.buffer.Bytes())
-			return w.ResponseWriter.Write(w.Encoder.EncodeAll(w.buffer.Bytes(), nil))
+			return w.Encoder.Write(w.buffer.Bytes())
+			//return w.ResponseWriter.Write(w.Encoder.EncodeAll(w.buffer.Bytes(), nil))
 		} else {
 			return n, err
 		}
 	}
 
-	//return w.Encoder.Write(b)
-	return w.ResponseWriter.Write(w.Encoder.EncodeAll(b, nil))
+	return w.Encoder.Write(b)
+	//return w.ResponseWriter.Write(w.Encoder.EncodeAll(b, nil))
 }
 
 func (w *zstdResponseWriter) Flush() {
@@ -214,8 +214,8 @@ func (w *zstdResponseWriter) Flush() {
 			w.ResponseWriter.WriteHeader(w.code)
 		}
 
-		//w.Encoder.Write(w.buffer.Bytes())
-		w.ResponseWriter.Write(w.Encoder.EncodeAll(w.buffer.Bytes(), nil))
+		w.Encoder.Write(w.buffer.Bytes())
+		//w.ResponseWriter.Write(w.Encoder.EncodeAll(w.buffer.Bytes(), nil))
 	}
 
 	w.Encoder.Flush()

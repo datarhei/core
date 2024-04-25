@@ -66,7 +66,6 @@ import (
 	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
 	mwredirect "github.com/datarhei/core/v16/http/middleware/redirect"
 	mwsession "github.com/datarhei/core/v16/http/middleware/session"
-	mwzstd "github.com/datarhei/core/v16/http/middleware/zstd"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -490,11 +489,6 @@ func (s *server) setRoutes() {
 		MinLength: 1000,
 		Skipper:   mwgzip.ContentTypeSkipper(nil),
 	})
-	zstdMiddleware := mwzstd.NewWithConfig(mwzstd.Config{
-		Level:     mwzstd.BestSpeed,
-		MinLength: 1000,
-		Skipper:   mwzstd.ContentTypeSkipper(nil),
-	})
 
 	// API router grouo
 	api := s.router.Group("/api")
@@ -599,7 +593,6 @@ func (s *server) setRoutes() {
 	// APIv3 router group
 	v3 := api.Group("/v3")
 
-	v3.Use(zstdMiddleware)
 	v3.Use(gzipMiddleware)
 
 	s.setRoutesV3(v3)
