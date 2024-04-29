@@ -2,11 +2,14 @@ package compress
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/datarhei/core/v16/math/rand"
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/gzip"
@@ -287,31 +290,37 @@ func TestCompressWithStatic(t *testing.T) {
 func BenchmarkCompress(b *testing.B) {
 	schemes := getTestcases()
 
-	for scheme := range schemes {
-		b.Run(scheme.String(), func(b *testing.B) {
-			e := echo.New()
+	for i := 1; i <= 18; i++ {
+		datalen := 2 << i
+		data := []byte(rand.String(datalen))
 
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+		for scheme := range schemes {
+			name := fmt.Sprintf("%s-%d", scheme.String(), datalen)
+			b.Run(name, func(b *testing.B) {
+				e := echo.New()
 
-			h := NewWithConfig(Config{Level: BestSpeed, Schemes: []Scheme{scheme}})(func(c echo.Context) error {
-				c.Response().Write([]byte("testtesttesttesttesttesttesttesttesttesttesttesttest"))
-				return nil
+				req := httptest.NewRequest(http.MethodGet, "/", nil)
+				req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+
+				h := NewWithConfig(Config{Level: BestSpeed, Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+					c.Response().Write(data)
+					return nil
+				})
+
+				b.ReportAllocs()
+				b.ResetTimer()
+
+				for i := 0; i < b.N; i++ {
+					rec := httptest.NewRecorder()
+					c := e.NewContext(req, rec)
+					h(c)
+				}
 			})
-
-			b.ReportAllocs()
-			b.ResetTimer()
-
-			for i := 0; i < b.N; i++ {
-				rec := httptest.NewRecorder()
-				c := e.NewContext(req, rec)
-				h(c)
-			}
-		})
+		}
 	}
 }
 
-func BenchmarkCompressLarge(b *testing.B) {
+func BenchmarkCompressJSON(b *testing.B) {
 	data, err := os.ReadFile("./fixtures/processList.json")
 	require.NoError(b, err)
 
