@@ -15,6 +15,7 @@
 package util
 
 import (
+	"encoding/json"
 	"regexp"
 	"sort"
 	"strings"
@@ -25,10 +26,13 @@ var evalReg = regexp.MustCompile(`\beval\((?P<rule>[^)]*)\)`)
 
 var escapeAssertionRegex = regexp.MustCompile(`\b((r|p)[0-9]*)\.`)
 
-var numericRegex = regexp.MustCompile(`^-?\d+(?:\.\d+)?$`)
-
-func IsNumeric(s string) bool {
-	return numericRegex.MatchString(s)
+func JsonToMap(jsonStr string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	err := json.Unmarshal([]byte(jsonStr), &result)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 // EscapeAssertion escapes the dots in the assertion, because the expression evaluation doesn't support such variable names.
@@ -76,7 +80,7 @@ func Array2DEquals(a [][]string, b [][]string) bool {
 	return true
 }
 
-// SortArray2D  Sorts the two-dimensional string array
+// SortArray2D  Sorts the two-dimensional string array.
 func SortArray2D(arr [][]string) {
 	if len(arr) != 0 {
 		sort.Slice(arr, func(i, j int) bool {
@@ -155,7 +159,7 @@ func SetEquals(a []string, b []string) bool {
 	return true
 }
 
-// SetEquals determines whether two string sets are identical.
+// SetEquals determines whether two int sets are identical.
 func SetEqualsInt(a []int, b []int) bool {
 	if len(a) != len(b) {
 		return false
@@ -172,7 +176,7 @@ func SetEqualsInt(a []int, b []int) bool {
 	return true
 }
 
-// SetEquals determines whether two string sets are identical.
+// Set2DEquals determines whether two string slice sets are identical.
 func Set2DEquals(a [][]string, b [][]string) bool {
 	if len(a) != len(b) {
 		return false
@@ -229,12 +233,12 @@ func SetSubtract(a []string, b []string) []string {
 	return diff
 }
 
-// HasEval determine whether matcher contains function eval
+// HasEval determine whether matcher contains function eval.
 func HasEval(s string) bool {
 	return evalReg.MatchString(s)
 }
 
-// ReplaceEval replace function eval with the value of its parameters
+// ReplaceEval replace function eval with the value of its parameters.
 func ReplaceEval(s string, rule string) string {
 	return evalReg.ReplaceAllString(s, "("+rule+")")
 }
@@ -255,7 +259,7 @@ func ReplaceEvalWithMap(src string, sets map[string]string) string {
 	})
 }
 
-// GetEvalValue returns the parameters of function eval
+// GetEvalValue returns the parameters of function eval.
 func GetEvalValue(s string) []string {
 	subMatch := evalReg.FindAllStringSubmatch(s, -1)
 	var rules []string

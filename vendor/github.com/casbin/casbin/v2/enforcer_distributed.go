@@ -22,8 +22,8 @@ func NewDistributedEnforcer(params ...interface{}) (*DistributedEnforcer, error)
 }
 
 // SetDispatcher sets the current dispatcher.
-func (e *DistributedEnforcer) SetDispatcher(dispatcher persist.Dispatcher) {
-	e.dispatcher = dispatcher
+func (d *DistributedEnforcer) SetDispatcher(dispatcher persist.Dispatcher) {
+	d.dispatcher = dispatcher
 }
 
 // AddPoliciesSelf provides a method for dispatcher to add authorization rules to the current policy.
@@ -64,7 +64,7 @@ func (d *DistributedEnforcer) RemovePoliciesSelf(shouldPersist func() bool, sec 
 	d.m.Lock()
 	defer d.m.Unlock()
 	if shouldPersist != nil && shouldPersist() {
-		if err := d.adapter.(persist.BatchAdapter).RemovePolicies(sec, ptype, rules); err != nil {
+		if err = d.adapter.(persist.BatchAdapter).RemovePolicies(sec, ptype, rules); err != nil {
 			if err.Error() != notImplemented {
 				return nil, err
 			}
@@ -74,7 +74,7 @@ func (d *DistributedEnforcer) RemovePoliciesSelf(shouldPersist func() bool, sec 
 	affected = d.model.RemovePoliciesWithAffected(sec, ptype, rules)
 
 	if sec == "g" {
-		err := d.BuildIncrementalRoleLinks(model.PolicyRemove, ptype, affected)
+		err = d.BuildIncrementalRoleLinks(model.PolicyRemove, ptype, affected)
 		if err != nil {
 			return affected, err
 		}

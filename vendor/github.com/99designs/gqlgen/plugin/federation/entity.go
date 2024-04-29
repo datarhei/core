@@ -3,10 +3,11 @@ package federation
 import (
 	"go/types"
 
+	"github.com/vektah/gqlparser/v2/ast"
+
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/plugin/federation/fieldset"
-	"github.com/vektah/gqlparser/v2/ast"
 )
 
 // Entity represents a federated type
@@ -17,6 +18,7 @@ type Entity struct {
 	Resolvers []*EntityResolver
 	Requires  []*Requires
 	Multi     bool
+	Type      types.Type
 }
 
 type EntityResolver struct {
@@ -114,4 +116,9 @@ func (e *Entity) keyFields() []string {
 		keyFields[i] = field[0]
 	}
 	return keyFields
+}
+
+// GetTypeInfo - get the imported package & type name combo.  package.TypeName
+func (e Entity) GetTypeInfo() string {
+	return templates.CurrentImports.LookupType(e.Type)
 }

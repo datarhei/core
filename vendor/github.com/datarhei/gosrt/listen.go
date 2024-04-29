@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/gosrt/internal/crypto"
-	srtnet "github.com/datarhei/gosrt/internal/net"
-	"github.com/datarhei/gosrt/internal/packet"
+	"github.com/datarhei/gosrt/crypto"
+	srtnet "github.com/datarhei/gosrt/net"
+	"github.com/datarhei/gosrt/packet"
 )
 
 // ConnType represents the kind of connection as returned
@@ -39,6 +39,52 @@ const (
 	SUBSCRIBE                                // This connection is meant to read data from a PUBLISHed stream
 )
 
+// RejectionReason are the rejection reasons that can be returned from the AcceptFunc in order to send
+// another reason than the default one (REJ_PEER) to the client.
+type RejectionReason uint32
+
+// Table 7: Handshake Rejection Reason Codes
+const (
+	REJ_UNKNOWN    RejectionReason = 1000 // unknown reason
+	REJ_SYSTEM     RejectionReason = 1001 // system function error
+	REJ_PEER       RejectionReason = 1002 // rejected by peer
+	REJ_RESOURCE   RejectionReason = 1003 // resource allocation problem
+	REJ_ROGUE      RejectionReason = 1004 // incorrect data in handshake
+	REJ_BACKLOG    RejectionReason = 1005 // listener's backlog exceeded
+	REJ_IPE        RejectionReason = 1006 // internal program error
+	REJ_CLOSE      RejectionReason = 1007 // socket is closing
+	REJ_VERSION    RejectionReason = 1008 // peer is older version than agent's min
+	REJ_RDVCOOKIE  RejectionReason = 1009 // rendezvous cookie collision
+	REJ_BADSECRET  RejectionReason = 1010 // wrong password
+	REJ_UNSECURE   RejectionReason = 1011 // password required or unexpected
+	REJ_MESSAGEAPI RejectionReason = 1012 // stream flag collision
+	REJ_CONGESTION RejectionReason = 1013 // incompatible congestion-controller type
+	REJ_FILTER     RejectionReason = 1014 // incompatible packet filter
+	REJ_GROUP      RejectionReason = 1015 // incompatible group
+)
+
+// These are the extended rejection reasons that may be less well supported
+// Codes & their meanings taken from https://github.com/Haivision/srt/blob/f477af533562505abf5295f059cf2156b17be740/srtcore/access_control.h
+const (
+	REJX_BAD_REQUEST   RejectionReason = 1400 // General syntax error in the SocketID specification (also a fallback code for undefined cases)
+	REJX_UNAUTHORIZED  RejectionReason = 1401 // Authentication failed, provided that the user was correctly identified and access to the required resource would be granted
+	REJX_OVERLOAD      RejectionReason = 1402 // The server is too heavily loaded, or you have exceeded credits for accessing the service and the resource.
+	REJX_FORBIDDEN     RejectionReason = 1403 // Access denied to the resource by any kind of reason.
+	REJX_NOTFOUND      RejectionReason = 1404 // Resource not found at this time.
+	REJX_BAD_MODE      RejectionReason = 1405 // The mode specified in `m` key in StreamID is not supported for this request.
+	REJX_UNACCEPTABLE  RejectionReason = 1406 // The requested parameters specified in SocketID cannot be satisfied for the requested resource. Also when m=publish and the data format is not acceptable.
+	REJX_CONFLICT      RejectionReason = 1407 // The resource being accessed is already locked for modification. This is in case of m=publish and the specified resource is currently read-only.
+	REJX_NOTSUP_MEDIA  RejectionReason = 1415 // The media type is not supported by the application. This is the `t` key that specifies the media type as stream, file and auth, possibly extended by the application.
+	REJX_LOCKED        RejectionReason = 1423 // The resource being accessed is locked for any access.
+	REJX_FAILED_DEPEND RejectionReason = 1424 // The request failed because it specified a dependent session ID that has been disconnected.
+	REJX_ISE           RejectionReason = 1500 // Unexpected internal server error
+	REJX_UNIMPLEMENTED RejectionReason = 1501 // The request was recognized, but the current version doesn't support it.
+	REJX_GW            RejectionReason = 1502 // The server acts as a gateway and the target endpoint rejected the connection.
+	REJX_DOWN          RejectionReason = 1503 // The service has been temporarily taken over by a stub reporting this error. The real service can be down for maintenance or crashed.
+	REJX_VERSION       RejectionReason = 1505 // SRT version not supported. This might be either unsupported backward compatibility, or an upper value of a version.
+	REJX_NOROOM        RejectionReason = 1507 // The data stream cannot be archived due to lacking storage space. This is in case when the request type was to send a file or the live stream to be archived.
+)
+
 // ConnRequest is an incoming connection request
 type ConnRequest interface {
 	// RemoteAddr returns the address of the peer. The returned net.Addr
@@ -63,6 +109,10 @@ type ConnRequest interface {
 	// data. Returns an error if the passphrase did not work or the connection
 	// is not encrypted.
 	SetPassphrase(p string) error
+
+	// SetRejectionReason sets the rejection reason for the connection. If
+	// no set, REJ_PEER will be used.
+	SetRejectionReason(r RejectionReason)
 }
 
 // connRequest implements the ConnRequest interface
@@ -72,9 +122,11 @@ type connRequest struct {
 	socketId  uint32
 	timestamp uint32
 
-	handshake  *packet.CIFHandshake
-	crypto     crypto.Crypto
-	passphrase string
+	config          Config
+	handshake       *packet.CIFHandshake
+	crypto          crypto.Crypto
+	passphrase      string
+	rejectionReason RejectionReason
 }
 
 func (req *connRequest) RemoteAddr() net.Addr {
@@ -108,6 +160,10 @@ func (req *connRequest) SetPassphrase(passphrase string) error {
 	req.passphrase = passphrase
 
 	return nil
+}
+
+func (req *connRequest) SetRejectionReason(reason RejectionReason) {
+	req.rejectionReason = reason
 }
 
 // ErrListenerClosed is returned when the listener is about to shutdown.
@@ -148,7 +204,9 @@ type listener struct {
 	start time.Time
 
 	rcvQueue chan packet.Packet
-	sndQueue chan packet.Packet
+
+	sndMutex sync.Mutex
+	sndData  bytes.Buffer
 
 	syncookie *srtnet.SYNCookie
 
@@ -157,9 +215,10 @@ type listener struct {
 	shutdownOnce sync.Once
 
 	stopReader context.CancelFunc
-	stopWriter context.CancelFunc
 
-	doneChan chan error
+	doneChan chan struct{}
+	doneErr  error
+	doneOnce sync.Once
 }
 
 // Listen returns a new listener on the SRT protocol on the address with
@@ -202,21 +261,24 @@ func Listen(network, address string, config Config) (Listener, error) {
 
 	ln.pc = pc
 	ln.addr = pc.LocalAddr()
+	if ln.addr == nil {
+		return nil, fmt.Errorf("listen: no local address")
+	}
 
 	ln.conns = make(map[uint32]*srtConn)
 
 	ln.backlog = make(chan connRequest, 128)
 
 	ln.rcvQueue = make(chan packet.Packet, 2048)
-	ln.sndQueue = make(chan packet.Packet, 2048)
 
-	ln.syncookie, err = srtnet.NewSYNCookie(ln.addr.String(), nil)
+	syncookie, err := srtnet.NewSYNCookie(ln.addr.String(), nil)
 	if err != nil {
 		ln.Close()
 		return nil, err
 	}
+	ln.syncookie = syncookie
 
-	ln.doneChan = make(chan error)
+	ln.doneChan = make(chan struct{})
 
 	ln.start = time.Now()
 
@@ -224,16 +286,12 @@ func Listen(network, address string, config Config) (Listener, error) {
 	readerCtx, ln.stopReader = context.WithCancel(context.Background())
 	go ln.reader(readerCtx)
 
-	var writerCtx context.Context
-	writerCtx, ln.stopWriter = context.WithCancel(context.Background())
-	go ln.writer(writerCtx)
-
 	go func() {
 		buffer := make([]byte, config.MSS) // MTU size
 
 		for {
 			if ln.isShutdown() {
-				ln.doneChan <- ErrListenerClosed
+				ln.markDone(ErrListenerClosed)
 				return
 			}
 
@@ -245,16 +303,16 @@ func Listen(network, address string, config Config) (Listener, error) {
 				}
 
 				if ln.isShutdown() {
-					ln.doneChan <- ErrListenerClosed
+					ln.markDone(ErrListenerClosed)
 					return
 				}
 
-				ln.doneChan <- err
+				ln.markDone(err)
 				return
 			}
 
-			p := packet.NewPacket(addr, buffer[:n])
-			if p == nil {
+			p, err := packet.NewPacketFromData(addr, buffer[:n])
+			if err != nil {
 				continue
 			}
 
@@ -276,22 +334,27 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 	}
 
 	select {
-	case err := <-ln.doneChan:
-		return nil, REJECT, err
+	case <-ln.doneChan:
+		return nil, REJECT, ln.error()
 	case request := <-ln.backlog:
 		if acceptFn == nil {
-			ln.reject(request, packet.REJ_PEER)
+			ln.reject(request, REJ_PEER)
 			break
 		}
 
 		mode := acceptFn(&request)
 		if mode != PUBLISH && mode != SUBSCRIBE {
-			ln.reject(request, packet.REJ_PEER)
+			// Figure out the reason
+			reason := REJ_PEER
+			if request.rejectionReason > 0 {
+				reason = request.rejectionReason
+			}
+			ln.reject(request, reason)
 			break
 		}
 
 		if request.crypto != nil && len(request.passphrase) == 0 {
-			ln.reject(request, packet.REJ_BADSECRET)
+			ln.reject(request, REJ_BADSECRET)
 			break
 		}
 
@@ -299,8 +362,8 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 		socketId := uint32(time.Since(ln.start).Microseconds())
 
 		// Select the largest TSBPD delay advertised by the caller, but at least 120ms
-		recvTsbpdDelay := uint16(ln.config.ReceiverLatency.Milliseconds())
-		sendTsbpdDelay := uint16(ln.config.PeerLatency.Milliseconds())
+		recvTsbpdDelay := uint16(request.config.ReceiverLatency.Milliseconds())
+		sendTsbpdDelay := uint16(request.config.PeerLatency.Milliseconds())
 
 		if request.handshake.Version == 5 {
 			if request.handshake.SRTHS.SendTSBPDDelay > recvTsbpdDelay {
@@ -311,17 +374,17 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 				sendTsbpdDelay = request.handshake.SRTHS.RecvTSBPDDelay
 			}
 
-			ln.config.StreamId = request.handshake.StreamId
+			request.config.StreamId = request.handshake.StreamId
 		}
 
-		ln.config.Passphrase = request.passphrase
+		request.config.Passphrase = request.passphrase
 
 		// Create a new connection
 		conn := newSRTConn(srtConnConfig{
 			version:                     request.handshake.Version,
 			localAddr:                   ln.addr,
 			remoteAddr:                  request.addr,
-			config:                      ln.config,
+			config:                      request.config,
 			start:                       request.start,
 			socketId:                    socketId,
 			peerSocketId:                request.handshake.SRTSocketId,
@@ -333,7 +396,7 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 			keyBaseEncryption:           packet.EvenKeyEncrypted,
 			onSend:                      ln.send,
 			onShutdown:                  ln.handleShutdown,
-			logger:                      ln.config.Logger,
+			logger:                      request.config.Logger,
 		})
 
 		ln.log("connection:new", func() string { return fmt.Sprintf("%#08x (%s) %s", conn.SocketId(), conn.StreamId(), mode) })
@@ -369,14 +432,33 @@ func (ln *listener) Accept(acceptFn AcceptFunc) (Conn, ConnType, error) {
 	return nil, REJECT, nil
 }
 
+// markDone marks the listener as done by closing
+// the done channel & sets the error
+func (ln *listener) markDone(err error) {
+	ln.doneOnce.Do(func() {
+		ln.lock.Lock()
+		defer ln.lock.Unlock()
+		ln.doneErr = err
+		close(ln.doneChan)
+	})
+}
+
+// error returns the error that caused the listener to be done
+// if it's nil then the listener is not done
+func (ln *listener) error() error {
+	ln.lock.Lock()
+	defer ln.lock.Unlock()
+	return ln.doneErr
+}
+
 func (ln *listener) handleShutdown(socketId uint32) {
 	ln.lock.Lock()
 	delete(ln.conns, socketId)
 	ln.lock.Unlock()
 }
 
-func (ln *listener) reject(request connRequest, reason packet.HandshakeType) {
-	p := packet.NewPacket(request.addr, nil)
+func (ln *listener) reject(request connRequest, reason RejectionReason) {
+	p := packet.NewPacket(request.addr)
 	p.Header().IsControlPacket = true
 
 	p.Header().ControlType = packet.CTRLTYPE_HANDSHAKE
@@ -386,7 +468,7 @@ func (ln *listener) reject(request connRequest, reason packet.HandshakeType) {
 	p.Header().Timestamp = uint32(time.Since(ln.start).Microseconds())
 	p.Header().DestinationSocketId = request.socketId
 
-	request.handshake.HandshakeType = reason
+	request.handshake.HandshakeType = packet.HandshakeType(reason)
 
 	p.MarshalCIF(request.handshake)
 
@@ -397,7 +479,7 @@ func (ln *listener) reject(request connRequest, reason packet.HandshakeType) {
 }
 
 func (ln *listener) accept(request connRequest) {
-	p := packet.NewPacket(request.addr, nil)
+	p := packet.NewPacket(request.addr)
 
 	p.Header().IsControlPacket = true
 
@@ -436,7 +518,6 @@ func (ln *listener) Close() {
 		ln.lock.RUnlock()
 
 		ln.stopReader()
-		ln.stopWriter()
 
 		ln.log("listen", func() string { return "closing socket" })
 
@@ -445,7 +526,12 @@ func (ln *listener) Close() {
 }
 
 func (ln *listener) Addr() net.Addr {
-	addr, _ := net.ResolveUDPAddr("udp", ln.addr.String())
+	addrString := "0.0.0.0:0"
+	if ln.addr != nil {
+		addrString = ln.addr.String()
+	}
+
+	addr, _ := net.ResolveUDPAddr("udp", addrString)
 	return addr
 }
 
@@ -489,49 +575,29 @@ func (ln *listener) reader(ctx context.Context) {
 	}
 }
 
+// Send a packet to the wire. This function must be synchronous in order to allow to safely call Packet.Decommission() afterward.
 func (ln *listener) send(p packet.Packet) {
-	// non-blocking
-	select {
-	case ln.sndQueue <- p:
-	default:
-		ln.log("listen", func() string { return "send queue is full" })
+	ln.sndMutex.Lock()
+	defer ln.sndMutex.Unlock()
+
+	ln.sndData.Reset()
+
+	if err := p.Marshal(&ln.sndData); err != nil {
+		p.Decommission()
+		ln.log("packet:send:error", func() string { return "marshalling packet failed" })
+		return
 	}
-}
 
-func (ln *listener) writer(ctx context.Context) {
-	defer func() {
-		ln.log("listen", func() string { return "left writer loop" })
-	}()
+	buffer := ln.sndData.Bytes()
 
-	ln.log("listen", func() string { return "writer loop started" })
+	ln.log("packet:send:dump", func() string { return p.Dump() })
 
-	var data bytes.Buffer
+	// Write the packet's contents to the wire
+	ln.pc.WriteTo(buffer, p.Header().Addr)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case p := <-ln.sndQueue:
-			data.Reset()
-
-			if err := p.Marshal(&data); err != nil {
-				p.Decommission()
-				ln.log("packet:send:error", func() string { return "marshalling packet failed" })
-				continue
-			}
-
-			buffer := data.Bytes()
-
-			ln.log("packet:send:dump", func() string { return p.Dump() })
-
-			// Write the packet's contents to the wire
-			ln.pc.WriteTo(buffer, p.Header().Addr)
-
-			if p.Header().IsControlPacket {
-				// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)
-				p.Decommission()
-			}
-		}
+	if p.Header().IsControlPacket {
+		// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)
+		p.Decommission()
 	}
 }
 
@@ -558,6 +624,9 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 
 	cif.PeerIP.FromNetAddr(ln.addr)
 
+	// Create a copy of the configuration for the connection
+	config := ln.config
+
 	if cif.HandshakeType == packet.HSTYPE_INDUCTION {
 		// cif
 		cif.Version = 5
@@ -578,7 +647,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 	} else if cif.HandshakeType == packet.HSTYPE_CONCLUSION {
 		// Verify the SYN cookie
 		if !ln.syncookie.Verify(cif.SynCookie, p.Header().Addr.String()) {
-			cif.HandshakeType = packet.REJ_ROGUE
+			cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 			ln.log("handshake:recv:error", func() string { return "invalid SYN cookie" })
 			p.MarshalCIF(cif)
 			ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -590,7 +659,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 
 		// Peer is advertising a too big MSS
 		if cif.MaxTransmissionUnitSize > MAX_MSS_SIZE {
-			cif.HandshakeType = packet.REJ_ROGUE
+			cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 			ln.log("handshake:recv:error", func() string { return fmt.Sprintf("MTU is too big (%d bytes)", cif.MaxTransmissionUnitSize) })
 			p.MarshalCIF(cif)
 			ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -601,13 +670,13 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		}
 
 		// If the peer has a smaller MTU size, adjust to it
-		if cif.MaxTransmissionUnitSize < ln.config.MSS {
-			ln.config.MSS = cif.MaxTransmissionUnitSize
-			ln.config.PayloadSize = ln.config.MSS - SRT_HEADER_SIZE - UDP_HEADER_SIZE
+		if cif.MaxTransmissionUnitSize < config.MSS {
+			config.MSS = cif.MaxTransmissionUnitSize
+			config.PayloadSize = config.MSS - SRT_HEADER_SIZE - UDP_HEADER_SIZE
 
-			if ln.config.PayloadSize < MIN_PAYLOAD_SIZE {
-				cif.HandshakeType = packet.REJ_ROGUE
-				ln.log("handshake:recv:error", func() string { return fmt.Sprintf("payload size is too small (%d bytes)", ln.config.PayloadSize) })
+			if config.PayloadSize < MIN_PAYLOAD_SIZE {
+				cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
+				ln.log("handshake:recv:error", func() string { return fmt.Sprintf("payload size is too small (%d bytes)", config.PayloadSize) })
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
 				ln.log("handshake:send:cif", func() string { return cif.String() })
@@ -619,7 +688,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		if cif.Version == 4 {
 			// Check if the type (encryption field + extension field) has the value 2
 			if cif.EncryptionField != 0 || cif.ExtensionField != 2 {
-				cif.HandshakeType = packet.REJ_ROGUE
+				cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 				ln.log("handshake:recv:error", func() string { return "invalid type, expecting a value of 2 (UDT_DGRAM)" })
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -630,10 +699,10 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 			}
 		} else if cif.Version == 5 {
 			// Check if the peer version is sufficient
-			if cif.SRTHS.SRTVersion < ln.config.MinVersion {
-				cif.HandshakeType = packet.REJ_VERSION
+			if cif.SRTHS.SRTVersion < config.MinVersion {
+				cif.HandshakeType = packet.HandshakeType(REJ_VERSION)
 				ln.log("handshake:recv:error", func() string {
-					return fmt.Sprintf("peer version insufficient (%#06x), expecting at least %#06x", cif.SRTHS.SRTVersion, ln.config.MinVersion)
+					return fmt.Sprintf("peer version insufficient (%#06x), expecting at least %#06x", cif.SRTHS.SRTVersion, config.MinVersion)
 				})
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -645,7 +714,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 
 			// Check the required SRT flags
 			if !cif.SRTHS.SRTFlags.TSBPDSND || !cif.SRTHS.SRTFlags.TSBPDRCV || !cif.SRTHS.SRTFlags.TLPKTDROP || !cif.SRTHS.SRTFlags.PERIODICNAK || !cif.SRTHS.SRTFlags.REXMITFLG {
-				cif.HandshakeType = packet.REJ_ROGUE
+				cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 				ln.log("handshake:recv:error", func() string { return "not all required flags are set" })
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -657,7 +726,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 
 			// We only support live streaming
 			if cif.SRTHS.SRTFlags.STREAM {
-				cif.HandshakeType = packet.REJ_MESSAGEAPI
+				cif.HandshakeType = packet.HandshakeType(REJ_MESSAGEAPI)
 				ln.log("handshake:recv:error", func() string { return "only live streaming is supported" })
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -667,7 +736,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 				return
 			}
 		} else {
-			cif.HandshakeType = packet.REJ_ROGUE
+			cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 			ln.log("handshake:recv:error", func() string { return fmt.Sprintf("only HSv4 and HSv5 are supported (got HSv%d)", cif.Version) })
 			p.MarshalCIF(cif)
 			ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -684,6 +753,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 			start:     time.Now(),
 			socketId:  cif.SRTSocketId,
 			timestamp: p.Header().Timestamp,
+			config:    config,
 
 			handshake: cif,
 		}
@@ -691,7 +761,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		if cif.SRTKM != nil {
 			cr, err := crypto.New(int(cif.SRTKM.KLen))
 			if err != nil {
-				cif.HandshakeType = packet.REJ_ROGUE
+				cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 				ln.log("handshake:recv:error", func() string { return fmt.Sprintf("crypto: %s", err) })
 				p.MarshalCIF(cif)
 				ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -708,7 +778,7 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 		select {
 		case ln.backlog <- c:
 		default:
-			cif.HandshakeType = packet.REJ_BACKLOG
+			cif.HandshakeType = packet.HandshakeType(REJ_BACKLOG)
 			ln.log("handshake:recv:error", func() string { return "backlog is full" })
 			p.MarshalCIF(cif)
 			ln.log("handshake:send:dump", func() string { return p.Dump() })
@@ -725,5 +795,9 @@ func (ln *listener) handleHandshake(p packet.Packet) {
 }
 
 func (ln *listener) log(topic string, message func() string) {
+	if ln.config.Logger == nil {
+		return
+	}
+
 	ln.config.Logger.Print(topic, 0, 2, message)
 }

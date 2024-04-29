@@ -34,10 +34,10 @@ func (c *SegmentChecker) SetRef(ref time.Time) {
 func (c *SegmentChecker) CheckDue(segment string, pos int) (due bool, err error) {
 	ref, last := c.GetRef(), -1
 	val, loc := valueByPos(ref, pos), ref.Location()
-	isMonth, isWeekDay := pos == 3, pos == 5
+	isMonthDay, isWeekDay := pos == 3, pos == 5
 
 	for _, offset := range strings.Split(segment, ",") {
-		mod := (isMonth || isWeekDay) && strings.ContainsAny(offset, "LW#")
+		mod := (isMonthDay || isWeekDay) && strings.ContainsAny(offset, "LW#")
 		if due, err = c.isOffsetDue(offset, val, pos); due || (!mod && err != nil) {
 			return
 		}
@@ -45,9 +45,9 @@ func (c *SegmentChecker) CheckDue(segment string, pos int) (due bool, err error)
 			continue
 		}
 		if last == -1 {
-			last = time.Date(ref.Year(), ref.Month(), 1, 0, 0, 0, 0, loc).AddDate(0, 1, 0).Add(-time.Nanosecond).Day()
+			last = time.Date(ref.Year(), ref.Month(), 1, 0, 0, 0, 0, loc).AddDate(0, 1, 0).Add(-time.Second).Day()
 		}
-		if isMonth {
+		if isMonthDay {
 			due, err = isValidMonthDay(offset, last, ref)
 		} else if isWeekDay {
 			due, err = isValidWeekDay(offset, last, ref)
@@ -81,12 +81,12 @@ func (c *SegmentChecker) isOffsetDue(offset string, val, pos int) (bool, error) 
 		return false, err
 	}
 
-	if !isWeekDay && (val == 0 || nval == 0) {
-		return nval == 0 && val == 0, nil
-	}
-
 	if nval < bounds[0] || nval > bounds[1] {
 		return false, fmt.Errorf("segment#%d: '%s' out of bounds(%d, %d)", pos, offset, bounds[0], bounds[1])
+	}
+
+	if !isWeekDay && (val == 0 || nval == 0) {
+		return nval == 0 && val == 0, nil
 	}
 
 	return nval == val || (isWeekDay && nval == 7 && val == 0), nil
@@ -126,7 +126,7 @@ func boundsByPos(pos int) (bounds []int) {
 	case 5:
 		bounds = []int{0, 7}
 	case 6:
-		bounds = []int{1, 9999}
+		bounds = []int{0, 9999}
 	}
 	return
 }

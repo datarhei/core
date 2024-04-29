@@ -23,7 +23,7 @@ import (
 	"github.com/casbin/casbin/v2/persist/cache"
 )
 
-// CachedEnforcer wraps Enforcer and provides decision cache
+// CachedEnforcer wraps Enforcer and provides decision cache.
 type CachedEnforcer struct {
 	*Enforcer
 	expireTime  time.Duration
@@ -61,7 +61,7 @@ func (e *CachedEnforcer) EnableCache(enableCache bool) {
 }
 
 // Enforce decides whether a "subject" can access a "object" with the operation "action", input parameters are usually: (sub, obj, act).
-// if rvals is not string , ingore the cache
+// if rvals is not string , ignore the cache.
 func (e *CachedEnforcer) Enforce(rvals ...interface{}) (bool, error) {
 	if atomic.LoadInt32(&e.enableCache) == 0 {
 		return e.Enforcer.Enforce(rvals...)
@@ -127,8 +127,8 @@ func (e *CachedEnforcer) RemovePolicies(rules [][]string) (bool, error) {
 }
 
 func (e *CachedEnforcer) getCachedResult(key string) (res bool, err error) {
-	e.locker.RLock()
-	defer e.locker.RUnlock()
+	e.locker.Lock()
+	defer e.locker.Unlock()
 	return e.cache.Get(key)
 }
 
