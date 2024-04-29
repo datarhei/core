@@ -19,6 +19,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gobwas/glob"
 	jwtgo "github.com/golang-jwt/jwt/v4"
+	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/compress/zstd"
 )
 
 const (
@@ -843,12 +845,47 @@ func (r *restclient) info() (api.About, error) {
 }
 
 func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
+	/*
+		fmt.Printf("%s %s\n", req.Method, req.URL)
+		for key, value := range req.Header {
+			for _, v := range value {
+				fmt.Printf("%s: %s\n", key, v)
+			}
+		}
+		fmt.Printf("\n")
+	*/
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return -1, nil, err
 	}
+	/*
+		for key, value := range resp.Header {
+			for _, v := range value {
+				fmt.Printf("%s: %s\n", key, v)
+			}
+		}
+	*/
+	reader := resp.Body
 
-	return resp.StatusCode, resp.Body, nil
+	contentEncoding := resp.Header.Get("Content-Encoding")
+
+	if contentEncoding == "gzip" {
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			resp.Body.Close()
+			return -1, nil, err
+		}
+	} else if contentEncoding == "zstd" {
+		zstd, err := zstd.NewReader(resp.Body)
+		if err != nil {
+			resp.Body.Close()
+			return -1, nil, err
+		}
+
+		reader = zstd.IOReadCloser()
+	}
+
+	return resp.StatusCode, reader, nil
 }
 
 func (r *restclient) stream(ctx context.Context, method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) (io.ReadCloser, error) {
@@ -873,6 +910,8 @@ func (r *restclient) stream(ctx context.Context, method, path string, query *url
 	if method == "POST" || method == "PUT" {
 		req.Header.Add("Content-Type", contentType)
 	}
+
+	req.Header.Set("Accept-Encoding", "zstd, gzip")
 
 	if r.accessToken.IsSet() {
 		if r.accessToken.IsExpired() {

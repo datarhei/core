@@ -51,6 +51,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.2 h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHH
 github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20240424105158-86a7f261b92c h1:RIzMclqmSYwpMZxyW7nLg0XyKjY6prQWcuIdgm97U8o=
 github.com/datarhei/core-client-go/v16 v16.11.1-0.20240424105158-86a7f261b92c/go.mod h1:7XrUOUlB165Gs8JUE4lzVuNve6HW90Yz3/+lTY2EV4A=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20240429143858-23ad5985b894 h1:ZQCTobOGpzfuZxgMWsZviFSXfI5QuttkTgPQz1PKbhU=
+github.com/datarhei/core-client-go/v16 v16.11.1-0.20240429143858-23ad5985b894/go.mod h1:Mu2bHqvGJe46KvAhY2ElohuQYhHB64PZeaCNDv6C5b8=
 github.com/datarhei/gosrt v0.6.0 h1:HrrXAw90V78ok4WMIhX6se1aTHPCn82Sg2hj+PhdmGc=
 github.com/datarhei/gosrt v0.6.0/go.mod h1:fsOWdLSHUHShHjgi/46h6wjtdQrtnSdAQFnlas8ONxs=
 github.com/datarhei/joy4 v0.0.0-20240229100136-43bcaf8ef5e7 h1:MG5XQMTTDPcuvvRzc1c37QbwgDbYPhKmPFo9gSaPdBE=
