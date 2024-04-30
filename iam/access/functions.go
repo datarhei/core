@@ -2,9 +2,13 @@ package access
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/datarhei/core/v16/glob"
 )
+
+var globcache = map[string]glob.Glob{}
+var globcacheMu = sync.RWMutex{}
 
 func resourceMatch(request, policy string) bool {
 	reqPrefix, reqResource := getPrefix(request)
@@ -31,16 +35,38 @@ func resourceMatch(request, policy string) bool {
 
 	match = false
 
+	key := reqType + polResource
+
 	if reqType == "api" || reqType == "fs" || reqType == "rtmp" || reqType == "srt" {
-		match, err = glob.Match(polResource, reqResource, rune('/'))
-		if err != nil {
-			return false
+		globcacheMu.RLock()
+		matcher, ok := globcache[key]
+		globcacheMu.RUnlock()
+		if !ok {
+			matcher, err = glob.Compile(polResource, rune('/'))
+			if err != nil {
+				return false
+			}
+			globcacheMu.Lock()
+			globcache[key] = matcher
+			globcacheMu.Unlock()
 		}
+
+		match = matcher.Match(reqResource)
 	} else {
-		match, err = glob.Match(polResource, reqResource)
-		if err != nil {
-			return false
+		globcacheMu.RLock()
+		matcher, ok := globcache[key]
+		globcacheMu.RUnlock()
+		if !ok {
+			matcher, err = glob.Compile(polResource)
+			if err != nil {
+				return false
+			}
+			globcacheMu.Lock()
+			globcache[key] = matcher
+			globcacheMu.Unlock()
 		}
+
+		match = matcher.Match(reqResource)
 	}
 
 	return match

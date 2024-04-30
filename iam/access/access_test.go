@@ -101,3 +101,23 @@ func TestAccessManager(t *testing.T) {
 	ok, _ = am.Enforce("foobar", "group", "blubb", "/", "write")
 	require.True(t, ok)
 }
+
+func BenchmarkEnforce(b *testing.B) {
+	adapter, err := createAdapter()
+	require.NoError(b, err)
+
+	am, err := New(Config{
+		Adapter: adapter,
+		Logger:  nil,
+	})
+	require.NoError(b, err)
+
+	am.AddPolicy("$anon", "$none", []string{"foobar"}, "**", []string{"ANY"})
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ok, _ := am.Enforce("$anon", "$none", "foobar", "baz", "read")
+		require.True(b, ok)
+	}
+}
