@@ -11,6 +11,7 @@ import (
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
+	"github.com/99designs/gqlgen/internal/rewrite"
 	"github.com/99designs/gqlgen/plugin"
 	"github.com/99designs/gqlgen/plugin/federation/fieldset"
 )
@@ -18,9 +19,13 @@ import (
 //go:embed federation.gotpl
 var federationTemplate string
 
+//go:embed requires.gotpl
+var explicitRequiresTemplate string
+
 type federation struct {
-	Entities []*Entity
-	Version  int
+	Entities       []*Entity
+	Version        int
+	PackageOptions map[string]bool
 }
 
 // New returns a federation plugin that injects
@@ -59,6 +64,12 @@ func (f *federation) MutateConfig(cfg *config.Config) error {
 		"_Any": {
 			Model: config.StringList{"github.com/99designs/gqlgen/graphql.Map"},
 		},
+		"federation__Scope": {
+			Model: config.StringList{"github.com/99designs/gqlgen/graphql.String"},
+		},
+		"federation__Policy": {
+			Model: config.StringList{"github.com/99designs/gqlgen/graphql.String"},
+		},
 	}
 
 	for typeName, entry := range builtins {
@@ -80,6 +91,11 @@ func (f *federation) MutateConfig(cfg *config.Config) error {
 		cfg.Directives["tag"] = config.DirectiveConfig{SkipRuntime: true}
 		cfg.Directives["override"] = config.DirectiveConfig{SkipRuntime: true}
 		cfg.Directives["inaccessible"] = config.DirectiveConfig{SkipRuntime: true}
+		cfg.Directives["authenticated"] = config.DirectiveConfig{SkipRuntime: true}
+		cfg.Directives["requiresScopes"] = config.DirectiveConfig{SkipRuntime: true}
+		cfg.Directives["policy"] = config.DirectiveConfig{SkipRuntime: true}
+		cfg.Directives["interfaceObject"] = config.DirectiveConfig{SkipRuntime: true}
+		cfg.Directives["composeDirective"] = config.DirectiveConfig{SkipRuntime: true}
 	}
 
 	return nil
@@ -101,6 +117,7 @@ func (f *federation) InjectSourceEarly() *ast.Source {
 `
 	} else if f.Version == 2 {
 		input += `
+	directive @authenticated on FIELD_DEFINITION | OBJECT | INTERFACE | SCALAR | ENUM
 	directive @composeDirective(name: String!) repeatable on SCHEMA
 	directive @extends on OBJECT | INTERFACE
 	directive @external on OBJECT | FIELD_DEFINITION
@@ -118,9 +135,21 @@ func (f *federation) InjectSourceEarly() *ast.Source {
 	  | UNION
 	directive @interfaceObject on OBJECT
 	directive @link(import: [String!], url: String!) repeatable on SCHEMA
-	directive @override(from: String!) on FIELD_DEFINITION
+	directive @override(from: String!, label: String) on FIELD_DEFINITION
+	directive @policy(policies: [[federation__Policy!]!]!) on 
+	  | FIELD_DEFINITION
+	  | OBJECT
+	  | INTERFACE
+	  | SCALAR
+	  | ENUM
 	directive @provides(fields: FieldSet!) on FIELD_DEFINITION
 	directive @requires(fields: FieldSet!) on FIELD_DEFINITION
+	directive @requiresScopes(scopes: [[federation__Scope!]!]!) on 
+	  | FIELD_DEFINITION
+	  | OBJECT
+	  | INTERFACE
+	  | SCALAR
+	  | ENUM
 	directive @shareable repeatable on FIELD_DEFINITION | OBJECT
 	directive @tag(name: String!) repeatable on
 	  | ARGUMENT_DEFINITION
@@ -135,6 +164,8 @@ func (f *federation) InjectSourceEarly() *ast.Source {
 	  | UNION
 	scalar _Any
 	scalar FieldSet
+	scalar federation__Policy
+	scalar federation__Scope
 `
 	}
 	return &ast.Source{
@@ -170,10 +201,14 @@ func (f *federation) InjectSourceLate(schema *ast.Schema) *ast.Source {
 				}
 				entityResolverInputDefinitions += "input " + r.InputTypeName + " {\n"
 				for _, keyField := range r.KeyFields {
-					entityResolverInputDefinitions += fmt.Sprintf("\t%s: %s\n", keyField.Field.ToGo(), keyField.Definition.Type.String())
+					entityResolverInputDefinitions += fmt.Sprintf(
+						"\t%s: %s\n",
+						keyField.Field.ToGo(),
+						keyField.Definition.Type.String(),
+					)
 				}
 				entityResolverInputDefinitions += "}"
-				resolvers += fmt.Sprintf("\t%s(reps: [%s!]!): [%s]\n", r.ResolverName, r.InputTypeName, e.Name)
+				resolvers += fmt.Sprintf("\t%s(reps: [%s]!): [%s]\n", r.ResolverName, r.InputTypeName, e.Name)
 			} else {
 				resolverArgs := ""
 				for _, keyField := range r.KeyFields {
@@ -233,6 +268,16 @@ type Entity {
 }
 
 func (f *federation) GenerateCode(data *codegen.Data) error {
+	// requires imports
+	requiresImports := make(map[string]bool, 0)
+	requiresImports["context"] = true
+	requiresImports["fmt"] = true
+
+	requiresEntities := make(map[string]*Entity, 0)
+
+	// Save package options on f for template use
+	f.PackageOptions = data.Config.Federation.Options
+
 	if len(f.Entities) > 0 {
 		if data.Objects.ByName("Entity") != nil {
 			data.Objects.ByName("Entity").Root = true
@@ -272,9 +317,19 @@ func (f *federation) GenerateCode(data *codegen.Data) error {
 					fmt.Println("skipping @requires field " + reqField.Name + " in " + e.Def.Name)
 					continue
 				}
+				// keep track of which entities have requires
+				requiresEntities[e.Def.Name] = e
+				// make a proper import path
+				typeString := strings.Split(obj.Type.String(), ".")
+				requiresImports[strings.Join(typeString[:len(typeString)-1], ".")] = true
+
 				cgField := reqField.Field.TypeReference(obj, data.Objects)
 				reqField.Type = cgField.TypeReference
 			}
+
+			// add type info to entity
+			e.Type = obj.Type
+
 		}
 	}
 
@@ -295,10 +350,82 @@ func (f *federation) GenerateCode(data *codegen.Data) error {
 		}
 	}
 
+	if data.Config.Federation.Options["explicit_requires"] && len(requiresEntities) > 0 {
+		// check for existing requires functions
+		type Populator struct {
+			FuncName       string
+			Exists         bool
+			Comment        string
+			Implementation string
+			Entity         *Entity
+		}
+		populators := make([]Populator, 0)
+
+		rewriter, err := rewrite.New(data.Config.Federation.Dir())
+		if err != nil {
+			return err
+		}
+
+		for name, entity := range requiresEntities {
+			populator := Populator{
+				FuncName: fmt.Sprintf("Populate%sRequires", name),
+				Entity:   entity,
+			}
+
+			populator.Comment = strings.TrimSpace(strings.TrimLeft(rewriter.GetMethodComment("executionContext", populator.FuncName), `\`))
+			populator.Implementation = strings.TrimSpace(rewriter.GetMethodBody("executionContext", populator.FuncName))
+
+			if populator.Implementation == "" {
+				populator.Exists = false
+				populator.Implementation = fmt.Sprintf("panic(fmt.Errorf(\"not implemented: %v\"))", populator.FuncName)
+			}
+			populators = append(populators, populator)
+		}
+
+		sort.Slice(populators, func(i, j int) bool {
+			return populators[i].FuncName < populators[j].FuncName
+		})
+
+		requiresFile := data.Config.Federation.Dir() + "/federation.requires.go"
+		existingImports := rewriter.ExistingImports(requiresFile)
+		for _, imp := range existingImports {
+			if imp.Alias == "" {
+				// import exists in both places, remove
+				delete(requiresImports, imp.ImportPath)
+			}
+		}
+
+		for k := range requiresImports {
+			existingImports = append(existingImports, rewrite.Import{ImportPath: k})
+		}
+
+		// render requires populators
+		err = templates.Render(templates.Options{
+			PackageName: data.Config.Federation.Package,
+			Filename:    requiresFile,
+			Data: struct {
+				federation
+				ExistingImports []rewrite.Import
+				Populators      []Populator
+				OriginalSource  string
+			}{*f, existingImports, populators, ""},
+			GeneratedHeader: false,
+			Packages:        data.Config.Packages,
+			Template:        explicitRequiresTemplate,
+		})
+		if err != nil {
+			return err
+		}
+
+	}
+
 	return templates.Render(templates.Options{
-		PackageName:     data.Config.Federation.Package,
-		Filename:        data.Config.Federation.Filename,
-		Data:            f,
+		PackageName: data.Config.Federation.Package,
+		Filename:    data.Config.Federation.Filename,
+		Data: struct {
+			federation
+			UsePointers bool
+		}{*f, data.Config.ResolversAlwaysReturnPointers},
 		GeneratedHeader: true,
 		Packages:        data.Config.Packages,
 		Template:        federationTemplate,

@@ -29,6 +29,23 @@ var expressions = map[string]string{
 	"@everysecond": "* * * * * *",
 }
 
+// AddTag adds a new custom tag representing given expr
+func AddTag(tag, expr string) error {
+	_, ok := expressions[tag]
+	if ok {
+		return errors.New("conflict tag")
+	}
+
+	segs, err := Segments(expr)
+	if err != nil {
+		return err
+	}
+	expr = strings.Join(segs, " ")
+
+	expressions[tag] = expr
+	return nil
+}
+
 // SpaceRe is regex for whitespace.
 var SpaceRe = regexp.MustCompile(`\s+`)
 var yearRe = regexp.MustCompile(`\d{4}`)
@@ -51,8 +68,8 @@ type Gronx struct {
 }
 
 // New initializes Gronx with factory defaults.
-func New() Gronx {
-	return Gronx{&SegmentChecker{}}
+func New() *Gronx {
+	return &Gronx{&SegmentChecker{}}
 }
 
 // IsDue checks if cron expression is due for given reference time (or now).
@@ -96,9 +113,40 @@ func Segments(expr string) ([]string, error) {
 // SegmentsDue checks if all cron parts are due.
 // It returns bool. You should use IsDue(expr) instead.
 func (g *Gronx) SegmentsDue(segs []string) (bool, error) {
-	for pos, seg := range segs {
+	skipMonthDayCheck := false
+	for i := 0; i < len(segs); i++ {
+		pos := len(segs) - 1 - i
+		seg := segs[pos]
+		isMonthDay, isWeekday := pos == 3, pos == 5
+
 		if seg == "*" || seg == "?" {
 			continue
+		}
+
+		if isMonthDay && skipMonthDayCheck {
+			continue
+		}
+
+		if isWeekday {
+			monthDaySeg := segs[3]
+			intersect := strings.Index(seg, "*/") == 0 || strings.Index(monthDaySeg, "*") == 0 || monthDaySeg == "?"
+
+			if !intersect {
+				due, err := g.C.CheckDue(seg, pos)
+				if err != nil {
+					return false, err
+				}
+
+				monthDayDue, err := g.C.CheckDue(monthDaySeg, 3)
+				if due || monthDayDue {
+					skipMonthDayCheck = true
+					continue
+				}
+
+				if err != nil {
+					return false, err
+				}
+			}
 		}
 
 		if due, err := g.C.CheckDue(seg, pos); !due {
@@ -109,6 +157,9 @@ func (g *Gronx) SegmentsDue(segs []string) (bool, error) {
 	return true, nil
 }
 
+// checker for validity
+var checker = &SegmentChecker{ref: time.Now()}
+
 // IsValid checks if cron expression is valid.
 // It returns bool.
 func (g *Gronx) IsValid(expr string) bool {
@@ -117,9 +168,8 @@ func (g *Gronx) IsValid(expr string) bool {
 		return false
 	}
 
-	g.C.SetRef(time.Now())
 	for pos, seg := range segs {
-		if _, err := g.C.CheckDue(seg, pos); err != nil {
+		if _, err := checker.CheckDue(seg, pos); err != nil {
 			return false
 		}
 	}

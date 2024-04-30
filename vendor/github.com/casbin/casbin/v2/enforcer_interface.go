@@ -15,18 +15,18 @@
 package casbin
 
 import (
-	"github.com/Knetic/govaluate"
 	"github.com/casbin/casbin/v2/effector"
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
 	"github.com/casbin/casbin/v2/rbac"
+	"github.com/casbin/govaluate"
 )
 
 var _ IEnforcer = &Enforcer{}
 var _ IEnforcer = &SyncedEnforcer{}
 var _ IEnforcer = &CachedEnforcer{}
 
-// IEnforcer is the API interface of Enforcer
+// IEnforcer is the API interface of Enforcer.
 type IEnforcer interface {
 	/* Enforcer API */
 	InitWithFile(modelPath string, policyPath string) error
@@ -69,7 +69,7 @@ type IEnforcer interface {
 	AddPermissionsForUser(user string, permissions ...[]string) (bool, error)
 	DeletePermissionForUser(user string, permission ...string) (bool, error)
 	DeletePermissionsForUser(user string) (bool, error)
-	GetPermissionsForUser(user string, domain ...string) [][]string
+	GetPermissionsForUser(user string, domain ...string) ([][]string, error)
 	HasPermissionForUser(user string, permission ...string) bool
 	GetImplicitRolesForUser(name string, domain ...string) ([]string, error)
 	GetImplicitPermissionsForUser(user string, domain ...string) ([][]string, error)
@@ -86,6 +86,12 @@ type IEnforcer interface {
 	GetPermissionsForUserInDomain(user string, domain string) [][]string
 	AddRoleForUserInDomain(user string, role string, domain string) (bool, error)
 	DeleteRoleForUserInDomain(user string, role string, domain string) (bool, error)
+	GetAllUsersByDomain(domain string) []string
+	DeleteRolesForUserInDomain(user string, domain string) (bool, error)
+	DeleteAllUsersByDomain(domain string) (bool, error)
+	DeleteDomains(domains ...string) (bool, error)
+	GetAllDomains() ([]string, error)
+	GetAllRolesByDomain(domain string) []string
 
 	/* Management API */
 	GetAllSubjects() []string

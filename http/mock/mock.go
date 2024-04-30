@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
@@ -84,7 +83,11 @@ type Response struct {
 	Data    interface{}
 }
 
-func Request(t *testing.T, httpstatus int, router *echo.Echo, method, path string, data io.Reader) *Response {
+func Request(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, data io.Reader) *Response {
+	return RequestEx(t, httpstatus, router, method, path, data, true)
+}
+
+func RequestEx(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, data io.Reader, checkResponse bool) *Response {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(method, path, data)
 	if data != nil {
@@ -92,14 +95,30 @@ func Request(t *testing.T, httpstatus int, router *echo.Echo, method, path strin
 	}
 	router.ServeHTTP(w, req)
 
-	response := CheckResponse(t, w.Result())
+	var response *Response = nil
+
+	if checkResponse {
+		response = CheckResponse(t, w.Result())
+	} else {
+		response = CheckResponseMinimal(t, w.Result())
+	}
 
 	require.Equal(t, httpstatus, w.Code, string(response.Raw))
 
 	return response
 }
 
-func CheckResponse(t *testing.T, res *http.Response) *Response {
+func CheckResponseMinimal(t require.TestingT, res *http.Response) *Response {
+	response := &Response{
+		Code: res.StatusCode,
+	}
+
+	res.Body.Close()
+
+	return response
+}
+
+func CheckResponse(t require.TestingT, res *http.Response) *Response {
 	response := &Response{
 		Code: res.StatusCode,
 	}
@@ -125,7 +144,7 @@ func CheckResponse(t *testing.T, res *http.Response) *Response {
 	return response
 }
 
-func Validate(t *testing.T, datatype, data interface{}) bool {
+func Validate(t require.TestingT, datatype, data interface{}) bool {
 	schema, err := jsonschema.Reflect(datatype).MarshalJSON()
 	require.NoError(t, err)
 
@@ -139,7 +158,7 @@ func Validate(t *testing.T, datatype, data interface{}) bool {
 	return true
 }
 
-func Read(t *testing.T, path string) io.Reader {
+func Read(t require.TestingT, path string) io.Reader {
 	data, err := os.ReadFile(path)
 	require.Equal(t, nil, err)
 

@@ -2,7 +2,9 @@ package restream
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1525,4 +1527,82 @@ func TestProcessLimit(t *testing.T) {
 
 	require.Equal(t, ncpu*process.LimitCPU, status.CPU.Limit)
 	require.Equal(t, process.LimitMemory, status.Memory.Limit)
+}
+
+func BenchmarkGetProcessIDs(b *testing.B) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(b, err)
+
+	for i := 0; i < 1000; i++ {
+		process := getDummyProcess()
+		process.ID = "test_" + strconv.Itoa(i)
+
+		err = rs.AddProcess(process)
+		require.Equal(b, nil, err, "Failed to add process (%s)", err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ids := rs.GetProcessIDs("", "", "", "")
+		require.NotEmpty(b, ids)
+		require.Equal(b, 1000, len(ids))
+	}
+}
+
+func BenchmarkGetProcess(b *testing.B) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(b, err)
+
+	for i := 0; i < 1000; i++ {
+		process := getDummyProcess()
+		process.ID = "test_" + strconv.Itoa(i)
+
+		err = rs.AddProcess(process)
+		require.Equal(b, nil, err, "Failed to add process (%s)", err)
+	}
+
+	rand := rand.New(rand.NewSource(42))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		n := rand.Intn(1000)
+		p, err := rs.GetProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""))
+		require.NotNil(b, p)
+		require.Nil(b, err)
+	}
+}
+
+func BenchmarkGetProcessState(b *testing.B) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	require.NoError(b, err)
+
+	n := 10
+
+	for i := 0; i < n; i++ {
+		process := getDummyProcess()
+		process.ID = "test_" + strconv.Itoa(i)
+		process.Autostart = true
+
+		err = rs.AddProcess(process)
+		require.Equal(b, nil, err, "Failed to add process (%s)", err)
+	}
+
+	rand := rand.New(rand.NewSource(42))
+
+	time.Sleep(10 * time.Second)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		n := rand.Intn(n)
+		s, err := rs.GetProcessState(app.NewProcessID("test_"+strconv.Itoa(n), ""))
+		require.NotNil(b, s)
+		require.Nil(b, err)
+	}
+
+	for i := 0; i < n; i++ {
+		rs.DeleteProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""))
+	}
 }

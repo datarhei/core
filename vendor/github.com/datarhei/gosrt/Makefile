@@ -9,7 +9,7 @@ test:
 
 ## fuzz: Run fuzz tests
 fuzz:
-	go test -fuzz=Fuzz -run=^Fuzz ./internal/packet -fuzztime 30s
+	go test -fuzz=Fuzz -run=^Fuzz ./packet -fuzztime 30s
 
 ## vet: Analyze code for potential errors
 vet:

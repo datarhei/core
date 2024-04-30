@@ -3,10 +3,11 @@ package aacparser
 import (
 	"bytes"
 	"fmt"
-	"github.com/datarhei/joy4/av"
-	"github.com/datarhei/joy4/utils/bits"
 	"io"
 	"time"
+
+	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/utils/bits"
 )
 
 // copied from libavcodec/mpeg4audio.h

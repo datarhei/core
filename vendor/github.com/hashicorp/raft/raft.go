@@ -293,7 +293,7 @@ func (r *Raft) runCandidate() {
 	// which will make other servers vote even though they have a leader already.
 	// It is important to reset that flag, because this priviledge could be abused
 	// otherwise.
-	defer func() { r.candidateFromLeadershipTransfer = false }()
+	defer func() { r.candidateFromLeadershipTransfer.Store(false) }()
 
 	electionTimeout := r.config().ElectionTimeout
 	electionTimer := randomTimeout(electionTimeout)
@@ -434,6 +434,11 @@ func (r *Raft) runLeader() {
 		select {
 		case notify <- true:
 		case <-r.shutdownCh:
+			// make sure push to the notify channel ( if given )
+			select {
+			case notify <- true:
+			default:
+			}
 		}
 	}
 
@@ -687,8 +692,21 @@ func (r *Raft) leaderLoop() {
 				case err := <-doneCh:
 					if err != nil {
 						r.logger.Debug(err.Error())
+						future.respond(err)
+					} else {
+						// Wait for up to ElectionTimeout before flagging the
+						// leadership transfer as done and unblocking applies in
+						// the leaderLoop.
+						select {
+						case <-time.After(r.config().ElectionTimeout):
+							err := fmt.Errorf("leadership transfer timeout")
+							r.logger.Debug(err.Error())
+							future.respond(err)
+						case <-leftLeaderLoop:
+							r.logger.Debug("lost leadership during transfer (expected)")
+							future.respond(nil)
+						}
 					}
-					future.respond(err)
 				}
 			}()
 
@@ -735,7 +753,7 @@ func (r *Raft) leaderLoop() {
 
 			start := time.Now()
 			var groupReady []*list.Element
-			var groupFutures = make(map[uint64]*logFuture)
+			groupFutures := make(map[uint64]*logFuture)
 			var lastIdxInGroup uint64
 
 			// Pull all inflight logs that are committed off the queue.
@@ -784,7 +802,6 @@ func (r *Raft) leaderLoop() {
 			if v.quorumSize == 0 {
 				// Just dispatched, start the verification
 				r.verifyLeader(v)
-
 			} else if v.votes < v.quorumSize {
 				// Early return, means there must be a new leader
 				r.logger.Warn("new leader elected, stepping down")
@@ -1391,7 +1408,7 @@ func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
 
 	// Increase the term if we see a newer one, also transition to follower
 	// if we ever get an appendEntries call
-	if a.Term > r.getCurrentTerm() || (r.getState() != Follower && !r.candidateFromLeadershipTransfer) {
+	if a.Term > r.getCurrentTerm() || (r.getState() != Follower && !r.candidateFromLeadershipTransfer.Load()) {
 		// Ensure transition to follower
 		r.setState(Follower)
 		r.setCurrentTerm(a.Term)
@@ -1411,7 +1428,6 @@ func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
 		var prevLogTerm uint64
 		if a.PrevLogEntry == lastIdx {
 			prevLogTerm = lastTerm
-
 		} else {
 			var prevLog Log
 			if err := r.logs.GetLog(a.PrevLogEntry, &prevLog); err != nil {
@@ -1841,7 +1857,7 @@ func (r *Raft) electSelf() <-chan *voteResult {
 		Candidate:          r.trans.EncodePeer(r.localID, r.localAddr),
 		LastLogIndex:       lastIdx,
 		LastLogTerm:        lastTerm,
-		LeadershipTransfer: r.candidateFromLeadershipTransfer,
+		LeadershipTransfer: r.candidateFromLeadershipTransfer.Load(),
 	}
 
 	// Construct a function to ask for a vote
@@ -1974,7 +1990,7 @@ func (r *Raft) initiateLeadershipTransfer(id *ServerID, address *ServerAddress) 
 func (r *Raft) timeoutNow(rpc RPC, req *TimeoutNowRequest) {
 	r.setLeader("", "")
 	r.setState(Candidate)
-	r.candidateFromLeadershipTransfer = true
+	r.candidateFromLeadershipTransfer.Store(true)
 	rpc.Respond(&TimeoutNowResponse{}, nil)
 }
 

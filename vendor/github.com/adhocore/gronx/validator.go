@@ -18,7 +18,10 @@ func inStep(val int, s string, bounds []int) (bool, error) {
 		return false, errors.New("step can't be 0")
 	}
 
-	if strings.Index(s, "*/") == 0 || strings.Index(s, "0/") == 0 {
+	if strings.Index(s, "*/") == 0 {
+		return (val-bounds[0])%step == 0, nil
+	}
+	if strings.Index(s, "0/") == 0 {
 		return val%step == 0, nil
 	}
 
@@ -104,22 +107,20 @@ func isValidMonthDay(val string, last int, ref time.Time) (valid bool, err error
 
 func isValidWeekDay(val string, last int, ref time.Time) (bool, error) {
 	loc := ref.Location()
-	if pos := strings.Index(strings.ReplaceAll(val, "7L", "0L"), "L"); pos > 0 {
+
+	if pos := strings.Index(val, "L"); pos > 0 {
 		nval, err := strconv.Atoi(val[0:pos])
 		if err != nil {
 			return false, err
 		}
 
 		for i := 0; i < 7; i++ {
-			decr := last - i
-			dref := time.Date(ref.Year(), ref.Month(), decr, ref.Hour(), ref.Minute(), ref.Second(), ref.Nanosecond(), loc)
-
-			if int(dref.Weekday()) == nval {
-				return ref.Day() == decr, nil
+			day := last - i
+			dref := time.Date(ref.Year(), ref.Month(), day, ref.Hour(), ref.Minute(), ref.Second(), 0, loc)
+			if int(dref.Weekday()) == nval%7 {
+				return ref.Day() == day, nil
 			}
 		}
-
-		return false, nil
 	}
 
 	pos := strings.Index(val, "#")

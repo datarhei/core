@@ -3,6 +3,7 @@ package h264parser
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/datarhei/joy4/av"
 	"github.com/datarhei/joy4/utils/bits"
 	"github.com/datarhei/joy4/utils/bits/pio"

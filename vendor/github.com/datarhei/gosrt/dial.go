@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/gosrt/internal/circular"
-	"github.com/datarhei/gosrt/internal/crypto"
-	"github.com/datarhei/gosrt/internal/packet"
-	"github.com/datarhei/gosrt/internal/rand"
+	"github.com/datarhei/gosrt/circular"
+	"github.com/datarhei/gosrt/crypto"
+	"github.com/datarhei/gosrt/packet"
+	"github.com/datarhei/gosrt/rand"
 )
 
 // ErrClientClosed is returned when the client connection has
@@ -44,14 +44,15 @@ type dialer struct {
 	start time.Time
 
 	rcvQueue chan packet.Packet // for packets that come from the wire
-	sndQueue chan packet.Packet // for packets that go to the wire
+
+	sndMutex sync.Mutex
+	sndData  bytes.Buffer // for packets that go to the wire
 
 	shutdown     bool
 	shutdownLock sync.RWMutex
 	shutdownOnce sync.Once
 
 	stopReader context.CancelFunc
-	stopWriter context.CancelFunc
 
 	doneChan chan error
 }
@@ -112,7 +113,6 @@ func Dial(network, address string, config Config) (Conn, error) {
 	dl.connChan = make(chan connResponse)
 
 	dl.rcvQueue = make(chan packet.Packet, 2048)
-	dl.sndQueue = make(chan packet.Packet, 2048)
 
 	dl.doneChan = make(chan error)
 
@@ -157,8 +157,8 @@ func Dial(network, address string, config Config) (Conn, error) {
 				return
 			}
 
-			p := packet.NewPacket(dl.remoteAddr, buffer[:n])
-			if p == nil {
+			p, err := packet.NewPacketFromData(dl.remoteAddr, buffer[:n])
+			if err != nil {
 				continue
 			}
 
@@ -174,10 +174,6 @@ func Dial(network, address string, config Config) (Conn, error) {
 	var readerCtx context.Context
 	readerCtx, dl.stopReader = context.WithCancel(context.Background())
 	go dl.reader(readerCtx)
-
-	var writerCtx context.Context
-	writerCtx, dl.stopWriter = context.WithCancel(context.Background())
-	go dl.writer(writerCtx)
 
 	// Send the initial handshake request
 	dl.sendInduction()
@@ -258,51 +254,29 @@ func (dl *dialer) reader(ctx context.Context) {
 	}
 }
 
-// send adds a packet to the send queue
+// Send a packet to the wire. This function must be synchronous in order to allow to safely call Packet.Decommission() afterward.
 func (dl *dialer) send(p packet.Packet) {
-	// non-blocking
-	select {
-	case dl.sndQueue <- p:
-	default:
-		dl.log("dial", func() string { return "send queue is full" })
+	dl.sndMutex.Lock()
+	defer dl.sndMutex.Unlock()
+
+	dl.sndData.Reset()
+
+	if err := p.Marshal(&dl.sndData); err != nil {
+		p.Decommission()
+		dl.log("packet:send:error", func() string { return "marshalling packet failed" })
+		return
 	}
-}
 
-// writer reads packets from the send queue and writes them to the wire
-func (dl *dialer) writer(ctx context.Context) {
-	defer func() {
-		dl.log("dial", func() string { return "left writer loop" })
-	}()
+	buffer := dl.sndData.Bytes()
 
-	dl.log("dial", func() string { return "writer loop started" })
+	dl.log("packet:send:dump", func() string { return p.Dump() })
 
-	var data bytes.Buffer
+	// Write the packet's contents to the wire
+	dl.pc.Write(buffer)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case p := <-dl.sndQueue:
-			data.Reset()
-
-			if err := p.Marshal(&data); err != nil {
-				p.Decommission()
-				dl.log("packet:send:error", func() string { return "marshalling packet failed" })
-				continue
-			}
-
-			buffer := data.Bytes()
-
-			dl.log("packet:send:dump", func() string { return p.Dump() })
-
-			// Write the packet's contents to the wire.
-			dl.pc.Write(buffer)
-
-			if p.Header().IsControlPacket {
-				// Control packets can be decommissioned because they will not be sent again
-				p.Decommission()
-			}
-		}
+	if p.Header().IsControlPacket {
+		// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)
+		p.Decommission()
 	}
 }
 
@@ -558,7 +532,7 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 }
 
 func (dl *dialer) sendInduction() {
-	p := packet.NewPacket(dl.remoteAddr, nil)
+	p := packet.NewPacket(dl.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -593,7 +567,7 @@ func (dl *dialer) sendInduction() {
 }
 
 func (dl *dialer) sendShutdown(peerSocketId uint32) {
-	p := packet.NewPacket(dl.remoteAddr, nil)
+	p := packet.NewPacket(dl.remoteAddr)
 
 	data := [4]byte{}
 	binary.BigEndian.PutUint32(data[0:], 0)
@@ -614,26 +588,68 @@ func (dl *dialer) sendShutdown(peerSocketId uint32) {
 }
 
 func (dl *dialer) LocalAddr() net.Addr {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return nil
+	}
+
 	return dl.conn.LocalAddr()
 }
 
 func (dl *dialer) RemoteAddr() net.Addr {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return nil
+	}
+
 	return dl.conn.RemoteAddr()
 }
 
 func (dl *dialer) SocketId() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.SocketId()
 }
 
 func (dl *dialer) PeerSocketId() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.PeerSocketId()
 }
 
 func (dl *dialer) StreamId() string {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return ""
+	}
+
 	return dl.conn.StreamId()
 }
 
 func (dl *dialer) Version() uint32 {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return 0
+	}
+
 	return dl.conn.Version()
 }
 
@@ -657,7 +673,6 @@ func (dl *dialer) Close() error {
 		dl.connLock.RUnlock()
 
 		dl.stopReader()
-		dl.stopWriter()
 
 		dl.log("dial", func() string { return "closing socket" })
 		dl.pc.Close()
@@ -679,10 +694,14 @@ func (dl *dialer) Read(p []byte) (n int, err error) {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
+	if dl.conn == nil {
+		return 0, fmt.Errorf("no connection")
+	}
+
 	return dl.conn.Read(p)
 }
 
-func (dl *dialer) readPacket() (packet.Packet, error) {
+func (dl *dialer) ReadPacket() (packet.Packet, error) {
 	if err := dl.checkConnection(); err != nil {
 		return nil, err
 	}
@@ -690,7 +709,11 @@ func (dl *dialer) readPacket() (packet.Packet, error) {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
-	return dl.conn.readPacket()
+	if dl.conn == nil {
+		return nil, fmt.Errorf("no connection")
+	}
+
+	return dl.conn.ReadPacket()
 }
 
 func (dl *dialer) Write(p []byte) (n int, err error) {
@@ -701,10 +724,14 @@ func (dl *dialer) Write(p []byte) (n int, err error) {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
+	if dl.conn == nil {
+		return 0, fmt.Errorf("no connection")
+	}
+
 	return dl.conn.Write(p)
 }
 
-func (dl *dialer) writePacket(p packet.Packet) error {
+func (dl *dialer) WritePacket(p packet.Packet) error {
 	if err := dl.checkConnection(); err != nil {
 		return err
 	}
@@ -712,14 +739,32 @@ func (dl *dialer) writePacket(p packet.Packet) error {
 	dl.connLock.RLock()
 	defer dl.connLock.RUnlock()
 
-	return dl.conn.writePacket(p)
+	if dl.conn == nil {
+		return fmt.Errorf("no connection")
+	}
+
+	return dl.conn.WritePacket(p)
 }
 
 func (dl *dialer) SetDeadline(t time.Time) error      { return dl.conn.SetDeadline(t) }
 func (dl *dialer) SetReadDeadline(t time.Time) error  { return dl.conn.SetReadDeadline(t) }
 func (dl *dialer) SetWriteDeadline(t time.Time) error { return dl.conn.SetWriteDeadline(t) }
-func (dl *dialer) Stats(s *Statistics)                { dl.conn.Stats(s) }
+
+func (dl *dialer) Stats(s *Statistics) {
+	dl.connLock.RLock()
+	defer dl.connLock.RUnlock()
+
+	if dl.conn == nil {
+		return
+	}
+
+	dl.conn.Stats(s)
+}
 
 func (dl *dialer) log(topic string, message func() string) {
+	if dl.config.Logger == nil {
+		return
+	}
+
 	dl.config.Logger.Print(topic, dl.socketId, 2, message)
 }

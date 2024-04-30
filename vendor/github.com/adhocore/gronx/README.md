@@ -75,12 +75,12 @@ gron.BatchDue(exprs, ref)
 To find out when is the cron due next (in near future):
 ```go
 allowCurrent = true // includes current time as well
-nextTime, err := gron.NextTick(expr, allowCurrent) // gives time.Time, error
+nextTime, err := gronx.NextTick(expr, allowCurrent) // gives time.Time, error
 
 // OR, next tick after certain reference time
 refTime = time.Date(2022, time.November, 1, 1, 1, 0, 0, time.UTC)
 allowCurrent = false // excludes the ref time
-nextTime, err := gron.NextTickAfter(expr, refTime, allowCurrent) // gives time.Time, error
+nextTime, err := gronx.NextTickAfter(expr, refTime, allowCurrent) // gives time.Time, error
 ```
 
 ### Prev Tick
@@ -88,12 +88,12 @@ nextTime, err := gron.NextTickAfter(expr, refTime, allowCurrent) // gives time.T
 To find out when was the cron due previously (in near past):
 ```go
 allowCurrent = true // includes current time as well
-prevTime, err := gron.PrevTick(expr, allowCurrent) // gives time.Time, error
+prevTime, err := gronx.PrevTick(expr, allowCurrent) // gives time.Time, error
 
 // OR, prev tick before certain reference time
 refTime = time.Date(2022, time.November, 1, 1, 1, 0, 0, time.UTC)
 allowCurrent = false // excludes the ref time
-nextTime, err := gron.PrevTickBefore(expr, refTime, allowCurrent) // gives time.Time, error
+nextTime, err := gronx.PrevTickBefore(expr, refTime, allowCurrent) // gives time.Time, error
 ```
 
 > The working of `PrevTick*()` and `NextTick*()` are mostly the same except the direction.
@@ -304,8 +304,8 @@ Following modifiers supported
     - `L` stands for last day of month (eg: `L` could mean 29th for February in leap year)
     - `W` stands for closest week day (eg: `10W` is closest week days (MON-FRI) to 10th date)
 - *Day of Week / 5th of 5 segments / 6th of 6+ segments:*
-    - `L` stands for last weekday of month (eg: `2L` is last monday)
-    - `#` stands for nth day of week in the month (eg: `1#2` is second sunday)
+    - `L` stands for last weekday of month (eg: `2L` is last tuesday)
+    - `#` stands for nth day of week in the month (eg: `1#2` is second monday)
 
 ---
 ## License

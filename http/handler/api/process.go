@@ -2,9 +2,11 @@ package api
 
 import (
 	"net/http"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
@@ -127,39 +129,66 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	preids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
-	ids := []app.ProcessID{}
+	ids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
 
-	for _, id := range preids {
-		if !h.iam.Enforce(ctxuser, domain, "process", id.ID, "read") {
-			continue
-		}
+	if len(wantids) != 0 {
+		filteredIds := []app.ProcessID{}
 
-		ids = append(ids, id)
-	}
-
-	processes := []api.Process{}
-
-	if len(wantids) == 0 || len(reference) != 0 {
-		for _, id := range ids {
-			if p, err := h.getProcess(id, filter); err == nil {
-				if len(reference) != 0 && p.Reference != reference {
-					continue
-				}
-				processes = append(processes, p)
-			}
-		}
-	} else {
 		for _, id := range ids {
 			for _, wantid := range wantids {
 				if wantid == id.ID {
-					if p, err := h.getProcess(id, filter); err == nil {
-						processes = append(processes, p)
-					}
+					filteredIds = append(filteredIds, id)
+					break
 				}
 			}
 		}
+
+		ids = filteredIds
 	}
+
+	processes := make([]*api.Process, 0, len(ids))
+
+	hasReference := len(reference) != 0 && len(wantids) == 0
+
+	processesMu := sync.Mutex{}
+	idChan := make(chan app.ProcessID, len(ids))
+
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+
+		go func(idChan <-chan app.ProcessID) {
+			defer wg.Done()
+
+			for id := range idChan {
+				if !h.iam.Enforce(ctxuser, domain, "process", id.ID, "read") {
+					continue
+				}
+
+				process, err := h.getProcess(id, filter)
+				if err != nil {
+					continue
+				}
+
+				if hasReference && process.Reference != reference {
+					continue
+				}
+
+				processesMu.Lock()
+				processes = append(processes, &process)
+				processesMu.Unlock()
+			}
+		}(idChan)
+	}
+
+	for _, id := range ids {
+		idChan <- id
+	}
+
+	close(idChan)
+
+	wg.Wait()
 
 	return c.JSON(http.StatusOK, processes)
 }

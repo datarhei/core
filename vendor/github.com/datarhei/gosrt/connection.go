@@ -11,10 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/gosrt/internal/circular"
-	"github.com/datarhei/gosrt/internal/congestion"
-	"github.com/datarhei/gosrt/internal/crypto"
-	"github.com/datarhei/gosrt/internal/packet"
+	"github.com/datarhei/gosrt/circular"
+	"github.com/datarhei/gosrt/congestion"
+	"github.com/datarhei/gosrt/congestion/live"
+	"github.com/datarhei/gosrt/crypto"
+	"github.com/datarhei/gosrt/packet"
 )
 
 // Conn is a SRT network connection.
@@ -24,10 +25,19 @@ type Conn interface {
 	// time limit; see SetDeadline and SetReadDeadline.
 	Read(p []byte) (int, error)
 
+	// ReadPacket reads a packet from the queue of received packets. It blocks
+	// if the queue is empty. Only data packets are returned. Using ReadPacket
+	// and Read at the same time may lead to data loss.
+	ReadPacket() (packet.Packet, error)
+
 	// Write writes data to the connection.
 	// Write can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetWriteDeadline.
 	Write(p []byte) (int, error)
+
+	// WritePacket writes a packet to the write queue. Packets on the write queue
+	// will be sent to the peer of the connection. Only data packets will be sent.
+	WritePacket(p packet.Packet) error
 
 	// Close closes the connection.
 	// Any blocked Read or Write operations will be unblocked and return errors.
@@ -252,7 +262,7 @@ func newSRTConn(config srtConnConfig) *srtConn {
 
 	// 4.8.1.  Packet Acknowledgement (ACKs, ACKACKs) -> periodicACK = 10 milliseconds
 	// 4.8.2.  Packet Retransmission (NAKs) -> periodicNAK at least 20 milliseconds
-	c.recv = congestion.NewLiveReceive(congestion.ReceiveConfig{
+	c.recv = live.NewReceiver(live.ReceiveConfig{
 		InitialSequenceNumber: c.initialPacketSequenceNumber,
 		PeriodicACKInterval:   10_000,
 		PeriodicNAKInterval:   20_000,
@@ -269,7 +279,7 @@ func newSRTConn(config srtConnConfig) *srtConn {
 	}
 	c.dropThreshold += 20_000
 
-	c.snd = congestion.NewLiveSend(congestion.SendConfig{
+	c.snd = live.NewSender(live.SendConfig{
 		InitialSequenceNumber: c.initialPacketSequenceNumber,
 		DropThreshold:         c.dropThreshold,
 		MaxBW:                 c.config.MaxBW,
@@ -281,9 +291,9 @@ func newSRTConn(config srtConnConfig) *srtConn {
 
 	c.ctx, c.cancelCtx = context.WithCancel(context.Background())
 
-	go c.networkQueueReader()
-	go c.writeQueueReader()
-	go c.ticker()
+	go c.networkQueueReader(c.ctx)
+	go c.writeQueueReader(c.ctx)
+	go c.ticker(c.ctx)
 
 	c.debug.expectedRcvPacketSequenceNumber = c.initialPacketSequenceNumber
 	c.debug.expectedReadPacketSequenceNumber = c.initialPacketSequenceNumber
@@ -311,11 +321,19 @@ func newSRTConn(config srtConnConfig) *srtConn {
 }
 
 func (c *srtConn) LocalAddr() net.Addr {
+	if c.localAddr == nil {
+		return nil
+	}
+
 	addr, _ := net.ResolveUDPAddr("udp", c.localAddr.String())
 	return addr
 }
 
 func (c *srtConn) RemoteAddr() net.Addr {
+	if c.remoteAddr == nil {
+		return nil
+	}
+
 	addr, _ := net.ResolveUDPAddr("udp", c.remoteAddr.String())
 	return addr
 }
@@ -338,7 +356,7 @@ func (c *srtConn) Version() uint32 {
 
 // ticker invokes the congestion control in regular intervals with
 // the current connection time.
-func (c *srtConn) ticker() {
+func (c *srtConn) ticker(ctx context.Context) {
 	ticker := time.NewTicker(c.tick)
 	defer ticker.Stop()
 	defer func() {
@@ -347,7 +365,7 @@ func (c *srtConn) ticker() {
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case t := <-ticker.C:
 			tickTime := uint64(t.Sub(c.start).Microseconds())
@@ -358,9 +376,7 @@ func (c *srtConn) ticker() {
 	}
 }
 
-// readPacket reads a packet from the queue of received packets. It blocks
-// if the queue is empty. Only data packets are returned.
-func (c *srtConn) readPacket() (packet.Packet, error) {
+func (c *srtConn) ReadPacket() (packet.Packet, error) {
 	var p packet.Packet
 	select {
 	case <-c.ctx.Done():
@@ -391,7 +407,7 @@ func (c *srtConn) Read(b []byte) (int, error) {
 
 	c.readBuffer.Reset()
 
-	p, err := c.readPacket()
+	p, err := c.ReadPacket()
 	if err != nil {
 		return 0, err
 	}
@@ -404,9 +420,9 @@ func (c *srtConn) Read(b []byte) (int, error) {
 	return c.readBuffer.Read(b)
 }
 
-// writePacket writes a packet to the write queue. Packets on the write queue
+// WritePacket writes a packet to the write queue. Packets on the write queue
 // will be sent to the peer of the connection. Only data packets will be sent.
-func (c *srtConn) writePacket(p packet.Packet) error {
+func (c *srtConn) WritePacket(p packet.Packet) error {
 	if p.Header().IsControlPacket {
 		// Ignore control packets
 		return nil
@@ -429,7 +445,7 @@ func (c *srtConn) Write(b []byte) (int, error) {
 			return 0, err
 		}
 
-		p := packet.NewPacket(nil, nil)
+		p := packet.NewPacket(nil)
 
 		p.SetData(c.writeData[:n])
 
@@ -526,14 +542,14 @@ func (c *srtConn) pop(p packet.Packet) {
 }
 
 // networkQueueReader reads the packets from the network queue in order to process them.
-func (c *srtConn) networkQueueReader() {
+func (c *srtConn) networkQueueReader(ctx context.Context) {
 	defer func() {
 		c.log("connection:close", func() string { return "left network queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case p := <-c.networkQueue:
 			c.handlePacket(p)
@@ -543,14 +559,14 @@ func (c *srtConn) networkQueueReader() {
 
 // writeQueueReader reads the packets from the write queue and puts them into congestion
 // control for sending.
-func (c *srtConn) writeQueueReader() {
+func (c *srtConn) writeQueueReader(ctx context.Context) {
 	defer func() {
 		c.log("connection:close", func() string { return "left write queue reader loop" })
 	}()
 
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
 		case p := <-c.writeQueue:
 			// Put the packet into the send congestion control
@@ -1133,7 +1149,7 @@ func (c *srtConn) handleKMResponse(p packet.Packet) {
 
 // sendShutdown sends a shutdown packet to the peer.
 func (c *srtConn) sendShutdown() {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1156,7 +1172,7 @@ func (c *srtConn) sendShutdown() {
 
 // sendNAK sends a NAK to the peer with the given range of sequence numbers.
 func (c *srtConn) sendNAK(from, to circular.Number) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1182,7 +1198,7 @@ func (c *srtConn) sendNAK(from, to circular.Number) {
 
 // sendACK sends an ACK to the peer with the given sequence number.
 func (c *srtConn) sendACK(seq circular.Number, lite bool) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1233,7 +1249,7 @@ func (c *srtConn) sendACK(seq circular.Number, lite bool) {
 
 // sendACKACK sends an ACKACK to the peer with the given ACK sequence.
 func (c *srtConn) sendACKACK(ackSequence uint32) {
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1280,7 +1296,7 @@ func (c *srtConn) sendHSRequest() {
 		SendTSBPDDelay: uint16(c.config.ReceiverLatency.Milliseconds()),
 	}
 
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 
@@ -1319,7 +1335,7 @@ func (c *srtConn) sendKMRequest(key packet.PacketEncryption) {
 
 	c.crypto.MarshalKM(cif, c.config.Passphrase, key)
 
-	p := packet.NewPacket(c.remoteAddr, nil)
+	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
 

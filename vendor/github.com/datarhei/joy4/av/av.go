@@ -116,6 +116,9 @@ type CodecType uint32
 
 var (
 	H264       = MakeVideoCodecType(avCodecTypeMagic + 1)
+	HEVC       = MakeVideoCodecType(avCodecTypeMagic + 2)
+	VP9        = MakeVideoCodecType(avCodecTypeMagic + 3)
+	AV1        = MakeVideoCodecType(avCodecTypeMagic + 4)
 	AAC        = MakeAudioCodecType(avCodecTypeMagic + 1)
 	PCM_MULAW  = MakeAudioCodecType(avCodecTypeMagic + 2)
 	PCM_ALAW   = MakeAudioCodecType(avCodecTypeMagic + 3)
@@ -126,10 +129,16 @@ var (
 const codecTypeAudioBit = 0x1
 const codecTypeOtherBits = 1
 
-func (self CodecType) String() string {
-	switch self {
+func (c CodecType) String() string {
+	switch c {
 	case H264:
 		return "H264"
+	case HEVC:
+		return "HEVC"
+	case VP9:
+		return "VP9"
+	case AV1:
+		return "AV1"
 	case AAC:
 		return "AAC"
 	case PCM_MULAW:
@@ -144,12 +153,12 @@ func (self CodecType) String() string {
 	return ""
 }
 
-func (self CodecType) IsAudio() bool {
-	return self&codecTypeAudioBit != 0
+func (c CodecType) IsAudio() bool {
+	return c&codecTypeAudioBit != 0
 }
 
-func (self CodecType) IsVideo() bool {
-	return self&codecTypeAudioBit == 0
+func (c CodecType) IsVideo() bool {
+	return c&codecTypeAudioBit == 0
 }
 
 // Make a new audio codec type.
@@ -169,7 +178,7 @@ const avCodecTypeMagic = 233333
 // CodecData is some important bytes for initializing audio/video decoder,
 // can be converted to VideoCodecData or AudioCodecData using:
 //
-//     codecdata.(AudioCodecData) or codecdata.(VideoCodecData)
+//	codecdata.(AudioCodecData) or codecdata.(VideoCodecData)
 //
 // for H264, CodecData is AVCDecoderConfigure bytes, includes SPS/PPS.
 type CodecData interface {

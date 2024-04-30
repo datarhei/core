@@ -17,8 +17,8 @@ package model
 import (
 	"sync"
 
-	"github.com/Knetic/govaluate"
 	"github.com/casbin/casbin/v2/util"
+	"github.com/casbin/govaluate"
 )
 
 // FunctionMap represents the collection of Function.
@@ -53,7 +53,7 @@ func LoadFunctionMap() FunctionMap {
 	return *fm
 }
 
-// GetFunctions return a map with all the functions
+// GetFunctions return a map with all the functions.
 func (fm *FunctionMap) GetFunctions() map[string]govaluate.ExpressionFunction {
 	ret := make(map[string]govaluate.ExpressionFunction)
 
