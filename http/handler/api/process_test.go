@@ -740,3 +740,36 @@ func TestMetadata(t *testing.T) {
 	response = mock.Request(t, http.StatusOK, router, "GET", "/metadata", nil)
 	require.Equal(t, nil, response.Data)
 }
+
+func BenchmarkAllProcesses(b *testing.B) {
+	router, err := getDummyRestreamRouter()
+	require.NoError(b, err)
+
+	data := bytes.Buffer{}
+	_, err = data.ReadFrom(mock.Read(b, "./fixtures/addProcess.json"))
+	require.NoError(b, err)
+
+	process := api.ProcessConfig{}
+	err = json.Unmarshal(data.Bytes(), &process)
+	require.NoError(b, err)
+
+	for i := 0; i < 1000; i++ {
+		process.ID = "test_" + strconv.Itoa(i)
+
+		encoded, err := json.Marshal(&process)
+		require.NoError(b, err)
+
+		data.Reset()
+		_, err = data.Write(encoded)
+		require.NoError(b, err)
+
+		mock.Request(b, http.StatusOK, router, "POST", "/", &data)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		response := mock.RequestEx(b, http.StatusOK, router, "GET", "/", nil, false)
+		require.Equal(b, response.Code, 200)
+	}
+}
