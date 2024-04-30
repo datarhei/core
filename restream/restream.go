@@ -1231,8 +1231,6 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 }
 
 func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID {
-	ids := []app.ProcessID{}
-
 	count := 0
 
 	var idglob glob.Glob
@@ -1260,45 +1258,62 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 		domainglob, _ = glob.Compile(domainpattern)
 	}
 
+	var ids []app.ProcessID
+
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
-	for _, t := range r.tasks {
-		matches := 0
-		if idglob != nil {
-			if match := idglob.Match(t.id); match {
-				matches++
+	if count == 0 {
+		ids = make([]app.ProcessID, 0, len(r.tasks))
+
+		for _, t := range r.tasks {
+			tid := app.ProcessID{
+				ID:     t.id,
+				Domain: t.domain,
 			}
-		}
 
-		if refglob != nil {
-			if match := refglob.Match(t.reference); match {
-				matches++
+			ids = append(ids, tid)
+		}
+	} else {
+		ids = []app.ProcessID{}
+
+		for _, t := range r.tasks {
+			matches := 0
+			if idglob != nil {
+				if match := idglob.Match(t.id); match {
+					matches++
+				}
 			}
-		}
 
-		if ownerglob != nil {
-			if match := ownerglob.Match(t.owner); match {
-				matches++
+			if refglob != nil {
+				if match := refglob.Match(t.reference); match {
+					matches++
+				}
 			}
-		}
 
-		if domainglob != nil {
-			if match := domainglob.Match(t.domain); match {
-				matches++
+			if ownerglob != nil {
+				if match := ownerglob.Match(t.owner); match {
+					matches++
+				}
 			}
-		}
 
-		if count != matches {
-			continue
-		}
+			if domainglob != nil {
+				if match := domainglob.Match(t.domain); match {
+					matches++
+				}
+			}
 
-		tid := app.ProcessID{
-			ID:     t.id,
-			Domain: t.domain,
-		}
+			if count != matches {
+				continue
+			}
 
-		ids = append(ids, tid)
+			tid := app.ProcessID{
+				ID:     t.id,
+				Domain: t.domain,
+			}
+
+			ids = append(ids, tid)
+		}
 	}
 
 	return ids
