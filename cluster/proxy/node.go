@@ -53,7 +53,7 @@ type NodeReader interface {
 
 	GetResourceInfo(prefix, path string) (int64, time.Time, error)
 
-	ProcessList(ProcessListOptions) ([]clientapi.Process, error)
+	ProcessList(ListProcessOptions) ([]clientapi.Process, error)
 	ProxyProcessList() ([]Process, error)
 }
 
@@ -743,7 +743,7 @@ func (n *node) GetResourceInfo(prefix, path string) (int64, time.Time, error) {
 	return 0, time.Time{}, fmt.Errorf("unknown prefix: %s", prefix)
 }
 
-func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, error) {
+func (n *node) ProcessList(options ListProcessOptions) ([]clientapi.Process, error) {
 	n.peerLock.RLock()
 	defer n.peerLock.RUnlock()
 
@@ -764,7 +764,7 @@ func (n *node) ProcessList(options ProcessListOptions) ([]clientapi.Process, err
 }
 
 func (n *node) ProxyProcessList() ([]Process, error) {
-	list, err := n.ProcessList(ProcessListOptions{
+	list, err := n.ProcessList(ListProcessOptions{
 		Filter: []string{"config", "state", "metadata"},
 	})
 	if err != nil {

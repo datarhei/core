@@ -15,28 +15,15 @@ import (
 )
 
 type Proxy interface {
-	Start()
-	Stop()
-
 	AddNode(id string, node Node) (string, error)
 	RemoveNode(id string) error
 
-	ProxyReader
-	Reader() ProxyReader
-
-	AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error
-	DeleteProcess(nodeid string, id app.ProcessID) error
-	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
-	CommandProcess(nodeid string, id app.ProcessID, command string) error
-}
-
-type ProxyReader interface {
 	ListNodes() []NodeReader
 	GetNodeReader(id string) (NodeReader, error)
 
 	FindNodeFromProcess(id app.ProcessID) (string, error)
 
-	ListProcesses(ProcessListOptions) []clientapi.Process
+	ListProcesses(ListProcessOptions) []clientapi.Process
 	ListProxyProcesses() []Process
 	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
 	ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error)
@@ -46,6 +33,11 @@ type ProxyReader interface {
 	GetURL(prefix, path string) (*url.URL, error)
 	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
 	GetFileInfo(prefix, path string) (int64, time.Time, error)
+
+	AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error
+	DeleteProcess(nodeid string, id app.ProcessID) error
+	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	CommandProcess(nodeid string, id app.ProcessID, command string) error
 }
 
 type ProxyConfig struct {
@@ -83,34 +75,6 @@ func NewProxy(config ProxyConfig) (Proxy, error) {
 	}
 
 	return p, nil
-}
-
-func (p *proxy) Start() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	if p.running {
-		return
-	}
-
-	p.running = true
-
-	p.logger.Debug().Log("Starting proxy")
-}
-
-func (p *proxy) Stop() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	if !p.running {
-		return
-	}
-
-	p.running = false
-
-	p.logger.Debug().Log("Stopping proxy")
-
-	p.nodes = map[string]Node{}
 }
 
 func (p *proxy) Reader() ProxyReader {
@@ -387,7 +351,7 @@ type Process struct {
 	Metadata  map[string]interface{}
 }
 
-type ProcessListOptions struct {
+type ListProcessOptions struct {
 	ID            []string
 	Filter        []string
 	Domain        string
@@ -462,7 +426,7 @@ func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
 	return nodeid, nil
 }
 
-func (p *proxy) ListProcesses(options ProcessListOptions) []clientapi.Process {
+func (p *proxy) ListProcesses(options ListProcessOptions) []clientapi.Process {
 	processChan := make(chan []clientapi.Process, 64)
 	processList := []clientapi.Process{}
 

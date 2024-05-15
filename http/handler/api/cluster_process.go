@@ -50,7 +50,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
+	procs := h.proxy.ListProcesses(proxy.ListProcessOptions{
 		ID:            wantids,
 		Filter:        filter.Slice(),
 		Domain:        domain,
@@ -317,7 +317,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "")
 	}
 
-	procs := h.proxy.ListProcesses(proxy.ProcessListOptions{
+	procs := h.proxy.ListProcesses(proxy.ListProcessOptions{
 		ID:     []string{id},
 		Filter: filter.Slice(),
 		Domain: domain,

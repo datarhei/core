@@ -61,8 +61,9 @@ type Cluster interface {
 	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
 
-	ListProcesses() []store.Process
-	GetProcess(id app.ProcessID) (store.Process, error)
+	StoreListProcesses() []store.Process
+	StoreGetProcess(id app.ProcessID) (store.Process, error)
+
 	AddProcess(origin string, config *app.Config) error
 	RemoveProcess(origin string, id app.ProcessID) error
 	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error

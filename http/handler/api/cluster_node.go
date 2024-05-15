@@ -339,7 +339,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	procs, err := peer.ProcessList(proxy.ProcessListOptions{
+	procs, err := peer.ProcessList(proxy.ListProcessOptions{
 		ID:            wantids,
 		Filter:        filter,
 		Domain:        domain,

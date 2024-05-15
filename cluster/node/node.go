@@ -50,8 +50,6 @@ type node struct {
 	runLock    sync.Mutex
 	cancelPing context.CancelFunc
 
-	proxyNode proxy.Node
-
 	logger log.Logger
 }
 
@@ -110,7 +108,7 @@ func (n *node) start(id string) error {
 	n.lastContactErr = fmt.Errorf("not started yet")
 
 	address, config, err := n.CoreEssentials()
-	n.proxyNode = proxy.NewNode(proxy.NodeConfig{
+	n.proxyNode = NewCore(proxy.NodeConfig{
 		ID:      id,
 		Address: address,
 		Config:  config,
@@ -352,7 +350,7 @@ func (n *node) pingCore(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := n.proxyNode.IsConnected()
+			_, err := n.core.About()
 
 			if err == nil {
 				n.pingLock.Lock()
