@@ -301,6 +301,7 @@ type chunkStream struct {
 	msgdataleft uint32
 	msghdrtype  uint8
 	msgdata     []byte
+	msgcount    int
 }
 
 func (cs *chunkStream) Start() {
@@ -1521,28 +1522,33 @@ func (conn *Conn) readChunk() (err error) {
 		timestamp = cs.timenow
 
 		if cs.msgtypeid == msgtypeidVideoMsg || cs.msgtypeid == msgtypeidAudioMsg {
-			if !cs.gentimenow {
-				if cs.prevtimenow >= cs.timenow {
-					cs.tscount++
-				} else {
-					cs.tscount = 0
+			if cs.msgcount < 20 { // only consider the first video and audio messages
+				if !cs.gentimenow {
+					if cs.prevtimenow >= cs.timenow {
+						cs.tscount++
+					} else {
+						cs.tscount = 0
+					}
+
+					// if the previous timestamp is the same as the current for too often in a row, assume defect timestamps
+					if cs.tscount > 10 {
+						cs.gentimenow = true
+					}
+
+					cs.prevtimenow = cs.timenow
 				}
 
-				if cs.tscount > 3 {
-					cs.gentimenow = true
-				}
+				cs.msgcount++
 			}
 
 			if cs.gentimenow {
-				timestamp = uint32((time.Since(conn.start).Milliseconds() % 0xFFFFFFFF) & 0xFFFFFFFF)
+				timestamp = uint32(time.Since(conn.start).Milliseconds() % 0xFFFFFFFF)
 			}
 		}
 
 		if err = conn.handleMsg(timestamp, cs.msgsid, cs.msgtypeid, cs.msgdata); err != nil {
 			return fmt.Errorf("handleMsg: %w", err)
 		}
-
-		cs.prevtimenow = cs.timenow
 	}
 
 	conn.ackn += uint32(n)
