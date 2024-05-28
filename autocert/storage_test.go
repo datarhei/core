@@ -46,7 +46,7 @@ func TestFileStorageDelete(t *testing.T) {
 	ctx := context.Background()
 
 	err := s.Delete(ctx, "foo")
-	require.ErrorIs(t, err, fs.ErrNotExist)
+	require.NoError(t, err)
 
 	err = s.Store(ctx, "foo", data)
 	require.NoError(t, err)
