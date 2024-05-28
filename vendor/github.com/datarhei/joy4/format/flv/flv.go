@@ -81,8 +81,17 @@ type Prober struct {
 	GotAudio, GotVideo             bool
 	VideoStreamIdx, AudioStreamIdx int
 	PushedCount                    int
+	MaxProbePacketCount            int
 	Streams                        []av.CodecData
 	CachedPkts                     []av.Packet
+}
+
+func NewProber(maxProbePacketCount int) *Prober {
+	prober := &Prober{
+		MaxProbePacketCount: maxProbePacketCount,
+	}
+
+	return prober
 }
 
 func (prober *Prober) CacheTag(_tag flvio.Tag, timestamp int32) {
@@ -93,7 +102,11 @@ func (prober *Prober) CacheTag(_tag flvio.Tag, timestamp int32) {
 func (prober *Prober) PushTag(tag flvio.Tag, timestamp int32) (err error) {
 	prober.PushedCount++
 
-	if prober.PushedCount > MaxProbePacketCount {
+	if prober.MaxProbePacketCount <= 0 {
+		prober.MaxProbePacketCount = MaxProbePacketCount
+	}
+
+	if prober.PushedCount > prober.MaxProbePacketCount {
 		err = fmt.Errorf("flv: max probe packet count reached")
 		return
 	}
@@ -229,16 +242,21 @@ func (prober *Prober) PushTag(tag flvio.Tag, timestamp int32) (err error) {
 }
 
 func (prober *Prober) Probed() (ok bool) {
+	if prober.MaxProbePacketCount <= 0 {
+		prober.MaxProbePacketCount = MaxProbePacketCount
+	}
+
 	if prober.HasAudio || prober.HasVideo {
 		if prober.HasAudio == prober.GotAudio && prober.HasVideo == prober.GotVideo {
 			return true
 		}
-	} else {
-		if prober.PushedCount == MaxProbePacketCount {
-			return true
-		}
 	}
-	return
+
+	if prober.PushedCount == prober.MaxProbePacketCount {
+		return true
+	}
+
+	return false
 }
 
 func (prober *Prober) TagToPacket(tag flvio.Tag, timestamp int32) (pkt av.Packet, ok bool) {

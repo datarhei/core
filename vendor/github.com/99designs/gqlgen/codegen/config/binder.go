@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
 	"golang.org/x/tools/go/packages"
@@ -204,6 +205,7 @@ type TypeReference struct {
 	IsContext               bool        // Is the Marshaler/Unmarshaller the context version; applies to either the method or interface variety.
 	PointersInUmarshalInput bool        // Inverse values and pointers in return.
 	IsRoot                  bool        // Is the type a root level definition such as Query, Mutation or Subscription
+	EnumValues              []EnumValueReference
 }
 
 func (ref *TypeReference) Elem() *TypeReference {
@@ -321,6 +323,10 @@ func (ref *TypeReference) IsTargetNilable() bool {
 	return IsNilable(ref.Target)
 }
 
+func (ref *TypeReference) HasEnumValues() bool {
+	return len(ref.EnumValues) > 0
+}
+
 func (b *Binder) PushRef(ret *TypeReference) {
 	b.References = append(b.References, ret)
 }
@@ -428,7 +434,12 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 			return nil, err
 		}
 
-		if fun, isFunc := obj.(*types.Func); isFunc {
+		if values := b.enumValues(def); len(values) > 0 {
+			err = b.enumReference(ref, obj, values)
+			if err != nil {
+				return nil, err
+			}
+		} else if fun, isFunc := obj.(*types.Func); isFunc {
 			ref.GO = fun.Type().(*types.Signature).Params().At(0).Type()
 			ref.IsContext = fun.Type().(*types.Signature).Results().At(0).Type().String() == "github.com/99designs/gqlgen/graphql.ContextMarshaler"
 			ref.Marshaler = fun
@@ -544,6 +555,84 @@ func basicUnderlying(it types.Type) *types.Basic {
 
 	if basic, ok := namedType.Underlying().(*types.Basic); ok {
 		return basic
+	}
+
+	return nil
+}
+
+type EnumValueReference struct {
+	Definition *ast.EnumValueDefinition
+	Object     types.Object
+}
+
+func (b *Binder) enumValues(def *ast.Definition) map[string]EnumValue {
+	if def.Kind != ast.Enum {
+		return nil
+	}
+
+	if strings.HasPrefix(def.Name, "__") {
+		return nil
+	}
+
+	model, ok := b.cfg.Models[def.Name]
+	if !ok {
+		return nil
+	}
+
+	return model.EnumValues
+}
+
+func (b *Binder) enumReference(ref *TypeReference, obj types.Object, values map[string]EnumValue) error {
+	if len(ref.Definition.EnumValues) != len(values) {
+		return fmt.Errorf("not all enum values are binded for %v", ref.Definition.Name)
+	}
+
+	if fn, ok := obj.Type().(*types.Signature); ok {
+		ref.GO = fn.Params().At(0).Type()
+	} else {
+		ref.GO = obj.Type()
+	}
+
+	str, err := b.TypeReference(&ast.Type{NamedType: "String"}, nil)
+	if err != nil {
+		return err
+	}
+
+	ref.Marshaler = str.Marshaler
+	ref.Unmarshaler = str.Unmarshaler
+	ref.EnumValues = make([]EnumValueReference, 0, len(values))
+
+	for _, value := range ref.Definition.EnumValues {
+		v, ok := values[value.Name]
+		if !ok {
+			return fmt.Errorf("enum value not found for: %v, of enum: %v", value.Name, ref.Definition.Name)
+		}
+
+		pkgName, typeName := code.PkgAndType(v.Value)
+		if pkgName == "" {
+			return fmt.Errorf("missing package name for %v", value.Name)
+		}
+
+		valueObj, err := b.FindObject(pkgName, typeName)
+		if err != nil {
+			return err
+		}
+
+		if !types.AssignableTo(valueObj.Type(), ref.GO) {
+			return fmt.Errorf("wrong type: %v, for enum value: %v, expected type: %v, of enum: %v",
+				valueObj.Type(), value.Name, ref.GO, ref.Definition.Name)
+		}
+
+		switch valueObj.(type) {
+		case *types.Const, *types.Var:
+			ref.EnumValues = append(ref.EnumValues, EnumValueReference{
+				Definition: value,
+				Object:     valueObj,
+			})
+		default:
+			return fmt.Errorf("unsupported enum value for: %v, of enum: %v, only const and var allowed",
+				value.Name, ref.Definition.Name)
+		}
 	}
 
 	return nil
