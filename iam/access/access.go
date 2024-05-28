@@ -82,13 +82,15 @@ func New(config Config) (Manager, error) {
 func (am *access) HasPolicy(name, domain string, types []string, resource string, actions []string) bool {
 	policy := []string{name, domain, EncodeResource(types, resource), EncodeActions(actions)}
 
-	return am.enforcer.HasPolicy(policy)
+	hasPolicy, _ := am.enforcer.HasPolicy(policy)
+
+	return hasPolicy
 }
 
 func (am *access) AddPolicy(name, domain string, types []string, resource string, actions []string) error {
 	policy := []string{name, domain, EncodeResource(types, resource), EncodeActions(actions)}
 
-	if am.enforcer.HasPolicy(policy) {
+	if hasPolicy, _ := am.enforcer.HasPolicy(policy); hasPolicy {
 		return nil
 	}
 
@@ -98,8 +100,12 @@ func (am *access) AddPolicy(name, domain string, types []string, resource string
 }
 
 func (am *access) RemovePolicy(name, domain string, types []string, resource string, actions []string) error {
-	policies := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
-	_, err := am.enforcer.RemovePolicies(policies)
+	policies, err := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
+	if err != nil {
+		return err
+	}
+
+	_, err = am.enforcer.RemovePolicies(policies)
 
 	return err
 }
@@ -107,7 +113,10 @@ func (am *access) RemovePolicy(name, domain string, types []string, resource str
 func (am *access) ListPolicies(name, domain string, types []string, resource string, actions []string) []Policy {
 	policies := []Policy{}
 
-	ps := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
+	ps, err := am.enforcer.GetFilteredPolicy(0, name, domain, EncodeResource(types, resource), EncodeActions(actions))
+	if err != nil {
+		return policies
+	}
 
 	for _, p := range ps {
 		types, resource := DecodeResource(p[2])

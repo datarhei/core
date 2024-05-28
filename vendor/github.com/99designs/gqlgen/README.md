@@ -20,9 +20,9 @@ Still not convinced enough to use **gqlgen**? Compare **gqlgen** with other Go g
        cd example
        go mod init example
 
-2. Add `github.com/99designs/gqlgen` to your [project's tools.go](https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module)
+2. Add `github.com/99designs/gqlgen` to your [project's tools.go](https://go.dev/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module)
 
-       printf '// +build tools\npackage tools\nimport (_ "github.com/99designs/gqlgen"\n _ "github.com/99designs/gqlgen/graphql/introspection")' | gofmt > tools.go
+       printf '//go:build tools\npackage tools\nimport (_ "github.com/99designs/gqlgen"\n _ "github.com/99designs/gqlgen/graphql/introspection")' | gofmt > tools.go
 
        go mod tidy
 
@@ -135,6 +135,7 @@ models:
     model:
       - github.com/99designs/gqlgen/graphql.IntID # a go integer
       - github.com/99designs/gqlgen/graphql.ID # or a go string
+      - github.com/99designs/gqlgen/graphql.UintID # or a go uint
 ```
 
 This means gqlgen will be able to automatically bind to strings or ints for models you have written yourself, but the
