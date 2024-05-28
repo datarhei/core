@@ -65,8 +65,31 @@ type Server struct {
 	HandlePlay    func(*Conn)
 	HandleConn    func(*Conn)
 
+	MaxProbePacketCount int
+	SkipInvalidMessages bool
+	DebugChunks         func(conn net.Conn) bool
+
 	listener net.Listener
 	doneChan chan struct{}
+}
+
+func (s *Server) HandleNetConn(netconn net.Conn) (err error) {
+	conn := NewConn(netconn)
+	conn.prober = flv.NewProber(s.MaxProbePacketCount)
+	conn.skipInvalidMessages = s.SkipInvalidMessages
+	if s.DebugChunks != nil {
+		conn.debugChunks = s.DebugChunks(netconn)
+	}
+	conn.isserver = true
+
+	err = s.handleConn(conn)
+	if Debug {
+		fmt.Println("rtmp: server: client closed err:", err)
+	}
+
+	conn.Close()
+
+	return
 }
 
 func (s *Server) handleConn(conn *Conn) (err error) {
@@ -171,15 +194,12 @@ func (s *Server) Serve(listener net.Listener) error {
 			fmt.Println("rtmp: server: accepted")
 		}
 
-		conn := NewConn(netconn)
-		conn.isserver = true
-		go func() {
-			err := s.handleConn(conn)
+		go func(conn net.Conn) {
+			err := s.HandleNetConn(conn)
 			if Debug {
 				fmt.Println("rtmp: server: client closed err:", err)
 			}
-			conn.Close()
-		}()
+		}(netconn)
 	}
 }
 
@@ -252,6 +272,10 @@ type Conn struct {
 	eventtype uint16
 
 	start time.Time
+
+	skipInvalidMessages bool
+
+	debugChunks bool
 }
 
 type txrxcount struct {
@@ -279,6 +303,7 @@ func NewConn(netconn net.Conn) *Conn {
 	conn.readcsmap = make(map[uint32]*chunkStream)
 	conn.readMaxChunkSize = 128
 	conn.writeMaxChunkSize = 128
+	conn.readAckSize = 1048576
 	conn.txrxcount = &txrxcount{ReadWriter: netconn}
 	conn.bufr = bufio.NewReaderSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.bufw = bufio.NewWriterSize(conn.txrxcount, pio.RecommendBufioSize)
@@ -295,6 +320,7 @@ type chunkStream struct {
 	gentimenow  bool
 	timedelta   uint32
 	hastimeext  bool
+	timeext     uint32
 	msgsid      uint32
 	msgtypeid   uint8
 	msgdatalen  uint32
@@ -380,6 +406,15 @@ func (conn *Conn) pollMsg() (err error) {
 		if err = conn.readChunk(); err != nil {
 			return
 		}
+
+		if conn.readAckSize != 0 && conn.ackn > conn.readAckSize {
+			if err = conn.writeAck(conn.ackn, false); err != nil {
+				return fmt.Errorf("writeACK: %w", err)
+			}
+			conn.flushWrite()
+			conn.ackn = 0
+		}
+
 		if conn.gotmsg {
 			return
 		}
@@ -758,7 +793,7 @@ func (conn *Conn) writeConnect(path string) (err error) {
 		} else {
 			if conn.msgtypeid == msgtypeidWindowAckSize {
 				if len(conn.msgdata) == 4 {
-					conn.readAckSize = pio.U32BE(conn.msgdata)
+					conn.readAckSize = pio.U32BE(conn.msgdata) >> 1
 				}
 				//if err = self.writeWindowAckSize(0xffffffff); err != nil {
 				//	return
@@ -1005,14 +1040,10 @@ func (conn *Conn) WriteHeader(streams []av.CodecData) (err error) {
 		return
 	}
 
-	var metadata flvio.AMFMap = nil
+	var metadata flvio.AMFMap
 
-	//metadata = self.GetMetaData()
-
-	if metadata == nil {
-		if metadata, err = flv.NewMetadataByStreams(streams); err != nil {
-			return
-		}
+	if metadata, err = flv.NewMetadataByStreams(streams); err != nil {
+		return
 	}
 
 	// > onMetaData()
@@ -1346,10 +1377,17 @@ func (conn *Conn) readChunk() (err error) {
 		csid = uint32(pio.U16BE(b)) + 64
 	}
 
+	newcs := false
 	cs := conn.readcsmap[csid]
 	if cs == nil {
 		cs = &chunkStream{}
 		conn.readcsmap[csid] = cs
+		newcs = true
+	}
+
+	if len(conn.readcsmap) > 16 {
+		err = fmt.Errorf("too many chunk stream ids")
+		return
 	}
 
 	var timestamp uint32
@@ -1368,8 +1406,10 @@ func (conn *Conn) readChunk() (err error) {
 		//
 		//       Figure 9 Chunk Message Header – Type 0
 		if cs.msgdataleft != 0 {
-			err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
-			return
+			if !conn.skipInvalidMessages {
+				err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
+				return
+			}
 		}
 		h := b[:11]
 		if _, err = io.ReadFull(conn.bufr, h); err != nil {
@@ -1388,6 +1428,7 @@ func (conn *Conn) readChunk() (err error) {
 			n += 4
 			timestamp = pio.U32BE(b)
 			cs.hastimeext = true
+			cs.timeext = timestamp
 		} else {
 			cs.hastimeext = false
 		}
@@ -1404,9 +1445,15 @@ func (conn *Conn) readChunk() (err error) {
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		//
 		//       Figure 10 Chunk Message Header – Type 1
-		if cs.msgdataleft != 0 {
-			err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
+		if newcs {
+			err = fmt.Errorf("chunk message type 1 without previous chunk")
 			return
+		}
+		if cs.msgdataleft != 0 {
+			if !conn.skipInvalidMessages {
+				err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
+				return
+			}
 		}
 		h := b[:7]
 		if _, err = io.ReadFull(conn.bufr, h); err != nil {
@@ -1424,6 +1471,7 @@ func (conn *Conn) readChunk() (err error) {
 			n += 4
 			timestamp = pio.U32BE(b)
 			cs.hastimeext = true
+			cs.timeext = timestamp
 		} else {
 			cs.hastimeext = false
 		}
@@ -1439,9 +1487,15 @@ func (conn *Conn) readChunk() (err error) {
 		// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 		//
 		//       Figure 11 Chunk Message Header – Type 2
-		if cs.msgdataleft != 0 {
-			err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
+		if newcs {
+			err = fmt.Errorf("chunk message type 2 without previous chunk")
 			return
+		}
+		if cs.msgdataleft != 0 {
+			if !conn.skipInvalidMessages {
+				err = fmt.Errorf("chunk msgdataleft=%d invalid", cs.msgdataleft)
+				return
+			}
 		}
 		h := b[:3]
 		if _, err = io.ReadFull(conn.bufr, h); err != nil {
@@ -1457,6 +1511,7 @@ func (conn *Conn) readChunk() (err error) {
 			n += 4
 			timestamp = pio.U32BE(b)
 			cs.hastimeext = true
+			cs.timeext = timestamp
 		} else {
 			cs.hastimeext = false
 		}
@@ -1465,6 +1520,11 @@ func (conn *Conn) readChunk() (err error) {
 		cs.Start()
 
 	case 3:
+		if newcs {
+			err = fmt.Errorf("chunk message type 3 without previous chunk")
+			return
+		}
+
 		if cs.msgdataleft == 0 {
 			switch cs.msghdrtype {
 			case 0:
@@ -1475,6 +1535,7 @@ func (conn *Conn) readChunk() (err error) {
 					n += 4
 					timestamp = pio.U32BE(b)
 					cs.timenow = timestamp
+					cs.timeext = timestamp
 				}
 			case 1, 2:
 				if cs.hastimeext {
@@ -1489,6 +1550,18 @@ func (conn *Conn) readChunk() (err error) {
 				cs.timenow += timestamp
 			}
 			cs.Start()
+		} else {
+			if cs.hastimeext {
+				var b []byte
+				if b, err = conn.bufr.Peek(4); err != nil {
+					return
+				}
+				if pio.U32BE(b) == cs.timeext {
+					if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
+						return
+					}
+				}
+			}
 		}
 
 	default:
@@ -1509,8 +1582,27 @@ func (conn *Conn) readChunk() (err error) {
 	cs.msgdataleft -= uint32(size)
 
 	if Debug {
-		fmt.Printf("rtmp: chunk msgsid=%d msgtypeid=%d msghdrtype=%d len=%d left=%d\n",
-			cs.msgsid, cs.msgtypeid, cs.msghdrtype, cs.msgdatalen, cs.msgdataleft)
+		fmt.Printf("rtmp: chunk msgsid=%d msgtypeid=%d msghdrtype=%d len=%d left=%d max=%d",
+			cs.msgsid, cs.msgtypeid, msghdrtype, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
+	}
+
+	if conn.debugChunks {
+		data := fmt.Sprintf("rtmp: chunk id=%d msgsid=%d msgtypeid=%d msghdrtype=%d timestamp=%d ext=%v len=%d left=%d max=%d",
+			csid, cs.msgsid, cs.msgtypeid, msghdrtype, cs.timenow, cs.hastimeext, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
+
+		if cs.msgtypeid != msgtypeidVideoMsg && cs.msgtypeid != msgtypeidAudioMsg {
+			if len(cs.msgdata) > 1024 {
+				data += " data=" + hex.EncodeToString(cs.msgdata[:1024]) + "... "
+			} else {
+				data += " data=" + hex.EncodeToString(cs.msgdata) + " "
+			}
+		} else {
+			data += " data= "
+		}
+
+		data += fmt.Sprintf("(%d bytes)", len(cs.msgdata))
+
+		fmt.Printf("%s\n", data)
 	}
 
 	if cs.msgdataleft == 0 {
@@ -1549,17 +1641,11 @@ func (conn *Conn) readChunk() (err error) {
 		if err = conn.handleMsg(timestamp, cs.msgsid, cs.msgtypeid, cs.msgdata); err != nil {
 			return fmt.Errorf("handleMsg: %w", err)
 		}
+
+		cs.msgdata = nil
 	}
 
 	conn.ackn += uint32(n)
-
-	if conn.readAckSize != 0 && conn.ackn > conn.readAckSize {
-		if err = conn.writeAck(conn.ackn, false); err != nil {
-			return fmt.Errorf("writeACK: %w", err)
-		}
-		conn.flushWrite()
-		conn.ackn = 0
-	}
 
 	return
 }
@@ -1614,6 +1700,7 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 	switch msgtypeid {
 	case msgtypeidCommandMsgAMF0:
 		if _, err = conn.handleCommandMsgAMF0(msgdata); err != nil {
+			err = fmt.Errorf("AMF0: %w", err)
 			return
 		}
 
@@ -1624,6 +1711,7 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 		}
 		// skip first byte
 		if _, err = conn.handleCommandMsgAMF0(msgdata[1:]); err != nil {
+			err = fmt.Errorf("AMF3: %w", err)
 			return
 		}
 
@@ -1676,8 +1764,14 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 
 		if metaindex != -1 && metaindex < len(conn.datamsgvals) {
 			conn.metadata = conn.datamsgvals[metaindex].(flvio.AMFMap)
-			//fmt.Printf("onMetadata: %+v\n", self.metadata)
-			//fmt.Printf("videocodecid: %#08x (%f)\n", int64(self.metadata["videocodecid"].(float64)), self.metadata["videocodecid"].(float64))
+			//fmt.Printf("onMetadata: %+v\n", conn.metadata)
+			if _, hasVideo := conn.metadata["videocodecid"]; hasVideo {
+				conn.prober.HasVideo = true
+			}
+
+			if _, hasAudio := conn.metadata["audiocodecid"]; hasAudio {
+				conn.prober.HasAudio = true
+			}
 		}
 
 	case msgtypeidVideoMsg:
@@ -1719,7 +1813,7 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 		if len(conn.msgdata) != 4 {
 			return fmt.Errorf("invalid packet of WindowAckSize")
 		}
-		conn.readAckSize = pio.U32BE(conn.msgdata)
+		conn.readAckSize = pio.U32BE(conn.msgdata) >> 1
 	default:
 		if Debug {
 			fmt.Printf("rtmp: unhandled msg: %d\n", msgtypeid)
