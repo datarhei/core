@@ -212,9 +212,9 @@ func (s *Server) Close() {
 	if s.listener != nil {
 		s.listener.Close()
 		s.listener = nil
-	}
 
-	close(s.doneChan)
+		close(s.doneChan)
+	}
 }
 
 const (

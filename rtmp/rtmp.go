@@ -4,7 +4,9 @@ package rtmp
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -435,7 +437,9 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		// Transfer the data
 		err := avutil.CopyFile(conn, demuxer)
 		if err != nil {
-			s.log(log.Lerror, "PLAY", "ERROR", playPath, err.Error(), client)
+			if !errors.Is(err, io.EOF) {
+				s.log(log.Lerror, "PLAY", "ERROR", playPath, err.Error(), client)
+			}
 		}
 
 		ch.RemoveSubscriber(id)
@@ -528,7 +532,9 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 	// Ingest the data
 	err := avutil.CopyPackets(ch.queue, conn)
 	if err != nil {
-		s.log(log.Lerror, "PUBLISH", "ERROR", playPath, err.Error(), client)
+		if !errors.Is(err, io.EOF) {
+			s.log(log.Lerror, "PUBLISH", "ERROR", playPath, err.Error(), client)
+		}
 	}
 
 	s.lock.Lock()
