@@ -95,6 +95,11 @@ type Logger interface {
 	// be reset to nil.
 	Error() Logger
 
+	// WithLevel writes a message with the given level to all registered outputs.
+	// The message will be written according to fmt.Printf(). The detail field will
+	// be reset to nil.
+	WithLevel(level Level) Logger
+
 	// Write implements the io.Writer interface such that it can be used in e.g. the
 	// the log/Logger facility. Messages will be printed with debug level.
 	Write(p []byte) (int, error)
@@ -176,6 +181,10 @@ func (l *logger) Warn() Logger {
 
 func (l *logger) Error() Logger {
 	return newEvent(l).Error()
+}
+
+func (l *logger) WithLevel(level Level) Logger {
+	return newEvent(l).WithLevel(level)
 }
 
 func (l *logger) Write(p []byte) (int, error) {
@@ -318,29 +327,24 @@ func (e *Event) WithError(err error) Logger {
 }
 
 func (e *Event) Debug() Logger {
-	clone := e.clone()
-	clone.Level = Ldebug
-
-	return clone
+	return e.WithLevel(Ldebug)
 }
 
 func (e *Event) Info() Logger {
-	clone := e.clone()
-	clone.Level = Linfo
-
-	return clone
+	return e.WithLevel(Linfo)
 }
 
 func (e *Event) Warn() Logger {
-	clone := e.clone()
-	clone.Level = Lwarn
-
-	return clone
+	return e.WithLevel(Lwarn)
 }
 
 func (e *Event) Error() Logger {
+	return e.WithLevel(Lerror)
+}
+
+func (e *Event) WithLevel(level Level) Logger {
 	clone := e.clone()
-	clone.Level = Lerror
+	clone.Level = level
 
 	return clone
 }
