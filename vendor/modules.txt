@@ -64,7 +64,7 @@ github.com/datarhei/gosrt/crypto
 github.com/datarhei/gosrt/net
 github.com/datarhei/gosrt/packet
 github.com/datarhei/gosrt/rand
-# github.com/datarhei/joy4 v0.0.0-20240528121836-da80d79b6435
+# github.com/datarhei/joy4 v0.0.0-20240529125512-3aeb406414d6
 ## explicit; go 1.14
 github.com/datarhei/joy4/av
 github.com/datarhei/joy4/av/avutil

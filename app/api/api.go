@@ -874,12 +874,13 @@ func (a *api) start() error {
 		a.log.logger.rtmp = a.log.logger.core.WithComponent("RTMP").WithField("address", cfg.RTMP.Address)
 
 		config := rtmp.Config{
-			Addr:      cfg.RTMP.Address,
-			TLSAddr:   cfg.RTMP.AddressTLS,
-			App:       cfg.RTMP.App,
-			Token:     cfg.RTMP.Token,
-			Logger:    a.log.logger.rtmp,
-			Collector: a.sessions.Collector("rtmp"),
+			Addr:                  cfg.RTMP.Address,
+			TLSAddr:               cfg.RTMP.AddressTLS,
+			App:                   cfg.RTMP.App,
+			Token:                 cfg.RTMP.Token,
+			Logger:                a.log.logger.rtmp,
+			ConnectionIdleTimeout: 10 * time.Second,
+			Collector:             a.sessions.Collector("rtmp"),
 		}
 
 		if cfg.RTMP.EnableTLS {

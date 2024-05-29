@@ -195,6 +195,10 @@ type Config struct {
 	// ListenAndServe, so it's not possible to modify the configuration
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
+
+	// ConnectionIdleTimeout is the timeout in seconds after which idle
+	// connection will be closes. Default is no timeout.
+	ConnectionIdleTimeout time.Duration
 }
 
 // Server represents a RTMP server
@@ -252,17 +256,19 @@ func New(config Config) (Server, error) {
 	}
 
 	s.server = &rtmp.Server{
-		Addr:          config.Addr,
-		HandlePlay:    s.handlePlay,
-		HandlePublish: s.handlePublish,
+		Addr:                  config.Addr,
+		HandlePlay:            s.handlePlay,
+		HandlePublish:         s.handlePublish,
+		ConnectionIdleTimeout: config.ConnectionIdleTimeout,
 	}
 
 	if len(config.TLSAddr) != 0 {
 		s.tlsServer = &rtmp.Server{
-			Addr:          config.TLSAddr,
-			TLSConfig:     config.TLSConfig.Clone(),
-			HandlePlay:    s.handlePlay,
-			HandlePublish: s.handlePublish,
+			Addr:                  config.TLSAddr,
+			TLSConfig:             config.TLSConfig.Clone(),
+			HandlePlay:            s.handlePlay,
+			HandlePublish:         s.handlePublish,
+			ConnectionIdleTimeout: config.ConnectionIdleTimeout,
 		}
 	}
 

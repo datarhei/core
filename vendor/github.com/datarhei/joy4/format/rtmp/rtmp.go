@@ -53,6 +53,7 @@ func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
 
 	conn = NewConn(netconn)
 	conn.URL = u
+
 	return
 }
 
@@ -65,9 +66,10 @@ type Server struct {
 	HandlePlay    func(*Conn)
 	HandleConn    func(*Conn)
 
-	MaxProbePacketCount int
-	SkipInvalidMessages bool
-	DebugChunks         func(conn net.Conn) bool
+	MaxProbePacketCount   int
+	SkipInvalidMessages   bool
+	DebugChunks           func(conn net.Conn) bool
+	ConnectionIdleTimeout time.Duration
 
 	listener net.Listener
 	doneChan chan struct{}
@@ -80,6 +82,7 @@ func (s *Server) HandleNetConn(netconn net.Conn) (err error) {
 	if s.DebugChunks != nil {
 		conn.debugChunks = s.DebugChunks(netconn)
 	}
+	conn.netconn.SetIdleTimeout(s.ConnectionIdleTimeout)
 	conn.isserver = true
 
 	err = s.handleConn(conn)
@@ -101,10 +104,12 @@ func (s *Server) handleConn(conn *Conn) (err error) {
 		}
 
 		if conn.playing {
+			conn.netconn.SetReadIdleTimeout(0)
 			if s.HandlePlay != nil {
 				s.HandlePlay(conn)
 			}
 		} else if conn.publishing {
+			conn.netconn.SetWriteIdleTimeout(0)
 			if s.HandlePublish != nil {
 				s.HandlePublish(conn)
 			}
@@ -204,14 +209,12 @@ func (s *Server) Serve(listener net.Listener) error {
 }
 
 func (s *Server) Close() {
-	if s.listener == nil {
-		return
+	if s.listener != nil {
+		s.listener.Close()
+		s.listener = nil
 	}
 
 	close(s.doneChan)
-
-	s.listener.Close()
-	s.listener = nil
 }
 
 const (
@@ -239,7 +242,7 @@ type Conn struct {
 	writebuf []byte
 	readbuf  []byte
 
-	netconn   net.Conn
+	netconn   *idleConn
 	txrxcount *txrxcount
 
 	writeMaxChunkSize int
@@ -278,6 +281,61 @@ type Conn struct {
 	debugChunks bool
 }
 
+type idleConn struct {
+	net.Conn
+	ReadIdleTimeout  time.Duration
+	WriteIdleTimeout time.Duration
+}
+
+func (t *idleConn) Read(p []byte) (int, error) {
+	if t.ReadIdleTimeout > 0 {
+		t.Conn.SetReadDeadline(time.Now().Add(t.ReadIdleTimeout))
+	}
+
+	n, err := t.Conn.Read(p)
+	return n, err
+}
+
+func (t *idleConn) Write(p []byte) (int, error) {
+	if t.WriteIdleTimeout > 0 {
+		t.Conn.SetWriteDeadline(time.Now().Add(t.WriteIdleTimeout))
+	}
+
+	n, err := t.Conn.Write(p)
+	return n, err
+}
+
+func (t *idleConn) SetReadIdleTimeout(d time.Duration) error {
+	t.ReadIdleTimeout = d
+
+	deadline := time.Time{}
+	if t.ReadIdleTimeout > 0 {
+		deadline = time.Now().Add(d)
+	}
+
+	return t.Conn.SetReadDeadline(deadline)
+}
+
+func (t *idleConn) SetWriteIdleTimeout(d time.Duration) error {
+	t.WriteIdleTimeout = d
+
+	deadline := time.Time{}
+	if t.WriteIdleTimeout > 0 {
+		deadline = time.Now().Add(d)
+	}
+
+	return t.Conn.SetWriteDeadline(deadline)
+}
+
+func (t *idleConn) SetIdleTimeout(d time.Duration) error {
+	err := t.SetReadIdleTimeout(d)
+	if err != nil {
+		return err
+	}
+
+	return t.SetWriteIdleTimeout(d)
+}
+
 type txrxcount struct {
 	io.ReadWriter
 	txbytes uint64
@@ -299,12 +357,14 @@ func (t *txrxcount) Write(p []byte) (int, error) {
 func NewConn(netconn net.Conn) *Conn {
 	conn := &Conn{}
 	conn.prober = &flv.Prober{}
-	conn.netconn = netconn
+	conn.netconn = &idleConn{
+		Conn: netconn,
+	}
 	conn.readcsmap = make(map[uint32]*chunkStream)
 	conn.readMaxChunkSize = 128
 	conn.writeMaxChunkSize = 128
 	conn.readAckSize = 1048576
-	conn.txrxcount = &txrxcount{ReadWriter: netconn}
+	conn.txrxcount = &txrxcount{ReadWriter: conn.netconn}
 	conn.bufr = bufio.NewReaderSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.bufw = bufio.NewWriterSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.writebuf = make([]byte, 4096)
@@ -358,7 +418,19 @@ const (
 )
 
 func (conn *Conn) NetConn() net.Conn {
-	return conn.netconn
+	return conn.netconn.Conn
+}
+
+func (conn *Conn) SetReadIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetReadIdleTimeout(d)
+}
+
+func (conn *Conn) SetWriteIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetWriteIdleTimeout(d)
+}
+
+func (conn *Conn) SetIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetIdleTimeout(d)
 }
 
 func (conn *Conn) TxBytes() uint64 {
@@ -1421,7 +1493,7 @@ func (conn *Conn) readChunk() (err error) {
 		cs.msgdatalen = pio.U24BE(h[3:6])
 		cs.msgtypeid = h[6]
 		cs.msgsid = pio.U32LE(h[7:11])
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}
@@ -1464,7 +1536,7 @@ func (conn *Conn) readChunk() (err error) {
 		cs.msghdrtype = msghdrtype
 		cs.msgdatalen = pio.U24BE(h[3:6])
 		cs.msgtypeid = h[6]
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}
@@ -1504,7 +1576,7 @@ func (conn *Conn) readChunk() (err error) {
 		n += len(h)
 		cs.msghdrtype = msghdrtype
 		timestamp = pio.U24BE(h[0:3])
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}

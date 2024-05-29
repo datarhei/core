@@ -10,7 +10,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.21.2
 	github.com/datarhei/gosrt v0.6.0
-	github.com/datarhei/joy4 v0.0.0-20240528121836-da80d79b6435
+	github.com/datarhei/joy4 v0.0.0-20240529125512-3aeb406414d6
 	github.com/go-playground/validator/v10 v10.20.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang-jwt/jwt/v5 v5.2.1
