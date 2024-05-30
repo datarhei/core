@@ -35,11 +35,16 @@ func ParseURL(uri string) (u *url.URL, err error) {
 	return
 }
 
-func Dial(uri string) (conn *Conn, err error) {
-	return DialTimeout(uri, 0)
+type DialOptions struct {
+	MaxProbePacketCount int
+	DebugChunks         func(conn net.Conn) bool
 }
 
-func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
+func Dial(uri string, options DialOptions) (conn *Conn, err error) {
+	return DialTimeout(uri, 0, options)
+}
+
+func DialTimeout(uri string, timeout time.Duration, options DialOptions) (conn *Conn, err error) {
 	var u *url.URL
 	if u, err = ParseURL(uri); err != nil {
 		return
@@ -53,6 +58,10 @@ func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
 
 	conn = NewConn(netconn)
 	conn.URL = u
+	conn.prober = flv.NewProber(options.MaxProbePacketCount)
+	if options.DebugChunks != nil {
+		conn.debugChunks = options.DebugChunks(netconn)
+	}
 
 	return
 }
@@ -374,20 +383,20 @@ func NewConn(netconn net.Conn) *Conn {
 }
 
 type chunkStream struct {
-	timenow     uint32
-	prevtimenow uint32
-	tscount     int
-	gentimenow  bool
-	timedelta   uint32
-	hastimeext  bool
-	timeext     uint32
-	msgsid      uint32
-	msgtypeid   uint8
-	msgdatalen  uint32
-	msgdataleft uint32
-	msghdrtype  uint8
-	msgdata     []byte
-	msgcount    int
+	timenow          uint32
+	prevtimenow      uint32
+	sametscount      int
+	genwallclocktime bool
+	timedelta        uint32
+	hastimeext       bool
+	timeext          uint32
+	msgsid           uint32
+	msgtypeid        uint8
+	msgdatalen       uint32
+	msgdataleft      uint32
+	msghdrtype       uint8
+	msgdata          []byte
+	msgcount         uint64
 }
 
 func (cs *chunkStream) Start() {
@@ -419,6 +428,14 @@ const (
 
 func (conn *Conn) NetConn() net.Conn {
 	return conn.netconn.Conn
+}
+
+func (conn *Conn) LocalAddr() net.Addr {
+	return conn.netconn.LocalAddr()
+}
+
+func (conn *Conn) RemoteAddr() net.Addr {
+	return conn.netconn.RemoteAddr()
 }
 
 func (conn *Conn) SetReadIdleTimeout(d time.Duration) error {
@@ -1659,8 +1676,12 @@ func (conn *Conn) readChunk() (err error) {
 	}
 
 	if conn.debugChunks {
-		data := fmt.Sprintf("rtmp: chunk id=%d msgsid=%d msgtypeid=%d msghdrtype=%d timestamp=%d ext=%v len=%d left=%d max=%d",
-			csid, cs.msgsid, cs.msgtypeid, msghdrtype, cs.timenow, cs.hastimeext, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
+		path := "***"
+		if conn.URL != nil {
+			path = conn.URL.Path
+		}
+		data := fmt.Sprintf("%s: chunk id=%d msgsid=%d msgtypeid=%d msghdrtype=%d timestamp=%d ext=%v wallclock=%v len=%d left=%d max=%d",
+			path, csid, cs.msgsid, cs.msgtypeid, msghdrtype, cs.timenow, cs.hastimeext, cs.genwallclocktime, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
 
 		if cs.msgtypeid != msgtypeidVideoMsg && cs.msgtypeid != msgtypeidAudioMsg {
 			if len(cs.msgdata) > 1024 {
@@ -1686,26 +1707,28 @@ func (conn *Conn) readChunk() (err error) {
 		timestamp = cs.timenow
 
 		if cs.msgtypeid == msgtypeidVideoMsg || cs.msgtypeid == msgtypeidAudioMsg {
-			if cs.msgcount < 20 { // only consider the first video and audio messages
-				if !cs.gentimenow {
-					if cs.prevtimenow >= cs.timenow {
-						cs.tscount++
-					} else {
-						cs.tscount = 0
-					}
-
-					// if the previous timestamp is the same as the current for too often in a row, assume defect timestamps
-					if cs.tscount > 10 {
-						cs.gentimenow = true
-					}
-
-					cs.prevtimenow = cs.timenow
+			if !cs.genwallclocktime {
+				if cs.prevtimenow >= cs.timenow {
+					cs.sametscount++
+				} else {
+					cs.sametscount = 0
 				}
 
+				// if the previous timestamp is the same as the current for too often in a row, assume defect timestamps
+				if cs.sametscount > 10 {
+					if cs.msgcount < 20 { // only consider the first video and audio messages
+						cs.genwallclocktime = true
+					} else { // otherwise bail out
+						err = fmt.Errorf("detected sequence of non-changing timestamps: %d (msgtypeid %d)", cs.timenow, cs.msgtypeid)
+						return
+					}
+				}
+
+				cs.prevtimenow = cs.timenow
 				cs.msgcount++
 			}
 
-			if cs.gentimenow {
+			if cs.genwallclocktime {
 				timestamp = uint32(time.Since(conn.start).Milliseconds() % 0xFFFFFFFF)
 			}
 		}
@@ -2104,7 +2127,7 @@ func Handler(h *avutil.RegisterHandler) {
 			return
 		}
 		ok = true
-		demuxer, err = Dial(uri)
+		demuxer, err = Dial(uri, DialOptions{})
 		return
 	}
 
@@ -2113,7 +2136,7 @@ func Handler(h *avutil.RegisterHandler) {
 			return
 		}
 		ok = true
-		muxer, err = Dial(uri)
+		muxer, err = Dial(uri, DialOptions{})
 		return
 	}
 
