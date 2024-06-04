@@ -346,19 +346,19 @@ func (t *idleConn) SetIdleTimeout(d time.Duration) error {
 }
 
 type txrxcount struct {
-	io.ReadWriter
+	io.ReadWriteCloser
 	txbytes uint64
 	rxbytes uint64
 }
 
 func (t *txrxcount) Read(p []byte) (int, error) {
-	n, err := t.ReadWriter.Read(p)
+	n, err := t.ReadWriteCloser.Read(p)
 	t.rxbytes += uint64(n)
 	return n, err
 }
 
 func (t *txrxcount) Write(p []byte) (int, error) {
-	n, err := t.ReadWriter.Write(p)
+	n, err := t.ReadWriteCloser.Write(p)
 	t.txbytes += uint64(n)
 	return n, err
 }
@@ -373,7 +373,7 @@ func NewConn(netconn net.Conn) *Conn {
 	conn.readMaxChunkSize = 128
 	conn.writeMaxChunkSize = 128
 	conn.readAckSize = 1048576
-	conn.txrxcount = &txrxcount{ReadWriter: conn.netconn}
+	conn.txrxcount = &txrxcount{ReadWriteCloser: conn.netconn}
 	conn.bufr = bufio.NewReaderSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.bufw = bufio.NewWriterSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.writebuf = make([]byte, 4096)
@@ -1135,6 +1135,16 @@ func (conn *Conn) WriteHeader(streams []av.CodecData) (err error) {
 		return
 	}
 
+	if conn.metadata != nil {
+		for key, value := range conn.metadata {
+			if _, hasKey := metadata[key]; hasKey {
+				continue
+			}
+
+			metadata[key] = value
+		}
+	}
+
 	// > onMetaData()
 	if err = conn.writeDataMsg(5, conn.avmsgsid, "onMetaData", metadata); err != nil {
 		return
@@ -1858,14 +1868,17 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 		}
 
 		if metaindex != -1 && metaindex < len(conn.datamsgvals) {
-			conn.metadata = conn.datamsgvals[metaindex].(flvio.AMFMap)
-			//fmt.Printf("onMetadata: %+v\n", conn.metadata)
-			if _, hasVideo := conn.metadata["videocodecid"]; hasVideo {
-				conn.prober.HasVideo = true
-			}
+			metadata, ok := conn.datamsgvals[metaindex].(flvio.AMFMap)
+			if ok {
+				conn.metadata = metadata
 
-			if _, hasAudio := conn.metadata["audiocodecid"]; hasAudio {
-				conn.prober.HasAudio = true
+				if _, hasVideo := metadata["videocodecid"]; hasVideo {
+					conn.prober.HasVideo = true
+				}
+
+				if _, hasAudio := metadata["audiocodecid"]; hasAudio {
+					conn.prober.HasAudio = true
+				}
 			}
 		}
 
