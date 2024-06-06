@@ -2,11 +2,13 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
@@ -173,13 +175,29 @@ func (h *ClusterHandler) TransferLeadership(c echo.Context) error {
 // @Tags v16.?.?
 // @ID cluster-3-leave
 // @Produce json
+// @Param nodeid body string true "Node ID"
 // @Success 200 {string} string
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/leave [put]
 func (h *ClusterHandler) Leave(c echo.Context) error {
-	h.cluster.Leave("", "")
-	h.cluster.Shutdown()
+	nodeid := ""
+
+	req := c.Request()
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	if len(body) != 0 {
+		if err := json.Unmarshal(body, &nodeid); err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err).Error())
+		}
+	}
+
+	h.cluster.Leave("", nodeid)
+	//h.cluster.Shutdown()
 
 	return c.JSON(http.StatusOK, "OK")
 }
