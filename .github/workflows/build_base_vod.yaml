@@ -19,12 +19,6 @@ jobs:
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                       key: alpine3.19
-                    - os: alpine
-                      os_version: "3.16"
-                      golang: golang:1.19-alpine3.16
-                      platforms: linux/amd64,linux/arm64,linux/arm/v7
-                      branch: vod
-                      key: alpine3.16
 
         steps:
             - name: Checkout
