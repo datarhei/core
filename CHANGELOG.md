@@ -1,5 +1,15 @@
 # Core
 
+### Core v16.15.0 > v16.16.0
+
+-   Add ConnectionIdleTimeout to RTMP server
+-   Add WithLevel() to Logger interface
+-   Fix datarhei/restreamer#759
+-   Fix various RTMP bugs
+-   Fix wrong log output when receiving a RTMP stream
+-   Fix skipping session handling if collectors are nil
+-   Update dependencies
+
 ### Core v16.14.0 > v16.15.0
 
 -   Add migrating to ffmpeg 6
