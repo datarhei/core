@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+type ClusterNodeID struct {
+	ID string `json:"id"`
+}
+
 type ClusterNode struct {
 	ID          string               `json:"id"`
 	Name        string               `json:"name"`

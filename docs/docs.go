@@ -860,6 +860,17 @@ const docTemplate = `{
                 ],
                 "summary": "Leave the cluster gracefully",
                 "operationId": "cluster-3-leave",
+                "parameters": [
+                    {
+                        "description": "Node ID",
+                        "name": "nodeid",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNodeID"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -5040,6 +5051,14 @@ const docTemplate = `{
                 "last_update": {
                     "description": "unix timestamp",
                     "type": "integer"
+                }
+            }
+        },
+        "api.ClusterNodeID": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
                 }
             }
         },

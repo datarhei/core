@@ -175,13 +175,13 @@ func (h *ClusterHandler) TransferLeadership(c echo.Context) error {
 // @Tags v16.?.?
 // @ID cluster-3-leave
 // @Produce json
-// @Param nodeid body string true "Node ID"
+// @Param nodeid body api.ClusterNodeID true "Node ID"
 // @Success 200 {string} string
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/leave [put]
 func (h *ClusterHandler) Leave(c echo.Context) error {
-	nodeid := ""
+	nodeid := api.ClusterNodeID{}
 
 	req := c.Request()
 
@@ -196,8 +196,7 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 		}
 	}
 
-	h.cluster.Leave("", nodeid)
-	//h.cluster.Shutdown()
+	h.cluster.Leave("", nodeid.ID)
 
 	return c.JSON(http.StatusOK, "OK")
 }

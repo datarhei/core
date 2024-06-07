@@ -432,6 +432,8 @@ func (c *cluster) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to setup cluster: %w", err)
 	}
 
+	<-c.shutdownCh
+
 	return nil
 }
 
@@ -1014,6 +1016,13 @@ func (c *cluster) trackNodeChanges() {
 				}
 
 				delete(c.nodes, id)
+				/*
+					if id == c.nodeID {
+						c.logger.Warn().WithField("id", id).Log("This node left the cluster. Shutting down.")
+						// We got removed from the cluster, shutdown
+						c.Shutdown()
+					}
+				*/
 			}
 
 			c.nodesLock.Unlock()
@@ -1307,6 +1316,27 @@ func (c *cluster) trackLeaderChanges() {
 				c.hasRaftLeader = true
 			}
 			c.leaderLock.Unlock()
+
+			servers, err := c.raft.Servers()
+			if err != nil {
+				c.logger.Error().WithError(err).Log("Raft configuration")
+				break
+			}
+
+			isNodeInCluster := false
+			for _, server := range servers {
+				if c.nodeID == server.ID {
+					isNodeInCluster = true
+					break
+				}
+			}
+
+			if !isNodeInCluster {
+				// We're not anymore part of the cluster, shutdown
+				c.logger.Warn().WithField("id", c.nodeID).Log("This node left the cluster. Shutting down.")
+				c.Shutdown()
+			}
+
 		case <-c.shutdownCh:
 			return
 		}

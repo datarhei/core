@@ -319,6 +319,10 @@ func (e *Event) WithFields(f Fields) Logger {
 }
 
 func (e *Event) WithError(err error) Logger {
+	if err == nil {
+		return e
+	}
+
 	return e.WithFields(Fields{
 		"error": err,
 	})

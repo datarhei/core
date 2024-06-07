@@ -1719,14 +1719,34 @@ func (a *api) start(ctx context.Context) error {
 
 	// Start the cluster
 	if a.cluster != nil {
-		ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Cluster.StartupTimeout)*time.Second)
-		defer cancel()
+		wgStart.Add(1)
+		a.wgStop.Add(1)
 
-		err := a.cluster.Start(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to start cluster: %w", err)
-		}
+		go func() {
+			logger := a.log.logger.core
+
+			var err error
+
+			defer func() {
+				logger.Info().Log("Cluster exited")
+				a.wgStop.Done()
+			}()
+
+			ctx, cancel := context.WithTimeout(ctx, time.Duration(cfg.Cluster.StartupTimeout)*time.Second)
+			defer cancel()
+
+			wgStart.Done()
+
+			err = a.cluster.Start(ctx)
+			if err != nil {
+				err = fmt.Errorf("cluster failed: %w", err)
+			}
+
+			sendError(err)
+		}()
 	}
+
+	wgStart.Wait()
 
 	// Start the service
 	if a.service != nil {

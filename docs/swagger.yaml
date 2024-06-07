@@ -181,6 +181,11 @@ definitions:
         description: unix timestamp
         type: integer
     type: object
+  api.ClusterNodeID:
+    properties:
+      id:
+        type: string
+    type: object
   api.ClusterNodeResources:
     properties:
       cpu_limit:
@@ -3093,6 +3098,13 @@ paths:
     put:
       description: Leave the cluster gracefully
       operationId: cluster-3-leave
+      parameters:
+      - description: Node ID
+        in: body
+        name: nodeid
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClusterNodeID'
       produces:
       - application/json
       responses:
