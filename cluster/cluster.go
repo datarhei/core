@@ -186,6 +186,7 @@ type cluster struct {
 }
 
 var ErrDegraded = errors.New("cluster is currently degraded")
+var ErrUnknownNode = errors.New("unknown node id")
 
 func New(config Config) (Cluster, error) {
 	c := &cluster{
@@ -715,6 +716,14 @@ func (c *cluster) Leave(origin, id string) error {
 
 	if len(id) == 0 {
 		id = c.nodeID
+	}
+
+	c.nodesLock.RLock()
+	_, hasNode := c.nodes[id]
+	c.nodesLock.RUnlock()
+
+	if !hasNode {
+		return ErrUnknownNode
 	}
 
 	c.logger.Debug().WithFields(log.Fields{
