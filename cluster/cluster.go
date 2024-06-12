@@ -59,6 +59,8 @@ type Cluster interface {
 	Leave(origin, id string) error              // gracefully remove a node from the cluster
 	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
+	IsRaftLeader() bool
+	HasRaftLeader() bool
 
 	ListProcesses() []store.Process
 	GetProcess(id app.ProcessID) (store.Process, error)
@@ -165,10 +167,11 @@ type cluster struct {
 	hostnames         []string
 	stateLock         sync.RWMutex
 
-	isRaftLeader  bool
-	hasRaftLeader bool
-	isLeader      bool
-	leaderLock    sync.Mutex
+	isRaftLeader      bool
+	hasRaftLeader     bool
+	isLeader          bool
+	isEmergencyLeader bool
+	leaderLock        sync.Mutex
 
 	isTLSRequired bool
 	clusterKVS    ClusterKVS
@@ -369,9 +372,15 @@ func New(config Config) (Cluster, error) {
 				ticker := time.NewTicker(time.Second)
 				defer ticker.Stop()
 
+				timer := time.NewTimer(c.nodeRecoverTimeout)
+				defer timer.Stop()
+
 				for {
 					select {
 					case <-c.shutdownCh:
+						return
+					case <-timer.C:
+						c.logger.Warn().WithField("peer", peerAddress).Log("Giving up joining cluster")
 						return
 					case <-ticker.C:
 						err := c.Join("", c.nodeID, c.raftAddress, peerAddress)
@@ -672,6 +681,13 @@ func (c *cluster) IsRaftLeader() bool {
 	return c.isRaftLeader
 }
 
+func (c *cluster) HasRaftLeader() bool {
+	c.leaderLock.Lock()
+	defer c.leaderLock.Unlock()
+
+	return c.hasRaftLeader
+}
+
 func (c *cluster) IsDegraded() (bool, error) {
 	c.stateLock.RLock()
 	defer c.stateLock.RUnlock()
@@ -709,7 +725,7 @@ func (c *cluster) IsClusterDegraded() (bool, error) {
 }
 
 func (c *cluster) Leave(origin, id string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if !c.HasRaftLeader() {
 		return ErrDegraded
 	}
 
@@ -767,11 +783,11 @@ func (c *cluster) Leave(origin, id string) error {
 		return err
 	}
 
-	numPeers := len(servers)
+	numServers := len(servers)
 
 	if id == c.nodeID {
 		// We're going to remove ourselves
-		if numPeers <= 1 {
+		if numServers <= 1 {
 			// Don't do so if we're the only server in the cluster
 			c.logger.Debug().Log("We're the leader without any peers, not doing anything")
 			return nil
@@ -847,7 +863,7 @@ func (c *cluster) Leave(origin, id string) error {
 }
 
 func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if !c.HasRaftLeader() {
 		return ErrDegraded
 	}
 
@@ -910,7 +926,7 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 }
 
 func (c *cluster) TransferLeadership(origin, id string) error {
-	if ok, _ := c.IsDegraded(); ok {
+	if !c.HasRaftLeader() {
 		return ErrDegraded
 	}
 
@@ -923,7 +939,7 @@ func (c *cluster) TransferLeadership(origin, id string) error {
 }
 
 func (c *cluster) Snapshot(origin string) (io.ReadCloser, error) {
-	if ok, _ := c.IsDegraded(); ok {
+	if !c.HasRaftLeader() {
 		return nil, ErrDegraded
 	}
 

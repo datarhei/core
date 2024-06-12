@@ -75,6 +75,7 @@ type NodeResources struct {
 }
 
 type NodeAbout struct {
+	SpawnedAt   time.Time
 	ID          string
 	Name        string
 	Address     string
@@ -113,6 +114,8 @@ var ErrNoPeer = errors.New("not connected to the core API: client not available"
 type node struct {
 	id      string
 	address string
+
+	createdAt time.Time
 
 	peer       client.RestClient
 	peerErr    error
@@ -159,12 +162,13 @@ type NodeConfig struct {
 
 func NewNode(config NodeConfig) Node {
 	n := &node{
-		id:      config.ID,
-		address: config.Address,
-		config:  config.Config,
-		state:   stateDisconnected,
-		secure:  strings.HasPrefix(config.Address, "https://"),
-		logger:  config.Logger,
+		id:        config.ID,
+		address:   config.Address,
+		config:    config.Config,
+		state:     stateDisconnected,
+		secure:    strings.HasPrefix(config.Address, "https://"),
+		logger:    config.Logger,
+		createdAt: time.Now(),
 	}
 
 	if n.logger == nil {
@@ -530,6 +534,7 @@ func (n *node) About() NodeAbout {
 	}
 
 	nodeAbout := NodeAbout{
+		SpawnedAt:   n.createdAt,
 		ID:          n.id,
 		Name:        name,
 		Address:     n.address,
