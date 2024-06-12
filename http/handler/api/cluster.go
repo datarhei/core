@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -196,7 +197,14 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 		}
 	}
 
-	h.cluster.Leave("", nodeid.ID)
+	err = h.cluster.Leave("", nodeid.ID)
+	if err != nil {
+		if errors.Is(err, cluster.ErrUnknownNode) {
+			return api.Err(http.StatusNotFound, "", "node not found")
+		}
+
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
