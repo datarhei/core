@@ -60,7 +60,7 @@ func (c *cluster) recoverCluster(ctx context.Context, interval time.Duration) {
 			c.leaderLock.Unlock()
 
 			uptime := c.raft.Stats().Uptime
-			if uptime < time.Minute {
+			if uptime < 2*c.recoverTimeout {
 				continue
 			}
 
