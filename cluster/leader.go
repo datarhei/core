@@ -306,14 +306,14 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 
 	if !emergency {
 		go c.clearLocks(ctx, time.Minute)
-		go c.clearDeadNodes(ctx, c.nodeRecoverTimeout)
+		go c.clearDeadNodes(ctx, c.syncInterval, c.nodeRecoverTimeout)
 	}
 
 	return nil
 }
 
-func (c *cluster) clearDeadNodes(ctx context.Context, nodeRecoverTimeout time.Duration) {
-	ticker := time.NewTicker(c.syncInterval)
+func (c *cluster) clearDeadNodes(ctx context.Context, interval, nodeRecoverTimeout time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

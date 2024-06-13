@@ -115,6 +115,7 @@ type Config struct {
 	SyncInterval           time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
 	NodeRecoverTimeout     time.Duration // Timeout for a node to recover before rebalancing the processes
 	EmergencyLeaderTimeout time.Duration // Timeout for establishing the emergency leadership after lost contact to raft leader
+	RecoverTimeout         time.Duration // Timeout for recovering the cluster if there's no raft leader
 
 	CoreConfig *config.Config
 	CoreSkills skills.Skills
@@ -133,7 +134,7 @@ type cluster struct {
 
 	logger log.Logger
 
-	raft                    raft.Raft
+	raft                    raft.RaftRecoverer
 	raftRemoveGracePeriod   time.Duration
 	raftAddress             string
 	raftNotifyCh            chan bool
@@ -142,7 +143,8 @@ type cluster struct {
 
 	store store.Store
 
-	cancelLeaderShip context.CancelFunc
+	cancelLeaderShip   context.CancelFunc
+	cancelFollowerShip context.CancelFunc
 
 	shutdown     bool
 	shutdownCh   chan struct{}
@@ -151,6 +153,7 @@ type cluster struct {
 	syncInterval           time.Duration
 	nodeRecoverTimeout     time.Duration
 	emergencyLeaderTimeout time.Duration
+	recoverTimeout         time.Duration
 
 	forwarder forwarder.Forwarder
 	api       API
@@ -171,6 +174,7 @@ type cluster struct {
 	hasRaftLeader     bool
 	isLeader          bool
 	isEmergencyLeader bool
+	lastLeaderChange  time.Time
 	leaderLock        sync.Mutex
 
 	isTLSRequired bool
@@ -207,12 +211,15 @@ func New(config Config) (Cluster, error) {
 		syncInterval:           config.SyncInterval,
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
+		recoverTimeout:         config.RecoverTimeout,
 
 		isDegraded:    true,
 		isDegradedErr: fmt.Errorf("cluster not yet startet"),
 
 		isCoreDegraded:    true,
 		isCoreDegradedErr: fmt.Errorf("cluster not yet started"),
+
+		lastLeaderChange: time.Now(),
 
 		config: config.CoreConfig,
 		skills: config.CoreSkills,
@@ -344,7 +351,7 @@ func New(config Config) (Cluster, error) {
 	c.raftLeaderObservationCh = make(chan string, 16)
 	c.raftEmergencyNotifyCh = make(chan bool, 16)
 
-	raft, err := raft.New(raft.Config{
+	raft, err := raft.NewRecoverer(raft.Config{
 		ID:                  config.NodeID,
 		Path:                config.Path,
 		Address:             config.Address,
@@ -381,9 +388,17 @@ func New(config Config) (Cluster, error) {
 					case <-c.shutdownCh:
 						return
 					case <-timer.C:
-						c.logger.Warn().WithField("peer", peerAddress).Log("Giving up joining cluster")
+						c.logger.Warn().WithFields(log.Fields{
+							"peer":    peerAddress,
+							"timeout": c.nodeRecoverTimeout,
+						}).Log("Giving up joining cluster via peer")
 						return
 					case <-ticker.C:
+						if c.HasRaftLeader() {
+							c.logger.Warn().WithField("peer", peerAddress).Log("Stop joining cluster via peer, already joined")
+							return
+						}
+
 						err := c.Join("", c.nodeID, c.raftAddress, peerAddress)
 						if err != nil {
 							c.logger.Warn().WithError(err).Log("Join cluster")
@@ -726,10 +741,6 @@ func (c *cluster) IsClusterDegraded() (bool, error) {
 }
 
 func (c *cluster) Leave(origin, id string) error {
-	if !c.HasRaftLeader() {
-		return ErrDegraded
-	}
-
 	if len(id) == 0 {
 		id = c.nodeID
 	}
@@ -872,10 +883,6 @@ func (c *cluster) Leave(origin, id string) error {
 }
 
 func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
-	if !c.HasRaftLeader() {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Join(origin, id, raftAddress, peerAddress)
@@ -1335,6 +1342,7 @@ func (c *cluster) trackLeaderChanges() {
 			}
 			c.forwarder.SetLeader(leaderAddress)
 			c.leaderLock.Lock()
+			c.lastLeaderChange = time.Now()
 			if len(leaderAddress) == 0 {
 				c.hasRaftLeader = false
 			} else {
