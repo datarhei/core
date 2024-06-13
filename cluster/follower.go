@@ -90,12 +90,12 @@ func (c *cluster) recoverCluster(ctx context.Context, interval time.Duration) {
 				}
 				c.nodesLock.RUnlock()
 
-				c.logger.Warn().WithField("peers", peers).Log("Recovering raft.")
+				c.logger.Warn().WithField("peers", peers).Log("Recovering raft")
 
 				// recover raft with new set of peers
 				err = c.raft.Recover(peers, 2*interval)
 				if err != nil {
-					c.logger.Error().WithError(err).Log("Recovering raft failed. Shutting down.")
+					c.logger.Error().WithError(err).Log("Recovering raft failed, shutting down")
 					c.Shutdown()
 					return
 				}
