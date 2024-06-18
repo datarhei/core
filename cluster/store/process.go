@@ -102,6 +102,30 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	return nil
 }
 
+func (s *store) setRelocateProcess(cmd CommandSetRelocateProcess) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for processid, targetNodeid := range cmd.Map {
+		id := processid.String()
+		s.data.ProcessRelocateMap[id] = targetNodeid
+	}
+
+	return nil
+}
+
+func (s *store) unsetRelocateProcess(cmd CommandUnsetRelocateProcess) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for _, processid := range cmd.ID {
+		id := processid.String()
+		delete(s.data.ProcessRelocateMap, id)
+	}
+
+	return nil
+}
+
 func (s *store) setProcessOrder(cmd CommandSetProcessOrder) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -221,6 +245,19 @@ func (s *store) GetProcessNodeMap() map[string]string {
 	m := map[string]string{}
 
 	for key, value := range s.data.ProcessNodeMap {
+		m[key] = value
+	}
+
+	return m
+}
+
+func (s *store) GetProcessRelocateMap() map[string]string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := map[string]string{}
+
+	for key, value := range s.data.ProcessRelocateMap {
 		m[key] = value
 	}
 

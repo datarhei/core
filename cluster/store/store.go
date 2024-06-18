@@ -23,6 +23,7 @@ type Store interface {
 	ListProcesses() []Process
 	GetProcess(id app.ProcessID) (Process, error)
 	GetProcessNodeMap() map[string]string
+	GetProcessRelocateMap() map[string]string
 
 	ListUsers() Users
 	GetUser(name string) Users
@@ -63,22 +64,24 @@ type Value struct {
 type Operation string
 
 const (
-	OpAddProcess         Operation = "addProcess"
-	OpRemoveProcess      Operation = "removeProcess"
-	OpUpdateProcess      Operation = "updateProcess"
-	OpSetProcessOrder    Operation = "setProcessOrder"
-	OpSetProcessMetadata Operation = "setProcessMetadata"
-	OpSetProcessError    Operation = "setProcessError"
-	OpAddIdentity        Operation = "addIdentity"
-	OpUpdateIdentity     Operation = "updateIdentity"
-	OpRemoveIdentity     Operation = "removeIdentity"
-	OpSetPolicies        Operation = "setPolicies"
-	OpSetProcessNodeMap  Operation = "setProcessNodeMap"
-	OpCreateLock         Operation = "createLock"
-	OpDeleteLock         Operation = "deleteLock"
-	OpClearLocks         Operation = "clearLocks"
-	OpSetKV              Operation = "setKV"
-	OpUnsetKV            Operation = "unsetKV"
+	OpAddProcess           Operation = "addProcess"
+	OpRemoveProcess        Operation = "removeProcess"
+	OpUpdateProcess        Operation = "updateProcess"
+	OpSetRelocateProcess   Operation = "setRelocateProcess"
+	OpUnsetRelocateProcess Operation = "unsetRelocateProcess"
+	OpSetProcessOrder      Operation = "setProcessOrder"
+	OpSetProcessMetadata   Operation = "setProcessMetadata"
+	OpSetProcessError      Operation = "setProcessError"
+	OpAddIdentity          Operation = "addIdentity"
+	OpUpdateIdentity       Operation = "updateIdentity"
+	OpRemoveIdentity       Operation = "removeIdentity"
+	OpSetPolicies          Operation = "setPolicies"
+	OpSetProcessNodeMap    Operation = "setProcessNodeMap"
+	OpCreateLock           Operation = "createLock"
+	OpDeleteLock           Operation = "deleteLock"
+	OpClearLocks           Operation = "clearLocks"
+	OpSetKV                Operation = "setKV"
+	OpUnsetKV              Operation = "unsetKV"
 )
 
 type Command struct {
@@ -90,13 +93,21 @@ type CommandAddProcess struct {
 	Config *app.Config
 }
 
+type CommandRemoveProcess struct {
+	ID app.ProcessID
+}
+
 type CommandUpdateProcess struct {
 	ID     app.ProcessID
 	Config *app.Config
 }
 
-type CommandRemoveProcess struct {
-	ID app.ProcessID
+type CommandSetRelocateProcess struct {
+	Map map[app.ProcessID]string
+}
+
+type CommandUnsetRelocateProcess struct {
+	ID []app.ProcessID
 }
 
 type CommandSetProcessOrder struct {
@@ -115,6 +126,10 @@ type CommandSetProcessError struct {
 	Error string
 }
 
+type CommandSetProcessNodeMap struct {
+	Map map[string]string
+}
+
 type CommandAddIdentity struct {
 	Identity identity.User
 }
@@ -131,10 +146,6 @@ type CommandRemoveIdentity struct {
 type CommandSetPolicies struct {
 	Name     string
 	Policies []access.Policy
-}
-
-type CommandSetProcessNodeMap struct {
-	Map map[string]string
 }
 
 type CommandCreateLock struct {
@@ -158,9 +169,10 @@ type CommandUnsetKV struct {
 }
 
 type storeData struct {
-	Version        uint64
-	Process        map[string]Process
-	ProcessNodeMap map[string]string
+	Version            uint64
+	Process            map[string]Process // processid -> process
+	ProcessNodeMap     map[string]string  // processid -> nodeid
+	ProcessRelocateMap map[string]string  // processid -> nodeid
 
 	Users struct {
 		UpdatedAt time.Time
@@ -297,6 +309,22 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.updateProcess(cmd)
+	case OpSetRelocateProcess:
+		cmd := CommandSetRelocateProcess{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setRelocateProcess(cmd)
+	case OpUnsetRelocateProcess:
+		cmd := CommandUnsetRelocateProcess{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.unsetRelocateProcess(cmd)
 	case OpSetProcessOrder:
 		cmd := CommandSetProcessOrder{}
 		err = decodeCommand(&cmd, c.Data)

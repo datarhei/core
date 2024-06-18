@@ -2034,6 +2034,276 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 	}, resources)
 }
 
+func TestRebalanceRelocateTarget(t *testing.T) {
+	processes := []proxy.Process{
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     35,
+			Mem:     20,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     17,
+			Mem:     31,
+			Runtime: 27,
+			Config: &app.Config{
+				ID: "foobar3",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     12,
+			Mem:     5,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar2",
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      27,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      15,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node3": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      0,
+				Mem:      0,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+	}
+
+	relocateMap := map[string]string{
+		"foobar1@": "node3",
+	}
+
+	opStack, resources, _ := relocate(processes, nodes, relocateMap)
+
+	require.NotEmpty(t, opStack)
+
+	require.Equal(t, []interface{}{
+		processOpMove{
+			fromNodeid: "node1",
+			toNodeid:   "node3",
+			config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+	}, opStack)
+
+	require.Equal(t, map[string]proxy.NodeResources{
+		"node1": {
+			NCPU:     1,
+			CPU:      0,
+			Mem:      15,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node2": {
+			NCPU:     1,
+			CPU:      15,
+			Mem:      11,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node3": {
+			NCPU:     1,
+			CPU:      35,
+			Mem:      20,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+	}, resources)
+}
+
+func TestRebalanceRelocateAny(t *testing.T) {
+	processes := []proxy.Process{
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     35,
+			Mem:     20,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+		{
+			NodeID:  "node1",
+			Order:   "start",
+			State:   "running",
+			CPU:     17,
+			Mem:     31,
+			Runtime: 27,
+			Config: &app.Config{
+				ID: "foobar3",
+			},
+		},
+		{
+			NodeID:  "node2",
+			Order:   "start",
+			State:   "running",
+			CPU:     12,
+			Mem:     5,
+			Runtime: 42,
+			Config: &app.Config{
+				ID: "foobar2",
+			},
+		},
+	}
+
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      27,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      15,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node3": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      0,
+				Mem:      0,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+	}
+
+	relocateMap := map[string]string{
+		"foobar1@": "",
+	}
+
+	opStack, resources, _ := relocate(processes, nodes, relocateMap)
+
+	require.NotEmpty(t, opStack)
+
+	require.Equal(t, []interface{}{
+		processOpMove{
+			fromNodeid: "node1",
+			toNodeid:   "node3",
+			config: &app.Config{
+				ID: "foobar1",
+			},
+		},
+	}, opStack)
+
+	require.Equal(t, map[string]proxy.NodeResources{
+		"node1": {
+			NCPU:     1,
+			CPU:      0,
+			Mem:      15,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node2": {
+			NCPU:     1,
+			CPU:      15,
+			Mem:      11,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+		"node3": {
+			NCPU:     1,
+			CPU:      35,
+			Mem:      20,
+			CPULimit: 90,
+			MemLimit: 90,
+		},
+	}, resources)
+}
+
+func TestFindBestNodesForProcess(t *testing.T) {
+	nodes := map[string]proxy.NodeAbout{
+		"node1": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      27,
+				Mem:      35,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node2": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      15,
+				Mem:      11,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+		"node3": {
+			LastContact: time.Now(),
+			Resources: proxy.NodeResources{
+				NCPU:     1,
+				CPU:      0,
+				Mem:      0,
+				CPULimit: 90,
+				MemLimit: 90,
+			},
+		},
+	}
+
+	resources := map[string]proxy.NodeResources{}
+	for nodeid, about := range nodes {
+		resources[nodeid] = about.Resources
+	}
+
+	list := findBestNodesForProcess(resources, 35, 20)
+
+	require.Equal(t, []string{"node3", "node2", "node1"}, list)
+}
+
 func TestCreateNodeProcessMap(t *testing.T) {
 	processes := []proxy.Process{
 		{
@@ -2291,7 +2561,7 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 		},
 	}
 
-	affinityMap := createReferenceAffinityMap(processes)
+	affinityMap := NewReferenceAffinity(processes)
 
 	require.Equal(t, map[string][]referenceAffinityNodeCount{
 		"ref1@": {
@@ -2316,36 +2586,38 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 				count:  1,
 			},
 		},
-	}, affinityMap)
+	}, affinityMap.m)
 }
 
 func TestUpdateReferenceAffinityNodeMap(t *testing.T) {
-	affinityMap := map[string][]referenceAffinityNodeCount{
-		"ref1@": {
-			{
-				nodeid: "node3",
-				count:  2,
+	affinityMap := &referenceAffinity{
+		m: map[string][]referenceAffinityNodeCount{
+			"ref1@": {
+				{
+					nodeid: "node3",
+					count:  2,
+				},
+				{
+					nodeid: "node1",
+					count:  1,
+				},
 			},
-			{
-				nodeid: "node1",
-				count:  1,
+			"ref2@": {
+				{
+					nodeid: "node2",
+					count:  1,
+				},
 			},
-		},
-		"ref2@": {
-			{
-				nodeid: "node2",
-				count:  1,
-			},
-		},
-		"ref3@": {
-			{
-				nodeid: "node2",
-				count:  1,
+			"ref3@": {
+				{
+					nodeid: "node2",
+					count:  1,
+				},
 			},
 		},
 	}
 
-	affinityMap = updateReferenceAffinityMap(affinityMap, "ref3@", "node1")
+	affinityMap.Add("ref3", "", "node1")
 
 	require.Equal(t, map[string][]referenceAffinityNodeCount{
 		"ref1@": {
@@ -2374,9 +2646,9 @@ func TestUpdateReferenceAffinityNodeMap(t *testing.T) {
 				count:  1,
 			},
 		},
-	}, affinityMap)
+	}, affinityMap.m)
 
-	affinityMap = updateReferenceAffinityMap(affinityMap, "ref2@", "node2")
+	affinityMap.Add("ref2", "", "node2")
 
 	require.Equal(t, map[string][]referenceAffinityNodeCount{
 		"ref1@": {
@@ -2405,9 +2677,9 @@ func TestUpdateReferenceAffinityNodeMap(t *testing.T) {
 				count:  1,
 			},
 		},
-	}, affinityMap)
+	}, affinityMap.m)
 
-	affinityMap = updateReferenceAffinityMap(affinityMap, "ref4@", "node2")
+	affinityMap.Add("ref4", "", "node2")
 
 	require.Equal(t, map[string][]referenceAffinityNodeCount{
 		"ref1@": {
@@ -2442,7 +2714,85 @@ func TestUpdateReferenceAffinityNodeMap(t *testing.T) {
 				count:  1,
 			},
 		},
-	}, affinityMap)
+	}, affinityMap.m)
+
+	affinityMap.Move("ref2", "", "node2", "node3")
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node3",
+				count:  1,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref4@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+	}, affinityMap.m)
+
+	affinityMap.Move("ref2", "", "node2", "node3")
+
+	require.Equal(t, map[string][]referenceAffinityNodeCount{
+		"ref1@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref2@": {
+			{
+				nodeid: "node3",
+				count:  2,
+			},
+		},
+		"ref3@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+			{
+				nodeid: "node1",
+				count:  1,
+			},
+		},
+		"ref4@": {
+			{
+				nodeid: "node2",
+				count:  1,
+			},
+		},
+	}, affinityMap.m)
 }
 
 func TestIsMetadataUpdateRequired(t *testing.T) {
