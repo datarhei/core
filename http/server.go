@@ -768,6 +768,8 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/cluster/process/:id/command", s.v3handler.cluster.SetProcessCommand)
 			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.SetProcessMetadata)
 
+			v3.PUT("/cluster/reallocation", s.v3handler.cluster.Reallocation)
+
 			v3.DELETE("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSDeleteFile)
 			v3.PUT("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSPutFile)
 

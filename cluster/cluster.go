@@ -69,6 +69,7 @@ type Cluster interface {
 	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
 	GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
 	GetProcessNodeMap() map[string]string
+	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
 	ListIdentities() (time.Time, []iamidentity.User)

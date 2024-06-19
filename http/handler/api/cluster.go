@@ -13,6 +13,7 @@ import (
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 )
@@ -152,7 +153,7 @@ func (h *ClusterHandler) Healthy(c echo.Context) error {
 	return c.JSON(http.StatusOK, !degraded)
 }
 
-// Transfer the leadership to another node
+// TransferLeadership transfers the leadership to another node
 // @Summary Transfer the leadership to another node
 // @Description Transfer the leadership to another node
 // @Tags v16.?.?
@@ -227,4 +228,48 @@ func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 	defer r.Close()
 
 	return c.Stream(http.StatusOK, "application/octet-stream", r)
+}
+
+// Reallocation issues reallocation requests of processes
+// @Summary Retrieve snapshot of the cluster DB
+// @Description Retrieve snapshot of the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-reallocation
+// @Produce json
+// @Param reallocations body api.ClusterProcessReallocate true "Process reallocations"
+// @Success 200 {string} string
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/reallocation [put]
+func (h *ClusterHandler) Reallocation(c echo.Context) error {
+	reallocations := []api.ClusterProcessReallocate{}
+
+	if err := util.ShouldBindJSONValidation(c, &reallocations, false); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	for _, r := range reallocations {
+		err := c.Validate(r)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		}
+	}
+
+	relocations := map[app.ProcessID]string{}
+
+	for _, r := range reallocations {
+		for _, p := range r.Processes {
+			relocations[app.ProcessID{
+				ID:     p.ID,
+				Domain: p.Domain,
+			}] = r.TargetNodeID
+		}
+	}
+
+	err := h.cluster.RelocateProcesses("", relocations)
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }

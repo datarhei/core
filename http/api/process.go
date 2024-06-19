@@ -7,6 +7,11 @@ import (
 	"github.com/lithammer/shortuuid/v4"
 )
 
+type ProcessID struct {
+	ID     string `json:"id"`
+	Domain string `json:"domain"`
+}
+
 // Process represents all information on a process
 type Process struct {
 	ID        string         `json:"id" jsonschema:"minLength=1"`

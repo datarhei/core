@@ -2039,6 +2039,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/reallocation": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve snapshot of the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve snapshot of the cluster DB",
+                "operationId": "cluster-3-reallocation",
+                "parameters": [
+                    {
+                        "description": "Process reallocations",
+                        "name": "reallocations",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterProcessReallocate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/snapshot": {
             "get": {
                 "security": [
@@ -5098,6 +5141,20 @@ const docTemplate = `{
                 "type": "string"
             }
         },
+        "api.ClusterProcessReallocate": {
+            "type": "object",
+            "properties": {
+                "process_ids": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessID"
+                    }
+                },
+                "target_node_id": {
+                    "type": "string"
+                }
+            }
+        },
         "api.ClusterRaft": {
             "type": "object",
             "properties": {
@@ -6611,6 +6668,17 @@ const docTemplate = `{
                 "waitfor_seconds": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProcessID": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
                 }
             }
         },

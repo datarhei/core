@@ -113,6 +113,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.PUT("/v1/process/:id/command", a.SetProcessCommand)
 	a.router.PUT("/v1/process/:id/metadata/:key", a.SetProcessMetadata)
 
+	a.router.PUT("/v1/relocate", a.RelocateProcesses)
+
 	a.router.POST("/v1/iam/user", a.AddIdentity)
 	a.router.PUT("/v1/iam/user/:name", a.UpdateIdentity)
 	a.router.PUT("/v1/iam/user/:name/policies", a.SetIdentityPolicies)
@@ -503,6 +505,39 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update metadata")
 		return Err(http.StatusInternalServerError, "", "unable to update metadata: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// RelocateProcesses relocates processes to another node
+// @Summary Relocate processes to another node
+// @Description Relocate processes to another node.
+// @Tags v1.0.0
+// @ID cluster-3-relocate-processes
+// @Produce json
+// @Param data body client.RelocateProcessesRequest true "List of processes to relocate"
+// @Success 200 {string} string
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/relocate [put]
+func (a *api) RelocateProcesses(c echo.Context) error {
+	r := client.RelocateProcessesRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	err := a.cluster.RelocateProcesses(origin, r.Map)
+	if err != nil {
+		a.logger.Debug().WithError(err).Log("Unable to apply process relocation request")
+		return Err(http.StatusInternalServerError, "", "unable to apply process relocation request: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

@@ -211,6 +211,15 @@ definitions:
     additionalProperties:
       type: string
     type: object
+  api.ClusterProcessReallocate:
+    properties:
+      process_ids:
+        items:
+          $ref: '#/definitions/api.ProcessID'
+        type: array
+      target_node_id:
+        type: string
+    type: object
   api.ClusterRaft:
     properties:
       address:
@@ -1230,6 +1239,13 @@ definitions:
       waitfor_seconds:
         format: uint64
         type: integer
+    type: object
+  api.ProcessID:
+    properties:
+      domain:
+        type: string
+      id:
+        type: string
     type: object
   api.ProcessReport:
     properties:
@@ -3891,6 +3907,33 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Probe a process in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/reallocation:
+    put:
+      description: Retrieve snapshot of the cluster DB
+      operationId: cluster-3-reallocation
+      parameters:
+      - description: Process reallocations
+        in: body
+        name: reallocations
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClusterProcessReallocate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve snapshot of the cluster DB
       tags:
       - v16.?.?
   /api/v3/cluster/snapshot:

@@ -196,6 +196,7 @@ func (s *storeData) init() {
 	s.Version = 1
 	s.Process = map[string]Process{}
 	s.ProcessNodeMap = map[string]string{}
+	s.ProcessRelocateMap = map[string]string{}
 	s.Users.UpdatedAt = now
 	s.Users.Users = map[string]identity.User{}
 	s.Users.userlist = identity.NewUserList()
@@ -474,6 +475,14 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	dec := json.NewDecoder(snapshot)
 	if err := dec.Decode(&data); err != nil {
 		return err
+	}
+
+	if data.ProcessNodeMap == nil {
+		data.ProcessNodeMap = map[string]string{}
+	}
+
+	if data.ProcessRelocateMap == nil {
+		data.ProcessRelocateMap = map[string]string{}
 	}
 
 	for id, p := range data.Process {

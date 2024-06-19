@@ -412,6 +412,7 @@ type processOpMove struct {
 	toNodeid   string
 	config     *app.Config
 	metadata   map[string]interface{}
+	order      string
 }
 
 type processOpStart struct {
@@ -574,18 +575,20 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 				break
 			}
 
-			err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.config.ProcessID(),
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ProcessID(),
-					"fromnodeid": v.fromNodeid,
-					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, starting process")
-				break
+			if v.order == "start" {
+				err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
+				if err != nil {
+					errors = append(errors, processOpError{
+						processid: v.config.ProcessID(),
+						err:       err,
+					})
+					logger.Info().WithError(err).WithFields(log.Fields{
+						"processid":  v.config.ProcessID(),
+						"fromnodeid": v.fromNodeid,
+						"tonodeid":   v.toNodeid,
+					}).Log("Moving process, starting process")
+					break
+				}
 			}
 
 			errors = append(errors, processOpError{
@@ -1055,6 +1058,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 							toNodeid:   nodeid,
 							config:     haveP.Config,
 							metadata:   haveP.Metadata,
+							order:      haveP.Order,
 						})
 					}
 
@@ -1475,6 +1479,7 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 				toNodeid:   availableNodeid,
 				config:     p.Config,
 				metadata:   p.Metadata,
+				order:      p.Order,
 			})
 
 			// Adjust the process.
@@ -1528,6 +1533,11 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 		}
 
 		sourceNodeid := process.NodeID
+
+		if sourceNodeid == targetNodeid {
+			relocatedProcessIDs = append(relocatedProcessIDs, processid)
+			continue
+		}
 
 		if len(targetNodeid) != 0 {
 			_, hasNode := nodes[targetNodeid]
@@ -1585,6 +1595,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 			toNodeid:   targetNodeid,
 			config:     process.Config,
 			metadata:   process.Metadata,
+			order:      process.Order,
 		})
 
 		// Adjust the resources.

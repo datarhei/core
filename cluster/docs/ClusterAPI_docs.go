@@ -918,6 +918,50 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/relocate": {
+            "put": {
+                "description": "Relocate processes to another node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Relocate processes to another node",
+                "operationId": "cluster-3-relocate-processes",
+                "parameters": [
+                    {
+                        "description": "List of processes to relocate",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.RelocateProcessesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/server": {
             "post": {
                 "description": "Add a new server to the cluster",
@@ -1278,6 +1322,17 @@ const docTemplateClusterAPI = `{
                 },
                 "valid_until": {
                     "type": "string"
+                }
+            }
+        },
+        "client.RelocateProcessesRequest": {
+            "type": "object",
+            "properties": {
+                "map": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },

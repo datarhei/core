@@ -122,6 +122,13 @@ definitions:
       valid_until:
         type: string
     type: object
+  client.RelocateProcessesRequest:
+    properties:
+      map:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   client.SetKVRequest:
     properties:
       key:
@@ -1464,6 +1471,35 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Add JSON metadata with a process under the given key
+      tags:
+      - v1.0.0
+  /v1/relocate:
+    put:
+      description: Relocate processes to another node.
+      operationId: cluster-3-relocate-processes
+      parameters:
+      - description: List of processes to relocate
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.RelocateProcessesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Relocate processes to another node
       tags:
       - v1.0.0
   /v1/server:

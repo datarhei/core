@@ -102,6 +102,25 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 	return c.proxy.CommandProcess(nodeid, id, command)
 }
 
+func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
+	if ok, _ := c.IsDegraded(); ok {
+		return ErrDegraded
+	}
+
+	if !c.IsRaftLeader() {
+		return c.forwarder.RelocateProcesses(origin, relocations)
+	}
+
+	cmd := &store.Command{
+		Operation: store.OpSetRelocateProcess,
+		Data: &store.CommandSetRelocateProcess{
+			Map: relocations,
+		},
+	}
+
+	return c.applyCommand(cmd)
+}
+
 func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
 	if ok, _ := c.IsDegraded(); ok {
 		return ErrDegraded

@@ -39,6 +39,10 @@ type SetProcessMetadataRequest struct {
 	Metadata interface{} `json:"metadata"`
 }
 
+type RelocateProcessesRequest struct {
+	Map map[app.ProcessID]string
+}
+
 type AddIdentityRequest struct {
 	Identity iamidentity.User `json:"identity"`
 }
@@ -215,6 +219,17 @@ func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key stri
 	}
 
 	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
+func (c *APIClient) RelocateProcesses(origin string, r RelocateProcessesRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/v1/relocate", "application/json", bytes.NewReader(data), origin)
 
 	return err
 }
