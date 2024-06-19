@@ -1777,6 +1777,7 @@ func TestRebalanceOverload(t *testing.T) {
 			config: &app.Config{
 				ID: "foobar3",
 			},
+			order: "start",
 		},
 	}, opStack)
 
@@ -2006,6 +2007,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 				ID:        "foobar2",
 				Reference: "barfoo",
 			},
+			order: "start",
 		},
 	}, opStack)
 
@@ -2119,6 +2121,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 			config: &app.Config{
 				ID: "foobar1",
 			},
+			order: "start",
 		},
 	}, opStack)
 
@@ -2232,6 +2235,8 @@ func TestRebalanceRelocateAny(t *testing.T) {
 			config: &app.Config{
 				ID: "foobar1",
 			},
+
+			order: "start",
 		},
 	}, opStack)
 
