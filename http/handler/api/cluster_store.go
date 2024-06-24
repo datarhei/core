@@ -259,3 +259,28 @@ func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, kvs)
 }
+
+// ListStoreNodes returns the list of stored node metadata
+// @Summary List nodes in the cluster DB
+// @Description List of nodes in the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-db-list-nodes
+// @Produce json
+// @Success 200 {array} api.ClusterStoreNode
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/node [get]
+func (h *ClusterHandler) ListStoreNodes(c echo.Context) error {
+	clusternodes := h.cluster.ListNodes()
+
+	nodes := []api.ClusterStoreNode{}
+
+	for nodeid, v := range clusternodes {
+		nodes = append(nodes, api.ClusterStoreNode{
+			ID:        nodeid,
+			State:     v.State,
+			UpdatedAt: v.UpdatedAt,
+		})
+	}
+
+	return c.JSON(http.StatusOK, nodes)
+}

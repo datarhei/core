@@ -2299,14 +2299,125 @@ func TestFindBestNodesForProcess(t *testing.T) {
 		},
 	}
 
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
+	resources := NewResources(nodes)
 
-	list := findBestNodesForProcess(resources, 35, 20)
+	list := resources.FindBestNodes(35, 20)
 
 	require.Equal(t, []string{"node3", "node2", "node1"}, list)
+}
+
+func TestFindBestNodesForProcess2(t *testing.T) {
+	resources := NewResources(nil)
+	resources.nodes = map[string]proxy.NodeResources{
+		"node1": {
+			CPULimit:     104.50000000000001,
+			CPU:          29.725299999999997,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          212262912,
+			NCPU:         1.1,
+		},
+		"node2": {
+			CPULimit:     104.50000000000001,
+			CPU:          53.576600000000006,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          805830656,
+			NCPU:         1.1,
+		},
+		"node3": {
+			CPULimit:     104.50000000000001,
+			CPU:          33.99000000000001,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          190910464,
+			NCPU:         1.1,
+		},
+		"node4": {
+			CPULimit:     104.50000000000001,
+			CPU:          31.291700000000006,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          129310720,
+			NCPU:         1.1,
+		},
+		"node5": {
+			CPULimit:     104.50000000000001,
+			CPU:          30.634999999999994,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          159158272,
+			NCPU:         1.1,
+		},
+		"node6": {
+			CPULimit:     104.50000000000001,
+			CPU:          40.368900000000004,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          212189184,
+			NCPU:         1.1,
+		},
+		"node7": {
+			CPULimit:     104.50000000000001,
+			CPU:          25.469399999999997,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          206098432,
+			NCPU:         1.1,
+		},
+		"node8": {
+			CPULimit:     104.50000000000001,
+			CPU:          22.180400000000002,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          144138240,
+			NCPU:         1.1,
+		},
+		"node9": {
+			CPULimit:     104.50000000000001,
+			CPU:          62.6714,
+			IsThrottling: true,
+			MemLimit:     1051931443,
+			Mem:          978501632,
+			NCPU:         1.1,
+		},
+		"node10": {
+			CPULimit:     104.50000000000001,
+			CPU:          18.7748,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          142430208,
+			NCPU:         1.1,
+		},
+		"node11": {
+			CPULimit:     104.50000000000001,
+			CPU:          43.807500000000005,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          368091136,
+			NCPU:         1.1,
+		},
+		"node12": {
+			CPULimit:     104.50000000000001,
+			CPU:          31.067299999999996,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          149897216,
+			NCPU:         1.1,
+		},
+		"node13": {
+			CPULimit:     104.50000000000001,
+			CPU:          35.93480000000001,
+			IsThrottling: false,
+			MemLimit:     1051931443,
+			Mem:          194408448,
+			NCPU:         1.1,
+		},
+	}
+
+	list := resources.FindBestNodes(4.0, 45*1024*1024)
+
+	require.Equal(t, []string{"node10", "node8", "node7", "node1", "node5", "node12", "node4", "node3", "node13", "node6", "node11", "node2"}, list)
 }
 
 func TestCreateNodeProcessMap(t *testing.T) {

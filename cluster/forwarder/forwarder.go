@@ -41,6 +41,8 @@ type Forwarder interface {
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
 	GetKV(origin, key string) (string, time.Time, error)
+
+	SetNodeState(origin, nodeid, state string) error
 }
 
 type forwarder struct {
@@ -382,4 +384,20 @@ func (f *forwarder) GetKV(origin, key string) (string, time.Time, error) {
 	f.lock.RUnlock()
 
 	return client.GetKV(origin, key)
+}
+
+func (f *forwarder) SetNodeState(origin, nodeid, state string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.SetNodeStateRequest{
+		State: state,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.SetNodeState(origin, nodeid, r)
 }

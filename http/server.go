@@ -736,6 +736,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/db/locks", s.v3handler.cluster.ListStoreLocks)
 		v3.GET("/cluster/db/kv", s.v3handler.cluster.ListStoreKV)
 		v3.GET("/cluster/db/map/process", s.v3handler.cluster.GetStoreProcessNodeMap)
+		v3.GET("/cluster/db/node", s.v3handler.cluster.ListStoreNodes)
 
 		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
 		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.ListIdentity)
@@ -753,6 +754,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSGetFile)
 		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.ListNodeProcesses)
 		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
+		v3.GET("/cluster/node/:id/state", s.v3handler.cluster.GetNodeState)
 
 		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.ListFiles)
 
@@ -772,6 +774,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 			v3.DELETE("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSDeleteFile)
 			v3.PUT("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSPutFile)
+			v3.PUT("/cluster/node/:id/state", s.v3handler.cluster.SetNodeState)
 
 			v3.PUT("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
 			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)

@@ -207,6 +207,17 @@ definitions:
       ncpu:
         type: number
     type: object
+  api.ClusterNodeState:
+    properties:
+      state:
+        enum:
+        - online
+        - maintenance
+        - leave
+        type: string
+    required:
+    - state
+    type: object
   api.ClusterProcessMap:
     additionalProperties:
       type: string
@@ -234,6 +245,15 @@ definitions:
       num_peers:
         type: integer
       state:
+        type: string
+    type: object
+  api.ClusterStoreNode:
+    properties:
+      id:
+        type: string
+      state:
+        type: string
+      updated_at:
         type: string
     type: object
   api.Command:
@@ -2705,6 +2725,24 @@ paths:
       summary: List locks in the cluster DB
       tags:
       - v16.?.?
+  /api/v3/cluster/db/node:
+    get:
+      description: List of nodes in the cluster DB
+      operationId: cluster-3-db-list-nodes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClusterStoreNode'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List nodes in the cluster DB
+      tags:
+      - v16.?.?
   /api/v3/cluster/db/policies:
     get:
       description: List of policies in the cluster
@@ -3465,6 +3503,71 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of processes in the cluster on a node
+      tags:
+      - v16.?.?
+  /api/v3/cluster/node/{id}/state:
+    get:
+      description: Get the state of a node with the given ID
+      operationId: cluster-3-get-node-state
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterNodeState'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the state of a node with the given ID
+      tags:
+      - v16.?.?
+    put:
+      description: Set the state of a node with the given ID
+      operationId: cluster-3-set-node-state
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: State
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClusterNodeState'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Set the state of a node with the given ID
       tags:
       - v16.?.?
   /api/v3/cluster/node/{id}/version:

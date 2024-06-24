@@ -90,6 +90,9 @@ type Cluster interface {
 	GetKV(origin, key string, stale bool) (string, time.Time, error)
 	ListKV(prefix string) map[string]store.Value
 
+	ListNodes() map[string]store.Node
+	SetNodeState(origin, id, state string) error
+
 	ProxyReader() proxy.ProxyReader
 	CertManager() autocert.Manager
 }
@@ -1476,6 +1479,8 @@ func (c *cluster) About() (ClusterAbout, error) {
 		}
 	}
 
+	storeNodes := c.ListNodes()
+
 	c.nodesLock.RLock()
 	for id, node := range c.nodes {
 		nodeAbout := node.About()
@@ -1513,6 +1518,12 @@ func (c *cluster) About() (ClusterAbout, error) {
 		if s, ok := serversMap[id]; ok {
 			node.Voter = s.Voter
 			node.Leader = s.Leader
+		}
+
+		if storeNode, hasStoreNode := storeNodes[id]; hasStoreNode {
+			if storeNode.State == "maintenance" {
+				node.Status = storeNode.State
+			}
 		}
 
 		about.Nodes = append(about.Nodes, node)

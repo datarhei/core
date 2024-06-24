@@ -136,6 +136,11 @@ definitions:
       value:
         type: string
     type: object
+  client.SetNodeStateRequest:
+    properties:
+      state:
+        type: string
+    type: object
   client.SetPoliciesRequest:
     properties:
       policies:
@@ -1273,6 +1278,43 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Remove a lock
+      tags:
+      - v1.0.0
+  /v1/node/{id}/state:
+    get:
+      description: Set a state for a node
+      operationId: cluster-1-node-set-state
+      parameters:
+      - description: Set node state request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetNodeStateRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Set a state for a node
       tags:
       - v1.0.0
   /v1/process:

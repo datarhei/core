@@ -35,6 +35,8 @@ type Store interface {
 
 	ListKVS(prefix string) map[string]Value
 	GetFromKVS(key string) (Value, error)
+
+	ListNodes() map[string]Node
 }
 
 type Process struct {
@@ -61,6 +63,11 @@ type Value struct {
 	UpdatedAt time.Time
 }
 
+type Node struct {
+	State     string
+	UpdatedAt time.Time
+}
+
 type Operation string
 
 const (
@@ -82,6 +89,7 @@ const (
 	OpClearLocks           Operation = "clearLocks"
 	OpSetKV                Operation = "setKV"
 	OpUnsetKV              Operation = "unsetKV"
+	OpSetNodeState         Operation = "setNodeState"
 )
 
 type Command struct {
@@ -168,6 +176,11 @@ type CommandUnsetKV struct {
 	Key string
 }
 
+type CommandSetNodeState struct {
+	NodeID string
+	State  string
+}
+
 type storeData struct {
 	Version            uint64
 	Process            map[string]Process // processid -> process
@@ -188,6 +201,8 @@ type storeData struct {
 	Locks map[string]time.Time
 
 	KVS map[string]Value
+
+	Nodes map[string]Node
 }
 
 func (s *storeData) init() {
@@ -204,6 +219,7 @@ func (s *storeData) init() {
 	s.Policies.Policies = map[string][]access.Policy{}
 	s.Locks = map[string]time.Time{}
 	s.KVS = map[string]Value{}
+	s.Nodes = map[string]Node{}
 }
 
 // store implements a raft.FSM
@@ -430,6 +446,14 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.unsetKV(cmd)
+	case OpSetNodeState:
+		cmd := CommandSetNodeState{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setNodeState(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)

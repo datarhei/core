@@ -400,6 +400,7 @@ func (c *cluster) clearLocks(ctx context.Context, interval time.Duration) {
 
 var errNotEnoughResourcesForDeployment = errors.New("no node with enough resources for deployment is available")
 var errNotEnoughResourcesForRebalancing = errors.New("no node with enough resources for rebalancing is available")
+var errNotEnoughResourcesForRelocating = errors.New("no node with enough resources for relocating is available")
 var errNoLimitsDefined = errors.New("this process has no limits defined")
 
 type processOpDelete struct {
@@ -672,6 +673,7 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 func (c *cluster) doSynchronize(emergency bool, term uint64) {
 	wish := c.store.GetProcessNodeMap()
 	want := c.store.ListProcesses()
+	storeNodes := c.store.ListNodes()
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
@@ -683,6 +685,11 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 
 	for _, node := range nodes {
 		about := node.About()
+
+		if storeNode, hasStoreNode := storeNodes[about.ID]; hasStoreNode {
+			about.State = storeNode.State
+		}
+
 		nodesMap[about.ID] = about
 	}
 
@@ -752,6 +759,7 @@ func (c *cluster) doRebalance(emergency bool, term uint64) {
 
 	logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
 
+	storeNodes := c.store.ListNodes()
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
@@ -759,6 +767,11 @@ func (c *cluster) doRebalance(emergency bool, term uint64) {
 
 	for _, node := range nodes {
 		about := node.About()
+
+		if storeNode, hasStoreNode := storeNodes[about.ID]; hasStoreNode {
+			about.State = storeNode.State
+		}
+
 		nodesMap[about.ID] = about
 	}
 
@@ -815,6 +828,7 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 	logger.Debug().WithField("emergency", emergency).Log("Relocating")
 
 	relocateMap := c.store.GetProcessRelocateMap()
+	storeNodes := c.store.ListNodes()
 	have := c.proxy.ListProxyProcesses()
 	nodes := c.proxy.ListNodes()
 
@@ -822,6 +836,11 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	for _, node := range nodes {
 		about := node.About()
+
+		if storeNode, hasStoreNode := storeNodes[about.ID]; hasStoreNode {
+			about.State = storeNode.State
+		}
+
 		nodesMap[about.ID] = about
 	}
 
@@ -933,10 +952,7 @@ func isMetadataUpdateRequired(wantMap map[string]interface{}, haveMap map[string
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
 func synchronize(wish map[string]string, want []store.Process, have []proxy.Process, nodes map[string]proxy.NodeAbout, nodeRecoverTimeout time.Duration) ([]interface{}, map[string]proxy.NodeResources, map[string]string) {
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
+	resources := NewResources(nodes)
 
 	// A map same as wish, but reflecting the actual situation.
 	reality := map[string]string{}
@@ -967,12 +983,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 				processid: haveP.Config.ProcessID(),
 			})
 
-			r, ok := resources[haveP.NodeID]
-			if ok {
-				r.CPU -= haveP.CPU
-				r.Mem -= haveP.Mem
-				resources[haveP.NodeID] = r
-			}
+			resources.Remove(haveP.NodeID, haveP.CPU, haveP.Mem)
 
 			continue
 		}
@@ -1007,12 +1018,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 				})
 
 				// Release the resources.
-				r, ok := resources[haveP.NodeID]
-				if ok {
-					r.CPU -= haveP.CPU
-					r.Mem -= haveP.Mem
-					resources[haveP.NodeID] = r
-				}
+				resources.Remove(haveP.NodeID, haveP.CPU, haveP.Mem)
 			}
 		}
 
@@ -1022,56 +1028,50 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	for _, haveP := range wantOrderStart {
 		nodeid := haveP.NodeID
 
-		r, ok := resources[nodeid]
-		if ok {
-			// Consume the resources.
-			r.CPU += haveP.Config.LimitCPU
-			r.Mem += haveP.Config.LimitMemory
-			resources[nodeid] = r
+		resources.Add(nodeid, haveP.Config.LimitCPU, haveP.Config.LimitMemory)
 
-			// TODO: check if the current node has actually enough resources available,
-			// otherwise it needs to be moved somewhere else. If the node doesn't
-			// have enough resources available, the process will be prevented
-			// from starting.
+		// TODO: check if the current node has actually enough resources available,
+		// otherwise it needs to be moved somewhere else. If the node doesn't
+		// have enough resources available, the process will be prevented
+		// from starting.
 
-			/*
-				if hasNodeEnoughResources(r, haveP.Config.LimitCPU, haveP.Config.LimitMemory) {
-					// Consume the resources
+		/*
+			if hasNodeEnoughResources(r, haveP.Config.LimitCPU, haveP.Config.LimitMemory) {
+				// Consume the resources
+				r.CPU += haveP.Config.LimitCPU
+				r.Mem += haveP.Config.LimitMemory
+				resources[nodeid] = r
+			} else {
+				nodeid = findBestNodeForProcess(resources, haveP.Config.LimitCPU, haveP.Config.LimitMemory)
+				if len(nodeid) == 0 {
+					// Start it anyways and let it run into an error
+					opStack = append(opStack, processOpStart{
+						nodeid:    nodeid,
+						processid: haveP.Config.ProcessID(),
+					})
+
+					continue
+				}
+
+				if nodeid != haveP.NodeID {
+					opStack = append(opStack, processOpMove{
+						fromNodeid: haveP.NodeID,
+						toNodeid:   nodeid,
+						config:     haveP.Config,
+						metadata:   haveP.Metadata,
+						order:      haveP.Order,
+					})
+				}
+
+				// Consume the resources
+				r, ok := resources[nodeid]
+				if ok {
 					r.CPU += haveP.Config.LimitCPU
 					r.Mem += haveP.Config.LimitMemory
 					resources[nodeid] = r
-				} else {
-					nodeid = findBestNodeForProcess(resources, haveP.Config.LimitCPU, haveP.Config.LimitMemory)
-					if len(nodeid) == 0 {
-						// Start it anyways and let it run into an error
-						opStack = append(opStack, processOpStart{
-							nodeid:    nodeid,
-							processid: haveP.Config.ProcessID(),
-						})
-
-						continue
-					}
-
-					if nodeid != haveP.NodeID {
-						opStack = append(opStack, processOpMove{
-							fromNodeid: haveP.NodeID,
-							toNodeid:   nodeid,
-							config:     haveP.Config,
-							metadata:   haveP.Metadata,
-							order:      haveP.Order,
-						})
-					}
-
-					// Consume the resources
-					r, ok := resources[nodeid]
-					if ok {
-						r.CPU += haveP.Config.LimitCPU
-						r.Mem += haveP.Config.LimitMemory
-						resources[nodeid] = r
-					}
 				}
-			*/
-		}
+			}
+		*/
 
 		opStack = append(opStack, processOpStart{
 			nodeid:    nodeid,
@@ -1140,7 +1140,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		// Try to add the process to a node where other processes with the same reference currently reside.
 		raNodes := haveReferenceAffinity.Nodes(wantP.Config.Reference, wantP.Config.Domain)
 		for _, raNodeid := range raNodes {
-			if hasNodeEnoughResources(resources[raNodeid], wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
+			if resources.HasNodeEnough(raNodeid, wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
 				nodeid = raNodeid
 				break
 			}
@@ -1148,7 +1148,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 
 		// Find the node with the most resources available.
 		if len(nodeid) == 0 {
-			nodes := findBestNodesForProcess(resources, wantP.Config.LimitCPU, wantP.Config.LimitMemory)
+			nodes := resources.FindBestNodes(wantP.Config.LimitCPU, wantP.Config.LimitMemory)
 			if len(nodes) > 0 {
 				nodeid = nodes[0]
 			}
@@ -1163,12 +1163,7 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 			})
 
 			// Consume the resources
-			r, ok := resources[nodeid]
-			if ok {
-				r.CPU += wantP.Config.LimitCPU
-				r.Mem += wantP.Config.LimitMemory
-				resources[nodeid] = r
-			}
+			resources.Add(nodeid, wantP.Config.LimitCPU, wantP.Config.LimitMemory)
 
 			reality[pid] = nodeid
 
@@ -1181,26 +1176,56 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 		}
 	}
 
-	return opStack, resources, reality
+	return opStack, resources.Map(), reality
 }
 
-// hasNodeEnoughResources returns whether a node has enough resources available for the
+type resources struct {
+	nodes   map[string]proxy.NodeResources
+	blocked map[string]struct{}
+}
+
+func NewResources(nodes map[string]proxy.NodeAbout) *resources {
+	r := &resources{
+		nodes:   map[string]proxy.NodeResources{},
+		blocked: map[string]struct{}{},
+	}
+
+	for nodeid, about := range nodes {
+		r.nodes[nodeid] = about.Resources
+		if about.State != "connected" {
+			r.blocked[nodeid] = struct{}{}
+		}
+	}
+
+	return r
+}
+
+// HasNodeEnough returns whether a node has enough resources available for the
 // requested cpu and memory consumption.
-func hasNodeEnoughResources(r proxy.NodeResources, cpu float64, mem uint64) bool {
-	if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit && !r.IsThrottling {
+func (r *resources) HasNodeEnough(nodeid string, cpu float64, mem uint64) bool {
+	res, hasNode := r.nodes[nodeid]
+	if !hasNode {
+		return false
+	}
+
+	if _, hasNode := r.blocked[nodeid]; hasNode {
+		return false
+	}
+
+	if res.CPU+cpu < res.CPULimit && res.Mem+mem < res.MemLimit && !res.IsThrottling {
 		return true
 	}
 
 	return false
 }
 
-// findBestNodeForProcess returns an array of nodeids that can fit the requested cpu and memory requirements. If no
+// FindBestNodes returns an array of nodeids that can fit the requested cpu and memory requirements. If no
 // such node is available, an empty array is returned. The array is sorted by the most suitable node first.
-func findBestNodesForProcess(resources map[string]proxy.NodeResources, cpu float64, mem uint64) []string {
+func (r *resources) FindBestNodes(cpu float64, mem uint64) []string {
 	nodes := []string{}
 
-	for id, r := range resources {
-		if hasNodeEnoughResources(r, cpu, mem) {
+	for id := range r.nodes {
+		if r.HasNodeEnough(id, cpu, mem) {
 			nodes = append(nodes, id)
 		}
 	}
@@ -1208,14 +1233,55 @@ func findBestNodesForProcess(resources map[string]proxy.NodeResources, cpu float
 	sort.SliceStable(nodes, func(i, j int) bool {
 		nodeA, nodeB := nodes[i], nodes[j]
 
-		if resources[nodeA].CPU < resources[nodeB].CPU && resources[nodeA].Mem <= resources[nodeB].Mem {
-			return true
+		if r.nodes[nodeA].CPU != r.nodes[nodeB].CPU {
+			return r.nodes[nodeA].CPU < r.nodes[nodeB].CPU
 		}
 
-		return false
+		return r.nodes[nodeA].Mem <= r.nodes[nodeB].Mem
 	})
 
 	return nodes
+}
+
+// Add adds the resources of the node according to the cpu and memory utilization.
+func (r *resources) Add(nodeid string, cpu float64, mem uint64) {
+	res, hasRes := r.nodes[nodeid]
+	if !hasRes {
+		return
+	}
+
+	res.CPU += cpu
+	res.Mem += mem
+	r.nodes[nodeid] = res
+}
+
+// Remove subtracts the resources from the node according to the cpu and memory utilization.
+func (r *resources) Remove(nodeid string, cpu float64, mem uint64) {
+	res, hasRes := r.nodes[nodeid]
+	if !hasRes {
+		return
+	}
+
+	res.CPU -= cpu
+	if res.CPU < 0 {
+		res.CPU = 0
+	}
+	if mem >= res.Mem {
+		res.Mem = 0
+	} else {
+		res.Mem -= mem
+	}
+	r.nodes[nodeid] = res
+}
+
+// Move adjusts the resources from the target and source node according to the cpu and memory utilization.
+func (r *resources) Move(target, source string, cpu float64, mem uint64) {
+	r.Add(target, cpu, mem)
+	r.Remove(source, cpu, mem)
+}
+
+func (r *resources) Map() map[string]proxy.NodeResources {
+	return r.nodes
 }
 
 type referenceAffinityNodeCount struct {
@@ -1394,10 +1460,7 @@ func (ra *referenceAffinity) Move(reference, domain, fromnodeid, tonodeid string
 
 // rebalance returns a list of operations that will move running processes away from nodes that are overloaded.
 func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interface{}, map[string]proxy.NodeResources) {
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
+	resources := NewResources(nodes)
 
 	// Group all running processes by node and sort them by their runtime in ascending order.
 	nodeProcessMap := createNodeProcessMap(have)
@@ -1444,8 +1507,7 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 						continue
 					}
 
-					r := resources[raNodeid]
-					if hasNodeEnoughResources(r, p.CPU, p.Mem) {
+					if resources.HasNodeEnough(raNodeid, p.CPU, p.Mem) {
 						availableNodeid = raNodeid
 						break
 					}
@@ -1454,7 +1516,7 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 
 			// Find the best node with enough resources available.
 			if len(availableNodeid) == 0 {
-				nodes := findBestNodesForProcess(resources, p.CPU, p.Mem)
+				nodes := resources.FindBestNodes(p.CPU, p.Mem)
 				for _, nodeid := range nodes {
 					if nodeid == overloadedNodeid {
 						continue
@@ -1487,7 +1549,7 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 			processes[i] = p
 
 			// Adjust the resources.
-			resources = adjustResources(resources, availableNodeid, overloadedNodeid, p.CPU, p.Mem)
+			resources.Move(availableNodeid, overloadedNodeid, p.CPU, p.Mem)
 
 			// Adjust the reference affinity.
 			haveReferenceAffinity.Move(p.Config.Reference, p.Config.Domain, overloadedNodeid, availableNodeid)
@@ -1497,15 +1559,12 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 		}
 	}
 
-	return opStack, resources
+	return opStack, resources.Map()
 }
 
 // relocate returns a list of operations that will move deployed processes to different nodes.
 func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMap map[string]string) ([]interface{}, map[string]proxy.NodeResources, []string) {
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
+	resources := NewResources(nodes)
 
 	relocatedProcessIDs := []string{}
 
@@ -1542,7 +1601,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 		if len(targetNodeid) != 0 {
 			_, hasNode := nodes[targetNodeid]
 
-			if !hasNode || !hasNodeEnoughResources(nodes[targetNodeid].Resources, process.CPU, process.Mem) {
+			if !hasNode || !resources.HasNodeEnough(targetNodeid, process.CPU, process.Mem) {
 				targetNodeid = ""
 			}
 		}
@@ -1558,8 +1617,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 						continue
 					}
 
-					r := resources[raNodeid]
-					if hasNodeEnoughResources(r, process.CPU, process.Mem) {
+					if resources.HasNodeEnough(raNodeid, process.CPU, process.Mem) {
 						targetNodeid = raNodeid
 						break
 					}
@@ -1568,7 +1626,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 
 			// Find the best node with enough resources available.
 			if len(targetNodeid) == 0 {
-				nodes := findBestNodesForProcess(resources, process.CPU, process.Mem)
+				nodes := resources.FindBestNodes(process.CPU, process.Mem)
 				for _, nodeid := range nodes {
 					if nodeid == sourceNodeid {
 						continue
@@ -1584,7 +1642,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 				opStack = append(opStack, processOpSkip{
 					nodeid:    sourceNodeid,
 					processid: process.Config.ProcessID(),
-					err:       errNotEnoughResourcesForRebalancing,
+					err:       errNotEnoughResourcesForRelocating,
 				})
 				continue
 			}
@@ -1599,7 +1657,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 		})
 
 		// Adjust the resources.
-		resources = adjustResources(resources, targetNodeid, sourceNodeid, process.CPU, process.Mem)
+		resources.Move(targetNodeid, sourceNodeid, process.CPU, process.Mem)
 
 		// Adjust the reference affinity.
 		haveReferenceAffinity.Move(process.Config.Reference, process.Config.Domain, sourceNodeid, targetNodeid)
@@ -1607,29 +1665,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 		relocatedProcessIDs = append(relocatedProcessIDs, processid)
 	}
 
-	return opStack, resources, relocatedProcessIDs
-}
-
-// adjustResources adjusts the resources from the target and source node according to the cpu and memory utilization.
-func adjustResources(resources map[string]proxy.NodeResources, target, source string, cpu float64, mem uint64) map[string]proxy.NodeResources {
-	r := resources[target]
-	r.CPU += cpu
-	r.Mem += mem
-	resources[target] = r
-
-	r = resources[source]
-	r.CPU -= cpu
-	if r.CPU < 0 {
-		r.CPU = 0
-	}
-	if mem >= r.Mem {
-		r.Mem = 0
-	} else {
-		r.Mem -= mem
-	}
-	resources[source] = r
-
-	return resources
+	return opStack, resources.Map(), relocatedProcessIDs
 }
 
 // createNodeProcessMap takes a list of processes and groups them by the nodeid they

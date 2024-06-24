@@ -15,6 +15,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -126,6 +127,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.POST("/v1/kv", a.SetKV)
 	a.router.GET("/v1/kv/:key", a.GetKV)
 	a.router.DELETE("/v1/kv/:key", a.UnsetKV)
+
+	a.router.PUT("/v1/node/:id/state", a.SetNodeState)
 
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
@@ -918,6 +921,55 @@ func (a *api) GetKV(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+// SetNodeState sets a state for a node
+// @Summary Set a state for a node
+// @Description Set a state for a node
+// @Tags v1.0.0
+// @ID cluster-1-node-set-state
+// @Produce json
+// @Param data body client.SetNodeStateRequest true "Set node state request"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/node/{id}/state [get]
+func (a *api) SetNodeState(c echo.Context) error {
+	nodeid := util.PathParam(c, "id")
+
+	r := client.SetNodeStateRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithFields(log.Fields{
+		"node":  nodeid,
+		"state": r.State,
+	}).Log("Set node state")
+
+	err := a.cluster.SetNodeState(origin, nodeid, r.State)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithFields(log.Fields{
+			"node":  nodeid,
+			"state": r.State,
+		}).Log("Unable to set state")
+
+		if errors.Is(err, ErrUnsupportedNodeState) {
+			return Err(http.StatusBadRequest, "", "%s: %s", err.Error(), r.State)
+		}
+		return Err(http.StatusInternalServerError, "", "unable to set state: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // Error represents an error response of the API

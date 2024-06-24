@@ -70,6 +70,10 @@ type GetKVResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type SetNodeStateRequest struct {
+	State string `json:"state"`
+}
+
 type APIClient struct {
 	Address string
 	Client  *http.Client
@@ -331,6 +335,17 @@ func (c *APIClient) GetKV(origin string, key string) (string, time.Time, error) 
 	}
 
 	return res.Value, res.UpdatedAt, nil
+}
+
+func (c *APIClient) SetNodeState(origin string, nodeid string, r SetNodeStateRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/v1/node/"+url.PathEscape(nodeid)+"/state", "application/json", bytes.NewReader(data), origin)
+
+	return err
 }
 
 func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {
