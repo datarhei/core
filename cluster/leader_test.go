@@ -1607,8 +1607,8 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
-			State:       "connected",
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      1,
@@ -1618,8 +1618,8 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "disconnected",
 			LastContact: time.Now().Add(-3 * time.Minute),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				IsThrottling: true,
 				NCPU:         1,
@@ -1681,6 +1681,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      42,
@@ -1691,6 +1692,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      37,
@@ -1746,6 +1748,7 @@ func TestRebalanceOverload(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      91,
@@ -1756,6 +1759,7 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      15,
@@ -1839,6 +1843,7 @@ func TestRebalanceSkip(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      91,
@@ -1849,6 +1854,7 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      15,
@@ -1965,6 +1971,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      90,
@@ -1975,6 +1982,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      1,
@@ -1985,6 +1993,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      1,
@@ -2076,6 +2085,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      27,
@@ -2086,6 +2096,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      15,
@@ -2096,6 +2107,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      0,
@@ -2190,6 +2202,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      27,
@@ -2200,6 +2213,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      15,
@@ -2210,6 +2224,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
+			State:       "connected",
 			Resources: proxy.NodeResources{
 				NCPU:     1,
 				CPU:      0,
@@ -2268,6 +2283,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 func TestFindBestNodesForProcess(t *testing.T) {
 	nodes := map[string]proxy.NodeAbout{
 		"node1": {
+			State:       "connected",
 			LastContact: time.Now(),
 			Resources: proxy.NodeResources{
 				NCPU:     1,
@@ -2278,6 +2294,7 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node2": {
+			State:       "connected",
 			LastContact: time.Now(),
 			Resources: proxy.NodeResources{
 				NCPU:     1,
@@ -2288,6 +2305,7 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node3": {
+			State:       "connected",
 			LastContact: time.Now(),
 			Resources: proxy.NodeResources{
 				NCPU:     1,
