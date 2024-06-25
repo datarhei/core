@@ -39,6 +39,10 @@ type SetProcessMetadataRequest struct {
 	Metadata interface{} `json:"metadata"`
 }
 
+type RelocateProcessesRequest struct {
+	Map map[app.ProcessID]string
+}
+
 type AddIdentityRequest struct {
 	Identity iamidentity.User `json:"identity"`
 }
@@ -81,6 +85,10 @@ type AboutResponseResources struct {
 	Mem          uint64  // Currently used memory in bytes
 	MemLimit     uint64  // Defined memory limit in bytes
 	Error        error   // Last error
+}
+
+type SetNodeStateRequest struct {
+	State string `json:"state"`
 }
 
 type APIClient struct {
@@ -251,6 +259,17 @@ func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key stri
 	return err
 }
 
+func (c *APIClient) RelocateProcesses(origin string, r RelocateProcessesRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/v1/relocate", "application/json", bytes.NewReader(data), origin)
+
+	return err
+}
+
 func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
 	data, err := json.Marshal(r)
 	if err != nil {
@@ -348,6 +367,17 @@ func (c *APIClient) GetKV(origin string, key string) (string, time.Time, error) 
 	}
 
 	return res.Value, res.UpdatedAt, nil
+}
+
+func (c *APIClient) SetNodeState(origin string, nodeid string, r SetNodeStateRequest) error {
+	data, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.call(http.MethodPut, "/v1/node/"+url.PathEscape(nodeid)+"/state", "application/json", bytes.NewReader(data), origin)
+
+	return err
 }
 
 func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {

@@ -209,6 +209,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/db/node": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List of nodes in the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List nodes in the cluster DB",
+                "operationId": "cluster-3-db-list-nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.ClusterStoreNode"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/db/policies": {
             "get": {
                 "security": [
@@ -860,6 +889,17 @@ const docTemplate = `{
                 ],
                 "summary": "Leave the cluster gracefully",
                 "operationId": "cluster-3-leave",
+                "parameters": [
+                    {
+                        "description": "Node ID",
+                        "name": "nodeid",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNodeID"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1353,6 +1393,107 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/api.Process"
                             }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/node/{id}/state": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get the state of a node with the given ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Get the state of a node with the given ID",
+                "operationId": "cluster-3-get-node-state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNodeState"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Set the state of a node with the given ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Set the state of a node with the given ID",
+                "operationId": "cluster-3-set-node-state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "State",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterNodeState"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
                         }
                     },
                     "404": {
@@ -2021,6 +2162,49 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/reallocation": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve snapshot of the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve snapshot of the cluster DB",
+                "operationId": "cluster-3-reallocation",
+                "parameters": [
+                    {
+                        "description": "Process reallocations",
+                        "name": "reallocations",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterProcessReallocate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }
@@ -5043,6 +5227,14 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterNodeID": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "api.ClusterNodeResources": {
             "type": "object",
             "properties": {
@@ -5073,10 +5265,40 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterNodeState": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": [
+                        "online",
+                        "maintenance",
+                        "leave"
+                    ]
+                }
+            }
+        },
         "api.ClusterProcessMap": {
             "type": "object",
             "additionalProperties": {
                 "type": "string"
+            }
+        },
+        "api.ClusterProcessReallocate": {
+            "type": "object",
+            "properties": {
+                "process_ids": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessID"
+                    }
+                },
+                "target_node_id": {
+                    "type": "string"
+                }
             }
         },
         "api.ClusterRaft": {
@@ -5099,6 +5321,20 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClusterStoreNode": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -6592,6 +6828,17 @@ const docTemplate = `{
                 "waitfor_seconds": {
                     "type": "integer",
                     "format": "uint64"
+                }
+            }
+        },
+        "api.ProcessID": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
                 }
             }
         },

@@ -28,6 +28,7 @@ type Forwarder interface {
 	RemoveProcess(origin string, id app.ProcessID) error
 	SetProcessCommand(origin string, id app.ProcessID, command string) error
 	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
+	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
 
 	AddIdentity(origin string, identity iamidentity.User) error
 	UpdateIdentity(origin, name string, identity iamidentity.User) error
@@ -40,6 +41,8 @@ type Forwarder interface {
 	SetKV(origin, key, value string) error
 	UnsetKV(origin, key string) error
 	GetKV(origin, key string) (string, time.Time, error)
+
+	SetNodeState(origin, nodeid, state string) error
 }
 
 type forwarder struct {
@@ -237,6 +240,22 @@ func (f *forwarder) RemoveProcess(origin string, id app.ProcessID) error {
 	return client.RemoveProcess(origin, id)
 }
 
+func (f *forwarder) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.RelocateProcessesRequest{
+		Map: relocations,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.RelocateProcesses(origin, r)
+}
+
 func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error {
 	if origin == "" {
 		origin = f.id
@@ -365,4 +384,20 @@ func (f *forwarder) GetKV(origin, key string) (string, time.Time, error) {
 	f.lock.RUnlock()
 
 	return client.GetKV(origin, key)
+}
+
+func (f *forwarder) SetNodeState(origin, nodeid, state string) error {
+	if origin == "" {
+		origin = f.id
+	}
+
+	r := apiclient.SetNodeStateRequest{
+		State: state,
+	}
+
+	f.lock.RLock()
+	client := f.client
+	f.lock.RUnlock()
+
+	return client.SetNodeState(origin, nodeid, r)
 }

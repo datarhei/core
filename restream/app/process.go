@@ -316,3 +316,12 @@ func (p *ProcessID) Parse(pid string) {
 	p.ID = pid[:i]
 	p.Domain = pid[i+1:]
 }
+
+func (p ProcessID) MarshalText() ([]byte, error) {
+	return []byte(p.String()), nil
+}
+
+func (p *ProcessID) UnmarshalText(text []byte) error {
+	p.Parse(string(text))
+	return nil
+}

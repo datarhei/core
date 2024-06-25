@@ -35,11 +35,16 @@ func ParseURL(uri string) (u *url.URL, err error) {
 	return
 }
 
-func Dial(uri string) (conn *Conn, err error) {
-	return DialTimeout(uri, 0)
+type DialOptions struct {
+	MaxProbePacketCount int
+	DebugChunks         func(conn net.Conn) bool
 }
 
-func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
+func Dial(uri string, options DialOptions) (conn *Conn, err error) {
+	return DialTimeout(uri, 0, options)
+}
+
+func DialTimeout(uri string, timeout time.Duration, options DialOptions) (conn *Conn, err error) {
 	var u *url.URL
 	if u, err = ParseURL(uri); err != nil {
 		return
@@ -53,6 +58,11 @@ func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
 
 	conn = NewConn(netconn)
 	conn.URL = u
+	conn.prober = flv.NewProber(options.MaxProbePacketCount)
+	if options.DebugChunks != nil {
+		conn.debugChunks = options.DebugChunks(netconn)
+	}
+
 	return
 }
 
@@ -65,9 +75,10 @@ type Server struct {
 	HandlePlay    func(*Conn)
 	HandleConn    func(*Conn)
 
-	MaxProbePacketCount int
-	SkipInvalidMessages bool
-	DebugChunks         func(conn net.Conn) bool
+	MaxProbePacketCount   int
+	SkipInvalidMessages   bool
+	DebugChunks           func(conn net.Conn) bool
+	ConnectionIdleTimeout time.Duration
 
 	listener net.Listener
 	doneChan chan struct{}
@@ -80,6 +91,7 @@ func (s *Server) HandleNetConn(netconn net.Conn) (err error) {
 	if s.DebugChunks != nil {
 		conn.debugChunks = s.DebugChunks(netconn)
 	}
+	conn.netconn.SetIdleTimeout(s.ConnectionIdleTimeout)
 	conn.isserver = true
 
 	err = s.handleConn(conn)
@@ -101,10 +113,12 @@ func (s *Server) handleConn(conn *Conn) (err error) {
 		}
 
 		if conn.playing {
+			conn.netconn.SetReadIdleTimeout(0)
 			if s.HandlePlay != nil {
 				s.HandlePlay(conn)
 			}
 		} else if conn.publishing {
+			conn.netconn.SetWriteIdleTimeout(0)
 			if s.HandlePublish != nil {
 				s.HandlePublish(conn)
 			}
@@ -204,14 +218,12 @@ func (s *Server) Serve(listener net.Listener) error {
 }
 
 func (s *Server) Close() {
-	if s.listener == nil {
-		return
+	if s.listener != nil {
+		s.listener.Close()
+		s.listener = nil
+
+		close(s.doneChan)
 	}
-
-	close(s.doneChan)
-
-	s.listener.Close()
-	s.listener = nil
 }
 
 const (
@@ -239,7 +251,7 @@ type Conn struct {
 	writebuf []byte
 	readbuf  []byte
 
-	netconn   net.Conn
+	netconn   *idleConn
 	txrxcount *txrxcount
 
 	writeMaxChunkSize int
@@ -278,20 +290,75 @@ type Conn struct {
 	debugChunks bool
 }
 
+type idleConn struct {
+	net.Conn
+	ReadIdleTimeout  time.Duration
+	WriteIdleTimeout time.Duration
+}
+
+func (t *idleConn) Read(p []byte) (int, error) {
+	if t.ReadIdleTimeout > 0 {
+		t.Conn.SetReadDeadline(time.Now().Add(t.ReadIdleTimeout))
+	}
+
+	n, err := t.Conn.Read(p)
+	return n, err
+}
+
+func (t *idleConn) Write(p []byte) (int, error) {
+	if t.WriteIdleTimeout > 0 {
+		t.Conn.SetWriteDeadline(time.Now().Add(t.WriteIdleTimeout))
+	}
+
+	n, err := t.Conn.Write(p)
+	return n, err
+}
+
+func (t *idleConn) SetReadIdleTimeout(d time.Duration) error {
+	t.ReadIdleTimeout = d
+
+	deadline := time.Time{}
+	if t.ReadIdleTimeout > 0 {
+		deadline = time.Now().Add(d)
+	}
+
+	return t.Conn.SetReadDeadline(deadline)
+}
+
+func (t *idleConn) SetWriteIdleTimeout(d time.Duration) error {
+	t.WriteIdleTimeout = d
+
+	deadline := time.Time{}
+	if t.WriteIdleTimeout > 0 {
+		deadline = time.Now().Add(d)
+	}
+
+	return t.Conn.SetWriteDeadline(deadline)
+}
+
+func (t *idleConn) SetIdleTimeout(d time.Duration) error {
+	err := t.SetReadIdleTimeout(d)
+	if err != nil {
+		return err
+	}
+
+	return t.SetWriteIdleTimeout(d)
+}
+
 type txrxcount struct {
-	io.ReadWriter
+	io.ReadWriteCloser
 	txbytes uint64
 	rxbytes uint64
 }
 
 func (t *txrxcount) Read(p []byte) (int, error) {
-	n, err := t.ReadWriter.Read(p)
+	n, err := t.ReadWriteCloser.Read(p)
 	t.rxbytes += uint64(n)
 	return n, err
 }
 
 func (t *txrxcount) Write(p []byte) (int, error) {
-	n, err := t.ReadWriter.Write(p)
+	n, err := t.ReadWriteCloser.Write(p)
 	t.txbytes += uint64(n)
 	return n, err
 }
@@ -299,12 +366,14 @@ func (t *txrxcount) Write(p []byte) (int, error) {
 func NewConn(netconn net.Conn) *Conn {
 	conn := &Conn{}
 	conn.prober = &flv.Prober{}
-	conn.netconn = netconn
+	conn.netconn = &idleConn{
+		Conn: netconn,
+	}
 	conn.readcsmap = make(map[uint32]*chunkStream)
 	conn.readMaxChunkSize = 128
 	conn.writeMaxChunkSize = 128
 	conn.readAckSize = 1048576
-	conn.txrxcount = &txrxcount{ReadWriter: netconn}
+	conn.txrxcount = &txrxcount{ReadWriteCloser: conn.netconn}
 	conn.bufr = bufio.NewReaderSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.bufw = bufio.NewWriterSize(conn.txrxcount, pio.RecommendBufioSize)
 	conn.writebuf = make([]byte, 4096)
@@ -314,20 +383,20 @@ func NewConn(netconn net.Conn) *Conn {
 }
 
 type chunkStream struct {
-	timenow     uint32
-	prevtimenow uint32
-	tscount     int
-	gentimenow  bool
-	timedelta   uint32
-	hastimeext  bool
-	timeext     uint32
-	msgsid      uint32
-	msgtypeid   uint8
-	msgdatalen  uint32
-	msgdataleft uint32
-	msghdrtype  uint8
-	msgdata     []byte
-	msgcount    int
+	timenow          uint32
+	prevtimenow      uint32
+	sametscount      int
+	genwallclocktime bool
+	timedelta        uint32
+	hastimeext       bool
+	timeext          uint32
+	msgsid           uint32
+	msgtypeid        uint8
+	msgdatalen       uint32
+	msgdataleft      uint32
+	msghdrtype       uint8
+	msgdata          []byte
+	msgcount         uint64
 }
 
 func (cs *chunkStream) Start() {
@@ -358,7 +427,27 @@ const (
 )
 
 func (conn *Conn) NetConn() net.Conn {
-	return conn.netconn
+	return conn.netconn.Conn
+}
+
+func (conn *Conn) LocalAddr() net.Addr {
+	return conn.netconn.LocalAddr()
+}
+
+func (conn *Conn) RemoteAddr() net.Addr {
+	return conn.netconn.RemoteAddr()
+}
+
+func (conn *Conn) SetReadIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetReadIdleTimeout(d)
+}
+
+func (conn *Conn) SetWriteIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetWriteIdleTimeout(d)
+}
+
+func (conn *Conn) SetIdleTimeout(d time.Duration) error {
+	return conn.netconn.SetIdleTimeout(d)
 }
 
 func (conn *Conn) TxBytes() uint64 {
@@ -1046,6 +1135,16 @@ func (conn *Conn) WriteHeader(streams []av.CodecData) (err error) {
 		return
 	}
 
+	if conn.metadata != nil {
+		for key, value := range conn.metadata {
+			if _, hasKey := metadata[key]; hasKey {
+				continue
+			}
+
+			metadata[key] = value
+		}
+	}
+
 	// > onMetaData()
 	if err = conn.writeDataMsg(5, conn.avmsgsid, "onMetaData", metadata); err != nil {
 		return
@@ -1421,7 +1520,7 @@ func (conn *Conn) readChunk() (err error) {
 		cs.msgdatalen = pio.U24BE(h[3:6])
 		cs.msgtypeid = h[6]
 		cs.msgsid = pio.U32LE(h[7:11])
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}
@@ -1464,7 +1563,7 @@ func (conn *Conn) readChunk() (err error) {
 		cs.msghdrtype = msghdrtype
 		cs.msgdatalen = pio.U24BE(h[3:6])
 		cs.msgtypeid = h[6]
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}
@@ -1504,7 +1603,7 @@ func (conn *Conn) readChunk() (err error) {
 		n += len(h)
 		cs.msghdrtype = msghdrtype
 		timestamp = pio.U24BE(h[0:3])
-		if timestamp == 0xffffff {
+		if timestamp == FlvTimestampMax {
 			if _, err = io.ReadFull(conn.bufr, b[:4]); err != nil {
 				return
 			}
@@ -1587,8 +1686,12 @@ func (conn *Conn) readChunk() (err error) {
 	}
 
 	if conn.debugChunks {
-		data := fmt.Sprintf("rtmp: chunk id=%d msgsid=%d msgtypeid=%d msghdrtype=%d timestamp=%d ext=%v len=%d left=%d max=%d",
-			csid, cs.msgsid, cs.msgtypeid, msghdrtype, cs.timenow, cs.hastimeext, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
+		path := "***"
+		if conn.URL != nil {
+			path = conn.URL.Path
+		}
+		data := fmt.Sprintf("%s: chunk id=%d msgsid=%d msgtypeid=%d msghdrtype=%d timestamp=%d ext=%v wallclock=%v len=%d left=%d max=%d",
+			path, csid, cs.msgsid, cs.msgtypeid, msghdrtype, cs.timenow, cs.hastimeext, cs.genwallclocktime, cs.msgdatalen, cs.msgdataleft, conn.readMaxChunkSize)
 
 		if cs.msgtypeid != msgtypeidVideoMsg && cs.msgtypeid != msgtypeidAudioMsg {
 			if len(cs.msgdata) > 1024 {
@@ -1614,26 +1717,28 @@ func (conn *Conn) readChunk() (err error) {
 		timestamp = cs.timenow
 
 		if cs.msgtypeid == msgtypeidVideoMsg || cs.msgtypeid == msgtypeidAudioMsg {
-			if cs.msgcount < 20 { // only consider the first video and audio messages
-				if !cs.gentimenow {
-					if cs.prevtimenow >= cs.timenow {
-						cs.tscount++
-					} else {
-						cs.tscount = 0
-					}
-
-					// if the previous timestamp is the same as the current for too often in a row, assume defect timestamps
-					if cs.tscount > 10 {
-						cs.gentimenow = true
-					}
-
-					cs.prevtimenow = cs.timenow
+			if !cs.genwallclocktime {
+				if cs.prevtimenow >= cs.timenow {
+					cs.sametscount++
+				} else {
+					cs.sametscount = 0
 				}
 
+				// if the previous timestamp is the same as the current for too often in a row, assume defect timestamps
+				if cs.sametscount > 10 {
+					if cs.msgcount < 20 { // only consider the first video and audio messages
+						cs.genwallclocktime = true
+					} else { // otherwise bail out
+						err = fmt.Errorf("detected sequence of non-changing timestamps: %d (msgtypeid %d)", cs.timenow, cs.msgtypeid)
+						return
+					}
+				}
+
+				cs.prevtimenow = cs.timenow
 				cs.msgcount++
 			}
 
-			if cs.gentimenow {
+			if cs.genwallclocktime {
 				timestamp = uint32(time.Since(conn.start).Milliseconds() % 0xFFFFFFFF)
 			}
 		}
@@ -1763,14 +1868,17 @@ func (conn *Conn) handleMsg(timestamp uint32, msgsid uint32, msgtypeid uint8, ms
 		}
 
 		if metaindex != -1 && metaindex < len(conn.datamsgvals) {
-			conn.metadata = conn.datamsgvals[metaindex].(flvio.AMFMap)
-			//fmt.Printf("onMetadata: %+v\n", conn.metadata)
-			if _, hasVideo := conn.metadata["videocodecid"]; hasVideo {
-				conn.prober.HasVideo = true
-			}
+			metadata, ok := conn.datamsgvals[metaindex].(flvio.AMFMap)
+			if ok {
+				conn.metadata = metadata
 
-			if _, hasAudio := conn.metadata["audiocodecid"]; hasAudio {
-				conn.prober.HasAudio = true
+				if _, hasVideo := metadata["videocodecid"]; hasVideo {
+					conn.prober.HasVideo = true
+				}
+
+				if _, hasAudio := metadata["audiocodecid"]; hasAudio {
+					conn.prober.HasAudio = true
+				}
 			}
 		}
 
@@ -2032,7 +2140,7 @@ func Handler(h *avutil.RegisterHandler) {
 			return
 		}
 		ok = true
-		demuxer, err = Dial(uri)
+		demuxer, err = Dial(uri, DialOptions{})
 		return
 	}
 
@@ -2041,7 +2149,7 @@ func Handler(h *avutil.RegisterHandler) {
 			return
 		}
 		ok = true
-		muxer, err = Dial(uri)
+		muxer, err = Dial(uri, DialOptions{})
 		return
 	}
 

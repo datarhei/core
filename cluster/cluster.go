@@ -71,6 +71,7 @@ type Cluster interface {
 	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
 	GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
 	GetProcessNodeMap() map[string]string
+	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
 	ListIdentities() (time.Time, []iamidentity.User)
@@ -90,6 +91,9 @@ type Cluster interface {
 	UnsetKV(origin, key string) error
 	GetKV(origin, key string, stale bool) (string, time.Time, error)
 	ListKV(prefix string) map[string]store.Value
+
+	ListNodes() map[string]store.Node
+	SetNodeState(origin, id, state string) error
 
 	ProxyReader() proxy.ProxyReader
 	CertManager() autocert.Manager
@@ -193,6 +197,7 @@ type cluster struct {
 }
 
 var ErrDegraded = errors.New("cluster is currently degraded")
+var ErrUnknownNode = errors.New("unknown node id")
 
 func New(config Config) (Cluster, error) {
 	c := &cluster{
@@ -438,6 +443,8 @@ func (c *cluster) Start(ctx context.Context) error {
 		c.Shutdown()
 		return fmt.Errorf("failed to setup cluster: %w", err)
 	}
+
+	<-c.shutdownCh
 
 	return nil
 }
@@ -720,6 +727,14 @@ func (c *cluster) Leave(origin, id string) error {
 
 	if len(id) == 0 {
 		id = c.nodeID
+	}
+
+	c.nodesLock.RLock()
+	_, hasNode := c.nodes[id]
+	c.nodesLock.RUnlock()
+
+	if !hasNode {
+		return ErrUnknownNode
 	}
 
 	c.logger.Debug().WithFields(log.Fields{
@@ -1021,6 +1036,13 @@ func (c *cluster) trackNodeChanges() {
 				}
 
 				delete(c.nodes, id)
+				/*
+					if id == c.nodeID {
+						c.logger.Warn().WithField("id", id).Log("This node left the cluster. Shutting down.")
+						// We got removed from the cluster, shutdown
+						c.Shutdown()
+					}
+				*/
 			}
 
 			c.nodesLock.Unlock()
@@ -1314,6 +1336,27 @@ func (c *cluster) trackLeaderChanges() {
 				c.hasRaftLeader = true
 			}
 			c.leaderLock.Unlock()
+
+			servers, err := c.raft.Servers()
+			if err != nil {
+				c.logger.Error().WithError(err).Log("Raft configuration")
+				break
+			}
+
+			isNodeInCluster := false
+			for _, server := range servers {
+				if c.nodeID == server.ID {
+					isNodeInCluster = true
+					break
+				}
+			}
+
+			if !isNodeInCluster {
+				// We're not anymore part of the cluster, shutdown
+				c.logger.Warn().WithField("id", c.nodeID).Log("This node left the cluster. Shutting down.")
+				c.Shutdown()
+			}
+
 		case <-c.shutdownCh:
 			return
 		}
@@ -1443,6 +1486,8 @@ func (c *cluster) About() (ClusterAbout, error) {
 		}
 	}
 
+	storeNodes := c.ListNodes()
+
 	c.nodesLock.RLock()
 	for id, node := range c.nodes {
 		nodeAbout := node.About()
@@ -1480,6 +1525,12 @@ func (c *cluster) About() (ClusterAbout, error) {
 		if s, ok := serversMap[id]; ok {
 			node.Voter = s.Voter
 			node.Leader = s.Leader
+		}
+
+		if storeNode, hasStoreNode := storeNodes[id]; hasStoreNode {
+			if storeNode.State == "maintenance" {
+				node.Status = storeNode.State
+			}
 		}
 
 		about.Nodes = append(about.Nodes, node)

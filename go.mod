@@ -10,13 +10,13 @@ require (
 	github.com/adhocore/gronx v1.8.1
 	github.com/andybalholm/brotli v1.1.0
 	github.com/atrox/haikunatorgo/v2 v2.0.1
-	github.com/caddyserver/certmagic v0.21.2
-	github.com/casbin/casbin/v2 v2.89.0
+	github.com/caddyserver/certmagic v0.21.3
+	github.com/casbin/casbin/v2 v2.90.0
 	github.com/datarhei/core-client-go/v16 v16.11.1-0.20240429143858-23ad5985b894
 	github.com/datarhei/gosrt v0.6.0
-	github.com/datarhei/joy4 v0.0.0-20240528121836-da80d79b6435
+	github.com/datarhei/joy4 v0.0.0-20240603190808-b1407345907e
 	github.com/fujiwara/shapeio v1.0.0
-	github.com/go-playground/validator/v10 v10.20.0
+	github.com/go-playground/validator/v10 v10.21.0
 	github.com/gobwas/glob v0.2.3
 	github.com/goccy/go-json v0.10.3
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -37,7 +37,7 @@ require (
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.19.1
 	github.com/puzpuzpuz/xsync/v3 v3.1.0
-	github.com/shirou/gopsutil/v3 v3.24.4
+	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/stretchr/testify v1.9.0
 	github.com/swaggo/echo-swagger v1.4.1
 	github.com/swaggo/swag v1.16.3
@@ -46,8 +46,8 @@ require (
 	go.etcd.io/bbolt v1.3.10
 	go.uber.org/automaxprocs v1.5.3
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.23.0
-	golang.org/x/mod v0.17.0
+	golang.org/x/crypto v0.24.0
+	golang.org/x/mod v0.18.0
 )
 
 //replace github.com/datarhei/core-client-go/v16 => ../core-client-go
@@ -98,8 +98,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.53.0 // indirect
-	github.com/prometheus/procfs v0.15.0 // indirect
+	github.com/prometheus/common v0.54.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -116,12 +116,12 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/net v0.25.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.21.0 // indirect
+	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

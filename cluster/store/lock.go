@@ -35,7 +35,7 @@ func (s *store) deleteLock(cmd CommandDeleteLock) error {
 	return nil
 }
 
-func (s *store) clearLocks(cmd CommandClearLocks) error {
+func (s *store) clearLocks(_ CommandClearLocks) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

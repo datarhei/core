@@ -626,6 +626,62 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/node/{id}/state": {
+            "get": {
+                "description": "Set a state for a node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Set a state for a node",
+                "operationId": "cluster-1-node-set-state",
+                "parameters": [
+                    {
+                        "description": "Set node state request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.SetNodeStateRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/process": {
             "post": {
                 "description": "Add a process to the cluster DB",
@@ -893,6 +949,50 @@ const docTemplateClusterAPI = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/client.SetProcessMetadataRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/relocate": {
+            "put": {
+                "description": "Relocate processes to another node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Relocate processes to another node",
+                "operationId": "cluster-3-relocate-processes",
+                "parameters": [
+                    {
+                        "description": "List of processes to relocate",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.RelocateProcessesRequest"
                         }
                     }
                 ],
@@ -1281,6 +1381,17 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "client.RelocateProcessesRequest": {
+            "type": "object",
+            "properties": {
+                "map": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "client.SetKVRequest": {
             "type": "object",
             "properties": {
@@ -1288,6 +1399,14 @@ const docTemplateClusterAPI = `{
                     "type": "string"
                 },
                 "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "client.SetNodeStateRequest": {
+            "type": "object",
+            "properties": {
+                "state": {
                     "type": "string"
                 }
             }

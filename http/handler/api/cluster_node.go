@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	clientapi "github.com/datarhei/core-client-go/v16/api"
+	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -26,9 +28,17 @@ import (
 func (h *ClusterHandler) GetNodes(c echo.Context) error {
 	about, _ := h.cluster.About()
 
+	nodes := h.cluster.ListNodes()
+
 	list := []api.ClusterNode{}
 
 	for _, node := range about.Nodes {
+		if dbnode, hasNode := nodes[node.ID]; hasNode {
+			if dbnode.State == "maintenance" {
+				node.Status = dbnode.State
+			}
+		}
+
 		list = append(list, h.marshalClusterNode(node))
 	}
 
@@ -51,9 +61,17 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 
 	about, _ := h.cluster.About()
 
+	nodes := h.cluster.ListNodes()
+
 	for _, node := range about.Nodes {
 		if node.ID != id {
 			continue
+		}
+
+		if dbnode, hasNode := nodes[node.ID]; hasNode {
+			if dbnode.State == "maintenance" {
+				node.Status = dbnode.State
+			}
 		}
 
 		return c.JSON(http.StatusOK, h.marshalClusterNode(node))
@@ -364,4 +382,109 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, processes)
+}
+
+// GetNodeState returns the state of a node with the given ID
+// @Summary Get the state of a node with the given ID
+// @Description Get the state of a node with the given ID
+// @Tags v16.?.?
+// @ID cluster-3-get-node-state
+// @Produce json
+// @Param id path string true "Node ID"
+// @Success 200 {object} api.ClusterNodeState
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/node/{id}/state [get]
+func (h *ClusterHandler) GetNodeState(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	about, _ := h.cluster.About()
+
+	state := ""
+	for _, node := range about.Nodes {
+		if node.ID != id {
+			continue
+		}
+
+		state = node.Status
+		break
+	}
+
+	if len(state) == 0 {
+		return api.Err(http.StatusNotFound, "", "node not found")
+	}
+
+	nodes := h.cluster.ListNodes()
+	if node, hasNode := nodes[id]; hasNode {
+		if node.State == "maintenance" {
+			state = node.State
+		}
+	}
+
+	return c.JSON(http.StatusOK, api.ClusterNodeState{
+		State: state,
+	})
+}
+
+// SetNodeState sets the state of a node with the given ID
+// @Summary Set the state of a node with the given ID
+// @Description Set the state of a node with the given ID
+// @Tags v16.?.?
+// @ID cluster-3-set-node-state
+// @Produce json
+// @Param id path string true "Node ID"
+// @Param config body api.ClusterNodeState true "State"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/node/{id}/state [put]
+func (h *ClusterHandler) SetNodeState(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	about, _ := h.cluster.About()
+
+	found := false
+	for _, node := range about.Nodes {
+		if node.ID != id {
+			continue
+		}
+
+		found = true
+		break
+	}
+
+	if !found {
+		return api.Err(http.StatusNotFound, "", "node not found")
+	}
+
+	state := api.ClusterNodeState{}
+
+	if err := util.ShouldBindJSON(c, &state); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	if state.State == "leave" {
+		err := h.cluster.Leave("", id)
+		if err != nil {
+			if errors.Is(err, cluster.ErrUnknownNode) {
+				return api.Err(http.StatusNotFound, "", "node not found")
+			}
+
+			return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		}
+
+		return c.JSON(http.StatusOK, "OK")
+	}
+
+	err := h.cluster.SetNodeState("", id, state.State)
+	if err != nil {
+		if errors.Is(err, cluster.ErrUnsupportedNodeState) {
+			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		}
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }

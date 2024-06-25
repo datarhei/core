@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+type ClusterNodeID struct {
+	ID string `json:"id"`
+}
+
 type ClusterNode struct {
 	ID          string               `json:"id"`
 	Name        string               `json:"name"`
@@ -19,6 +23,10 @@ type ClusterNode struct {
 	Latency     float64              `json:"latency_ms"`
 	Core        ClusterNodeCore      `json:"core"`
 	Resources   ClusterNodeResources `json:"resources"`
+}
+
+type ClusterNodeState struct {
+	State string `json:"state" validate:"required" enums:"online,maintenance,leave" jsonschema:"enum=online,enum=maintenance,enum=leave"`
 }
 
 type ClusterNodeCore struct {
@@ -85,3 +93,14 @@ type ClusterKVSValue struct {
 type ClusterKVS map[string]ClusterKVSValue
 
 type ClusterProcessMap map[string]string
+
+type ClusterProcessReallocate struct {
+	TargetNodeID string      `json:"target_node_id"`
+	Processes    []ProcessID `json:"process_ids"`
+}
+
+type ClusterStoreNode struct {
+	ID        string    `json:"id"`
+	State     string    `json:"state"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

@@ -15,6 +15,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -114,6 +115,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.PUT("/v1/process/:id/command", a.SetProcessCommand)
 	a.router.PUT("/v1/process/:id/metadata/:key", a.SetProcessMetadata)
 
+	a.router.PUT("/v1/relocate", a.RelocateProcesses)
+
 	a.router.POST("/v1/iam/user", a.AddIdentity)
 	a.router.PUT("/v1/iam/user/:name", a.UpdateIdentity)
 	a.router.PUT("/v1/iam/user/:name/policies", a.SetIdentityPolicies)
@@ -125,6 +128,8 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.POST("/v1/kv", a.SetKV)
 	a.router.GET("/v1/kv/:key", a.GetKV)
 	a.router.DELETE("/v1/kv/:key", a.UnsetKV)
+
+	a.router.PUT("/v1/node/:id/state", a.SetNodeState)
 
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
@@ -539,6 +544,39 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
+// RelocateProcesses relocates processes to another node
+// @Summary Relocate processes to another node
+// @Description Relocate processes to another node.
+// @Tags v1.0.0
+// @ID cluster-3-relocate-processes
+// @Produce json
+// @Param data body client.RelocateProcessesRequest true "List of processes to relocate"
+// @Success 200 {string} string
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/relocate [put]
+func (a *api) RelocateProcesses(c echo.Context) error {
+	r := client.RelocateProcessesRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	err := a.cluster.RelocateProcesses(origin, r.Map)
+	if err != nil {
+		a.logger.Debug().WithError(err).Log("Unable to apply process relocation request")
+		return Err(http.StatusInternalServerError, "", "unable to apply process relocation request: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // AddIdentity adds an identity to the cluster DB
 // @Summary Add an identity
 // @Description Add an identity to the cluster DB
@@ -914,6 +952,55 @@ func (a *api) GetKV(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+// SetNodeState sets a state for a node
+// @Summary Set a state for a node
+// @Description Set a state for a node
+// @Tags v1.0.0
+// @ID cluster-1-node-set-state
+// @Produce json
+// @Param data body client.SetNodeStateRequest true "Set node state request"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/node/{id}/state [get]
+func (a *api) SetNodeState(c echo.Context) error {
+	nodeid := util.PathParam(c, "id")
+
+	r := client.SetNodeStateRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithFields(log.Fields{
+		"node":  nodeid,
+		"state": r.State,
+	}).Log("Set node state")
+
+	err := a.cluster.SetNodeState(origin, nodeid, r.State)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithFields(log.Fields{
+			"node":  nodeid,
+			"state": r.State,
+		}).Log("Unable to set state")
+
+		if errors.Is(err, ErrUnsupportedNodeState) {
+			return Err(http.StatusBadRequest, "", "%s: %s", err.Error(), r.State)
+		}
+		return Err(http.StatusInternalServerError, "", "unable to set state: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // Error represents an error response of the API
