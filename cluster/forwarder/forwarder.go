@@ -14,59 +14,27 @@ import (
 )
 
 // Forwarder forwards any HTTP request from a follower to the leader
-type Forwarder interface {
-	SetLeader(address string)
-	HasLeader() bool
+type Forwarder struct {
+	ID     string
+	Logger log.Logger
 
-	Join(origin, id, raftAddress, peerAddress string) error
-	Leave(origin, id string) error
-	TransferLeadership(origin, id string) error
-	Snapshot(origin string) (io.ReadCloser, error)
-
-	AddProcess(origin string, config *app.Config) error
-	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
-	RemoveProcess(origin string, id app.ProcessID) error
-	SetProcessCommand(origin string, id app.ProcessID, command string) error
-	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
-	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
-
-	AddIdentity(origin string, identity iamidentity.User) error
-	UpdateIdentity(origin, name string, identity iamidentity.User) error
-	SetPolicies(origin, name string, policies []iamaccess.Policy) error
-	RemoveIdentity(origin string, name string) error
-
-	CreateLock(origin string, name string, validUntil time.Time) error
-	DeleteLock(origin string, name string) error
-
-	SetKV(origin, key, value string) error
-	UnsetKV(origin, key string) error
-	GetKV(origin, key string) (string, time.Time, error)
-
-	SetNodeState(origin, nodeid, state string) error
-}
-
-type forwarder struct {
-	id   string
-	lock sync.RWMutex
-
+	lock   sync.RWMutex
 	client apiclient.APIClient
-
-	logger log.Logger
 }
 
-type ForwarderConfig struct {
+type Config struct {
 	ID     string
 	Logger log.Logger
 }
 
-func New(config ForwarderConfig) (Forwarder, error) {
-	f := &forwarder{
-		id:     config.ID,
-		logger: config.Logger,
+func New(config Config) (*Forwarder, error) {
+	f := &Forwarder{
+		ID:     config.ID,
+		Logger: config.Logger,
 	}
 
-	if f.logger == nil {
-		f.logger = log.New("")
+	if f.Logger == nil {
+		f.Logger = log.New("")
 	}
 
 	tr := http.DefaultTransport.(*http.Transport).Clone()
@@ -85,7 +53,7 @@ func New(config ForwarderConfig) (Forwarder, error) {
 	return f, nil
 }
 
-func (f *forwarder) SetLeader(address string) {
+func (f *Forwarder) SetLeader(address string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -93,18 +61,18 @@ func (f *forwarder) SetLeader(address string) {
 		return
 	}
 
-	f.logger.Debug().Log("Setting leader address to %s", address)
+	f.Logger.Debug().Log("Setting leader address to %s", address)
 
 	f.client.Address = address
 }
 
-func (f *forwarder) HasLeader() bool {
+func (f *Forwarder) HasLeader() bool {
 	return len(f.client.Address) != 0
 }
 
-func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
+func (f *Forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.JoinRequest{
@@ -112,7 +80,7 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 		RaftAddress: raftAddress,
 	}
 
-	f.logger.Debug().WithField("request", r).Log("Forwarding to leader")
+	f.Logger.Debug().WithField("request", r).Log("Forwarding to leader")
 
 	f.lock.RLock()
 	client := f.client
@@ -128,12 +96,12 @@ func (f *forwarder) Join(origin, id, raftAddress, peerAddress string) error {
 	return client.Join(origin, r)
 }
 
-func (f *forwarder) Leave(origin, id string) error {
+func (f *Forwarder) Leave(origin, id string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
-	f.logger.Debug().WithField("id", id).Log("Forwarding to leader")
+	f.Logger.Debug().WithField("id", id).Log("Forwarding to leader")
 
 	f.lock.RLock()
 	client := f.client
@@ -142,12 +110,12 @@ func (f *forwarder) Leave(origin, id string) error {
 	return client.Leave(origin, id)
 }
 
-func (f *forwarder) TransferLeadership(origin, id string) error {
+func (f *Forwarder) TransferLeadership(origin, id string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
-	f.logger.Debug().WithField("id", id).Log("Transferring leadership")
+	f.Logger.Debug().WithField("id", id).Log("Transferring leadership")
 
 	f.lock.RLock()
 	client := f.client
@@ -156,7 +124,7 @@ func (f *forwarder) TransferLeadership(origin, id string) error {
 	return client.TransferLeadership(origin, id)
 }
 
-func (f *forwarder) Snapshot(origin string) (io.ReadCloser, error) {
+func (f *Forwarder) Snapshot(origin string) (io.ReadCloser, error) {
 	f.lock.RLock()
 	client := f.client
 	f.lock.RUnlock()
@@ -164,9 +132,9 @@ func (f *forwarder) Snapshot(origin string) (io.ReadCloser, error) {
 	return client.Snapshot(origin)
 }
 
-func (f *forwarder) AddProcess(origin string, config *app.Config) error {
+func (f *Forwarder) AddProcess(origin string, config *app.Config) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.AddProcessRequest{
@@ -180,9 +148,9 @@ func (f *forwarder) AddProcess(origin string, config *app.Config) error {
 	return client.AddProcess(origin, r)
 }
 
-func (f *forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
+func (f *Forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.UpdateProcessRequest{
@@ -196,9 +164,9 @@ func (f *forwarder) UpdateProcess(origin string, id app.ProcessID, config *app.C
 	return client.UpdateProcess(origin, id, r)
 }
 
-func (f *forwarder) SetProcessCommand(origin string, id app.ProcessID, command string) error {
+func (f *Forwarder) SetProcessCommand(origin string, id app.ProcessID, command string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.SetProcessCommandRequest{
@@ -212,9 +180,9 @@ func (f *forwarder) SetProcessCommand(origin string, id app.ProcessID, command s
 	return client.SetProcessCommand(origin, id, r)
 }
 
-func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
+func (f *Forwarder) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.SetProcessMetadataRequest{
@@ -228,9 +196,9 @@ func (f *forwarder) SetProcessMetadata(origin string, id app.ProcessID, key stri
 	return client.SetProcessMetadata(origin, id, key, r)
 }
 
-func (f *forwarder) RemoveProcess(origin string, id app.ProcessID) error {
+func (f *Forwarder) RemoveProcess(origin string, id app.ProcessID) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	f.lock.RLock()
@@ -240,9 +208,9 @@ func (f *forwarder) RemoveProcess(origin string, id app.ProcessID) error {
 	return client.RemoveProcess(origin, id)
 }
 
-func (f *forwarder) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
+func (f *Forwarder) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.RelocateProcessesRequest{
@@ -256,9 +224,9 @@ func (f *forwarder) RelocateProcesses(origin string, relocations map[app.Process
 	return client.RelocateProcesses(origin, r)
 }
 
-func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error {
+func (f *Forwarder) AddIdentity(origin string, identity iamidentity.User) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.AddIdentityRequest{
@@ -272,9 +240,9 @@ func (f *forwarder) AddIdentity(origin string, identity iamidentity.User) error 
 	return client.AddIdentity(origin, r)
 }
 
-func (f *forwarder) UpdateIdentity(origin, name string, identity iamidentity.User) error {
+func (f *Forwarder) UpdateIdentity(origin, name string, identity iamidentity.User) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.UpdateIdentityRequest{
@@ -288,9 +256,9 @@ func (f *forwarder) UpdateIdentity(origin, name string, identity iamidentity.Use
 	return client.UpdateIdentity(origin, name, r)
 }
 
-func (f *forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
+func (f *Forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.SetPoliciesRequest{
@@ -304,9 +272,9 @@ func (f *forwarder) SetPolicies(origin, name string, policies []iamaccess.Policy
 	return client.SetPolicies(origin, name, r)
 }
 
-func (f *forwarder) RemoveIdentity(origin string, name string) error {
+func (f *Forwarder) RemoveIdentity(origin string, name string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	f.lock.RLock()
@@ -316,9 +284,9 @@ func (f *forwarder) RemoveIdentity(origin string, name string) error {
 	return client.RemoveIdentity(origin, name)
 }
 
-func (f *forwarder) CreateLock(origin string, name string, validUntil time.Time) error {
+func (f *Forwarder) CreateLock(origin string, name string, validUntil time.Time) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.LockRequest{
@@ -333,9 +301,9 @@ func (f *forwarder) CreateLock(origin string, name string, validUntil time.Time)
 	return client.Lock(origin, r)
 }
 
-func (f *forwarder) DeleteLock(origin string, name string) error {
+func (f *Forwarder) DeleteLock(origin string, name string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	f.lock.RLock()
@@ -345,9 +313,9 @@ func (f *forwarder) DeleteLock(origin string, name string) error {
 	return client.Unlock(origin, name)
 }
 
-func (f *forwarder) SetKV(origin, key, value string) error {
+func (f *Forwarder) SetKV(origin, key, value string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.SetKVRequest{
@@ -362,9 +330,9 @@ func (f *forwarder) SetKV(origin, key, value string) error {
 	return client.SetKV(origin, r)
 }
 
-func (f *forwarder) UnsetKV(origin, key string) error {
+func (f *Forwarder) UnsetKV(origin, key string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	f.lock.RLock()
@@ -374,9 +342,9 @@ func (f *forwarder) UnsetKV(origin, key string) error {
 	return client.UnsetKV(origin, key)
 }
 
-func (f *forwarder) GetKV(origin, key string) (string, time.Time, error) {
+func (f *Forwarder) GetKV(origin, key string) (string, time.Time, error) {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	f.lock.RLock()
@@ -386,9 +354,9 @@ func (f *forwarder) GetKV(origin, key string) (string, time.Time, error) {
 	return client.GetKV(origin, key)
 }
 
-func (f *forwarder) SetNodeState(origin, nodeid, state string) error {
+func (f *Forwarder) SetNodeState(origin, nodeid, state string) error {
 	if origin == "" {
-		origin = f.id
+		origin = f.ID
 	}
 
 	r := apiclient.SetNodeStateRequest{

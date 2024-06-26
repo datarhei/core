@@ -159,7 +159,7 @@ type cluster struct {
 	nodeRecoverTimeout     time.Duration
 	emergencyLeaderTimeout time.Duration
 
-	forwarder forwarder.Forwarder
+	forwarder *forwarder.Forwarder
 	api       API
 	proxy     proxy.Proxy
 
@@ -323,7 +323,7 @@ func New(config Config) (Cluster, error) {
 
 	c.proxy = nodeproxy
 
-	if forwarder, err := forwarder.New(forwarder.ForwarderConfig{
+	if forwarder, err := forwarder.New(forwarder.Config{
 		ID:     c.nodeID,
 		Logger: c.logger.WithField("logname", "forwarder"),
 	}); err != nil {
