@@ -392,15 +392,16 @@ func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
 }
 
 type Process struct {
-	NodeID    string
-	Order     string
-	State     string
-	CPU       float64 // Current CPU load of this process, 0-100*ncpu
-	Mem       uint64  // Currently consumed memory of this process in bytes
-	Runtime   time.Duration
-	UpdatedAt time.Time
-	Config    *app.Config
-	Metadata  map[string]interface{}
+	NodeID     string
+	Order      string
+	State      string
+	CPU        float64 // Current CPU load of this process, 0-100*ncpu
+	Mem        uint64  // Currently consumed memory of this process in bytes
+	Throttling bool
+	Runtime    time.Duration
+	UpdatedAt  time.Time
+	Config     *app.Config
+	Metadata   map[string]interface{}
 }
 
 type ProcessListOptions struct {

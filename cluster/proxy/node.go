@@ -934,14 +934,15 @@ func (n *node) ProxyProcessList() ([]Process, error) {
 		}
 
 		process := Process{
-			NodeID:    nodeid,
-			Order:     p.State.Order,
-			State:     p.State.State,
-			Mem:       p.State.Memory,
-			CPU:       p.State.CPU * n.resources.ncpu,
-			Runtime:   time.Duration(p.State.Runtime) * time.Second,
-			UpdatedAt: time.Unix(p.UpdatedAt, 0),
-			Metadata:  p.Metadata,
+			NodeID:     nodeid,
+			Order:      p.State.Order,
+			State:      p.State.State,
+			Mem:        p.State.Resources.Memory.Current,
+			CPU:        p.State.Resources.CPU.Current,
+			Throttling: p.State.Resources.CPU.IsThrottling,
+			Runtime:    time.Duration(p.State.Runtime) * time.Second,
+			UpdatedAt:  time.Unix(p.UpdatedAt, 0),
+			Metadata:   p.Metadata,
 		}
 
 		cfg := &app.Config{
