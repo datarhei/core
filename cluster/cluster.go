@@ -95,7 +95,7 @@ type Cluster interface {
 	ListNodes() map[string]store.Node
 	SetNodeState(origin, id, state string) error
 
-	ProxyReader() proxy.ProxyReader
+	Proxy() proxy.Proxy
 	CertManager() autocert.Manager
 
 	Resources() (resources.Info, error)
@@ -183,7 +183,7 @@ type cluster struct {
 	clusterKVS    ClusterKVS
 	certManager   autocert.Manager
 
-	nodes     map[string]clusternode.Node
+	nodes     map[string]*clusternode.Node
 	nodesLock sync.RWMutex
 
 	barrier     map[string]bool
@@ -224,7 +224,7 @@ func New(config Config) (Cluster, error) {
 
 		config: config.CoreConfig,
 		skills: config.CoreSkills,
-		nodes:  map[string]clusternode.Node{},
+		nodes:  map[string]*clusternode.Node{},
 
 		barrier: map[string]bool{},
 
@@ -316,10 +316,6 @@ func New(config Config) (Cluster, error) {
 		c.Shutdown()
 		return nil, err
 	}
-
-	go func(nodeproxy proxy.Proxy) {
-		nodeproxy.Start()
-	}(nodeproxy)
 
 	c.proxy = nodeproxy
 
@@ -659,7 +655,7 @@ func (c *cluster) Shutdown() error {
 	}
 
 	if c.proxy != nil {
-		c.proxy.Stop()
+		c.proxy = nil
 	}
 
 	if c.api != nil {
@@ -1004,7 +1000,7 @@ func (c *cluster) trackNodeChanges() {
 						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
 					}
 
-					if _, err := c.proxy.AddNode(id, node.Proxy()); err != nil {
+					if _, err := c.proxy.AddNode(id, node); err != nil {
 						logger.Warn().WithError(err).Log("Adding node")
 						node.Stop()
 						continue
@@ -1496,10 +1492,10 @@ func (c *cluster) About() (ClusterAbout, error) {
 			ID:          id,
 			Name:        nodeAbout.Name,
 			Version:     nodeAbout.Version,
-			Status:      nodeAbout.Status,
+			Status:      nodeAbout.State,
 			Error:       nodeAbout.Error,
 			Address:     nodeAbout.Address,
-			LastContact: nodeAbout.LastContact,
+			LastContact: time.Since(nodeAbout.LastContact),
 			Latency:     nodeAbout.Latency,
 			CreatedAt:   nodeAbout.Core.CreatedAt,
 			Uptime:      nodeAbout.Core.Uptime,
@@ -1507,9 +1503,9 @@ func (c *cluster) About() (ClusterAbout, error) {
 				Address:     nodeAbout.Core.Address,
 				Status:      nodeAbout.Core.Status,
 				Error:       nodeAbout.Core.Error,
-				LastContact: nodeAbout.Core.LastContact,
+				LastContact: time.Since(nodeAbout.Core.LastContact),
 				Latency:     nodeAbout.Core.Latency,
-				Version:     nodeAbout.Core.Version,
+				Version:     nodeAbout.Core.Version.Number,
 			},
 			Resources: ClusterNodeResources{
 				IsThrottling: nodeAbout.Resources.IsThrottling,
@@ -1577,13 +1573,14 @@ func (c *cluster) sentinel() {
 	}
 }
 
-func (c *cluster) ProxyReader() proxy.ProxyReader {
-	return c.proxy.Reader()
-}
-
 func (c *cluster) Resources() (resources.Info, error) {
 	if c.resources == nil {
 		return resources.Info{}, fmt.Errorf("not available")
 	}
+
 	return c.resources.Info(), nil
+}
+
+func (c *cluster) Proxy() proxy.Proxy {
+	return c.proxy
 }

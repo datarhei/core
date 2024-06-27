@@ -15,13 +15,12 @@ import (
 )
 
 type Node struct {
-	client client.APIClient
-
 	id      string
 	address string
 	ips     []string
 	version string
 
+	node            client.APIClient
 	nodeAbout       About
 	nodeLastContact time.Time
 	nodeLastErr     error
@@ -56,7 +55,7 @@ func New(config Config) *Node {
 		id:      config.ID,
 		address: config.Address,
 		version: "0.0.0",
-		client: client.APIClient{
+		node: client.APIClient{
 			Address: config.Address,
 			Client: &http.Client{
 				Transport: tr,
@@ -76,21 +75,8 @@ func New(config Config) *Node {
 		}
 	}
 
-	if version, err := n.client.Version(); err == nil {
+	if version, err := n.node.Version(); err == nil {
 		n.version = version
-	}
-
-	n.start(n.id)
-
-	return n
-}
-
-func (n *Node) start(id string) error {
-	n.runLock.Lock()
-	defer n.runLock.Unlock()
-
-	if n.cancel != nil {
-		return nil
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,9 +85,9 @@ func (n *Node) start(id string) error {
 	n.nodeLastErr = fmt.Errorf("not started yet")
 	n.coreLastErr = fmt.Errorf("not started yet")
 
-	address, config, err := n.CoreEssentials()
-	n.core = NewCore(id, n.logger.WithComponent("ClusterProxyNode").WithField("address", address))
-	n.core.SetEssentials(address, config)
+	address, coreConfig, err := n.CoreEssentials()
+	n.core = NewCore(n.id, n.logger.WithComponent("ClusterProxyNode").WithField("address", address))
+	n.core.SetEssentials(address, coreConfig)
 
 	n.coreLastErr = err
 
@@ -109,7 +95,7 @@ func (n *Node) start(id string) error {
 	go n.ping(ctx)
 	go n.pingCore(ctx)
 
-	return nil
+	return n
 }
 
 func (n *Node) Stop() error {
@@ -135,8 +121,8 @@ type About struct {
 	Name        string
 	Version     string
 	Address     string
-	Status      string
-	LastContact time.Duration
+	State       string
+	LastContact time.Time
 	Latency     time.Duration
 	Error       error
 	Core        CoreAbout
@@ -164,25 +150,25 @@ func (n *Node) About() About {
 	}
 
 	a.Name = n.coreAbout.Name
-	a.LastContact = time.Since(n.nodeLastContact)
-	if a.LastContact > maxLastContact {
-		a.Status = "offline"
+	a.Error = n.nodeLastErr
+	a.LastContact = n.nodeLastContact
+	if time.Since(a.LastContact) > maxLastContact || n.nodeLastErr != nil {
+		a.State = "offline"
 	} else {
-		a.Status = "online"
+		a.State = "online"
 	}
 	a.Latency = time.Duration(n.nodeLatency * float64(time.Second))
-	a.Error = n.nodeLastErr
 	a.Resources = n.nodeAbout.Resources
 
 	a.Core = n.coreAbout
 	a.Core.Error = n.coreLastErr
-	a.Core.LastContact = time.Since(n.coreLastContact)
-	if a.Core.LastContact > maxLastContact {
+	a.Core.LastContact = n.coreLastContact
+	if time.Since(a.Core.LastContact) > maxLastContact || n.coreLastErr != nil {
 		a.Core.Status = "offline"
 	} else {
 		a.Core.Status = "online"
 	}
-	a.Core.Latency = n.coreAbout.Latency
+	a.Core.Latency = time.Duration(n.coreLatency * float64(time.Second))
 
 	return a
 }
@@ -244,23 +230,23 @@ func (n *Node) CoreEssentials() (string, *config.Config, error) {
 }
 
 func (n *Node) CoreConfig() (*config.Config, error) {
-	return n.client.CoreConfig()
+	return n.node.CoreConfig()
 }
 
 func (n *Node) CoreSkills() (skills.Skills, error) {
-	return n.client.CoreSkills()
+	return n.node.CoreSkills()
 }
 
 func (n *Node) CoreAPIAddress() (string, error) {
-	return n.client.CoreAPIAddress()
+	return n.node.CoreAPIAddress()
+}
+
+func (n *Node) Barrier(name string) (bool, error) {
+	return n.node.Barrier(name)
 }
 
 func (n *Node) CoreAbout() CoreAbout {
 	return n.About().Core
-}
-
-func (n *Node) Barrier(name string) (bool, error) {
-	return n.client.Barrier(name)
 }
 
 func (n *Node) Core() *Core {
@@ -275,7 +261,7 @@ func (n *Node) ping(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			start := time.Now()
-			about, err := n.client.About()
+			about, err := n.node.About()
 			n.lock.Lock()
 			if err == nil {
 				n.version = about.Version

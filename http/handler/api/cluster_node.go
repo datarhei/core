@@ -94,20 +94,20 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	v := peer.Version()
+	v := peer.CoreAbout()
 
 	version := api.Version{
-		Number:   v.Number,
-		Commit:   v.Commit,
-		Branch:   v.Branch,
-		Build:    v.Build.Format(time.RFC3339),
-		Arch:     v.Arch,
-		Compiler: v.Compiler,
+		Number:   v.Version.Number,
+		Commit:   v.Version.Commit,
+		Branch:   v.Version.Branch,
+		Build:    v.Version.Build.Format(time.RFC3339),
+		Arch:     v.Version.Arch,
+		Compiler: v.Version.Compiler,
 	}
 
 	return c.JSON(http.StatusOK, version)
@@ -127,7 +127,7 @@ func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 func (h *ClusterHandler) GetNodeResources(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
@@ -136,7 +136,7 @@ func (h *ClusterHandler) GetNodeResources(c echo.Context) error {
 		Files: make(map[string][]string),
 	}
 
-	peerFiles := peer.ListResources()
+	peerFiles := peer.Core().ResourcesList()
 
 	files.LastUpdate = peerFiles.LastUpdate.Unix()
 
@@ -176,12 +176,12 @@ func (h *ClusterHandler) NodeFSListFiles(c echo.Context) error {
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	files, err := peer.ListFiles(name, pattern)
+	files, err := peer.Core().FilesystemList(name, pattern)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "retrieving file list: %s", err.Error())
 	}
@@ -234,12 +234,12 @@ func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 	storage := util.PathParam(c, "storage")
 	path := util.PathWildcardParam(c)
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	file, err := peer.GetFile(storage, path, 0)
+	file, err := peer.Core().FilesystemGetFile(storage, path, 0)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
@@ -270,14 +270,14 @@ func (h *ClusterHandler) NodeFSPutFile(c echo.Context) error {
 	storage := util.PathParam(c, "storage")
 	path := util.PathWildcardParam(c)
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	req := c.Request()
 
-	err = peer.PutFile(storage, path, req.Body)
+	err = peer.Core().FilesystemPutFile(storage, path, req.Body)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
@@ -303,12 +303,12 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 	storage := util.PathParam(c, "storage")
 	path := util.PathWildcardParam(c)
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	err = peer.DeleteFile(storage, path)
+	err = peer.Core().FilesystemDeleteFile(storage, path)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
@@ -352,12 +352,12 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	peer, err := h.proxy.GetNodeReader(id)
+	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	procs, err := peer.ProcessList(proxy.ListProcessOptions{
+	procs, err := peer.Core().ProcessList(proxy.ProcessListOptions{
 		ID:            wantids,
 		Filter:        filter,
 		Domain:        domain,

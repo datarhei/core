@@ -94,12 +94,12 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 		return c.applyCommand(cmd)
 	}
 
-	nodeid, err := c.proxy.FindNodeFromProcess(id)
+	nodeid, err := c.proxy.ProcessFindNodeID(id)
 	if err != nil {
 		return fmt.Errorf("the process '%s' is not registered with any node: %w", id.String(), err)
 	}
 
-	return c.proxy.CommandProcess(nodeid, id, command)
+	return c.proxy.ProcessCommand(nodeid, id, command)
 }
 
 func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {

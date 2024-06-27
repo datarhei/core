@@ -44,7 +44,7 @@ func (s *RawAVstreamSwap) UnmarshalPlayout(status playout.Status) {
 	s.Lasterror = status.Swap.LastError
 }
 
-func (p *Process) UnmarshalRestream(process *app.Process, state *app.State, report *app.Log, metadata map[string]interface{}) {
+func (p *Process) UnmarshalRestream(process *app.Process, state *app.State, report *app.Report, metadata map[string]interface{}) {
 	p.ID = process.ID
 	p.Type = "ffmpeg"
 	p.Reference = process.Reference
@@ -189,7 +189,7 @@ func (a *AVStreamIo) UnmarshalRestream(io app.AVstreamIO) {
 	a.SizeKb = scalars.Uint64(io.Size)
 }
 
-func (r *ProcessReport) UnmarshalRestream(report *app.Log) {
+func (r *ProcessReport) UnmarshalRestream(report *app.Report) {
 	r.CreatedAt = report.CreatedAt
 	r.Prelude = report.Prelude
 	r.Log = []*ProcessReportLogEntry{}
@@ -210,7 +210,7 @@ func (r *ProcessReport) UnmarshalRestream(report *app.Log) {
 	}
 }
 
-func (h *ProcessReportHistoryEntry) UnmarshalRestream(entry app.LogHistoryEntry) {
+func (h *ProcessReportHistoryEntry) UnmarshalRestream(entry app.ReportHistoryEntry) {
 	h.CreatedAt = entry.CreatedAt
 	h.Prelude = entry.Prelude
 	h.Log = []*ProcessReportLogEntry{}

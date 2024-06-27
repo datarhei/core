@@ -24,7 +24,7 @@ import (
 func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 
-	procs := h.cluster.ListProcesses()
+	procs := h.cluster.StoreListProcesses()
 
 	processes := []api.Process{}
 
@@ -66,7 +66,7 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
 	}
 
-	p, err := h.cluster.GetProcess(pid)
+	p, err := h.cluster.StoreGetProcess(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}

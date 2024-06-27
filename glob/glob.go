@@ -10,6 +10,12 @@ type globber struct {
 	glob glob.Glob
 }
 
+func MustCompile(pattern string, separators ...rune) Glob {
+	g := glob.MustCompile(pattern, separators...)
+
+	return &globber{glob: g}
+}
+
 func Compile(pattern string, separators ...rune) (Glob, error) {
 	g, err := glob.Compile(pattern, separators...)
 	if err != nil {

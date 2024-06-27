@@ -9,15 +9,15 @@ type LogLine struct {
 	Data      string
 }
 
-type LogEntry struct {
+type ReportEntry struct {
 	CreatedAt time.Time
 	Prelude   []string
 	Log       []LogLine
 	Matches   []string
 }
 
-type LogHistoryEntry struct {
-	LogEntry
+type ReportHistoryEntry struct {
+	ReportEntry
 
 	ExitedAt  time.Time
 	ExitState string
@@ -25,12 +25,12 @@ type LogHistoryEntry struct {
 	Usage     ProcessUsage
 }
 
-type Log struct {
-	LogEntry
-	History []LogHistoryEntry
+type Report struct {
+	ReportEntry
+	History []ReportHistoryEntry
 }
 
-type LogHistorySearchResult struct {
+type ReportHistorySearchResult struct {
 	ProcessID string
 	Reference string
 	ExitState string

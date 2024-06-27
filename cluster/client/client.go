@@ -12,7 +12,6 @@ import (
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
-	httpapi "github.com/datarhei/core/v16/http/api"
 	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream/app"
@@ -340,7 +339,7 @@ func (c *APIClient) SetKV(origin string, r SetKVRequest) error {
 func (c *APIClient) UnsetKV(origin string, key string) error {
 	_, err := c.call(http.MethodDelete, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
 	if err != nil {
-		e, ok := err.(httpapi.Error)
+		e, ok := err.(Error)
 		if ok && e.Code == 404 {
 			return fs.ErrNotExist
 		}
@@ -352,7 +351,7 @@ func (c *APIClient) UnsetKV(origin string, key string) error {
 func (c *APIClient) GetKV(origin string, key string) (string, time.Time, error) {
 	data, err := c.call(http.MethodGet, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
 	if err != nil {
-		e, ok := err.(httpapi.Error)
+		e, ok := err.(Error)
 		if ok && e.Code == 404 {
 			return "", time.Time{}, fs.ErrNotExist
 		}
@@ -408,7 +407,7 @@ func (c *APIClient) stream(method, path, contentType string, data io.Reader, ori
 	}
 
 	if status < 200 || status >= 300 {
-		e := httpapi.Error{}
+		e := Error{}
 
 		defer body.Close()
 
@@ -453,4 +452,15 @@ func (c *APIClient) request(req *http.Request) (int, io.ReadCloser, error) {
 	}
 
 	return resp.StatusCode, resp.Body, nil
+}
+
+// Error represents an error response of the API
+type Error struct {
+	Code    int      `json:"code" jsonschema:"required" format:"int"`
+	Message string   `json:"message" jsonschema:""`
+	Details []string `json:"details" jsonschema:""`
+}
+
+func (e Error) Error() string {
+	return ""
 }

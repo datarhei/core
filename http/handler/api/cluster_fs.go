@@ -29,7 +29,7 @@ func (h *ClusterHandler) ListFiles(c echo.Context) error {
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	files := h.proxy.ListFiles(name, pattern)
+	files := h.proxy.FilesystemList(name, pattern)
 
 	var sortFunc func(i, j int) bool
 

@@ -8,36 +8,38 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/cluster/node"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/client"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
-
-	clientapi "github.com/datarhei/core-client-go/v16/api"
 )
 
+type ProcessListOptions = client.ProcessListOptions
+
 type Proxy interface {
-	AddNode(id string, node Node) (string, error)
+	AddNode(id string, node *node.Node) (string, error)
 	RemoveNode(id string) error
 
-	ListNodes() []NodeReader
-	GetNodeReader(id string) (NodeReader, error)
+	NodeList() []*node.Node
+	NodeGet(id string) (*node.Node, error)
 
-	FindNodeFromProcess(id app.ProcessID) (string, error)
+	ClusterProcessList() []node.Process
 
-	ListProcesses(ListProcessOptions) []clientapi.Process
-	ListProxyProcesses() []Process
-	ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error)
-	ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error)
+	ProcessList(options ProcessListOptions) []api.Process
+	ProcessFindNodeID(id app.ProcessID) (string, error)
+	ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error
+	ProcessDelete(nodeid string, id app.ProcessID) error
+	ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
+	ProcessCommand(nodeid string, id app.ProcessID, command string) error
+	ProcessProbe(nodeid string, id app.ProcessID) (api.Probe, error)
+	ProcessProbeConfig(nodeid string, config *app.Config) (api.Probe, error)
 
-	ListFiles(storage, pattern string) []clientapi.FileInfo
+	FilesystemList(storage, pattern string) []api.FileInfo
+	FilesystemGetFile(prefix, path string, offset int64) (io.ReadCloser, error)
+	FilesystemGetFileInfo(prefix, path string) (int64, time.Time, error)
 
-	GetURL(prefix, path string) (*url.URL, error)
-	GetFile(prefix, path string, offset int64) (io.ReadCloser, error)
-	GetFileInfo(prefix, path string) (int64, time.Time, error)
-
-	AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error
-	DeleteProcess(nodeid string, id app.ProcessID) error
-	UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error
-	CommandProcess(nodeid string, id app.ProcessID, command string) error
+	ResourcesGetURL(prefix, path string) (*url.URL, error)
 }
 
 type ProxyConfig struct {
@@ -49,11 +51,8 @@ type ProxyConfig struct {
 type proxy struct {
 	id string
 
-	nodes     map[string]Node // List of known nodes
-	nodesLock sync.RWMutex
-
-	lock    sync.RWMutex
-	running bool
+	nodes map[string]*node.Node // List of known nodes
+	lock  sync.RWMutex
 
 	cache *Cache[string]
 
@@ -65,7 +64,7 @@ var ErrNodeNotFound = errors.New("node not found")
 func NewProxy(config ProxyConfig) (Proxy, error) {
 	p := &proxy{
 		id:     config.ID,
-		nodes:  map[string]Node{},
+		nodes:  map[string]*node.Node{},
 		cache:  NewCache[string](nil),
 		logger: config.Logger,
 	}
@@ -77,22 +76,14 @@ func NewProxy(config ProxyConfig) (Proxy, error) {
 	return p, nil
 }
 
-func (p *proxy) Reader() ProxyReader {
-	return p
-}
-
-func (p *proxy) AddNode(id string, node Node) (string, error) {
+func (p *proxy) AddNode(id string, node *node.Node) (string, error) {
 	about := node.About()
 
-	//if id != about.ID {
-	//	return "", fmt.Errorf("the provided (%s) and retrieved (%s) ID's don't match", id, about.ID)
-	//}
-
-	p.nodesLock.Lock()
-	defer p.nodesLock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	if n, ok := p.nodes[id]; ok {
-		n.Disconnect()
+		n.Stop()
 		delete(p.nodes, id)
 	}
 
@@ -108,15 +99,15 @@ func (p *proxy) AddNode(id string, node Node) (string, error) {
 }
 
 func (p *proxy) RemoveNode(id string) error {
-	p.nodesLock.Lock()
-	defer p.nodesLock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	node, ok := p.nodes[id]
 	if !ok {
 		return ErrNodeNotFound
 	}
 
-	node.Disconnect()
+	node.Stop()
 
 	delete(p.nodes, id)
 
@@ -127,11 +118,11 @@ func (p *proxy) RemoveNode(id string) error {
 	return nil
 }
 
-func (p *proxy) ListNodes() []NodeReader {
-	list := []NodeReader{}
+func (p *proxy) NodeList() []*node.Node {
+	list := []*node.Node{}
 
-	p.nodesLock.RLock()
-	defer p.nodesLock.RUnlock()
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 
 	for _, node := range p.nodes {
 		list = append(list, node)
@@ -140,9 +131,9 @@ func (p *proxy) ListNodes() []NodeReader {
 	return list
 }
 
-func (p *proxy) GetNode(id string) (Node, error) {
-	p.nodesLock.RLock()
-	defer p.nodesLock.RUnlock()
+func (p *proxy) NodeGet(id string) (*node.Node, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 
 	node, ok := p.nodes[id]
 	if !ok {
@@ -152,23 +143,19 @@ func (p *proxy) GetNode(id string) (Node, error) {
 	return node, nil
 }
 
-func (p *proxy) GetNodeReader(id string) (NodeReader, error) {
-	return p.GetNode(id)
-}
-
-func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
+func (p *proxy) ResourcesGetURL(prefix, path string) (*url.URL, error) {
 	logger := p.logger.WithFields(log.Fields{
 		"path":   path,
 		"prefix": prefix,
 	})
 
-	node, err := p.getNodeForFile(prefix, path)
+	node, err := p.getNodeForResource(prefix, path)
 	if err != nil {
 		logger.Debug().WithError(err).Log("Unknown node")
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
-	url, err := node.GetURL(prefix, path)
+	url, err := node.Core().ResourcesGetURL(prefix, path)
 	if err != nil {
 		logger.Debug().Log("Invalid path")
 		return nil, fmt.Errorf("file not found")
@@ -179,19 +166,19 @@ func (p *proxy) GetURL(prefix, path string) (*url.URL, error) {
 	return url, nil
 }
 
-func (p *proxy) GetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
+func (p *proxy) FilesystemGetFile(prefix, path string, offset int64) (io.ReadCloser, error) {
 	logger := p.logger.WithFields(log.Fields{
 		"path":   path,
 		"prefix": prefix,
 	})
 
-	node, err := p.getNodeForFile(prefix, path)
+	node, err := p.getNodeForResource(prefix, path)
 	if err != nil {
 		logger.Debug().WithError(err).Log("File not available")
 		return nil, fmt.Errorf("file not found")
 	}
 
-	data, err := node.GetFile(prefix, path, offset)
+	data, err := node.Core().FilesystemGetFile(prefix, path, offset)
 	if err != nil {
 		logger.Debug().Log("Invalid path")
 		return nil, fmt.Errorf("file not found")
@@ -202,19 +189,19 @@ func (p *proxy) GetFile(prefix, path string, offset int64) (io.ReadCloser, error
 	return data, nil
 }
 
-func (p *proxy) GetFileInfo(prefix, path string) (int64, time.Time, error) {
+func (p *proxy) FilesystemGetFileInfo(prefix, path string) (int64, time.Time, error) {
 	logger := p.logger.WithFields(log.Fields{
 		"path":   path,
 		"prefix": prefix,
 	})
 
-	node, err := p.getNodeForFile(prefix, path)
+	node, err := p.getNodeForResource(prefix, path)
 	if err != nil {
 		logger.Debug().WithError(err).Log("File not available")
 		return 0, time.Time{}, fmt.Errorf("file not found")
 	}
 
-	size, lastModified, err := node.GetFileInfo(prefix, path)
+	size, lastModified, err := node.Core().FilesystemGetFileInfo(prefix, path)
 	if err != nil {
 		logger.Debug().Log("Invalid path")
 		return 0, time.Time{}, fmt.Errorf("file not found")
@@ -225,7 +212,7 @@ func (p *proxy) GetFileInfo(prefix, path string) (int64, time.Time, error) {
 	return size, lastModified, nil
 }
 
-func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
+func (p *proxy) getNodeIDForResource(prefix, path string) (string, error) {
 	// this is only for mem and disk prefixes
 	nodesChan := make(chan string, 16)
 	nodeids := []string{}
@@ -247,22 +234,22 @@ func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
 
 	wg := sync.WaitGroup{}
 
-	p.nodesLock.RLock()
-	for id, node := range p.nodes {
+	p.lock.RLock()
+	for id, n := range p.nodes {
 		wg.Add(1)
 
-		go func(nodeid string, node Node, p chan<- string) {
+		go func(nodeid string, node *node.Node, p chan<- string) {
 			defer wg.Done()
 
-			_, _, err := node.GetResourceInfo(prefix, path)
+			_, _, err := node.Core().ResourcesGetInfo(prefix, path)
 			if err != nil {
 				nodeid = ""
 			}
 
 			p <- nodeid
-		}(id, node, nodesChan)
+		}(id, n, nodesChan)
 	}
-	p.nodesLock.RUnlock()
+	p.lock.RUnlock()
 
 	wg.Wait()
 
@@ -277,28 +264,28 @@ func (p *proxy) getNodeIDForFile(prefix, path string) (string, error) {
 	return nodeids[0], nil
 }
 
-func (p *proxy) getNodeForFile(prefix, path string) (Node, error) {
+func (p *proxy) getNodeForResource(prefix, path string) (*node.Node, error) {
 	id, err := p.cache.Get(prefix + ":" + path)
 	if err == nil {
-		node, err := p.GetNode(id)
+		node, err := p.NodeGet(id)
 		if err == nil {
 			return node, nil
 		}
 	}
 
-	id, err = p.getNodeIDForFile(prefix, path)
+	id, err = p.getNodeIDForResource(prefix, path)
 	if err != nil {
 		return nil, err
 	}
 
 	p.cache.Put(prefix+":"+path, id, 5*time.Second)
 
-	return p.GetNode(id)
+	return p.NodeGet(id)
 }
 
-func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
-	filesChan := make(chan []clientapi.FileInfo, 64)
-	filesList := []clientapi.FileInfo{}
+func (p *proxy) FilesystemList(storage, pattern string) []api.FileInfo {
+	filesChan := make(chan []api.FileInfo, 64)
+	filesList := []api.FileInfo{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -313,22 +300,22 @@ func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
 
 	wg := sync.WaitGroup{}
 
-	p.nodesLock.RLock()
-	for _, node := range p.nodes {
+	p.lock.RLock()
+	for _, n := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- []clientapi.FileInfo) {
+		go func(node *node.Node, p chan<- []api.FileInfo) {
 			defer wg.Done()
 
-			files, err := node.ListFiles(storage, pattern)
+			files, err := node.Core().FilesystemList(storage, pattern)
 			if err != nil {
 				return
 			}
 
 			p <- files
-		}(node, filesChan)
+		}(n, filesChan)
 	}
-	p.nodesLock.RUnlock()
+	p.lock.RUnlock()
 
 	wg.Wait()
 
@@ -339,33 +326,9 @@ func (p *proxy) ListFiles(storage, pattern string) []clientapi.FileInfo {
 	return filesList
 }
 
-type Process struct {
-	NodeID     string
-	Order      string
-	State      string
-	CPU        float64 // Current CPU load of this process, 0-100*ncpu
-	Mem        uint64  // Currently consumed memory of this process in bytes
-	Throttling bool
-	Runtime    time.Duration
-	UpdatedAt  time.Time
-	Config     *app.Config
-	Metadata   map[string]interface{}
-}
-
-type ListProcessOptions struct {
-	ID            []string
-	Filter        []string
-	Domain        string
-	Reference     string
-	IDPattern     string
-	RefPattern    string
-	OwnerPattern  string
-	DomainPattern string
-}
-
-func (p *proxy) ListProxyProcesses() []Process {
-	processChan := make(chan []Process, 64)
-	processList := []Process{}
+func (p *proxy) ClusterProcessList() []node.Process {
+	processChan := make(chan []node.Process, 64)
+	processList := []node.Process{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -380,22 +343,22 @@ func (p *proxy) ListProxyProcesses() []Process {
 
 	wg := sync.WaitGroup{}
 
-	p.nodesLock.RLock()
-	for _, node := range p.nodes {
+	p.lock.RLock()
+	for _, n := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- []Process) {
+		go func(node *node.Node, p chan<- []node.Process) {
 			defer wg.Done()
 
-			processes, err := node.ProxyProcessList()
+			processes, err := node.Core().ClusterProcessList()
 			if err != nil {
 				return
 			}
 
 			p <- processes
-		}(node, processChan)
+		}(n, processChan)
 	}
-	p.nodesLock.RUnlock()
+	p.lock.RUnlock()
 
 	wg.Wait()
 
@@ -406,8 +369,8 @@ func (p *proxy) ListProxyProcesses() []Process {
 	return processList
 }
 
-func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
-	procs := p.ListProxyProcesses()
+func (p *proxy) ProcessFindNodeID(id app.ProcessID) (string, error) {
+	procs := p.ClusterProcessList()
 	nodeid := ""
 
 	for _, p := range procs {
@@ -427,9 +390,9 @@ func (p *proxy) FindNodeFromProcess(id app.ProcessID) (string, error) {
 	return nodeid, nil
 }
 
-func (p *proxy) ListProcesses(options ListProcessOptions) []clientapi.Process {
-	processChan := make(chan []clientapi.Process, 64)
-	processList := []clientapi.Process{}
+func (p *proxy) ProcessList(options client.ProcessListOptions) []api.Process {
+	processChan := make(chan []api.Process, 64)
+	processList := []api.Process{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -444,22 +407,22 @@ func (p *proxy) ListProcesses(options ListProcessOptions) []clientapi.Process {
 
 	wg := sync.WaitGroup{}
 
-	p.nodesLock.RLock()
-	for _, node := range p.nodes {
+	p.lock.RLock()
+	for _, n := range p.nodes {
 		wg.Add(1)
 
-		go func(node Node, p chan<- []clientapi.Process) {
+		go func(node *node.Node, p chan<- []api.Process) {
 			defer wg.Done()
 
-			processes, err := node.ProcessList(options)
+			processes, err := node.Core().ProcessList(options)
 			if err != nil {
 				return
 			}
 
 			p <- processes
-		}(node, processChan)
+		}(n, processChan)
 	}
-	p.nodesLock.RUnlock()
+	p.lock.RUnlock()
 
 	wg.Wait()
 
@@ -470,75 +433,62 @@ func (p *proxy) ListProcesses(options ListProcessOptions) []clientapi.Process {
 	return processList
 }
 
-func (p *proxy) AddProcess(nodeid string, config *app.Config, metadata map[string]interface{}) error {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	return node.AddProcess(config, metadata)
+	return node.Core().ProcessAdd(config, metadata)
 }
 
-func (p *proxy) DeleteProcess(nodeid string, id app.ProcessID) error {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessDelete(nodeid string, id app.ProcessID) error {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	return node.DeleteProcess(id)
+	return node.Core().ProcessDelete(id)
 }
 
-func (p *proxy) UpdateProcess(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	return node.UpdateProcess(id, config, metadata)
+	return node.Core().ProcessUpdate(id, config, metadata)
 }
 
-func (p *proxy) CommandProcess(nodeid string, id app.ProcessID, command string) error {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessCommand(nodeid string, id app.ProcessID, command string) error {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
 
-	switch command {
-	case "start":
-		err = node.StartProcess(id)
-	case "stop":
-		err = node.StopProcess(id)
-	case "restart":
-		err = node.RestartProcess(id)
-	case "reload":
-		err = node.ReloadProcess(id)
-	default:
-		err = fmt.Errorf("unknown command: %s", command)
-	}
-
-	return err
+	return node.Core().ProcessCommand(id, command)
 }
 
-func (p *proxy) ProbeProcess(nodeid string, id app.ProcessID) (clientapi.Probe, error) {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessProbe(nodeid string, id app.ProcessID) (api.Probe, error) {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		probe := clientapi.Probe{
+		probe := api.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process %s should reside on, doesn't exist", nodeid, id.String())},
 		}
 		return probe, fmt.Errorf("node not found: %w", err)
 	}
 
-	return node.ProbeProcess(id)
+	return node.Core().ProcessProbe(id)
 }
 
-func (p *proxy) ProbeProcessConfig(nodeid string, config *app.Config) (clientapi.Probe, error) {
-	node, err := p.GetNode(nodeid)
+func (p *proxy) ProcessProbeConfig(nodeid string, config *app.Config) (api.Probe, error) {
+	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		probe := clientapi.Probe{
+		probe := api.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process config should be probed on, doesn't exist", nodeid)},
 		}
 		return probe, fmt.Errorf("node not found: %w", err)
 	}
 
-	return node.ProbeProcessConfig(config)
+	return node.Core().ProcessProbeConfig(config)
 }

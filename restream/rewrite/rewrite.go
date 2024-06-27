@@ -7,7 +7,7 @@ import (
 
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
-	"github.com/datarhei/core/v16/rtmp"
+	rtmpurl "github.com/datarhei/core/v16/rtmp/url"
 	srturl "github.com/datarhei/core/v16/srt/url"
 )
 
@@ -124,7 +124,7 @@ func (g *rewrite) rtmpURL(u *url.URL, _ Access, identity iamidentity.Verifier) s
 	token := identity.GetServiceToken()
 
 	// Remove the existing token from the path
-	path, _, _ := rtmp.GetToken(u)
+	path, _, _ := rtmpurl.GetToken(u)
 	u.Path = path
 
 	q := u.Query()

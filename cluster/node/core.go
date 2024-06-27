@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,9 +13,10 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/client"
 	"github.com/datarhei/core/v16/log"
-
-	client "github.com/datarhei/core-client-go/v16"
+	"github.com/datarhei/core/v16/restream/app"
 )
 
 type Core struct {
@@ -254,6 +256,28 @@ func (n *Core) connect() error {
 	return nil
 }
 
+type CoreAbout struct {
+	ID          string
+	Name        string
+	Address     string
+	Status      string
+	Error       error
+	CreatedAt   time.Time
+	Uptime      time.Duration
+	LastContact time.Time
+	Latency     time.Duration
+	Version     CoreVersion
+}
+
+type CoreVersion struct {
+	Number   string
+	Commit   string
+	Branch   string
+	Build    time.Time
+	Arch     string
+	Compiler string
+}
+
 func (n *Core) About() (CoreAbout, error) {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
@@ -263,6 +287,9 @@ func (n *Core) About() (CoreAbout, error) {
 	}
 
 	about, err := n.client.About(false)
+	if err != nil {
+		return CoreAbout{}, err
+	}
 
 	cabout := CoreAbout{
 		ID:      about.ID,
@@ -296,24 +323,477 @@ func (n *Core) About() (CoreAbout, error) {
 	return cabout, err
 }
 
-type CoreAbout struct {
-	ID          string
-	Name        string
-	Address     string
-	Status      string
-	Error       error
-	CreatedAt   time.Time
-	Uptime      time.Duration
-	LastContact time.Duration
-	Latency     time.Duration
-	Version     CoreVersion
+func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.ProcessAdd(config, metadata)
 }
 
-type CoreVersion struct {
-	Number   string
-	Commit   string
-	Branch   string
-	Build    time.Time
-	Arch     string
-	Compiler string
+func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.ProcessCommand(id, command)
+}
+
+func (n *Core) ProcessDelete(id app.ProcessID) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.ProcessDelete(id)
+}
+
+func (n *Core) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.ProcessUpdate(id, config, metadata)
+}
+
+func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		probe := api.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process %s resides, is not connected", n.id, id.String())},
+		}
+		return probe, ErrNoPeer
+	}
+
+	probe, err := client.ProcessProbe(id)
+
+	probe.Log = append([]string{fmt.Sprintf("probed on node: %s", n.id)}, probe.Log...)
+
+	return probe, err
+}
+
+func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		probe := api.Probe{
+			Log: []string{fmt.Sprintf("the node %s where the process config should be probed, is not connected", n.id)},
+		}
+		return probe, ErrNoPeer
+	}
+
+	probe, err := client.ProcessProbeConfig(config)
+
+	probe.Log = append([]string{fmt.Sprintf("probed on node: %s", n.id)}, probe.Log...)
+
+	return probe, err
+}
+
+func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, error) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return nil, ErrNoPeer
+	}
+
+	return n.client.ProcessList(client.ProcessListOptions{
+		ID:            options.ID,
+		Filter:        options.Filter,
+		Domain:        options.Domain,
+		Reference:     options.Reference,
+		IDPattern:     options.IDPattern,
+		RefPattern:    options.RefPattern,
+		OwnerPattern:  options.OwnerPattern,
+		DomainPattern: options.DomainPattern,
+	})
+}
+
+func (n *Core) FilesystemList(storage, pattern string) ([]api.FileInfo, error) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return nil, ErrNoPeer
+	}
+
+	files, err := n.client.FilesystemList(storage, pattern, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range files {
+		files[i].CoreID = n.id
+	}
+
+	return files, nil
+}
+
+func (n *Core) FilesystemDeleteFile(storage, path string) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.FilesystemDeleteFile(storage, path)
+}
+
+func (n *Core) FilesystemPutFile(storage, path string, data io.Reader) error {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return ErrNoPeer
+	}
+
+	return n.client.FilesystemAddFile(storage, path, data)
+}
+
+func (n *Core) FilesystemGetFileInfo(storage, path string) (int64, time.Time, error) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return 0, time.Time{}, ErrNoPeer
+	}
+
+	info, err := n.client.FilesystemList(storage, path, "", "")
+	if err != nil {
+		return 0, time.Time{}, fmt.Errorf("file not found: %w", err)
+	}
+
+	if len(info) != 1 {
+		return 0, time.Time{}, fmt.Errorf("ambigous result")
+	}
+
+	return info[0].Size, time.Unix(info[0].LastMod, 0), nil
+}
+
+func (n *Core) FilesystemGetFile(storage, path string, offset int64) (io.ReadCloser, error) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
+	if n.client == nil {
+		return nil, ErrNoPeer
+	}
+
+	return n.client.FilesystemGetFileOffset(storage, path, offset)
+}
+
+type NodeFiles struct {
+	ID         string
+	Files      []string
+	LastUpdate time.Time
+}
+
+func (n *Core) ResourcesList() NodeFiles {
+	files := NodeFiles{
+		ID:         n.id,
+		Files:      []string{},
+		LastUpdate: time.Now(),
+	}
+
+	errorsChan := make(chan error, 8)
+	filesChan := make(chan string, 1024)
+	errorList := []error{}
+
+	wgList := sync.WaitGroup{}
+	wgList.Add(1)
+
+	go func() {
+		defer wgList.Done()
+
+		for file := range filesChan {
+			files.Files = append(files.Files, file)
+		}
+
+		for err := range errorsChan {
+			errorList = append(errorList, err)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func(f chan<- string, e chan<- error) {
+		defer wg.Done()
+
+		n.lock.RLock()
+		defer n.lock.RUnlock()
+
+		if n.client == nil {
+			e <- ErrNoPeer
+			return
+		}
+
+		files, err := n.client.FilesystemList("mem", "/*", "name", "asc")
+		if err != nil {
+			e <- err
+			return
+		}
+
+		for _, file := range files {
+			f <- "mem:" + file.Name
+		}
+	}(filesChan, errorsChan)
+
+	go func(f chan<- string, e chan<- error) {
+		defer wg.Done()
+
+		n.lock.RLock()
+		defer n.lock.RUnlock()
+
+		if n.client == nil {
+			e <- ErrNoPeer
+			return
+		}
+
+		files, err := n.client.FilesystemList("disk", "/*", "name", "asc")
+		if err != nil {
+			e <- err
+			return
+		}
+
+		for _, file := range files {
+			f <- "disk:" + file.Name
+		}
+	}(filesChan, errorsChan)
+
+	if n.hasRTMP {
+		wg.Add(1)
+
+		go func(f chan<- string, e chan<- error) {
+			defer wg.Done()
+
+			n.lock.RLock()
+			defer n.lock.RUnlock()
+
+			if n.client == nil {
+				e <- ErrNoPeer
+				return
+			}
+
+			files, err := n.client.RTMPChannels()
+			if err != nil {
+				e <- err
+				return
+			}
+
+			for _, file := range files {
+				f <- "rtmp:" + file.Name
+			}
+		}(filesChan, errorsChan)
+	}
+
+	if n.hasSRT {
+		wg.Add(1)
+
+		go func(f chan<- string, e chan<- error) {
+			defer wg.Done()
+
+			n.lock.RLock()
+			defer n.lock.RUnlock()
+
+			if n.client == nil {
+				e <- ErrNoPeer
+				return
+			}
+
+			files, err := n.client.SRTChannels()
+			if err != nil {
+				e <- err
+				return
+			}
+
+			for _, file := range files {
+				f <- "srt:" + file.Name
+			}
+		}(filesChan, errorsChan)
+	}
+
+	wg.Wait()
+
+	close(filesChan)
+	close(errorsChan)
+
+	wgList.Wait()
+
+	return files
+}
+
+func cloneURL(src *url.URL) *url.URL {
+	dst := &url.URL{
+		Scheme:      src.Scheme,
+		Opaque:      src.Opaque,
+		User:        nil,
+		Host:        src.Host,
+		Path:        src.Path,
+		RawPath:     src.RawPath,
+		OmitHost:    src.OmitHost,
+		ForceQuery:  src.ForceQuery,
+		RawQuery:    src.RawQuery,
+		Fragment:    src.Fragment,
+		RawFragment: src.RawFragment,
+	}
+
+	if src.User != nil {
+		username := src.User.Username()
+		password, ok := src.User.Password()
+
+		if ok {
+			dst.User = url.UserPassword(username, password)
+		} else {
+			dst.User = url.User(username)
+		}
+	}
+
+	return dst
+}
+
+func (n *Core) ResourcesGetURL(prefix, path string) (*url.URL, error) {
+	var u *url.URL
+
+	if prefix == "mem" {
+		u = cloneURL(n.httpAddress)
+		u = u.JoinPath("memfs", path)
+	} else if prefix == "disk" {
+		u = cloneURL(n.httpAddress)
+		u = u.JoinPath(path)
+	} else if prefix == "rtmp" {
+		u = cloneURL(n.rtmpAddress)
+		u = u.JoinPath(path)
+	} else if prefix == "srt" {
+		u = cloneURL(n.srtAddress)
+	} else {
+		return nil, fmt.Errorf("unknown prefix")
+	}
+
+	return u, nil
+}
+
+func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
+	if prefix == "disk" || prefix == "mem" {
+		return n.FilesystemGetFileInfo(prefix, path)
+	} else if prefix == "rtmp" {
+		n.lock.RLock()
+		defer n.lock.RUnlock()
+
+		if n.client == nil {
+			return 0, time.Time{}, ErrNoPeer
+		}
+
+		files, err := n.client.RTMPChannels()
+		if err != nil {
+			return 0, time.Time{}, err
+		}
+
+		for _, file := range files {
+			if path == file.Name {
+				return 0, time.Now(), nil
+			}
+		}
+
+		return 0, time.Time{}, fmt.Errorf("resource not found")
+	} else if prefix == "srt" {
+		n.lock.RLock()
+		defer n.lock.RUnlock()
+
+		if n.client == nil {
+			return 0, time.Time{}, ErrNoPeer
+		}
+
+		files, err := n.client.SRTChannels()
+		if err != nil {
+			return 0, time.Time{}, err
+		}
+
+		for _, file := range files {
+			if path == file.Name {
+				return 0, time.Now(), nil
+			}
+		}
+
+		return 0, time.Time{}, fmt.Errorf("resource not found")
+	}
+
+	return 0, time.Time{}, fmt.Errorf("unknown prefix: %s", prefix)
+}
+
+type Process struct {
+	NodeID     string
+	Order      string
+	State      string
+	CPU        float64 // Current CPU load of this process, 0-100*ncpu
+	Mem        uint64  // Currently consumed memory of this process in bytes
+	Throttling bool
+	Runtime    time.Duration
+	UpdatedAt  time.Time
+	Config     *app.Config
+	Metadata   map[string]interface{}
+}
+
+func (n *Core) ClusterProcessList() ([]Process, error) {
+	list, err := n.ProcessList(client.ProcessListOptions{
+		Filter: []string{"config", "state", "metadata"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	nodeid := n.id
+
+	processes := []Process{}
+
+	for _, p := range list {
+		if p.State == nil {
+			p.State = &api.ProcessState{}
+		}
+
+		if p.Config == nil {
+			p.Config = &api.ProcessConfig{}
+		}
+
+		cpu, err := p.State.Resources.CPU.Current.Float64()
+		if err != nil {
+			cpu = 0
+		}
+
+		process := Process{
+			NodeID:     nodeid,
+			Order:      p.State.Order,
+			State:      p.State.State,
+			Mem:        p.State.Resources.Memory.Current,
+			CPU:        cpu,
+			Throttling: p.State.Resources.CPU.IsThrottling,
+			Runtime:    time.Duration(p.State.Runtime) * time.Second,
+			UpdatedAt:  time.Unix(p.UpdatedAt, 0),
+		}
+
+		config, metadata := p.Config.Marshal()
+
+		process.Config = config
+		process.Metadata = metadata
+
+		processes = append(processes, process)
+	}
+
+	return processes, nil
 }

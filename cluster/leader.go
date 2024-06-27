@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
@@ -503,7 +503,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 
 	switch v := op.(type) {
 	case processOpAdd:
-		err := c.proxy.AddProcess(v.nodeid, v.config, v.metadata)
+		err := c.proxy.ProcessAdd(v.nodeid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -517,7 +517,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.proxy.CommandProcess(v.nodeid, v.config.ProcessID(), "start")
+			err = c.proxy.ProcessCommand(v.nodeid, v.config.ProcessID(), "start")
 			if err != nil {
 				opErr = processOpError{
 					processid: v.config.ProcessID(),
@@ -541,7 +541,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Adding process")
 	case processOpUpdate:
-		err := c.proxy.UpdateProcess(v.nodeid, v.processid, v.config, v.metadata)
+		err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -564,7 +564,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Updating process")
 	case processOpDelete:
-		err := c.proxy.DeleteProcess(v.nodeid, v.processid)
+		err := c.proxy.ProcessDelete(v.nodeid, v.processid)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -587,7 +587,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Removing process")
 	case processOpMove:
-		err := c.proxy.AddProcess(v.toNodeid, v.config, v.metadata)
+		err := c.proxy.ProcessAdd(v.toNodeid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -601,7 +601,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			break
 		}
 
-		err = c.proxy.DeleteProcess(v.fromNodeid, v.config.ProcessID())
+		err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ProcessID())
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -616,7 +616,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
+			err = c.proxy.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
 				opErr = processOpError{
 					processid: v.config.ProcessID(),
@@ -642,7 +642,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"tonodeid":   v.toNodeid,
 		}).Log("Moving process")
 	case processOpStart:
-		err := c.proxy.CommandProcess(v.nodeid, v.processid, "start")
+		err := c.proxy.ProcessCommand(v.nodeid, v.processid, "start")
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -665,7 +665,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Starting process")
 	case processOpStop:
-		err := c.proxy.CommandProcess(v.nodeid, v.processid, "stop")
+		err := c.proxy.ProcessCommand(v.nodeid, v.processid, "stop")
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -712,14 +712,14 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 	wish := c.store.GetProcessNodeMap()
 	want := c.store.ListProcesses()
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ListProxyProcesses()
-	nodes := c.proxy.ListNodes()
+	have := c.proxy.ClusterProcessList()
+	nodes := c.proxy.NodeList()
 
 	logger := c.logger.WithField("term", term)
 
 	logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
 
-	nodesMap := map[string]proxy.NodeAbout{}
+	nodesMap := map[string]node.About{}
 
 	for _, node := range nodes {
 		about := node.About()
@@ -798,10 +798,10 @@ func (c *cluster) doRebalance(emergency bool, term uint64) {
 	logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
 
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ListProxyProcesses()
-	nodes := c.proxy.ListNodes()
+	have := c.proxy.ClusterProcessList()
+	nodes := c.proxy.NodeList()
 
-	nodesMap := map[string]proxy.NodeAbout{}
+	nodesMap := map[string]node.About{}
 
 	for _, node := range nodes {
 		about := node.About()
@@ -867,10 +867,10 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	relocateMap := c.store.GetProcessRelocateMap()
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ListProxyProcesses()
-	nodes := c.proxy.ListNodes()
+	have := c.proxy.ClusterProcessList()
+	nodes := c.proxy.NodeList()
 
-	nodesMap := map[string]proxy.NodeAbout{}
+	nodesMap := map[string]node.About{}
 
 	for _, node := range nodes {
 		about := node.About()
@@ -991,8 +991,8 @@ func isMetadataUpdateRequired(wantMap map[string]interface{}, haveMap map[string
 
 // synchronize returns a list of operations in order to adjust the "have" list to the "want" list
 // with taking the available resources on each node into account.
-func synchronize(wish map[string]string, want []store.Process, have []proxy.Process, nodes map[string]proxy.NodeAbout, nodeRecoverTimeout time.Duration) ([]interface{}, map[string]proxy.NodeResources, map[string]string) {
-	resources := NewResources(nodes)
+func synchronize(wish map[string]string, want []store.Process, have []node.Process, nodes map[string]node.About, nodeRecoverTimeout time.Duration) ([]interface{}, map[string]node.Resources, map[string]string) {
+	resources := NewResourcePlanner(nodes)
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
@@ -1017,8 +1017,8 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	// Now we iterate through the processes we actually have running on the nodes
 	// and remove them from the wantMap. We also make sure that they have the correct order.
 	// If a process cannot be found on the wantMap, it will be deleted from the nodes.
-	haveAfterRemove := []proxy.Process{}
-	wantOrderStart := []proxy.Process{}
+	haveAfterRemove := []node.Process{}
+	wantOrderStart := []node.Process{}
 
 	for _, haveP := range have {
 		pid := haveP.Config.ProcessID().String()
@@ -1226,14 +1226,14 @@ func synchronize(wish map[string]string, want []store.Process, have []proxy.Proc
 	return opStack, resources.Map(), reality
 }
 
-type resources struct {
-	nodes   map[string]proxy.NodeResources
+type resourcePlanner struct {
+	nodes   map[string]node.Resources
 	blocked map[string]struct{}
 }
 
-func NewResources(nodes map[string]proxy.NodeAbout) *resources {
-	r := &resources{
-		nodes:   map[string]proxy.NodeResources{},
+func NewResourcePlanner(nodes map[string]node.About) *resourcePlanner {
+	r := &resourcePlanner{
+		nodes:   map[string]node.Resources{},
 		blocked: map[string]struct{}{},
 	}
 
@@ -1247,7 +1247,7 @@ func NewResources(nodes map[string]proxy.NodeAbout) *resources {
 	return r
 }
 
-func (r *resources) Throttling(nodeid string, throttling bool) {
+func (r *resourcePlanner) Throttling(nodeid string, throttling bool) {
 	res, hasNode := r.nodes[nodeid]
 	if !hasNode {
 		return
@@ -1260,7 +1260,7 @@ func (r *resources) Throttling(nodeid string, throttling bool) {
 
 // HasNodeEnough returns whether a node has enough resources available for the
 // requested cpu and memory consumption.
-func (r *resources) HasNodeEnough(nodeid string, cpu float64, mem uint64) bool {
+func (r *resourcePlanner) HasNodeEnough(nodeid string, cpu float64, mem uint64) bool {
 	res, hasNode := r.nodes[nodeid]
 	if !hasNode {
 		return false
@@ -1279,7 +1279,7 @@ func (r *resources) HasNodeEnough(nodeid string, cpu float64, mem uint64) bool {
 
 // FindBestNodes returns an array of nodeids that can fit the requested cpu and memory requirements. If no
 // such node is available, an empty array is returned. The array is sorted by the most suitable node first.
-func (r *resources) FindBestNodes(cpu float64, mem uint64) []string {
+func (r *resourcePlanner) FindBestNodes(cpu float64, mem uint64) []string {
 	nodes := []string{}
 
 	for id := range r.nodes {
@@ -1302,7 +1302,7 @@ func (r *resources) FindBestNodes(cpu float64, mem uint64) []string {
 }
 
 // Add adds the resources of the node according to the cpu and memory utilization.
-func (r *resources) Add(nodeid string, cpu float64, mem uint64) {
+func (r *resourcePlanner) Add(nodeid string, cpu float64, mem uint64) {
 	res, hasRes := r.nodes[nodeid]
 	if !hasRes {
 		return
@@ -1314,7 +1314,7 @@ func (r *resources) Add(nodeid string, cpu float64, mem uint64) {
 }
 
 // Remove subtracts the resources from the node according to the cpu and memory utilization.
-func (r *resources) Remove(nodeid string, cpu float64, mem uint64) {
+func (r *resourcePlanner) Remove(nodeid string, cpu float64, mem uint64) {
 	res, hasRes := r.nodes[nodeid]
 	if !hasRes {
 		return
@@ -1333,12 +1333,12 @@ func (r *resources) Remove(nodeid string, cpu float64, mem uint64) {
 }
 
 // Move adjusts the resources from the target and source node according to the cpu and memory utilization.
-func (r *resources) Move(target, source string, cpu float64, mem uint64) {
+func (r *resourcePlanner) Move(target, source string, cpu float64, mem uint64) {
 	r.Add(target, cpu, mem)
 	r.Remove(source, cpu, mem)
 }
 
-func (r *resources) Map() map[string]proxy.NodeResources {
+func (r *resourcePlanner) Map() map[string]node.Resources {
 	return r.nodes
 }
 
@@ -1353,7 +1353,7 @@ type referenceAffinity struct {
 
 // NewReferenceAffinity returns a referenceAffinity. This is a map of references (per domain) to an array of
 // nodes this reference is found on and their count.
-func NewReferenceAffinity(processes []proxy.Process) *referenceAffinity {
+func NewReferenceAffinity(processes []node.Process) *referenceAffinity {
 	ra := &referenceAffinity{
 		m: map[string][]referenceAffinityNodeCount{},
 	}
@@ -1517,8 +1517,8 @@ func (ra *referenceAffinity) Move(reference, domain, fromnodeid, tonodeid string
 }
 
 // rebalance returns a list of operations that will move running processes away from nodes that are overloaded.
-func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interface{}, map[string]proxy.NodeResources) {
-	resources := NewResources(nodes)
+func rebalance(have []node.Process, nodes map[string]node.About) ([]interface{}, map[string]node.Resources) {
+	resources := NewResourcePlanner(nodes)
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
@@ -1627,8 +1627,8 @@ func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interf
 }
 
 // relocate returns a list of operations that will move deployed processes to different nodes.
-func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMap map[string]string) ([]interface{}, map[string]proxy.NodeResources, []string) {
-	resources := NewResources(nodes)
+func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[string]string) ([]interface{}, map[string]node.Resources, []string) {
+	resources := NewResourcePlanner(nodes)
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
@@ -1646,7 +1646,7 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 
 	// Check for any requested relocations.
 	for processid, targetNodeid := range relocateMap {
-		process := proxy.Process{}
+		process := node.Process{}
 
 		found := false
 		for _, p := range have {
@@ -1743,8 +1743,8 @@ func relocate(have []proxy.Process, nodes map[string]proxy.NodeAbout, relocateMa
 // are running on. Each group contains only running processes and gets sorted by their
 // preference to be moved somewhere else, increasing. From the running processes, the
 // ones with the shortest runtime have the highest preference.
-func createNodeProcessMap(processes []proxy.Process) map[string][]proxy.Process {
-	nodeProcessMap := map[string][]proxy.Process{}
+func createNodeProcessMap(processes []node.Process) map[string][]node.Process {
+	nodeProcessMap := map[string][]node.Process{}
 
 	for _, p := range processes {
 		if p.State != "running" {

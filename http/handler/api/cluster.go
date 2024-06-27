@@ -21,7 +21,7 @@ import (
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
 type ClusterHandler struct {
 	cluster cluster.Cluster
-	proxy   proxy.ProxyReader
+	proxy   proxy.Proxy
 	iam     iam.IAM
 }
 
@@ -29,7 +29,7 @@ type ClusterHandler struct {
 func NewCluster(cluster cluster.Cluster, iam iam.IAM) (*ClusterHandler, error) {
 	h := &ClusterHandler{
 		cluster: cluster,
-		proxy:   cluster.ProxyReader(),
+		proxy:   cluster.Proxy(),
 		iam:     iam,
 	}
 

@@ -45,21 +45,21 @@ type Restreamer interface {
 	SetMetadata(key string, data interface{}) error // Set general metadata
 	GetMetadata(key string) (interface{}, error)    // Get previously set general metadata
 
-	AddProcess(config *app.Config) error                                                                           // Add a new process
-	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID                       // Get a list of process IDs based on patterns for ID and reference
-	DeleteProcess(id app.ProcessID) error                                                                          // Delete a process
-	UpdateProcess(id app.ProcessID, config *app.Config) error                                                      // Update a process
-	StartProcess(id app.ProcessID) error                                                                           // Start a process
-	StopProcess(id app.ProcessID) error                                                                            // Stop a process
-	RestartProcess(id app.ProcessID) error                                                                         // Restart a process
-	ReloadProcess(id app.ProcessID) error                                                                          // Reload a process
-	GetProcess(id app.ProcessID) (*app.Process, error)                                                             // Get a process
-	GetProcessState(id app.ProcessID) (*app.State, error)                                                          // Get the state of a process
-	GetProcessLog(id app.ProcessID) (*app.Log, error)                                                              // Get the logs of a process
-	SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.LogHistorySearchResult // Search the log history of all processes
-	GetPlayout(id app.ProcessID, inputid string) (string, error)                                                   // Get the URL of the playout API for a process
-	SetProcessMetadata(id app.ProcessID, key string, data interface{}) error                                       // Set metatdata to a process
-	GetProcessMetadata(id app.ProcessID, key string) (interface{}, error)                                          // Get previously set metadata from a process
+	AddProcess(config *app.Config) error                                                                              // Add a new process
+	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID                          // Get a list of process IDs based on patterns for ID and reference
+	DeleteProcess(id app.ProcessID) error                                                                             // Delete a process
+	UpdateProcess(id app.ProcessID, config *app.Config) error                                                         // Update a process
+	StartProcess(id app.ProcessID) error                                                                              // Start a process
+	StopProcess(id app.ProcessID) error                                                                               // Stop a process
+	RestartProcess(id app.ProcessID) error                                                                            // Restart a process
+	ReloadProcess(id app.ProcessID) error                                                                             // Reload a process
+	GetProcess(id app.ProcessID) (*app.Process, error)                                                                // Get a process
+	GetProcessState(id app.ProcessID) (*app.State, error)                                                             // Get the state of a process
+	GetProcessLog(id app.ProcessID) (*app.Report, error)                                                              // Get the logs of a process
+	SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.ReportHistorySearchResult // Search the log history of all processes
+	GetPlayout(id app.ProcessID, inputid string) (string, error)                                                      // Get the URL of the playout API for a process
+	SetProcessMetadata(id app.ProcessID, key string, data interface{}) error                                          // Set metatdata to a process
+	GetProcessMetadata(id app.ProcessID, key string) (interface{}, error)                                             // Get previously set metadata from a process
 
 	Probe(config *app.Config, timeout time.Duration) app.Probe // Probe a process with specific timeout
 }
@@ -1777,8 +1777,8 @@ func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress)
 	}
 }
 
-func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
-	log := &app.Log{}
+func (r *restream) GetProcessLog(id app.ProcessID) (*app.Report, error) {
+	log := &app.Report{}
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -1808,8 +1808,8 @@ func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
 	history := task.parser.ReportHistory()
 
 	for _, h := range history {
-		e := app.LogHistoryEntry{
-			LogEntry: app.LogEntry{
+		e := app.ReportHistoryEntry{
+			ReportEntry: app.ReportEntry{
 				CreatedAt: h.CreatedAt,
 				Prelude:   h.Prelude,
 				Matches:   h.Matches,
@@ -1849,9 +1849,9 @@ func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
 			e.Progress.Output[i].ID = task.process.Config.Output[p.Index].ID
 		}
 
-		e.LogEntry.Log = make([]app.LogLine, len(h.Log))
+		e.ReportEntry.Log = make([]app.LogLine, len(h.Log))
 		for i, line := range h.Log {
-			e.LogEntry.Log[i] = app.LogLine{
+			e.ReportEntry.Log[i] = app.LogLine{
 				Timestamp: line.Timestamp,
 				Data:      line.Data,
 			}
@@ -1863,8 +1863,8 @@ func (r *restream) GetProcessLog(id app.ProcessID) (*app.Log, error) {
 	return log, nil
 }
 
-func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.LogHistorySearchResult {
-	result := []app.LogHistorySearchResult{}
+func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.ReportHistorySearchResult {
+	result := []app.ReportHistorySearchResult{}
 
 	ids := r.GetProcessIDs(idpattern, refpattern, "", "")
 
@@ -1880,7 +1880,7 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 		presult := task.parser.SearchReportHistory(state, from, to)
 
 		for _, f := range presult {
-			result = append(result, app.LogHistorySearchResult{
+			result = append(result, app.ReportHistorySearchResult{
 				ProcessID: task.id,
 				Reference: task.reference,
 				ExitState: f.ExitState,

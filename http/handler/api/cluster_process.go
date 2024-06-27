@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	clientapi "github.com/datarhei/core-client-go/v16/api"
 	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
@@ -50,7 +49,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	procs := h.proxy.ListProcesses(proxy.ListProcessOptions{
+	procs := h.proxy.ProcessList(proxy.ProcessListOptions{
 		ID:            wantids,
 		Filter:        filter.Slice(),
 		Domain:        domain,
@@ -61,7 +60,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 		DomainPattern: domainpattern,
 	})
 
-	processes := []clientapi.Process{}
+	processes := []api.Process{}
 	pmap := map[app.ProcessID]struct{}{}
 
 	for _, p := range procs {
@@ -77,7 +76,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 
 	// Here we have to add those processes that are in the cluster DB and couldn't be deployed
 	{
-		processes := h.cluster.ListProcesses()
+		processes := h.cluster.StoreListProcesses()
 		filtered := h.getFilteredStoreProcesses(processes, wantids, domain, reference, idpattern, refpattern, ownerpattern, domainpattern)
 
 		for _, p := range filtered {
@@ -317,7 +316,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "")
 	}
 
-	procs := h.proxy.ListProcesses(proxy.ListProcessOptions{
+	procs := h.proxy.ProcessList(proxy.ProcessListOptions{
 		ID:     []string{id},
 		Filter: filter.Slice(),
 		Domain: domain,
@@ -325,7 +324,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 
 	if len(procs) == 0 {
 		// Check the store in the cluster for an undeployed process
-		p, err := h.cluster.GetProcess(app.NewProcessID(id, domain))
+		p, err := h.cluster.StoreGetProcess(app.NewProcessID(id, domain))
 		if err != nil {
 			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
 		}
@@ -437,7 +436,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	pid := process.ProcessID()
 
-	current, err := h.cluster.GetProcess(pid)
+	current, err := h.cluster.StoreGetProcess(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
@@ -642,14 +641,14 @@ func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
 		Domain: domain,
 	}
 
-	nodeid, err := h.proxy.FindNodeFromProcess(pid)
+	nodeid, err := h.proxy.ProcessFindNodeID(pid)
 	if err != nil {
 		return c.JSON(http.StatusOK, api.Probe{
 			Log: []string{fmt.Sprintf("the process can't be found: %s", err.Error())},
 		})
 	}
 
-	probe, _ := h.proxy.ProbeProcess(nodeid, pid)
+	probe, _ := h.proxy.ProcessProbe(nodeid, pid)
 
 	return c.JSON(http.StatusOK, probe)
 }
@@ -702,12 +701,12 @@ func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
 
 	config, _ := process.Marshal()
 
-	coreid = h.proxy.FindNodeFromResources(coreid, config.LimitCPU, config.LimitMemory)
+	coreid = h.proxy.ProcessFindNodeFromResources(coreid, config.LimitCPU, config.LimitMemory)
 	if len(coreid) == 0 {
 		return api.Err(http.StatusInternalServerError, "", "Not enough resources available to execute probe")
 	}
 
-	probe, _ := h.proxy.ProbeProcessConfig(coreid, config)
+	probe, _ := h.proxy.ProcessProbeConfig(coreid, config)
 
 	return c.JSON(http.StatusOK, probe)
 }
