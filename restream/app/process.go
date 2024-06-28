@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -141,6 +142,15 @@ func (config *Config) CreateCommand() []string {
 	}
 
 	return command
+}
+
+func (config *Config) String() string {
+	data, err := json.MarshalIndent(config, "", "   ")
+	if err != nil {
+		return err.Error()
+	}
+
+	return string(data)
 }
 
 func (config *Config) Hash() []byte {

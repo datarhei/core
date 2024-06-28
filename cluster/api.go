@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster/client"
 	"github.com/datarhei/core/v16/encoding/json"
@@ -38,11 +39,12 @@ import (
 )
 
 type api struct {
-	id      string
-	address string
-	router  *echo.Echo
-	cluster Cluster
-	logger  log.Logger
+	id        string
+	address   string
+	router    *echo.Echo
+	cluster   Cluster
+	logger    log.Logger
+	startedAt time.Time
 }
 
 type API interface {
@@ -58,9 +60,10 @@ type APIConfig struct {
 
 func NewAPI(config APIConfig) (API, error) {
 	a := &api{
-		id:      config.ID,
-		cluster: config.Cluster,
-		logger:  config.Logger,
+		id:        config.ID,
+		cluster:   config.Cluster,
+		logger:    config.Logger,
+		startedAt: time.Now(),
 	}
 
 	if a.logger == nil {
@@ -169,14 +172,15 @@ func (a *api) Version(c echo.Context) error {
 // @Produce json
 // @Success 200 {string} About
 // @Success 500 {object} Error
-// @Router /about [get]
+// @Router /v1/about [get]
 func (a *api) About(c echo.Context) error {
 	resources, err := a.cluster.Resources()
 
 	about := client.AboutResponse{
-		ID:      a.id,
-		Version: Version.String(),
-		Address: a.cluster.Address(),
+		ID:        a.id,
+		Version:   Version.String(),
+		Address:   a.cluster.Address(),
+		StartedAt: a.startedAt,
 		Resources: client.AboutResponseResources{
 			IsThrottling: resources.CPU.Throttling,
 			NCPU:         resources.CPU.NCPU,
@@ -184,8 +188,11 @@ func (a *api) About(c echo.Context) error {
 			CPULimit:     resources.CPU.Limit * resources.CPU.NCPU,
 			Mem:          resources.Mem.Total - resources.Mem.Available,
 			MemLimit:     resources.Mem.Total,
-			Error:        err,
 		},
+	}
+
+	if err != nil {
+		about.Resources.Error = err.Error()
 	}
 
 	return c.JSON(http.StatusOK, about)

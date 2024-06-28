@@ -67,10 +67,6 @@ func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) 
 }
 
 func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if err := identity.Validate(); err != nil {
 		return fmt.Errorf("invalid identity: %w", err)
 	}
@@ -90,10 +86,6 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 }
 
 func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateIdentity(origin, name, identity)
 	}
@@ -110,10 +102,6 @@ func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User)
 }
 
 func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetPolicies(origin, name, policies)
 	}
@@ -130,10 +118,6 @@ func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) 
 }
 
 func (c *cluster) RemoveIdentity(origin string, name string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveIdentity(origin, name)
 	}

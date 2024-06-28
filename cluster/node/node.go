@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,9 +33,13 @@ type Node struct {
 	coreLastErr     error
 	coreLatency     float64
 
-	lock    sync.RWMutex
-	runLock sync.Mutex
-	cancel  context.CancelFunc
+	compatibilityErr error
+
+	config *config.Config
+	skills *skills.Skills
+
+	lock   sync.RWMutex
+	cancel context.CancelFunc
 
 	logger log.Logger
 }
@@ -85,31 +90,34 @@ func New(config Config) *Node {
 	n.nodeLastErr = fmt.Errorf("not started yet")
 	n.coreLastErr = fmt.Errorf("not started yet")
 
-	address, coreConfig, err := n.CoreEssentials()
-	n.core = NewCore(n.id, n.logger.WithComponent("ClusterProxyNode").WithField("address", address))
+	address, coreConfig, coreSkills, err := n.CoreEssentials()
+	n.config = coreConfig
+	n.skills = coreSkills
+
+	n.core = NewCore(n.id, n.logger.WithComponent("ClusterCore").WithField("address", address))
 	n.core.SetEssentials(address, coreConfig)
 
 	n.coreLastErr = err
 
-	go n.updateCore(ctx)
-	go n.ping(ctx)
-	go n.pingCore(ctx)
+	go n.updateCore(ctx, 5*time.Second)
+	go n.ping(ctx, time.Second)
+	go n.pingCore(ctx, time.Second)
 
 	return n
 }
 
 func (n *Node) Stop() error {
-	n.runLock.Lock()
-	defer n.runLock.Unlock()
+	n.lock.Lock()
+	defer n.lock.Unlock()
 
 	if n.cancel == nil {
 		return nil
 	}
 
-	n.core.Stop()
-
 	n.cancel()
 	n.cancel = nil
+
+	n.core.Stop()
 
 	return nil
 }
@@ -122,6 +130,7 @@ type About struct {
 	Version     string
 	Address     string
 	State       string
+	Uptime      time.Duration
 	LastContact time.Time
 	Latency     time.Duration
 	Error       error
@@ -152,8 +161,13 @@ func (n *Node) About() About {
 	a.Name = n.coreAbout.Name
 	a.Error = n.nodeLastErr
 	a.LastContact = n.nodeLastContact
-	if time.Since(a.LastContact) > maxLastContact || n.nodeLastErr != nil {
+	if time.Since(a.LastContact) > maxLastContact {
 		a.State = "offline"
+	} else if n.nodeLastErr != nil {
+		a.State = "degraded"
+	} else if n.compatibilityErr != nil {
+		a.State = "degraded"
+		a.Error = n.compatibilityErr
 	} else {
 		a.State = "online"
 	}
@@ -163,12 +177,27 @@ func (n *Node) About() About {
 	a.Core = n.coreAbout
 	a.Core.Error = n.coreLastErr
 	a.Core.LastContact = n.coreLastContact
-	if time.Since(a.Core.LastContact) > maxLastContact || n.coreLastErr != nil {
-		a.Core.Status = "offline"
-	} else {
-		a.Core.Status = "online"
-	}
 	a.Core.Latency = time.Duration(n.coreLatency * float64(time.Second))
+
+	if a.State == "online" {
+		if a.Resources.Error != nil {
+			a.State = "degraded"
+			a.Error = a.Resources.Error
+		}
+	}
+
+	if a.State == "online" {
+		if time.Since(a.Core.LastContact) > maxLastContact {
+			a.Core.State = "offline"
+		} else if n.coreLastErr != nil {
+			a.Core.State = "degraded"
+			a.Error = n.coreLastErr
+		} else {
+			a.Core.State = "online"
+		}
+
+		a.State = a.Core.State
+	}
 
 	return a
 }
@@ -215,26 +244,53 @@ func (n *Node) LastContact() time.Time {
 	return n.nodeLastContact
 }
 
-func (n *Node) CoreEssentials() (string, *config.Config, error) {
+func (n *Node) CoreEssentials() (string, *config.Config, *skills.Skills, error) {
 	address, err := n.CoreAPIAddress()
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
-	config, err := n.CoreConfig()
+	config, err := n.CoreConfig(false)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
-	return address, config, nil
+	skills, err := n.CoreSkills(false)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return address, config, skills, nil
 }
 
-func (n *Node) CoreConfig() (*config.Config, error) {
+func (n *Node) CoreConfig(cached bool) (*config.Config, error) {
+	if cached {
+		n.lock.RLock()
+		config := n.config
+		n.lock.RUnlock()
+
+		if config != nil {
+			return config, nil
+		}
+	}
+
 	return n.node.CoreConfig()
 }
 
-func (n *Node) CoreSkills() (skills.Skills, error) {
-	return n.node.CoreSkills()
+func (n *Node) CoreSkills(cached bool) (*skills.Skills, error) {
+	if cached {
+		n.lock.RLock()
+		skills := n.skills
+		n.lock.RUnlock()
+
+		if skills != nil {
+			return skills, nil
+		}
+	}
+
+	skills, err := n.node.CoreSkills()
+
+	return &skills, err
 }
 
 func (n *Node) CoreAPIAddress() (string, error) {
@@ -253,8 +309,179 @@ func (n *Node) Core() *Core {
 	return n.core
 }
 
-func (n *Node) ping(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
+func (n *Node) CheckCompatibility(other *Node, skipSkillsCheck bool) {
+	err := n.checkCompatibility(other, skipSkillsCheck)
+	n.lock.Lock()
+	n.compatibilityErr = err
+	n.lock.Unlock()
+}
+
+func (n *Node) checkCompatibility(other *Node, skipSkillsCheck bool) error {
+	if other == nil {
+		return fmt.Errorf("no other node available to compare to")
+	}
+
+	n.lock.RLock()
+	version := n.version
+	config := n.config
+	skills := n.skills
+	n.lock.RUnlock()
+
+	otherID := other.About().ID
+	otherVersion := other.Version()
+	otherConfig, _ := other.CoreConfig(true)
+	otherSkills, _ := other.CoreSkills(true)
+
+	err := verifyVersion(version, otherVersion)
+	if err != nil {
+		return fmt.Errorf("version differs to %s: %w", otherID, err)
+	}
+
+	err = verifyConfig(config, otherConfig)
+	if err != nil {
+		return fmt.Errorf("config differs to %s: %w", otherID, err)
+	}
+
+	if !skipSkillsCheck {
+		err := verifySkills(skills, otherSkills)
+		if err != nil {
+			return fmt.Errorf("skills differ to %s: %w", otherID, err)
+		}
+	}
+
+	return nil
+}
+
+func verifyVersion(local, other string) error {
+	if local != other {
+		return fmt.Errorf("other has version %s", other)
+	}
+
+	return nil
+}
+
+func verifyConfig(local, other *config.Config) error {
+	if local == nil || other == nil {
+		return fmt.Errorf("config is not available")
+	}
+
+	if local.Cluster.Enable != other.Cluster.Enable {
+		return fmt.Errorf("cluster.enable is different")
+	}
+
+	if local.Cluster.ID != other.Cluster.ID {
+		return fmt.Errorf("cluster.id is different")
+	}
+
+	if local.Cluster.SyncInterval != other.Cluster.SyncInterval {
+		return fmt.Errorf("cluster.sync_interval_sec is different")
+	}
+
+	if local.Cluster.NodeRecoverTimeout != other.Cluster.NodeRecoverTimeout {
+		return fmt.Errorf("cluster.node_recover_timeout_sec is different")
+	}
+
+	if local.Cluster.EmergencyLeaderTimeout != other.Cluster.EmergencyLeaderTimeout {
+		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
+	}
+
+	if local.Cluster.Debug.DisableFFmpegCheck != other.Cluster.Debug.DisableFFmpegCheck {
+		return fmt.Errorf("cluster.debug.disable_ffmpeg_check is different")
+	}
+
+	if !local.API.Auth.Enable {
+		return fmt.Errorf("api.auth.enable must be true")
+	}
+
+	if local.API.Auth.Enable != other.API.Auth.Enable {
+		return fmt.Errorf("api.auth.enable is different")
+	}
+
+	if local.API.Auth.Username != other.API.Auth.Username {
+		return fmt.Errorf("api.auth.username is different")
+	}
+
+	if local.API.Auth.Password != other.API.Auth.Password {
+		return fmt.Errorf("api.auth.password is different")
+	}
+
+	if local.API.Auth.JWT.Secret != other.API.Auth.JWT.Secret {
+		return fmt.Errorf("api.auth.jwt.secret is different")
+	}
+
+	if local.RTMP.Enable != other.RTMP.Enable {
+		return fmt.Errorf("rtmp.enable is different")
+	}
+
+	if local.RTMP.Enable {
+		if local.RTMP.App != other.RTMP.App {
+			return fmt.Errorf("rtmp.app is different")
+		}
+	}
+
+	if local.SRT.Enable != other.SRT.Enable {
+		return fmt.Errorf("srt.enable is different")
+	}
+
+	if local.SRT.Enable {
+		if local.SRT.Passphrase != other.SRT.Passphrase {
+			return fmt.Errorf("srt.passphrase is different")
+		}
+	}
+
+	if local.Resources.MaxCPUUsage == 0 || other.Resources.MaxCPUUsage == 0 {
+		return fmt.Errorf("resources.max_cpu_usage must be defined")
+	}
+
+	if local.Resources.MaxMemoryUsage == 0 || other.Resources.MaxMemoryUsage == 0 {
+		return fmt.Errorf("resources.max_memory_usage must be defined")
+	}
+
+	if local.TLS.Enable != other.TLS.Enable {
+		return fmt.Errorf("tls.enable is different")
+	}
+
+	if local.TLS.Enable {
+		if local.TLS.Auto != other.TLS.Auto {
+			return fmt.Errorf("tls.auto is different")
+		}
+
+		if len(local.Host.Name) == 0 || len(other.Host.Name) == 0 {
+			return fmt.Errorf("host.name must be set")
+		}
+
+		if local.TLS.Auto {
+			if local.TLS.Email != other.TLS.Email {
+				return fmt.Errorf("tls.email is different")
+			}
+
+			if local.TLS.Staging != other.TLS.Staging {
+				return fmt.Errorf("tls.staging is different")
+			}
+
+			if local.TLS.Secret != other.TLS.Secret {
+				return fmt.Errorf("tls.secret is different")
+			}
+		}
+	}
+
+	return nil
+}
+
+func verifySkills(local, other *skills.Skills) error {
+	if local == nil || other == nil {
+		return fmt.Errorf("skills are not available")
+	}
+
+	if !local.Equal(*other) {
+		return fmt.Errorf("mismatching FFmpeg skills: %w", nil)
+	}
+
+	return nil
+}
+
+func (n *Node) ping(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -269,6 +496,7 @@ func (n *Node) ping(ctx context.Context) {
 					ID:      about.ID,
 					Version: about.Version,
 					Address: about.Address,
+					Uptime:  time.Since(about.StartedAt),
 					Error:   err,
 					Resources: Resources{
 						IsThrottling: about.Resources.IsThrottling,
@@ -277,15 +505,17 @@ func (n *Node) ping(ctx context.Context) {
 						CPULimit:     about.Resources.CPULimit,
 						Mem:          about.Resources.Mem,
 						MemLimit:     about.Resources.MemLimit,
-						Error:        about.Resources.Error,
+						Error:        nil,
 					},
+				}
+				if len(about.Resources.Error) != 0 {
+					n.nodeAbout.Resources.Error = errors.New(about.Resources.Error)
 				}
 				n.nodeLastContact = time.Now()
 				n.nodeLastErr = nil
 				n.nodeLatency = n.nodeLatency*0.2 + time.Since(start).Seconds()*0.8
 			} else {
 				n.nodeLastErr = err
-
 				n.logger.Warn().WithError(err).Log("Failed to ping cluster API")
 			}
 			n.lock.Unlock()
@@ -295,16 +525,18 @@ func (n *Node) ping(ctx context.Context) {
 	}
 }
 
-func (n *Node) updateCore(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+func (n *Node) updateCore(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			address, config, err := n.CoreEssentials()
+			address, config, skills, err := n.CoreEssentials()
 			n.lock.Lock()
 			if err == nil {
+				n.config = config
+				n.skills = skills
 				n.core.SetEssentials(address, config)
 				n.coreLastErr = nil
 			} else {
@@ -318,8 +550,8 @@ func (n *Node) updateCore(ctx context.Context) {
 	}
 }
 
-func (n *Node) pingCore(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
+func (n *Node) pingCore(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -336,7 +568,6 @@ func (n *Node) pingCore(ctx context.Context) {
 				n.coreLatency = n.coreLatency*0.2 + time.Since(start).Seconds()*0.8
 			} else {
 				n.coreLastErr = fmt.Errorf("not connected to core api: %w", err)
-				n.logger.Warn().WithError(err).Log("not connected to core API")
 			}
 			n.lock.Unlock()
 		case <-ctx.Done():

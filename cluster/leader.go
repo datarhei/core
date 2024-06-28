@@ -350,10 +350,6 @@ func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Dur
 			return
 		case <-ticker.C:
 			if !emergency {
-				if ok, _ := c.IsDegraded(); ok {
-					break
-				}
-
 				c.doSynchronize(emergency, term)
 				c.doRebalance(emergency, term)
 				c.doRelocate(emergency, term)
@@ -503,7 +499,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 
 	switch v := op.(type) {
 	case processOpAdd:
-		err := c.proxy.ProcessAdd(v.nodeid, v.config, v.metadata)
+		err := c.manager.ProcessAdd(v.nodeid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -517,7 +513,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.proxy.ProcessCommand(v.nodeid, v.config.ProcessID(), "start")
+			err = c.manager.ProcessCommand(v.nodeid, v.config.ProcessID(), "start")
 			if err != nil {
 				opErr = processOpError{
 					processid: v.config.ProcessID(),
@@ -541,7 +537,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Adding process")
 	case processOpUpdate:
-		err := c.proxy.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
+		err := c.manager.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -564,7 +560,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Updating process")
 	case processOpDelete:
-		err := c.proxy.ProcessDelete(v.nodeid, v.processid)
+		err := c.manager.ProcessDelete(v.nodeid, v.processid)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -587,7 +583,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Removing process")
 	case processOpMove:
-		err := c.proxy.ProcessAdd(v.toNodeid, v.config, v.metadata)
+		err := c.manager.ProcessAdd(v.toNodeid, v.config, v.metadata)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -601,7 +597,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			break
 		}
 
-		err = c.proxy.ProcessDelete(v.fromNodeid, v.config.ProcessID())
+		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
 		if err != nil {
 			opErr = processOpError{
 				processid: v.config.ProcessID(),
@@ -616,7 +612,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.proxy.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
+			err = c.manager.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
 				opErr = processOpError{
 					processid: v.config.ProcessID(),
@@ -642,7 +638,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"tonodeid":   v.toNodeid,
 		}).Log("Moving process")
 	case processOpStart:
-		err := c.proxy.ProcessCommand(v.nodeid, v.processid, "start")
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "start")
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -665,7 +661,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Starting process")
 	case processOpStop:
-		err := c.proxy.ProcessCommand(v.nodeid, v.processid, "stop")
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "stop")
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -712,8 +708,8 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 	wish := c.store.GetProcessNodeMap()
 	want := c.store.ListProcesses()
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ClusterProcessList()
-	nodes := c.proxy.NodeList()
+	have := c.manager.ClusterProcessList()
+	nodes := c.manager.NodeList()
 
 	logger := c.logger.WithField("term", term)
 
@@ -798,8 +794,8 @@ func (c *cluster) doRebalance(emergency bool, term uint64) {
 	logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
 
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ClusterProcessList()
-	nodes := c.proxy.NodeList()
+	have := c.manager.ClusterProcessList()
+	nodes := c.manager.NodeList()
 
 	nodesMap := map[string]node.About{}
 
@@ -867,8 +863,8 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	relocateMap := c.store.GetProcessRelocateMap()
 	storeNodes := c.store.ListNodes()
-	have := c.proxy.ClusterProcessList()
-	nodes := c.proxy.NodeList()
+	have := c.manager.ClusterProcessList()
+	nodes := c.manager.NodeList()
 
 	nodesMap := map[string]node.About{}
 
@@ -1239,7 +1235,7 @@ func NewResourcePlanner(nodes map[string]node.About) *resourcePlanner {
 
 	for nodeid, about := range nodes {
 		r.nodes[nodeid] = about.Resources
-		if about.State != "connected" {
+		if about.State != "online" {
 			r.blocked[nodeid] = struct{}{}
 		}
 	}
@@ -1270,7 +1266,7 @@ func (r *resourcePlanner) HasNodeEnough(nodeid string, cpu float64, mem uint64) 
 		return false
 	}
 
-	if res.CPU+cpu < res.CPULimit && res.Mem+mem < res.MemLimit && !res.IsThrottling {
+	if res.Error == nil && res.CPU+cpu < res.CPULimit && res.Mem+mem < res.MemLimit && !res.IsThrottling {
 		return true
 	}
 

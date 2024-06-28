@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/glob"
@@ -49,7 +49,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
-	procs := h.proxy.ProcessList(proxy.ProcessListOptions{
+	procs := h.proxy.ProcessList(node.ProcessListOptions{
 		ID:            wantids,
 		Filter:        filter.Slice(),
 		Domain:        domain,
@@ -138,7 +138,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 	return c.Stream(http.StatusOK, "application/json", buf)
 }
 
-func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, domain, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
+func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, _, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
 	filtered := []store.Process{}
 
 	count := 0
@@ -316,7 +316,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "")
 	}
 
-	procs := h.proxy.ProcessList(proxy.ProcessListOptions{
+	procs := h.proxy.ProcessList(node.ProcessListOptions{
 		ID:     []string{id},
 		Filter: filter.Slice(),
 		Domain: domain,
@@ -701,7 +701,7 @@ func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
 
 	config, _ := process.Marshal()
 
-	coreid = h.proxy.ProcessFindNodeFromResources(coreid, config.LimitCPU, config.LimitMemory)
+	coreid = h.proxy.FindNodeForResources(coreid, config.LimitCPU, config.LimitMemory)
 	if len(coreid) == 0 {
 		return api.Err(http.StatusInternalServerError, "", "Not enough resources available to execute probe")
 	}

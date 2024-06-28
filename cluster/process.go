@@ -16,10 +16,6 @@ func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
 }
 
 func (c *cluster) AddProcess(origin string, config *app.Config) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddProcess(origin, config)
 	}
@@ -35,10 +31,6 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 }
 
 func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveProcess(origin, id)
 	}
@@ -54,10 +46,6 @@ func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
 }
 
 func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateProcess(origin, id, config)
 	}
@@ -74,10 +62,6 @@ func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Con
 }
 
 func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if command == "start" || command == "stop" {
 		if !c.IsRaftLeader() {
 			return c.forwarder.SetProcessCommand(origin, id, command)
@@ -94,19 +78,15 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 		return c.applyCommand(cmd)
 	}
 
-	nodeid, err := c.proxy.ProcessFindNodeID(id)
+	nodeid, err := c.manager.ProcessFindNodeID(id)
 	if err != nil {
 		return fmt.Errorf("the process '%s' is not registered with any node: %w", id.String(), err)
 	}
 
-	return c.proxy.ProcessCommand(nodeid, id, command)
+	return c.manager.ProcessCommand(nodeid, id, command)
 }
 
 func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.RelocateProcesses(origin, relocations)
 	}
@@ -122,10 +102,6 @@ func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID
 }
 
 func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetProcessMetadata(origin, id, key, data)
 	}
@@ -143,10 +119,6 @@ func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string
 }
 
 func (c *cluster) GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error) {
-	if ok, _ := c.IsDegraded(); ok {
-		return nil, ErrDegraded
-	}
-
 	p, err := c.store.GetProcess(id)
 	if err != nil {
 		return nil, err

@@ -70,20 +70,21 @@ type GetKVResponse struct {
 }
 
 type AboutResponse struct {
-	ID        string
-	Version   string
-	Address   string
-	Resources AboutResponseResources
+	ID        string                 `json:"id"`
+	Version   string                 `json:"version"`
+	Address   string                 `json:"address"`
+	StartedAt time.Time              `json:"started_at"`
+	Resources AboutResponseResources `json:"resources"`
 }
 
 type AboutResponseResources struct {
-	IsThrottling bool    // Whether this core is currently throttling
-	NCPU         float64 // Number of CPU on this node
-	CPU          float64 // Current CPU load, 0-100*ncpu
-	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
-	Mem          uint64  // Currently used memory in bytes
-	MemLimit     uint64  // Defined memory limit in bytes
-	Error        error   // Last error
+	IsThrottling bool    `json:"is_throttling"`      // Whether this core is currently throttling
+	NCPU         float64 `json:"ncpu"`               // Number of CPU on this node
+	CPU          float64 `json:"cpu"`                // Current CPU load, 0-100*ncpu
+	CPULimit     float64 `json:"cpu_limit"`          // Defined CPU load limit, 0-100*ncpu
+	Mem          uint64  `json:"memory_bytes"`       // Currently used memory in bytes
+	MemLimit     uint64  `json:"memory_limit_bytes"` // Defined memory limit in bytes
+	Error        string  `json:"error"`              // Last error
 }
 
 type SetNodeStateRequest struct {
@@ -111,7 +112,7 @@ func (c *APIClient) Version() (string, error) {
 }
 
 func (c *APIClient) About() (AboutResponse, error) {
-	data, err := c.call(http.MethodGet, "/about", "", nil, "")
+	data, err := c.call(http.MethodGet, "/v1/about", "", nil, "")
 	if err != nil {
 		return AboutResponse{}, err
 	}

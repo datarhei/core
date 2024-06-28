@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	enctoken "github.com/datarhei/core/v16/encoding/token"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -45,7 +45,7 @@ type Config struct {
 
 	SRTLogTopics []string
 
-	Proxy proxy.ProxyReader
+	Proxy *node.Manager
 
 	IAM iam.IAM
 }
@@ -84,7 +84,7 @@ type server struct {
 	srtlog          map[string]*ring.Ring // Per logtopic a dedicated ring buffer
 	srtlogLock      sync.RWMutex
 
-	proxy proxy.ProxyReader
+	proxy *node.Manager
 
 	iam iam.IAM
 }
@@ -423,7 +423,7 @@ func (s *server) handleSubscribe(conn srt.Conn) {
 		}
 
 		// Check in the cluster for the stream and proxy it
-		srturl, err := s.proxy.GetURL("srt", si.Resource)
+		srturl, err := s.proxy.MediaGetURL("srt", si.Resource)
 		if err != nil {
 			s.log(identity, "PLAY", "NOTFOUND", si.Resource, "no publisher for this resource found", client)
 			return

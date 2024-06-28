@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	clientapi "github.com/datarhei/core-client-go/v16/api"
 	"github.com/datarhei/core/v16/cluster"
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/labstack/echo/v4"
@@ -35,7 +34,7 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 	for _, node := range about.Nodes {
 		if dbnode, hasNode := nodes[node.ID]; hasNode {
 			if dbnode.State == "maintenance" {
-				node.Status = dbnode.State
+				node.State = dbnode.State
 			}
 		}
 
@@ -70,7 +69,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 
 		if dbnode, hasNode := nodes[node.ID]; hasNode {
 			if dbnode.State == "maintenance" {
-				node.Status = dbnode.State
+				node.State = dbnode.State
 			}
 		}
 
@@ -357,7 +356,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
-	procs, err := peer.Core().ProcessList(proxy.ProcessListOptions{
+	procs, err := peer.Core().ProcessList(node.ProcessListOptions{
 		ID:            wantids,
 		Filter:        filter,
 		Domain:        domain,
@@ -371,7 +370,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 		return api.Err(http.StatusInternalServerError, "", "node not available: %s", err.Error())
 	}
 
-	processes := []clientapi.Process{}
+	processes := []api.Process{}
 
 	for _, p := range procs {
 		if !h.iam.Enforce(ctxuser, domain, "process", p.Config.ID, "read") {
@@ -406,7 +405,7 @@ func (h *ClusterHandler) GetNodeState(c echo.Context) error {
 			continue
 		}
 
-		state = node.Status
+		state = node.State
 		break
 	}
 

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	enctoken "github.com/datarhei/core/v16/encoding/token"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -61,7 +61,7 @@ type Config struct {
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
 
-	Proxy proxy.ProxyReader
+	Proxy *node.Manager
 
 	IAM iam.IAM
 }
@@ -98,7 +98,7 @@ type server struct {
 	channels map[string]*channel
 	lock     sync.RWMutex
 
-	proxy proxy.ProxyReader
+	proxy *node.Manager
 
 	iam iam.IAM
 }
@@ -239,7 +239,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	if ch == nil && s.proxy != nil {
 		// Check in the cluster for that stream
-		url, err := s.proxy.GetURL("rtmp", playpath)
+		url, err := s.proxy.MediaGetURL("rtmp", playpath)
 		if err != nil {
 			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 			return

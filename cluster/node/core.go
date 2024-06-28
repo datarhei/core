@@ -57,7 +57,7 @@ func NewCore(id string, logger log.Logger) *Core {
 	ctx, cancel := context.WithCancel(context.Background())
 	core.cancel = cancel
 
-	go core.reconnect(ctx)
+	go core.reconnect(ctx, time.Second)
 
 	return core
 }
@@ -82,8 +82,8 @@ func (n *Core) SetEssentials(address string, config *config.Config) {
 	}
 }
 
-func (n *Core) reconnect(ctx context.Context) {
-	ticker := time.NewTicker(3 * time.Second)
+func (n *Core) reconnect(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {
@@ -211,7 +211,7 @@ func (n *Core) connect() error {
 			rtmpAddress.Host = net.JoinHostPort(host, port)
 		}
 
-		rtmpAddress = n.rtmpAddress.JoinPath(n.config.RTMP.App)
+		rtmpAddress = rtmpAddress.JoinPath(n.config.RTMP.App)
 	}
 
 	hasSRT := false
@@ -260,7 +260,7 @@ type CoreAbout struct {
 	ID          string
 	Name        string
 	Address     string
-	Status      string
+	State       string
 	Error       error
 	CreatedAt   time.Time
 	Uptime      time.Duration
@@ -320,7 +320,7 @@ func (n *Core) About() (CoreAbout, error) {
 
 	cabout.Version.Build = build
 
-	return cabout, err
+	return cabout, nil
 }
 
 func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {

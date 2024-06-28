@@ -1338,7 +1338,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		if a.cluster != nil {
-			config.Proxy = a.cluster.Proxy()
+			config.Proxy = a.cluster.Manager()
 		}
 
 		if cfg.RTMP.EnableTLS {
@@ -1369,7 +1369,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		if a.cluster != nil {
-			config.Proxy = a.cluster.Proxy()
+			config.Proxy = a.cluster.Manager()
 		}
 
 		if cfg.SRT.Log.Enable {

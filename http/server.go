@@ -206,7 +206,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 		if config.Cluster != nil {
 			if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
-				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
+				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.Manager())
 			}
 		}
 
