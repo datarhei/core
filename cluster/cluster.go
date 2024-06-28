@@ -462,7 +462,7 @@ func (c *cluster) setup(ctx context.Context) error {
 	c.logger.Info().Log("Waiting for cluster to become operational ...")
 
 	for {
-		ok, err := c.IsClusterDegraded()
+		ok, err := c.isClusterOperational()
 		if !ok {
 			break
 		}
@@ -665,7 +665,7 @@ func (c *cluster) HasRaftLeader() bool {
 	return c.hasRaftLeader
 }
 
-func (c *cluster) IsClusterDegraded() (bool, error) {
+func (c *cluster) isClusterOperational() (bool, error) {
 	servers, err := c.raft.Servers()
 	if err != nil {
 		return true, err

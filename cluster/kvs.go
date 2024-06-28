@@ -11,10 +11,6 @@ import (
 )
 
 func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error) {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return nil, ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		err := c.forwarder.CreateLock(origin, name, validUntil)
 		if err != nil {
@@ -53,10 +49,6 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 }
 
 func (c *cluster) DeleteLock(origin string, name string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.DeleteLock(origin, name)
 	}
@@ -76,10 +68,6 @@ func (c *cluster) ListLocks() map[string]time.Time {
 }
 
 func (c *cluster) SetKV(origin, key, value string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetKV(origin, key, value)
 	}
@@ -96,10 +84,6 @@ func (c *cluster) SetKV(origin, key, value string) error {
 }
 
 func (c *cluster) UnsetKV(origin, key string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		return c.forwarder.UnsetKV(origin, key)
 	}
@@ -116,10 +100,6 @@ func (c *cluster) UnsetKV(origin, key string) error {
 
 func (c *cluster) GetKV(origin, key string, stale bool) (string, time.Time, error) {
 	if !stale {
-		if ok, _ := c.IsClusterDegraded(); ok {
-			return "", time.Time{}, ErrDegraded
-		}
-
 		if !c.IsRaftLeader() {
 			return c.forwarder.GetKV(origin, key)
 		}
