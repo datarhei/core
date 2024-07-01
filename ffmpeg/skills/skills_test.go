@@ -321,28 +321,28 @@ func TestNew(t *testing.T) {
 func TestEqualEmptySkills(t *testing.T) {
 	s := Skills{}
 
-	ok := s.Equal(s)
-	require.True(t, ok)
+	err := s.Equal(s)
+	require.NoError(t, err)
 }
 
-func TestEuqalSkills(t *testing.T) {
+func TestEqualSkills(t *testing.T) {
 	binary, err := testhelper.BuildBinary("ffmpeg", "../../internal/testhelper")
 	require.NoError(t, err, "Failed to build helper program")
 
 	s1, err := New(binary)
 	require.NoError(t, err)
 
-	ok := s1.Equal(s1)
-	require.True(t, ok)
+	err = s1.Equal(s1)
+	require.NoError(t, err)
 
 	s2, err := New(binary)
 	require.NoError(t, err)
 
-	ok = s1.Equal(s2)
-	require.True(t, ok)
+	err = s1.Equal(s2)
+	require.NoError(t, err)
 
-	ok = s1.Equal(Skills{})
-	require.False(t, ok)
+	err = s1.Equal(Skills{})
+	require.Error(t, err)
 }
 
 func TestPatchVersion(t *testing.T) {

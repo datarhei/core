@@ -42,7 +42,7 @@ type api struct {
 	id        string
 	address   string
 	router    *echo.Echo
-	cluster   Cluster
+	cluster   *cluster
 	logger    log.Logger
 	startedAt time.Time
 }
@@ -54,7 +54,7 @@ type API interface {
 
 type APIConfig struct {
 	ID      string
-	Cluster Cluster
+	Cluster *cluster
 	Logger  log.Logger
 }
 

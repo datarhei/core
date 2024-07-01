@@ -93,6 +93,7 @@ type Cluster interface {
 
 	Manager() *clusternode.Manager
 	CertManager() autocert.Manager
+	Store() store.Store
 
 	Resources() (resources.Info, error)
 }
@@ -1095,4 +1096,8 @@ func (c *cluster) Resources() (resources.Info, error) {
 
 func (c *cluster) Manager() *clusternode.Manager {
 	return c.manager
+}
+
+func (c *cluster) Store() store.Store {
+	return c.store
 }

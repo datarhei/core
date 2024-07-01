@@ -51,8 +51,6 @@ github.com/circonus-labs/circonus-gometrics v2.3.1+incompatible/go.mod h1:nmEj6D
 github.com/circonus-labs/circonusllhist v0.1.3/go.mod h1:kMXHVDlOchFAehlya5ePtbp5jckzBHf4XRpQvBOLI+I=
 github.com/cpuguy83/go-md2man/v2 v2.0.4 h1:wfIWP927BUkWJb2NmU/kNDYIBTh/ziUX91+lVfRxZq4=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
-github.com/datarhei/core-client-go/v16 v16.11.1-0.20240429143858-23ad5985b894 h1:ZQCTobOGpzfuZxgMWsZviFSXfI5QuttkTgPQz1PKbhU=
-github.com/datarhei/core-client-go/v16 v16.11.1-0.20240429143858-23ad5985b894/go.mod h1:Mu2bHqvGJe46KvAhY2ElohuQYhHB64PZeaCNDv6C5b8=
 github.com/datarhei/gosrt v0.6.0 h1:HrrXAw90V78ok4WMIhX6se1aTHPCn82Sg2hj+PhdmGc=
 github.com/datarhei/gosrt v0.6.0/go.mod h1:fsOWdLSHUHShHjgi/46h6wjtdQrtnSdAQFnlas8ONxs=
 github.com/datarhei/joy4 v0.0.0-20240603190808-b1407345907e h1:Qc/0D4xvXrazFkoi/4UGqO15yQ1JN5I8h7RwdzCLgTY=

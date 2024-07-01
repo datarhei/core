@@ -172,7 +172,13 @@ func (n *Node) About() About {
 		a.State = "online"
 	}
 	a.Latency = time.Duration(n.nodeLatency * float64(time.Second))
+
 	a.Resources = n.nodeAbout.Resources
+	if a.Resources.Error != nil {
+		a.Resources.CPU = a.Resources.CPULimit
+		a.Resources.Mem = a.Resources.MemLimit
+		a.Resources.IsThrottling = true
+	}
 
 	a.Core = n.coreAbout
 	a.Core.Error = n.coreLastErr
@@ -327,25 +333,24 @@ func (n *Node) checkCompatibility(other *Node, skipSkillsCheck bool) error {
 	skills := n.skills
 	n.lock.RUnlock()
 
-	otherID := other.About().ID
 	otherVersion := other.Version()
 	otherConfig, _ := other.CoreConfig(true)
 	otherSkills, _ := other.CoreSkills(true)
 
 	err := verifyVersion(version, otherVersion)
 	if err != nil {
-		return fmt.Errorf("version differs to %s: %w", otherID, err)
+		return fmt.Errorf("version: %w", err)
 	}
 
 	err = verifyConfig(config, otherConfig)
 	if err != nil {
-		return fmt.Errorf("config differs to %s: %w", otherID, err)
+		return fmt.Errorf("config: %w", err)
 	}
 
 	if !skipSkillsCheck {
 		err := verifySkills(skills, otherSkills)
 		if err != nil {
-			return fmt.Errorf("skills differ to %s: %w", otherID, err)
+			return fmt.Errorf("skills: %w", err)
 		}
 	}
 
@@ -366,84 +371,84 @@ func verifyConfig(local, other *config.Config) error {
 	}
 
 	if local.Cluster.Enable != other.Cluster.Enable {
-		return fmt.Errorf("cluster.enable is different")
+		return fmt.Errorf("cluster.enable: actual: %v, expected: %v", local.Cluster.Enable, other.Cluster.Enable)
 	}
 
 	if local.Cluster.ID != other.Cluster.ID {
-		return fmt.Errorf("cluster.id is different")
+		return fmt.Errorf("cluster.id: actual: %v, expected: %v", local.Cluster.ID, other.Cluster.ID)
 	}
 
 	if local.Cluster.SyncInterval != other.Cluster.SyncInterval {
-		return fmt.Errorf("cluster.sync_interval_sec is different")
+		return fmt.Errorf("cluster.sync_interval_sec: actual: %v, expected: %v", local.Cluster.SyncInterval, other.Cluster.SyncInterval)
 	}
 
 	if local.Cluster.NodeRecoverTimeout != other.Cluster.NodeRecoverTimeout {
-		return fmt.Errorf("cluster.node_recover_timeout_sec is different")
+		return fmt.Errorf("cluster.node_recover_timeout_sec: actual: %v, expected: %v", local.Cluster.NodeRecoverTimeout, other.Cluster.NodeRecoverTimeout)
 	}
 
 	if local.Cluster.EmergencyLeaderTimeout != other.Cluster.EmergencyLeaderTimeout {
-		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
+		return fmt.Errorf("cluster.emergency_leader_timeout_sec: actual: %v, expected: %v", local.Cluster.EmergencyLeaderTimeout, other.Cluster.EmergencyLeaderTimeout)
 	}
 
 	if local.Cluster.Debug.DisableFFmpegCheck != other.Cluster.Debug.DisableFFmpegCheck {
-		return fmt.Errorf("cluster.debug.disable_ffmpeg_check is different")
+		return fmt.Errorf("cluster.debug.disable_ffmpeg_check: actual: %v, expected: %v", local.Cluster.Debug.DisableFFmpegCheck, other.Cluster.Debug.DisableFFmpegCheck)
 	}
 
 	if !local.API.Auth.Enable {
-		return fmt.Errorf("api.auth.enable must be true")
+		return fmt.Errorf("api.auth.enable must be enabled")
 	}
 
 	if local.API.Auth.Enable != other.API.Auth.Enable {
-		return fmt.Errorf("api.auth.enable is different")
+		return fmt.Errorf("api.auth.enable: actual: %v, expected: %v", local.API.Auth.Enable, other.API.Auth.Enable)
 	}
 
 	if local.API.Auth.Username != other.API.Auth.Username {
-		return fmt.Errorf("api.auth.username is different")
+		return fmt.Errorf("api.auth.username: actual: %v, expected: %v", local.API.Auth.Username, other.API.Auth.Username)
 	}
 
 	if local.API.Auth.Password != other.API.Auth.Password {
-		return fmt.Errorf("api.auth.password is different")
+		return fmt.Errorf("api.auth.password: actual: %v, expected: %v", local.API.Auth.Password, other.API.Auth.Password)
 	}
 
 	if local.API.Auth.JWT.Secret != other.API.Auth.JWT.Secret {
-		return fmt.Errorf("api.auth.jwt.secret is different")
+		return fmt.Errorf("api.auth.jwt.secret: actual: %v, expected: %v", local.API.Auth.JWT.Secret, other.API.Auth.JWT.Secret)
 	}
 
 	if local.RTMP.Enable != other.RTMP.Enable {
-		return fmt.Errorf("rtmp.enable is different")
+		return fmt.Errorf("rtmp.enable: actual: %v, expected: %v", local.RTMP.Enable, other.RTMP.Enable)
 	}
 
 	if local.RTMP.Enable {
 		if local.RTMP.App != other.RTMP.App {
-			return fmt.Errorf("rtmp.app is different")
+			return fmt.Errorf("rtmp.app: actual: %v, expected: %v", local.RTMP.App, other.RTMP.App)
 		}
 	}
 
 	if local.SRT.Enable != other.SRT.Enable {
-		return fmt.Errorf("srt.enable is different")
+		return fmt.Errorf("srt.enable: actual: %v, expected: %v", local.SRT.Enable, other.SRT.Enable)
 	}
 
 	if local.SRT.Enable {
 		if local.SRT.Passphrase != other.SRT.Passphrase {
-			return fmt.Errorf("srt.passphrase is different")
+			return fmt.Errorf("srt.passphrase: actual: %v, expected: %v", local.SRT.Passphrase, other.SRT.Passphrase)
 		}
 	}
 
 	if local.Resources.MaxCPUUsage == 0 || other.Resources.MaxCPUUsage == 0 {
-		return fmt.Errorf("resources.max_cpu_usage must be defined")
+		return fmt.Errorf("resources.max_cpu_usage")
 	}
 
 	if local.Resources.MaxMemoryUsage == 0 || other.Resources.MaxMemoryUsage == 0 {
-		return fmt.Errorf("resources.max_memory_usage must be defined")
+		return fmt.Errorf("resources.max_memory_usage")
 	}
 
 	if local.TLS.Enable != other.TLS.Enable {
-		return fmt.Errorf("tls.enable is different")
+		return fmt.Errorf("tls.enable: actual: %v, expected: %v", local.TLS.Enable, other.TLS.Enable)
 	}
 
 	if local.TLS.Enable {
 		if local.TLS.Auto != other.TLS.Auto {
-			return fmt.Errorf("tls.auto is different")
+			return fmt.Errorf("tls.auto: actual: %v, expected: %v", local.TLS.Auto, other.TLS.Auto)
 		}
 
 		if len(local.Host.Name) == 0 || len(other.Host.Name) == 0 {
@@ -452,15 +457,15 @@ func verifyConfig(local, other *config.Config) error {
 
 		if local.TLS.Auto {
 			if local.TLS.Email != other.TLS.Email {
-				return fmt.Errorf("tls.email is different")
+				return fmt.Errorf("tls.email: actual: %v, expected: %v", local.TLS.Email, other.TLS.Email)
 			}
 
 			if local.TLS.Staging != other.TLS.Staging {
-				return fmt.Errorf("tls.staging is different")
+				return fmt.Errorf("tls.staging: actual: %v, expected: %v", local.TLS.Staging, other.TLS.Staging)
 			}
 
 			if local.TLS.Secret != other.TLS.Secret {
-				return fmt.Errorf("tls.secret is different")
+				return fmt.Errorf("tls.secret: actual: %v, expected: %v", local.TLS.Secret, other.TLS.Secret)
 			}
 		}
 	}
@@ -473,8 +478,8 @@ func verifySkills(local, other *skills.Skills) error {
 		return fmt.Errorf("skills are not available")
 	}
 
-	if !local.Equal(*other) {
-		return fmt.Errorf("mismatching FFmpeg skills: %w", nil)
+	if err := local.Equal(*other); err != nil {
+		return err
 	}
 
 	return nil
@@ -559,6 +564,8 @@ func (n *Node) pingCore(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			start := time.Now()
 			about, err := n.core.About()
+
+			fmt.Printf("%+v\n", about)
 
 			n.lock.Lock()
 			if err == nil {

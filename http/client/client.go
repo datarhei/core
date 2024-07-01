@@ -57,7 +57,6 @@ type RestClient interface {
 	FilesystemDeleteFile(storage, path string) error                                   // DELETE /v3/fs/{storage}/{path}
 	FilesystemAddFile(storage, path string, data io.Reader) error                      // PUT /v3/fs/{storage}/{path}
 
-	Log() ([]api.LogEvent, error)                                                   // GET /v3/log
 	Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) // POST /v3/events
 
 	ProcessList(opts ProcessListOptions) ([]api.Process, error)                           // GET /v3/process
@@ -545,6 +544,9 @@ func (r *restclient) Address() string {
 
 func (r *restclient) About(cached bool) (api.About, error) {
 	if cached {
+		r.aboutLock.RLock()
+		defer r.aboutLock.RUnlock()
+
 		return r.about, nil
 	}
 
@@ -553,7 +555,22 @@ func (r *restclient) About(cached bool) (api.About, error) {
 		return api.About{}, err
 	}
 
+	if r.accessToken.IsSet() && len(about.ID) == 0 {
+		if err := r.refresh(); err != nil {
+			if err := r.login(); err != nil {
+				return api.About{}, err
+			}
+		}
+
+		about, err = r.info()
+		if err != nil {
+			return api.About{}, err
+		}
+	}
+
+	r.aboutLock.Lock()
 	r.about = about
+	r.aboutLock.Unlock()
 
 	return about, nil
 }
@@ -752,7 +769,15 @@ func (r *restclient) info() (api.About, error) {
 		return api.About{}, err
 	}
 
-	if r.accessToken.IsSet() && !r.accessToken.IsExpired() {
+	if r.accessToken.IsSet() {
+		if r.accessToken.IsExpired() {
+			if err := r.refresh(); err != nil {
+				if err := r.login(); err != nil {
+					return api.About{}, err
+				}
+			}
+		}
+
 		req.Header.Add("Authorization", "Bearer "+r.accessToken.String())
 	}
 
