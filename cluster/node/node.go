@@ -107,7 +107,9 @@ func New(config Config) *Node {
 }
 
 func (n *Node) Stop() error {
+
 	n.lock.Lock()
+
 	defer n.lock.Unlock()
 
 	if n.cancel == nil {
@@ -154,7 +156,7 @@ func (n *Node) About() About {
 
 	a := About{
 		ID:      n.id,
-		Version: n.Version(),
+		Version: n.version,
 		Address: n.address,
 	}
 
@@ -243,13 +245,6 @@ func (n *Node) CoreStatus() (string, error) {
 	return "online", nil
 }
 
-func (n *Node) LastContact() time.Time {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
-	return n.nodeLastContact
-}
-
 func (n *Node) CoreEssentials() (string, *config.Config, *skills.Skills, error) {
 	address, err := n.CoreAPIAddress()
 	if err != nil {
@@ -317,6 +312,7 @@ func (n *Node) Core() *Core {
 
 func (n *Node) CheckCompatibility(other *Node, skipSkillsCheck bool) {
 	err := n.checkCompatibility(other, skipSkillsCheck)
+
 	n.lock.Lock()
 	n.compatibilityErr = err
 	n.lock.Unlock()
@@ -359,7 +355,7 @@ func (n *Node) checkCompatibility(other *Node, skipSkillsCheck bool) error {
 
 func verifyVersion(local, other string) error {
 	if local != other {
-		return fmt.Errorf("other has version %s", other)
+		return fmt.Errorf("actual: %s, expected %s", local, other)
 	}
 
 	return nil
@@ -494,6 +490,7 @@ func (n *Node) ping(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			start := time.Now()
 			about, err := n.node.About()
+
 			n.lock.Lock()
 			if err == nil {
 				n.version = about.Version
@@ -538,6 +535,7 @@ func (n *Node) updateCore(ctx context.Context, interval time.Duration) {
 		select {
 		case <-ticker.C:
 			address, config, skills, err := n.CoreEssentials()
+
 			n.lock.Lock()
 			if err == nil {
 				n.config = config
@@ -564,8 +562,6 @@ func (n *Node) pingCore(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			start := time.Now()
 			about, err := n.core.About()
-
-			fmt.Printf("%+v\n", about)
 
 			n.lock.Lock()
 			if err == nil {

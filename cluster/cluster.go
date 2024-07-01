@@ -1095,9 +1095,17 @@ func (c *cluster) Resources() (resources.Info, error) {
 }
 
 func (c *cluster) Manager() *clusternode.Manager {
+	if c.manager == nil {
+		return nil
+	}
+
 	return c.manager
 }
 
 func (c *cluster) Store() store.Store {
+	if c.store == nil {
+		return nil
+	}
+
 	return c.store
 }

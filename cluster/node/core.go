@@ -119,21 +119,6 @@ func (n *Core) Reconnect() {
 	n.client = nil
 }
 
-func (n *Core) IsConnected() (bool, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
-	if n.client == nil {
-		return false, ErrNoPeer
-	}
-
-	if n.clientErr != nil {
-		return false, n.clientErr
-	}
-
-	return true, nil
-}
-
 func (n *Core) connect() error {
 	n.lock.Lock()
 
@@ -243,7 +228,6 @@ func (n *Core) connect() error {
 	}
 
 	n.lock.Lock()
-	defer n.lock.Unlock()
 
 	n.secure = secure
 	n.httpAddress = httpAddress
@@ -252,6 +236,8 @@ func (n *Core) connect() error {
 	n.hasSRT = hasSRT
 	n.srtAddress = srtAddress
 	n.client = client
+
+	n.lock.Unlock()
 
 	return nil
 }
@@ -279,14 +265,16 @@ type CoreVersion struct {
 }
 
 func (n *Core) About() (CoreAbout, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return CoreAbout{}, ErrNoPeer
 	}
 
-	about, err := n.client.About(false)
+	about, err := client.About(false)
 	if err != nil {
 		return CoreAbout{}, err
 	}
@@ -324,50 +312,59 @@ func (n *Core) About() (CoreAbout, error) {
 }
 
 func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.ProcessAdd(config, metadata)
+	return client.ProcessAdd(config, metadata)
 }
 
 func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.ProcessCommand(id, command)
+	return client.ProcessCommand(id, command)
 }
 
 func (n *Core) ProcessDelete(id app.ProcessID) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.ProcessDelete(id)
+	return client.ProcessDelete(id)
 }
 
 func (n *Core) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.ProcessUpdate(id, config, metadata)
+	return client.ProcessUpdate(id, config, metadata)
 }
 
 func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
+
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -387,6 +384,7 @@ func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
 }
 
 func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
+
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -406,34 +404,29 @@ func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
 }
 
 func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return nil, ErrNoPeer
 	}
 
-	return n.client.ProcessList(client.ProcessListOptions{
-		ID:            options.ID,
-		Filter:        options.Filter,
-		Domain:        options.Domain,
-		Reference:     options.Reference,
-		IDPattern:     options.IDPattern,
-		RefPattern:    options.RefPattern,
-		OwnerPattern:  options.OwnerPattern,
-		DomainPattern: options.DomainPattern,
-	})
+	return client.ProcessList(options)
 }
 
 func (n *Core) FilesystemList(storage, pattern string) ([]api.FileInfo, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return nil, ErrNoPeer
 	}
 
-	files, err := n.client.FilesystemList(storage, pattern, "", "")
+	files, err := client.FilesystemList(storage, pattern, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -446,36 +439,42 @@ func (n *Core) FilesystemList(storage, pattern string) ([]api.FileInfo, error) {
 }
 
 func (n *Core) FilesystemDeleteFile(storage, path string) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.FilesystemDeleteFile(storage, path)
+	return client.FilesystemDeleteFile(storage, path)
 }
 
 func (n *Core) FilesystemPutFile(storage, path string, data io.Reader) error {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return ErrNoPeer
 	}
 
-	return n.client.FilesystemAddFile(storage, path, data)
+	return client.FilesystemAddFile(storage, path, data)
 }
 
 func (n *Core) FilesystemGetFileInfo(storage, path string) (int64, time.Time, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return 0, time.Time{}, ErrNoPeer
 	}
 
-	info, err := n.client.FilesystemList(storage, path, "", "")
+	info, err := client.FilesystemList(storage, path, "", "")
 	if err != nil {
 		return 0, time.Time{}, fmt.Errorf("file not found: %w", err)
 	}
@@ -488,14 +487,16 @@ func (n *Core) FilesystemGetFileInfo(storage, path string) (int64, time.Time, er
 }
 
 func (n *Core) FilesystemGetFile(storage, path string, offset int64) (io.ReadCloser, error) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
 
-	if n.client == nil {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
 		return nil, ErrNoPeer
 	}
 
-	return n.client.FilesystemGetFileOffset(storage, path, offset)
+	return client.FilesystemGetFileOffset(storage, path, offset)
 }
 
 type NodeFiles struct {
@@ -537,14 +538,15 @@ func (n *Core) ResourcesList() NodeFiles {
 		defer wg.Done()
 
 		n.lock.RLock()
-		defer n.lock.RUnlock()
+		client := n.client
+		n.lock.RUnlock()
 
-		if n.client == nil {
+		if client == nil {
 			e <- ErrNoPeer
 			return
 		}
 
-		files, err := n.client.FilesystemList("mem", "/*", "name", "asc")
+		files, err := client.FilesystemList("mem", "/*", "name", "asc")
 		if err != nil {
 			e <- err
 			return
@@ -559,14 +561,15 @@ func (n *Core) ResourcesList() NodeFiles {
 		defer wg.Done()
 
 		n.lock.RLock()
-		defer n.lock.RUnlock()
+		client := n.client
+		n.lock.RUnlock()
 
-		if n.client == nil {
+		if client == nil {
 			e <- ErrNoPeer
 			return
 		}
 
-		files, err := n.client.FilesystemList("disk", "/*", "name", "asc")
+		files, err := client.FilesystemList("disk", "/*", "name", "asc")
 		if err != nil {
 			e <- err
 			return
@@ -584,14 +587,15 @@ func (n *Core) ResourcesList() NodeFiles {
 			defer wg.Done()
 
 			n.lock.RLock()
-			defer n.lock.RUnlock()
+			client := n.client
+			n.lock.RUnlock()
 
-			if n.client == nil {
+			if client == nil {
 				e <- ErrNoPeer
 				return
 			}
 
-			files, err := n.client.RTMPChannels()
+			files, err := client.RTMPChannels()
 			if err != nil {
 				e <- err
 				return
@@ -610,14 +614,15 @@ func (n *Core) ResourcesList() NodeFiles {
 			defer wg.Done()
 
 			n.lock.RLock()
-			defer n.lock.RUnlock()
+			client := n.client
+			n.lock.RUnlock()
 
-			if n.client == nil {
+			if client == nil {
 				e <- ErrNoPeer
 				return
 			}
 
-			files, err := n.client.SRTChannels()
+			files, err := client.SRTChannels()
 			if err != nil {
 				e <- err
 				return
@@ -692,14 +697,21 @@ func (n *Core) ResourcesGetURL(prefix, path string) (*url.URL, error) {
 func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
 	if prefix == "disk" || prefix == "mem" {
 		return n.FilesystemGetFileInfo(prefix, path)
-	} else if prefix == "rtmp" {
-		n.lock.RLock()
-		defer n.lock.RUnlock()
+	}
 
-		if n.client == nil {
-			return 0, time.Time{}, ErrNoPeer
-		}
+	if prefix != "rtmp" && prefix != "srt" {
+		return 0, time.Time{}, fmt.Errorf("unknown prefix: %s", prefix)
+	}
 
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		return 0, time.Time{}, ErrNoPeer
+	}
+
+	if prefix == "rtmp" {
 		files, err := n.client.RTMPChannels()
 		if err != nil {
 			return 0, time.Time{}, err
@@ -712,14 +724,9 @@ func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
 		}
 
 		return 0, time.Time{}, fmt.Errorf("resource not found")
-	} else if prefix == "srt" {
-		n.lock.RLock()
-		defer n.lock.RUnlock()
+	}
 
-		if n.client == nil {
-			return 0, time.Time{}, ErrNoPeer
-		}
-
+	if prefix == "srt" {
 		files, err := n.client.SRTChannels()
 		if err != nil {
 			return 0, time.Time{}, err
