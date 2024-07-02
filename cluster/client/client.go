@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/datarhei/core/v16/config"
@@ -209,177 +209,6 @@ func (c *APIClient) TransferLeadership(origin, id string) error {
 	return err
 }
 
-func (c *APIClient) AddProcess(origin string, r AddProcessRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/v1/process", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) RemoveProcess(origin string, id app.ProcessID) error {
-	_, err := c.call(http.MethodDelete, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", nil, origin)
-
-	return err
-}
-
-func (c *APIClient) UpdateProcess(origin string, id app.ProcessID, r UpdateProcessRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) SetProcessCommand(origin string, id app.ProcessID, r SetProcessCommandRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"/command?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) SetProcessMetadata(origin string, id app.ProcessID, key string, r SetProcessMetadataRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key)+"?domain="+url.QueryEscape(id.Domain), "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) RelocateProcesses(origin string, r RelocateProcessesRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/relocate", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) AddIdentity(origin string, r AddIdentityRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/v1/iam/user", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) UpdateIdentity(origin, name string, r UpdateIdentityRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/iam/user/"+url.PathEscape(name), "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) SetPolicies(origin, name string, r SetPoliciesRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/iam/user/"+url.PathEscape(name)+"/policies", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) RemoveIdentity(origin string, name string) error {
-	_, err := c.call(http.MethodDelete, "/v1/iam/user/"+url.PathEscape(name), "application/json", nil, origin)
-
-	return err
-}
-
-func (c *APIClient) Lock(origin string, r LockRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/v1/lock", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) Unlock(origin string, name string) error {
-	_, err := c.call(http.MethodDelete, "/v1/lock/"+url.PathEscape(name), "application/json", nil, origin)
-
-	return err
-}
-
-func (c *APIClient) SetKV(origin string, r SetKVRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPost, "/v1/kv", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
-func (c *APIClient) UnsetKV(origin string, key string) error {
-	_, err := c.call(http.MethodDelete, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
-	if err != nil {
-		e, ok := err.(Error)
-		if ok && e.Code == 404 {
-			return fs.ErrNotExist
-		}
-	}
-
-	return err
-}
-
-func (c *APIClient) GetKV(origin string, key string) (string, time.Time, error) {
-	data, err := c.call(http.MethodGet, "/v1/kv/"+url.PathEscape(key), "application/json", nil, origin)
-	if err != nil {
-		e, ok := err.(Error)
-		if ok && e.Code == 404 {
-			return "", time.Time{}, fs.ErrNotExist
-		}
-
-		return "", time.Time{}, err
-	}
-
-	res := GetKVResponse{}
-	err = json.Unmarshal(data, &res)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return res.Value, res.UpdatedAt, nil
-}
-
-func (c *APIClient) SetNodeState(origin string, nodeid string, r SetNodeStateRequest) error {
-	data, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.call(http.MethodPut, "/v1/node/"+url.PathEscape(nodeid)+"/state", "application/json", bytes.NewReader(data), origin)
-
-	return err
-}
-
 func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {
 	return c.stream(http.MethodGet, "/v1/snapshot", "", nil, origin)
 }
@@ -463,5 +292,5 @@ type Error struct {
 }
 
 func (e Error) Error() string {
-	return ""
+	return strings.Join(e.Details, ", ")
 }
