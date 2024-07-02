@@ -505,7 +505,7 @@ type NodeFiles struct {
 	LastUpdate time.Time
 }
 
-func (n *Core) ResourcesList() NodeFiles {
+func (n *Core) MediaList() NodeFiles {
 	files := NodeFiles{
 		ID:         n.id,
 		Files:      []string{},
@@ -673,7 +673,7 @@ func cloneURL(src *url.URL) *url.URL {
 	return dst
 }
 
-func (n *Core) ResourcesGetURL(prefix, path string) (*url.URL, error) {
+func (n *Core) MediaGetURL(prefix, path string) (*url.URL, error) {
 	var u *url.URL
 
 	if prefix == "mem" {
@@ -694,7 +694,7 @@ func (n *Core) ResourcesGetURL(prefix, path string) (*url.URL, error) {
 	return u, nil
 }
 
-func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
+func (n *Core) MediaGetInfo(prefix, path string) (int64, time.Time, error) {
 	if prefix == "disk" || prefix == "mem" {
 		return n.FilesystemGetFileInfo(prefix, path)
 	}
@@ -723,7 +723,7 @@ func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
 			}
 		}
 
-		return 0, time.Time{}, fmt.Errorf("resource not found")
+		return 0, time.Time{}, fmt.Errorf("media not found")
 	}
 
 	if prefix == "srt" {
@@ -738,7 +738,7 @@ func (n *Core) ResourcesGetInfo(prefix, path string) (int64, time.Time, error) {
 			}
 		}
 
-		return 0, time.Time{}, fmt.Errorf("resource not found")
+		return 0, time.Time{}, fmt.Errorf("media not found")
 	}
 
 	return 0, time.Time{}, fmt.Errorf("unknown prefix: %s", prefix)

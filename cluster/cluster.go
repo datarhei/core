@@ -676,7 +676,7 @@ func (c *cluster) Leave(origin, id string) error {
 		id = c.nodeID
 	}
 
-	if !c.manager.NodeHas(id) {
+	if !c.manager.NodeHasNode(id) {
 		return ErrUnknownNode
 	}
 
@@ -908,7 +908,7 @@ func (c *cluster) trackNodeChanges() {
 			for _, server := range servers {
 				id := server.ID
 
-				if !c.manager.NodeHas(id) {
+				if !c.manager.NodeHasNode(id) {
 					logger := c.logger.WithFields(log.Fields{
 						"id":      server.ID,
 						"address": server.Address,

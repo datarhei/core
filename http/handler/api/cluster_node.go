@@ -112,7 +112,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 	return c.JSON(http.StatusOK, version)
 }
 
-// NodeGetResources returns the resources from the proxy node with the given ID
+// NodeGetMedia returns the resources from the proxy node with the given ID
 // @Summary List the resources of a proxy node by its ID
 // @Description List the resources of a proxy node by its ID
 // @Tags v16.?.?
@@ -123,7 +123,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/files [get]
-func (h *ClusterHandler) NodeGetResources(c echo.Context) error {
+func (h *ClusterHandler) NodeGetMedia(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	peer, err := h.proxy.NodeGet(id)
@@ -135,7 +135,7 @@ func (h *ClusterHandler) NodeGetResources(c echo.Context) error {
 		Files: make(map[string][]string),
 	}
 
-	peerFiles := peer.Core().ResourcesList()
+	peerFiles := peer.Core().MediaList()
 
 	files.LastUpdate = peerFiles.LastUpdate.Unix()
 

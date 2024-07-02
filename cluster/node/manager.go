@@ -106,7 +106,7 @@ func (p *Manager) NodesClear() {
 	p.logger.Info().Log("Removed all nodes")
 }
 
-func (p *Manager) NodeHas(id string) bool {
+func (p *Manager) NodeHasNode(id string) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -238,7 +238,7 @@ func (p *Manager) MediaGetURL(prefix, path string) (*url.URL, error) {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
-	url, err := node.Core().ResourcesGetURL(prefix, path)
+	url, err := node.Core().MediaGetURL(prefix, path)
 	if err != nil {
 		logger.Debug().Log("Invalid path")
 		return nil, fmt.Errorf("file not found")
@@ -324,7 +324,7 @@ func (p *Manager) getNodeIDForMedia(prefix, path string) (string, error) {
 		go func(nodeid string, node *Node, p chan<- string) {
 			defer wg.Done()
 
-			_, _, err := node.Core().ResourcesGetInfo(prefix, path)
+			_, _, err := node.Core().MediaGetInfo(prefix, path)
 			if err != nil {
 				nodeid = ""
 			}
