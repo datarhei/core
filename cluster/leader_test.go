@@ -39,7 +39,7 @@ func TestSynchronizeAdd(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -50,7 +50,7 @@ func TestSynchronizeAdd(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -131,7 +131,7 @@ func TestSynchronizeAddDeleted(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -210,7 +210,7 @@ func TestSynchronizeOrderStop(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -221,7 +221,7 @@ func TestSynchronizeOrderStop(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -302,7 +302,7 @@ func TestSynchronizeOrderStart(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -313,7 +313,7 @@ func TestSynchronizeOrderStart(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -406,7 +406,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -417,7 +417,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -508,7 +508,7 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -519,7 +519,7 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -605,7 +605,7 @@ func TestSynchronizeAddReferenceAffinityMultipleEmptyNodes(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -616,7 +616,7 @@ func TestSynchronizeAddReferenceAffinityMultipleEmptyNodes(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -660,7 +660,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -671,7 +671,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -738,7 +738,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -749,7 +749,7 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -790,7 +790,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -801,7 +801,7 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -840,7 +840,7 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -851,7 +851,7 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -896,7 +896,7 @@ func TestSynchronizeRemove(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -907,7 +907,7 @@ func TestSynchronizeRemove(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -981,7 +981,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -992,7 +992,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1081,7 +1081,7 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1092,7 +1092,7 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1150,7 +1150,7 @@ func TestSynchronizeUpdate(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1161,7 +1161,7 @@ func TestSynchronizeUpdate(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1234,7 +1234,7 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1245,7 +1245,7 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1331,7 +1331,7 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1415,7 +1415,7 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1511,7 +1511,7 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -1608,7 +1608,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
@@ -1619,7 +1619,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now().Add(-3 * time.Minute),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				IsThrottling: true,
 				NCPU:         1,
@@ -1681,7 +1681,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      42,
@@ -1692,7 +1692,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      37,
@@ -1748,7 +1748,7 @@ func TestRebalanceOverload(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      91,
@@ -1759,7 +1759,7 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
@@ -1843,7 +1843,7 @@ func TestRebalanceSkip(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      91,
@@ -1854,7 +1854,7 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
@@ -1971,7 +1971,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      90,
@@ -1982,7 +1982,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
@@ -1993,7 +1993,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
@@ -2085,7 +2085,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      27,
@@ -2096,7 +2096,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
@@ -2107,7 +2107,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      0,
@@ -2202,7 +2202,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      27,
@@ -2213,7 +2213,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
@@ -2224,7 +2224,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
+			State:       "online",
 			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      0,
@@ -2283,7 +2283,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 func TestFindBestNodesForProcess(t *testing.T) {
 	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -2294,7 +2294,7 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
@@ -2305,7 +2305,7 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node3": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
 			Resources: node.Resources{
 				NCPU:     1,
