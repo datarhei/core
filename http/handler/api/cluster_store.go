@@ -204,6 +204,7 @@ func (h *ClusterHandler) StoreListPolicies(c echo.Context) error {
 			Name:     pol.Name,
 			Domain:   pol.Domain,
 			Resource: pol.Resource,
+			Types:    pol.Types,
 			Actions:  pol.Actions,
 		})
 	}
