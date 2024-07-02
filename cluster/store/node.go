@@ -21,7 +21,7 @@ func (s *store) setNodeState(cmd CommandSetNodeState) error {
 	return nil
 }
 
-func (s *store) ListNodes() map[string]Node {
+func (s *store) NodeList() map[string]Node {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

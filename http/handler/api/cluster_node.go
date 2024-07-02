@@ -14,7 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// GetNodes returns the list of proxy nodes in the cluster
+// NodeList returns the list of proxy nodes in the cluster
 // @Summary List of proxy nodes in the cluster
 // @Description List of proxy nodes in the cluster
 // @Tags v16.?.?
@@ -24,10 +24,10 @@ import (
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node [get]
-func (h *ClusterHandler) GetNodes(c echo.Context) error {
+func (h *ClusterHandler) NodeList(c echo.Context) error {
 	about, _ := h.cluster.About()
 
-	nodes := h.cluster.ListNodes()
+	nodes := h.cluster.Store().NodeList()
 
 	list := []api.ClusterNode{}
 
@@ -44,7 +44,7 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 	return c.JSON(http.StatusOK, list)
 }
 
-// GetNode returns the proxy node with the given ID
+// NodeGet returns the proxy node with the given ID
 // @Summary List a proxy node by its ID
 // @Description List a proxy node by its ID
 // @Tags v16.?.?
@@ -55,12 +55,12 @@ func (h *ClusterHandler) GetNodes(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id} [get]
-func (h *ClusterHandler) GetNode(c echo.Context) error {
+func (h *ClusterHandler) NodeGet(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	about, _ := h.cluster.About()
 
-	nodes := h.cluster.ListNodes()
+	nodes := h.cluster.Store().NodeList()
 
 	for _, node := range about.Nodes {
 		if node.ID != id {
@@ -79,7 +79,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 	return api.Err(http.StatusNotFound, "", "node not found")
 }
 
-// GetNodeVersion returns the proxy node version with the given ID
+// NodeGetVersion returns the proxy node version with the given ID
 // @Summary List a proxy node by its ID
 // @Description List a proxy node by its ID
 // @Tags v16.?.?
@@ -90,7 +90,7 @@ func (h *ClusterHandler) GetNode(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/version [get]
-func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
+func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	peer, err := h.proxy.NodeGet(id)
@@ -112,7 +112,7 @@ func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 	return c.JSON(http.StatusOK, version)
 }
 
-// GetNodeResources returns the resources from the proxy node with the given ID
+// NodeGetResources returns the resources from the proxy node with the given ID
 // @Summary List the resources of a proxy node by its ID
 // @Description List the resources of a proxy node by its ID
 // @Tags v16.?.?
@@ -123,7 +123,7 @@ func (h *ClusterHandler) GetNodeVersion(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/files [get]
-func (h *ClusterHandler) GetNodeResources(c echo.Context) error {
+func (h *ClusterHandler) NodeGetResources(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	peer, err := h.proxy.NodeGet(id)
@@ -315,7 +315,7 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 	return c.JSON(http.StatusOK, nil)
 }
 
-// ListNodeProcesses returns the list of processes running on a node of the cluster
+// NodeListProcesses returns the list of processes running on a node of the cluster
 // @Summary List of processes in the cluster on a node
 // @Description List of processes in the cluster on a node
 // @Tags v16.?.?
@@ -335,7 +335,7 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/process [get]
-func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
+func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	filter := strings.FieldsFunc(util.DefaultQuery(c, "filter", ""), func(r rune) bool {
@@ -383,7 +383,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 	return c.JSON(http.StatusOK, processes)
 }
 
-// GetNodeState returns the state of a node with the given ID
+// NodeGetState returns the state of a node with the given ID
 // @Summary Get the state of a node with the given ID
 // @Description Get the state of a node with the given ID
 // @Tags v16.?.?
@@ -394,7 +394,7 @@ func (h *ClusterHandler) ListNodeProcesses(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/state [get]
-func (h *ClusterHandler) GetNodeState(c echo.Context) error {
+func (h *ClusterHandler) NodeGetState(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	about, _ := h.cluster.About()
@@ -413,7 +413,7 @@ func (h *ClusterHandler) GetNodeState(c echo.Context) error {
 		return api.Err(http.StatusNotFound, "", "node not found")
 	}
 
-	nodes := h.cluster.ListNodes()
+	nodes := h.cluster.Store().NodeList()
 	if node, hasNode := nodes[id]; hasNode {
 		if node.State == "maintenance" {
 			state = node.State
@@ -425,7 +425,7 @@ func (h *ClusterHandler) GetNodeState(c echo.Context) error {
 	})
 }
 
-// SetNodeState sets the state of a node with the given ID
+// NodeSetState sets the state of a node with the given ID
 // @Summary Set the state of a node with the given ID
 // @Description Set the state of a node with the given ID
 // @Tags v16.?.?
@@ -439,7 +439,7 @@ func (h *ClusterHandler) GetNodeState(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/state [put]
-func (h *ClusterHandler) SetNodeState(c echo.Context) error {
+func (h *ClusterHandler) NodeSetState(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	about, _ := h.cluster.About()
@@ -477,7 +477,7 @@ func (h *ClusterHandler) SetNodeState(c echo.Context) error {
 		return c.JSON(http.StatusOK, "OK")
 	}
 
-	err := h.cluster.SetNodeState("", id, state.State)
+	err := h.cluster.NodeSetState("", id, state.State)
 	if err != nil {
 		if errors.Is(err, cluster.ErrUnsupportedNodeState) {
 			return api.Err(http.StatusBadRequest, "", "%s", err.Error())

@@ -266,7 +266,7 @@ func (h *ClusterHandler) Reallocation(c echo.Context) error {
 		}
 	}
 
-	err := h.cluster.RelocateProcesses("", relocations)
+	err := h.cluster.ProcessesRelocate("", relocations)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}

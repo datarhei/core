@@ -199,7 +199,7 @@ func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
 	return nil
 }
 
-func (s *store) ListProcesses() []Process {
+func (s *store) ProcessList() []Process {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -219,7 +219,7 @@ func (s *store) ListProcesses() []Process {
 	return processes
 }
 
-func (s *store) GetProcess(id app.ProcessID) (Process, error) {
+func (s *store) ProcessGet(id app.ProcessID) (Process, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -238,7 +238,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 	}, nil
 }
 
-func (s *store) GetProcessNodeMap() map[string]string {
+func (s *store) ProcessGetNodeMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -251,7 +251,7 @@ func (s *store) GetProcessNodeMap() map[string]string {
 	return m
 }
 
-func (s *store) GetProcessRelocateMap() map[string]string {
+func (s *store) ProcessGetRelocateMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

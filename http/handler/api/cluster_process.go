@@ -19,7 +19,7 @@ import (
 	"github.com/lithammer/shortuuid/v4"
 )
 
-// GetAllProcesses returns the list of processes running on all nodes of the cluster
+// ProcessList returns the list of processes running on all nodes of the cluster
 // @Summary List of processes in the cluster
 // @Description List of processes in the cluster
 // @Tags v16.?.?
@@ -36,7 +36,7 @@ import (
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [get]
-func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
+func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	filter := newFilter(util.DefaultQuery(c, "filter", ""))
 	reference := util.DefaultQuery(c, "reference", "")
@@ -76,7 +76,7 @@ func (h *ClusterHandler) GetAllProcesses(c echo.Context) error {
 
 	// Here we have to add those processes that are in the cluster DB and couldn't be deployed
 	{
-		processes := h.cluster.StoreListProcesses()
+		processes := h.cluster.Store().ProcessList()
 		filtered := h.getFilteredStoreProcesses(processes, wantids, domain, reference, idpattern, refpattern, ownerpattern, domainpattern)
 
 		for _, p := range filtered {
@@ -292,7 +292,7 @@ func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter
 	return process
 }
 
-// GetProcess returns the process with the given ID whereever it's running on the cluster
+// ProcessGet returns the process with the given ID whereever it's running on the cluster
 // @Summary List a process by its ID
 // @Description List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.
 // @Tags v16.?.?
@@ -306,7 +306,7 @@ func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [get]
-func (h *ClusterHandler) GetProcess(c echo.Context) error {
+func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
 	filter := newFilter(util.DefaultQuery(c, "filter", ""))
@@ -324,7 +324,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 
 	if len(procs) == 0 {
 		// Check the store in the cluster for an undeployed process
-		p, err := h.cluster.StoreGetProcess(app.NewProcessID(id, domain))
+		p, err := h.cluster.Store().ProcessGet(app.NewProcessID(id, domain))
 		if err != nil {
 			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
 		}
@@ -354,7 +354,7 @@ func (h *ClusterHandler) GetProcess(c echo.Context) error {
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [post]
-func (h *ClusterHandler) AddProcess(c echo.Context) error {
+func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 
@@ -389,12 +389,12 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	if err := h.cluster.AddProcess("", config); err != nil {
+	if err := h.cluster.ProcessAdd("", config); err != nil {
 		return api.Err(http.StatusBadRequest, "", "adding process config: %s", err.Error())
 	}
 
 	for key, value := range metadata {
-		h.cluster.SetProcessMetadata("", config.ProcessID(), key, value)
+		h.cluster.ProcessSetMetadata("", config.ProcessID(), key, value)
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -416,7 +416,7 @@ func (h *ClusterHandler) AddProcess(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [put]
-func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
+func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
@@ -436,7 +436,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	pid := process.ProcessID()
 
-	current, err := h.cluster.StoreGetProcess(pid)
+	current, err := h.cluster.Store().ProcessGet(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
@@ -460,7 +460,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	if err := h.cluster.UpdateProcess("", pid, config); err != nil {
+	if err := h.cluster.ProcessUpdate("", pid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
 			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
@@ -471,7 +471,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 	pid = process.ProcessID()
 
 	for key, value := range metadata {
-		h.cluster.SetProcessMetadata("", pid, key, value)
+		h.cluster.ProcessSetMetadata("", pid, key, value)
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -493,7 +493,7 @@ func (h *ClusterHandler) UpdateProcess(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/command [put]
-func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
+func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -522,14 +522,14 @@ func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "unknown command provided. known commands are: start, stop, reload, restart")
 	}
 
-	if err := h.cluster.SetProcessCommand("", pid, command.Command); err != nil {
+	if err := h.cluster.ProcessSetCommand("", pid, command.Command); err != nil {
 		return api.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// SetProcessMetadata stores metadata with a process
+// ProcessSetMetadata stores metadata with a process
 // @Summary Add JSON metadata with a process under the given key
 // @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
 // @Tags v16.?.?
@@ -545,7 +545,7 @@ func (h *ClusterHandler) SetProcessCommand(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/metadata/{key} [put]
-func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
+func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
 	ctxuser := util.DefaultContext(c, "user", "")
@@ -570,14 +570,14 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 		Domain: domain,
 	}
 
-	if err := h.cluster.SetProcessMetadata("", pid, key, data); err != nil {
+	if err := h.cluster.ProcessSetMetadata("", pid, key, data); err != nil {
 		return api.Err(http.StatusNotFound, "", "setting metadata failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
 }
 
-// GetProcessMetadata returns the metadata stored with a process
+// ProcessGetMetadata returns the metadata stored with a process
 // @Summary Retrieve JSON metadata stored with a process under a key
 // @Description Retrieve the previously stored JSON metadata under the given key. If the key is empty, all metadata will be returned.
 // @Tags v16.?.?
@@ -592,7 +592,7 @@ func (h *ClusterHandler) SetProcessMetadata(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/metadata/{key} [get]
-func (h *ClusterHandler) GetProcessMetadata(c echo.Context) error {
+func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
 	ctxuser := util.DefaultContext(c, "user", "")
@@ -607,7 +607,7 @@ func (h *ClusterHandler) GetProcessMetadata(c echo.Context) error {
 		Domain: domain,
 	}
 
-	data, err := h.cluster.GetProcessMetadata("", pid, key)
+	data, err := h.cluster.ProcessGetMetadata("", pid, key)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
@@ -627,7 +627,7 @@ func (h *ClusterHandler) GetProcessMetadata(c echo.Context) error {
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/probe [get]
-func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
+func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -668,7 +668,7 @@ func (h *ClusterHandler) ProbeProcess(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/probe [post]
-func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
+func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	coreid := util.DefaultQuery(c, "coreid", "")
 
@@ -723,7 +723,7 @@ func (h *ClusterHandler) ProbeProcessConfig(c echo.Context) error {
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [delete]
-func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
+func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
@@ -737,7 +737,7 @@ func (h *ClusterHandler) DeleteProcess(c echo.Context) error {
 		Domain: domain,
 	}
 
-	if err := h.cluster.RemoveProcess("", pid); err != nil {
+	if err := h.cluster.ProcessRemove("", pid); err != nil {
 		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 

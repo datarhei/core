@@ -7,12 +7,12 @@ import (
 )
 
 func (c *cluster) ListNodes() map[string]store.Node {
-	return c.store.ListNodes()
+	return c.store.NodeList()
 }
 
 var ErrUnsupportedNodeState = errors.New("unsupported node state")
 
-func (c *cluster) SetNodeState(origin, id, state string) error {
+func (c *cluster) NodeSetState(origin, id, state string) error {
 	switch state {
 	case "online":
 	case "maintenance":

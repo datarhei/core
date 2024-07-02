@@ -368,7 +368,7 @@ func (c *cluster) clearLocks(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			locks := c.ListLocks()
+			locks := c.store.LockList()
 			hasExpiredLocks := false
 
 			for _, validUntil := range locks {

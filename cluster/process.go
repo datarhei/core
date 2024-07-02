@@ -7,15 +7,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 )
 
-func (c *cluster) ListProcesses() []store.Process {
-	return c.store.ListProcesses()
-}
-
-func (c *cluster) GetProcess(id app.ProcessID) (store.Process, error) {
-	return c.store.GetProcess(id)
-}
-
-func (c *cluster) AddProcess(origin string, config *app.Config) error {
+func (c *cluster) ProcessAdd(origin string, config *app.Config) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.AddProcess(origin, config)
 	}
@@ -30,7 +22,7 @@ func (c *cluster) AddProcess(origin string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
+func (c *cluster) ProcessRemove(origin string, id app.ProcessID) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveProcess(origin, id)
 	}
@@ -45,7 +37,7 @@ func (c *cluster) RemoveProcess(origin string, id app.ProcessID) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Config) error {
+func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateProcess(origin, id, config)
 	}
@@ -61,7 +53,7 @@ func (c *cluster) UpdateProcess(origin string, id app.ProcessID, config *app.Con
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command string) error {
+func (c *cluster) ProcessSetCommand(origin string, id app.ProcessID, command string) error {
 	if command == "start" || command == "stop" {
 		if !c.IsRaftLeader() {
 			return c.forwarder.SetProcessCommand(origin, id, command)
@@ -86,7 +78,7 @@ func (c *cluster) SetProcessCommand(origin string, id app.ProcessID, command str
 	return c.manager.ProcessCommand(nodeid, id, command)
 }
 
-func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID]string) error {
+func (c *cluster) ProcessesRelocate(origin string, relocations map[app.ProcessID]string) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.RelocateProcesses(origin, relocations)
 	}
@@ -101,7 +93,7 @@ func (c *cluster) RelocateProcesses(origin string, relocations map[app.ProcessID
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
+func (c *cluster) ProcessSetMetadata(origin string, id app.ProcessID, key string, data interface{}) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetProcessMetadata(origin, id, key, data)
 	}
@@ -118,8 +110,8 @@ func (c *cluster) SetProcessMetadata(origin string, id app.ProcessID, key string
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error) {
-	p, err := c.store.GetProcess(id)
+func (c *cluster) ProcessGetMetadata(origin string, id app.ProcessID, key string) (interface{}, error) {
+	p, err := c.store.ProcessGet(id)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +126,4 @@ func (c *cluster) GetProcessMetadata(origin string, id app.ProcessID, key string
 	}
 
 	return data, nil
-}
-
-func (c *cluster) GetProcessNodeMap() map[string]string {
-	return c.store.GetProcessNodeMap()
 }

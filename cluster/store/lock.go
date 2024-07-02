@@ -51,7 +51,7 @@ func (s *store) clearLocks(_ CommandClearLocks) error {
 	return nil
 }
 
-func (s *store) HasLock(name string) bool {
+func (s *store) LockHasLock(name string) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -60,7 +60,7 @@ func (s *store) HasLock(name string) bool {
 	return ok
 }
 
-func (s *store) ListLocks() map[string]time.Time {
+func (s *store) LockList() map[string]time.Time {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

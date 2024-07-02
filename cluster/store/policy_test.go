@@ -88,7 +88,7 @@ func TestSetPolicies(t *testing.T) {
 	require.Equal(t, 1, len(s.data.Users.Users))
 	require.Equal(t, 0, len(s.data.Policies.Policies))
 
-	users := s.GetUser("foobar")
+	users := s.IAMIdentityGet("foobar")
 	require.NotEmpty(t, users.Users)
 
 	updatedAt := users.Users[0].UpdatedAt
@@ -101,7 +101,7 @@ func TestSetPolicies(t *testing.T) {
 	require.Equal(t, 1, len(s.data.Users.Users))
 	require.Equal(t, 2, len(s.data.Policies.Policies["foobar"]))
 
-	users = s.GetUser("foobar")
+	users = s.IAMIdentityGet("foobar")
 	require.NotEmpty(t, users.Users)
 
 	require.False(t, updatedAt.Equal(users.Users[0].UpdatedAt))

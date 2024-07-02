@@ -89,7 +89,7 @@ func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
 	return nil
 }
 
-func (s *store) ListUsers() Users {
+func (s *store) IAMIdentityList() Users {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -104,7 +104,7 @@ func (s *store) ListUsers() Users {
 	return u
 }
 
-func (s *store) GetUser(name string) Users {
+func (s *store) IAMIdentityGet(name string) Users {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

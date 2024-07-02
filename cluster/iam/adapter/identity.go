@@ -18,7 +18,7 @@ func NewIdentityAdapter(store store.Store) (iamidentity.Adapter, error) {
 }
 
 func (a *identityAdapter) LoadIdentities() ([]iamidentity.User, error) {
-	users := a.store.ListUsers()
+	users := a.store.IAMIdentityList()
 
 	return users.Users, nil
 }

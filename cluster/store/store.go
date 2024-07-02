@@ -20,23 +20,23 @@ type Store interface {
 
 	OnApply(func(op Operation))
 
-	ListProcesses() []Process
-	GetProcess(id app.ProcessID) (Process, error)
-	GetProcessNodeMap() map[string]string
-	GetProcessRelocateMap() map[string]string
+	ProcessList() []Process
+	ProcessGet(id app.ProcessID) (Process, error)
+	ProcessGetNodeMap() map[string]string
+	ProcessGetRelocateMap() map[string]string
 
-	ListUsers() Users
-	GetUser(name string) Users
-	ListPolicies() Policies
-	ListUserPolicies(name string) Policies
+	IAMIdentityList() Users
+	IAMIdentityGet(name string) Users
+	IAMIdentityPolicyList(name string) Policies
+	IAMPolicyList() Policies
 
-	HasLock(name string) bool
-	ListLocks() map[string]time.Time
+	LockHasLock(name string) bool
+	LockList() map[string]time.Time
 
-	ListKVS(prefix string) map[string]Value
-	GetFromKVS(key string) (Value, error)
+	KVSList(prefix string) map[string]Value
+	KVSGetValue(key string) (Value, error)
 
-	ListNodes() map[string]Node
+	NodeList() map[string]Node
 }
 
 type Process struct {

@@ -17,8 +17,8 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	logger.Debug().WithField("emergency", emergency).Log("Relocating")
 
-	relocateMap := c.store.GetProcessRelocateMap()
-	storeNodes := c.store.ListNodes()
+	relocateMap := c.store.ProcessGetRelocateMap()
+	storeNodes := c.store.NodeList()
 	have := c.manager.ClusterProcessList()
 	nodes := c.manager.NodeList()
 
@@ -46,7 +46,7 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	for _, e := range errors {
 		// Only apply the command if the error is different.
-		process, err := c.store.GetProcess(e.processid)
+		process, err := c.store.ProcessGet(e.processid)
 		if err != nil {
 			continue
 		}

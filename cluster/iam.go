@@ -39,13 +39,13 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 }
 
 func (c *cluster) ListIdentities() (time.Time, []iamidentity.User) {
-	users := c.store.ListUsers()
+	users := c.store.IAMIdentityList()
 
 	return users.UpdatedAt, users.Users
 }
 
 func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error) {
-	user := c.store.GetUser(name)
+	user := c.store.IAMIdentityGet(name)
 
 	if len(user.Users) == 0 {
 		return time.Time{}, iamidentity.User{}, fmt.Errorf("not found")
@@ -55,18 +55,18 @@ func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error)
 }
 
 func (c *cluster) ListPolicies() (time.Time, []iamaccess.Policy) {
-	policies := c.store.ListPolicies()
+	policies := c.store.IAMPolicyList()
 
 	return policies.UpdatedAt, policies.Policies
 }
 
 func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) {
-	policies := c.store.ListUserPolicies(name)
+	policies := c.store.IAMIdentityPolicyList(name)
 
 	return policies.UpdatedAt, policies.Policies
 }
 
-func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
+func (c *cluster) IAMIdentityAdd(origin string, identity iamidentity.User) error {
 	if err := identity.Validate(); err != nil {
 		return fmt.Errorf("invalid identity: %w", err)
 	}
@@ -85,7 +85,7 @@ func (c *cluster) AddIdentity(origin string, identity iamidentity.User) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User) error {
+func (c *cluster) IAMIdentityUpdate(origin, name string, identity iamidentity.User) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.UpdateIdentity(origin, name, identity)
 	}
@@ -101,7 +101,7 @@ func (c *cluster) UpdateIdentity(origin, name string, identity iamidentity.User)
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) error {
+func (c *cluster) IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.SetPolicies(origin, name, policies)
 	}
@@ -117,7 +117,7 @@ func (c *cluster) SetPolicies(origin, name string, policies []iamaccess.Policy) 
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) RemoveIdentity(origin string, name string) error {
+func (c *cluster) IAMIdentityRemove(origin string, name string) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.RemoveIdentity(origin, name)
 	}

@@ -12,9 +12,9 @@ import (
 )
 
 func (c *cluster) doSynchronize(emergency bool, term uint64) {
-	wish := c.store.GetProcessNodeMap()
-	want := c.store.ListProcesses()
-	storeNodes := c.store.ListNodes()
+	wish := c.store.ProcessGetNodeMap()
+	want := c.store.ProcessList()
+	storeNodes := c.store.NodeList()
 	have := c.manager.ClusterProcessList()
 	nodes := c.manager.NodeList()
 
@@ -58,7 +58,7 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 	if !emergency {
 		for _, e := range errors {
 			// Only apply the command if the error is different.
-			process, err := c.store.GetProcess(e.processid)
+			process, err := c.store.ProcessGet(e.processid)
 			if err != nil {
 				continue
 			}

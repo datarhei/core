@@ -57,39 +57,28 @@ type Cluster interface {
 	Snapshot(origin string) (io.ReadCloser, error)
 	HasRaftLeader() bool
 
-	StoreListProcesses() []store.Process
-	StoreGetProcess(id app.ProcessID) (store.Process, error)
-
-	AddProcess(origin string, config *app.Config) error
-	RemoveProcess(origin string, id app.ProcessID) error
-	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
-	SetProcessCommand(origin string, id app.ProcessID, order string) error
-	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
-	GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
-	GetProcessNodeMap() map[string]string
-	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
+	ProcessAdd(origin string, config *app.Config) error
+	ProcessRemove(origin string, id app.ProcessID) error
+	ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error
+	ProcessSetCommand(origin string, id app.ProcessID, order string) error
+	ProcessSetMetadata(origin string, id app.ProcessID, key string, data interface{}) error
+	ProcessGetMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
+	ProcessesRelocate(origin string, relocations map[app.ProcessID]string) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
-	ListIdentities() (time.Time, []iamidentity.User)
-	ListIdentity(name string) (time.Time, iamidentity.User, error)
-	ListPolicies() (time.Time, []iamaccess.Policy)
-	ListUserPolicies(name string) (time.Time, []iamaccess.Policy)
-	AddIdentity(origin string, identity iamidentity.User) error
-	UpdateIdentity(origin, name string, identity iamidentity.User) error
-	SetPolicies(origin, name string, policies []iamaccess.Policy) error
-	RemoveIdentity(origin string, name string) error
+	IAMIdentityAdd(origin string, identity iamidentity.User) error
+	IAMIdentityUpdate(origin, name string, identity iamidentity.User) error
+	IAMIdentityRemove(origin string, name string) error
+	IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error
 
-	CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
-	DeleteLock(origin string, name string) error
-	ListLocks() map[string]time.Time
+	LockCreate(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
+	LockDelete(origin string, name string) error
 
-	SetKV(origin, key, value string) error
-	UnsetKV(origin, key string) error
-	GetKV(origin, key string, stale bool) (string, time.Time, error)
-	ListKV(prefix string) map[string]store.Value
+	KVSet(origin, key, value string) error
+	KVUnset(origin, key string) error
+	KVGet(origin, key string, stale bool) (string, time.Time, error)
 
-	ListNodes() map[string]store.Node
-	SetNodeState(origin, id, state string) error
+	NodeSetState(origin, id, state string) error
 
 	Manager() *clusternode.Manager
 	CertManager() autocert.Manager

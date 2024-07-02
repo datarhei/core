@@ -378,7 +378,7 @@ func (a *api) AddProcess(c echo.Context) error {
 
 	a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
 
-	err := a.cluster.AddProcess(origin, &r.Config)
+	err := a.cluster.ProcessAdd(origin, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("Unable to add process")
 		return Err(http.StatusInternalServerError, "", "unable to add process: %s", err.Error())
@@ -414,7 +414,7 @@ func (a *api) RemoveProcess(c echo.Context) error {
 
 	a.logger.Debug().WithField("id", pid).Log("Remove process request")
 
-	err := a.cluster.RemoveProcess(origin, pid)
+	err := a.cluster.ProcessRemove(origin, pid)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to remove process")
 		return Err(http.StatusInternalServerError, "", "unable to remove process: %s", err.Error())
@@ -460,7 +460,7 @@ func (a *api) UpdateProcess(c echo.Context) error {
 		"new_id": r.Config.ProcessID(),
 	}).Log("Update process request")
 
-	err := a.cluster.UpdateProcess(origin, pid, &r.Config)
+	err := a.cluster.ProcessUpdate(origin, pid, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update process")
 		return Err(http.StatusInternalServerError, "", "unable to update process: %s", err.Error())
@@ -500,7 +500,7 @@ func (a *api) SetProcessCommand(c echo.Context) error {
 
 	pid := app.ProcessID{ID: id, Domain: domain}
 
-	err := a.cluster.SetProcessCommand(origin, pid, r.Command)
+	err := a.cluster.ProcessSetCommand(origin, pid, r.Command)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to set order")
 		return Err(http.StatusInternalServerError, "", "unable to set order: %s", err.Error())
@@ -542,7 +542,7 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 
 	pid := app.ProcessID{ID: id, Domain: domain}
 
-	err := a.cluster.SetProcessMetadata(origin, pid, key, r.Metadata)
+	err := a.cluster.ProcessSetMetadata(origin, pid, key, r.Metadata)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update metadata")
 		return Err(http.StatusInternalServerError, "", "unable to update metadata: %s", err.Error())
@@ -575,7 +575,7 @@ func (a *api) RelocateProcesses(c echo.Context) error {
 		return Err(http.StatusLoopDetected, "", "breaking circuit")
 	}
 
-	err := a.cluster.RelocateProcesses(origin, r.Map)
+	err := a.cluster.ProcessesRelocate(origin, r.Map)
 	if err != nil {
 		a.logger.Debug().WithError(err).Log("Unable to apply process relocation request")
 		return Err(http.StatusInternalServerError, "", "unable to apply process relocation request: %s", err.Error())
@@ -613,7 +613,7 @@ func (a *api) AddIdentity(c echo.Context) error {
 
 	a.logger.Debug().WithField("identity", r.Identity).Log("Add identity request")
 
-	err := a.cluster.AddIdentity(origin, r.Identity)
+	err := a.cluster.IAMIdentityAdd(origin, r.Identity)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", r.Identity).Log("Unable to add identity")
 		return Err(http.StatusInternalServerError, "", "unable to add identity: %s", err.Error())
@@ -655,7 +655,7 @@ func (a *api) UpdateIdentity(c echo.Context) error {
 		"identity": r.Identity,
 	}).Log("Update identity request")
 
-	err := a.cluster.UpdateIdentity(origin, name, r.Identity)
+	err := a.cluster.IAMIdentityUpdate(origin, name, r.Identity)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithFields(log.Fields{
 			"name":     name,
@@ -697,7 +697,7 @@ func (a *api) SetIdentityPolicies(c echo.Context) error {
 
 	a.logger.Debug().WithField("policies", r.Policies).Log("Set policiesrequest")
 
-	err := a.cluster.SetPolicies(origin, name, r.Policies)
+	err := a.cluster.IAMPoliciesSet(origin, name, r.Policies)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("policies", r.Policies).Log("Unable to set policies")
 		return Err(http.StatusInternalServerError, "", "unable to add identity: %s", err.Error())
@@ -729,7 +729,7 @@ func (a *api) RemoveIdentity(c echo.Context) error {
 
 	a.logger.Debug().WithField("identity", name).Log("Remove identity request")
 
-	err := a.cluster.RemoveIdentity(origin, name)
+	err := a.cluster.IAMIdentityRemove(origin, name)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", name).Log("Unable to remove identity")
 		return Err(http.StatusInternalServerError, "", "unable to remove identity: %s", err.Error())
@@ -804,7 +804,7 @@ func (a *api) Lock(c echo.Context) error {
 
 	a.logger.Debug().WithField("name", r.Name).Log("Acquire lock")
 
-	_, err := a.cluster.CreateLock(origin, r.Name, r.ValidUntil)
+	_, err := a.cluster.LockCreate(origin, r.Name, r.ValidUntil)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", r.Name).Log("Unable to acquire lock")
 		return Err(http.StatusInternalServerError, "", "unable to acquire lock: %s", err.Error())
@@ -837,7 +837,7 @@ func (a *api) Unlock(c echo.Context) error {
 
 	a.logger.Debug().WithField("name", name).Log("Remove lock request")
 
-	err := a.cluster.DeleteLock(origin, name)
+	err := a.cluster.LockDelete(origin, name)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", name).Log("Unable to remove lock")
 		return Err(http.StatusInternalServerError, "", "unable to remove lock: %s", err.Error())
@@ -873,7 +873,7 @@ func (a *api) SetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", r.Key).Log("Store value")
 
-	err := a.cluster.SetKV(origin, r.Key, r.Value)
+	err := a.cluster.KVSet(origin, r.Key, r.Value)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("key", r.Key).Log("Unable to store value")
 		return Err(http.StatusInternalServerError, "", "unable to store value: %s", err.Error())
@@ -906,7 +906,7 @@ func (a *api) UnsetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", key).Log("Delete key")
 
-	err := a.cluster.UnsetKV(origin, key)
+	err := a.cluster.KVUnset(origin, key)
 	if err != nil {
 		if err == fs.ErrNotExist {
 			a.logger.Debug().WithError(err).WithField("key", key).Log("Delete key: not found")
@@ -943,7 +943,7 @@ func (a *api) GetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", key).Log("Get key")
 
-	value, updatedAt, err := a.cluster.GetKV(origin, key, false)
+	value, updatedAt, err := a.cluster.KVGet(origin, key, false)
 	if err != nil {
 		if err == fs.ErrNotExist {
 			a.logger.Debug().WithError(err).WithField("key", key).Log("Get key: not found")
@@ -994,7 +994,7 @@ func (a *api) SetNodeState(c echo.Context) error {
 		"state": r.State,
 	}).Log("Set node state")
 
-	err := a.cluster.SetNodeState(origin, nodeid, r.State)
+	err := a.cluster.NodeSetState(origin, nodeid, r.State)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithFields(log.Fields{
 			"node":  nodeid,

@@ -45,7 +45,7 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	return nil
 }
 
-func (s *store) ListPolicies() Policies {
+func (s *store) IAMPolicyList() Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -60,7 +60,7 @@ func (s *store) ListPolicies() Policies {
 	return p
 }
 
-func (s *store) ListUserPolicies(name string) Policies {
+func (s *store) IAMIdentityPolicyList(name string) Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

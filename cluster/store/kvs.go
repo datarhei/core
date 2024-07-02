@@ -33,7 +33,7 @@ func (s *store) unsetKV(cmd CommandUnsetKV) error {
 	return nil
 }
 
-func (s *store) ListKVS(prefix string) map[string]Value {
+func (s *store) KVSList(prefix string) map[string]Value {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -50,7 +50,7 @@ func (s *store) ListKVS(prefix string) map[string]Value {
 	return m
 }
 
-func (s *store) GetFromKVS(key string) (Value, error) {
+func (s *store) KVSGetValue(key string) (Value, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
