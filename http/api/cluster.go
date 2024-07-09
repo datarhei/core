@@ -25,6 +25,10 @@ type ClusterNode struct {
 	Resources   ClusterNodeResources `json:"resources"`
 }
 
+type ClusterNodeState struct {
+	State string `json:"state" validate:"required" enums:"online,maintenance,leave" jsonschema:"enum=online,enum=maintenance,enum=leave"`
+}
+
 type ClusterNodeCore struct {
 	Address     string  `json:"address"`
 	Status      string  `json:"status"`
@@ -89,3 +93,14 @@ type ClusterKVSValue struct {
 type ClusterKVS map[string]ClusterKVSValue
 
 type ClusterProcessMap map[string]string
+
+type ClusterProcessReallocate struct {
+	TargetNodeID string      `json:"target_node_id"`
+	Processes    []ProcessID `json:"process_ids"`
+}
+
+type ClusterStoreNode struct {
+	ID        string    `json:"id"`
+	State     string    `json:"state"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

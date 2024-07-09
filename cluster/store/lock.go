@@ -13,7 +13,7 @@ func (s *store) createLock(cmd CommandCreateLock) error {
 
 	if ok {
 		if time.Now().Before(validUntil) {
-			return fmt.Errorf("the lock with the ID '%s' already exists", cmd.Name)
+			return fmt.Errorf("the lock with the ID '%s' already exists%w", cmd.Name, ErrBadRequest)
 		}
 	}
 
@@ -35,7 +35,7 @@ func (s *store) deleteLock(cmd CommandDeleteLock) error {
 	return nil
 }
 
-func (s *store) clearLocks(cmd CommandClearLocks) error {
+func (s *store) clearLocks(_ CommandClearLocks) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -51,7 +51,7 @@ func (s *store) clearLocks(cmd CommandClearLocks) error {
 	return nil
 }
 
-func (s *store) HasLock(name string) bool {
+func (s *store) LockHasLock(name string) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -60,7 +60,7 @@ func (s *store) HasLock(name string) bool {
 	return ok
 }
 
-func (s *store) ListLocks() map[string]time.Time {
+func (s *store) LockList() map[string]time.Time {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

@@ -122,11 +122,23 @@ definitions:
       valid_until:
         type: string
     type: object
+  client.RelocateProcessesRequest:
+    properties:
+      map:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   client.SetKVRequest:
     properties:
       key:
         type: string
       value:
+        type: string
+    type: object
+  client.SetNodeStateRequest:
+    properties:
+      state:
         type: string
     type: object
   client.SetPoliciesRequest:
@@ -1268,6 +1280,43 @@ paths:
       summary: Remove a lock
       tags:
       - v1.0.0
+  /v1/node/{id}/state:
+    get:
+      description: Set a state for a node
+      operationId: cluster-1-node-set-state
+      parameters:
+      - description: Set node state request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetNodeStateRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Set a state for a node
+      tags:
+      - v1.0.0
   /v1/process:
     post:
       consumes:
@@ -1464,6 +1513,35 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Add JSON metadata with a process under the given key
+      tags:
+      - v1.0.0
+  /v1/relocate:
+    put:
+      description: Relocate processes to another node.
+      operationId: cluster-3-relocate-processes
+      parameters:
+      - description: List of processes to relocate
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.RelocateProcessesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Relocate processes to another node
       tags:
       - v1.0.0
   /v1/server:

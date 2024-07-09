@@ -59,7 +59,7 @@ func DiffEqualer[T any, X Equaler[T]](listA []T, listB []X) ([]T, []X) {
 			if visited[j] {
 				continue
 			}
-			if listB[j].Equal(element) {
+			if listB[j].Equal(element) == nil {
 				visited[j] = true
 				found = true
 				break

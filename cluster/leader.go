@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,11 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
-	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/maps"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -380,12 +377,9 @@ func (c *cluster) synchronizeAndRebalance(ctx context.Context, interval time.Dur
 			return
 		case <-ticker.C:
 			if !emergency {
-				if ok, _ := c.IsDegraded(); ok {
-					break
-				}
-
 				c.doSynchronize(emergency, term)
 				c.doRebalance(emergency, term)
+				c.doRelocate(emergency, term)
 			} else {
 				c.doSynchronize(emergency, term)
 			}
@@ -404,7 +398,7 @@ func (c *cluster) clearLocks(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			locks := c.ListLocks()
+			locks := c.store.LockList()
 			hasExpiredLocks := false
 
 			for _, validUntil := range locks {
@@ -429,6 +423,7 @@ func (c *cluster) clearLocks(ctx context.Context, interval time.Duration) {
 
 var errNotEnoughResourcesForDeployment = errors.New("no node with enough resources for deployment is available")
 var errNotEnoughResourcesForRebalancing = errors.New("no node with enough resources for rebalancing is available")
+var errNotEnoughResourcesForRelocating = errors.New("no node with enough resources for relocating is available")
 var errNoLimitsDefined = errors.New("this process has no limits defined")
 
 type processOpDelete struct {
@@ -441,6 +436,7 @@ type processOpMove struct {
 	toNodeid   string
 	config     *app.Config
 	metadata   map[string]interface{}
+	order      string
 }
 
 type processOpStart struct {
@@ -486,129 +482,169 @@ type processOpError struct {
 func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpError {
 	errors := []processOpError{}
 
-	logger := c.logger.WithField("term", term)
+	logger := c.logger.WithFields(log.Fields{
+		"term":    term,
+		"logname": "opstack",
+	})
 
+	errChan := make(chan processOpError, len(stack))
+
+	wgReader := sync.WaitGroup{}
+	wgReader.Add(1)
+	go func(errChan <-chan processOpError) {
+		for opErr := range errChan {
+			errors = append(errors, opErr)
+		}
+
+		wgReader.Done()
+	}(errChan)
+
+	wg := sync.WaitGroup{}
 	for _, op := range stack {
-		switch v := op.(type) {
-		case processOpAdd:
-			err := c.proxy.AddProcess(v.nodeid, v.config, v.metadata)
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.config.ProcessID(),
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.config.ProcessID(),
-					"nodeid":    v.nodeid,
-				}).Log("Adding process")
-				break
-			}
+		wg.Add(1)
 
-			if v.order == "start" {
-				err = c.proxy.CommandProcess(v.nodeid, v.config.ProcessID(), "start")
-				if err != nil {
-					errors = append(errors, processOpError{
-						processid: v.config.ProcessID(),
-						err:       err,
-					})
-					logger.Info().WithError(err).WithFields(log.Fields{
-						"processid": v.config.ProcessID(),
-						"nodeid":    v.nodeid,
-					}).Log("Starting process")
-					break
-				}
+		go func(errChan chan<- processOpError, op interface{}, logger log.Logger) {
+			opErr := c.applyOp(op, logger)
+			if opErr.err != nil {
+				errChan <- opErr
 			}
+			wg.Done()
+		}(errChan, op, logger)
+	}
 
-			errors = append(errors, processOpError{
+	wg.Wait()
+
+	close(errChan)
+
+	wgReader.Wait()
+
+	return errors
+}
+
+func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
+	opErr := processOpError{}
+
+	switch v := op.(type) {
+	case processOpAdd:
+		err := c.manager.ProcessAdd(v.nodeid, v.config, v.metadata)
+		if err != nil {
+			opErr = processOpError{
 				processid: v.config.ProcessID(),
-				err:       nil,
-			})
-
-			logger.Info().WithFields(log.Fields{
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
 				"processid": v.config.ProcessID(),
 				"nodeid":    v.nodeid,
 			}).Log("Adding process")
-		case processOpUpdate:
-			err := c.proxy.UpdateProcess(v.nodeid, v.processid, v.config, v.metadata)
+			break
+		}
+
+		if v.order == "start" {
+			err = c.manager.ProcessCommand(v.nodeid, v.config.ProcessID(), "start")
 			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.processid,
+				opErr = processOpError{
+					processid: v.config.ProcessID(),
 					err:       err,
-				})
+				}
 				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.processid,
+					"processid": v.config.ProcessID(),
 					"nodeid":    v.nodeid,
-				}).Log("Updating process")
+				}).Log("Starting process")
 				break
 			}
+		}
 
-			errors = append(errors, processOpError{
+		opErr = processOpError{
+			processid: v.config.ProcessID(),
+			err:       nil,
+		}
+
+		logger.Info().WithFields(log.Fields{
+			"processid": v.config.ProcessID(),
+			"nodeid":    v.nodeid,
+		}).Log("Adding process")
+	case processOpUpdate:
+		err := c.manager.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
+		if err != nil {
+			opErr = processOpError{
 				processid: v.processid,
-				err:       nil,
-			})
-
-			logger.Info().WithFields(log.Fields{
-				"processid": v.config.ProcessID(),
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Updating process")
-		case processOpDelete:
-			err := c.proxy.DeleteProcess(v.nodeid, v.processid)
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.processid,
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.processid,
-					"nodeid":    v.nodeid,
-				}).Log("Removing process")
-				break
-			}
+			break
+		}
 
-			errors = append(errors, processOpError{
+		opErr = processOpError{
+			processid: v.processid,
+			err:       nil,
+		}
+
+		logger.Info().WithFields(log.Fields{
+			"processid": v.config.ProcessID(),
+			"nodeid":    v.nodeid,
+		}).Log("Updating process")
+	case processOpDelete:
+		err := c.manager.ProcessDelete(v.nodeid, v.processid)
+		if err != nil {
+			opErr = processOpError{
 				processid: v.processid,
-				err:       nil,
-			})
-
-			logger.Info().WithFields(log.Fields{
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Removing process")
-		case processOpMove:
-			err := c.proxy.AddProcess(v.toNodeid, v.config, v.metadata)
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.config.ProcessID(),
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ProcessID(),
-					"fromnodeid": v.fromNodeid,
-					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, adding process")
-				break
-			}
+			break
+		}
 
-			err = c.proxy.DeleteProcess(v.fromNodeid, v.config.ProcessID())
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.config.ProcessID(),
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid":  v.config.ProcessID(),
-					"fromnodeid": v.fromNodeid,
-					"tonodeid":   v.toNodeid,
-				}).Log("Moving process, removing process")
-				break
-			}
+		opErr = processOpError{
+			processid: v.processid,
+			err:       nil,
+		}
 
-			err = c.proxy.CommandProcess(v.toNodeid, v.config.ProcessID(), "start")
+		logger.Info().WithFields(log.Fields{
+			"processid": v.processid,
+			"nodeid":    v.nodeid,
+		}).Log("Removing process")
+	case processOpMove:
+		err := c.manager.ProcessAdd(v.toNodeid, v.config, v.metadata)
+		if err != nil {
+			opErr = processOpError{
+				processid: v.config.ProcessID(),
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid":  v.config.ProcessID(),
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process, adding process")
+			break
+		}
+
+		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
+		if err != nil {
+			opErr = processOpError{
+				processid: v.config.ProcessID(),
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid":  v.config.ProcessID(),
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process, removing process")
+			break
+		}
+
+		if v.order == "start" {
+			err = c.manager.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
-				errors = append(errors, processOpError{
+				opErr = processOpError{
 					processid: v.config.ProcessID(),
 					err:       err,
-				})
+				}
 				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
@@ -616,750 +652,91 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 				}).Log("Moving process, starting process")
 				break
 			}
+		}
 
-			errors = append(errors, processOpError{
-				processid: v.config.ProcessID(),
-				err:       nil,
-			})
+		opErr = processOpError{
+			processid: v.config.ProcessID(),
+			err:       nil,
+		}
 
-			logger.Info().WithFields(log.Fields{
-				"processid":  v.config.ProcessID(),
-				"fromnodeid": v.fromNodeid,
-				"tonodeid":   v.toNodeid,
-			}).Log("Moving process")
-		case processOpStart:
-			err := c.proxy.CommandProcess(v.nodeid, v.processid, "start")
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.processid,
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.processid,
-					"nodeid":    v.nodeid,
-				}).Log("Starting process")
-				break
-			}
-
-			errors = append(errors, processOpError{
+		logger.Info().WithFields(log.Fields{
+			"processid":  v.config.ProcessID(),
+			"fromnodeid": v.fromNodeid,
+			"tonodeid":   v.toNodeid,
+		}).Log("Moving process")
+	case processOpStart:
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "start")
+		if err != nil {
+			opErr = processOpError{
 				processid: v.processid,
-				err:       nil,
-			})
-
-			logger.Info().WithFields(log.Fields{
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Starting process")
-		case processOpStop:
-			err := c.proxy.CommandProcess(v.nodeid, v.processid, "stop")
-			if err != nil {
-				errors = append(errors, processOpError{
-					processid: v.processid,
-					err:       err,
-				})
-				logger.Info().WithError(err).WithFields(log.Fields{
-					"processid": v.processid,
-					"nodeid":    v.nodeid,
-				}).Log("Stopping process")
-				break
-			}
+			break
+		}
 
-			errors = append(errors, processOpError{
+		opErr = processOpError{
+			processid: v.processid,
+			err:       nil,
+		}
+
+		logger.Info().WithFields(log.Fields{
+			"processid": v.processid,
+			"nodeid":    v.nodeid,
+		}).Log("Starting process")
+	case processOpStop:
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "stop")
+		if err != nil {
+			opErr = processOpError{
 				processid: v.processid,
-				err:       nil,
-			})
-
-			logger.Info().WithFields(log.Fields{
+				err:       err,
+			}
+			logger.Info().WithError(err).WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
 			}).Log("Stopping process")
-		case processOpReject:
-			errors = append(errors, processOpError(v))
-			logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
-		case processOpSkip:
-			errors = append(errors, processOpError{
-				processid: v.processid,
-				err:       v.err,
-			})
-			logger.Warn().WithError(v.err).WithFields(log.Fields{
-				"nodeid":    v.nodeid,
-				"processid": v.processid,
-			}).Log("Process skipped")
-		case processOpError:
-			errors = append(errors, v)
-		default:
-			logger.Warn().Log("Unknown operation on stack: %+v", v)
-		}
-	}
-
-	return errors
-}
-
-func (c *cluster) doSynchronize(emergency bool, term uint64) {
-	wish := c.store.GetProcessNodeMap()
-	want := c.store.ListProcesses()
-	have := c.proxy.ListProxyProcesses()
-	nodes := c.proxy.ListNodes()
-
-	logger := c.logger.WithField("term", term)
-
-	logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
-
-	nodesMap := map[string]proxy.NodeAbout{}
-
-	for _, node := range nodes {
-		about := node.About()
-		nodesMap[about.ID] = about
-	}
-
-	logger.Debug().WithFields(log.Fields{
-		"want":  want,
-		"have":  have,
-		"nodes": nodesMap,
-	}).Log("Synchronize")
-
-	opStack, _, reality := synchronize(wish, want, have, nodesMap, c.nodeRecoverTimeout)
-
-	if !emergency && !maps.Equal(wish, reality) {
-		cmd := &store.Command{
-			Operation: store.OpSetProcessNodeMap,
-			Data: store.CommandSetProcessNodeMap{
-				Map: reality,
-			},
-		}
-
-		c.applyCommand(cmd)
-	}
-
-	errors := c.applyOpStack(opStack, term)
-
-	if !emergency {
-		for _, e := range errors {
-			// Only apply the command if the error is different.
-			process, err := c.store.GetProcess(e.processid)
-			if err != nil {
-				continue
-			}
-
-			var errmessage string = ""
-
-			if e.err != nil {
-				if process.Error == e.err.Error() {
-					continue
-				}
-
-				errmessage = e.err.Error()
-			} else {
-				if len(process.Error) == 0 {
-					continue
-				}
-			}
-
-			cmd := &store.Command{
-				Operation: store.OpSetProcessError,
-				Data: store.CommandSetProcessError{
-					ID:    e.processid,
-					Error: errmessage,
-				},
-			}
-
-			c.applyCommand(cmd)
-		}
-	}
-}
-
-func (c *cluster) doRebalance(emergency bool, term uint64) {
-	if emergency {
-		// Don't rebalance in emergency mode
-		return
-	}
-
-	logger := c.logger.WithField("term", term)
-
-	logger.Debug().WithField("emergency", emergency).Log("Rebalancing")
-
-	have := c.proxy.ListProxyProcesses()
-	nodes := c.proxy.ListNodes()
-
-	nodesMap := map[string]proxy.NodeAbout{}
-
-	for _, node := range nodes {
-		about := node.About()
-		nodesMap[about.ID] = about
-	}
-
-	logger.Debug().WithFields(log.Fields{
-		"have":  have,
-		"nodes": nodesMap,
-	}).Log("Rebalance")
-
-	opStack, _ := rebalance(have, nodesMap)
-
-	errors := c.applyOpStack(opStack, term)
-
-	for _, e := range errors {
-		// Only apply the command if the error is different.
-		process, err := c.store.GetProcess(e.processid)
-		if err != nil {
-			continue
-		}
-
-		var errmessage string = ""
-
-		if e.err != nil {
-			if process.Error == e.err.Error() {
-				continue
-			}
-
-			errmessage = e.err.Error()
-		} else {
-			if len(process.Error) == 0 {
-				continue
-			}
-		}
-
-		cmd := &store.Command{
-			Operation: store.OpSetProcessError,
-			Data: store.CommandSetProcessError{
-				ID:    e.processid,
-				Error: errmessage,
-			},
-		}
-
-		c.applyCommand(cmd)
-	}
-}
-
-// isMetadataUpdateRequired compares two metadata. It relies on the documented property that json.Marshal
-// sorts the map keys prior encoding.
-func isMetadataUpdateRequired(wantMap map[string]interface{}, haveMap map[string]interface{}) (bool, map[string]interface{}) {
-	hasChanges := false
-	changeMap := map[string]interface{}{}
-
-	haveMapKeys := map[string]struct{}{}
-
-	for key := range haveMap {
-		haveMapKeys[key] = struct{}{}
-	}
-
-	for key, wantMapValue := range wantMap {
-		haveMapValue, ok := haveMap[key]
-		if !ok {
-			// A key in map1 exists, that doesn't exist in map2, we need to update
-			hasChanges = true
-		}
-
-		// Compare the values
-		changesData, err := json.Marshal(wantMapValue)
-		if err != nil {
-			continue
-		}
-
-		completeData, err := json.Marshal(haveMapValue)
-		if err != nil {
-			continue
-		}
-
-		if !bytes.Equal(changesData, completeData) {
-			// The values are not equal, we need to update
-			hasChanges = true
-		}
-
-		delete(haveMapKeys, key)
-
-		changeMap[key] = wantMapValue
-	}
-
-	for key := range haveMapKeys {
-		// If there keys in map2 that are not in map1, we have to update
-		hasChanges = true
-		changeMap[key] = nil
-	}
-
-	return hasChanges, changeMap
-}
-
-// synchronize returns a list of operations in order to adjust the "have" list to the "want" list
-// with taking the available resources on each node into account.
-func synchronize(wish map[string]string, want []store.Process, have []proxy.Process, nodes map[string]proxy.NodeAbout, nodeRecoverTimeout time.Duration) ([]interface{}, map[string]proxy.NodeResources, map[string]string) {
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
-
-	// A map same as wish, but reflecting the actual situation.
-	reality := map[string]string{}
-
-	// A map from the process ID to the process config of the processes
-	// we want to be running on the nodes.
-	wantMap := map[string]store.Process{}
-	for _, wantP := range want {
-		pid := wantP.Config.ProcessID().String()
-		wantMap[pid] = wantP
-	}
-
-	opStack := []interface{}{}
-
-	// Now we iterate through the processes we actually have running on the nodes
-	// and remove them from the wantMap. We also make sure that they have the correct order.
-	// If a process cannot be found on the wantMap, it will be deleted from the nodes.
-	haveAfterRemove := []proxy.Process{}
-	wantOrderStart := []proxy.Process{}
-
-	for _, haveP := range have {
-		pid := haveP.Config.ProcessID().String()
-		wantP, ok := wantMap[pid]
-		if !ok {
-			// The process is not on the wantMap. Delete it and adjust the resources.
-			opStack = append(opStack, processOpDelete{
-				nodeid:    haveP.NodeID,
-				processid: haveP.Config.ProcessID(),
-			})
-
-			r, ok := resources[haveP.NodeID]
-			if ok {
-				r.CPU -= haveP.CPU
-				r.Mem -= haveP.Mem
-				resources[haveP.NodeID] = r
-			}
-
-			continue
-		}
-
-		// The process is on the wantMap. Update the process if the configuration and/or metadata differ.
-		hasConfigChanges := !wantP.Config.Equal(haveP.Config)
-		hasMetadataChanges, metadata := isMetadataUpdateRequired(wantP.Metadata, haveP.Metadata)
-		if hasConfigChanges || hasMetadataChanges {
-			// TODO: When the required resources increase, should we move this process to a node
-			// that has them available? Otherwise, this node might start throttling. However, this
-			// will result in rebalancing.
-			opStack = append(opStack, processOpUpdate{
-				nodeid:    haveP.NodeID,
-				processid: haveP.Config.ProcessID(),
-				config:    wantP.Config,
-				metadata:  metadata,
-			})
-		}
-
-		delete(wantMap, pid)
-		reality[pid] = haveP.NodeID
-
-		if haveP.Order != wantP.Order {
-			if wantP.Order == "start" {
-				// Delay pushing them to the stack in order to have
-				// all resources released first.
-				wantOrderStart = append(wantOrderStart, haveP)
-			} else {
-				opStack = append(opStack, processOpStop{
-					nodeid:    haveP.NodeID,
-					processid: haveP.Config.ProcessID(),
-				})
-
-				// Release the resources
-				r, ok := resources[haveP.NodeID]
-				if ok {
-					r.CPU -= haveP.CPU
-					r.Mem -= haveP.Mem
-					resources[haveP.NodeID] = r
-				}
-			}
-		}
-
-		haveAfterRemove = append(haveAfterRemove, haveP)
-	}
-
-	for _, haveP := range wantOrderStart {
-		nodeid := haveP.NodeID
-
-		r, ok := resources[nodeid]
-		if ok {
-			// Consume the resources
-			r.CPU += haveP.Config.LimitCPU
-			r.Mem += haveP.Config.LimitMemory
-			resources[nodeid] = r
-
-			// TODO: check if the current node has actually enough resources available,
-			// otherwise it needs to be moved somewhere else. If the node doesn't
-			// have enough resources available, the process will be prevented
-			// from starting.
-
-			/*
-				if hasNodeEnoughResources(r, haveP.Config.LimitCPU, haveP.Config.LimitMemory) {
-					// Consume the resources
-					r.CPU += haveP.Config.LimitCPU
-					r.Mem += haveP.Config.LimitMemory
-					resources[nodeid] = r
-				} else {
-					nodeid = findBestNodeForProcess(resources, haveP.Config.LimitCPU, haveP.Config.LimitMemory)
-					if len(nodeid) == 0 {
-						// Start it anyways and let it run into an error
-						opStack = append(opStack, processOpStart{
-							nodeid:    nodeid,
-							processid: haveP.Config.ProcessID(),
-						})
-
-						continue
-					}
-
-					if nodeid != haveP.NodeID {
-						opStack = append(opStack, processOpMove{
-							fromNodeid: haveP.NodeID,
-							toNodeid:   nodeid,
-							config:     haveP.Config,
-							metadata:   haveP.Metadata,
-						})
-					}
-
-					// Consume the resources
-					r, ok := resources[nodeid]
-					if ok {
-						r.CPU += haveP.Config.LimitCPU
-						r.Mem += haveP.Config.LimitMemory
-						resources[nodeid] = r
-					}
-				}
-			*/
-		}
-
-		opStack = append(opStack, processOpStart{
-			nodeid:    nodeid,
-			processid: haveP.Config.ProcessID(),
-		})
-	}
-
-	have = haveAfterRemove
-
-	// In case a node didn't respond, some PID are still on the wantMap, that would run on
-	// the currently not responding nodes. We use the wish map to assign them to the node.
-	// If the node is unavailable for too long, keep these processes on the wantMap, otherwise
-	// remove them and hope that they will reappear during the nodeRecoverTimeout.
-	for pid := range wantMap {
-		// Check if this PID is be assigned to a node.
-		if nodeid, ok := wish[pid]; ok {
-			// Check for how long the node hasn't been contacted, or if it still exists.
-			if node, ok := nodes[nodeid]; ok {
-				if node.State != "disconnected" {
-					continue
-				}
-
-				if time.Since(node.LastContact) <= nodeRecoverTimeout {
-					reality[pid] = nodeid
-					delete(wantMap, pid)
-				}
-			}
-		}
-	}
-
-	// The wantMap now contains only those processes that need to be installed on a node.
-	// We will rebuild the "want" array from the wantMap in the same order as the original
-	// "want" array to make the resulting opStack deterministic.
-	wantReduced := []store.Process{}
-	for _, wantP := range want {
-		pid := wantP.Config.ProcessID().String()
-		if _, ok := wantMap[pid]; !ok {
-			continue
-		}
-
-		wantReduced = append(wantReduced, wantP)
-	}
-
-	// Create a map from the process reference to the node it is running on.
-	haveReferenceAffinityMap := createReferenceAffinityMap(have)
-
-	// Now, all remaining processes in the wantMap must be added to one of the nodes.
-	for _, wantP := range wantReduced {
-		pid := wantP.Config.ProcessID().String()
-		reference := wantP.Config.Reference + "@" + wantP.Config.Domain
-
-		// If a process doesn't have any limits defined, reject that process
-		if wantP.Config.LimitCPU <= 0 || wantP.Config.LimitMemory <= 0 {
-			opStack = append(opStack, processOpReject{
-				processid: wantP.Config.ProcessID(),
-				err:       errNoLimitsDefined,
-			})
-
-			continue
-		}
-
-		// Check if there are already processes with the same reference, and if so
-		// choose this node. Then check the node if it has enough resources left. If
-		// not, then select a node with the most available resources.
-		nodeid := ""
-
-		// Try to add the process to a node where other processes with the same reference currently reside.
-		if len(wantP.Config.Reference) != 0 {
-			for _, count := range haveReferenceAffinityMap[reference] {
-				if hasNodeEnoughResources(resources[count.nodeid], wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
-					nodeid = count.nodeid
-					break
-				}
-			}
-		}
-
-		// Find the node with the most resources available
-		if len(nodeid) == 0 {
-			nodeid = findBestNodeForProcess(resources, wantP.Config.LimitCPU, wantP.Config.LimitMemory)
-		}
-
-		if len(nodeid) != 0 {
-			opStack = append(opStack, processOpAdd{
-				nodeid:   nodeid,
-				config:   wantP.Config,
-				metadata: wantP.Metadata,
-				order:    wantP.Order,
-			})
-
-			// Consume the resources
-			r, ok := resources[nodeid]
-			if ok {
-				r.CPU += wantP.Config.LimitCPU
-				r.Mem += wantP.Config.LimitMemory
-				resources[nodeid] = r
-			}
-
-			reality[pid] = nodeid
-
-			haveReferenceAffinityMap = updateReferenceAffinityMap(haveReferenceAffinityMap, reference, nodeid)
-		} else {
-			opStack = append(opStack, processOpReject{
-				processid: wantP.Config.ProcessID(),
-				err:       errNotEnoughResourcesForDeployment,
-			})
-		}
-	}
-
-	return opStack, resources, reality
-}
-
-// hasNodeEnoughResources returns whether a node has enough resources available for the
-// requested cpu and memory consumption.
-func hasNodeEnoughResources(r proxy.NodeResources, cpu float64, mem uint64) bool {
-	if r.CPU+cpu < r.CPULimit && r.Mem+mem < r.MemLimit && !r.IsThrottling {
-		return true
-	}
-
-	return false
-}
-
-// findBestNodeForProcess returns the nodeid that can fit the requested cpu and memory requirements. If no
-// such node is available, an empty string is returned.
-func findBestNodeForProcess(resources map[string]proxy.NodeResources, cpu float64, mem uint64) string {
-	nodeid := ""
-
-	for id, r := range resources {
-		if len(nodeid) == 0 {
-			if hasNodeEnoughResources(r, cpu, mem) {
-				nodeid = id
-			}
-
-			continue
-		}
-
-		if r.CPU < resources[nodeid].CPU && r.Mem <= resources[nodeid].Mem {
-			nodeid = id
-		}
-	}
-
-	return nodeid
-}
-
-type referenceAffinityNodeCount struct {
-	nodeid string
-	count  uint64
-}
-
-// createReferenceAffinityMap returns a map of references (per domain) to an array of nodes this reference
-// is found on and their count. The array is sorted by the count, the highest first.
-func createReferenceAffinityMap(processes []proxy.Process) map[string][]referenceAffinityNodeCount {
-	referenceAffinityMap := map[string][]referenceAffinityNodeCount{}
-	for _, p := range processes {
-		if len(p.Config.Reference) == 0 {
-			continue
-		}
-
-		ref := p.Config.Reference + "@" + p.Config.Domain
-
-		// Here we count how often a reference is present on a node. When
-		// moving processes to a different node, the node with the highest
-		// count of same references will be the first candidate.
-		found := false
-		arr := referenceAffinityMap[ref]
-		for i, count := range arr {
-			if count.nodeid == p.NodeID {
-				count.count++
-				arr[i] = count
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			arr = append(arr, referenceAffinityNodeCount{
-				nodeid: p.NodeID,
-				count:  1,
-			})
-		}
-
-		referenceAffinityMap[ref] = arr
-	}
-
-	// Sort every reference count in decreasing order for each reference
-	for ref, count := range referenceAffinityMap {
-		sort.SliceStable(count, func(a, b int) bool {
-			return count[a].count > count[b].count
-		})
-
-		referenceAffinityMap[ref] = count
-	}
-
-	return referenceAffinityMap
-}
-
-func updateReferenceAffinityMap(raMap map[string][]referenceAffinityNodeCount, reference, nodeid string) map[string][]referenceAffinityNodeCount {
-	counts, ok := raMap[reference]
-	if !ok {
-		raMap[reference] = []referenceAffinityNodeCount{
-			{
-				nodeid: nodeid,
-				count:  1,
-			},
-		}
-
-		return raMap
-	}
-
-	found := false
-	for i, count := range counts {
-		if count.nodeid == nodeid {
-			count.count++
-			counts[i] = count
-			found = true
 			break
 		}
-	}
 
-	if !found {
-		counts = append(counts, referenceAffinityNodeCount{
-			nodeid: nodeid,
-			count:  1,
-		})
-	}
-
-	raMap[reference] = counts
-
-	return raMap
-}
-
-// rebalance returns a list of operations that will move running processes away from nodes that are overloaded.
-func rebalance(have []proxy.Process, nodes map[string]proxy.NodeAbout) ([]interface{}, map[string]proxy.NodeResources) {
-	resources := map[string]proxy.NodeResources{}
-	for nodeid, about := range nodes {
-		resources[nodeid] = about.Resources
-	}
-
-	// Group all running processes by node and sort them by their runtime in ascending order.
-	nodeProcessMap := createNodeProcessMap(have)
-
-	// A map from the process reference to the nodes it is running on
-	haveReferenceAffinityMap := createReferenceAffinityMap(have)
-
-	opStack := []interface{}{}
-
-	// Check if any of the nodes is overloaded
-	for id, node := range nodes {
-		r := node.Resources
-
-		// Ignore this node if the resource values are not reliable
-		if r.Error != nil {
-			continue
+		opErr = processOpError{
+			processid: v.processid,
+			err:       nil,
 		}
 
-		// Check if node is overloaded
-		if r.CPU < r.CPULimit && r.Mem < r.MemLimit && !r.IsThrottling {
-			continue
+		logger.Info().WithFields(log.Fields{
+			"processid": v.processid,
+			"nodeid":    v.nodeid,
+		}).Log("Stopping process")
+	case processOpReject:
+		opErr = processOpError(v)
+		logger.Warn().WithError(v.err).WithField("processid", v.processid).Log("Process rejected")
+	case processOpSkip:
+		opErr = processOpError{
+			processid: v.processid,
+			err:       v.err,
 		}
-
-		// Move processes from this noed to another node with enough free resources.
-		// The processes are ordered ascending by their runtime.
-		processes := nodeProcessMap[id]
-		if len(processes) == 0 {
-			// If there are no processes on that node, we can't do anything
-			continue
-		}
-
-		overloadedNodeid := id
-
-		for i, p := range processes {
-			availableNodeid := ""
-
-			// Try to move the process to a node where other processes with the same
-			// reference currently reside.
-			if len(p.Config.Reference) != 0 {
-				for _, count := range haveReferenceAffinityMap[p.Config.Reference+"@"+p.Config.Domain] {
-					// Do not move the process to the node it is currently on
-					if count.nodeid == overloadedNodeid {
-						continue
-					}
-
-					r := resources[count.nodeid]
-					if hasNodeEnoughResources(r, p.CPU, p.Mem) {
-						availableNodeid = count.nodeid
-						break
-					}
-				}
-			}
-
-			// Find the best node with enough resources available
-			if len(availableNodeid) == 0 {
-				availableNodeid = findBestNodeForProcess(resources, p.CPU, p.Mem)
-			}
-
-			if len(availableNodeid) == 0 {
-				// There's no other node with enough resources to take over this process
-				opStack = append(opStack, processOpSkip{
-					nodeid:    overloadedNodeid,
-					processid: p.Config.ProcessID(),
-					err:       errNotEnoughResourcesForRebalancing,
-				})
-				continue
-			}
-
-			opStack = append(opStack, processOpMove{
-				fromNodeid: overloadedNodeid,
-				toNodeid:   availableNodeid,
-				config:     p.Config,
-				metadata:   p.Metadata,
-			})
-
-			// Adjust the process
-			p.NodeID = availableNodeid
-			processes[i] = p
-
-			// Adjust the resources
-			r = resources[availableNodeid]
-			r.CPU += p.CPU
-			r.Mem += p.Mem
-			resources[availableNodeid] = r
-
-			r = resources[overloadedNodeid]
-			r.CPU -= p.CPU
-			r.Mem -= p.Mem
-			resources[overloadedNodeid] = r
-
-			// Move only one process at a time
-			break
-		}
+		logger.Warn().WithError(v.err).WithFields(log.Fields{
+			"nodeid":    v.nodeid,
+			"processid": v.processid,
+		}).Log("Process skipped")
+	case processOpError:
+		opErr = v
+	default:
+		logger.Warn().Log("Unknown operation on stack: %+v", v)
 	}
 
-	return opStack, resources
+	return opErr
 }
 
 // createNodeProcessMap takes a list of processes and groups them by the nodeid they
 // are running on. Each group contains only running processes and gets sorted by their
 // preference to be moved somewhere else, increasing. From the running processes, the
 // ones with the shortest runtime have the highest preference.
-func createNodeProcessMap(processes []proxy.Process) map[string][]proxy.Process {
-	nodeProcessMap := map[string][]proxy.Process{}
+func createNodeProcessMap(processes []node.Process) map[string][]node.Process {
+	nodeProcessMap := map[string][]node.Process{}
 
 	for _, p := range processes {
 		if p.State != "running" {

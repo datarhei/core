@@ -20,20 +20,23 @@ type Store interface {
 
 	OnApply(func(op Operation))
 
-	ListProcesses() []Process
-	GetProcess(id app.ProcessID) (Process, error)
-	GetProcessNodeMap() map[string]string
+	ProcessList() []Process
+	ProcessGet(id app.ProcessID) (Process, error)
+	ProcessGetNodeMap() map[string]string
+	ProcessGetRelocateMap() map[string]string
 
-	ListUsers() Users
-	GetUser(name string) Users
-	ListPolicies() Policies
-	ListUserPolicies(name string) Policies
+	IAMIdentityList() Users
+	IAMIdentityGet(name string) Users
+	IAMIdentityPolicyList(name string) Policies
+	IAMPolicyList() Policies
 
-	HasLock(name string) bool
-	ListLocks() map[string]time.Time
+	LockHasLock(name string) bool
+	LockList() map[string]time.Time
 
-	ListKVS(prefix string) map[string]Value
-	GetFromKVS(key string) (Value, error)
+	KVSList(prefix string) map[string]Value
+	KVSGetValue(key string) (Value, error)
+
+	NodeList() map[string]Node
 }
 
 type Process struct {
@@ -60,25 +63,33 @@ type Value struct {
 	UpdatedAt time.Time
 }
 
+type Node struct {
+	State     string
+	UpdatedAt time.Time
+}
+
 type Operation string
 
 const (
-	OpAddProcess         Operation = "addProcess"
-	OpRemoveProcess      Operation = "removeProcess"
-	OpUpdateProcess      Operation = "updateProcess"
-	OpSetProcessOrder    Operation = "setProcessOrder"
-	OpSetProcessMetadata Operation = "setProcessMetadata"
-	OpSetProcessError    Operation = "setProcessError"
-	OpAddIdentity        Operation = "addIdentity"
-	OpUpdateIdentity     Operation = "updateIdentity"
-	OpRemoveIdentity     Operation = "removeIdentity"
-	OpSetPolicies        Operation = "setPolicies"
-	OpSetProcessNodeMap  Operation = "setProcessNodeMap"
-	OpCreateLock         Operation = "createLock"
-	OpDeleteLock         Operation = "deleteLock"
-	OpClearLocks         Operation = "clearLocks"
-	OpSetKV              Operation = "setKV"
-	OpUnsetKV            Operation = "unsetKV"
+	OpAddProcess           Operation = "addProcess"
+	OpRemoveProcess        Operation = "removeProcess"
+	OpUpdateProcess        Operation = "updateProcess"
+	OpSetRelocateProcess   Operation = "setRelocateProcess"
+	OpUnsetRelocateProcess Operation = "unsetRelocateProcess"
+	OpSetProcessOrder      Operation = "setProcessOrder"
+	OpSetProcessMetadata   Operation = "setProcessMetadata"
+	OpSetProcessError      Operation = "setProcessError"
+	OpAddIdentity          Operation = "addIdentity"
+	OpUpdateIdentity       Operation = "updateIdentity"
+	OpRemoveIdentity       Operation = "removeIdentity"
+	OpSetPolicies          Operation = "setPolicies"
+	OpSetProcessNodeMap    Operation = "setProcessNodeMap"
+	OpCreateLock           Operation = "createLock"
+	OpDeleteLock           Operation = "deleteLock"
+	OpClearLocks           Operation = "clearLocks"
+	OpSetKV                Operation = "setKV"
+	OpUnsetKV              Operation = "unsetKV"
+	OpSetNodeState         Operation = "setNodeState"
 )
 
 type Command struct {
@@ -90,13 +101,21 @@ type CommandAddProcess struct {
 	Config *app.Config
 }
 
+type CommandRemoveProcess struct {
+	ID app.ProcessID
+}
+
 type CommandUpdateProcess struct {
 	ID     app.ProcessID
 	Config *app.Config
 }
 
-type CommandRemoveProcess struct {
-	ID app.ProcessID
+type CommandSetRelocateProcess struct {
+	Map map[app.ProcessID]string
+}
+
+type CommandUnsetRelocateProcess struct {
+	ID []app.ProcessID
 }
 
 type CommandSetProcessOrder struct {
@@ -115,6 +134,10 @@ type CommandSetProcessError struct {
 	Error string
 }
 
+type CommandSetProcessNodeMap struct {
+	Map map[string]string
+}
+
 type CommandAddIdentity struct {
 	Identity identity.User
 }
@@ -131,10 +154,6 @@ type CommandRemoveIdentity struct {
 type CommandSetPolicies struct {
 	Name     string
 	Policies []access.Policy
-}
-
-type CommandSetProcessNodeMap struct {
-	Map map[string]string
 }
 
 type CommandCreateLock struct {
@@ -157,10 +176,16 @@ type CommandUnsetKV struct {
 	Key string
 }
 
+type CommandSetNodeState struct {
+	NodeID string
+	State  string
+}
+
 type storeData struct {
-	Version        uint64
-	Process        map[string]Process
-	ProcessNodeMap map[string]string
+	Version            uint64
+	Process            map[string]Process // processid -> process
+	ProcessNodeMap     map[string]string  // processid -> nodeid
+	ProcessRelocateMap map[string]string  // processid -> nodeid
 
 	Users struct {
 		UpdatedAt time.Time
@@ -176,6 +201,8 @@ type storeData struct {
 	Locks map[string]time.Time
 
 	KVS map[string]Value
+
+	Nodes map[string]Node
 }
 
 func (s *storeData) init() {
@@ -184,6 +211,7 @@ func (s *storeData) init() {
 	s.Version = 1
 	s.Process = map[string]Process{}
 	s.ProcessNodeMap = map[string]string{}
+	s.ProcessRelocateMap = map[string]string{}
 	s.Users.UpdatedAt = now
 	s.Users.Users = map[string]identity.User{}
 	s.Users.userlist = identity.NewUserList()
@@ -191,6 +219,7 @@ func (s *storeData) init() {
 	s.Policies.Policies = map[string][]access.Policy{}
 	s.Locks = map[string]time.Time{}
 	s.KVS = map[string]Value{}
+	s.Nodes = map[string]Node{}
 }
 
 // store implements a raft.FSM
@@ -297,6 +326,22 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.updateProcess(cmd)
+	case OpSetRelocateProcess:
+		cmd := CommandSetRelocateProcess{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setRelocateProcess(cmd)
+	case OpUnsetRelocateProcess:
+		cmd := CommandUnsetRelocateProcess{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.unsetRelocateProcess(cmd)
 	case OpSetProcessOrder:
 		cmd := CommandSetProcessOrder{}
 		err = decodeCommand(&cmd, c.Data)
@@ -401,6 +446,14 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.unsetKV(cmd)
+	case OpSetNodeState:
+		cmd := CommandSetNodeState{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setNodeState(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -446,6 +499,14 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 	dec := json.NewDecoder(snapshot)
 	if err := dec.Decode(&data); err != nil {
 		return err
+	}
+
+	if data.ProcessNodeMap == nil {
+		data.ProcessNodeMap = map[string]string{}
+	}
+
+	if data.ProcessRelocateMap == nil {
+		data.ProcessRelocateMap = map[string]string{}
 	}
 
 	for id, p := range data.Process {

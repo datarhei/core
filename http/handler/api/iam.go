@@ -84,6 +84,7 @@ func (h *IAMHandler) AddIdentity(c echo.Context) error {
 // @Param name path string true "Username"
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {string} string
+// @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Failure 500 {object} api.Error

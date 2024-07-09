@@ -10,13 +10,9 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
-func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error) {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return nil, ErrDegraded
-	}
-
+func (c *cluster) LockCreate(origin string, name string, validUntil time.Time) (*kvs.Lock, error) {
 	if !c.IsRaftLeader() {
-		err := c.forwarder.CreateLock(origin, name, validUntil)
+		err := c.forwarder.LockCreate(origin, name, validUntil)
 		if err != nil {
 			return nil, err
 		}
@@ -28,7 +24,7 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 		return l, nil
 	}
 
-	if c.store.HasLock(name) {
+	if c.store.LockHasLock(name) {
 		return nil, fmt.Errorf("the lock '%s' already exists", name)
 	}
 
@@ -52,13 +48,9 @@ func (c *cluster) CreateLock(origin string, name string, validUntil time.Time) (
 	return l, nil
 }
 
-func (c *cluster) DeleteLock(origin string, name string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
+func (c *cluster) LockDelete(origin string, name string) error {
 	if !c.IsRaftLeader() {
-		return c.forwarder.DeleteLock(origin, name)
+		return c.forwarder.LockDelete(origin, name)
 	}
 
 	cmd := &store.Command{
@@ -71,17 +63,9 @@ func (c *cluster) DeleteLock(origin string, name string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) ListLocks() map[string]time.Time {
-	return c.store.ListLocks()
-}
-
-func (c *cluster) SetKV(origin, key, value string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
+func (c *cluster) KVSet(origin, key, value string) error {
 	if !c.IsRaftLeader() {
-		return c.forwarder.SetKV(origin, key, value)
+		return c.forwarder.KVSet(origin, key, value)
 	}
 
 	cmd := &store.Command{
@@ -95,13 +79,9 @@ func (c *cluster) SetKV(origin, key, value string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) UnsetKV(origin, key string) error {
-	if ok, _ := c.IsClusterDegraded(); ok {
-		return ErrDegraded
-	}
-
+func (c *cluster) KVUnset(origin, key string) error {
 	if !c.IsRaftLeader() {
-		return c.forwarder.UnsetKV(origin, key)
+		return c.forwarder.KVUnset(origin, key)
 	}
 
 	cmd := &store.Command{
@@ -114,29 +94,19 @@ func (c *cluster) UnsetKV(origin, key string) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) GetKV(origin, key string, stale bool) (string, time.Time, error) {
+func (c *cluster) KVGet(origin, key string, stale bool) (string, time.Time, error) {
 	if !stale {
-		if ok, _ := c.IsClusterDegraded(); ok {
-			return "", time.Time{}, ErrDegraded
-		}
-
 		if !c.IsRaftLeader() {
-			return c.forwarder.GetKV(origin, key)
+			return c.forwarder.KVGet(origin, key)
 		}
 	}
 
-	value, err := c.store.GetFromKVS(key)
+	value, err := c.store.KVSGetValue(key)
 	if err != nil {
 		return "", time.Time{}, err
 	}
 
 	return value.Value, value.UpdatedAt, nil
-}
-
-func (c *cluster) ListKV(prefix string) map[string]store.Value {
-	storeValues := c.store.ListKVS(prefix)
-
-	return storeValues
 }
 
 type ClusterKVS interface {
@@ -178,17 +148,17 @@ func (s *clusterKVS) CreateLock(name string, validUntil time.Time) (*kvs.Lock, e
 		"name":        name,
 		"valid_until": validUntil,
 	}).Log("Create lock")
-	return s.cluster.CreateLock("", name, validUntil)
+	return s.cluster.LockCreate("", name, validUntil)
 }
 
 func (s *clusterKVS) DeleteLock(name string) error {
 	s.logger.Debug().WithField("name", name).Log("Delete lock")
-	return s.cluster.DeleteLock("", name)
+	return s.cluster.LockDelete("", name)
 }
 
 func (s *clusterKVS) ListLocks() map[string]time.Time {
 	s.logger.Debug().Log("List locks")
-	return s.cluster.ListLocks()
+	return s.cluster.Store().LockList()
 }
 
 func (s *clusterKVS) SetKV(key, value string) error {
@@ -196,12 +166,12 @@ func (s *clusterKVS) SetKV(key, value string) error {
 		"key":   key,
 		"value": value,
 	}).Log("Set KV")
-	return s.cluster.SetKV("", key, value)
+	return s.cluster.KVSet("", key, value)
 }
 
 func (s *clusterKVS) UnsetKV(key string) error {
 	s.logger.Debug().WithField("key", key).Log("Unset KV")
-	return s.cluster.UnsetKV("", key)
+	return s.cluster.KVUnset("", key)
 }
 
 func (s *clusterKVS) GetKV(key string) (string, time.Time, error) {
@@ -213,10 +183,10 @@ func (s *clusterKVS) GetKV(key string) (string, time.Time, error) {
 		"key":   key,
 		"stale": stale,
 	}).Log("Get KV")
-	return s.cluster.GetKV("", key, stale)
+	return s.cluster.KVGet("", key, stale)
 }
 
 func (s *clusterKVS) ListKV(prefix string) map[string]store.Value {
 	s.logger.Debug().Log("List KV")
-	return s.cluster.ListKV(prefix)
+	return s.cluster.Store().KVSList(prefix)
 }

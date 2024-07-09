@@ -206,7 +206,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 		if config.Cluster != nil {
 			if httpfs.Filesystem.Type() == "disk" || httpfs.Filesystem.Type() == "mem" {
-				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.ProxyReader())
+				httpfs.Filesystem = fs.NewClusterFS(httpfs.Filesystem.Name(), httpfs.Filesystem, config.Cluster.Manager())
 			}
 		}
 
@@ -728,54 +728,59 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		v3.GET("/cluster/snapshot", s.v3handler.cluster.GetSnapshot)
 
-		v3.GET("/cluster/db/process", s.v3handler.cluster.ListStoreProcesses)
-		v3.GET("/cluster/db/process/:id", s.v3handler.cluster.GetStoreProcess)
-		v3.GET("/cluster/db/user", s.v3handler.cluster.ListStoreIdentities)
-		v3.GET("/cluster/db/user/:name", s.v3handler.cluster.ListStoreIdentity)
-		v3.GET("/cluster/db/policies", s.v3handler.cluster.ListStorePolicies)
-		v3.GET("/cluster/db/locks", s.v3handler.cluster.ListStoreLocks)
-		v3.GET("/cluster/db/kv", s.v3handler.cluster.ListStoreKV)
-		v3.GET("/cluster/db/map/process", s.v3handler.cluster.GetStoreProcessNodeMap)
+		v3.GET("/cluster/db/process", s.v3handler.cluster.StoreListProcesses)
+		v3.GET("/cluster/db/process/:id", s.v3handler.cluster.StoreGetProcess)
+		v3.GET("/cluster/db/user", s.v3handler.cluster.StoreListIdentities)
+		v3.GET("/cluster/db/user/:name", s.v3handler.cluster.StoreGetIdentity)
+		v3.GET("/cluster/db/policies", s.v3handler.cluster.StoreListPolicies)
+		v3.GET("/cluster/db/locks", s.v3handler.cluster.StoreListLocks)
+		v3.GET("/cluster/db/kv", s.v3handler.cluster.StoreListKV)
+		v3.GET("/cluster/db/map/process", s.v3handler.cluster.StoreGetProcessNodeMap)
+		v3.GET("/cluster/db/node", s.v3handler.cluster.StoreListNodes)
 
-		v3.GET("/cluster/iam/user", s.v3handler.cluster.ListIdentities)
-		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.ListIdentity)
-		v3.GET("/cluster/iam/policies", s.v3handler.cluster.ListPolicies)
+		v3.GET("/cluster/iam/user", s.v3handler.cluster.IAMIdentityList)
+		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityGet)
+		v3.GET("/cluster/iam/policies", s.v3handler.cluster.IAMPolicyList)
 
-		v3.GET("/cluster/process", s.v3handler.cluster.GetAllProcesses)
-		v3.GET("/cluster/process/:id", s.v3handler.cluster.GetProcess)
-		v3.GET("/cluster/process/:id/metadata", s.v3handler.cluster.GetProcessMetadata)
-		v3.GET("/cluster/process/:id/metadata/:key", s.v3handler.cluster.GetProcessMetadata)
+		v3.GET("/cluster/process", s.v3handler.cluster.ProcessList)
+		v3.GET("/cluster/process/:id", s.v3handler.cluster.ProcessGet)
+		v3.GET("/cluster/process/:id/metadata", s.v3handler.cluster.ProcessGetMetadata)
+		v3.GET("/cluster/process/:id/metadata/:key", s.v3handler.cluster.ProcessGetMetadata)
 
-		v3.GET("/cluster/node", s.v3handler.cluster.GetNodes)
-		v3.GET("/cluster/node/:id", s.v3handler.cluster.GetNode)
-		v3.GET("/cluster/node/:id/files", s.v3handler.cluster.GetNodeResources)
+		v3.GET("/cluster/node", s.v3handler.cluster.NodeList)
+		v3.GET("/cluster/node/:id", s.v3handler.cluster.NodeGet)
+		v3.GET("/cluster/node/:id/files", s.v3handler.cluster.NodeGetMedia)
 		v3.GET("/cluster/node/:id/fs/:storage", s.v3handler.cluster.NodeFSListFiles)
 		v3.GET("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSGetFile)
-		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.ListNodeProcesses)
-		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.GetNodeVersion)
+		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.NodeListProcesses)
+		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.NodeGetVersion)
+		v3.GET("/cluster/node/:id/state", s.v3handler.cluster.NodeGetState)
 
-		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.ListFiles)
+		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.FilesystemListFiles)
 
 		if !s.readOnly {
 			v3.PUT("/cluster/transfer/:id", s.v3handler.cluster.TransferLeadership)
 			v3.PUT("/cluster/leave", s.v3handler.cluster.Leave)
 
-			v3.POST("/cluster/process", s.v3handler.cluster.AddProcess)
-			v3.POST("/cluster/process/probe", s.v3handler.cluster.ProbeProcessConfig)
-			v3.PUT("/cluster/process/:id", s.v3handler.cluster.UpdateProcess)
-			v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProbeProcess)
-			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.DeleteProcess)
-			v3.PUT("/cluster/process/:id/command", s.v3handler.cluster.SetProcessCommand)
-			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.SetProcessMetadata)
+			v3.POST("/cluster/process", s.v3handler.cluster.ProcessAdd)
+			v3.POST("/cluster/process/probe", s.v3handler.cluster.ProcessProbeConfig)
+			v3.PUT("/cluster/process/:id", s.v3handler.cluster.ProcessUpdate)
+			v3.GET("/cluster/process/:id/probe", s.v3handler.cluster.ProcessProbe)
+			v3.DELETE("/cluster/process/:id", s.v3handler.cluster.ProcessDelete)
+			v3.PUT("/cluster/process/:id/command", s.v3handler.cluster.ProcessSetCommand)
+			v3.PUT("/cluster/process/:id/metadata/:key", s.v3handler.cluster.ProcessSetMetadata)
+
+			v3.PUT("/cluster/reallocation", s.v3handler.cluster.Reallocation)
 
 			v3.DELETE("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSDeleteFile)
 			v3.PUT("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSPutFile)
+			v3.PUT("/cluster/node/:id/state", s.v3handler.cluster.NodeSetState)
 
-			v3.PUT("/cluster/iam/reload", s.v3handler.cluster.ReloadIAM)
-			v3.POST("/cluster/iam/user", s.v3handler.cluster.AddIdentity)
-			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.UpdateIdentity)
-			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.UpdateIdentityPolicies)
-			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.RemoveIdentity)
+			v3.PUT("/cluster/iam/reload", s.v3handler.cluster.IAMReload)
+			v3.POST("/cluster/iam/user", s.v3handler.cluster.IAMIdentityAdd)
+			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityUpdate)
+			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.IAMIdentityUpdatePolicies)
+			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityRemove)
 		}
 	}
 

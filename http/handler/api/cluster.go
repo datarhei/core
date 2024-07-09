@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/cluster"
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
+	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
 )
@@ -20,7 +21,7 @@ import (
 // The ClusterHandler type provides handler functions for manipulating the cluster config.
 type ClusterHandler struct {
 	cluster cluster.Cluster
-	proxy   proxy.ProxyReader
+	proxy   *node.Manager
 	iam     iam.IAM
 }
 
@@ -28,7 +29,7 @@ type ClusterHandler struct {
 func NewCluster(cluster cluster.Cluster, iam iam.IAM) (*ClusterHandler, error) {
 	h := &ClusterHandler{
 		cluster: cluster,
-		proxy:   cluster.ProxyReader(),
+		proxy:   cluster.Manager(),
 		iam:     iam,
 	}
 
@@ -67,7 +68,7 @@ func (h *ClusterHandler) About(c echo.Context) error {
 			Address:      state.Leader.Address,
 			ElectedSince: uint64(state.Leader.ElectedSince.Seconds()),
 		},
-		Status: state.Status,
+		Status: state.State,
 		Raft: api.ClusterRaft{
 			Address:     state.Raft.Address,
 			State:       state.Raft.State,
@@ -76,13 +77,13 @@ func (h *ClusterHandler) About(c echo.Context) error {
 			LogTerm:     state.Raft.LogTerm,
 			LogIndex:    state.Raft.LogIndex,
 		},
-		Nodes:    []api.ClusterNode{},
-		Version:  state.Version.String(),
-		Degraded: state.Degraded,
+		Nodes:   []api.ClusterNode{},
+		Version: state.Version.String(),
 	}
 
-	if state.DegradedErr != nil {
-		about.DegradedErr = state.DegradedErr.Error()
+	if state.Error != nil {
+		about.Degraded = true
+		about.DegradedErr = state.Error.Error()
 	}
 
 	for _, node := range state.Nodes {
@@ -97,7 +98,7 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 		ID:          node.ID,
 		Name:        node.Name,
 		Version:     node.Version,
-		Status:      node.Status,
+		Status:      node.State,
 		Voter:       node.Voter,
 		Leader:      node.Leader,
 		Address:     node.Address,
@@ -107,7 +108,7 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 		Latency:     node.Latency.Seconds() * 1000,
 		Core: api.ClusterNodeCore{
 			Address:     node.Core.Address,
-			Status:      node.Core.Status,
+			Status:      node.Core.State,
 			LastContact: node.Core.LastContact.Seconds() * 1000,
 			Latency:     node.Core.Latency.Seconds() * 1000,
 			Version:     node.Core.Version,
@@ -147,12 +148,12 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/healthy [get]
 func (h *ClusterHandler) Healthy(c echo.Context) error {
-	degraded, _ := h.cluster.IsDegraded()
+	hasLeader := h.cluster.HasRaftLeader()
 
-	return c.JSON(http.StatusOK, !degraded)
+	return c.JSON(http.StatusOK, hasLeader)
 }
 
-// Transfer the leadership to another node
+// TransferLeadership transfers the leadership to another node
 // @Summary Transfer the leadership to another node
 // @Description Transfer the leadership to another node
 // @Tags v16.?.?
@@ -227,4 +228,48 @@ func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 	defer r.Close()
 
 	return c.Stream(http.StatusOK, "application/octet-stream", r)
+}
+
+// Reallocation issues reallocation requests of processes
+// @Summary Retrieve snapshot of the cluster DB
+// @Description Retrieve snapshot of the cluster DB
+// @Tags v16.?.?
+// @ID cluster-3-reallocation
+// @Produce json
+// @Param reallocations body api.ClusterProcessReallocate true "Process reallocations"
+// @Success 200 {string} string
+// @Failure 500 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/reallocation [put]
+func (h *ClusterHandler) Reallocation(c echo.Context) error {
+	reallocations := []api.ClusterProcessReallocate{}
+
+	if err := util.ShouldBindJSONValidation(c, &reallocations, false); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	for _, r := range reallocations {
+		err := c.Validate(r)
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		}
+	}
+
+	relocations := map[app.ProcessID]string{}
+
+	for _, r := range reallocations {
+		for _, p := range r.Processes {
+			relocations[app.ProcessID{
+				ID:     p.ID,
+				Domain: p.Domain,
+			}] = r.TargetNodeID
+		}
+	}
+
+	err := h.cluster.ProcessesRelocate("", relocations)
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }

@@ -1,8 +1,10 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam/access"
@@ -23,7 +25,7 @@ import (
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user [post]
-func (h *ClusterHandler) AddIdentity(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityAdd(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
@@ -50,18 +52,18 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "Only superusers can add superusers")
 	}
 
-	if err := h.cluster.AddIdentity("", iamuser); err != nil {
+	if err := h.cluster.IAMIdentityAdd("", iamuser); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 
-	if err := h.cluster.SetPolicies("", iamuser.Name, iampolicies); err != nil {
+	if err := h.cluster.IAMPoliciesSet("", iamuser.Name, iampolicies); err != nil {
 		return api.Err(http.StatusBadRequest, "", "Invalid policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, user)
 }
 
-// UpdateIdentity replaces an existing user
+// IAMIdentityUpdate replaces an existing user
 // @Summary Replace an existing user
 // @Description Replace an existing user.
 // @Tags v16.?.?
@@ -78,7 +80,7 @@ func (h *ClusterHandler) AddIdentity(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [put]
-func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
@@ -128,13 +130,13 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	}
 
 	if name != "$anon" {
-		err = h.cluster.UpdateIdentity("", name, iamuser)
+		err = h.cluster.IAMIdentityUpdate("", name, iamuser)
 		if err != nil {
 			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 		}
 	}
 
-	err = h.cluster.SetPolicies("", iamuser.Name, iampolicies)
+	err = h.cluster.IAMPoliciesSet("", iamuser.Name, iampolicies)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
@@ -142,7 +144,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-// UpdateIdentityPolicies replaces existing user policies
+// IAMIdentityUpdatePolicies replaces existing user policies
 // @Summary Replace policies of an user
 // @Description Replace policies of an user
 // @Tags v16.?.?
@@ -159,7 +161,7 @@ func (h *ClusterHandler) UpdateIdentity(c echo.Context) error {
 // @Failure 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name}/policy [put]
-func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
@@ -216,15 +218,18 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "only superusers can modify superusers")
 	}
 
-	err = h.cluster.SetPolicies("", name, accessPolicies)
+	err = h.cluster.IAMPoliciesSet("", name, accessPolicies)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return api.Err(http.StatusNotFound, "", "set policies: %s", err.Error())
+		}
 		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, policies)
 }
 
-// ReloadIAM reloads the identities and policies from the cluster store to IAM
+// IAMReload reloads the identities and policies from the cluster store to IAM
 // @Summary Reload identities and policies
 // @Description Reload identities and policies
 // @Tags v16.?.?
@@ -234,7 +239,7 @@ func (h *ClusterHandler) UpdateIdentityPolicies(c echo.Context) error {
 // @Success 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/reload [get]
-func (h *ClusterHandler) ReloadIAM(c echo.Context) error {
+func (h *ClusterHandler) IAMReload(c echo.Context) error {
 	err := h.iam.ReloadIndentities()
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "reload identities: %w", err.Error())
@@ -248,7 +253,7 @@ func (h *ClusterHandler) ReloadIAM(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// ListIdentities returns the list of identities stored in IAM
+// IAMIdentityList returns the list of identities stored in IAM
 // @Summary List of identities in IAM
 // @Description List of identities in IAM
 // @Tags v16.?.?
@@ -257,7 +262,7 @@ func (h *ClusterHandler) ReloadIAM(c echo.Context) error {
 // @Success 200 {array} api.IAMUser
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user [get]
-func (h *ClusterHandler) ListIdentities(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
@@ -292,7 +297,7 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 	return c.JSON(http.StatusOK, users)
 }
 
-// ListIdentity returns the identity stored in IAM
+// IAMIdentityGet returns the identity stored in IAM
 // @Summary Identity in IAM
 // @Description Identity in IAM
 // @Tags v16.?.?
@@ -303,7 +308,7 @@ func (h *ClusterHandler) ListIdentities(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [get]
-func (h *ClusterHandler) ListIdentity(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityGet(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
@@ -342,7 +347,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-// ListPolicies returns the list of policies stored in IAM
+// IAMPolicyList returns the list of policies stored in IAM
 // @Summary List of policies in IAM
 // @Description List of policies IAM
 // @Tags v16.?.?
@@ -351,7 +356,7 @@ func (h *ClusterHandler) ListIdentity(c echo.Context) error {
 // @Success 200 {array} api.IAMPolicy
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/policies [get]
-func (h *ClusterHandler) ListPolicies(c echo.Context) error {
+func (h *ClusterHandler) IAMPolicyList(c echo.Context) error {
 	iampolicies := h.iam.ListPolicies("", "", nil, "", nil)
 
 	policies := []api.IAMPolicy{}
@@ -381,7 +386,7 @@ func (h *ClusterHandler) ListPolicies(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [delete]
-func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
+func (h *ClusterHandler) IAMIdentityRemove(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "$none")
@@ -400,7 +405,7 @@ func (h *ClusterHandler) RemoveIdentity(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "Only superusers can remove superusers")
 	}
 
-	if err := h.cluster.RemoveIdentity("", name); err != nil {
+	if err := h.cluster.IAMIdentityRemove("", name); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 

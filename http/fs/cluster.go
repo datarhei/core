@@ -6,7 +6,7 @@ import (
 	gofs "io/fs"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/io/fs"
 )
 
@@ -18,10 +18,10 @@ type filesystem struct {
 	fs.Filesystem
 
 	name  string
-	proxy proxy.ProxyReader
+	proxy *node.Manager
 }
 
-func NewClusterFS(name string, fs fs.Filesystem, proxy proxy.ProxyReader) Filesystem {
+func NewClusterFS(name string, fs fs.Filesystem, proxy *node.Manager) Filesystem {
 	if proxy == nil {
 		return fs
 	}
@@ -42,14 +42,14 @@ func (fs *filesystem) Open(path string) fs.File {
 	}
 
 	// Check if the file is available in the cluster
-	size, lastModified, err := fs.proxy.GetFileInfo(fs.name, path)
+	size, lastModified, err := fs.proxy.FilesystemGetFileInfo(fs.name, path)
 	if err != nil {
 		return nil
 	}
 
 	file := &file{
 		getFile: func(offset int64) (io.ReadCloser, error) {
-			return fs.proxy.GetFile(fs.name, path, offset)
+			return fs.proxy.FilesystemGetFile(fs.name, path, offset)
 		},
 		name:          path,
 		size:          size,
