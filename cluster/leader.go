@@ -318,7 +318,7 @@ func (c *cluster) clearDeadNodes(ctx context.Context, interval, nodeRecoverTimeo
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			nodes := c.proxy.ListNodes()
+			nodes := c.manager.NodeList()
 			for _, node := range nodes {
 				about := node.About()
 				if time.Since(about.SpawnedAt) > nodeRecoverTimeout && time.Since(about.LastContact) > nodeRecoverTimeout {

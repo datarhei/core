@@ -73,11 +73,13 @@ func (c *cluster) recoverCluster(ctx context.Context, interval time.Duration) {
 					break
 				}
 
-				c.nodesLock.RLock()
-				for id, node := range c.nodes {
+				nodes := c.manager.NodeList()
+				for _, node := range nodes {
 					if _, err := node.Status(); err != nil {
 						continue
 					}
+
+					id := node.About().ID
 
 					for _, server := range servers {
 						if server.ID == id && server.ID != c.nodeID {
@@ -88,7 +90,6 @@ func (c *cluster) recoverCluster(ctx context.Context, interval time.Duration) {
 						}
 					}
 				}
-				c.nodesLock.RUnlock()
 
 				c.logger.Warn().WithField("peers", peers).Log("Recovering raft")
 
