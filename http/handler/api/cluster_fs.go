@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// ListFiles lists all files on a filesystem
+// FilesystemListFiles lists all files on a filesystem
 // @Summary List all files on a filesystem
 // @Description List all files on a filesystem. The listing can be ordered by name, size, or date of last modification in ascending or descending order.
 // @Tags v16.?.?
@@ -23,13 +23,13 @@ import (
 // @Success 500 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/fs/{storage} [get]
-func (h *ClusterHandler) ListFiles(c echo.Context) error {
+func (h *ClusterHandler) FilesystemListFiles(c echo.Context) error {
 	name := util.PathParam(c, "storage")
 	pattern := util.DefaultQuery(c, "glob", "")
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
-	files := h.proxy.ListFiles(name, pattern)
+	files := h.proxy.FilesystemList(name, pattern)
 
 	var sortFunc func(i, j int) bool
 

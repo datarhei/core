@@ -17,11 +17,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster/client"
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/handler/util"
 	httplog "github.com/datarhei/core/v16/http/log"
@@ -38,11 +39,12 @@ import (
 )
 
 type api struct {
-	id      string
-	address string
-	router  *echo.Echo
-	cluster Cluster
-	logger  log.Logger
+	id        string
+	address   string
+	router    *echo.Echo
+	cluster   *cluster
+	logger    log.Logger
+	startedAt time.Time
 }
 
 type API interface {
@@ -52,15 +54,16 @@ type API interface {
 
 type APIConfig struct {
 	ID      string
-	Cluster Cluster
+	Cluster *cluster
 	Logger  log.Logger
 }
 
 func NewAPI(config APIConfig) (API, error) {
 	a := &api{
-		id:      config.ID,
-		cluster: config.Cluster,
-		logger:  config.Logger,
+		id:        config.ID,
+		cluster:   config.Cluster,
+		logger:    config.Logger,
+		startedAt: time.Now(),
 	}
 
 	if a.logger == nil {
@@ -98,6 +101,7 @@ func NewAPI(config APIConfig) (API, error) {
 	doc.GET("", echoSwagger.EchoWrapHandler(echoSwagger.InstanceName("ClusterAPI")))
 
 	a.router.GET("/", a.Version)
+	a.router.GET("/v1/about", a.About)
 
 	a.router.GET("/v1/barrier/:name", a.Barrier)
 
@@ -108,27 +112,27 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.GET("/v1/snaphot", a.Snapshot)
 
-	a.router.POST("/v1/process", a.AddProcess)
-	a.router.DELETE("/v1/process/:id", a.RemoveProcess)
-	a.router.PUT("/v1/process/:id", a.UpdateProcess)
-	a.router.PUT("/v1/process/:id/command", a.SetProcessCommand)
-	a.router.PUT("/v1/process/:id/metadata/:key", a.SetProcessMetadata)
+	a.router.POST("/v1/process", a.ProcessAdd)
+	a.router.DELETE("/v1/process/:id", a.ProcessRemove)
+	a.router.PUT("/v1/process/:id", a.ProcessUpdate)
+	a.router.PUT("/v1/process/:id/command", a.ProcessSetCommand)
+	a.router.PUT("/v1/process/:id/metadata/:key", a.ProcessSetMetadata)
 
-	a.router.PUT("/v1/relocate", a.RelocateProcesses)
+	a.router.PUT("/v1/relocate", a.ProcessesRelocate)
 
-	a.router.POST("/v1/iam/user", a.AddIdentity)
-	a.router.PUT("/v1/iam/user/:name", a.UpdateIdentity)
-	a.router.PUT("/v1/iam/user/:name/policies", a.SetIdentityPolicies)
-	a.router.DELETE("/v1/iam/user/:name", a.RemoveIdentity)
+	a.router.POST("/v1/iam/user", a.IAMIdentityAdd)
+	a.router.PUT("/v1/iam/user/:name", a.IAMIdentityUpdate)
+	a.router.PUT("/v1/iam/user/:name/policies", a.IAMPoliciesSet)
+	a.router.DELETE("/v1/iam/user/:name", a.IAMIdentityRemove)
 
-	a.router.POST("/v1/lock", a.Lock)
-	a.router.DELETE("/v1/lock/:name", a.Unlock)
+	a.router.POST("/v1/lock", a.LockCreate)
+	a.router.DELETE("/v1/lock/:name", a.LockDelete)
 
-	a.router.POST("/v1/kv", a.SetKV)
-	a.router.GET("/v1/kv/:key", a.GetKV)
-	a.router.DELETE("/v1/kv/:key", a.UnsetKV)
+	a.router.POST("/v1/kv", a.KVSet)
+	a.router.GET("/v1/kv/:key", a.KVGet)
+	a.router.DELETE("/v1/kv/:key", a.KVUnset)
 
-	a.router.PUT("/v1/node/:id/state", a.SetNodeState)
+	a.router.PUT("/v1/node/:id/state", a.NodeSetState)
 
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
@@ -158,6 +162,40 @@ func (a *api) Shutdown(ctx context.Context) error {
 // @Router / [get]
 func (a *api) Version(c echo.Context) error {
 	return c.JSON(http.StatusOK, Version.String())
+}
+
+// About returns the version of the cluster
+// @Summary The cluster version
+// @Description The cluster version
+// @Tags v1.0.0
+// @ID cluster-1-about
+// @Produce json
+// @Success 200 {string} About
+// @Success 500 {object} Error
+// @Router /v1/about [get]
+func (a *api) About(c echo.Context) error {
+	resources, err := a.cluster.Resources()
+
+	about := client.AboutResponse{
+		ID:        a.id,
+		Version:   Version.String(),
+		Address:   a.cluster.Address(),
+		StartedAt: a.startedAt,
+		Resources: client.AboutResponseResources{
+			IsThrottling: resources.CPU.Throttling,
+			NCPU:         resources.CPU.NCPU,
+			CPU:          (100 - resources.CPU.Idle) * resources.CPU.NCPU,
+			CPULimit:     resources.CPU.Limit * resources.CPU.NCPU,
+			Mem:          resources.Mem.Total - resources.Mem.Available,
+			MemLimit:     resources.Mem.Total,
+		},
+	}
+
+	if err != nil {
+		about.Resources.Error = err.Error()
+	}
+
+	return c.JSON(http.StatusOK, about)
 }
 
 // Barrier returns if the barrier already has been passed
@@ -210,7 +248,7 @@ func (a *api) AddServer(c echo.Context) error {
 	err := a.cluster.Join(origin, r.ID, r.RaftAddress, "")
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", r.ID).Log("Unable to join cluster")
-		return Err(http.StatusInternalServerError, "", "unable to join cluster: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -244,7 +282,7 @@ func (a *api) RemoveServer(c echo.Context) error {
 	err := a.cluster.Leave(origin, id)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to leave cluster")
-		return Err(http.StatusInternalServerError, "", "unable to leave cluster: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -278,7 +316,7 @@ func (a *api) TransferLeadership(c echo.Context) error {
 	err := a.cluster.TransferLeadership(origin, id)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to transfer leadership")
-		return Err(http.StatusInternalServerError, "", "unable to transfer leadership: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -303,7 +341,7 @@ func (a *api) Snapshot(c echo.Context) error {
 	data, err := a.cluster.Snapshot(origin)
 	if err != nil {
 		a.logger.Debug().WithError(err).Log("Unable to create snaphot")
-		return Err(http.StatusInternalServerError, "", "unable to create snapshot: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	defer data.Close()
@@ -311,7 +349,7 @@ func (a *api) Snapshot(c echo.Context) error {
 	return c.Stream(http.StatusOK, "application/octet-stream", data)
 }
 
-// AddProcess adds a process to the cluster DB
+// ProcessAdd adds a process to the cluster DB
 // @Summary Add a process
 // @Description Add a process to the cluster DB
 // @Tags v1.0.0
@@ -325,7 +363,7 @@ func (a *api) Snapshot(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/process [post]
-func (a *api) AddProcess(c echo.Context) error {
+func (a *api) ProcessAdd(c echo.Context) error {
 	r := client.AddProcessRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -340,16 +378,16 @@ func (a *api) AddProcess(c echo.Context) error {
 
 	a.logger.Debug().WithField("id", r.Config.ID).Log("Add process request")
 
-	err := a.cluster.AddProcess(origin, &r.Config)
+	err := a.cluster.ProcessAdd(origin, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", r.Config.ID).Log("Unable to add process")
-		return Err(http.StatusInternalServerError, "", "unable to add process: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// RemoveProcess removes a process from the cluster DB
+// ProcessRemove removes a process from the cluster DB
 // @Summary Remove a process
 // @Description Remove a process from the cluster DB
 // @Tags v1.0.0
@@ -362,7 +400,7 @@ func (a *api) AddProcess(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/process/{id} [delete]
-func (a *api) RemoveProcess(c echo.Context) error {
+func (a *api) ProcessRemove(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
@@ -376,16 +414,16 @@ func (a *api) RemoveProcess(c echo.Context) error {
 
 	a.logger.Debug().WithField("id", pid).Log("Remove process request")
 
-	err := a.cluster.RemoveProcess(origin, pid)
+	err := a.cluster.ProcessRemove(origin, pid)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to remove process")
-		return Err(http.StatusInternalServerError, "", "unable to remove process: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// UpdateProcess replaces an existing process in the cluster DB
+// ProcessUpdate replaces an existing process in the cluster DB
 // @Summary Replace an existing process
 // @Description Replace an existing process in the cluster DB
 // @Tags v1.0.0
@@ -399,7 +437,7 @@ func (a *api) RemoveProcess(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/process/{id} [put]
-func (a *api) UpdateProcess(c echo.Context) error {
+func (a *api) ProcessUpdate(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
@@ -422,16 +460,16 @@ func (a *api) UpdateProcess(c echo.Context) error {
 		"new_id": r.Config.ProcessID(),
 	}).Log("Update process request")
 
-	err := a.cluster.UpdateProcess(origin, pid, &r.Config)
+	err := a.cluster.ProcessUpdate(origin, pid, &r.Config)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update process")
-		return Err(http.StatusInternalServerError, "", "unable to update process: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// SetProcessCommand sets the order for a process
+// ProcessSetCommand sets the order for a process
 // @Summary Set the order for a process
 // @Description Set the order for a process.
 // @Tags v1.0.0
@@ -444,7 +482,7 @@ func (a *api) UpdateProcess(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/process/{id}/command [put]
-func (a *api) SetProcessCommand(c echo.Context) error {
+func (a *api) ProcessSetCommand(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
@@ -462,16 +500,16 @@ func (a *api) SetProcessCommand(c echo.Context) error {
 
 	pid := app.ProcessID{ID: id, Domain: domain}
 
-	err := a.cluster.SetProcessCommand(origin, pid, r.Command)
+	err := a.cluster.ProcessSetCommand(origin, pid, r.Command)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to set order")
-		return Err(http.StatusInternalServerError, "", "unable to set order: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// SetProcessMetadata stores metadata with a process
+// ProcessSetMetadata stores metadata with a process
 // @Summary Add JSON metadata with a process under the given key
 // @Description Add arbitrary JSON metadata under the given key. If the key exists, all already stored metadata with this key will be overwritten. If the key doesn't exist, it will be created.
 // @Tags v1.0.0
@@ -485,7 +523,7 @@ func (a *api) SetProcessCommand(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/process/{id}/metadata/{key} [put]
-func (a *api) SetProcessMetadata(c echo.Context) error {
+func (a *api) ProcessSetMetadata(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	key := util.PathParam(c, "key")
 	domain := util.DefaultQuery(c, "domain", "")
@@ -504,16 +542,16 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 
 	pid := app.ProcessID{ID: id, Domain: domain}
 
-	err := a.cluster.SetProcessMetadata(origin, pid, key, r.Metadata)
+	err := a.cluster.ProcessSetMetadata(origin, pid, key, r.Metadata)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update metadata")
-		return Err(http.StatusInternalServerError, "", "unable to update metadata: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// RelocateProcesses relocates processes to another node
+// ProcessesRelocate relocates processes to another node
 // @Summary Relocate processes to another node
 // @Description Relocate processes to another node.
 // @Tags v1.0.0
@@ -524,7 +562,7 @@ func (a *api) SetProcessMetadata(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/relocate [put]
-func (a *api) RelocateProcesses(c echo.Context) error {
+func (a *api) ProcessesRelocate(c echo.Context) error {
 	r := client.RelocateProcessesRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -537,16 +575,16 @@ func (a *api) RelocateProcesses(c echo.Context) error {
 		return Err(http.StatusLoopDetected, "", "breaking circuit")
 	}
 
-	err := a.cluster.RelocateProcesses(origin, r.Map)
+	err := a.cluster.ProcessesRelocate(origin, r.Map)
 	if err != nil {
 		a.logger.Debug().WithError(err).Log("Unable to apply process relocation request")
-		return Err(http.StatusInternalServerError, "", "unable to apply process relocation request: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// AddIdentity adds an identity to the cluster DB
+// IAMIdentityAdd adds an identity to the cluster DB
 // @Summary Add an identity
 // @Description Add an identity to the cluster DB
 // @Tags v1.0.0
@@ -560,7 +598,7 @@ func (a *api) RelocateProcesses(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/iam/user [post]
-func (a *api) AddIdentity(c echo.Context) error {
+func (a *api) IAMIdentityAdd(c echo.Context) error {
 	r := client.AddIdentityRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -575,16 +613,16 @@ func (a *api) AddIdentity(c echo.Context) error {
 
 	a.logger.Debug().WithField("identity", r.Identity).Log("Add identity request")
 
-	err := a.cluster.AddIdentity(origin, r.Identity)
+	err := a.cluster.IAMIdentityAdd(origin, r.Identity)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", r.Identity).Log("Unable to add identity")
-		return Err(http.StatusInternalServerError, "", "unable to add identity: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// UpdateIdentity replaces an existing identity in the cluster DB
+// IAMIdentityUpdate replaces an existing identity in the cluster DB
 // @Summary Replace an existing identity
 // @Description Replace an existing identity in the cluster DB
 // @Tags v1.0.0
@@ -597,7 +635,7 @@ func (a *api) AddIdentity(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/iam/user/{name} [put]
-func (a *api) UpdateIdentity(c echo.Context) error {
+func (a *api) IAMIdentityUpdate(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	r := client.UpdateIdentityRequest{}
@@ -617,32 +655,32 @@ func (a *api) UpdateIdentity(c echo.Context) error {
 		"identity": r.Identity,
 	}).Log("Update identity request")
 
-	err := a.cluster.UpdateIdentity(origin, name, r.Identity)
+	err := a.cluster.IAMIdentityUpdate(origin, name, r.Identity)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithFields(log.Fields{
 			"name":     name,
 			"identity": r.Identity,
 		}).Log("Unable to add identity")
-		return Err(http.StatusInternalServerError, "", "unable to update identity: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// SetIdentityPolicies set policies for an identity in the cluster DB
+// IAMPoliciesSet set policies for an identity in the cluster DB
 // @Summary Set identity policies
 // @Description Set policies for an identity in the cluster DB. Any existing policies will be replaced.
 // @Tags v1.0.0
 // @ID cluster-3-set-identity-policies
 // @Produce json
-// @Param id path string true "Process ID"SetPoliciesRequest
+// @Param id path string true "Process ID" SetPoliciesRequest
 // @Param data body client.SetPoliciesRequest true "Policies for that user"
 // @Success 200 {string} string
 // @Failure 400 {object} Error
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/iam/user/{name}/policies [put]
-func (a *api) SetIdentityPolicies(c echo.Context) error {
+func (a *api) IAMPoliciesSet(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	r := client.SetPoliciesRequest{}
@@ -659,16 +697,16 @@ func (a *api) SetIdentityPolicies(c echo.Context) error {
 
 	a.logger.Debug().WithField("policies", r.Policies).Log("Set policiesrequest")
 
-	err := a.cluster.SetPolicies(origin, name, r.Policies)
+	err := a.cluster.IAMPoliciesSet(origin, name, r.Policies)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("policies", r.Policies).Log("Unable to set policies")
-		return Err(http.StatusInternalServerError, "", "unable to add identity: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// RemoveIdentity removes an identity from the cluster DB
+// IAMIdentityRemove removes an identity from the cluster DB
 // @Summary Remove an identity
 // @Description Remove an identity from the cluster DB
 // @Tags v1.0.0
@@ -680,7 +718,7 @@ func (a *api) SetIdentityPolicies(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/iam/user/{name} [delete]
-func (a *api) RemoveIdentity(c echo.Context) error {
+func (a *api) IAMIdentityRemove(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -691,10 +729,10 @@ func (a *api) RemoveIdentity(c echo.Context) error {
 
 	a.logger.Debug().WithField("identity", name).Log("Remove identity request")
 
-	err := a.cluster.RemoveIdentity(origin, name)
+	err := a.cluster.IAMIdentityRemove(origin, name)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("identity", name).Log("Unable to remove identity")
-		return Err(http.StatusInternalServerError, "", "unable to remove identity: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -739,19 +777,19 @@ func (a *api) CoreSkills(c echo.Context) error {
 	return c.JSON(http.StatusOK, skills)
 }
 
-// Lock tries to acquire a named lock
+// LockCreate tries to acquire a named lock
 // @Summary Acquire a named lock
 // @Description Acquire a named lock
 // @Tags v1.0.0
 // @ID cluster-1-lock
 // @Produce json
-// @Param data body client.LockRequest true "Lock request"
+// @Param data body client.LockRequest true "LockCreate request"
 // @Param X-Cluster-Origin header string false "Origin ID of request"
 // @Success 200 {string} string
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/lock [post]
-func (a *api) Lock(c echo.Context) error {
+func (a *api) LockCreate(c echo.Context) error {
 	r := client.LockRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -766,16 +804,16 @@ func (a *api) Lock(c echo.Context) error {
 
 	a.logger.Debug().WithField("name", r.Name).Log("Acquire lock")
 
-	_, err := a.cluster.CreateLock(origin, r.Name, r.ValidUntil)
+	_, err := a.cluster.LockCreate(origin, r.Name, r.ValidUntil)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", r.Name).Log("Unable to acquire lock")
-		return Err(http.StatusInternalServerError, "", "unable to acquire lock: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// Unlock removes a named lock
+// LockDelete removes a named lock
 // @Summary Remove a lock
 // @Description Remove a lock
 // @Tags v1.0.0
@@ -788,7 +826,7 @@ func (a *api) Lock(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/lock/{name} [delete]
-func (a *api) Unlock(c echo.Context) error {
+func (a *api) LockDelete(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -799,16 +837,16 @@ func (a *api) Unlock(c echo.Context) error {
 
 	a.logger.Debug().WithField("name", name).Log("Remove lock request")
 
-	err := a.cluster.DeleteLock(origin, name)
+	err := a.cluster.LockDelete(origin, name)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("name", name).Log("Unable to remove lock")
-		return Err(http.StatusInternalServerError, "", "unable to remove lock: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// SetKV stores the value under key
+// KVSet stores the value under key
 // @Summary Store value under key
 // @Description Store value under key
 // @Tags v1.0.0
@@ -820,7 +858,7 @@ func (a *api) Unlock(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/kv [post]
-func (a *api) SetKV(c echo.Context) error {
+func (a *api) KVSet(c echo.Context) error {
 	r := client.SetKVRequest{}
 
 	if err := util.ShouldBindJSON(c, &r); err != nil {
@@ -835,16 +873,16 @@ func (a *api) SetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", r.Key).Log("Store value")
 
-	err := a.cluster.SetKV(origin, r.Key, r.Value)
+	err := a.cluster.KVSet(origin, r.Key, r.Value)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("key", r.Key).Log("Unable to store value")
-		return Err(http.StatusInternalServerError, "", "unable to store value: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// UnsetKV removes a key
+// KVUnset removes a key
 // @Summary Remove a key
 // @Description Remove a key
 // @Tags v1.0.0
@@ -857,7 +895,7 @@ func (a *api) SetKV(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/kv/{key} [delete]
-func (a *api) UnsetKV(c echo.Context) error {
+func (a *api) KVUnset(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -868,20 +906,16 @@ func (a *api) UnsetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", key).Log("Delete key")
 
-	err := a.cluster.UnsetKV(origin, key)
+	err := a.cluster.KVUnset(origin, key)
 	if err != nil {
-		if err == fs.ErrNotExist {
-			a.logger.Debug().WithError(err).WithField("key", key).Log("Delete key: not found")
-			return Err(http.StatusNotFound, "", "%s", err.Error())
-		}
 		a.logger.Debug().WithError(err).WithField("key", key).Log("Unable to remove key")
-		return Err(http.StatusInternalServerError, "", "unable to remove key: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
 
-// GetKV fetches a key
+// KVGet fetches a key
 // @Summary Fetch a key
 // @Description Fetch a key
 // @Tags v1.0.0
@@ -894,7 +928,7 @@ func (a *api) UnsetKV(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/kv/{key} [get]
-func (a *api) GetKV(c echo.Context) error {
+func (a *api) KVGet(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
@@ -905,14 +939,10 @@ func (a *api) GetKV(c echo.Context) error {
 
 	a.logger.Debug().WithField("key", key).Log("Get key")
 
-	value, updatedAt, err := a.cluster.GetKV(origin, key, false)
+	value, updatedAt, err := a.cluster.KVGet(origin, key, false)
 	if err != nil {
-		if err == fs.ErrNotExist {
-			a.logger.Debug().WithError(err).WithField("key", key).Log("Get key: not found")
-			return Err(http.StatusNotFound, "", "%s", err.Error())
-		}
 		a.logger.Debug().WithError(err).WithField("key", key).Log("Unable to retrieve key")
-		return Err(http.StatusInternalServerError, "", "unable to retrieve key: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	res := client.GetKVResponse{
@@ -923,7 +953,7 @@ func (a *api) GetKV(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-// SetNodeState sets a state for a node
+// NodeSetState sets a state for a node
 // @Summary Set a state for a node
 // @Description Set a state for a node
 // @Tags v1.0.0
@@ -936,7 +966,7 @@ func (a *api) GetKV(c echo.Context) error {
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
 // @Router /v1/node/{id}/state [get]
-func (a *api) SetNodeState(c echo.Context) error {
+func (a *api) NodeSetState(c echo.Context) error {
 	nodeid := util.PathParam(c, "id")
 
 	r := client.SetNodeStateRequest{}
@@ -956,7 +986,7 @@ func (a *api) SetNodeState(c echo.Context) error {
 		"state": r.State,
 	}).Log("Set node state")
 
-	err := a.cluster.SetNodeState(origin, nodeid, r.State)
+	err := a.cluster.NodeSetState(origin, nodeid, r.State)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithFields(log.Fields{
 			"node":  nodeid,
@@ -966,7 +996,7 @@ func (a *api) SetNodeState(c echo.Context) error {
 		if errors.Is(err, ErrUnsupportedNodeState) {
 			return Err(http.StatusBadRequest, "", "%s: %s", err.Error(), r.State)
 		}
-		return Err(http.StatusInternalServerError, "", "unable to set state: %s", err.Error())
+		return ErrFromClusterError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -1005,6 +1035,17 @@ func Err(code int, message string, args ...interface{}) Error {
 	}
 
 	return e
+}
+
+func ErrFromClusterError(err error) Error {
+	status := http.StatusInternalServerError
+	if errors.Is(err, store.ErrNotFound) {
+		status = http.StatusNotFound
+	} else if errors.Is(err, store.ErrBadRequest) {
+		status = http.StatusBadRequest
+	}
+
+	return Err(status, "", "%s", err.Error())
 }
 
 // ErrorHandler is a genral handler for echo handler errors

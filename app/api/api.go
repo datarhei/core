@@ -543,6 +543,7 @@ func (a *api) start(ctx context.Context) error {
 			CoreSkills:             a.ffmpeg.Skills(),
 			IPLimiter:              a.sessionsLimiter,
 			Logger:                 a.log.logger.core.WithComponent("Cluster"),
+			Resources:              a.resources,
 			Debug: cluster.DebugConfig{
 				DisableFFmpegCheck: cfg.Cluster.Debug.DisableFFmpegCheck,
 			},
@@ -1337,7 +1338,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		if a.cluster != nil {
-			config.Proxy = a.cluster.ProxyReader()
+			config.Proxy = a.cluster.Manager()
 		}
 
 		if cfg.RTMP.EnableTLS {
@@ -1368,7 +1369,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		if a.cluster != nil {
-			config.Proxy = a.cluster.ProxyReader()
+			config.Proxy = a.cluster.Manager()
 		}
 
 		if cfg.SRT.Log.Enable {

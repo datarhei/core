@@ -34,7 +34,7 @@ func TestSetKV(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	value, err := s.GetFromKVS("foo")
+	value, err := s.KVSGetValue("foo")
 	require.NoError(t, err)
 	require.Equal(t, "bar", value.Value)
 
@@ -46,7 +46,7 @@ func TestSetKV(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	value, err = s.GetFromKVS("foo")
+	value, err = s.KVSGetValue("foo")
 	require.NoError(t, err)
 	require.Equal(t, "baz", value.Value)
 	require.Greater(t, value.UpdatedAt, updatedAt)
@@ -86,7 +86,7 @@ func TestUnsetKVCommand(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	require.Equal(t, fs.ErrNotExist, err)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 }
 
 func TestUnsetKV(t *testing.T) {
@@ -99,7 +99,7 @@ func TestUnsetKV(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = s.GetFromKVS("foo")
+	_, err = s.KVSGetValue("foo")
 	require.NoError(t, err)
 
 	err = s.unsetKV(CommandUnsetKV{
@@ -107,7 +107,7 @@ func TestUnsetKV(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = s.GetFromKVS("foo")
+	_, err = s.KVSGetValue("foo")
 	require.Error(t, err)
-	require.Equal(t, fs.ErrNotExist, err)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 }

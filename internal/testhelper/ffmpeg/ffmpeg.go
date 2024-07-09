@@ -139,7 +139,7 @@ Output #0, hls, to './data/testsrc.m3u8':
 		os.Exit(2)
 	}
 
-	if slices.EqualComparableElements(os.Args[1:], []string{"-f", "avfoundation", "-list_devices", "true", "-i", ""}) {
+	if err := slices.EqualComparableElements(os.Args[1:], []string{"-f", "avfoundation", "-list_devices", "true", "-i", ""}); err == nil {
 		fmt.Fprintf(os.Stderr, "%s\n", avfoundation)
 		os.Exit(0)
 	}

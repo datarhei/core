@@ -49,7 +49,7 @@ func TestAddIdentity(t *testing.T) {
 	require.Equal(t, 1, len(s.data.Users.Users))
 	require.Equal(t, 0, len(s.data.Policies.Policies))
 
-	u := s.GetUser("foobar")
+	u := s.IAMIdentityGet("foobar")
 	require.Equal(t, 1, len(u.Users))
 
 	user := u.Users[0]
@@ -254,7 +254,7 @@ func TestUpdateIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(s.data.Users.Users))
 
-	foobar := s.GetUser("foobar1").Users[0]
+	foobar := s.IAMIdentityGet("foobar1").Users[0]
 	require.True(t, foobar.CreatedAt.Equal(foobar.UpdatedAt))
 	require.False(t, time.Time{}.Equal(foobar.CreatedAt))
 
@@ -287,13 +287,13 @@ func TestUpdateIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(s.data.Users.Users))
 
-	u := s.GetUser("foobar1")
+	u := s.IAMIdentityGet("foobar1")
 	require.Empty(t, u.Users)
 
-	u = s.GetUser("foobar2")
+	u = s.IAMIdentityGet("foobar2")
 	require.NotEmpty(t, u.Users)
 
-	u = s.GetUser("foobaz")
+	u = s.IAMIdentityGet("foobaz")
 	require.NotEmpty(t, u.Users)
 
 	require.True(t, u.Users[0].CreatedAt.Equal(foobar.CreatedAt))
@@ -367,22 +367,22 @@ func TestUpdateIdentityWithAlias(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(s.data.Users.Users))
 
-	u := s.GetUser("foobar1")
+	u := s.IAMIdentityGet("foobar1")
 	require.Empty(t, u.Users)
 
-	u = s.GetUser("fooalias1")
+	u = s.IAMIdentityGet("fooalias1")
 	require.Empty(t, u.Users)
 
-	u = s.GetUser("foobar2")
+	u = s.IAMIdentityGet("foobar2")
 	require.NotEmpty(t, u.Users)
 
-	u = s.GetUser("fooalias2")
+	u = s.IAMIdentityGet("fooalias2")
 	require.NotEmpty(t, u.Users)
 
-	u = s.GetUser("foobaz")
+	u = s.IAMIdentityGet("foobaz")
 	require.NotEmpty(t, u.Users)
 
-	u = s.GetUser("fooalias")
+	u = s.IAMIdentityGet("fooalias")
 	require.NotEmpty(t, u.Users)
 }
 

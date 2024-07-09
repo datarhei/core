@@ -16,12 +16,12 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	if cmd.Name != "$anon" {
 		user, err := s.data.Users.userlist.Get(cmd.Name)
 		if err != nil {
-			return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+			return fmt.Errorf("unknown identity %s%w", cmd.Name, ErrNotFound)
 		}
 
 		u, ok := s.data.Users.Users[user.Name]
 		if !ok {
-			return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+			return fmt.Errorf("unknown identity %s%w", cmd.Name, ErrNotFound)
 		}
 
 		u.UpdatedAt = now
@@ -45,7 +45,7 @@ func (s *store) setPolicies(cmd CommandSetPolicies) error {
 	return nil
 }
 
-func (s *store) ListPolicies() Policies {
+func (s *store) IAMPolicyList() Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -60,7 +60,7 @@ func (s *store) ListPolicies() Policies {
 	return p
 }
 
-func (s *store) ListUserPolicies(name string) Policies {
+func (s *store) IAMIdentityPolicyList(name string) Policies {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

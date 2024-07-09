@@ -23,24 +23,24 @@ type Codec struct {
 	Decoders []string
 }
 
-func (a Codec) Equal(b Codec) bool {
+func (a Codec) Equal(b Codec) error {
 	if a.Id != b.Id {
-		return false
+		return fmt.Errorf("id expected: %s, actual: %s", a.Id, b.Id)
 	}
 
 	if a.Name != b.Name {
-		return false
+		return fmt.Errorf("name expected: %s, actual: %s", a.Name, b.Name)
 	}
 
-	if !slices.EqualComparableElements(a.Encoders, b.Encoders) {
-		return false
+	if err := slices.EqualComparableElements(a.Encoders, b.Encoders); err != nil {
+		return fmt.Errorf("codec %s encoders: %w", a.Name, err)
 	}
 
-	if !slices.EqualComparableElements(a.Decoders, b.Decoders) {
-		return false
+	if err := slices.EqualComparableElements(a.Decoders, b.Decoders); err != nil {
+		return fmt.Errorf("codec %s decoders: %w", a.Name, err)
 	}
 
-	return true
+	return nil
 }
 
 type ffCodecs struct {
@@ -49,20 +49,20 @@ type ffCodecs struct {
 	Subtitle []Codec
 }
 
-func (a ffCodecs) Equal(b ffCodecs) bool {
-	if !slices.EqualEqualerElements(a.Audio, b.Audio) {
-		return false
+func (a ffCodecs) Equal(b ffCodecs) error {
+	if err := slices.EqualEqualerElements(a.Audio, b.Audio); err != nil {
+		return fmt.Errorf("audio: %w", err)
 	}
 
-	if !slices.EqualEqualerElements(a.Video, b.Video) {
-		return false
+	if err := slices.EqualEqualerElements(a.Video, b.Video); err != nil {
+		return fmt.Errorf("video: %w", err)
 	}
 
-	if !slices.EqualEqualerElements(a.Subtitle, b.Subtitle) {
-		return false
+	if err := slices.EqualEqualerElements(a.Subtitle, b.Subtitle); err != nil {
+		return fmt.Errorf("subtitle: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 // HWDevice represents a hardware device (e.g. USB device)
@@ -73,24 +73,24 @@ type HWDevice struct {
 	Media string
 }
 
-func (a HWDevice) Equal(b HWDevice) bool {
+func (a HWDevice) Equal(b HWDevice) error {
 	if a.Id != b.Id {
-		return false
+		return fmt.Errorf("id expected: %s, actual: %s", a.Id, b.Id)
 	}
 
 	if a.Name != b.Name {
-		return false
+		return fmt.Errorf("name expected: %s, actual: %s", a.Name, b.Name)
 	}
 
 	if a.Extra != b.Extra {
-		return false
+		return fmt.Errorf("extra expected: %s, actual: %s", a.Extra, b.Extra)
 	}
 
 	if a.Media != b.Media {
-		return false
+		return fmt.Errorf("media expected: %s, actual: %s", a.Media, b.Media)
 	}
 
-	return true
+	return nil
 }
 
 // Device represents a type of device (e.g. V4L2) including connected actual devices
@@ -100,20 +100,20 @@ type Device struct {
 	Devices []HWDevice
 }
 
-func (a Device) Equal(b Device) bool {
+func (a Device) Equal(b Device) error {
 	if a.Id != b.Id {
-		return false
+		return fmt.Errorf("id expected: %s, actual: %s", a.Id, b.Id)
 	}
 
 	if a.Name != b.Name {
-		return false
+		return fmt.Errorf("name expected: %s, actual: %s", a.Name, b.Name)
 	}
 
-	if !slices.EqualEqualerElements(a.Devices, b.Devices) {
-		return false
+	if err := slices.EqualEqualerElements(a.Devices, b.Devices); err != nil {
+		return fmt.Errorf("hwdevice: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 type ffDevices struct {
@@ -121,16 +121,16 @@ type ffDevices struct {
 	Muxers   []Device
 }
 
-func (a ffDevices) Equal(b ffDevices) bool {
-	if !slices.EqualEqualerElements(a.Demuxers, b.Demuxers) {
-		return false
+func (a ffDevices) Equal(b ffDevices) error {
+	if err := slices.EqualEqualerElements(a.Demuxers, b.Demuxers); err != nil {
+		return fmt.Errorf("demuxers: %w", err)
 	}
 
-	if !slices.EqualEqualerElements(a.Muxers, b.Muxers) {
-		return false
+	if err := slices.EqualEqualerElements(a.Muxers, b.Muxers); err != nil {
+		return fmt.Errorf("muxers: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 // Format represents a supported format (e.g. flv)
@@ -144,16 +144,16 @@ type ffFormats struct {
 	Muxers   []Format
 }
 
-func (a ffFormats) Equal(b ffFormats) bool {
-	if !slices.EqualComparableElements(a.Demuxers, b.Demuxers) {
-		return false
+func (a ffFormats) Equal(b ffFormats) error {
+	if err := slices.EqualComparableElements(a.Demuxers, b.Demuxers); err != nil {
+		return fmt.Errorf("demuxers: %w", err)
 	}
 
-	if !slices.EqualComparableElements(a.Muxers, b.Muxers) {
-		return false
+	if err := slices.EqualComparableElements(a.Muxers, b.Muxers); err != nil {
+		return fmt.Errorf("muxers: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 // Protocol represents a supported protocol (e.g. rtsp)
@@ -167,16 +167,16 @@ type ffProtocols struct {
 	Output []Protocol
 }
 
-func (a ffProtocols) Equal(b ffProtocols) bool {
-	if !slices.EqualComparableElements(a.Input, b.Input) {
-		return false
+func (a ffProtocols) Equal(b ffProtocols) error {
+	if err := slices.EqualComparableElements(a.Input, b.Input); err != nil {
+		return fmt.Errorf("input: %w", err)
 	}
 
-	if !slices.EqualComparableElements(a.Output, b.Output) {
-		return false
+	if err := slices.EqualComparableElements(a.Output, b.Output); err != nil {
+		return fmt.Errorf("output: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 type HWAccel struct {
@@ -204,24 +204,24 @@ type ffmpeg struct {
 	Libraries     []Library
 }
 
-func (a ffmpeg) Equal(b ffmpeg) bool {
+func (a ffmpeg) Equal(b ffmpeg) error {
 	if a.Version != b.Version {
-		return false
+		return fmt.Errorf("version expected: %s, actual: %s", a.Version, b.Version)
 	}
 
 	if a.Compiler != b.Compiler {
-		return false
+		return fmt.Errorf("compiler expected: %s, actual: %s", a.Compiler, b.Compiler)
 	}
 
 	if a.Configuration != b.Configuration {
-		return false
+		return fmt.Errorf("configuration expected: %s, actual: %s", a.Configuration, b.Configuration)
 	}
 
-	if !slices.EqualComparableElements(a.Libraries, b.Libraries) {
-		return false
+	if err := slices.EqualComparableElements(a.Libraries, b.Libraries); err != nil {
+		return fmt.Errorf("libraries: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 // Skills are the detected capabilities of a ffmpeg binary
@@ -237,36 +237,36 @@ type Skills struct {
 	Protocols ffProtocols
 }
 
-func (a Skills) Equal(b Skills) bool {
-	if !a.FFmpeg.Equal(b.FFmpeg) {
-		return false
+func (a Skills) Equal(b Skills) error {
+	if err := a.FFmpeg.Equal(b.FFmpeg); err != nil {
+		return fmt.Errorf("ffmpeg: %w", err)
 	}
 
-	if !slices.EqualComparableElements(a.Filters, b.Filters) {
-		return false
+	if err := slices.EqualComparableElements(a.Filters, b.Filters); err != nil {
+		return fmt.Errorf("filters: %w", err)
 	}
 
-	if !slices.EqualComparableElements(a.HWAccels, b.HWAccels) {
-		return false
+	if err := slices.EqualComparableElements(a.HWAccels, b.HWAccels); err != nil {
+		return fmt.Errorf("hwaccels: %w", err)
 	}
 
-	if !a.Codecs.Equal(b.Codecs) {
-		return false
+	if err := a.Codecs.Equal(b.Codecs); err != nil {
+		return fmt.Errorf("codecs: %w", err)
 	}
 
-	if !a.Devices.Equal(b.Devices) {
-		return false
+	if err := a.Devices.Equal(b.Devices); err != nil {
+		return fmt.Errorf("devices: %w", err)
 	}
 
-	if !a.Formats.Equal(b.Formats) {
-		return false
+	if err := a.Formats.Equal(b.Formats); err != nil {
+		return fmt.Errorf("formats: %w", err)
 	}
 
-	if !a.Protocols.Equal(b.Protocols) {
-		return false
+	if err := a.Protocols.Equal(b.Protocols); err != nil {
+		return fmt.Errorf("protocols: %w", err)
 	}
 
-	return true
+	return nil
 }
 
 // New returns all skills that ffmpeg provides

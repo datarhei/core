@@ -14,12 +14,12 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 	id := cmd.Config.ProcessID().String()
 
 	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return fmt.Errorf("the process with the ID '%s' must have limits defined", id)
+		return fmt.Errorf("the process with the ID '%s' must have limits defined%w", id, ErrBadRequest)
 	}
 
 	_, ok := s.data.Process[id]
 	if ok {
-		return fmt.Errorf("the process with the ID '%s' already exists", id)
+		return fmt.Errorf("the process with the ID '%s' already exists%w", id, ErrBadRequest)
 	}
 
 	order := "stop"
@@ -48,7 +48,7 @@ func (s *store) removeProcess(cmd CommandRemoveProcess) error {
 
 	_, ok := s.data.Process[id]
 	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exist", id)
+		return fmt.Errorf("the process with the ID '%s' doesn't exist%w", id, ErrNotFound)
 	}
 
 	delete(s.data.Process, id)
@@ -64,12 +64,12 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	dstid := cmd.Config.ProcessID().String()
 
 	if cmd.Config.LimitCPU <= 0 || cmd.Config.LimitMemory <= 0 {
-		return fmt.Errorf("the process with the ID '%s' must have limits defined", dstid)
+		return fmt.Errorf("the process with the ID '%s' must have limits defined%w", dstid, ErrBadRequest)
 	}
 
 	p, ok := s.data.Process[srcid]
 	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", srcid)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", srcid, ErrNotFound)
 	}
 
 	if p.Config.Equal(cmd.Config) {
@@ -87,7 +87,7 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 
 	_, ok = s.data.Process[dstid]
 	if ok {
-		return fmt.Errorf("the process with the ID '%s' already exists", dstid)
+		return fmt.Errorf("the process with the ID '%s' already exists%w", dstid, ErrBadRequest)
 	}
 
 	now := time.Now()
@@ -134,7 +134,7 @@ func (s *store) setProcessOrder(cmd CommandSetProcessOrder) error {
 
 	p, ok := s.data.Process[id]
 	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", cmd.ID, ErrNotFound)
 	}
 
 	p.Order = cmd.Order
@@ -153,7 +153,7 @@ func (s *store) setProcessMetadata(cmd CommandSetProcessMetadata) error {
 
 	p, ok := s.data.Process[id]
 	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", cmd.ID, ErrNotFound)
 	}
 
 	if p.Metadata == nil {
@@ -180,7 +180,7 @@ func (s *store) setProcessError(cmd CommandSetProcessError) error {
 
 	p, ok := s.data.Process[id]
 	if !ok {
-		return fmt.Errorf("the process with the ID '%s' doesn't exists", cmd.ID)
+		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", cmd.ID, ErrNotFound)
 	}
 
 	p.Error = cmd.Error
@@ -199,7 +199,7 @@ func (s *store) setProcessNodeMap(cmd CommandSetProcessNodeMap) error {
 	return nil
 }
 
-func (s *store) ListProcesses() []Process {
+func (s *store) ProcessList() []Process {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -219,13 +219,13 @@ func (s *store) ListProcesses() []Process {
 	return processes
 }
 
-func (s *store) GetProcess(id app.ProcessID) (Process, error) {
+func (s *store) ProcessGet(id app.ProcessID) (Process, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	process, ok := s.data.Process[id.String()]
 	if !ok {
-		return Process{}, fmt.Errorf("not found")
+		return Process{}, fmt.Errorf("not found%w", ErrNotFound)
 	}
 
 	return Process{
@@ -238,7 +238,7 @@ func (s *store) GetProcess(id app.ProcessID) (Process, error) {
 	}, nil
 }
 
-func (s *store) GetProcessNodeMap() map[string]string {
+func (s *store) ProcessGetNodeMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -251,7 +251,7 @@ func (s *store) GetProcessNodeMap() map[string]string {
 	return m
 }
 
-func (s *store) GetProcessRelocateMap() map[string]string {
+func (s *store) ProcessGetRelocateMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

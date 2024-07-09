@@ -2,7 +2,6 @@ package url
 
 import (
 	"fmt"
-	"net/url"
 	neturl "net/url"
 	"regexp"
 	"strings"
@@ -111,7 +110,7 @@ func (si *StreamInfo) String() string {
 func ParseStreamId(streamid string) (StreamInfo, error) {
 	si := StreamInfo{Mode: "request"}
 
-	if decodedStreamid, err := url.QueryUnescape(streamid); err == nil {
+	if decodedStreamid, err := neturl.QueryUnescape(streamid); err == nil {
 		streamid = decodedStreamid
 	}
 

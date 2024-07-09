@@ -7,7 +7,6 @@ import (
 	"io"
 	gonet "net"
 	"net/url"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/datarhei/core/v16/cluster/forwarder"
 	"github.com/datarhei/core/v16/cluster/kvs"
 	clusternode "github.com/datarhei/core/v16/cluster/node"
-	"github.com/datarhei/core/v16/cluster/proxy"
 	"github.com/datarhei/core/v16/cluster/raft"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/config"
@@ -29,8 +27,8 @@ import (
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream/app"
-	"github.com/datarhei/core/v16/slices"
 )
 
 type Cluster interface {
@@ -51,50 +49,42 @@ type Cluster interface {
 	CoreSkills() skills.Skills
 
 	About() (ClusterAbout, error)
-	IsClusterDegraded() (bool, error)
-	IsDegraded() (bool, error)
 	GetBarrier(name string) bool
 
 	Join(origin, id, raftAddress, peerAddress string) error
 	Leave(origin, id string) error              // gracefully remove a node from the cluster
 	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
+	HasRaftLeader() bool
 
-	ListProcesses() []store.Process
-	GetProcess(id app.ProcessID) (store.Process, error)
-	AddProcess(origin string, config *app.Config) error
-	RemoveProcess(origin string, id app.ProcessID) error
-	UpdateProcess(origin string, id app.ProcessID, config *app.Config) error
-	SetProcessCommand(origin string, id app.ProcessID, order string) error
-	SetProcessMetadata(origin string, id app.ProcessID, key string, data interface{}) error
-	GetProcessMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
-	GetProcessNodeMap() map[string]string
-	RelocateProcesses(origin string, relocations map[app.ProcessID]string) error
+	ProcessAdd(origin string, config *app.Config) error
+	ProcessRemove(origin string, id app.ProcessID) error
+	ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error
+	ProcessSetCommand(origin string, id app.ProcessID, order string) error
+	ProcessSetMetadata(origin string, id app.ProcessID, key string, data interface{}) error
+	ProcessGetMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
+	ProcessesRelocate(origin string, relocations map[app.ProcessID]string) error
 
 	IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error)
-	ListIdentities() (time.Time, []iamidentity.User)
-	ListIdentity(name string) (time.Time, iamidentity.User, error)
-	ListPolicies() (time.Time, []iamaccess.Policy)
-	ListUserPolicies(name string) (time.Time, []iamaccess.Policy)
-	AddIdentity(origin string, identity iamidentity.User) error
-	UpdateIdentity(origin, name string, identity iamidentity.User) error
-	SetPolicies(origin, name string, policies []iamaccess.Policy) error
-	RemoveIdentity(origin string, name string) error
+	IAMIdentityAdd(origin string, identity iamidentity.User) error
+	IAMIdentityUpdate(origin, name string, identity iamidentity.User) error
+	IAMIdentityRemove(origin string, name string) error
+	IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error
 
-	CreateLock(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
-	DeleteLock(origin string, name string) error
-	ListLocks() map[string]time.Time
+	LockCreate(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
+	LockDelete(origin string, name string) error
 
-	SetKV(origin, key, value string) error
-	UnsetKV(origin, key string) error
-	GetKV(origin, key string, stale bool) (string, time.Time, error)
-	ListKV(prefix string) map[string]store.Value
+	KVSet(origin, key, value string) error
+	KVUnset(origin, key string) error
+	KVGet(origin, key string, stale bool) (string, time.Time, error)
 
-	ListNodes() map[string]store.Node
-	SetNodeState(origin, id, state string) error
+	NodeSetState(origin, id, state string) error
 
-	ProxyReader() proxy.ProxyReader
+	Manager() *clusternode.Manager
 	CertManager() autocert.Manager
+	Store() store.Store
+
+	Resources() (resources.Info, error)
 }
 
 type Peer struct {
@@ -122,6 +112,7 @@ type Config struct {
 	CoreSkills skills.Skills
 
 	IPLimiter net.IPLimiter
+	Resources resources.Resources
 	Logger    log.Logger
 
 	Debug DebugConfig
@@ -154,20 +145,16 @@ type cluster struct {
 	nodeRecoverTimeout     time.Duration
 	emergencyLeaderTimeout time.Duration
 
-	forwarder forwarder.Forwarder
+	forwarder *forwarder.Forwarder
 	api       API
-	proxy     proxy.Proxy
+	manager   *clusternode.Manager
 
 	config      *config.Config
 	skills      skills.Skills
 	coreAddress string
 
-	isDegraded        bool
-	isDegradedErr     error
-	isCoreDegraded    bool
-	isCoreDegradedErr error
-	hostnames         []string
-	stateLock         sync.RWMutex
+	hostnames []string
+	stateLock sync.RWMutex
 
 	isRaftLeader  bool
 	hasRaftLeader bool
@@ -178,13 +165,12 @@ type cluster struct {
 	clusterKVS    ClusterKVS
 	certManager   autocert.Manager
 
-	nodes     map[string]clusternode.Node
-	nodesLock sync.RWMutex
-
 	barrier     map[string]bool
 	barrierLock sync.RWMutex
 
 	limiter net.IPLimiter
+
+	resources resources.Resources
 
 	debugDisableFFmpegCheck bool
 }
@@ -209,19 +195,14 @@ func New(config Config) (Cluster, error) {
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
 
-		isDegraded:    true,
-		isDegradedErr: fmt.Errorf("cluster not yet startet"),
-
-		isCoreDegraded:    true,
-		isCoreDegradedErr: fmt.Errorf("cluster not yet started"),
-
 		config: config.CoreConfig,
 		skills: config.CoreSkills,
-		nodes:  map[string]clusternode.Node{},
 
 		barrier: map[string]bool{},
 
 		limiter: config.IPLimiter,
+
+		resources: config.Resources,
 
 		debugDisableFFmpegCheck: config.Debug.DisableFFmpegCheck,
 	}
@@ -301,7 +282,7 @@ func New(config Config) (Cluster, error) {
 
 	c.api = api
 
-	nodeproxy, err := proxy.NewProxy(proxy.ProxyConfig{
+	nodemanager, err := clusternode.NewManager(clusternode.ManagerConfig{
 		ID:     c.nodeID,
 		Logger: c.logger.WithField("logname", "proxy"),
 	})
@@ -310,13 +291,9 @@ func New(config Config) (Cluster, error) {
 		return nil, err
 	}
 
-	go func(nodeproxy proxy.Proxy) {
-		nodeproxy.Start()
-	}(nodeproxy)
+	c.manager = nodemanager
 
-	c.proxy = nodeproxy
-
-	if forwarder, err := forwarder.New(forwarder.ForwarderConfig{
+	if forwarder, err := forwarder.New(forwarder.Config{
 		ID:     c.nodeID,
 		Logger: c.logger.WithField("logname", "forwarder"),
 	}); err != nil {
@@ -475,12 +452,12 @@ func (c *cluster) setup(ctx context.Context) error {
 	c.logger.Info().Log("Waiting for cluster to become operational ...")
 
 	for {
-		ok, err := c.IsClusterDegraded()
+		ok, err := c.isClusterOperational()
 		if !ok {
 			break
 		}
 
-		c.logger.Warn().WithError(err).Log("Cluster is in degraded state")
+		c.logger.Warn().WithError(err).Log("Waiting for all nodes to be registered")
 
 		select {
 		case <-ctx.Done():
@@ -644,15 +621,9 @@ func (c *cluster) Shutdown() error {
 	c.shutdown = true
 	close(c.shutdownCh)
 
-	for id, node := range c.nodes {
-		node.Stop()
-		if c.proxy != nil {
-			c.proxy.RemoveNode(id)
-		}
-	}
-
-	if c.proxy != nil {
-		c.proxy.Stop()
+	if c.manager != nil {
+		c.manager.NodesClear()
+		c.manager = nil
 	}
 
 	if c.api != nil {
@@ -677,56 +648,35 @@ func (c *cluster) IsRaftLeader() bool {
 	return c.isRaftLeader
 }
 
-func (c *cluster) IsDegraded() (bool, error) {
-	c.stateLock.RLock()
-	defer c.stateLock.RUnlock()
+func (c *cluster) HasRaftLeader() bool {
+	c.leaderLock.Lock()
+	defer c.leaderLock.Unlock()
 
-	if c.isDegraded {
-		return c.isDegraded, c.isDegradedErr
-	}
-
-	return c.isCoreDegraded, c.isCoreDegradedErr
+	return c.hasRaftLeader
 }
 
-func (c *cluster) IsClusterDegraded() (bool, error) {
-	c.stateLock.Lock()
-	isDegraded, isDegradedErr := c.isDegraded, c.isDegradedErr
-	c.stateLock.Unlock()
-
-	if isDegraded {
-		return isDegraded, isDegradedErr
-	}
-
+func (c *cluster) isClusterOperational() (bool, error) {
 	servers, err := c.raft.Servers()
 	if err != nil {
 		return true, err
 	}
 
-	c.nodesLock.RLock()
-	nodes := len(c.nodes)
-	c.nodesLock.RUnlock()
+	serverCount := len(servers)
+	nodeCount := c.manager.NodeCount()
 
-	if len(servers) != nodes {
-		return true, fmt.Errorf("not all nodes are connected")
+	if serverCount != nodeCount {
+		return true, fmt.Errorf("%d of %d nodes registered", nodeCount, serverCount)
 	}
 
 	return false, nil
 }
 
 func (c *cluster) Leave(origin, id string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if len(id) == 0 {
 		id = c.nodeID
 	}
 
-	c.nodesLock.RLock()
-	_, hasNode := c.nodes[id]
-	c.nodesLock.RUnlock()
-
-	if !hasNode {
+	if !c.manager.NodeHasNode(id) {
 		return ErrUnknownNode
 	}
 
@@ -860,10 +810,6 @@ func (c *cluster) Leave(origin, id string) error {
 }
 
 func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Join(origin, id, raftAddress, peerAddress)
@@ -923,10 +869,6 @@ func (c *cluster) Join(origin, id, raftAddress, peerAddress string) error {
 }
 
 func (c *cluster) TransferLeadership(origin, id string) error {
-	if ok, _ := c.IsDegraded(); ok {
-		return ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.TransferLeadership(origin, id)
@@ -936,10 +878,6 @@ func (c *cluster) TransferLeadership(origin, id string) error {
 }
 
 func (c *cluster) Snapshot(origin string) (io.ReadCloser, error) {
-	if ok, _ := c.IsDegraded(); ok {
-		return nil, ErrDegraded
-	}
-
 	if !c.IsRaftLeader() {
 		c.logger.Debug().Log("Not leader, forwarding to leader")
 		return c.forwarder.Snapshot(origin)
@@ -962,18 +900,15 @@ func (c *cluster) trackNodeChanges() {
 				continue
 			}
 
-			c.nodesLock.Lock()
-
 			removeNodes := map[string]struct{}{}
-			for id := range c.nodes {
+			for _, id := range c.manager.NodeIDs() {
 				removeNodes[id] = struct{}{}
 			}
 
 			for _, server := range servers {
 				id := server.ID
 
-				_, ok := c.nodes[id]
-				if !ok {
+				if !c.manager.NodeHasNode(id) {
 					logger := c.logger.WithFields(log.Fields{
 						"id":      server.ID,
 						"address": server.Address,
@@ -993,17 +928,11 @@ func (c *cluster) trackNodeChanges() {
 						}),
 					})
 
-					if err := verifyClusterVersion(node.Version()); err != nil {
-						logger.Warn().Log("Version mismatch. Cluster will end up in degraded mode")
-					}
-
-					if _, err := c.proxy.AddNode(id, node.Proxy()); err != nil {
+					if _, err := c.manager.NodeAdd(id, node); err != nil {
 						logger.Warn().WithError(err).Log("Adding node")
 						node.Stop()
 						continue
 					}
-
-					c.nodes[id] = node
 
 					ips := node.IPs()
 					for _, ip := range ips {
@@ -1015,57 +944,21 @@ func (c *cluster) trackNodeChanges() {
 			}
 
 			for id := range removeNodes {
-				node, ok := c.nodes[id]
-				if !ok {
-					continue
-				}
-
-				c.proxy.RemoveNode(id)
-				node.Stop()
-
-				ips := node.IPs()
-				for _, ip := range ips {
-					c.limiter.RemoveBlock(ip)
-				}
-
-				delete(c.nodes, id)
-				/*
-					if id == c.nodeID {
-						c.logger.Warn().WithField("id", id).Log("This node left the cluster. Shutting down.")
-						// We got removed from the cluster, shutdown
-						c.Shutdown()
+				if node, err := c.manager.NodeRemove(id); err != nil {
+					ips := node.IPs()
+					for _, ip := range ips {
+						c.limiter.RemoveBlock(ip)
 					}
-				*/
+				}
 			}
-
-			c.nodesLock.Unlock()
 
 			// Put the cluster in "degraded" mode in case there's a mismatch in expected values
-			hostnames, err := c.checkClusterNodes()
+			c.manager.NodeCheckCompatibility(c.debugDisableFFmpegCheck)
+
+			hostnames, _ := c.manager.GetHostnames(true)
 
 			c.stateLock.Lock()
-			if err != nil {
-				c.isDegraded = true
-				c.isDegradedErr = err
-				c.hostnames = []string{}
-			} else {
-				c.isDegraded = false
-				c.isDegradedErr = nil
-				c.hostnames = hostnames
-			}
-			c.stateLock.Unlock()
-
-			// Put the cluster in "coreDegraded" mode in case there's a mismatch in expected values
-			err = c.checkClusterCoreNodes()
-
-			c.stateLock.Lock()
-			if err != nil {
-				c.isCoreDegraded = true
-				c.isCoreDegradedErr = err
-			} else {
-				c.isCoreDegraded = false
-				c.isCoreDegradedErr = nil
-			}
+			c.hostnames = hostnames
 			c.stateLock.Unlock()
 		case <-c.shutdownCh:
 			return
@@ -1073,240 +966,15 @@ func (c *cluster) trackNodeChanges() {
 	}
 }
 
-// checkClusterNodes returns a list of hostnames that are configured on all nodes. The
-// returned list will not contain any duplicates. An error is returned in case the
-// node is not compatible.
-func (c *cluster) checkClusterNodes() ([]string, error) {
-	hostnames := map[string]int{}
-
-	c.nodesLock.RLock()
-	defer c.nodesLock.RUnlock()
-
-	for id, node := range c.nodes {
-		if status, err := node.Status(); status == "offline" {
-			return nil, fmt.Errorf("node %s is offline: %w", id, err)
-		}
-
-		version := node.Version()
-		if err := verifyClusterVersion(version); err != nil {
-			return nil, fmt.Errorf("node %s has a different cluster version: %s: %w", id, version, err)
-		}
-
-		config, err := node.CoreConfig()
-		if err != nil {
-			return nil, fmt.Errorf("node %s has no configuration available: %w", id, err)
-		}
-		if err := verifyClusterConfig(c.config, config); err != nil {
-			return nil, fmt.Errorf("node %s has a different configuration: %w", id, err)
-		}
-
-		if !c.debugDisableFFmpegCheck {
-			skills, err := node.CoreSkills()
-			if err != nil {
-				return nil, fmt.Errorf("node %s has no FFmpeg skills available: %w", id, err)
-			}
-			if !c.skills.Equal(skills) {
-				return nil, fmt.Errorf("node %s has mismatching FFmpeg skills", id)
-			}
-		}
-
-		for _, name := range config.Host.Name {
-			hostnames[name]++
-		}
-	}
-
-	names := []string{}
-
-	for key, value := range hostnames {
-		if value != len(c.nodes) {
-			continue
-		}
-
-		names = append(names, key)
-	}
-
-	sort.Strings(names)
-
-	return names, nil
-}
-
-func (c *cluster) checkClusterCoreNodes() error {
-	c.nodesLock.RLock()
-	defer c.nodesLock.RUnlock()
-
-	for id, node := range c.nodes {
-		if status, err := node.CoreStatus(); status == "offline" {
-			return fmt.Errorf("node %s core is offline: %w", id, err)
-		}
-	}
-
-	return nil
-}
-
 // getClusterHostnames return a list of all hostnames configured on all nodes. The
 // returned list will not contain any duplicates.
 func (c *cluster) getClusterHostnames() ([]string, error) {
-	hostnames := map[string]struct{}{}
-
-	c.nodesLock.RLock()
-	defer c.nodesLock.RUnlock()
-
-	for id, node := range c.nodes {
-		config, err := node.CoreConfig()
-		if err != nil {
-			return nil, fmt.Errorf("node %s has no configuration available: %w", id, err)
-		}
-
-		for _, name := range config.Host.Name {
-			hostnames[name] = struct{}{}
-		}
-	}
-
-	names := []string{}
-
-	for key := range hostnames {
-		names = append(names, key)
-	}
-
-	sort.Strings(names)
-
-	return names, nil
+	return c.manager.GetHostnames(false)
 }
 
 // getClusterBarrier returns whether all nodes are currently on the same barrier.
 func (c *cluster) getClusterBarrier(name string) (bool, error) {
-	c.nodesLock.RLock()
-	defer c.nodesLock.RUnlock()
-
-	for _, node := range c.nodes {
-		ok, err := node.Barrier(name)
-		if !ok {
-			return false, err
-		}
-	}
-
-	return true, nil
-}
-
-func verifyClusterVersion(v string) error {
-	version, err := ParseClusterVersion(v)
-	if err != nil {
-		return fmt.Errorf("parsing version %s: %w", v, err)
-	}
-
-	if !Version.Equal(version) {
-		return fmt.Errorf("version %s not equal to my version %s", version.String(), Version.String())
-	}
-
-	return nil
-}
-
-func verifyClusterConfig(local, remote *config.Config) error {
-	if local == nil || remote == nil {
-		return fmt.Errorf("config is not available")
-	}
-
-	if local.Cluster.Enable != remote.Cluster.Enable {
-		return fmt.Errorf("cluster.enable is different")
-	}
-
-	if local.Cluster.ID != remote.Cluster.ID {
-		return fmt.Errorf("cluster.id is different")
-	}
-
-	if local.Cluster.SyncInterval != remote.Cluster.SyncInterval {
-		return fmt.Errorf("cluster.sync_interval_sec is different")
-	}
-
-	if local.Cluster.NodeRecoverTimeout != remote.Cluster.NodeRecoverTimeout {
-		return fmt.Errorf("cluster.node_recover_timeout_sec is different")
-	}
-
-	if local.Cluster.EmergencyLeaderTimeout != remote.Cluster.EmergencyLeaderTimeout {
-		return fmt.Errorf("cluster.emergency_leader_timeout_sec is different")
-	}
-
-	if local.Cluster.Debug.DisableFFmpegCheck != remote.Cluster.Debug.DisableFFmpegCheck {
-		return fmt.Errorf("cluster.debug.disable_ffmpeg_check is different")
-	}
-
-	if !local.API.Auth.Enable {
-		return fmt.Errorf("api.auth.enable must be true")
-	}
-
-	if local.API.Auth.Enable != remote.API.Auth.Enable {
-		return fmt.Errorf("api.auth.enable is different")
-	}
-
-	if local.API.Auth.Username != remote.API.Auth.Username {
-		return fmt.Errorf("api.auth.username is different")
-	}
-
-	if local.API.Auth.Password != remote.API.Auth.Password {
-		return fmt.Errorf("api.auth.password is different")
-	}
-
-	if local.API.Auth.JWT.Secret != remote.API.Auth.JWT.Secret {
-		return fmt.Errorf("api.auth.jwt.secret is different")
-	}
-
-	if local.RTMP.Enable != remote.RTMP.Enable {
-		return fmt.Errorf("rtmp.enable is different")
-	}
-
-	if local.RTMP.Enable {
-		if local.RTMP.App != remote.RTMP.App {
-			return fmt.Errorf("rtmp.app is different")
-		}
-	}
-
-	if local.SRT.Enable != remote.SRT.Enable {
-		return fmt.Errorf("srt.enable is different")
-	}
-
-	if local.SRT.Enable {
-		if local.SRT.Passphrase != remote.SRT.Passphrase {
-			return fmt.Errorf("srt.passphrase is different")
-		}
-	}
-
-	if local.Resources.MaxCPUUsage == 0 || remote.Resources.MaxCPUUsage == 0 {
-		return fmt.Errorf("resources.max_cpu_usage must be defined")
-	}
-
-	if local.Resources.MaxMemoryUsage == 0 || remote.Resources.MaxMemoryUsage == 0 {
-		return fmt.Errorf("resources.max_memory_usage must be defined")
-	}
-
-	if local.TLS.Enable != remote.TLS.Enable {
-		return fmt.Errorf("tls.enable is different")
-	}
-
-	if local.TLS.Enable {
-		if local.TLS.Auto != remote.TLS.Auto {
-			return fmt.Errorf("tls.auto is different")
-		}
-
-		if len(local.Host.Name) == 0 || len(remote.Host.Name) == 0 {
-			return fmt.Errorf("host.name must be set")
-		}
-
-		if local.TLS.Auto {
-			if local.TLS.Email != remote.TLS.Email {
-				return fmt.Errorf("tls.email is different")
-			}
-
-			if local.TLS.Staging != remote.TLS.Staging {
-				return fmt.Errorf("tls.staging is different")
-			}
-
-			if local.TLS.Secret != remote.TLS.Secret {
-				return fmt.Errorf("tls.secret is different")
-			}
-		}
-	}
-
-	return nil
+	return c.manager.Barrier(name)
 }
 
 // trackLeaderChanges registers an Observer with raft in order to receive updates
@@ -1370,169 +1038,6 @@ func (c *cluster) applyCommand(cmd *store.Command) error {
 	return nil
 }
 
-type ClusterRaft struct {
-	Address     string
-	State       string
-	LastContact time.Duration
-	NumPeers    uint64
-	LogTerm     uint64
-	LogIndex    uint64
-}
-
-type ClusterNodeResources struct {
-	IsThrottling bool    // Whether this core is currently throttling
-	NCPU         float64 // Number of CPU on this node
-	CPU          float64 // Current CPU load, 0-100*ncpu
-	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
-	Mem          uint64  // Currently used memory in bytes
-	MemLimit     uint64  // Defined memory limit in bytes
-	Error        error
-}
-
-type ClusterNode struct {
-	ID          string
-	Name        string
-	Version     string
-	Status      string
-	Error       error
-	Voter       bool
-	Leader      bool
-	Address     string
-	CreatedAt   time.Time
-	Uptime      time.Duration
-	LastContact time.Duration
-	Latency     time.Duration
-	Core        ClusterNodeCore
-	Resources   ClusterNodeResources
-}
-
-type ClusterNodeCore struct {
-	Address     string
-	Status      string
-	Error       error
-	LastContact time.Duration
-	Latency     time.Duration
-	Version     string
-}
-
-type ClusterAboutLeader struct {
-	ID           string
-	Address      string
-	ElectedSince time.Duration
-}
-
-type ClusterAbout struct {
-	ID          string
-	Domains     []string
-	Leader      ClusterAboutLeader
-	Status      string
-	Raft        ClusterRaft
-	Nodes       []ClusterNode
-	Version     ClusterVersion
-	Degraded    bool
-	DegradedErr error
-}
-
-func (c *cluster) About() (ClusterAbout, error) {
-	degraded, degradedErr := c.IsDegraded()
-
-	about := ClusterAbout{
-		ID:          c.id,
-		Leader:      ClusterAboutLeader{},
-		Status:      "online",
-		Version:     Version,
-		Degraded:    degraded,
-		DegradedErr: degradedErr,
-	}
-
-	if about.Degraded {
-		about.Status = "offline"
-	}
-
-	c.stateLock.RLock()
-	about.Domains = slices.Copy(c.hostnames)
-	c.stateLock.RUnlock()
-
-	stats := c.raft.Stats()
-
-	about.Raft.Address = stats.Address
-	about.Raft.State = stats.State
-	about.Raft.LastContact = stats.LastContact
-	about.Raft.NumPeers = stats.NumPeers
-	about.Raft.LogIndex = stats.LogIndex
-	about.Raft.LogTerm = stats.LogTerm
-
-	servers, err := c.raft.Servers()
-	if err != nil {
-		c.logger.Warn().WithError(err).Log("Raft configuration")
-	}
-
-	serversMap := map[string]raft.Server{}
-
-	for _, s := range servers {
-		serversMap[s.ID] = s
-
-		if s.Leader {
-			about.Leader.ID = s.ID
-			about.Leader.Address = s.Address
-			about.Leader.ElectedSince = s.LastChange
-		}
-	}
-
-	storeNodes := c.ListNodes()
-
-	c.nodesLock.RLock()
-	for id, node := range c.nodes {
-		nodeAbout := node.About()
-
-		node := ClusterNode{
-			ID:          id,
-			Name:        nodeAbout.Name,
-			Version:     nodeAbout.Version,
-			Status:      nodeAbout.Status,
-			Error:       nodeAbout.Error,
-			Address:     nodeAbout.Address,
-			LastContact: nodeAbout.LastContact,
-			Latency:     nodeAbout.Latency,
-			CreatedAt:   nodeAbout.Core.CreatedAt,
-			Uptime:      nodeAbout.Core.Uptime,
-			Core: ClusterNodeCore{
-				Address:     nodeAbout.Core.Address,
-				Status:      nodeAbout.Core.Status,
-				Error:       nodeAbout.Core.Error,
-				LastContact: nodeAbout.Core.LastContact,
-				Latency:     nodeAbout.Core.Latency,
-				Version:     nodeAbout.Core.Version,
-			},
-			Resources: ClusterNodeResources{
-				IsThrottling: nodeAbout.Resources.IsThrottling,
-				NCPU:         nodeAbout.Resources.NCPU,
-				CPU:          nodeAbout.Resources.CPU,
-				CPULimit:     nodeAbout.Resources.CPULimit,
-				Mem:          nodeAbout.Resources.Mem,
-				MemLimit:     nodeAbout.Resources.MemLimit,
-				Error:        nodeAbout.Resources.Error,
-			},
-		}
-
-		if s, ok := serversMap[id]; ok {
-			node.Voter = s.Voter
-			node.Leader = s.Leader
-		}
-
-		if storeNode, hasStoreNode := storeNodes[id]; hasStoreNode {
-			if storeNode.State == "maintenance" {
-				node.Status = storeNode.State
-			}
-		}
-
-		about.Nodes = append(about.Nodes, node)
-	}
-	c.nodesLock.RUnlock()
-
-	return about, nil
-}
-
 func (c *cluster) sentinel() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -1570,6 +1075,26 @@ func (c *cluster) sentinel() {
 	}
 }
 
-func (c *cluster) ProxyReader() proxy.ProxyReader {
-	return c.proxy.Reader()
+func (c *cluster) Resources() (resources.Info, error) {
+	if c.resources == nil {
+		return resources.Info{}, fmt.Errorf("resource information is not available")
+	}
+
+	return c.resources.Info(), nil
+}
+
+func (c *cluster) Manager() *clusternode.Manager {
+	if c.manager == nil {
+		return nil
+	}
+
+	return c.manager
+}
+
+func (c *cluster) Store() store.Store {
+	if c.store == nil {
+		return nil
+	}
+
+	return c.store
 }

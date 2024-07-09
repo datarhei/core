@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -35,13 +35,13 @@ func TestSynchronizeAdd(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      35,
@@ -50,9 +50,9 @@ func TestSynchronizeAdd(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      11,
@@ -90,7 +90,7 @@ func TestSynchronizeAdd(t *testing.T) {
 		"foobaz@": "node1",
 	}, reality)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      27,
@@ -127,13 +127,13 @@ func TestSynchronizeAddDeleted(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -161,7 +161,7 @@ func TestSynchronizeAddDeleted(t *testing.T) {
 		"foobar@": "node1",
 	}, reality)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      11,
@@ -191,7 +191,7 @@ func TestSynchronizeOrderStop(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "start",
@@ -208,11 +208,11 @@ func TestSynchronizeOrderStop(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      20,
 				Mem:      35,
@@ -221,9 +221,9 @@ func TestSynchronizeOrderStop(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -246,7 +246,7 @@ func TestSynchronizeOrderStop(t *testing.T) {
 		"foobar@": "node1",
 	}, reality)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      8,
@@ -283,7 +283,7 @@ func TestSynchronizeOrderStart(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "stop",
@@ -300,11 +300,11 @@ func TestSynchronizeOrderStart(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      20,
 				Mem:      35,
@@ -313,9 +313,9 @@ func TestSynchronizeOrderStart(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -338,7 +338,7 @@ func TestSynchronizeOrderStart(t *testing.T) {
 		"foobar@": "node1",
 	}, reality)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      30,
@@ -386,7 +386,7 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node2",
 			Order:     "start",
@@ -404,11 +404,11 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -417,9 +417,9 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -488,7 +488,7 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node2",
 			Order:     "start",
@@ -506,11 +506,11 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -519,9 +519,9 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -601,13 +601,13 @@ func TestSynchronizeAddReferenceAffinityMultipleEmptyNodes(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -616,9 +616,9 @@ func TestSynchronizeAddReferenceAffinityMultipleEmptyNodes(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -656,13 +656,13 @@ func TestSynchronizeAddLimit(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      81,
 				Mem:      72,
@@ -671,9 +671,9 @@ func TestSynchronizeAddLimit(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      79,
 				Mem:      72,
@@ -701,7 +701,7 @@ func TestSynchronizeAddLimit(t *testing.T) {
 		"foobar@": "node2",
 	}, reality)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      81,
@@ -734,13 +734,13 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      81,
 				Mem:      72,
@@ -749,9 +749,9 @@ func TestSynchronizeAddNoResourcesCPU(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      79,
 				Mem:      72,
@@ -786,13 +786,13 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      81,
 				Mem:      72,
@@ -801,9 +801,9 @@ func TestSynchronizeAddNoResourcesMemory(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      79,
 				Mem:      72,
@@ -836,13 +836,13 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{}
+	have := []node.Process{}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      81,
 				Mem:      72,
@@ -851,9 +851,9 @@ func TestSynchronizeAddNoLimits(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      79,
 				Mem:      72,
@@ -880,7 +880,7 @@ func TestSynchronizeRemove(t *testing.T) {
 
 	want := []store.Process{}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -894,11 +894,11 @@ func TestSynchronizeRemove(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      65,
@@ -907,9 +907,9 @@ func TestSynchronizeRemove(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      11,
@@ -928,7 +928,7 @@ func TestSynchronizeRemove(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      7,
@@ -965,7 +965,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:  "node2",
 			Order:   "start",
@@ -979,11 +979,11 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      35,
@@ -992,9 +992,9 @@ func TestSynchronizeAddRemove(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      65,
@@ -1022,7 +1022,7 @@ func TestSynchronizeAddRemove(t *testing.T) {
 		},
 	}, stack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      17,
@@ -1062,7 +1062,7 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1079,11 +1079,11 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      35,
@@ -1092,9 +1092,9 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      65,
@@ -1131,7 +1131,7 @@ func TestSynchronizeUpdate(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1148,11 +1148,11 @@ func TestSynchronizeUpdate(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      35,
@@ -1161,9 +1161,9 @@ func TestSynchronizeUpdate(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      65,
@@ -1215,7 +1215,7 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1232,11 +1232,11 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      7,
 				Mem:      35,
@@ -1245,9 +1245,9 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      85,
 				Mem:      65,
@@ -1311,7 +1311,7 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "start",
@@ -1329,11 +1329,11 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -1342,9 +1342,9 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "disconnected",
+			State:       "offline",
 			LastContact: time.Now().Add(-time.Minute),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				IsThrottling: true,
 				NCPU:         1,
 				CPU:          1,
@@ -1395,7 +1395,7 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "start",
@@ -1413,11 +1413,11 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -1426,9 +1426,9 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "disconnected",
+			State:       "offline",
 			LastContact: time.Now().Add(-time.Minute),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				IsThrottling: true,
 				NCPU:         1,
 				CPU:          1,
@@ -1491,7 +1491,7 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "start",
@@ -1509,11 +1509,11 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -1522,9 +1522,9 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "disconnected",
+			State:       "offline",
 			LastContact: time.Now().Add(-time.Minute),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				IsThrottling: true,
 				NCPU:         1,
 				CPU:          1,
@@ -1587,7 +1587,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 		},
 	}
 
-	have := []proxy.Process{
+	have := []node.Process{
 		{
 			NodeID:    "node1",
 			Order:     "start",
@@ -1605,11 +1605,11 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -1619,8 +1619,8 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now().Add(-3 * time.Minute),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				IsThrottling: true,
 				NCPU:         1,
 				CPU:          1,
@@ -1653,7 +1653,7 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 }
 
 func TestRebalanceNothingToDo(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1678,11 +1678,11 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      42,
 				Mem:      35,
@@ -1692,8 +1692,8 @@ func TestRebalanceNothingToDo(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      37,
 				Mem:      11,
@@ -1709,7 +1709,7 @@ func TestRebalanceNothingToDo(t *testing.T) {
 }
 
 func TestRebalanceOverload(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1745,11 +1745,11 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      91,
 				Mem:      35,
@@ -1759,8 +1759,8 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
 				Mem:      11,
@@ -1785,7 +1785,7 @@ func TestRebalanceOverload(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      74,
@@ -1804,7 +1804,7 @@ func TestRebalanceOverload(t *testing.T) {
 }
 
 func TestRebalanceSkip(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1840,11 +1840,11 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      91,
 				Mem:      35,
@@ -1854,8 +1854,8 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
 				Mem:      92,
@@ -1887,7 +1887,7 @@ func TestRebalanceSkip(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      91,
@@ -1906,7 +1906,7 @@ func TestRebalanceSkip(t *testing.T) {
 }
 
 func TestRebalanceReferenceAffinity(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -1968,11 +1968,11 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      90,
 				Mem:      90,
@@ -1982,8 +1982,8 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -1993,8 +1993,8 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      1,
 				Mem:      1,
@@ -2020,7 +2020,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      89,
@@ -2046,7 +2046,7 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 }
 
 func TestRebalanceRelocateTarget(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -2082,11 +2082,11 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      27,
 				Mem:      35,
@@ -2096,8 +2096,8 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
 				Mem:      11,
@@ -2107,8 +2107,8 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      0,
 				Mem:      0,
@@ -2137,7 +2137,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      0,
@@ -2163,7 +2163,7 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 }
 
 func TestRebalanceRelocateAny(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -2199,11 +2199,11 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 	}
 
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      27,
 				Mem:      35,
@@ -2213,8 +2213,8 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node2": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
 				Mem:      11,
@@ -2224,8 +2224,8 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 		"node3": {
 			LastContact: time.Now(),
-			State:       "connected",
-			Resources: proxy.NodeResources{
+			State:       "online",
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      0,
 				Mem:      0,
@@ -2255,7 +2255,7 @@ func TestRebalanceRelocateAny(t *testing.T) {
 		},
 	}, opStack)
 
-	require.Equal(t, map[string]proxy.NodeResources{
+	require.Equal(t, map[string]node.Resources{
 		"node1": {
 			NCPU:     1,
 			CPU:      0,
@@ -2281,11 +2281,11 @@ func TestRebalanceRelocateAny(t *testing.T) {
 }
 
 func TestFindBestNodesForProcess(t *testing.T) {
-	nodes := map[string]proxy.NodeAbout{
+	nodes := map[string]node.About{
 		"node1": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      27,
 				Mem:      35,
@@ -2294,9 +2294,9 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node2": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      15,
 				Mem:      11,
@@ -2305,9 +2305,9 @@ func TestFindBestNodesForProcess(t *testing.T) {
 			},
 		},
 		"node3": {
-			State:       "connected",
+			State:       "online",
 			LastContact: time.Now(),
-			Resources: proxy.NodeResources{
+			Resources: node.Resources{
 				NCPU:     1,
 				CPU:      0,
 				Mem:      0,
@@ -2317,7 +2317,7 @@ func TestFindBestNodesForProcess(t *testing.T) {
 		},
 	}
 
-	resources := NewResources(nodes)
+	resources := NewResourcePlanner(nodes)
 
 	list := resources.FindBestNodes(35, 20)
 
@@ -2325,8 +2325,8 @@ func TestFindBestNodesForProcess(t *testing.T) {
 }
 
 func TestFindBestNodesForProcess2(t *testing.T) {
-	resources := NewResources(nil)
-	resources.nodes = map[string]proxy.NodeResources{
+	resources := NewResourcePlanner(nil)
+	resources.nodes = map[string]node.Resources{
 		"node1": {
 			CPULimit:     104.50000000000001,
 			CPU:          29.725299999999997,
@@ -2439,7 +2439,7 @@ func TestFindBestNodesForProcess2(t *testing.T) {
 }
 
 func TestCreateNodeProcessMap(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",
@@ -2539,7 +2539,7 @@ func TestCreateNodeProcessMap(t *testing.T) {
 
 	nodeProcessMap := createNodeProcessMap(processes)
 
-	require.Equal(t, map[string][]proxy.Process{
+	require.Equal(t, map[string][]node.Process{
 		"node1": {
 			{
 				NodeID:  "node1",
@@ -2621,7 +2621,7 @@ func TestCreateNodeProcessMap(t *testing.T) {
 }
 
 func TestCreateReferenceAffinityNodeMap(t *testing.T) {
-	processes := []proxy.Process{
+	processes := []node.Process{
 		{
 			NodeID:  "node1",
 			Order:   "start",

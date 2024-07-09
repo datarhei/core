@@ -11,7 +11,7 @@ func (s *store) addIdentity(cmd CommandAddIdentity) error {
 
 	err := s.data.Users.userlist.Add(cmd.Identity)
 	if err != nil {
-		return fmt.Errorf("the identity with the name '%s' already exists", cmd.Identity.Name)
+		return fmt.Errorf("the identity with the name '%s' already exists%w", cmd.Identity.Name, ErrBadRequest)
 	}
 
 	now := time.Now()
@@ -30,17 +30,17 @@ func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
 	defer s.lock.Unlock()
 
 	if cmd.Name == "$anon" {
-		return fmt.Errorf("the identity with the name '%s' can't be updated", cmd.Name)
+		return fmt.Errorf("the identity with the name '%s' can't be updated%w", cmd.Name, ErrBadRequest)
 	}
 
 	oldUser, err := s.data.Users.userlist.Get(cmd.Name)
 	if err != nil {
-		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+		return fmt.Errorf("the identity with the name '%s' doesn't exist%w", cmd.Name, ErrNotFound)
 	}
 
 	o, ok := s.data.Users.Users[oldUser.Name]
 	if !ok {
-		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Name)
+		return fmt.Errorf("the identity with the name '%s' doesn't exist%w", cmd.Name, ErrNotFound)
 	}
 
 	err = s.data.Users.userlist.Update(cmd.Name, cmd.Identity)
@@ -50,7 +50,7 @@ func (s *store) updateIdentity(cmd CommandUpdateIdentity) error {
 
 	user, err := s.data.Users.userlist.Get(cmd.Identity.Name)
 	if err != nil {
-		return fmt.Errorf("the identity with the name '%s' doesn't exist", cmd.Identity.Name)
+		return fmt.Errorf("the identity with the name '%s' doesn't exist%w", cmd.Identity.Name, ErrNotFound)
 	}
 
 	now := time.Now()
@@ -89,7 +89,7 @@ func (s *store) removeIdentity(cmd CommandRemoveIdentity) error {
 	return nil
 }
 
-func (s *store) ListUsers() Users {
+func (s *store) IAMIdentityList() Users {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -104,7 +104,7 @@ func (s *store) ListUsers() Users {
 	return u
 }
 
-func (s *store) GetUser(name string) Users {
+func (s *store) IAMIdentityGet(name string) Users {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

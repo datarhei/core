@@ -29,7 +29,7 @@ type ProcessReport struct {
 }
 
 // Unmarshal converts a restream log to a report
-func (report *ProcessReport) Unmarshal(l *app.Log) {
+func (report *ProcessReport) Unmarshal(l *app.Report) {
 	if l == nil {
 		return
 	}

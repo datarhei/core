@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"io/fs"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ func (s *store) unsetKV(cmd CommandUnsetKV) error {
 	defer s.lock.Unlock()
 
 	if _, ok := s.data.KVS[cmd.Key]; !ok {
-		return fs.ErrNotExist
+		return errors.Join(fs.ErrNotExist, ErrNotFound)
 	}
 
 	delete(s.data.KVS, cmd.Key)
@@ -33,7 +34,7 @@ func (s *store) unsetKV(cmd CommandUnsetKV) error {
 	return nil
 }
 
-func (s *store) ListKVS(prefix string) map[string]Value {
+func (s *store) KVSList(prefix string) map[string]Value {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -50,13 +51,13 @@ func (s *store) ListKVS(prefix string) map[string]Value {
 	return m
 }
 
-func (s *store) GetFromKVS(key string) (Value, error) {
+func (s *store) KVSGetValue(key string) (Value, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	value, ok := s.data.KVS[key]
 	if !ok {
-		return Value{}, fs.ErrNotExist
+		return Value{}, errors.Join(fs.ErrNotExist, ErrNotFound)
 	}
 
 	return value, nil

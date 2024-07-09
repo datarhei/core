@@ -12,7 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// ListStoreProcesses returns the list of processes stored in the DB of the cluster
+// StoreListProcesses returns the list of processes stored in the DB of the cluster
 // @Summary List of processes in the cluster DB
 // @Description List of processes in the cluster DB
 // @Tags v16.?.?
@@ -21,10 +21,10 @@ import (
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/process [get]
-func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
+func (h *ClusterHandler) StoreListProcesses(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 
-	procs := h.cluster.ListProcesses()
+	procs := h.cluster.Store().ProcessList()
 
 	processes := []api.Process{}
 
@@ -52,7 +52,7 @@ func (h *ClusterHandler) ListStoreProcesses(c echo.Context) error {
 // @Success 200 {object} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/process/:id [get]
-func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
+func (h *ClusterHandler) StoreGetProcess(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
@@ -66,7 +66,7 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
 	}
 
-	p, err := h.cluster.GetProcess(pid)
+	p, err := h.cluster.Store().ProcessGet(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
@@ -76,7 +76,7 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 	return c.JSON(http.StatusOK, process)
 }
 
-// GetStoreProcessNodeMap returns a map of which process is running on which node
+// StoreGetProcessNodeMap returns a map of which process is running on which node
 // @Summary Retrieve a map of which process is running on which node
 // @Description Retrieve a map of which process is running on which node
 // @Tags v16.?.?
@@ -85,13 +85,13 @@ func (h *ClusterHandler) GetStoreProcess(c echo.Context) error {
 // @Success 200 {object} api.ClusterProcessMap
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/map/process [get]
-func (h *ClusterHandler) GetStoreProcessNodeMap(c echo.Context) error {
-	m := h.cluster.GetProcessNodeMap()
+func (h *ClusterHandler) StoreGetProcessNodeMap(c echo.Context) error {
+	m := h.cluster.Store().ProcessGetNodeMap()
 
 	return c.JSON(http.StatusOK, m)
 }
 
-// ListStoreIdentities returns the list of identities stored in the DB of the cluster
+// StoreListIdentities returns the list of identities stored in the DB of the cluster
 // @Summary List of identities in the cluster
 // @Description List of identities in the cluster
 // @Tags v16.?.?
@@ -100,15 +100,15 @@ func (h *ClusterHandler) GetStoreProcessNodeMap(c echo.Context) error {
 // @Success 200 {array} api.IAMUser
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/user [get]
-func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
+func (h *ClusterHandler) StoreListIdentities(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 
-	updatedAt, identities := h.cluster.ListIdentities()
+	identities := h.cluster.Store().IAMIdentityList()
 
-	users := make([]api.IAMUser, len(identities))
+	users := make([]api.IAMUser, len(identities.Users))
 
-	for i, iamuser := range identities {
+	for i, iamuser := range identities.Users {
 		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "read") {
 			continue
 		}
@@ -119,27 +119,27 @@ func (h *ClusterHandler) ListStoreIdentities(c echo.Context) error {
 			}
 		}
 
-		_, policies := h.cluster.ListUserPolicies(iamuser.Name)
-		users[i].Marshal(iamuser, policies)
+		policies := h.cluster.Store().IAMIdentityPolicyList(iamuser.Name)
+		users[i].Marshal(iamuser, policies.Policies)
 	}
 
-	c.Response().Header().Set("Last-Modified", updatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
+	c.Response().Header().Set("Last-Modified", identities.UpdatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 
 	return c.JSON(http.StatusOK, users)
 }
 
-// ListStoreIdentity returns the list of identities stored in the DB of the cluster
+// StoreGetIdentity returns the list of identities stored in the DB of the cluster
 // @Summary List of identities in the cluster
 // @Description List of identities in the cluster
 // @Tags v16.?.?
-// @ID cluster-3-db-list-identity
+// @ID cluster-3-db-get-identity
 // @Produce json
 // @Success 200 {object} api.IAMUser
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/user/{name} [get]
-func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
+func (h *ClusterHandler) StoreGetIdentity(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	name := util.PathParam(c, "name")
@@ -150,13 +150,14 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 
 	var updatedAt time.Time
 	var iamuser identity.User
-	var err error
 
 	if name != "$anon" {
-		updatedAt, iamuser, err = h.cluster.ListIdentity(name)
-		if err != nil {
-			return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		user := h.cluster.Store().IAMIdentityGet(name)
+		if len(user.Users) == 0 {
+			return api.Err(http.StatusNotFound, "")
 		}
+
+		updatedAt, iamuser = user.UpdatedAt, user.Users[0]
 
 		if ctxuser != iamuser.Name {
 			if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
@@ -171,20 +172,20 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 		}
 	}
 
-	policiesUpdatedAt, policies := h.cluster.ListUserPolicies(name)
+	policies := h.cluster.Store().IAMIdentityPolicyList(name)
 	if updatedAt.IsZero() {
-		updatedAt = policiesUpdatedAt
+		updatedAt = policies.UpdatedAt
 	}
 
 	user := api.IAMUser{}
-	user.Marshal(iamuser, policies)
+	user.Marshal(iamuser, policies.Policies)
 
 	c.Response().Header().Set("Last-Modified", updatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 
 	return c.JSON(http.StatusOK, user)
 }
 
-// ListStorePolicies returns the list of policies stored in the DB of the cluster
+// StoreListPolicies returns the list of policies stored in the DB of the cluster
 // @Summary List of policies in the cluster
 // @Description List of policies in the cluster
 // @Tags v16.?.?
@@ -193,26 +194,27 @@ func (h *ClusterHandler) ListStoreIdentity(c echo.Context) error {
 // @Success 200 {array} api.IAMPolicy
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/policies [get]
-func (h *ClusterHandler) ListStorePolicies(c echo.Context) error {
-	updatedAt, clusterpolicies := h.cluster.ListPolicies()
+func (h *ClusterHandler) StoreListPolicies(c echo.Context) error {
+	clusterpolicies := h.cluster.Store().IAMPolicyList()
 
 	policies := []api.IAMPolicy{}
 
-	for _, pol := range clusterpolicies {
+	for _, pol := range clusterpolicies.Policies {
 		policies = append(policies, api.IAMPolicy{
 			Name:     pol.Name,
 			Domain:   pol.Domain,
 			Resource: pol.Resource,
+			Types:    pol.Types,
 			Actions:  pol.Actions,
 		})
 	}
 
-	c.Response().Header().Set("Last-Modified", updatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
+	c.Response().Header().Set("Last-Modified", clusterpolicies.UpdatedAt.UTC().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 
 	return c.JSON(http.StatusOK, policies)
 }
 
-// ListStoreLocks returns the list of currently stored locks
+// StoreListLocks returns the list of currently stored locks
 // @Summary List locks in the cluster DB
 // @Description List of locks in the cluster DB
 // @Tags v16.?.?
@@ -221,8 +223,8 @@ func (h *ClusterHandler) ListStorePolicies(c echo.Context) error {
 // @Success 200 {array} api.ClusterLock
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/locks [get]
-func (h *ClusterHandler) ListStoreLocks(c echo.Context) error {
-	clusterlocks := h.cluster.ListLocks()
+func (h *ClusterHandler) StoreListLocks(c echo.Context) error {
+	clusterlocks := h.cluster.Store().LockList()
 
 	locks := []api.ClusterLock{}
 
@@ -236,7 +238,7 @@ func (h *ClusterHandler) ListStoreLocks(c echo.Context) error {
 	return c.JSON(http.StatusOK, locks)
 }
 
-// ListStoreKV returns the list of currently stored key/value pairs
+// StoreListKV returns the list of currently stored key/value pairs
 // @Summary List KV in the cluster DB
 // @Description List of KV in the cluster DB
 // @Tags v16.?.?
@@ -245,8 +247,8 @@ func (h *ClusterHandler) ListStoreLocks(c echo.Context) error {
 // @Success 200 {object} api.ClusterKVS
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/kv [get]
-func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
-	clusterkv := h.cluster.ListKV("")
+func (h *ClusterHandler) StoreListKV(c echo.Context) error {
+	clusterkv := h.cluster.Store().KVSList("")
 
 	kvs := api.ClusterKVS{}
 
@@ -260,7 +262,7 @@ func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
 	return c.JSON(http.StatusOK, kvs)
 }
 
-// ListStoreNodes returns the list of stored node metadata
+// StoreListNodes returns the list of stored node metadata
 // @Summary List nodes in the cluster DB
 // @Description List of nodes in the cluster DB
 // @Tags v16.?.?
@@ -269,8 +271,8 @@ func (h *ClusterHandler) ListStoreKV(c echo.Context) error {
 // @Success 200 {array} api.ClusterStoreNode
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/node [get]
-func (h *ClusterHandler) ListStoreNodes(c echo.Context) error {
-	clusternodes := h.cluster.ListNodes()
+func (h *ClusterHandler) StoreListNodes(c echo.Context) error {
+	clusternodes := h.cluster.Store().NodeList()
 
 	nodes := []api.ClusterStoreNode{}
 

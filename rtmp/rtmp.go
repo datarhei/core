@@ -5,17 +5,17 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/cluster/proxy"
+	"github.com/datarhei/core/v16/cluster/node"
 	enctoken "github.com/datarhei/core/v16/encoding/token"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
+	rtmpurl "github.com/datarhei/core/v16/rtmp/url"
 	"github.com/datarhei/core/v16/session"
 
 	"github.com/datarhei/joy4/av/avutil"
@@ -61,7 +61,7 @@ type Config struct {
 	// with methods like tls.Config.SetSessionTicketKeys.
 	TLSConfig *tls.Config
 
-	Proxy proxy.ProxyReader
+	Proxy *node.Manager
 
 	IAM iam.IAM
 }
@@ -98,7 +98,7 @@ type server struct {
 	channels map[string]*channel
 	lock     sync.RWMutex
 
-	proxy proxy.ProxyReader
+	proxy *node.Manager
 
 	iam iam.IAM
 }
@@ -203,68 +203,14 @@ func (s *server) log(who, handler, action, resource, message string, client net.
 	}).Log(message)
 }
 
-// GetToken returns the path without the token and the token found in the URL and whether
-// it was found in the path. If the token was part of the path, the token is removed from
-// the path. The token in the query string takes precedence. The token in the path is
-// assumed to be the last path element.
-func GetToken(u *url.URL) (string, string, bool) {
-	q := u.Query()
-	if q.Has("token") {
-		// The token was in the query. Return the unmomdified path and the token.
-		return u.Path, q.Get("token"), false
-	}
-
-	pathElements := splitPath(u.EscapedPath())
-	nPathElements := len(pathElements)
-
-	if nPathElements <= 1 {
-		return u.Path, "", false
-	}
-
-	rawPath := "/" + strings.Join(pathElements[:nPathElements-1], "/")
-	rawToken := pathElements[nPathElements-1]
-
-	path, err := url.PathUnescape(rawPath)
-	if err != nil {
-		path = rawPath
-	}
-
-	token, err := url.PathUnescape(rawToken)
-	if err != nil {
-		token = rawToken
-	}
-
-	// Return the path without the token
-	return path, token, true
-}
-
-func splitPath(path string) []string {
-	pathElements := strings.Split(filepath.Clean(path), "/")
-
-	if len(pathElements) == 0 {
-		return pathElements
-	}
-
-	if len(pathElements[0]) == 0 {
-		pathElements = pathElements[1:]
-	}
-
-	return pathElements
-}
-
-func removePathPrefix(path, prefix string) (string, string) {
-	prefix = filepath.Join("/", prefix)
-	return filepath.Join("/", strings.TrimPrefix(path, prefix+"/")), prefix
-}
-
 // handlePlay is called when a RTMP client wants to play a stream
 func (s *server) handlePlay(conn *rtmp.Conn) {
 	defer conn.Close()
 
 	remote := conn.NetConn().RemoteAddr()
-	playpath, token, isStreamkey := GetToken(conn.URL)
+	playpath, token, isStreamkey := rtmpurl.GetToken(conn.URL)
 
-	playpath, _ = removePathPrefix(playpath, s.app)
+	playpath, _ = rtmpurl.RemovePathPrefix(playpath, s.app)
 
 	identity, err := s.findIdentityFromStreamKey(token)
 	if err != nil {
@@ -293,7 +239,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 
 	if ch == nil && s.proxy != nil {
 		// Check in the cluster for that stream
-		url, err := s.proxy.GetURL("rtmp", playpath)
+		url, err := s.proxy.MediaGetURL("rtmp", playpath)
 		if err != nil {
 			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 			return
@@ -390,9 +336,9 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 	defer conn.Close()
 
 	remote := conn.NetConn().RemoteAddr()
-	playpath, token, isStreamkey := GetToken(conn.URL)
+	playpath, token, isStreamkey := rtmpurl.GetToken(conn.URL)
 
-	playpath, app := removePathPrefix(playpath, s.app)
+	playpath, app := rtmpurl.RemovePathPrefix(playpath, s.app)
 
 	identity, err := s.findIdentityFromStreamKey(token)
 	if err != nil {
@@ -534,7 +480,7 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 // considered the domain. It is assumed that the app is not part of
 // the provided path.
 func (s *server) findDomainFromPlaypath(path string) string {
-	elements := splitPath(path)
+	elements := rtmpurl.SplitPath(path)
 	if len(elements) == 1 {
 		return "$none"
 	}
