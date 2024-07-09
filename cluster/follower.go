@@ -33,7 +33,9 @@ func (c *cluster) establishFollowership(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancelFollowerShip = cancel
 
-	go c.recoverCluster(ctx, c.syncInterval)
+	if c.recoverTimeout > 0 {
+		go c.recoverCluster(ctx, c.syncInterval)
+	}
 }
 
 func (c *cluster) revokeFollowership() {

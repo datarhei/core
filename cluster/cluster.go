@@ -55,6 +55,7 @@ type Cluster interface {
 	Leave(origin, id string) error              // gracefully remove a node from the cluster
 	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
+	IsRaftLeader() bool
 	HasRaftLeader() bool
 
 	ProcessAdd(origin string, config *app.Config) error
