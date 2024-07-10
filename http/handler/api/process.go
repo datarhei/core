@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 	"sort"
@@ -333,11 +334,6 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	tid = app.ProcessID{
-		ID:     id,
-		Domain: domain,
-	}
-
 	if err := h.restream.UpdateProcess(tid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
 			return api.Err(http.StatusNotFound, "", "process not found: %s", id)
@@ -545,7 +541,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 		Domain: domain,
 	}
 
-	l, err := h.restream.GetProcessLog(tid)
+	l, err := h.restream.GetProcessReport(tid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
@@ -560,13 +556,15 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 	filteredReport := api.ProcessReport{}
 
 	// Add the current report as a fake history entry
-	report.History = append(report.History, api.ProcessReportEntry{
-		CreatedAt: report.CreatedAt,
-		Prelude:   report.Prelude,
-		Log:       report.Log,
+	report.History = append(report.History, api.ProcessReportHistoryEntry{
+		ProcessReportEntry: api.ProcessReportEntry{
+			CreatedAt: report.CreatedAt,
+			Prelude:   report.Prelude,
+			Log:       report.Log,
+		},
 	})
 
-	entries := []api.ProcessReportEntry{}
+	entries := []api.ProcessReportHistoryEntry{}
 
 	for _, r := range report.History {
 		if createdAt != nil && exitedAt == nil {
@@ -604,6 +602,53 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, filteredReport)
+}
+
+// SetReport sets the report history of a process
+// @Summary Set the report history a process
+// @Description Set the report history a process
+// @Tags v16.?.?
+// @ID process-3-set-report
+// @Accept json
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param report body api.ProcessReport true "Process report"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/process/{id}/report [put]
+func (h *ProcessHandler) SetReport(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+	id := util.PathParam(c, "id")
+
+	fmt.Printf("entering SetReport handler\n")
+
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
+	}
+
+	tid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	report := api.ProcessReport{}
+
+	if err := util.ShouldBindJSON(c, &report); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	appreport := report.Marshal()
+
+	if err := h.restream.SetProcessReport(tid, &appreport); err != nil {
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // SearchReportHistory returns a list of matching report references
@@ -1031,7 +1076,7 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 	}
 
 	if filter.report {
-		log, err := h.restream.GetProcessLog(id)
+		log, err := h.restream.GetProcessReport(id)
 		if err != nil {
 			return api.Process{}, err
 		}

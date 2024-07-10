@@ -51,6 +51,33 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/about": {
+            "get": {
+                "description": "The cluster version",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "The cluster version",
+                "operationId": "cluster-1-about",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/barrier/{name}": {
             "get": {
                 "description": "Has the barrier already has been passed",
@@ -535,7 +562,7 @@ const docTemplateClusterAPI = `{
                 "operationId": "cluster-1-lock",
                 "parameters": [
                     {
-                        "description": "Lock request",
+                        "description": "LockCreate request",
                         "name": "data",
                         "in": "body",
                         "required": true,

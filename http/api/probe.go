@@ -44,10 +44,10 @@ func (i *ProbeIO) Unmarshal(io *app.ProbeIO) {
 	i.Type = io.Type
 	i.Codec = io.Codec
 	i.Coder = io.Coder
-	i.Bitrate = ToNumber(io.Bitrate)
-	i.Duration = ToNumber(io.Duration)
+	i.Bitrate = json.ToNumber(io.Bitrate)
+	i.Duration = json.ToNumber(io.Duration)
 
-	i.FPS = ToNumber(io.FPS)
+	i.FPS = json.ToNumber(io.FPS)
 	i.Pixfmt = io.Pixfmt
 	i.Width = io.Width
 	i.Height = io.Height
@@ -64,7 +64,7 @@ type Probe struct {
 	Log     []string  `json:"log"`
 }
 
-// Unmarshal converts a restreamer Probe to a Probe in API representation
+// Unmarshal converts a core Probe to a Probe in API representation
 func (probe *Probe) Unmarshal(p *app.Probe) {
 	if p == nil {
 		return

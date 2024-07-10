@@ -312,7 +312,6 @@ func (n *Core) About() (CoreAbout, error) {
 }
 
 func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -325,7 +324,6 @@ func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) e
 }
 
 func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -338,7 +336,6 @@ func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
 }
 
 func (n *Core) ProcessDelete(id app.ProcessID) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -351,7 +348,6 @@ func (n *Core) ProcessDelete(id app.ProcessID) error {
 }
 
 func (n *Core) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -363,8 +359,19 @@ func (n *Core) ProcessUpdate(id app.ProcessID, config *app.Config, metadata map[
 	return client.ProcessUpdate(id, config, metadata)
 }
 
-func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
+func (n *Core) ProcessReportSet(id app.ProcessID, report *app.Report) error {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
 
+	if client == nil {
+		return ErrNoPeer
+	}
+
+	return client.ProcessReportSet(id, report)
+}
+
+func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -384,7 +391,6 @@ func (n *Core) ProcessProbe(id app.ProcessID) (api.Probe, error) {
 }
 
 func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -404,7 +410,6 @@ func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
 }
 
 func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -417,7 +422,6 @@ func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, er
 }
 
 func (n *Core) FilesystemList(storage, pattern string) ([]api.FileInfo, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -439,7 +443,6 @@ func (n *Core) FilesystemList(storage, pattern string) ([]api.FileInfo, error) {
 }
 
 func (n *Core) FilesystemDeleteFile(storage, path string) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -452,7 +455,6 @@ func (n *Core) FilesystemDeleteFile(storage, path string) error {
 }
 
 func (n *Core) FilesystemPutFile(storage, path string, data io.Reader) error {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -465,7 +467,6 @@ func (n *Core) FilesystemPutFile(storage, path string, data io.Reader) error {
 }
 
 func (n *Core) FilesystemGetFileInfo(storage, path string) (int64, time.Time, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -487,7 +488,6 @@ func (n *Core) FilesystemGetFileInfo(storage, path string) (int64, time.Time, er
 }
 
 func (n *Core) FilesystemGetFile(storage, path string, offset int64) (io.ReadCloser, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()

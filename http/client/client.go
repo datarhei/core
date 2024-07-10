@@ -69,6 +69,7 @@ type RestClient interface {
 	ProcessProbeConfig(config *app.Config) (api.Probe, error)                             // POST /v3/process/probe
 	ProcessConfig(id app.ProcessID) (api.ProcessConfig, error)                            // GET /v3/process/{id}/config
 	ProcessReport(id app.ProcessID) (api.ProcessReport, error)                            // GET /v3/process/{id}/report
+	ProcessReportSet(id app.ProcessID, report *app.Report) error                          // PUT /v3/process/{id}/report
 	ProcessState(id app.ProcessID) (api.ProcessState, error)                              // GET /v3/process/{id}/state
 	ProcessMetadata(id app.ProcessID, key string) (api.Metadata, error)                   // GET /v3/process/{id}/metadata/{key}
 	ProcessMetadataSet(id app.ProcessID, key string, metadata api.Metadata) error         // PUT /v3/process/{id}/metadata/{key}
@@ -453,6 +454,10 @@ func New(config Config) (RestClient, error) {
 			{
 				path:       mustNewGlob("/v3/cluster/node/*/state"),
 				constraint: mustNewConstraint("^16.14.0"),
+			},
+			{
+				path:       mustNewGlob("/v3/process/*/report"),
+				constraint: mustNewConstraint("^16.20.0"),
 			},
 		},
 		"DELETE": {

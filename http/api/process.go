@@ -70,7 +70,7 @@ type ProcessConfig struct {
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Marshal converts a process config in API representation to a restreamer process config and metadata
+// Marshal converts a process config in API representation to a core process config and metadata
 func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 	p := &app.Config{
 		ID:             cfg.ID,
@@ -153,7 +153,7 @@ func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {
 	}
 }
 
-// Unmarshal converts a restream process config to a process config in API representation
+// Unmarshal converts a core process config to a process config in API representation
 func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 	if c == nil {
 		return
@@ -236,7 +236,7 @@ type ProcessState struct {
 	Command   []string     `json:"command"`
 }
 
-// Unmarshal converts a restreamer ffmpeg process state to a state in API representation
+// Unmarshal converts a core ffmpeg process state to a state in API representation
 func (s *ProcessState) Unmarshal(state *app.State) {
 	if state == nil {
 		return
@@ -249,19 +249,19 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.LastLog = state.LastLog
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
-	s.CPU = ToNumber(state.CPU)
+	s.CPU = json.ToNumber(state.CPU)
 	s.LimitMode = state.LimitMode
 	s.Resources.CPU = ProcessUsageCPU{
-		NCPU:         ToNumber(state.Resources.CPU.NCPU),
-		Current:      ToNumber(state.Resources.CPU.Current),
-		Average:      ToNumber(state.Resources.CPU.Average),
-		Max:          ToNumber(state.Resources.CPU.Max),
-		Limit:        ToNumber(state.Resources.CPU.Limit),
+		NCPU:         json.ToNumber(state.Resources.CPU.NCPU),
+		Current:      json.ToNumber(state.Resources.CPU.Current),
+		Average:      json.ToNumber(state.Resources.CPU.Average),
+		Max:          json.ToNumber(state.Resources.CPU.Max),
+		Limit:        json.ToNumber(state.Resources.CPU.Limit),
 		IsThrottling: state.Resources.CPU.IsThrottling,
 	}
 	s.Resources.Memory = ProcessUsageMemory{
 		Current: state.Resources.Memory.Current,
-		Average: ToNumber(state.Resources.Memory.Average),
+		Average: json.ToNumber(state.Resources.Memory.Average),
 		Max:     state.Resources.Memory.Max,
 		Limit:   state.Resources.Memory.Limit,
 	}
@@ -279,6 +279,43 @@ type ProcessUsageCPU struct {
 	IsThrottling bool        `json:"throttling"`
 }
 
+func (p *ProcessUsageCPU) Unmarshal(pp *app.ProcessUsageCPU) {
+	p.NCPU = json.ToNumber(pp.NCPU)
+	p.Current = json.ToNumber(pp.Current)
+	p.Average = json.ToNumber(pp.Average)
+	p.Max = json.ToNumber(pp.Max)
+	p.Limit = json.ToNumber(pp.Limit)
+	p.IsThrottling = pp.IsThrottling
+}
+
+func (p *ProcessUsageCPU) Marshal() app.ProcessUsageCPU {
+	pp := app.ProcessUsageCPU{
+		IsThrottling: p.IsThrottling,
+	}
+
+	if x, err := p.NCPU.Float64(); err == nil {
+		pp.NCPU = x
+	}
+
+	if x, err := p.Current.Float64(); err == nil {
+		pp.Current = x
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = x
+	}
+
+	if x, err := p.Max.Float64(); err == nil {
+		pp.Max = x
+	}
+
+	if x, err := p.Limit.Float64(); err == nil {
+		pp.Limit = x
+	}
+
+	return pp
+}
+
 type ProcessUsageMemory struct {
 	Current uint64      `json:"cur" format:"uint64"`
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
@@ -286,7 +323,42 @@ type ProcessUsageMemory struct {
 	Limit   uint64      `json:"limit" format:"uint64"`
 }
 
+func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
+	p.Current = pp.Current
+	p.Average = json.ToNumber(pp.Average)
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageMemory) Marshal() app.ProcessUsageMemory {
+	pp := app.ProcessUsageMemory{
+		Current: p.Current,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = x
+	}
+
+	return pp
+}
+
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU    `json:"cpu_usage"`
 	Memory ProcessUsageMemory `json:"memory_bytes"`
+}
+
+func (p *ProcessUsage) Unmarshal(pp *app.ProcessUsage) {
+	p.CPU.Unmarshal(&pp.CPU)
+	p.Memory.Unmarshal(&pp.Memory)
+}
+
+func (p *ProcessUsage) Marshal() app.ProcessUsage {
+	pp := app.ProcessUsage{
+		CPU:    p.CPU.Marshal(),
+		Memory: p.Memory.Marshal(),
+	}
+
+	return pp
 }

@@ -594,6 +594,36 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			break
 		}
 
+		// Transfer report with best effort, it's ok if it fails.
+		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop")
+		if err == nil {
+			process, err := c.manager.ProcessGet(v.fromNodeid, v.config.ProcessID(), []string{"report"})
+			if err != nil {
+				logger.Info().WithError(err).WithFields(log.Fields{
+					"processid":  v.config.ProcessID(),
+					"fromnodeid": v.fromNodeid,
+					"tonodeid":   v.toNodeid,
+				}).Log("Moving process, get process report")
+			}
+			if process.Report != nil && err == nil {
+				report := process.Report.Marshal()
+				err = c.manager.ProcessReportSet(v.toNodeid, v.config.ProcessID(), &report)
+				if err != nil {
+					logger.Info().WithError(err).WithFields(log.Fields{
+						"processid":  v.config.ProcessID(),
+						"fromnodeid": v.fromNodeid,
+						"tonodeid":   v.toNodeid,
+					}).Log("Moving process, set process report")
+				}
+			}
+		} else {
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid":  v.config.ProcessID(),
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process, stopping process")
+		}
+
 		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
 		if err != nil {
 			opErr = processOpError{

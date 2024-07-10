@@ -896,6 +896,24 @@ paths:
       summary: The cluster version
       tags:
       - v1.0.0
+  /v1/about:
+    get:
+      description: The cluster version
+      operationId: cluster-1-about
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: The cluster version
+      tags:
+      - v1.0.0
   /v1/barrier/{name}:
     get:
       description: Has the barrier already has been passed
@@ -1216,7 +1234,7 @@ paths:
       description: Acquire a named lock
       operationId: cluster-1-lock
       parameters:
-      - description: Lock request
+      - description: LockCreate request
         in: body
         name: data
         required: true

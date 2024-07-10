@@ -104,6 +104,26 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 	return nil
 }
 
+func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) error {
+	var buf bytes.Buffer
+
+	data := api.ProcessReport{}
+	data.Unmarshal(report)
+
+	e := json.NewEncoder(&buf)
+	e.Encode(data)
+
+	query := &url.Values{}
+	query.Set("domain", id.Domain)
+
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", &buf)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *restclient) ProcessDelete(id app.ProcessID) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)

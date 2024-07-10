@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/process"
 )
 
@@ -272,6 +273,24 @@ type ProcessUsageCPU struct {
 	IsThrottling bool
 }
 
+func (p *ProcessUsageCPU) UnmarshalParser(pp *parse.UsageCPU) {
+	p.NCPU = pp.NCPU
+	p.Average = pp.Average
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageCPU) MarshalParser() parse.UsageCPU {
+	pp := parse.UsageCPU{
+		NCPU:    p.NCPU,
+		Average: p.Average,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	return pp
+}
+
 type ProcessUsageMemory struct {
 	Current uint64  // bytes
 	Average float64 // bytes
@@ -279,9 +298,39 @@ type ProcessUsageMemory struct {
 	Limit   uint64  // bytes
 }
 
+func (p *ProcessUsageMemory) UnmarshalParser(pp *parse.UsageMemory) {
+	p.Average = pp.Average
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageMemory) MarshalParser() parse.UsageMemory {
+	pp := parse.UsageMemory{
+		Average: p.Average,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	return pp
+}
+
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU
 	Memory ProcessUsageMemory
+}
+
+func (p *ProcessUsage) UnmarshalParser(pp *parse.Usage) {
+	p.CPU.UnmarshalParser(&pp.CPU)
+	p.Memory.UnmarshalParser(&pp.Memory)
+}
+
+func (p *ProcessUsage) MarshalParser() parse.Usage {
+	pp := parse.Usage{
+		CPU:    p.CPU.MarshalParser(),
+		Memory: p.Memory.MarshalParser(),
+	}
+
+	return pp
 }
 
 type ProcessID struct {

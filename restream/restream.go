@@ -13,7 +13,6 @@ import (
 
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/parse"
-	"github.com/datarhei/core/v16/ffmpeg/probe"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/io/fs"
@@ -55,7 +54,8 @@ type Restreamer interface {
 	ReloadProcess(id app.ProcessID) error                                                                             // Reload a process
 	GetProcess(id app.ProcessID) (*app.Process, error)                                                                // Get a process
 	GetProcessState(id app.ProcessID) (*app.State, error)                                                             // Get the state of a process
-	GetProcessLog(id app.ProcessID) (*app.Report, error)                                                              // Get the logs of a process
+	GetProcessReport(id app.ProcessID) (*app.Report, error)                                                           // Get the logs of a process
+	SetProcessReport(id app.ProcessID, report *app.Report) error                                                      // Set the log history of a process
 	SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.ReportHistorySearchResult // Search the log history of all processes
 	GetPlayout(id app.ProcessID, inputid string) (string, error)                                                      // Get the URL of the playout API for a process
 	SetProcessMetadata(id app.ProcessID, key string, data interface{}) error                                          // Set metatdata to a process
@@ -1211,7 +1211,8 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 	t.process.UpdatedAt = time.Now().Unix()
 
 	// Transfer the report history to the new process
-	task.parser.TransferReportHistory(t.parser)
+	history := task.parser.ReportHistory()
+	t.parser.ImportReportHistory(history)
 
 	// Transfer the metadata to the new process
 	t.metadata = task.metadata
@@ -1532,8 +1533,10 @@ func (r *restream) reloadProcess(tid app.ProcessID) error {
 		r.stopProcess(tid)
 	}
 
+	history := t.parser.ReportHistory()
+
 	parser := r.ffmpeg.NewProcessParser(t.logger, t.String(), t.reference, t.config.LogPatterns)
-	t.parser.TransferReportHistory(parser)
+	t.parser.ImportReportHistory(history)
 	t.parser = parser
 
 	limitMode := "hard"
@@ -1616,7 +1619,8 @@ func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 		state.Reconnect = status.Reconnect.Round(10 * time.Millisecond).Seconds()
 	}
 
-	convertProgressFromParser(&state.Progress, task.parser.Progress())
+	progress := task.parser.Progress()
+	state.Progress.UnmarshalParser(&progress)
 
 	for i, p := range state.Progress.Input {
 		if int(p.Index) >= len(task.process.Config.Input) {
@@ -1637,201 +1641,32 @@ func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 	return state, nil
 }
 
-// convertProgressFromParser converts a ffmpeg/parse.Progress type into a restream/app.Progress type.
-func convertProgressFromParser(progress *app.Progress, pprogress parse.Progress) {
-	progress.Started = pprogress.Started
-	progress.Frame = pprogress.Frame
-	progress.Packet = pprogress.Packet
-	progress.FPS = pprogress.FPS
-	progress.PPS = pprogress.PPS
-	progress.Quantizer = pprogress.Quantizer
-	progress.Size = pprogress.Size
-	progress.Time = pprogress.Time
-	progress.Bitrate = pprogress.Bitrate
-	progress.Speed = pprogress.Speed
-	progress.Drop = pprogress.Drop
-	progress.Dup = pprogress.Dup
-
-	for _, pinput := range pprogress.Input {
-		input := app.ProgressIO{
-			Address:   pinput.Address,
-			Index:     pinput.Index,
-			Stream:    pinput.Stream,
-			Format:    pinput.Format,
-			Type:      pinput.Type,
-			Codec:     pinput.Codec,
-			Coder:     pinput.Coder,
-			Frame:     pinput.Frame,
-			Keyframe:  pinput.Keyframe,
-			Framerate: pinput.Framerate,
-			FPS:       pinput.FPS,
-			Packet:    pinput.Packet,
-			PPS:       pinput.PPS,
-			Size:      pinput.Size,
-			Bitrate:   pinput.Bitrate,
-			Extradata: pinput.Extradata,
-			Pixfmt:    pinput.Pixfmt,
-			Quantizer: pinput.Quantizer,
-			Width:     pinput.Width,
-			Height:    pinput.Height,
-			Sampling:  pinput.Sampling,
-			Layout:    pinput.Layout,
-			Channels:  pinput.Channels,
-			AVstream:  nil,
-		}
-
-		if pinput.AVstream != nil {
-			avstream := &app.AVstream{
-				Input: app.AVstreamIO{
-					State:  pinput.AVstream.Input.State,
-					Packet: pinput.AVstream.Input.Packet,
-					Time:   pinput.AVstream.Input.Time,
-					Size:   pinput.AVstream.Input.Size,
-				},
-				Output: app.AVstreamIO{
-					State:  pinput.AVstream.Output.State,
-					Packet: pinput.AVstream.Output.Packet,
-					Time:   pinput.AVstream.Output.Time,
-					Size:   pinput.AVstream.Output.Size,
-				},
-				Aqueue:         pinput.AVstream.Aqueue,
-				Queue:          pinput.AVstream.Queue,
-				Dup:            pinput.AVstream.Dup,
-				Drop:           pinput.AVstream.Drop,
-				Enc:            pinput.AVstream.Enc,
-				Looping:        pinput.AVstream.Looping,
-				LoopingRuntime: pinput.AVstream.LoopingRuntime,
-				Duplicating:    pinput.AVstream.Duplicating,
-				GOP:            pinput.AVstream.GOP,
-				Mode:           pinput.AVstream.Mode,
-			}
-
-			input.AVstream = avstream
-		}
-
-		progress.Input = append(progress.Input, input)
-	}
-
-	for _, poutput := range pprogress.Output {
-		output := app.ProgressIO{
-			Address:   poutput.Address,
-			Index:     poutput.Index,
-			Stream:    poutput.Stream,
-			Format:    poutput.Format,
-			Type:      poutput.Type,
-			Codec:     poutput.Codec,
-			Coder:     poutput.Coder,
-			Frame:     poutput.Frame,
-			Keyframe:  poutput.Keyframe,
-			Framerate: poutput.Framerate,
-			FPS:       poutput.FPS,
-			Packet:    poutput.Packet,
-			PPS:       poutput.PPS,
-			Size:      poutput.Size,
-			Bitrate:   poutput.Bitrate,
-			Extradata: poutput.Extradata,
-			Pixfmt:    poutput.Pixfmt,
-			Quantizer: poutput.Quantizer,
-			Width:     poutput.Width,
-			Height:    poutput.Height,
-			Sampling:  poutput.Sampling,
-			Layout:    poutput.Layout,
-			Channels:  poutput.Channels,
-			AVstream:  nil,
-		}
-
-		progress.Output = append(progress.Output, output)
-	}
-
-	for _, pgraph := range pprogress.Mapping.Graphs {
-		graph := app.GraphElement{
-			Index:     pgraph.Index,
-			Name:      pgraph.Name,
-			Filter:    pgraph.Filter,
-			DstName:   pgraph.DstName,
-			DstFilter: pgraph.DstFilter,
-			Inpad:     pgraph.Inpad,
-			Outpad:    pgraph.Outpad,
-			Timebase:  pgraph.Timebase,
-			Type:      pgraph.Type,
-			Format:    pgraph.Format,
-			Sampling:  pgraph.Sampling,
-			Layout:    pgraph.Layout,
-			Width:     pgraph.Width,
-			Height:    pgraph.Height,
-		}
-
-		progress.Mapping.Graphs = append(progress.Mapping.Graphs, graph)
-	}
-
-	for _, pmapping := range pprogress.Mapping.Mapping {
-		mapping := app.GraphMapping{
-			Input:  pmapping.Input,
-			Output: pmapping.Output,
-			Index:  pmapping.Index,
-			Name:   pmapping.Name,
-			Copy:   pmapping.Copy,
-		}
-
-		progress.Mapping.Mapping = append(progress.Mapping.Mapping, mapping)
-	}
-}
-
-func (r *restream) GetProcessLog(id app.ProcessID) (*app.Report, error) {
-	log := &app.Report{}
+func (r *restream) GetProcessReport(id app.ProcessID) (*app.Report, error) {
+	report := &app.Report{}
 
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return log, ErrUnknownProcess
+		return report, ErrUnknownProcess
 	}
 
 	if !task.valid {
-		return log, nil
+		return report, nil
 	}
 
 	current := task.parser.Report()
 
-	log.CreatedAt = current.CreatedAt
-	log.Prelude = current.Prelude
-	log.Log = make([]app.LogLine, len(current.Log))
-	for i, line := range current.Log {
-		log.Log[i] = app.LogLine{
-			Timestamp: line.Timestamp,
-			Data:      line.Data,
-		}
-	}
-	log.Matches = current.Matches
+	report.UnmarshalParser(&current)
 
 	history := task.parser.ReportHistory()
 
-	for _, h := range history {
-		e := app.ReportHistoryEntry{
-			ReportEntry: app.ReportEntry{
-				CreatedAt: h.CreatedAt,
-				Prelude:   h.Prelude,
-				Matches:   h.Matches,
-			},
-			ExitedAt:  h.ExitedAt,
-			ExitState: h.ExitState,
-			Usage: app.ProcessUsage{
-				CPU: app.ProcessUsageCPU{
-					NCPU:    h.Usage.CPU.NCPU,
-					Average: h.Usage.CPU.Average,
-					Max:     h.Usage.CPU.Max,
-					Limit:   h.Usage.CPU.Limit,
-				},
-				Memory: app.ProcessUsageMemory{
-					Average: h.Usage.Memory.Average,
-					Max:     h.Usage.Memory.Max,
-					Limit:   h.Usage.Memory.Limit,
-				},
-			},
-		}
+	report.History = make([]app.ReportHistoryEntry, len(history))
 
-		convertProgressFromParser(&e.Progress, h.Progress)
+	for i, h := range history {
+		report.History[i].UnmarshalParser(&h)
+		e := &report.History[i]
 
 		for i, p := range e.Progress.Input {
 			if int(p.Index) >= len(task.process.Config.Input) {
@@ -1848,19 +1683,29 @@ func (r *restream) GetProcessLog(id app.ProcessID) (*app.Report, error) {
 
 			e.Progress.Output[i].ID = task.process.Config.Output[p.Index].ID
 		}
-
-		e.ReportEntry.Log = make([]app.LogLine, len(h.Log))
-		for i, line := range h.Log {
-			e.ReportEntry.Log[i] = app.LogLine{
-				Timestamp: line.Timestamp,
-				Data:      line.Data,
-			}
-		}
-
-		log.History = append(log.History, e)
 	}
 
-	return log, nil
+	return report, nil
+}
+
+func (r *restream) SetProcessReport(id app.ProcessID, report *app.Report) error {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	task, ok := r.tasks[id]
+	if !ok {
+		return ErrUnknownProcess
+	}
+
+	if !task.valid {
+		return nil
+	}
+
+	_, history := report.MarshalParser()
+
+	task.parser.ImportReportHistory(history)
+
+	return nil
 }
 
 func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.ReportHistorySearchResult {
@@ -1894,7 +1739,7 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 }
 
 func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
-	appprobe := app.Probe{}
+	probe := app.Probe{}
 
 	config = config.Clone()
 
@@ -1902,16 +1747,16 @@ func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 
 	err := r.resolveAddresses(r.tasks, config)
 	if err != nil {
-		appprobe.Log = append(appprobe.Log, err.Error())
-		return appprobe
+		probe.Log = append(probe.Log, err.Error())
+		return probe
 	}
 
 	resolveDynamicPlaceholder(config, r.replace)
 
 	_, err = validateConfig(config, r.fs.list, r.ffmpeg)
 	if err != nil {
-		appprobe.Log = append(appprobe.Log, err.Error())
-		return appprobe
+		probe.Log = append(probe.Log, err.Error())
+		return probe
 	}
 
 	var command []string
@@ -1950,51 +1795,22 @@ func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 		formatter := log.NewConsoleFormatter(false)
 
 		for _, e := range logbuffer.Events() {
-			appprobe.Log = append(appprobe.Log, strings.TrimSpace(formatter.String(e)))
+			probe.Log = append(probe.Log, strings.TrimSpace(formatter.String(e)))
 		}
 
-		appprobe.Log = append(appprobe.Log, err.Error())
+		probe.Log = append(probe.Log, err.Error())
 
-		return appprobe
+		return probe
 	}
 
 	ffmpeg.Start()
 
 	wg.Wait()
 
-	convertProbeFromProber(&appprobe, prober.Probe())
+	p := prober.Probe()
+	probe.UnmarshalProber(&p)
 
-	return appprobe
-}
-
-// convertProbeFromProber converts a ffmpeg/probe.Probe type into an restream/app.Probe type.
-func convertProbeFromProber(appprobe *app.Probe, pprobe probe.Probe) {
-	appprobe.Log = make([]string, len(pprobe.Log))
-	copy(appprobe.Log, pprobe.Log)
-
-	for _, s := range pprobe.Streams {
-		stream := app.ProbeIO{
-			Address:  s.Address,
-			Index:    s.Index,
-			Stream:   s.Stream,
-			Language: s.Language,
-			Format:   s.Format,
-			Type:     s.Type,
-			Codec:    s.Codec,
-			Coder:    s.Coder,
-			Bitrate:  s.Bitrate,
-			Duration: s.Duration,
-			Pixfmt:   s.Pixfmt,
-			Width:    s.Width,
-			Height:   s.Height,
-			FPS:      s.FPS,
-			Sampling: s.Sampling,
-			Layout:   s.Layout,
-			Channels: s.Channels,
-		}
-
-		appprobe.Streams = append(appprobe.Streams, stream)
-	}
+	return probe
 }
 
 func (r *restream) Skills() skills.Skills {

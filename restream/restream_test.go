@@ -354,7 +354,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 		return state.State == "running"
 	}, 10*time.Second, time.Second)
 
-	log, err := rs.GetProcessLog(tid1)
+	log, err := rs.GetProcessReport(tid1)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(log.History))
@@ -379,7 +379,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 		return state.State == "running"
 	}, 10*time.Second, time.Second)
 
-	log, err = rs.GetProcessLog(tid2)
+	log, err = rs.GetProcessReport(tid2)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(log.History))
@@ -617,7 +617,7 @@ func TestParseProcessPattern(t *testing.T) {
 
 	rs.StopProcess(tid)
 
-	log, err := rs.GetProcessLog(tid)
+	log, err := rs.GetProcessReport(tid)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(log.History))
@@ -684,10 +684,10 @@ func TestLog(t *testing.T) {
 
 	rs.AddProcess(process)
 
-	_, err = rs.GetProcessLog(app.ProcessID{ID: "foobar"})
+	_, err = rs.GetProcessReport(app.ProcessID{ID: "foobar"})
 	require.Error(t, err)
 
-	log, err := rs.GetProcessLog(tid)
+	log, err := rs.GetProcessReport(tid)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(log.Prelude))
 	require.Equal(t, 0, len(log.Log))
@@ -698,7 +698,7 @@ func TestLog(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 
-	log, _ = rs.GetProcessLog(tid)
+	log, _ = rs.GetProcessReport(tid)
 
 	require.NotEqual(t, 0, len(log.Prelude))
 	require.NotEqual(t, 0, len(log.Log))
@@ -707,7 +707,7 @@ func TestLog(t *testing.T) {
 
 	rs.StopProcess(tid)
 
-	log, _ = rs.GetProcessLog(tid)
+	log, _ = rs.GetProcessReport(tid)
 
 	require.Equal(t, 0, len(log.Prelude))
 	require.Equal(t, 0, len(log.Log))
@@ -728,14 +728,14 @@ func TestLogTransfer(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	rs.StopProcess(tid)
 
-	log, _ := rs.GetProcessLog(tid)
+	log, _ := rs.GetProcessReport(tid)
 
 	require.Equal(t, 1, len(log.History))
 
 	err = rs.UpdateProcess(tid, process)
 	require.NoError(t, err)
 
-	log, _ = rs.GetProcessLog(tid)
+	log, _ = rs.GetProcessReport(tid)
 
 	require.Equal(t, 1, len(log.History))
 }
@@ -1493,7 +1493,7 @@ func TestProcessLogPattern(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	log, err := rs.GetProcessLog(tid)
+	log, err := rs.GetProcessReport(tid)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(log.Matches))

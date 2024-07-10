@@ -19,7 +19,7 @@ type Event struct {
 	Data map[string]string `json:"data"`
 }
 
-func (e *Event) Marshal(le *log.Event) {
+func (e *Event) Unmarshal(le *log.Event) {
 	e.Timestamp = le.Time.Unix()
 	e.Level = int(le.Level)
 	e.Component = strings.ToLower(le.Component)

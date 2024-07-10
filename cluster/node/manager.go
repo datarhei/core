@@ -540,6 +540,24 @@ func (p *Manager) ProcessList(options client.ProcessListOptions) []api.Process {
 	return processList
 }
 
+func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (api.Process, error) {
+	node, err := p.NodeGet(nodeid)
+	if err != nil {
+		return api.Process{}, fmt.Errorf("node not found: %w", err)
+	}
+
+	list, err := node.Core().ProcessList(client.ProcessListOptions{
+		ID:     []string{id.ID},
+		Filter: filter,
+		Domain: id.Domain,
+	})
+	if err != nil {
+		return api.Process{}, err
+	}
+
+	return list[0], nil
+}
+
 func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
@@ -565,6 +583,15 @@ func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Con
 	}
 
 	return node.Core().ProcessUpdate(id, config, metadata)
+}
+
+func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.Report) error {
+	node, err := p.NodeGet(nodeid)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	return node.Core().ProcessReportSet(id, report)
 }
 
 func (p *Manager) ProcessCommand(nodeid string, id app.ProcessID, command string) error {

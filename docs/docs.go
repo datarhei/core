@@ -381,7 +381,7 @@ const docTemplate = `{
                     "v16.?.?"
                 ],
                 "summary": "List of identities in the cluster",
-                "operationId": "cluster-3-db-list-identity",
+                "operationId": "cluster-3-db-get-identity",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -3061,6 +3061,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
@@ -4458,6 +4464,75 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.ProcessReport"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Set the report history a process",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Set the report history a process",
+                "operationId": "process-3-set-report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Process report",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessReport"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "400": {
@@ -6849,17 +6924,10 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
-                "exit_state": {
-                    "type": "string"
-                },
-                "exited_at": {
-                    "type": "integer",
-                    "format": "int64"
-                },
                 "history": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.ProcessReportEntry"
+                        "$ref": "#/definitions/api.ProcessReportHistoryEntry"
                     }
                 },
                 "log": {
@@ -6882,16 +6950,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                },
-                "progress": {
-                    "$ref": "#/definitions/api.Progress"
-                },
-                "resources": {
-                    "$ref": "#/definitions/api.ProcessUsage"
                 }
             }
         },
-        "api.ProcessReportEntry": {
+        "api.ProcessReportHistoryEntry": {
             "type": "object",
             "properties": {
                 "created_at": {

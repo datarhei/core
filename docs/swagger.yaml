@@ -1272,14 +1272,9 @@ definitions:
       created_at:
         format: int64
         type: integer
-      exit_state:
-        type: string
-      exited_at:
-        format: int64
-        type: integer
       history:
         items:
-          $ref: '#/definitions/api.ProcessReportEntry'
+          $ref: '#/definitions/api.ProcessReportHistoryEntry'
         type: array
       log:
         items:
@@ -1295,12 +1290,8 @@ definitions:
         items:
           type: string
         type: array
-      progress:
-        $ref: '#/definitions/api.Progress'
-      resources:
-        $ref: '#/definitions/api.ProcessUsage'
     type: object
-  api.ProcessReportEntry:
+  api.ProcessReportHistoryEntry:
     properties:
       created_at:
         format: int64
@@ -2826,7 +2817,7 @@ paths:
   /api/v3/cluster/db/user/{name}:
     get:
       description: List of identities in the cluster
-      operationId: cluster-3-db-list-identity
+      operationId: cluster-3-db-get-identity
       produces:
       - application/json
       responses:
@@ -4502,6 +4493,10 @@ paths:
           description: OK
           schema:
             type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
         "403":
           description: Forbidden
           schema:
@@ -5503,6 +5498,51 @@ paths:
       summary: Get the logs of a process
       tags:
       - v16.7.2
+    put:
+      consumes:
+      - application/json
+      description: Set the report history a process
+      operationId: process-3-set-report
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Process report
+        in: body
+        name: report
+        required: true
+        schema:
+          $ref: '#/definitions/api.ProcessReport'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Set the report history a process
+      tags:
+      - v16.?.?
   /api/v3/process/{id}/state:
     get:
       description: Get the state and progress data of a process.

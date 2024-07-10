@@ -40,8 +40,8 @@ type Parser interface {
 	// LastLogline returns the last parsed log line
 	LastLogline() string
 
-	// TransferReportHistory transfers the report history to another parser
-	TransferReportHistory(Parser) error
+	// ImportReportHistory imports a report history from another parser
+	ImportReportHistory([]ReportHistoryEntry)
 }
 
 // Config is the config for the Parser implementation
@@ -862,31 +862,6 @@ func (p *parser) ResetLog() {
 	p.lock.log.Unlock()
 }
 
-// Report represents a log report, including the prelude and the last log lines of the process.
-type Report struct {
-	CreatedAt time.Time
-	Prelude   []string
-	Log       []process.Line
-	Matches   []string
-}
-
-// ReportHistoryEntry represents an historical log report, including the exit status of the
-// process and the last progress data.
-type ReportHistoryEntry struct {
-	Report
-
-	ExitedAt  time.Time
-	ExitState string
-	Progress  Progress
-	Usage     Usage
-}
-
-type ReportHistorySearchResult struct {
-	CreatedAt time.Time
-	ExitedAt  time.Time
-	ExitState string
-}
-
 func (p *parser) SearchReportHistory(state string, from, to *time.Time) []ReportHistorySearchResult {
 	p.lock.logHistory.RLock()
 	defer p.lock.logHistory.RUnlock()
@@ -1006,26 +981,20 @@ func (p *parser) ReportHistory() []ReportHistoryEntry {
 	return history
 }
 
-func (p *parser) TransferReportHistory(dst Parser) error {
-	p.lock.logHistory.RLock()
-	defer p.lock.logHistory.RUnlock()
+func (p *parser) ImportReportHistory(history []ReportHistoryEntry) {
+	p.lock.logHistory.Lock()
+	defer p.lock.logHistory.Unlock()
 
-	pp, ok := dst.(*parser)
-	if !ok {
-		return fmt.Errorf("the target parser is not of the required type")
+	historyLength := p.logHistoryLength + p.logMinimalHistoryLength
+
+	if historyLength <= 0 {
+		return
 	}
 
-	pp.lock.logHistory.Lock()
-	defer pp.lock.logHistory.Unlock()
+	p.logHistory = ring.New(historyLength)
 
-	p.logHistory.Do(func(l interface{}) {
-		if l == nil {
-			return
-		}
-
-		pp.logHistory.Value = l
-		pp.logHistory = pp.logHistory.Next()
-	})
-
-	return nil
+	for _, r := range history {
+		p.logHistory.Value = r
+		p.logHistory = p.logHistory.Next()
+	}
 }

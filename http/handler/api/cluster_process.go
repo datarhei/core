@@ -252,8 +252,8 @@ func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter
 			LastLog: p.Error,
 			Resources: api.ProcessUsage{
 				CPU: api.ProcessUsageCPU{
-					NCPU:  api.ToNumber(1),
-					Limit: api.ToNumber(p.Config.LimitCPU),
+					NCPU:  json.ToNumber(1),
+					Limit: json.ToNumber(p.Config.LimitCPU),
 				},
 				Memory: api.ProcessUsageMemory{
 					Limit: p.Config.LimitMemory,
@@ -284,8 +284,8 @@ func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter
 			process.Report.Log = [][2]string{
 				{strconv.FormatInt(p.CreatedAt.Unix(), 10), p.Error},
 			}
-			process.Report.ExitedAt = p.CreatedAt.Unix()
-			process.Report.ExitState = "failed"
+			//process.Report.ExitedAt = p.CreatedAt.Unix()
+			//process.Report.ExitState = "failed"
 		}
 	}
 
