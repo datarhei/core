@@ -68,7 +68,13 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.Sampling = pp.Sampling
 	p.Layout = pp.Layout
 	p.Channels = pp.Channels
-	p.AVstream.UnmarshalParser(pp.AVstream)
+
+	if pp.AVstream != nil {
+		p.AVstream = &AVstream{}
+		p.AVstream.UnmarshalParser(pp.AVstream)
+	} else {
+		p.AVstream = nil
+	}
 }
 
 func (p *ProgressIO) MarshalParser() parse.ProgressIO {
