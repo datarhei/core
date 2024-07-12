@@ -48,29 +48,6 @@ func (p *ProbeIO) UnmarshalProber(pp *probe.ProbeIO) {
 	p.Channels = pp.Channels
 }
 
-/*
-	func (app *ProbeIO) MarshallAPI() api.ProbeIO {
-		return api.ProbeIO{
-			Address:  app.Address,
-			Format:   app.Format,
-			Index:    app.Index,
-			Stream:   app.Stream,
-			Language: app.Language,
-			Type:     app.Type,
-			Codec:    app.Codec,
-			Coder:    app.Coder,
-			Bitrate:  json.ToNumber(app.Bitrate),
-			Duration: json.ToNumber(app.Duration),
-			FPS:      json.ToNumber(app.FPS),
-			Pixfmt:   app.Pixfmt,
-			Width:    app.Width,
-			Height:   app.Height,
-			Sampling: app.Sampling,
-			Layout:   app.Layout,
-			Channels: app.Channels,
-		}
-	}
-*/
 type Probe struct {
 	Streams []ProbeIO
 	Log     []string
@@ -86,21 +63,3 @@ func (p *Probe) UnmarshalProber(pp *probe.Probe) {
 		p.Streams[i].UnmarshalProber(&s)
 	}
 }
-
-/*
-// Unmarshal converts a restreamer Probe to a Probe in API representation
-func (app *Probe) MarshallAPI() api.Probe {
-	p := api.Probe{
-		Streams: make([]api.ProbeIO, len(app.Streams)),
-		Log:     make([]string, len(app.Log)),
-	}
-
-	for i, io := range app.Streams {
-		p.Streams[i] = io.MarshallAPI()
-	}
-
-	copy(p.Log, app.Log)
-
-	return p
-}
-*/

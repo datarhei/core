@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,4 +58,55 @@ func TestConfigHash(t *testing.T) {
 	hash2 := config.Hash()
 
 	require.False(t, bytes.Equal(hash1, hash2))
+}
+
+func TestProcessUsageCPU(t *testing.T) {
+	original := parse.UsageCPU{
+		NCPU:    1.5,
+		Average: 0.9,
+		Max:     1.3,
+		Limit:   100,
+	}
+
+	p := ProcessUsageCPU{}
+	p.UnmarshalParser(&original)
+	restored := p.MarshalParser()
+
+	require.Equal(t, original, restored)
+}
+
+func TestProcessUsageMemory(t *testing.T) {
+	original := parse.UsageMemory{
+		Average: 72,
+		Max:     150,
+		Limit:   200,
+	}
+
+	p := ProcessUsageMemory{}
+	p.UnmarshalParser(&original)
+	restored := p.MarshalParser()
+
+	require.Equal(t, original, restored)
+}
+
+func TestProcessUsage(t *testing.T) {
+	original := parse.Usage{
+		CPU: parse.UsageCPU{
+			NCPU:    1.5,
+			Average: 0.9,
+			Max:     1.3,
+			Limit:   100,
+		},
+		Memory: parse.UsageMemory{
+			Average: 72,
+			Max:     150,
+			Limit:   200,
+		},
+	}
+
+	p := ProcessUsage{}
+	p.UnmarshalParser(&original)
+	restored := p.MarshalParser()
+
+	require.Equal(t, original, restored)
 }
