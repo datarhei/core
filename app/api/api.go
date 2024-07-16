@@ -1179,7 +1179,7 @@ func (a *api) start(ctx context.Context) error {
 
 	var store restreamstore.Store = nil
 
-	{
+	if !cfg.Cluster.Enable {
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 			Root: cfg.DB.Dir,
 		})
