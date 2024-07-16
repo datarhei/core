@@ -66,19 +66,21 @@ func (n *Core) SetEssentials(address string, config *config.Config) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	if address != n.address {
+	if n.address != address {
 		n.address = address
 		n.client = nil // force reconnet
 	}
 
-	if n.config == nil && config != nil {
-		n.config = config
-		n.client = nil // force reconnect
-	}
+	if config != nil {
+		if n.config == nil {
+			n.config = config
+			n.client = nil // force reconnect
+		}
 
-	if n.config.UpdatedAt != config.UpdatedAt {
-		n.config = config
-		n.client = nil // force reconnect
+		if n.config != nil && n.config.UpdatedAt != config.UpdatedAt {
+			n.config = config
+			n.client = nil // force reconnect
+		}
 	}
 }
 
