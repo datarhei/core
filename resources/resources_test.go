@@ -21,6 +21,10 @@ func (u *util) CPUCounts(logical bool) (float64, error) {
 	return 2, nil
 }
 
+func (u *util) GPUCounts() (float64, error) {
+	return 0, nil
+}
+
 func (u *util) CPUPercent() (*psutil.CPUInfoStat, error) {
 	return &psutil.CPUInfoStat{
 		System: 10,
@@ -43,6 +47,10 @@ func (u *util) VirtualMemory() (*psutil.MemoryInfoStat, error) {
 }
 
 func (u *util) NetIOCounters(pernic bool) ([]net.IOCountersStat, error) {
+	return nil, nil
+}
+
+func (u *util) GPUStats() ([]psutil.GPUInfoStat, error) {
 	return nil, nil
 }
 

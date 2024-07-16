@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/psutil/gpu/nvidia"
+
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -58,6 +60,18 @@ type CPUInfoStat struct {
 	Other  float64 // percent 0-100
 }
 
+type GPUInfoStat struct {
+	Name string
+
+	MemoryTotal uint64 // bytes
+	MemoryUsed  uint64 // bytes
+
+	Usage        float64 // percent 0-100
+	MemoryUsage  float64 // percent 0-100
+	EncoderUsage float64 // percent 0-100
+	DecoderUsage float64 // percent 0-100
+}
+
 type cpuTimesStat struct {
 	total  float64 // seconds
 	system float64 // seconds
@@ -73,12 +87,16 @@ type Util interface {
 	// CPUCounts returns the number of cores, either logical or physical.
 	CPUCounts(logical bool) (float64, error)
 
+	// GPUCounts returns the number of GPU cores.
+	GPUCounts() (float64, error)
+
 	// CPUPercent returns the current CPU load in percent. The values range
 	// from 0 to 100, independently of the number of logical cores.
 	CPUPercent() (*CPUInfoStat, error)
 	DiskUsage(path string) (*disk.UsageStat, error)
 	VirtualMemory() (*MemoryInfoStat, error)
 	NetIOCounters(pernic bool) ([]net.IOCountersStat, error)
+	GPUStats() ([]GPUInfoStat, error)
 
 	// Process returns a process observer for a process with the given pid.
 	Process(pid int32) (Process, error)
@@ -280,6 +298,16 @@ func (u *util) CPUCounts(logical bool) (float64, error) {
 
 func CPUCounts(logical bool) (float64, error) {
 	return DefaultUtil.CPUCounts(logical)
+}
+
+func (u *util) GPUCounts() (float64, error) {
+	count, err := nvidia.Default.Count()
+
+	return float64(count), err
+}
+
+func GPUCounts() (float64, error) {
+	return DefaultUtil.GPUCounts()
 }
 
 // cpuTimes returns the current cpu usage times in seconds.
@@ -533,4 +561,31 @@ func (u *util) readFile(path string) ([]string, error) {
 func cpuTotal(c *cpu.TimesStat) float64 {
 	return c.User + c.System + c.Idle + c.Nice + c.Iowait + c.Irq +
 		c.Softirq + c.Steal + c.Guest + c.GuestNice
+}
+
+func (u *util) GPUStats() ([]GPUInfoStat, error) {
+	nvstats, err := nvidia.Default.Stats()
+	if err != nil {
+		return nil, err
+	}
+
+	stats := []GPUInfoStat{}
+
+	for _, nv := range nvstats {
+		stats = append(stats, GPUInfoStat{
+			Name:         nv.Name,
+			MemoryTotal:  nv.MemoryTotal,
+			MemoryUsed:   nv.MemoryUsed,
+			Usage:        nv.Usage,
+			MemoryUsage:  nv.MemoryUsage,
+			EncoderUsage: nv.EncoderUsage,
+			DecoderUsage: nv.DecoderUsage,
+		})
+	}
+
+	return stats, nil
+}
+
+func GPUStats() ([]GPUInfoStat, error) {
+	return DefaultUtil.GPUStats()
 }
