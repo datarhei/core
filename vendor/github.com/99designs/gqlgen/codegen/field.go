@@ -31,7 +31,7 @@ type Field struct {
 	NoErr            bool             // If this is bound to a go method, does that method have an error as the second argument
 	VOkFunc          bool             // If this is bound to a go method, is it of shape (interface{}, bool)
 	Object           *Object          // A link back to the parent object
-	Default          interface{}      // The default value
+	Default          any              // The default value
 	Stream           bool             // does this field return a channel?
 	Directives       []*Directive
 }
@@ -174,7 +174,7 @@ func (b *builder) bindField(obj *Object, f *Field) (errret error) {
 		} else if s := sig.Results(); s.Len() == 2 && s.At(1).Type().String() == "bool" {
 			f.VOkFunc = true
 		} else if sig.Results().Len() != 2 {
-			return fmt.Errorf("method has wrong number of args")
+			return errors.New("method has wrong number of args")
 		}
 		params := sig.Params()
 		// If the first argument is the context, remove it from the comparison and set

@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	// number of entries per bucket; 3 entries lead to size of 64B
+	// number of Map entries per bucket; 3 entries lead to size of 64B
 	// (one cache line) on 64-bit machines
 	entriesPerMapBucket = 3
 	// threshold fraction of table occupation to start a table shrinking
@@ -75,6 +75,7 @@ type Map struct {
 	resizeCond   sync.Cond      // used to wake up resize waiters (concurrent modifications)
 	table        unsafe.Pointer // *mapTable
 	minTableLen  int
+	growOnly     bool
 }
 
 type mapTable struct {
@@ -118,26 +119,68 @@ type rangeEntry struct {
 	value unsafe.Pointer
 }
 
-// NewMap creates a new Map instance.
-func NewMap() *Map {
-	return NewMapPresized(defaultMinMapTableLen * entriesPerMapBucket)
+// MapConfig defines configurable Map/MapOf options.
+type MapConfig struct {
+	sizeHint int
+	growOnly bool
 }
 
-// NewMapPresized creates a new Map instance with capacity enough to hold
-// sizeHint entries. If sizeHint is zero or negative, the value is ignored.
-func NewMapPresized(sizeHint int) *Map {
+// WithPresize configures new Map/MapOf instance with capacity enough
+// to hold sizeHint entries. The capacity is treated as the minimal
+// capacity meaning that the underlying hash table will never shrink
+// to a smaller capacity. If sizeHint is zero or negative, the value
+// is ignored.
+func WithPresize(sizeHint int) func(*MapConfig) {
+	return func(c *MapConfig) {
+		c.sizeHint = sizeHint
+	}
+}
+
+// WithGrowOnly configures new Map/MapOf instance to be grow-only.
+// This means that the underlying hash table grows in capacity when
+// new keys are added, but does not shrink when keys are deleted.
+// The only exception to this rule is the Clear method which
+// shrinks the hash table back to the initial capacity.
+func WithGrowOnly() func(*MapConfig) {
+	return func(c *MapConfig) {
+		c.growOnly = true
+	}
+}
+
+// NewMap creates a new Map instance configured with the given
+// options.
+func NewMap(options ...func(*MapConfig)) *Map {
+	c := &MapConfig{
+		sizeHint: defaultMinMapTableLen * entriesPerMapBucket,
+	}
+	for _, o := range options {
+		o(c)
+	}
+
 	m := &Map{}
 	m.resizeCond = *sync.NewCond(&m.resizeMu)
 	var table *mapTable
-	if sizeHint <= defaultMinMapTableLen*entriesPerMapBucket {
+	if c.sizeHint <= defaultMinMapTableLen*entriesPerMapBucket {
 		table = newMapTable(defaultMinMapTableLen)
 	} else {
-		tableLen := nextPowOf2(uint32(sizeHint / entriesPerMapBucket))
+		tableLen := nextPowOf2(uint32((float64(c.sizeHint) / entriesPerMapBucket) / mapLoadFactor))
 		table = newMapTable(int(tableLen))
 	}
 	m.minTableLen = len(table.buckets)
+	m.growOnly = c.growOnly
 	atomic.StorePointer(&m.table, unsafe.Pointer(table))
 	return m
+}
+
+// NewMapPresized creates a new Map instance with capacity enough to hold
+// sizeHint entries. The capacity is treated as the minimal capacity
+// meaning that the underlying hash table will never shrink to
+// a smaller capacity. If sizeHint is zero or negative, the value
+// is ignored.
+//
+// Deprecated: use NewMap in combination with WithPresize.
+func NewMapPresized(sizeHint int) *Map {
+	return NewMap(WithPresize(sizeHint))
 }
 
 func newMapTable(minTableLen int) *mapTable {
@@ -434,7 +477,7 @@ func (m *Map) doCompute(
 					unlockBucket(&rootb.topHashMutex)
 					return newValue, false
 				}
-				// Create and append the bucket.
+				// Create and append a bucket.
 				newb := new(bucketPadded)
 				newb.keys[0] = unsafe.Pointer(&key)
 				newb.values[0] = unsafe.Pointer(&newValue)
@@ -470,8 +513,9 @@ func (m *Map) resize(knownTable *mapTable, hint mapResizeHint) {
 	knownTableLen := len(knownTable.buckets)
 	// Fast path for shrink attempts.
 	if hint == mapShrinkHint {
-		shrinkThreshold := int64((knownTableLen * entriesPerMapBucket) / mapShrinkFraction)
-		if knownTableLen == m.minTableLen || knownTable.sumSize() > shrinkThreshold {
+		if m.growOnly ||
+			m.minTableLen == knownTableLen ||
+			knownTable.sumSize() > int64((knownTableLen*entriesPerMapBucket)/mapShrinkFraction) {
 			return
 		}
 	}
@@ -722,23 +766,51 @@ func (table *mapTable) sumSize() int64 {
 	return sum
 }
 
-type mapStats struct {
-	RootBuckets  int
+// MapStats is Map/MapOf statistics.
+//
+// Warning: map statistics are intented to be used for diagnostic
+// purposes, not for production code. This means that breaking changes
+// may be introduced into this struct even between minor releases.
+type MapStats struct {
+	// RootBuckets is the number of root buckets in the hash table.
+	// Each bucket holds a few entries.
+	RootBuckets int
+	// TotalBuckets is the total number of buckets in the hash table,
+	// including root and their chained buckets. Each bucket holds
+	// a few entries.
 	TotalBuckets int
+	// EmptyBuckets is the number of buckets that hold no entries.
 	EmptyBuckets int
-	Capacity     int
-	Size         int // calculated number of entries
-	Counter      int // number of entries according to table counter
-	CounterLen   int // number of counter stripes
-	MinEntries   int // min entries per chain of buckets
-	MaxEntries   int // max entries per chain of buckets
+	// Capacity is the Map/MapOf capacity, i.e. the total number of
+	// entries that all buckets can physically hold. This number
+	// does not consider the load factor.
+	Capacity int
+	// Size is the exact number of entries stored in the map.
+	Size int
+	// Counter is the number of entries stored in the map according
+	// to the internal atomic counter. In case of concurrent map
+	// modifications this number may be different from Size.
+	Counter int
+	// CounterLen is the number of internal atomic counter stripes.
+	// This number may grow with the map capacity to improve
+	// multithreaded scalability.
+	CounterLen int
+	// MinEntries is the minimum number of entries per a chain of
+	// buckets, i.e. a root bucket and its chained buckets.
+	MinEntries int
+	// MinEntries is the maximum number of entries per a chain of
+	// buckets, i.e. a root bucket and its chained buckets.
+	MaxEntries int
+	// TotalGrowths is the number of times the hash table grew.
 	TotalGrowths int64
+	// TotalGrowths is the number of times the hash table shrinked.
 	TotalShrinks int64
 }
 
-func (s *mapStats) ToString() string {
+// ToString returns string representation of map stats.
+func (s *MapStats) ToString() string {
 	var sb strings.Builder
-	sb.WriteString("\n---\n")
+	sb.WriteString("MapStats{\n")
 	sb.WriteString(fmt.Sprintf("RootBuckets:  %d\n", s.RootBuckets))
 	sb.WriteString(fmt.Sprintf("TotalBuckets: %d\n", s.TotalBuckets))
 	sb.WriteString(fmt.Sprintf("EmptyBuckets: %d\n", s.EmptyBuckets))
@@ -750,13 +822,15 @@ func (s *mapStats) ToString() string {
 	sb.WriteString(fmt.Sprintf("MaxEntries:   %d\n", s.MaxEntries))
 	sb.WriteString(fmt.Sprintf("TotalGrowths: %d\n", s.TotalGrowths))
 	sb.WriteString(fmt.Sprintf("TotalShrinks: %d\n", s.TotalShrinks))
-	sb.WriteString("---\n")
+	sb.WriteString("}\n")
 	return sb.String()
 }
 
-// O(N) operation; use for debug purposes only
-func (m *Map) stats() mapStats {
-	stats := mapStats{
+// Stats returns statistics for the Map. Just like other map
+// methods, this one is thread-safe. Yet it's an O(N) operation,
+// so it should be used only for diagnostics or debugging purposes.
+func (m *Map) Stats() MapStats {
+	stats := MapStats{
 		TotalGrowths: atomic.LoadInt64(&m.totalGrowths),
 		TotalShrinks: atomic.LoadInt64(&m.totalShrinks),
 		MinEntries:   math.MaxInt32,
@@ -785,7 +859,7 @@ func (m *Map) stats() mapStats {
 			if b.next == nil {
 				break
 			}
-			b = (*bucketPadded)(b.next)
+			b = (*bucketPadded)(atomic.LoadPointer(&b.next))
 			stats.TotalBuckets++
 		}
 		if nentries < stats.MinEntries {
