@@ -70,7 +70,7 @@ func (c *cluster) ProcessSetCommand(origin string, id app.ProcessID, command str
 		return c.applyCommand(cmd)
 	}
 
-	nodeid, err := c.manager.ProcessFindNodeID(id)
+	nodeid, err := c.store.ProcessGetNode(id)
 	if err != nil {
 		return fmt.Errorf("the process '%s' is not registered with any node: %w", id.String(), err)
 	}
