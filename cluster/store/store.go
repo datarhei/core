@@ -22,6 +22,7 @@ type Store interface {
 
 	ProcessList() []Process
 	ProcessGet(id app.ProcessID) (Process, error)
+	ProcessGetNode(id app.ProcessID) (string, error)
 	ProcessGetNodeMap() map[string]string
 	ProcessGetRelocateMap() map[string]string
 

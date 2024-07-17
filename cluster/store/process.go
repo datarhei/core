@@ -251,6 +251,18 @@ func (s *store) ProcessGetNodeMap() map[string]string {
 	return m
 }
 
+func (s *store) ProcessGetNode(id app.ProcessID) (string, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	nodeid, hasProcess := s.data.ProcessNodeMap[id.String()]
+	if !hasProcess {
+		return "", ErrNotFound
+	}
+
+	return nodeid, nil
+}
+
 func (s *store) ProcessGetRelocateMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
