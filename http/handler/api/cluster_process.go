@@ -641,7 +641,7 @@ func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
 		Domain: domain,
 	}
 
-	nodeid, err := h.proxy.ProcessFindNodeID(pid)
+	nodeid, err := h.cluster.Store().ProcessGetNode(pid)
 	if err != nil {
 		return c.JSON(http.StatusOK, api.Probe{
 			Log: []string{fmt.Sprintf("the process can't be found: %s", err.Error())},
