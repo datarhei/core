@@ -8,19 +8,22 @@ import (
 	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/log"
 )
 
 func (c *cluster) doSynchronize(emergency bool, term uint64) {
-	wish := c.store.ProcessGetNodeMap()
-	want := c.store.ProcessList()
-	storeNodes := c.store.NodeList()
-	have := c.manager.ClusterProcessList()
-	nodes := c.manager.NodeList()
-
 	logger := c.logger.WithField("term", term)
 
 	logger.Debug().WithField("emergency", emergency).Log("Synchronizing")
+
+	wish := c.store.ProcessGetNodeMap()
+	want := c.store.ProcessList()
+	storeNodes := c.store.NodeList()
+	nodes := c.manager.NodeList()
+	have, err := c.manager.ClusterProcessList()
+	if err != nil {
+		logger.Warn().WithError(err).Log("Failed to retrieve complete process list")
+		return
+	}
 
 	nodesMap := map[string]node.About{}
 
@@ -33,12 +36,6 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 
 		nodesMap[about.ID] = about
 	}
-
-	logger.Debug().WithFields(log.Fields{
-		"want":  want,
-		"have":  have,
-		"nodes": nodesMap,
-	}).Log("Synchronize")
 
 	opStack, _, reality := synchronize(wish, want, have, nodesMap, c.nodeRecoverTimeout)
 
@@ -53,7 +50,7 @@ func (c *cluster) doSynchronize(emergency bool, term uint64) {
 		c.applyCommand(cmd)
 	}
 
-	errors := c.applyOpStack(opStack, term)
+	errors := c.applyOpStack(opStack, term, 5)
 
 	if !emergency {
 		for _, e := range errors {
