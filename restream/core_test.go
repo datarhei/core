@@ -884,9 +884,17 @@ func TestTeeAddressReference(t *testing.T) {
 
 	r := rs.(*restream)
 
-	require.Equal(t, "http://example.com/live.m3u8", r.tasks[app.ProcessID{ID: "process2"}].config.Input[0].Address)
-	require.Equal(t, "http://example.com/live.m3u8", r.tasks[app.ProcessID{ID: "process3"}].config.Input[0].Address)
-	require.Equal(t, "rtmp://example.com/live.stream?token=123", r.tasks[app.ProcessID{ID: "process4"}].config.Input[0].Address)
+	task, ok := r.tasks.Load(app.ProcessID{ID: "process2"})
+	require.True(t, ok)
+	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
+
+	task, ok = r.tasks.Load(app.ProcessID{ID: "process3"})
+	require.True(t, ok)
+	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
+
+	task, ok = r.tasks.Load(app.ProcessID{ID: "process4"})
+	require.True(t, ok)
+	require.Equal(t, "rtmp://example.com/live.stream?token=123", task.config.Input[0].Address)
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -1466,7 +1474,7 @@ func TestProcessReplacer(t *testing.T) {
 		LogPatterns:    []string{},
 	}
 
-	task, ok := rs.tasks[app.ProcessID{ID: "314159265359"}]
+	task, ok := rs.tasks.Load(app.ProcessID{ID: "314159265359"})
 	require.True(t, ok)
 
 	require.Equal(t, process, task.config)
@@ -1517,7 +1525,7 @@ func TestProcessLimit(t *testing.T) {
 
 	rs := rsi.(*restream)
 
-	task, ok := rs.tasks[app.ProcessID{ID: process.ID}]
+	task, ok := rs.tasks.Load(app.ProcessID{ID: process.ID})
 	require.True(t, ok)
 
 	status := task.ffmpeg.Status()
