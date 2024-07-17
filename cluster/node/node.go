@@ -107,9 +107,7 @@ func New(config Config) *Node {
 }
 
 func (n *Node) Stop() error {
-
 	n.lock.Lock()
-
 	defer n.lock.Unlock()
 
 	if n.cancel == nil {
