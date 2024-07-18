@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -156,7 +155,7 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < 8; /*runtime.NumCPU()*/ i++ {
 		wg.Add(1)
 
 		go func(idChan <-chan app.ProcessID) {
@@ -316,7 +315,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	// Prefill the config with the current values
-	process.Unmarshal(current.Config)
+	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -446,7 +445,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 	}
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p.Config)
+	config.Unmarshal(p.Config, nil)
 
 	return c.JSON(http.StatusOK, config)
 }
@@ -1062,7 +1061,7 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 
 	if filter.config {
 		info.Config = &api.ProcessConfig{}
-		info.Config.Unmarshal(process.Config)
+		info.Config.Unmarshal(process.Config, nil)
 	}
 
 	if filter.state {

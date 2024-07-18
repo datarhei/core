@@ -186,7 +186,7 @@ func MarshalProcess(a *app.Process) Process {
 		Config:    ProcessConfig{},
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
-		Order:     a.Order,
+		Order:     a.Order.String(),
 	}
 
 	p.Config.Marshal(a.Config)
@@ -203,7 +203,7 @@ func UnmarshalProcess(p Process) *app.Process {
 		Config:    &app.Config{},
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
-		Order:     p.Order,
+		Order:     app.NewOrder(p.Order),
 	}
 
 	a.Config = p.Config.Unmarshal()

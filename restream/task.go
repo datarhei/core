@@ -2,7 +2,6 @@ package restream
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
@@ -10,6 +9,8 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/process"
 	"github.com/datarhei/core/v16/restream/app"
+
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var ErrInvalidProcessConfig = errors.New("invalid process config")
@@ -32,19 +33,26 @@ type task struct {
 	usesDisk  bool // Whether this task uses the disk
 	metadata  map[string]interface{}
 
-	lock sync.RWMutex
+	lock *xsync.RBMutex
 }
 
 func (t *task) IsValid() bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	return t.valid
 }
 
+func (t *task) Valid(valid bool) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.valid = valid
+}
+
 func (t *task) UsesDisk() bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	return t.usesDisk
 }
@@ -62,8 +70,8 @@ func (t *task) String() string {
 
 // Restore restores the task's order
 func (t *task) Restore() error {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if !t.valid {
 		return ErrInvalidProcessConfig
@@ -73,7 +81,7 @@ func (t *task) Restore() error {
 		return ErrInvalidProcessConfig
 	}
 
-	if t.process.Order == "start" {
+	if t.process.Order.String() == "start" {
 		err := t.ffmpeg.Start()
 		if err != nil {
 			return err
@@ -84,8 +92,8 @@ func (t *task) Restore() error {
 }
 
 func (t *task) Start() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if !t.valid {
 		return ErrInvalidProcessConfig
@@ -97,19 +105,20 @@ func (t *task) Start() error {
 
 	status := t.ffmpeg.Status()
 
-	if t.process.Order == "start" && status.Order == "start" {
+	if t.process.Order.String() == "start" && status.Order == "start" {
 		return nil
 	}
 
-	t.process.Order = "start"
+	t.process.Order.Set("start")
+
 	t.ffmpeg.Start()
 
 	return nil
 }
 
 func (t *task) Stop() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if t.ffmpeg == nil {
 		return nil
@@ -117,11 +126,11 @@ func (t *task) Stop() error {
 
 	status := t.ffmpeg.Status()
 
-	if t.process.Order == "stop" && status.Order == "stop" {
+	if t.process.Order.String() == "stop" && status.Order == "stop" {
 		return nil
 	}
 
-	t.process.Order = "stop"
+	t.process.Order.Set("stop")
 
 	t.ffmpeg.Stop(true)
 
@@ -130,8 +139,8 @@ func (t *task) Stop() error {
 
 // Kill stops a process without changing the tasks order
 func (t *task) Kill() {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if t.ffmpeg == nil {
 		return
@@ -141,14 +150,14 @@ func (t *task) Kill() {
 }
 
 func (t *task) Restart() error {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if !t.valid {
 		return ErrInvalidProcessConfig
 	}
 
-	if t.process.Order == "stop" {
+	if t.process.Order.String() == "stop" {
 		return nil
 	}
 
@@ -161,8 +170,8 @@ func (t *task) Restart() error {
 }
 
 func (t *task) State() (*app.State, error) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	state := &app.State{}
 
@@ -172,7 +181,7 @@ func (t *task) State() (*app.State, error) {
 
 	status := t.ffmpeg.Status()
 
-	state.Order = t.process.Order
+	state.Order = t.process.Order.String()
 	state.State = status.State
 	state.States.Marshal(status.States)
 	state.Time = status.Time.Unix()
@@ -213,8 +222,8 @@ func (t *task) State() (*app.State, error) {
 }
 
 func (t *task) Report() (*app.Report, error) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	report := &app.Report{}
 
@@ -255,8 +264,8 @@ func (t *task) Report() (*app.Report, error) {
 }
 
 func (t *task) SetReport(report *app.Report) error {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if !t.valid {
 		return nil
@@ -270,8 +279,8 @@ func (t *task) SetReport(report *app.Report) error {
 }
 
 func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.ReportHistorySearchResult {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	result := []app.ReportHistorySearchResult{}
 
@@ -316,8 +325,8 @@ func (t *task) SetMetadata(key string, data interface{}) error {
 }
 
 func (t *task) GetMetadata(key string) (interface{}, error) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if len(key) == 0 {
 		return t.metadata, nil
@@ -332,8 +341,8 @@ func (t *task) GetMetadata(key string) (interface{}, error) {
 }
 
 func (t *task) Limit(cpu, memory bool) bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if !t.valid {
 		return false
@@ -349,15 +358,15 @@ func (t *task) Limit(cpu, memory bool) bool {
 }
 
 func (t *task) Equal(config *app.Config) bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	return t.process.Config.Equal(config)
 }
 
 func (t *task) Config() *app.Config {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	return t.config.Clone()
 }
@@ -378,8 +387,8 @@ func (t *task) Destroy() {
 }
 
 func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	count := 0
 	matches := 0
@@ -416,15 +425,15 @@ func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
 }
 
 func (t *task) Process() *app.Process {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	return t.process.Clone()
 }
 
 func (t *task) Order() string {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
-	return t.process.Order
+	return t.process.Order.String()
 }

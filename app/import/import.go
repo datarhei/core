@@ -575,11 +575,11 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 		ID:        "restreamer-ui:ingest:" + cfg.id,
 		Reference: cfg.id,
 		CreatedAt: time.Now().Unix(),
-		Order:     "stop",
+		Order:     app.NewOrder("stop"),
 	}
 
 	if v1data.Actions.Ingest == "start" {
-		process.Order = "start"
+		process.Order = app.NewOrder("start")
 	}
 
 	config := &app.Config{
@@ -1211,11 +1211,11 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 			ID:        "restreamer-ui:ingest:" + cfg.id + "_snapshot",
 			Reference: cfg.id,
 			CreatedAt: time.Now().Unix(),
-			Order:     "stop",
+			Order:     app.NewOrder("stop"),
 		}
 
 		if v1data.Actions.Ingest == "start" {
-			process.Order = "start"
+			process.Order = app.NewOrder("start")
 		}
 
 		snapshotConfig := &app.Config{
@@ -1292,11 +1292,11 @@ func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, erro
 			ID:        egressId,
 			Reference: cfg.id,
 			CreatedAt: time.Now().Unix(),
-			Order:     "stop",
+			Order:     app.NewOrder("stop"),
 		}
 
 		if v1data.Actions.Egress == "start" {
-			process.Order = "start"
+			process.Order = app.NewOrder("start")
 		}
 
 		egress := restreamerUIEgress{

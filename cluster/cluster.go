@@ -634,7 +634,6 @@ func (c *cluster) Shutdown() error {
 
 	if c.manager != nil {
 		c.manager.NodesClear()
-		c.manager = nil
 	}
 
 	if c.api != nil {
@@ -647,6 +646,9 @@ func (c *cluster) Shutdown() error {
 	if c.raft != nil {
 		c.raft.Shutdown()
 	}
+
+	c.manager = nil
+	c.raft = nil
 
 	return nil
 }

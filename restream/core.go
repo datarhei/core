@@ -26,6 +26,7 @@ import (
 	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 // The Restreamer interface
@@ -358,6 +359,7 @@ func (r *restream) load() error {
 					"domain":    p.Process.Domain,
 					"reference": p.Process.Reference,
 				}),
+				lock: xsync.NewRBMutex(),
 			}
 
 			t.metadata = p.Metadata
@@ -452,7 +454,7 @@ func (r *restream) load() error {
 		}
 
 		t.ffmpeg = ffmpeg
-		t.valid = true
+		t.Valid(true)
 
 		return true
 	})
@@ -558,14 +560,14 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		Domain:    config.Domain,
 		Reference: config.Reference,
 		Config:    config.Clone(),
-		Order:     "stop",
+		Order:     app.NewOrder("stop"),
 		CreatedAt: time.Now().Unix(),
 	}
 
 	process.UpdatedAt = process.CreatedAt
 
 	if config.Autostart {
-		process.Order = "start"
+		process.Order.Set("start")
 	}
 
 	t := &task{
@@ -581,6 +583,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 			"reference": process.Reference,
 			"domain":    process.Domain,
 		}),
+		lock: xsync.NewRBMutex(),
 	}
 
 	resolveStaticPlaceholders(t.config, r.replace)
@@ -647,7 +650,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	t.ffmpeg = ffmpeg
 
-	t.valid = true
+	t.Valid(true)
 
 	return t, nil
 }
@@ -1125,9 +1128,17 @@ func parseAddressReference(address string) (map[string]string, error) {
 }
 
 func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	err := r.updateProcess(id, config)
+	if err != nil {
+		return err
+	}
 
+	r.save()
+
+	return nil
+}
+
+func (r *restream) updateProcess(id app.ProcessID, config *app.Config) error {
 	task, ok := r.tasks.Load(id)
 	if !ok {
 		return ErrUnknownProcess
@@ -1152,7 +1163,7 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 		}
 	}
 
-	t.process.Order = task.Order()
+	t.process.Order.Set(task.Order())
 
 	if err := r.stopProcess(id); err != nil {
 		return fmt.Errorf("stop process: %w", err)
@@ -1160,7 +1171,6 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 
 	// This would require a major version jump
 	//t.process.CreatedAt = task.process.CreatedAt
-	t.process.UpdatedAt = time.Now().Unix()
 
 	// Transfer the report history to the new process
 	history := task.parser.ReportHistory()
@@ -1179,8 +1189,6 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 	r.setCleanup(tid, t.Config())
 
 	t.Restore()
-
-	r.save()
 
 	return nil
 }
@@ -1353,93 +1361,44 @@ func (r *restream) ReloadProcess(id app.ProcessID) error {
 	return nil
 }
 
-func (r *restream) reloadProcess(tid app.ProcessID) error {
-	t, ok := r.tasks.Load(tid)
+func (r *restream) reloadProcess(id app.ProcessID) error {
+	task, ok := r.tasks.Load(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
 
-	t.valid = false
-
-	t.config = t.process.Config.Clone()
-
-	resolveStaticPlaceholders(t.config, r.replace)
-
-	err := r.resolveAddresses(r.tasks, t.config)
+	t, err := r.createTask(task.Config())
 	if err != nil {
 		return err
 	}
 
-	// Validate config with all placeholders replaced. However, we need to take care
-	// that the config with the task keeps its dynamic placeholders for process starts.
-	config := t.config.Clone()
-	resolveDynamicPlaceholder(config, r.replace)
+	tid := t.ID()
 
-	t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
-	if err != nil {
-		return err
+	t.process.Order.Set(task.Order())
+
+	if err := task.Stop(); err != nil {
+		return fmt.Errorf("stop process: %w", err)
 	}
 
-	err = r.setPlayoutPorts(t)
-	if err != nil {
-		return err
-	}
-
-	t.command = t.config.CreateCommand()
-
-	order := "stop"
-	if t.process.Order == "start" {
-		order = "start"
-		r.stopProcess(tid)
-	}
-
-	history := t.parser.ReportHistory()
-
-	parser := r.ffmpeg.NewProcessParser(t.logger, t.String(), t.reference, t.config.LogPatterns)
+	// Transfer the report history to the new process
+	history := task.parser.ReportHistory()
 	t.parser.ImportReportHistory(history)
-	t.parser = parser
 
-	limitMode := "hard"
-	if r.enableSoftLimit {
-		limitMode = "soft"
+	// Transfer the metadata to the new process
+	t.metadata = task.metadata
+
+	if err := r.deleteProcess(id); err != nil {
+		return fmt.Errorf("delete process: %w", err)
 	}
 
-	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
-		Reconnect:      t.config.Reconnect,
-		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
-		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-		Timeout:        time.Duration(t.config.Timeout) * time.Second,
-		LimitCPU:       t.config.LimitCPU,
-		LimitMemory:    t.config.LimitMemory,
-		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-		LimitMode:      limitMode,
-		Scheduler:      t.config.Scheduler,
-		Args:           t.command,
-		Parser:         t.parser,
-		Logger:         t.logger,
-		OnArgs:         r.onArgs(t.config.Clone()),
-		OnBeforeStart: func() error {
-			if !r.enableSoftLimit {
-				return nil
-			}
+	r.tasks.Store(tid, t)
 
-			if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
-				return err
-			}
+	// set filesystem cleanup rules
+	r.setCleanup(tid, t.Config())
 
-			return nil
-		},
-	})
-	if err != nil {
-		return err
-	}
+	t.Restore()
 
-	t.ffmpeg = ffmpeg
-	t.valid = true
-
-	if order == "start" {
-		r.startProcess(tid)
-	}
+	r.save()
 
 	return nil
 }

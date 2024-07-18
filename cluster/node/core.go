@@ -796,10 +796,12 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 			UpdatedAt:  time.Unix(p.UpdatedAt, 0),
 		}
 
-		config, metadata := p.Config.Marshal()
+		config, _ := p.Config.Marshal()
 
 		process.Config = config
-		process.Metadata = metadata
+		if p.Metadata != nil {
+			process.Metadata = p.Metadata.(map[string]interface{})
+		}
 
 		processes = append(processes, process)
 	}

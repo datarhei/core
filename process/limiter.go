@@ -91,9 +91,12 @@ type limiter struct {
 	ncpu       float64
 	ncpuFactor float64
 	proc       psutil.Process
-	lock       sync.Mutex
+	lock       sync.RWMutex
 	cancel     context.CancelFunc
 	onLimit    LimitFunc
+
+	lastUsage     Usage
+	lastUsageLock sync.RWMutex
 
 	cpu            float64   // CPU limit
 	cpuCurrent     float64   // Current CPU load of this process
@@ -149,6 +152,10 @@ func NewLimiter(config LimiterConfig) Limiter {
 	} else {
 		l.ncpu = ncpu
 	}
+
+	l.lastUsage.CPU.NCPU = l.ncpu
+	l.lastUsage.CPU.Limit = l.cpu * l.ncpu
+	l.lastUsage.Memory.Limit = l.memory
 
 	l.ncpuFactor = 1
 
@@ -208,7 +215,7 @@ func (l *limiter) Start(process psutil.Process) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
 
-	go l.ticker(ctx, 1000*time.Millisecond)
+	go l.ticker(ctx, time.Second)
 
 	if l.mode == LimitModeSoft {
 		ctx, cancel = context.WithCancel(context.Background())
@@ -255,15 +262,21 @@ func (l *limiter) ticker(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (l *limiter) collect(t time.Time) {
+func (l *limiter) collect(_ time.Time) {
 	l.lock.Lock()
-	defer l.lock.Unlock()
+	proc := l.proc
+	l.lock.Unlock()
 
-	if l.proc == nil {
+	if proc == nil {
 		return
 	}
 
-	if mstat, err := l.proc.VirtualMemory(); err == nil {
+	mstat, merr := proc.VirtualMemory()
+	cpustat, cerr := proc.CPUPercent()
+
+	l.lock.Lock()
+
+	if merr == nil {
 		l.memoryLast, l.memoryCurrent = l.memoryCurrent, mstat
 
 		if l.memoryCurrent > l.memoryMax {
@@ -281,7 +294,7 @@ func (l *limiter) collect(t time.Time) {
 		l.memoryAvg = ((l.memoryAvg * float64(l.memoryAvgCounter-1)) + float64(l.memoryCurrent)) / float64(l.memoryAvgCounter)
 	}
 
-	if cpustat, err := l.proc.CPUPercent(); err == nil {
+	if cerr == nil {
 		l.cpuLast, l.cpuCurrent = l.cpuCurrent, (cpustat.System+cpustat.User+cpustat.Other)/100
 
 		if l.cpuCurrent > l.cpuMax {
@@ -354,6 +367,19 @@ func (l *limiter) collect(t time.Time) {
 	if isLimitExceeded {
 		go l.onLimit(l.cpuCurrent*l.ncpuFactor*100, l.memoryCurrent)
 	}
+
+	l.lastUsageLock.Lock()
+	l.lastUsage.CPU.Current = l.cpuCurrent * l.ncpu * 100
+	l.lastUsage.CPU.Average = l.cpuAvg * l.ncpu * 100
+	l.lastUsage.CPU.Max = l.cpuMax * l.ncpu * 100
+	l.lastUsage.CPU.IsThrottling = l.cpuThrottling
+
+	l.lastUsage.Memory.Current = l.memoryCurrent
+	l.lastUsage.Memory.Average = l.memoryAvg
+	l.lastUsage.Memory.Max = l.memoryMax
+	l.lastUsageLock.Unlock()
+
+	l.lock.Unlock()
 }
 
 func (l *limiter) Limit(cpu, memory bool) error {
@@ -498,34 +524,20 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 }
 
 func (l *limiter) Current() (cpu float64, memory uint64) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
+	l.lastUsageLock.RLock()
+	defer l.lastUsageLock.RUnlock()
 
-	cpu = l.cpuCurrent * 100
-	memory = l.memoryCurrent * 100
+	cpu = l.lastUsage.CPU.Current / l.ncpu
+	memory = l.lastUsage.Memory.Current
 
 	return
 }
 
 func (l *limiter) Usage() Usage {
-	l.lock.Lock()
-	defer l.lock.Unlock()
+	l.lastUsageLock.RLock()
+	defer l.lastUsageLock.RUnlock()
 
-	usage := Usage{}
-
-	usage.CPU.NCPU = l.ncpu
-	usage.CPU.Limit = l.cpu * l.ncpu * 100
-	usage.CPU.Current = l.cpuCurrent * l.ncpu * 100
-	usage.CPU.Average = l.cpuAvg * l.ncpu * 100
-	usage.CPU.Max = l.cpuMax * l.ncpu * 100
-	usage.CPU.IsThrottling = l.cpuThrottling
-
-	usage.Memory.Limit = l.memory
-	usage.Memory.Current = l.memoryCurrent
-	usage.Memory.Average = l.memoryAvg
-	usage.Memory.Max = l.memoryMax
-
-	return usage
+	return l.lastUsage
 }
 
 func (l *limiter) Limits() (cpu float64, memory uint64) {

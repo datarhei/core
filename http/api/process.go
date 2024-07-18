@@ -154,7 +154,7 @@ func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {
 }
 
 // Unmarshal converts a core process config to a process config in API representation
-func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
+func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface{}) {
 	if c == nil {
 		return
 	}
@@ -212,6 +212,8 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 	cfg.LogPatterns = make([]string, len(c.LogPatterns))
 	copy(cfg.LogPatterns, c.LogPatterns)
+
+	cfg.Metadata = metadata
 }
 
 func (p *ProcessConfig) ProcessID() app.ProcessID {

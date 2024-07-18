@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/process"
@@ -197,6 +198,37 @@ func (c *Config) ProcessID() ProcessID {
 	}
 }
 
+type order struct {
+	order string
+	lock  sync.RWMutex
+}
+
+func NewOrder(o string) order {
+	return order{
+		order: o,
+	}
+}
+
+func (o *order) Clone() order {
+	return order{
+		order: o.order,
+	}
+}
+
+func (o *order) String() string {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	return o.order
+}
+
+func (o *order) Set(order string) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	o.order = order
+}
+
 type Process struct {
 	ID        string
 	Owner     string
@@ -205,7 +237,7 @@ type Process struct {
 	Config    *Config
 	CreatedAt int64
 	UpdatedAt int64
-	Order     string
+	Order     order
 }
 
 func (process *Process) Clone() *Process {
@@ -217,7 +249,7 @@ func (process *Process) Clone() *Process {
 		Config:    process.Config.Clone(),
 		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,
-		Order:     process.Order,
+		Order:     process.Order.Clone(),
 	}
 
 	return clone

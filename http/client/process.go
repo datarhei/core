@@ -69,8 +69,7 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
-	config.Metadata = metadata
+	config.Unmarshal(p, metadata)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
@@ -87,8 +86,7 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
-	config.Metadata = metadata
+	config.Unmarshal(p, metadata)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
@@ -206,7 +204,7 @@ func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
+	config.Unmarshal(p, nil)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)

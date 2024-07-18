@@ -368,6 +368,8 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 				err:       errNotEnoughResourcesForDeployment,
 			})
 		}
+
+		//break
 	}
 
 	return opStack, resources.Map(), reality

@@ -197,6 +197,9 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 		haveReferenceAffinity.Move(process.Config.Reference, process.Config.Domain, sourceNodeid, targetNodeid)
 
 		relocatedProcessIDs = append(relocatedProcessIDs, processid)
+
+		// Move only one process at a time.
+		break
 	}
 
 	return opStack, resources.Map(), relocatedProcessIDs

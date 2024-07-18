@@ -177,7 +177,7 @@ type process struct {
 		state  stateType
 		time   time.Time
 		states States
-		lock   sync.Mutex
+		lock   sync.RWMutex
 	}
 	order struct {
 		order string
@@ -401,8 +401,8 @@ func (p *process) setState(state stateType) (stateType, error) {
 }
 
 func (p *process) getState() stateType {
-	p.state.lock.Lock()
-	defer p.state.lock.Unlock()
+	p.state.lock.RLock()
+	defer p.state.lock.RUnlock()
 
 	return p.state.state
 }
@@ -431,15 +431,15 @@ func (p *process) setOrder(order string) bool {
 }
 
 func (p *process) isRunning() bool {
-	p.state.lock.Lock()
-	defer p.state.lock.Unlock()
+	p.state.lock.RLock()
+	defer p.state.lock.RUnlock()
 
 	return p.state.state.IsRunning()
 }
 
 func (p *process) getStateString() string {
-	p.state.lock.Lock()
-	defer p.state.lock.Unlock()
+	p.state.lock.RLock()
+	defer p.state.lock.RUnlock()
 
 	return p.state.state.String()
 }
@@ -448,11 +448,11 @@ func (p *process) getStateString() string {
 func (p *process) Status() Status {
 	usage := p.limits.Usage()
 
-	p.state.lock.Lock()
+	p.state.lock.RLock()
 	stateTime := p.state.time
 	state := p.state.state
 	states := p.state.states
-	p.state.lock.Unlock()
+	p.state.lock.RUnlock()
 
 	if state == stateRunning && !p.parser.IsRunning() {
 		state = stateStarting
