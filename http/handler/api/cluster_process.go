@@ -442,7 +442,7 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	}
 
 	// Prefill the config with the current values
-	process.Unmarshal(current.Config, current.Metadata)
+	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
