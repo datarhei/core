@@ -36,6 +36,23 @@ type task struct {
 	lock *xsync.RBMutex
 }
 
+func NewTask(process *app.Process, logger log.Logger) *task {
+	t := &task{
+		id:        process.ID,
+		owner:     process.Owner,
+		domain:    process.Domain,
+		reference: process.Reference,
+		process:   process,
+		config:    process.Config.Clone(),
+		playout:   map[string]int{},
+		logger:    logger,
+		metadata:  nil,
+		lock:      xsync.NewRBMutex(),
+	}
+
+	return t
+}
+
 func (t *task) IsValid() bool {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
@@ -81,6 +98,10 @@ func (t *task) Restore() error {
 		return ErrInvalidProcessConfig
 	}
 
+	if t.process == nil {
+		return ErrInvalidProcessConfig
+	}
+
 	if t.process.Order.String() == "start" {
 		err := t.ffmpeg.Start()
 		if err != nil {
@@ -103,6 +124,10 @@ func (t *task) Start() error {
 		return nil
 	}
 
+	if t.process == nil {
+		return nil
+	}
+
 	status := t.ffmpeg.Status()
 
 	if t.process.Order.String() == "start" && status.Order == "start" {
@@ -121,6 +146,10 @@ func (t *task) Stop() error {
 	defer t.lock.RUnlock(token)
 
 	if t.ffmpeg == nil {
+		return nil
+	}
+
+	if t.process == nil {
 		return nil
 	}
 
@@ -157,6 +186,10 @@ func (t *task) Restart() error {
 		return ErrInvalidProcessConfig
 	}
 
+	if t.process == nil {
+		return nil
+	}
+
 	if t.process.Order.String() == "stop" {
 		return nil
 	}
@@ -176,6 +209,18 @@ func (t *task) State() (*app.State, error) {
 	state := &app.State{}
 
 	if !t.valid {
+		return state, nil
+	}
+
+	if t.ffmpeg == nil {
+		return state, nil
+	}
+
+	if t.parser == nil {
+		return state, nil
+	}
+
+	if t.process == nil {
 		return state, nil
 	}
 
@@ -231,6 +276,10 @@ func (t *task) Report() (*app.Report, error) {
 		return report, nil
 	}
 
+	if t.parser == nil {
+		return report, nil
+	}
+
 	current := t.parser.Report()
 
 	report.UnmarshalParser(&current)
@@ -271,6 +320,10 @@ func (t *task) SetReport(report *app.Report) error {
 		return nil
 	}
 
+	if t.parser == nil {
+		return nil
+	}
+
 	_, history := report.MarshalParser()
 
 	t.parser.ImportReportHistory(history)
@@ -281,6 +334,10 @@ func (t *task) SetReport(report *app.Report) error {
 func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.ReportHistorySearchResult {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
+
+	if t.parser == nil {
+		return []app.ReportHistorySearchResult{}
+	}
 
 	result := []app.ReportHistorySearchResult{}
 
@@ -324,12 +381,23 @@ func (t *task) SetMetadata(key string, data interface{}) error {
 	return nil
 }
 
+func (t *task) ImportMetadata(m map[string]interface{}) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.metadata = m
+}
+
 func (t *task) GetMetadata(key string) (interface{}, error) {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
 	if len(key) == 0 {
 		return t.metadata, nil
+	}
+
+	if t.metadata == nil {
+		return nil, ErrMetadataKeyNotFound
 	}
 
 	data, ok := t.metadata[key]
@@ -340,13 +408,16 @@ func (t *task) GetMetadata(key string) (interface{}, error) {
 	return data, nil
 }
 
-func (t *task) Limit(cpu, memory bool) bool {
+func (t *task) ExportMetadata() map[string]interface{} {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
-	if !t.valid {
-		return false
-	}
+	return t.metadata
+}
+
+func (t *task) Limit(cpu, memory bool) bool {
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
 
 	if t.ffmpeg == nil {
 		return false
@@ -361,12 +432,20 @@ func (t *task) Equal(config *app.Config) bool {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
+	if t.process == nil {
+		return false
+	}
+
 	return t.process.Config.Equal(config)
 }
 
 func (t *task) Config() *app.Config {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
+
+	if t.config == nil {
+		return nil
+	}
 
 	return t.config.Clone()
 }
@@ -383,7 +462,7 @@ func (t *task) Destroy() {
 	t.command = nil
 	t.ffmpeg = nil
 	t.parser = nil
-	t.metadata = nil
+	t.metadata = map[string]interface{}{}
 }
 
 func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
@@ -428,6 +507,10 @@ func (t *task) Process() *app.Process {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
+	if t.process == nil {
+		return nil
+	}
+
 	return t.process.Clone()
 }
 
@@ -435,5 +518,31 @@ func (t *task) Order() string {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
+	if t.process == nil {
+		return ""
+	}
+
 	return t.process.Order.String()
+}
+
+func (t *task) ExportParserReportHistory() []parse.ReportHistoryEntry {
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
+
+	if t.parser == nil {
+		return nil
+	}
+
+	return t.parser.ReportHistory()
+}
+
+func (t *task) ImportParserReportHistory(report []parse.ReportHistoryEntry) {
+	token := t.lock.RLock()
+	defer t.lock.RUnlock(token)
+
+	if t.parser == nil {
+		return
+	}
+
+	t.parser.ImportReportHistory(report)
 }

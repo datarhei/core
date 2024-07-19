@@ -26,7 +26,6 @@ import (
 	"github.com/datarhei/core/v16/restream/store"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
 // The Restreamer interface
@@ -346,23 +345,14 @@ func (r *restream) load() error {
 				p.Process.Config.FFVersion = "^" + ffversion
 			}
 
-			t := &task{
-				id:        p.Process.ID,
-				owner:     p.Process.Owner,
-				domain:    p.Process.Domain,
-				reference: p.Process.Reference,
-				process:   p.Process,
-				config:    p.Process.Config.Clone(),
-				logger: r.logger.WithFields(log.Fields{
-					"id":        p.Process.ID,
-					"owner":     p.Process.Owner,
-					"domain":    p.Process.Domain,
-					"reference": p.Process.Reference,
-				}),
-				lock: xsync.NewRBMutex(),
-			}
+			t := NewTask(p.Process, r.logger.WithFields(log.Fields{
+				"id":        p.Process.ID,
+				"owner":     p.Process.Owner,
+				"domain":    p.Process.Domain,
+				"reference": p.Process.Reference,
+			}))
 
-			t.metadata = p.Metadata
+			t.ImportMetadata(p.Metadata)
 
 			// Replace all placeholders in the config
 			resolveStaticPlaceholders(t.config, r.replace)
@@ -570,21 +560,12 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		process.Order.Set("start")
 	}
 
-	t := &task{
-		id:        config.ID,
-		owner:     config.Owner,
-		domain:    config.Domain,
-		reference: process.Reference,
-		process:   process,
-		config:    process.Config.Clone(),
-		logger: r.logger.WithFields(log.Fields{
-			"id":        process.ID,
-			"owner":     process.Owner,
-			"reference": process.Reference,
-			"domain":    process.Domain,
-		}),
-		lock: xsync.NewRBMutex(),
-	}
+	t := NewTask(process, r.logger.WithFields(log.Fields{
+		"id":        process.ID,
+		"owner":     process.Owner,
+		"reference": process.Reference,
+		"domain":    process.Domain,
+	}))
 
 	resolveStaticPlaceholders(t.config, r.replace)
 
@@ -1173,11 +1154,12 @@ func (r *restream) updateProcess(id app.ProcessID, config *app.Config) error {
 	//t.process.CreatedAt = task.process.CreatedAt
 
 	// Transfer the report history to the new process
-	history := task.parser.ReportHistory()
-	t.parser.ImportReportHistory(history)
+	history := task.ExportParserReportHistory()
+	t.ImportParserReportHistory(history)
 
 	// Transfer the metadata to the new process
-	t.metadata = task.metadata
+	metadata := task.ExportMetadata()
+	t.ImportMetadata(metadata)
 
 	if err := r.deleteProcess(id); err != nil {
 		return fmt.Errorf("delete process: %w", err)
