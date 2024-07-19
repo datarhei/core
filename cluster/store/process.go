@@ -72,11 +72,11 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", srcid, ErrNotFound)
 	}
 
-	if p.Config.Equal(cmd.Config) {
-		return nil
-	}
-
 	if srcid == dstid {
+		if p.Config.Equal(cmd.Config) {
+			return nil
+		}
+
 		p.UpdatedAt = time.Now()
 		p.Config = cmd.Config
 
