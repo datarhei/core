@@ -58,6 +58,7 @@ type Cluster interface {
 	HasRaftLeader() bool
 
 	ProcessAdd(origin string, config *app.Config) error
+	ProcessGet(origin string, id app.ProcessID, stale bool) (store.Process, string, error)
 	ProcessRemove(origin string, id app.ProcessID) error
 	ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error
 	ProcessSetCommand(origin string, id app.ProcessID, order string) error

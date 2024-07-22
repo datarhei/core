@@ -1046,50 +1046,40 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 		return api.Process{}, err
 	}
 
-	info := api.Process{
-		ID:        process.ID,
-		Owner:     process.Owner,
-		Domain:    process.Domain,
-		Reference: process.Reference,
-		Type:      "ffmpeg",
-		CoreID:    h.restream.ID(),
-		CreatedAt: process.CreatedAt,
-		UpdatedAt: process.UpdatedAt,
-	}
+	var config *app.Config
+	var state *app.State
+	var report *app.Report
+	var metadata interface{}
 
 	if filter.config {
-		info.Config = &api.ProcessConfig{}
-		info.Config.Unmarshal(process.Config, nil)
+		config = process.Config
 	}
 
 	if filter.state {
-		state, err := h.restream.GetProcessState(id)
+		state, err = h.restream.GetProcessState(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.State = &api.ProcessState{}
-		info.State.Unmarshal(state)
 	}
 
 	if filter.report {
-		log, err := h.restream.GetProcessReport(id)
+		report, err = h.restream.GetProcessReport(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Report = &api.ProcessReport{}
-		info.Report.Unmarshal(log)
 	}
 
 	if filter.metadata {
-		data, err := h.restream.GetProcessMetadata(id, "")
+		metadata, err = h.restream.GetProcessMetadata(id, "")
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Metadata = api.NewMetadata(data)
 	}
+
+	info := api.Process{
+		CoreID: h.restream.ID(),
+	}
+	info.Unmarshal(process, config, state, report, metadata)
 
 	return info, nil
 }

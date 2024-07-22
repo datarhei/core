@@ -81,7 +81,7 @@ type Config struct {
 	StaleTimeout   uint64   // seconds
 	Timeout        uint64   // seconds
 	Scheduler      string   // crontab pattern or RFC3339 timestamp
-	LogPatterns    []string // will we interpreted as regular expressions
+	LogPatterns    []string // will be interpreted as regular expressions
 	LimitCPU       float64  // percent
 	LimitMemory    uint64   // bytes
 	LimitWaitFor   uint64   // seconds

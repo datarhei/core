@@ -22,6 +22,21 @@ func (c *cluster) ProcessAdd(origin string, config *app.Config) error {
 	return c.applyCommand(cmd)
 }
 
+func (c *cluster) ProcessGet(origin string, id app.ProcessID, stale bool) (store.Process, string, error) {
+	if !stale {
+		if !c.IsRaftLeader() {
+			return c.forwarder.ProcessGet(origin, id)
+		}
+	}
+
+	process, nodeid, err := c.store.ProcessGet(id)
+	if err != nil {
+		return store.Process{}, "", err
+	}
+
+	return process, nodeid, nil
+}
+
 func (c *cluster) ProcessRemove(origin string, id app.ProcessID) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.ProcessRemove(origin, id)
@@ -111,7 +126,7 @@ func (c *cluster) ProcessSetMetadata(origin string, id app.ProcessID, key string
 }
 
 func (c *cluster) ProcessGetMetadata(origin string, id app.ProcessID, key string) (interface{}, error) {
-	p, err := c.store.ProcessGet(id)
+	p, _, err := c.store.ProcessGet(id)
 	if err != nil {
 		return nil, err
 	}

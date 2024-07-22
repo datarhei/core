@@ -41,7 +41,7 @@ func (c *cluster) doRebalance(emergency bool, term uint64) {
 
 	for _, e := range errors {
 		// Only apply the command if the error is different.
-		process, err := c.store.ProcessGet(e.processid)
+		process, _, err := c.store.ProcessGet(e.processid)
 		if err != nil {
 			continue
 		}

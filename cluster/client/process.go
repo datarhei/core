@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/restream/app"
 )
@@ -18,6 +19,22 @@ func (c *APIClient) ProcessAdd(origin string, r AddProcessRequest) error {
 	_, err = c.call(http.MethodPost, "/v1/process", "application/json", bytes.NewReader(data), origin)
 
 	return err
+}
+
+func (c APIClient) ProcessGet(origin string, id app.ProcessID) (store.Process, string, error) {
+	res := GetProcessResponse{}
+
+	data, err := c.call(http.MethodGet, "/v1/process/"+url.PathEscape(id.ID)+"?domain="+url.QueryEscape(id.Domain), "application/json", nil, origin)
+	if err != nil {
+		return store.Process{}, "", err
+	}
+
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return store.Process{}, "", err
+	}
+
+	return res.Process, res.NodeID, nil
 }
 
 func (c *APIClient) ProcessRemove(origin string, id app.ProcessID) error {

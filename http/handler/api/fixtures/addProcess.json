@@ -25,6 +25,7 @@
 			]
 		}
 	],
+	"log_patterns": [],
 	"autostart": false,
 	"reconnect": true,
 	"reconnect_delay_seconds": 10,

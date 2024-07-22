@@ -2,6 +2,7 @@ package restream
 
 import (
 	"errors"
+	"maps"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
@@ -393,7 +394,11 @@ func (t *task) GetMetadata(key string) (interface{}, error) {
 	defer t.lock.RUnlock(token)
 
 	if len(key) == 0 {
-		return t.metadata, nil
+		if t.metadata == nil {
+			return nil, nil
+		}
+
+		return maps.Clone(t.metadata), nil
 	}
 
 	if t.metadata == nil {

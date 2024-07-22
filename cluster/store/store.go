@@ -21,7 +21,7 @@ type Store interface {
 	OnApply(func(op Operation))
 
 	ProcessList() []Process
-	ProcessGet(id app.ProcessID) (Process, error)
+	ProcessGet(id app.ProcessID) (Process, string, error)
 	ProcessGetNode(id app.ProcessID) (string, error)
 	ProcessGetNodeMap() map[string]string
 	ProcessGetRelocateMap() map[string]string

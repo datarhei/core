@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
@@ -24,6 +25,11 @@ type JoinRequest struct {
 
 type AddProcessRequest struct {
 	Config app.Config `json:"config"`
+}
+
+type GetProcessResponse struct {
+	Process store.Process `json:"process"`
+	NodeID  string        `json:"nodeid"`
 }
 
 type UpdateProcessRequest struct {
