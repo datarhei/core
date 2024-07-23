@@ -456,10 +456,12 @@ func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Dur
 			if factorTopLimit > 0 {
 				factorTopLimit -= 10
 			} else {
-				if l.proc != nil {
-					l.proc.Resume()
+				if l.cpuThrottling {
+					if l.proc != nil {
+						l.proc.Resume()
+					}
+					l.cpuThrottling = false
 				}
-				l.cpuThrottling = false
 				l.lock.Unlock()
 				time.Sleep(100 * time.Millisecond)
 				continue
