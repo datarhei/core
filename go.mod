@@ -1,6 +1,6 @@
 module github.com/datarhei/core/v16
 
-go 1.21.0
+go 1.22.0
 
 toolchain go1.22.1
 
@@ -11,7 +11,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.21.3
-	github.com/casbin/casbin/v2 v2.97.0
 	github.com/datarhei/gosrt v0.6.0
 	github.com/datarhei/joy4 v0.0.0-20240603190808-b1407345907e
 	github.com/fujiwara/shapeio v1.0.0
@@ -60,7 +59,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/zerossl v0.1.3 // indirect
-	github.com/casbin/govaluate v1.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

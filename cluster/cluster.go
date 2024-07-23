@@ -23,8 +23,8 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/resources"
@@ -70,7 +70,7 @@ type Cluster interface {
 	IAMIdentityAdd(origin string, identity iamidentity.User) error
 	IAMIdentityUpdate(origin, name string, identity iamidentity.User) error
 	IAMIdentityRemove(origin string, name string) error
-	IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error
+	IAMPoliciesSet(origin, name string, policies []iampolicy.Policy) error
 
 	LockCreate(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
 	LockDelete(origin string, name string) error

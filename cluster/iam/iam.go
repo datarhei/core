@@ -5,8 +5,8 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/iam"
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -84,7 +84,7 @@ func (m *manager) RemovePolicy(name, domain string, types []string, resource str
 	return ErrClusterMode
 }
 
-func (m *manager) ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy {
+func (m *manager) ListPolicies(name, domain string, types []string, resource string, actions []string) []policy.Policy {
 	return m.iam.ListPolicies(name, domain, types, resource, actions)
 }
 

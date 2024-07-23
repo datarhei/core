@@ -13,8 +13,8 @@ import (
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -57,7 +57,7 @@ type UpdateIdentityRequest struct {
 }
 
 type SetPoliciesRequest struct {
-	Policies []iamaccess.Policy `json:"policies"`
+	Policies []iampolicy.Policy `json:"policies"`
 }
 
 type LockRequest struct {

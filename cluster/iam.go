@@ -8,8 +8,8 @@ import (
 	clusteriamadapter "github.com/datarhei/core/v16/cluster/iam/adapter"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 )
 
 func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (iam.IAM, error) {
@@ -54,13 +54,13 @@ func (c *cluster) ListIdentity(name string) (time.Time, iamidentity.User, error)
 	return user.UpdatedAt, user.Users[0], nil
 }
 
-func (c *cluster) ListPolicies() (time.Time, []iamaccess.Policy) {
+func (c *cluster) ListPolicies() (time.Time, []iampolicy.Policy) {
 	policies := c.store.IAMPolicyList()
 
 	return policies.UpdatedAt, policies.Policies
 }
 
-func (c *cluster) ListUserPolicies(name string) (time.Time, []iamaccess.Policy) {
+func (c *cluster) ListUserPolicies(name string) (time.Time, []iampolicy.Policy) {
 	policies := c.store.IAMIdentityPolicyList(name)
 
 	return policies.UpdatedAt, policies.Policies
@@ -101,7 +101,7 @@ func (c *cluster) IAMIdentityUpdate(origin, name string, identity iamidentity.Us
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error {
+func (c *cluster) IAMPoliciesSet(origin, name string, policies []iampolicy.Policy) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.IAMPoliciesSet(origin, name, policies)
 	}
