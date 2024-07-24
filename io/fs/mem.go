@@ -127,14 +127,76 @@ type memFilesystem struct {
 
 	// Storage backend
 	storage memStorage
+	dirs    *dirStorage
+}
+
+type dirStorage struct {
+	dirs map[string]uint64
+	lock sync.RWMutex
+}
+
+func newDirStorage() *dirStorage {
+	s := &dirStorage{
+		dirs: map[string]uint64{},
+	}
+
+	s.dirs["/"] = 1
+
+	return s
+}
+
+func (s *dirStorage) Has(path string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	_, hasDir := s.dirs[path]
+
+	return hasDir
+}
+
+func (s *dirStorage) Add(path string) {
+	dir := filepath.Dir(path)
+	elements := strings.Split(dir, "/")
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	p := "/"
+	for _, e := range elements {
+		p = filepath.Join(p, e)
+		n := s.dirs[p]
+		n++
+		s.dirs[p] = n
+	}
+}
+
+func (s *dirStorage) Remove(path string) {
+	dir := filepath.Dir(path)
+	elements := strings.Split(dir, "/")
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	p := "/"
+	for _, e := range elements {
+		p = filepath.Join(p, e)
+		n := s.dirs[p]
+		n--
+		if n == 0 {
+			delete(s.dirs, p)
+		} else {
+			s.dirs[p] = n
+		}
+	}
 }
 
 // NewMemFilesystem creates a new filesystem in memory that implements
 // the Filesystem interface.
 func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 	fs := &memFilesystem{
-		metadata: make(map[string]string),
+		metadata: map[string]string{},
 		logger:   config.Logger,
+		dirs:     newDirStorage(),
 	}
 
 	if fs.logger == nil {
@@ -327,12 +389,16 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 		},
 	}
 
-	oldFile, loaded := fs.storage.Store(newname, newFile)
+	oldFile, replaced := fs.storage.Store(newname, newFile)
+
+	if !replaced {
+		fs.dirs.Add(newname)
+	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
-	if loaded {
+	if replaced {
 		oldFile.Close()
 		fs.currentSize -= oldFile.size
 	}
@@ -376,6 +442,10 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 	newFile.size = size
 
 	oldFile, replace := fs.storage.Store(path, newFile)
+
+	if !replace {
+		fs.dirs.Add(path)
+	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
@@ -430,6 +500,8 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 		size -= f.size
 		freed += f.size
 
+		fs.dirs.Remove(f.name)
+
 		fs.sizeLock.Lock()
 		fs.currentSize -= f.size
 		fs.sizeLock.Unlock()
@@ -464,16 +536,7 @@ func (fs *memFilesystem) MkdirAll(path string, perm os.FileMode) error {
 		return ErrExist
 	}
 
-	f := &memFile{
-		memFileInfo: memFileInfo{
-			name:    path,
-			size:    0,
-			dir:     true,
-			lastMod: time.Now(),
-		},
-	}
-
-	fs.storage.Store(path, f)
+	fs.dirs.Add(filepath.Join(path, "x"))
 
 	return nil
 }
@@ -493,6 +556,11 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 
 	dstFile, replace := fs.storage.Store(dst, srcFile)
 	fs.storage.Delete(src)
+
+	fs.dirs.Remove(src)
+	if !replace {
+		fs.dirs.Add(dst)
+	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
@@ -539,6 +607,10 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 	}
 
 	f, replace := fs.storage.Store(dst, dstFile)
+
+	if !replace {
+		fs.dirs.Add(dst)
+	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
@@ -600,31 +672,7 @@ func (fs *memFilesystem) stat(path string) (FileInfo, error) {
 }
 
 func (fs *memFilesystem) isDir(path string) bool {
-	file, ok := fs.storage.Load(path)
-	if ok {
-		return file.dir
-	}
-
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
-	}
-
-	if path == "/" {
-		return true
-	}
-
-	found := false
-
-	fs.storage.Range(func(k string, _ *memFile) bool {
-		if strings.HasPrefix(k, path) {
-			found = true
-			return false
-		}
-
-		return true
-	})
-
-	return found
+	return fs.dirs.Has(path)
 }
 
 func (fs *memFilesystem) Remove(path string) int64 {
@@ -637,6 +685,8 @@ func (fs *memFilesystem) remove(path string) int64 {
 	file, ok := fs.storage.Delete(path)
 	if ok {
 		file.Close()
+
+		fs.dirs.Remove(path)
 
 		fs.sizeLock.Lock()
 		defer fs.sizeLock.Unlock()
@@ -721,6 +771,8 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 		fs.storage.Delete(file.name)
 		size += file.size
 		names = append(names, file.name)
+
+		fs.dirs.Remove(file.name)
 
 		file.Close()
 	}

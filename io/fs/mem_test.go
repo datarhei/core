@@ -107,6 +107,25 @@ func TestWriteWhileRead(t *testing.T) {
 	require.Equal(t, []byte("xxxxx"), data)
 }
 
+func BenchmarkMemWriteFile(b *testing.B) {
+	mem, err := NewMemFilesystem(MemConfig{})
+	require.NoError(b, err)
+
+	nFiles := 50000
+
+	for i := 0; i < nFiles; i++ {
+		path := fmt.Sprintf("/%d.dat", i)
+		mem.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		path := fmt.Sprintf("/%d.dat", i%nFiles)
+		mem.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
+	}
+}
+
 func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 	mem, err := NewMemFilesystem(MemConfig{})
 	require.NoError(b, err)
