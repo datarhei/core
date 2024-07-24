@@ -2,6 +2,7 @@ package fs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -249,7 +250,7 @@ func NewMemFilesystemFromDir(dir string, config MemConfig) (Filesystem, error) {
 
 		defer file.Close()
 
-		_, _, err = mem.WriteFileReader(strings.TrimPrefix(path, dir), file)
+		_, _, err = mem.WriteFileReader(strings.TrimPrefix(path, dir), file, int(info.Size()))
 		if err != nil {
 			return fmt.Errorf("can't copy %s", path)
 		}
@@ -408,7 +409,44 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	return nil
 }
 
-func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
+var chunkPool = sync.Pool{
+	New: func() interface{} {
+		chunk := make([]byte, 128*1024)
+		return &chunk
+	},
+}
+
+func copyToBufferFromReader(buf *bytes.Buffer, r io.Reader, _ int) (int64, error) {
+	chunkPtr := chunkPool.Get().(*[]byte)
+	chunk := *chunkPtr
+	defer chunkPool.Put(chunkPtr)
+
+	size := int64(0)
+
+	for {
+		n, err := r.Read(chunk)
+		if n != 0 {
+			buf.Write(chunk[:n])
+			size += int64(n)
+		}
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return size, nil
+			}
+
+			return size, err
+		}
+
+		if n == 0 {
+			break
+		}
+	}
+
+	return size, nil
+}
+
+func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
 	isdir := fs.isDir(path)
@@ -426,7 +464,11 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 		data: &bytes.Buffer{},
 	}
 
-	size, err := newFile.data.ReadFrom(r)
+	if sizeHint > 0 {
+		newFile.data.Grow(sizeHint)
+	}
+
+	size, err := copyToBufferFromReader(newFile.data, r, 8*1024)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
 			"path":           path,
@@ -474,11 +516,11 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool,
 }
 
 func (fs *memFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewReader(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
 func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewReader(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
 func (fs *memFilesystem) Purge(size int64) int64 {

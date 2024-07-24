@@ -1988,7 +1988,7 @@ func backupMemFS(target, source fs.Filesystem, patterns []string) error {
 			continue
 		}
 
-		target.WriteFileReader(name, file)
+		target.WriteFileReader(name, file, -1)
 
 		file.Close()
 	}

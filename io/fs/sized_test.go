@@ -52,7 +52,7 @@ func TestSizedResizePurge(t *testing.T) {
 	require.Equal(t, int64(0), cur)
 	require.Equal(t, int64(10), max)
 
-	fs.WriteFileReader("/foobar", strings.NewReader("xxxxxxxxxx"))
+	fs.WriteFileReader("/foobar", strings.NewReader("xxxxxxxxxx"), -1)
 
 	cur, max = fs.Size()
 
@@ -76,7 +76,7 @@ func TestSizedWrite(t *testing.T) {
 	require.Equal(t, int64(0), cur)
 	require.Equal(t, int64(10), max)
 
-	size, created, err := fs.WriteFileReader("/foobar", strings.NewReader("xxxxx"))
+	size, created, err := fs.WriteFileReader("/foobar", strings.NewReader("xxxxx"), -1)
 	require.NoError(t, err)
 	require.Equal(t, int64(5), size)
 	require.Equal(t, true, created)
@@ -89,7 +89,7 @@ func TestSizedWrite(t *testing.T) {
 	_, _, err = fs.WriteFile("/foobaz", []byte("xxxxxx"))
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("xxxxxx"))
+	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("xxxxxx"), -1)
 	require.Error(t, err)
 
 	_, _, err = fs.WriteFileSafe("/foobaz", []byte("xxxxxx"))
@@ -101,7 +101,7 @@ func TestSizedReplaceNoPurge(t *testing.T) {
 
 	data := strings.NewReader("xxxxx")
 
-	size, created, err := fs.WriteFileReader("/foobar", data)
+	size, created, err := fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(5), size)
@@ -118,7 +118,7 @@ func TestSizedReplaceNoPurge(t *testing.T) {
 
 	data = strings.NewReader("yyy")
 
-	size, created, err = fs.WriteFileReader("/foobar", data)
+	size, created, err = fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(3), size)
@@ -141,9 +141,9 @@ func TestSizedReplacePurge(t *testing.T) {
 	data2 := strings.NewReader("yyy")
 	data3 := strings.NewReader("zzz")
 
-	fs.WriteFileReader("/foobar1", data1)
-	fs.WriteFileReader("/foobar2", data2)
-	fs.WriteFileReader("/foobar3", data3)
+	fs.WriteFileReader("/foobar1", data1, -1)
+	fs.WriteFileReader("/foobar2", data2, -1)
+	fs.WriteFileReader("/foobar3", data3, -1)
 
 	cur, max := fs.Size()
 
@@ -156,7 +156,7 @@ func TestSizedReplacePurge(t *testing.T) {
 
 	data4 := strings.NewReader("zzzzz")
 
-	size, _, _ := fs.WriteFileReader("/foobar1", data4)
+	size, _, _ := fs.WriteFileReader("/foobar1", data4, -1)
 
 	require.Equal(t, int64(5), size)
 
@@ -175,7 +175,7 @@ func TestSizedReplaceUnlimited(t *testing.T) {
 
 	data := strings.NewReader("xxxxx")
 
-	size, created, err := fs.WriteFileReader("/foobar", data)
+	size, created, err := fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(5), size)
@@ -192,7 +192,7 @@ func TestSizedReplaceUnlimited(t *testing.T) {
 
 	data = strings.NewReader("yyy")
 
-	size, created, err = fs.WriteFileReader("/foobar", data)
+	size, created, err = fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(3), size)
@@ -213,7 +213,7 @@ func TestSizedTooBigNoPurge(t *testing.T) {
 
 	data := strings.NewReader("xxxxxyyyyyz")
 
-	size, _, err := fs.WriteFileReader("/foobar", data)
+	size, _, err := fs.WriteFileReader("/foobar", data, -1)
 	require.Error(t, err)
 	require.Equal(t, int64(-1), size)
 }
@@ -224,12 +224,12 @@ func TestSizedTooBigPurge(t *testing.T) {
 	data1 := strings.NewReader("xxxxx")
 	data2 := strings.NewReader("yyyyy")
 
-	fs.WriteFileReader("/foobar1", data1)
-	fs.WriteFileReader("/foobar2", data2)
+	fs.WriteFileReader("/foobar1", data1, -1)
+	fs.WriteFileReader("/foobar2", data2, -1)
 
 	data := strings.NewReader("xxxxxyyyyyz")
 
-	size, _, err := fs.WriteFileReader("/foobar", data)
+	size, _, err := fs.WriteFileReader("/foobar", data, -1)
 	require.Error(t, err)
 	require.Equal(t, int64(-1), size)
 
@@ -242,8 +242,8 @@ func TestSizedFullSpaceNoPurge(t *testing.T) {
 	data1 := strings.NewReader("xxxxx")
 	data2 := strings.NewReader("yyyyy")
 
-	fs.WriteFileReader("/foobar1", data1)
-	fs.WriteFileReader("/foobar2", data2)
+	fs.WriteFileReader("/foobar1", data1, -1)
+	fs.WriteFileReader("/foobar2", data2, -1)
 
 	cur, max := fs.Size()
 
@@ -256,7 +256,7 @@ func TestSizedFullSpaceNoPurge(t *testing.T) {
 
 	data3 := strings.NewReader("zzzzz")
 
-	size, _, err := fs.WriteFileReader("/foobar3", data3)
+	size, _, err := fs.WriteFileReader("/foobar3", data3, -1)
 	require.Error(t, err)
 	require.Equal(t, int64(-1), size)
 }
@@ -267,8 +267,8 @@ func TestSizedFullSpacePurge(t *testing.T) {
 	data1 := strings.NewReader("xxxxx")
 	data2 := strings.NewReader("yyyyy")
 
-	fs.WriteFileReader("/foobar1", data1)
-	fs.WriteFileReader("/foobar2", data2)
+	fs.WriteFileReader("/foobar1", data1, -1)
+	fs.WriteFileReader("/foobar2", data2, -1)
 
 	cur, max := fs.Size()
 
@@ -281,7 +281,7 @@ func TestSizedFullSpacePurge(t *testing.T) {
 
 	data3 := strings.NewReader("zzzzz")
 
-	size, _, _ := fs.WriteFileReader("/foobar3", data3)
+	size, _, _ := fs.WriteFileReader("/foobar3", data3, -1)
 
 	require.Equal(t, int64(5), size)
 
@@ -302,9 +302,9 @@ func TestSizedFullSpacePurgeMulti(t *testing.T) {
 	data2 := strings.NewReader("yyy")
 	data3 := strings.NewReader("zzz")
 
-	fs.WriteFileReader("/foobar1", data1)
-	fs.WriteFileReader("/foobar2", data2)
-	fs.WriteFileReader("/foobar3", data3)
+	fs.WriteFileReader("/foobar1", data1, -1)
+	fs.WriteFileReader("/foobar2", data2, -1)
+	fs.WriteFileReader("/foobar3", data3, -1)
 
 	cur, max := fs.Size()
 
@@ -317,7 +317,7 @@ func TestSizedFullSpacePurgeMulti(t *testing.T) {
 
 	data4 := strings.NewReader("zzzzz")
 
-	size, _, _ := fs.WriteFileReader("/foobar4", data4)
+	size, _, _ := fs.WriteFileReader("/foobar4", data4, -1)
 
 	require.Equal(t, int64(5), size)
 
@@ -338,11 +338,11 @@ func TestSizedPurgeOrder(t *testing.T) {
 	data2 := strings.NewReader("yyyyy")
 	data3 := strings.NewReader("zzzzz")
 
-	fs.WriteFileReader("/foobar1", data1)
+	fs.WriteFileReader("/foobar1", data1, -1)
 	time.Sleep(1 * time.Second)
-	fs.WriteFileReader("/foobar2", data2)
+	fs.WriteFileReader("/foobar2", data2, -1)
 	time.Sleep(1 * time.Second)
-	fs.WriteFileReader("/foobar3", data3)
+	fs.WriteFileReader("/foobar3", data3, -1)
 
 	file := fs.Open("/foobar1")
 

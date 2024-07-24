@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -189,4 +190,37 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 	}
 
 	readerWg.Wait()
+}
+
+func BenchmarkBufferReadFrom(b *testing.B) {
+	data := []byte(rand.StringAlphanumeric(1024 * 1024))
+
+	for i := 0; i < b.N; i++ {
+		r := bytes.NewReader(data)
+		buf := &bytes.Buffer{}
+		buf.ReadFrom(r)
+	}
+}
+
+func TestBufferReadChunks(t *testing.T) {
+	data := []byte(rand.StringAlphanumeric(1024 * 1024))
+
+	r := bytes.NewReader(data)
+	buf := &bytes.Buffer{}
+
+	copyToBufferFromReader(buf, r, 32*1024)
+
+	res := bytes.Compare(data, buf.Bytes())
+	require.Equal(t, 0, res)
+}
+
+func BenchmarkBufferReadChunks(b *testing.B) {
+	data := []byte(rand.StringAlphanumeric(1024 * 1024))
+
+	for i := 0; i < b.N; i++ {
+		r := bytes.NewReader(data)
+		buf := &bytes.Buffer{}
+
+		copyToBufferFromReader(buf, r, 32*1024)
+	}
 }

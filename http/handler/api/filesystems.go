@@ -263,7 +263,7 @@ func (h *FSHandler) FileOperation(c echo.Context) error {
 	// In case the target is S3, allow it to determine the size of the file
 	sizer := fs.NewReadSizer(reader, fromFileStat.Size())
 
-	_, _, err = toFS.Handler.FS.Filesystem.WriteFileReader(toPath, sizer)
+	_, _, err = toFS.Handler.FS.Filesystem.WriteFileReader(toPath, sizer, int(sizer.Size()))
 	if err != nil {
 		toFS.Handler.FS.Filesystem.Remove(toPath)
 		return api.Err(http.StatusBadRequest, "", "writing target file failed: %s", err)

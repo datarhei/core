@@ -22,10 +22,10 @@ func getDummyConfigRouter(t *testing.T) (*echo.Echo, store.Store) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	_, _, err = memfs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
+	_, _, err = memfs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"), -1)
 	require.NoError(t, err)
 
-	_, _, err = memfs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
+	_, _, err = memfs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"), -1)
 	require.NoError(t, err)
 
 	config, err := store.NewJSON(memfs, "/config.json", nil)
