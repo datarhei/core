@@ -361,7 +361,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 			}
 		}
 
-		if len(nodeid) != 0 && opBudget > 0 {
+		if len(nodeid) != 0 {
 			opStackAdd = append(opStackAdd, processOpAdd{
 				nodeid:   nodeid,
 				config:   wantP.Config,
@@ -382,6 +382,10 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 				processid: wantP.Config.ProcessID(),
 				err:       errNotEnoughResourcesForDeployment,
 			})
+		}
+
+		if opBudget <= 0 {
+			break
 		}
 	}
 
