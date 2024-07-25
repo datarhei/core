@@ -43,8 +43,11 @@ type ClusterNodeResources struct {
 	NCPU         float64 `json:"ncpu"`
 	CPU          float64 `json:"cpu_used"`           // percent 0-100*npcu
 	CPULimit     float64 `json:"cpu_limit"`          // percent 0-100*npcu
+	CPUCore      float64 `json:"cpu_core"`           // percent 0-100*ncpu
 	Mem          uint64  `json:"memory_used_bytes"`  // bytes
 	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
+	MemTotal     uint64  `json:"memory_total_bytes"` // bytes
+	MemCore      uint64  `json:"memory_core_bytes"`  // bytes
 	Error        string  `json:"error"`
 }
 

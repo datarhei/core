@@ -143,8 +143,11 @@ type Resources struct {
 	NCPU         float64 // Number of CPU on this node
 	CPU          float64 // Current CPU load, 0-100*ncpu
 	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64 // Current CPU load of the core itself, 0-100*ncpu
 	Mem          uint64  // Currently used memory in bytes
 	MemLimit     uint64  // Defined memory limit in bytes
+	MemTotal     uint64  // Total available memory in bytes
+	MemCore      uint64  // Current used memory of the core itself in bytes
 	Error        error   // Last error
 }
 
@@ -503,8 +506,11 @@ func (n *Node) ping(ctx context.Context, interval time.Duration) {
 						NCPU:         about.Resources.NCPU,
 						CPU:          about.Resources.CPU,
 						CPULimit:     about.Resources.CPULimit,
+						CPUCore:      about.Resources.CPUCore,
 						Mem:          about.Resources.Mem,
 						MemLimit:     about.Resources.MemLimit,
+						MemTotal:     about.Resources.MemTotal,
+						MemCore:      about.Resources.MemCore,
 						Error:        nil,
 					},
 				}

@@ -88,8 +88,11 @@ type AboutResponseResources struct {
 	NCPU         float64 `json:"ncpu"`               // Number of CPU on this node
 	CPU          float64 `json:"cpu"`                // Current CPU load, 0-100*ncpu
 	CPULimit     float64 `json:"cpu_limit"`          // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64 `json:"cpu_core"`           // Current CPU load of the core itself, 0-100*ncpu
 	Mem          uint64  `json:"memory_bytes"`       // Currently used memory in bytes
 	MemLimit     uint64  `json:"memory_limit_bytes"` // Defined memory limit in bytes
+	MemTotal     uint64  `json:"memory_total_bytes"` // Total available memory in bytes
+	MemCore      uint64  `json:"memory_core_bytes"`  // Current used memory of the core itself in bytes
 	Error        string  `json:"error"`              // Last error
 }
 

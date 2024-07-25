@@ -187,8 +187,11 @@ func (a *api) About(c echo.Context) error {
 			NCPU:         resources.CPU.NCPU,
 			CPU:          (100 - resources.CPU.Idle) * resources.CPU.NCPU,
 			CPULimit:     resources.CPU.Limit * resources.CPU.NCPU,
+			CPUCore:      resources.CPU.Core * resources.CPU.NCPU,
 			Mem:          resources.Mem.Total - resources.Mem.Available,
-			MemLimit:     resources.Mem.Total,
+			MemLimit:     resources.Mem.Limit,
+			MemTotal:     resources.Mem.Total,
+			MemCore:      resources.Mem.Core,
 		},
 	}
 
