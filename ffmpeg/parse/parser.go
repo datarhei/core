@@ -307,7 +307,7 @@ func (p *parser) Parse(line []byte) uint64 {
 			if len(p.prelude.data) < p.prelude.headLines {
 				p.prelude.data = append(p.prelude.data, stringLine)
 			} else {
-				p.prelude.tail.Value = line
+				p.prelude.tail.Value = stringLine
 				p.prelude.tail = p.prelude.tail.Next()
 				p.prelude.truncatedLines++
 			}
