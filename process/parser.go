@@ -10,7 +10,7 @@ type Parser interface {
 	// Parse parses the given line and returns an indicator
 	// for progress (e.g. based on the contents of the line,
 	// or previous line, ...)
-	Parse(line string) uint64
+	Parse(line []byte) uint64
 
 	// Stop tells the parser that the process stopped and provides
 	// its exit state.
@@ -50,12 +50,12 @@ func NewNullParser() Parser {
 
 var _ Parser = &nullParser{}
 
-func (p *nullParser) Parse(string) uint64 { return 1 }
-func (p *nullParser) Stop(string, Usage)  {}
-func (p *nullParser) ResetStats()         {}
-func (p *nullParser) ResetLog()           {}
-func (p *nullParser) Log() []Line         { return []Line{} }
-func (p *nullParser) IsRunning() bool     { return true }
+func (p *nullParser) Parse(line []byte) uint64 { return 1 }
+func (p *nullParser) Stop(string, Usage)       {}
+func (p *nullParser) ResetStats()              {}
+func (p *nullParser) ResetLog()                {}
+func (p *nullParser) Log() []Line              { return []Line{} }
+func (p *nullParser) IsRunning() bool          { return true }
 
 type bufferParser struct {
 	log []Line
@@ -69,10 +69,10 @@ func NewBufferParser() Parser {
 
 var _ Parser = &bufferParser{}
 
-func (p *bufferParser) Parse(line string) uint64 {
+func (p *bufferParser) Parse(line []byte) uint64 {
 	p.log = append(p.log, Line{
 		Timestamp: time.Now(),
-		Data:      line,
+		Data:      string(line),
 	})
 	return 1
 }

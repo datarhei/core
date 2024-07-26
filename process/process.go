@@ -167,13 +167,12 @@ type States struct {
 
 // Process represents a ffmpeg process
 type process struct {
-	binary   string
-	args     []string
-	cmd      *exec.Cmd
-	pid      int32
-	stdout   io.ReadCloser
-	lastLine string
-	state    struct {
+	binary string
+	args   []string
+	cmd    *exec.Cmd
+	pid    int32
+	stdout io.ReadCloser
+	state  struct {
 		state  stateType
 		time   time.Time
 		states States
@@ -575,7 +574,7 @@ func (p *process) start() error {
 	if err != nil {
 		p.setState(stateFailed)
 
-		p.parser.Parse(err.Error())
+		p.parser.Parse([]byte(err.Error()))
 		p.logger.WithError(err).Error().Log("Command failed")
 
 		p.reconnect(p.delay(stateFailed))
@@ -587,7 +586,7 @@ func (p *process) start() error {
 		if err := p.callbacks.onBeforeStart(); err != nil {
 			p.setState(stateFailed)
 
-			p.parser.Parse(err.Error())
+			p.parser.Parse([]byte(err.Error()))
 			p.logger.WithError(err).Error().Log("Starting failed")
 
 			p.reconnect(p.delay(stateFailed))
@@ -599,7 +598,7 @@ func (p *process) start() error {
 	if err := p.cmd.Start(); err != nil {
 		p.setState(stateFailed)
 
-		p.parser.Parse(err.Error())
+		p.parser.Parse([]byte(err.Error()))
 		p.logger.WithError(err).Error().Log("Command failed")
 		p.reconnect(p.delay(stateFailed))
 
@@ -770,7 +769,7 @@ func (p *process) stop(wait bool, reason string) error {
 	}
 
 	if err != nil {
-		p.parser.Parse(err.Error())
+		p.parser.Parse([]byte(err.Error()))
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),
 			"order": p.getOrder(),
@@ -857,7 +856,7 @@ func (p *process) staler(ctx context.Context) {
 // may kick in.
 func (p *process) reader() {
 	scanner := bufio.NewScanner(p.stdout)
-	scanner.Split(scanLine)
+	scanner.Split(scanLines)
 
 	// Reset the parser statistics
 	p.parser.ResetStats()
@@ -868,9 +867,7 @@ func (p *process) reader() {
 	var n uint64 = 0
 
 	for scanner.Scan() {
-		line := scanner.Text()
-
-		p.lastLine = line
+		line := scanner.Bytes()
 
 		// Parse the output line from ffmpeg
 		n = p.parser.Parse(line)
@@ -886,12 +883,12 @@ func (p *process) reader() {
 
 	if err := scanner.Err(); err != nil {
 		p.logger.Debug().WithError(err).Log("")
-		p.parser.Parse(err.Error())
+		p.parser.Parse([]byte(err.Error()))
 	}
 
 	p.stopReasonLock.Lock()
 	if len(p.stopReason) != 0 {
-		p.parser.Parse(p.stopReason)
+		p.parser.Parse([]byte(p.stopReason))
 		p.stopReason = ""
 	}
 	p.stopReasonLock.Unlock()
@@ -1062,7 +1059,7 @@ func (p *process) delay(state stateType) time.Duration {
 }
 
 // scanLine splits the data on \r, \n, or \r\n line endings
-func scanLine(data []byte, atEOF bool) (advance int, token []byte, err error) {
+func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// Skip leading spaces.
 	start := 0
 	for width := 0; start < len(data); start += width {
