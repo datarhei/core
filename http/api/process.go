@@ -1,6 +1,9 @@
 package api
 
 import (
+	"strconv"
+
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -26,6 +29,114 @@ type Process struct {
 	State     *ProcessState  `json:"state,omitempty"`
 	Report    *ProcessReport `json:"report,omitempty"`
 	Metadata  Metadata       `json:"metadata,omitempty"`
+}
+
+func (p *Process) Unmarshal(ap *app.Process, ac *app.Config, as *app.State, ar *app.Report, am interface{}) {
+	p.ID = ap.ID
+	p.Owner = ap.Owner
+	p.Domain = ap.Domain
+	p.Reference = ap.Reference
+	p.Type = "ffmpeg"
+	p.CreatedAt = ap.CreatedAt
+	p.UpdatedAt = ap.UpdatedAt
+
+	p.Config = nil
+	if ac != nil {
+		p.Config = &ProcessConfig{}
+		p.Config.Unmarshal(ap.Config, nil)
+	}
+
+	p.State = nil
+	if as != nil {
+		p.State = &ProcessState{}
+		p.State.Unmarshal(as)
+	}
+
+	p.Report = nil
+	if ar != nil {
+		p.Report = &ProcessReport{}
+		p.Report.Unmarshal(ar)
+	}
+
+	p.Metadata = nil
+	if am != nil {
+		p.Metadata = NewMetadata(am)
+	}
+}
+
+func (p *Process) UnmarshalStore(s store.Process, config, state, report, metadata bool) {
+	p.ID = s.Config.ID
+	p.Owner = s.Config.Owner
+	p.Domain = s.Config.Domain
+	p.Type = "ffmpeg"
+	p.Reference = s.Config.Reference
+	p.CreatedAt = s.CreatedAt.Unix()
+	p.UpdatedAt = s.UpdatedAt.Unix()
+
+	p.Metadata = nil
+	if metadata {
+		p.Metadata = s.Metadata
+	}
+
+	p.Config = nil
+	if config {
+		config := &ProcessConfig{}
+		config.Unmarshal(s.Config, s.Metadata)
+
+		p.Config = config
+	}
+
+	p.State = nil
+	if state {
+		p.State = &ProcessState{
+			Order:   s.Order,
+			LastLog: s.Error,
+			Resources: ProcessUsage{
+				CPU: ProcessUsageCPU{
+					NCPU:  json.ToNumber(1),
+					Limit: json.ToNumber(s.Config.LimitCPU),
+				},
+				Memory: ProcessUsageMemory{
+					Limit: s.Config.LimitMemory,
+				},
+			},
+			Command: []string{},
+			Progress: &Progress{
+				Input:  []ProgressIO{},
+				Output: []ProgressIO{},
+				Mapping: StreamMapping{
+					Graphs:  []GraphElement{},
+					Mapping: []GraphMapping{},
+				},
+			},
+		}
+
+		if len(s.Error) != 0 {
+			p.State.State = "failed"
+		} else {
+			p.State.State = "deploying"
+		}
+	}
+
+	if report {
+		p.Report = &ProcessReport{
+			ProcessReportEntry: ProcessReportEntry{
+				CreatedAt: s.CreatedAt.Unix(),
+				Prelude:   []string{},
+				Log:       [][2]string{},
+				Matches:   []string{},
+			},
+		}
+
+		if len(s.Error) != 0 {
+			p.Report.Prelude = []string{s.Error}
+			p.Report.Log = [][2]string{
+				{strconv.FormatInt(s.CreatedAt.Unix(), 10), s.Error},
+			}
+			//process.Report.ExitedAt = p.CreatedAt.Unix()
+			//process.Report.ExitState = "failed"
+		}
+	}
 }
 
 // ProcessConfigIO represents an input or output of an ffmpeg process config
@@ -154,7 +265,7 @@ func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {
 }
 
 // Unmarshal converts a core process config to a process config in API representation
-func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
+func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface{}) {
 	if c == nil {
 		return
 	}
@@ -212,6 +323,8 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 	cfg.LogPatterns = make([]string, len(c.LogPatterns))
 	copy(cfg.LogPatterns, c.LogPatterns)
+
+	cfg.Metadata = metadata
 }
 
 func (p *ProcessConfig) ProcessID() app.ProcessID {

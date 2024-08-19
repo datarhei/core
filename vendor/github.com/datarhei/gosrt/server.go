@@ -75,7 +75,7 @@ func (s *Server) Listen() error {
 func (s *Server) Serve() error {
 	for {
 		// Wait for connections.
-		conn, mode, err := s.ln.Accept(s.HandleConnect)
+		req, err := s.ln.Accept2()
 		if err != nil {
 			if err == ErrListenerClosed {
 				return ErrServerClosed
@@ -84,16 +84,30 @@ func (s *Server) Serve() error {
 			return err
 		}
 
-		if conn == nil {
-			// rejected connection, ignore
+		if s.HandleConnect == nil {
+			req.Reject(REJ_PEER)
 			continue
 		}
 
-		if mode == PUBLISH {
-			go s.HandlePublish(conn)
-		} else {
-			go s.HandleSubscribe(conn)
-		}
+		go func(req ConnRequest) {
+			mode := s.HandleConnect(req)
+			if mode == REJECT {
+				req.Reject(REJ_PEER)
+				return
+			}
+
+			conn, err := req.Accept()
+			if err != nil {
+				// rejected connection, ignore
+				return
+			}
+
+			if mode == PUBLISH {
+				s.HandlePublish(conn)
+			} else {
+				s.HandleSubscribe(conn)
+			}
+		}(req)
 	}
 }
 

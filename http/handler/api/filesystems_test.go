@@ -149,10 +149,10 @@ func TestFilesystemsListSize(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.WriteFileReader("/a", strings.NewReader("a"))
-	memfs.WriteFileReader("/aa", strings.NewReader("aa"))
-	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"))
-	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+	memfs.WriteFileReader("/a", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/aa", strings.NewReader("aa"), -1)
+	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"), -1)
+	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"), -1)
 
 	filesystems := []httpfs.FS{
 		{
@@ -207,13 +207,13 @@ func TestFilesystemsListLastmod(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.WriteFileReader("/a", strings.NewReader("a"))
+	memfs.WriteFileReader("/a", strings.NewReader("a"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/b", strings.NewReader("b"))
+	memfs.WriteFileReader("/b", strings.NewReader("b"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/c", strings.NewReader("c"))
+	memfs.WriteFileReader("/c", strings.NewReader("c"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/d", strings.NewReader("d"))
+	memfs.WriteFileReader("/d", strings.NewReader("d"), -1)
 
 	var a, b, c, d time.Time
 
@@ -274,10 +274,10 @@ func TestFilesystemsDeleteFiles(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.WriteFileReader("/a", strings.NewReader("a"))
-	memfs.WriteFileReader("/aa", strings.NewReader("aa"))
-	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"))
-	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+	memfs.WriteFileReader("/a", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/aa", strings.NewReader("aa"), -1)
+	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"), -1)
+	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"), -1)
 
 	filesystems := []httpfs.FS{
 		{
@@ -312,10 +312,10 @@ func TestFilesystemsDeleteFilesSize(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.WriteFileReader("/a", strings.NewReader("a"))
-	memfs.WriteFileReader("/aa", strings.NewReader("aa"))
-	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"))
-	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+	memfs.WriteFileReader("/a", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/aa", strings.NewReader("aa"), -1)
+	memfs.WriteFileReader("/aaa", strings.NewReader("aaa"), -1)
+	memfs.WriteFileReader("/aaaa", strings.NewReader("aaaa"), -1)
 
 	filesystems := []httpfs.FS{
 		{
@@ -348,13 +348,13 @@ func TestFilesystemsDeleteFilesLastmod(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	memfs.WriteFileReader("/a", strings.NewReader("a"))
+	memfs.WriteFileReader("/a", strings.NewReader("a"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/b", strings.NewReader("b"))
+	memfs.WriteFileReader("/b", strings.NewReader("b"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/c", strings.NewReader("c"))
+	memfs.WriteFileReader("/c", strings.NewReader("c"), -1)
 	time.Sleep(1 * time.Second)
-	memfs.WriteFileReader("/d", strings.NewReader("d"))
+	memfs.WriteFileReader("/d", strings.NewReader("d"), -1)
 
 	var b, c time.Time
 

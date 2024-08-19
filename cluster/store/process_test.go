@@ -301,13 +301,13 @@ func TestUpdateProcess(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(s.data.Process))
 
-	_, err = s.ProcessGet(config1.ProcessID())
+	_, _, err = s.ProcessGet(config1.ProcessID())
 	require.Error(t, err)
 
-	_, err = s.ProcessGet(config2.ProcessID())
+	_, _, err = s.ProcessGet(config2.ProcessID())
 	require.NoError(t, err)
 
-	_, err = s.ProcessGet(config.ProcessID())
+	_, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 }
 
@@ -330,7 +330,7 @@ func TestSetProcessOrderCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, s.data.Process)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "stop", p.Order)
 
@@ -343,7 +343,7 @@ func TestSetProcessOrderCommand(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "start", p.Order)
 }
@@ -382,7 +382,7 @@ func TestSetProcessOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "stop", p.Order)
 
@@ -392,7 +392,7 @@ func TestSetProcessOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "start", p.Order)
 }
@@ -416,7 +416,7 @@ func TestSetProcessMetadataCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, s.data.Process)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Empty(t, p.Metadata)
 
@@ -432,7 +432,7 @@ func TestSetProcessMetadataCommand(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 
 	require.NotEmpty(t, p.Metadata)
@@ -477,7 +477,7 @@ func TestSetProcessMetadata(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 
 	require.NotEmpty(t, p.Metadata)
@@ -492,7 +492,7 @@ func TestSetProcessMetadata(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 
 	require.NotEmpty(t, p.Metadata)
@@ -506,7 +506,7 @@ func TestSetProcessMetadata(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 
 	require.NotEmpty(t, p.Metadata)
@@ -533,7 +533,7 @@ func TestSetProcessErrorCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, s.data.Process)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "", p.Error)
 
@@ -546,7 +546,7 @@ func TestSetProcessErrorCommand(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "foobar", p.Error)
 }
@@ -585,7 +585,7 @@ func TestSetProcessError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err := s.ProcessGet(config.ProcessID())
+	p, _, err := s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "", p.Error)
 
@@ -595,7 +595,7 @@ func TestSetProcessError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	p, err = s.ProcessGet(config.ProcessID())
+	p, _, err = s.ProcessGet(config.ProcessID())
 	require.NoError(t, err)
 	require.Equal(t, "foobar", p.Error)
 }

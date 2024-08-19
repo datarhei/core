@@ -107,7 +107,7 @@ func TestProcessConfig(t *testing.T) {
 	}
 
 	p := ProcessConfig{}
-	p.Unmarshal(&original)
+	p.Unmarshal(&original, nil)
 	restored, _ := p.Marshal()
 
 	require.Equal(t, &original, restored)

@@ -17,7 +17,7 @@ func TestParserProgress(t *testing.T) {
 	}).(*parser)
 
 	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+	parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 	d, _ := time.ParseDuration("3m58s440ms")
 	wantP := Progress{
@@ -66,7 +66,7 @@ func TestParserPrelude(t *testing.T) {
 
 	require.Equal(t, 0, len(log))
 
-	parser.Parse("prelude")
+	parser.Parse([]byte("prelude"))
 
 	log = parser.Prelude()
 
@@ -85,7 +85,7 @@ func TestParserLongPrelude(t *testing.T) {
 	require.Equal(t, 0, len(log))
 
 	for i := 0; i < 150; i++ {
-		parser.Parse(fmt.Sprintf("prelude %3d", i))
+		parser.Parse([]byte(fmt.Sprintf("prelude %3d", i)))
 	}
 
 	log = parser.Prelude()
@@ -105,7 +105,7 @@ func TestParserVeryLongPrelude(t *testing.T) {
 	require.Equal(t, 0, len(log))
 
 	for i := 0; i < 300; i++ {
-		parser.Parse(fmt.Sprintf("prelude %3d", i))
+		parser.Parse([]byte(fmt.Sprintf("prelude %3d", i)))
 	}
 
 	log = parser.Prelude()
@@ -122,7 +122,7 @@ func TestParserLog(t *testing.T) {
 
 	require.Equal(t, 0, len(log))
 
-	parser.Parse("bla")
+	parser.Parse([]byte("bla"))
 
 	log = parser.Log()
 
@@ -134,19 +134,19 @@ func TestParserLastLogLine(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse("foo")
+	parser.Parse([]byte("foo"))
 
 	line := parser.LastLogline()
 	require.Equal(t, "foo", line)
 
 	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+	parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 	// progress lines are not logged
 	line = parser.LastLogline()
 	require.Equal(t, "foo", line)
 
-	parser.Parse("bar")
+	parser.Parse([]byte("bar"))
 	line = parser.LastLogline()
 	require.Equal(t, "bar", line)
 }
@@ -158,10 +158,10 @@ func TestParserLogHistory(t *testing.T) {
 	}).(*parser)
 
 	for i := 0; i < 7; i++ {
-		parser.Parse("bla")
+		parser.Parse([]byte("bla"))
 
 		parser.prelude.done = true
-		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 		history := parser.ReportHistory()
 		require.Equal(t, int(math.Min(float64(i), 5)), len(history))
@@ -207,10 +207,10 @@ func TestParserImportLogHistory(t *testing.T) {
 	}).(*parser)
 
 	for i := 0; i < 7; i++ {
-		parser.Parse("bla")
+		parser.Parse([]byte("bla"))
 
 		parser.prelude.done = true
-		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 		history := parser.ReportHistory()
 		require.Equal(t, int(math.Min(float64(i), 5)), len(history))
@@ -271,10 +271,10 @@ func TestParserLogHistoryLength(t *testing.T) {
 	require.Equal(t, 0, len(history))
 
 	for i := 0; i < 5; i++ {
-		parser.Parse("bla")
+		parser.Parse([]byte("bla"))
 
 		parser.prelude.done = true
-		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 		parser.Stop("finished", process.Usage{})
 	}
@@ -294,10 +294,10 @@ func TestParserLogMinimalHistoryLength(t *testing.T) {
 	require.Equal(t, 0, len(history))
 
 	for i := 0; i < 42; i++ {
-		parser.Parse("bla")
+		parser.Parse([]byte("bla"))
 
 		parser.prelude.done = true
-		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 		parser.Stop("finished", process.Usage{})
 	}
@@ -353,10 +353,10 @@ func TestParserLogMinimalHistoryLengthWithoutFullHistory(t *testing.T) {
 	require.Equal(t, 0, len(history))
 
 	for i := 0; i < 15; i++ {
-		parser.Parse("bla")
+		parser.Parse([]byte("bla"))
 
 		parser.prelude.done = true
-		parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+		parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 		parser.Stop("finished", process.Usage{})
 	}
@@ -375,10 +375,10 @@ func TestParserLogHistorySearch(t *testing.T) {
 		LogHistory: 5,
 	}).(*parser)
 
-	parser.Parse("foo")
+	parser.Parse([]byte("foo"))
 
 	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+	parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 	parser.Stop("finished", process.Usage{})
 
@@ -388,10 +388,10 @@ func TestParserLogHistorySearch(t *testing.T) {
 
 	parser.ResetLog()
 
-	parser.Parse("bar")
+	parser.Parse([]byte("bar"))
 
 	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+	parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 	parser.Stop("finished", process.Usage{})
 
@@ -401,10 +401,10 @@ func TestParserLogHistorySearch(t *testing.T) {
 
 	parser.ResetLog()
 
-	parser.Parse("foobar")
+	parser.Parse([]byte("foobar"))
 
 	parser.prelude.done = true
-	parser.Parse("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463")
+	parser.Parse([]byte("frame= 5968 fps= 25 q=19.4 size=443kB time=00:03:58.44 bitrate=5632kbits/s speed=0.999x skip=9733 drop=3522 dup=87463"))
 
 	parser.Stop("failed", process.Usage{})
 
@@ -466,7 +466,7 @@ func TestParserReset(t *testing.T) {
 	require.Equal(t, 0, len(log))
 	require.Equal(t, 0, len(prelude))
 
-	parser.Parse("prelude")
+	parser.Parse([]byte("prelude"))
 
 	log = parser.Log()
 	prelude = parser.Prelude()
@@ -543,7 +543,7 @@ frame=   58 fps= 25 q=-1.0 Lsize=N/A time=00:00:02.32 bitrate=N/A speed=0.999x`
 	data := strings.Split(rawdata, "\n")
 
 	for _, d := range data {
-		parser.Parse(d)
+		parser.Parse([]byte(d))
 	}
 
 	require.Equal(t, 3, len(parser.process.input), "expected 3 inputs")
@@ -602,7 +602,7 @@ frame=   58 fps= 25 q=-1.0 Lsize=N/A time=00:00:02.32 bitrate=N/A speed=0.999x`
 	data := strings.Split(rawdata, "\n")
 
 	for _, d := range data {
-		parser.Parse(d)
+		parser.Parse([]byte(d))
 	}
 
 	require.Equal(t, 2, len(parser.process.input), "expected 2 inputs")
@@ -685,7 +685,7 @@ ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb
 	data := strings.Split(rawdata, "\n")
 
 	for _, d := range data {
-		parser.Parse(d)
+		parser.Parse([]byte(d))
 	}
 
 	require.Equal(t, 1, len(parser.process.input), "expected 1 input")
@@ -768,7 +768,7 @@ ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb
 	data := strings.Split(rawdata, "\n")
 
 	for _, d := range data {
-		parser.Parse(d)
+		parser.Parse([]byte(d))
 	}
 
 	require.Equal(t, 1, len(parser.process.input), "expected 1 input")
@@ -852,7 +852,7 @@ ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb
 	data := strings.Split(rawdata, "\n")
 
 	for _, d := range data {
-		parser.Parse(d)
+		parser.Parse([]byte(d))
 	}
 
 	require.Equal(t, 1, len(parser.process.input), "expected 1 input")
@@ -864,10 +864,10 @@ func TestParserProgressPlayout(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse(`ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`)
-	parser.Parse(`ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`)
-	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":11,"size_kb":226,"size_bytes":42}],"outputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":0,"q":0.0,"size_kb":0,"size_bytes":5,"extradata_size_bytes":32},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`)
-	parser.Parse(`avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`)
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":11,"size_kb":226,"size_bytes":42}],"outputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":0,"q":0.0,"size_kb":0,"size_bytes":5,"extradata_size_bytes":32},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`))
+	parser.Parse([]byte(`avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`))
 
 	progress := parser.Progress()
 
@@ -996,11 +996,11 @@ func TestParserStreamMapping(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
-	parser.Parse(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`)
-	parser.Parse(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
-	parser.Parse(`ffmpeg.mapping:{"graphs":[{"index":0,"graph":[{"src_name":"Parsed_null_0","src_filter":"null","dst_name":"format","dst_filter":"format","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"graph 0 input from stream 0:0","src_filter":"buffer","dst_name":"Parsed_null_0","dst_filter":"null","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"format","src_filter":"format","dst_name":"out_0_0","dst_filter":"buffersink","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720}]},{"index":1,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_1_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_2","src_filter":"aformat","dst_name":"out_0_2","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_2","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]},{"index":2,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_2_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_3","src_filter":"aformat","dst_name":"out_0_3","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_3","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]}],"mapping":[{"input":{"index":0,"stream":0},"graph":{"index":0,"name":"graph 0 input from stream 0:0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":1,"name":"graph_1_in_2_0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":2,"name":"graph_2_in_2_0"},"output":null},{"input":null,"graph":{"index":0,"name":"out_0_0"},"output":{"index":0,"stream":0}},{"input":{"index":1,"stream":0},"output":{"index":0,"stream":1},"copy":true},{"input":null,"graph":{"index":1,"name":"out_0_2"},"output":{"index":0,"stream":2}},{"input":null,"graph":{"index":2,"name":"out_0_3"},"output":{"index":0,"stream":3}}]}`)
-	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`)
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`ffmpeg.mapping:{"graphs":[{"index":0,"graph":[{"src_name":"Parsed_null_0","src_filter":"null","dst_name":"format","dst_filter":"format","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"graph 0 input from stream 0:0","src_filter":"buffer","dst_name":"Parsed_null_0","dst_filter":"null","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720},{"src_name":"format","src_filter":"format","dst_name":"out_0_0","dst_filter":"buffersink","inpad":"default","outpad":"default","timebase": "1/90000","type":"video","format":"yuvj420p","width":1280,"height":720}]},{"index":1,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_1_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_2","src_filter":"aformat","dst_name":"out_0_2","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_2","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]},{"index":2,"graph":[{"src_name":"Parsed_anull_0","src_filter":"anull","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"graph_2_in_2_0","src_filter":"abuffer","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"u8","sampling_hz":44100,"layout":"mono"},{"src_name":"format_out_0_3","src_filter":"aformat","dst_name":"out_0_3","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"},{"src_name":"auto_aresample_0","src_filter":"aresample","dst_name":"format_out_0_3","dst_filter":"aformat","inpad":"default","outpad":"default","timebase": "1/44100","type":"audio","format":"fltp","sampling_hz":44100,"layout":"mono"}]}],"mapping":[{"input":{"index":0,"stream":0},"graph":{"index":0,"name":"graph 0 input from stream 0:0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":1,"name":"graph_1_in_2_0"},"output":null},{"input":{"index":2,"stream":0},"graph":{"index":2,"name":"graph_2_in_2_0"},"output":null},{"input":null,"graph":{"index":0,"name":"out_0_0"},"output":{"index":0,"stream":0}},{"input":{"index":1,"stream":0},"output":{"index":0,"stream":1},"copy":true},{"input":null,"graph":{"index":1,"name":"out_0_2"},"output":{"index":0,"stream":2}},{"input":null,"graph":{"index":2,"name":"out_0_3"},"output":{"index":0,"stream":3}}]}`))
+	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`))
 
 	progress := parser.Progress()
 
@@ -1096,10 +1096,10 @@ func TestParserHLSMapping(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
-	parser.Parse(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`)
-	parser.Parse(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`)
-	parser.Parse(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`)
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`))
 
 	progress := parser.Progress()
 
@@ -1132,14 +1132,14 @@ func TestParserPatterns(t *testing.T) {
 		},
 	})
 
-	p.Parse("some foobar more")
+	p.Parse([]byte("some foobar more"))
 	require.Empty(t, p.Report().Matches)
 
-	p.Parse("foobar some more")
+	p.Parse([]byte("foobar some more"))
 	require.Equal(t, 1, len(p.Report().Matches))
 	require.Equal(t, "foobar some more", p.Report().Matches[0])
 
-	p.Parse("some more foobar")
+	p.Parse([]byte("some more foobar"))
 	require.Equal(t, 2, len(p.Report().Matches))
 	require.Equal(t, "some more foobar", p.Report().Matches[1])
 
@@ -1164,4 +1164,26 @@ func TestParserPatternsError(t *testing.T) {
 	})
 
 	require.Equal(t, 1, len(parser.Report().Matches))
+}
+
+func BenchmarkParserString(b *testing.B) {
+	parser := New(Config{
+		LogLines: 100,
+	})
+
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+
+	data := [][]byte{
+		[]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`),
+		[]byte(`[https @ 0x557c840d1080] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720_100794.ts' for reading`),
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		parser.Parse(data[0])
+		parser.Parse(data[1])
+	}
 }

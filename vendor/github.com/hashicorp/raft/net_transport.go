@@ -24,6 +24,7 @@ const (
 	rpcRequestVote
 	rpcInstallSnapshot
 	rpcTimeoutNow
+	rpcRequestPreVote
 
 	// DefaultTimeoutScale is the default TimeoutScale in a NetworkTransport.
 	DefaultTimeoutScale = 256 * 1024 // 256KB
@@ -91,6 +92,7 @@ type NetworkTransport struct {
 	maxPool     int
 	maxInFlight int
 
+	serverAddressLock     sync.RWMutex
 	serverAddressProvider ServerAddressProvider
 
 	shutdown     bool
@@ -384,6 +386,8 @@ func (n *NetworkTransport) getConnFromAddressProvider(id ServerID, target Server
 }
 
 func (n *NetworkTransport) getProviderAddressOrFallback(id ServerID, target ServerAddress) ServerAddress {
+	n.serverAddressLock.RLock()
+	defer n.serverAddressLock.RUnlock()
 	if n.serverAddressProvider != nil {
 		serverAddressOverride, err := n.serverAddressProvider.ServerAddr(id)
 		if err != nil {
@@ -468,6 +472,11 @@ func (n *NetworkTransport) AppendEntries(id ServerID, target ServerAddress, args
 // RequestVote implements the Transport interface.
 func (n *NetworkTransport) RequestVote(id ServerID, target ServerAddress, args *RequestVoteRequest, resp *RequestVoteResponse) error {
 	return n.genericRPC(id, target, rpcRequestVote, args, resp)
+}
+
+// RequestPreVote implements the Transport interface.
+func (n *NetworkTransport) RequestPreVote(id ServerID, target ServerAddress, args *RequestPreVoteRequest, resp *RequestPreVoteResponse) error {
+	return n.genericRPC(id, target, rpcRequestPreVote, args, resp)
 }
 
 // genericRPC handles a simple request/response RPC.
@@ -682,6 +691,13 @@ func (n *NetworkTransport) handleCommand(r *bufio.Reader, dec *codec.Decoder, en
 		}
 		rpc.Command = &req
 		labels = []metrics.Label{{Name: "rpcType", Value: "RequestVote"}}
+	case rpcRequestPreVote:
+		var req RequestPreVoteRequest
+		if err := dec.Decode(&req); err != nil {
+			return err
+		}
+		rpc.Command = &req
+		labels = []metrics.Label{{Name: "rpcType", Value: "RequestPreVote"}}
 	case rpcInstallSnapshot:
 		var req InstallSnapshotRequest
 		if err := dec.Decode(&req); err != nil {

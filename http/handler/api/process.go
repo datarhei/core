@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -156,7 +155,7 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < 8; /*runtime.NumCPU()*/ i++ {
 		wg.Add(1)
 
 		go func(idChan <-chan app.ProcessID) {
@@ -316,7 +315,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	// Prefill the config with the current values
-	process.Unmarshal(current.Config)
+	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -351,9 +350,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
-	p, _ := h.getProcess(tid, newFilter("config"))
-
-	return c.JSON(http.StatusOK, p.Config)
+	return c.JSON(http.StatusOK, process)
 }
 
 // Command issues a command to a process
@@ -446,7 +443,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 	}
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p.Config)
+	config.Unmarshal(p.Config, nil)
 
 	return c.JSON(http.StatusOK, config)
 }
@@ -1049,50 +1046,40 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 		return api.Process{}, err
 	}
 
-	info := api.Process{
-		ID:        process.ID,
-		Owner:     process.Owner,
-		Domain:    process.Domain,
-		Reference: process.Reference,
-		Type:      "ffmpeg",
-		CoreID:    h.restream.ID(),
-		CreatedAt: process.CreatedAt,
-		UpdatedAt: process.UpdatedAt,
-	}
+	var config *app.Config
+	var state *app.State
+	var report *app.Report
+	var metadata interface{}
 
 	if filter.config {
-		info.Config = &api.ProcessConfig{}
-		info.Config.Unmarshal(process.Config)
+		config = process.Config
 	}
 
 	if filter.state {
-		state, err := h.restream.GetProcessState(id)
+		state, err = h.restream.GetProcessState(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.State = &api.ProcessState{}
-		info.State.Unmarshal(state)
 	}
 
 	if filter.report {
-		log, err := h.restream.GetProcessReport(id)
+		report, err = h.restream.GetProcessReport(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Report = &api.ProcessReport{}
-		info.Report.Unmarshal(log)
 	}
 
 	if filter.metadata {
-		data, err := h.restream.GetProcessMetadata(id, "")
+		metadata, err = h.restream.GetProcessMetadata(id, "")
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Metadata = api.NewMetadata(data)
 	}
+
+	info := api.Process{
+		CoreID: h.restream.ID(),
+	}
+	info.Unmarshal(process, config, state, report, metadata)
 
 	return info, nil
 }

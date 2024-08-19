@@ -14,8 +14,8 @@ import (
 	apihandler "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
@@ -30,7 +30,7 @@ func getIAM() (iam.IAM, error) {
 		return nil, err
 	}
 
-	policyAdapter, err := iamaccess.NewJSONAdapter(dummyfs, "./policy.json", nil)
+	policyAdapter, err := policy.NewJSONAdapter(dummyfs, "./policy.json", nil)
 	if err != nil {
 		return nil, err
 	}

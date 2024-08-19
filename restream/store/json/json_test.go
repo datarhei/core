@@ -73,7 +73,7 @@ func TestStoreLoad(t *testing.T) {
 			},
 			CreatedAt: 0,
 			UpdatedAt: 0,
-			Order:     "stop",
+			Order:     app.NewOrder("stop"),
 		},
 		Metadata: map[string]interface{}{
 			"some": "data",
@@ -112,7 +112,7 @@ func TestStoreLoad(t *testing.T) {
 			},
 			CreatedAt: 0,
 			UpdatedAt: 0,
-			Order:     "stop",
+			Order:     app.NewOrder("stop"),
 		},
 		Metadata: map[string]interface{}{
 			"some-more": "data",

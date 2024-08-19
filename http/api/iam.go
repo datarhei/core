@@ -3,8 +3,8 @@ package api
 import (
 	"time"
 
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 )
 
 type IAMUser struct {
@@ -17,7 +17,7 @@ type IAMUser struct {
 	Policies  []IAMPolicy `json:"policies"`
 }
 
-func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
+func (u *IAMUser) Marshal(user identity.User, policies []policy.Policy) {
 	u.CreatedAt = user.CreatedAt.Unix()
 	u.UpdatedAt = user.UpdatedAt.Unix()
 	u.Name = user.Name
@@ -52,7 +52,7 @@ func (u *IAMUser) Marshal(user identity.User, policies []access.Policy) {
 	}
 }
 
-func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
+func (u *IAMUser) Unmarshal() (identity.User, []policy.Policy) {
 	iamuser := identity.User{
 		CreatedAt: time.Unix(u.CreatedAt, 0),
 		UpdatedAt: time.Unix(u.UpdatedAt, 0),
@@ -79,10 +79,10 @@ func (u *IAMUser) Unmarshal() (identity.User, []access.Policy) {
 		},
 	}
 
-	iampolicies := []access.Policy{}
+	iampolicies := []policy.Policy{}
 
 	for _, p := range u.Policies {
-		iampolicies = append(iampolicies, access.Policy{
+		iampolicies = append(iampolicies, policy.Policy{
 			Name:     u.Name,
 			Domain:   p.Domain,
 			Types:    p.Types,

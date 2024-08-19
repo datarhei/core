@@ -32,15 +32,15 @@ func TestMaxFiles(t *testing.T) {
 		},
 	})
 
-	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"), -1)
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 3
 	}, 3*time.Second, time.Second)
 
-	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"), -1)
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 3 {
@@ -81,15 +81,15 @@ func TestMaxAge(t *testing.T) {
 		},
 	})
 
-	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"), -1)
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 0
 	}, 10*time.Second, time.Second)
 
-	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"), -1)
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 1 {
@@ -130,15 +130,15 @@ func TestUnsetCleanup(t *testing.T) {
 		},
 	})
 
-	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"))
-	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"))
-	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"))
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"), -1)
 
 	require.Eventually(t, func() bool {
 		return cleanfs.Files() == 3
 	}, 3*time.Second, time.Second)
 
-	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"))
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"), -1)
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 3 {
@@ -158,7 +158,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 	cleanfs.UnsetCleanup("foobar")
 
-	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"))
+	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"), -1)
 
 	require.Eventually(t, func() bool {
 		if cleanfs.Files() != 4 {

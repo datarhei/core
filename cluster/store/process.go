@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/datarhei/core/v16/restream/app"
@@ -72,11 +73,11 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", srcid, ErrNotFound)
 	}
 
-	if p.Config.Equal(cmd.Config) {
-		return nil
-	}
-
 	if srcid == dstid {
+		if p.Config.Equal(cmd.Config) {
+			return nil
+		}
+
 		p.UpdatedAt = time.Now()
 		p.Config = cmd.Config
 
@@ -219,36 +220,44 @@ func (s *store) ProcessList() []Process {
 	return processes
 }
 
-func (s *store) ProcessGet(id app.ProcessID) (Process, error) {
+func (s *store) ProcessGet(id app.ProcessID) (Process, string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	process, ok := s.data.Process[id.String()]
 	if !ok {
-		return Process{}, fmt.Errorf("not found%w", ErrNotFound)
+		return Process{}, "", fmt.Errorf("not found%w", ErrNotFound)
 	}
+
+	nodeid := s.data.ProcessNodeMap[id.String()]
 
 	return Process{
 		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,
 		Config:    process.Config.Clone(),
 		Order:     process.Order,
-		Metadata:  process.Metadata,
+		Metadata:  maps.Clone(process.Metadata),
 		Error:     process.Error,
-	}, nil
+	}, nodeid, nil
 }
 
 func (s *store) ProcessGetNodeMap() map[string]string {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	m := map[string]string{}
+	return maps.Clone(s.data.ProcessNodeMap)
+}
 
-	for key, value := range s.data.ProcessNodeMap {
-		m[key] = value
+func (s *store) ProcessGetNode(id app.ProcessID) (string, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	nodeid, hasProcess := s.data.ProcessNodeMap[id.String()]
+	if !hasProcess {
+		return "", ErrNotFound
 	}
 
-	return m
+	return nodeid, nil
 }
 
 func (s *store) ProcessGetRelocateMap() map[string]string {

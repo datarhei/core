@@ -118,8 +118,11 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 			NCPU:         node.Resources.NCPU,
 			CPU:          node.Resources.CPU,
 			CPULimit:     node.Resources.CPULimit,
+			CPUCore:      node.Resources.CPUCore,
 			Mem:          node.Resources.Mem,
 			MemLimit:     node.Resources.MemLimit,
+			MemTotal:     node.Resources.MemTotal,
+			MemCore:      node.Resources.MemCore,
 		},
 	}
 

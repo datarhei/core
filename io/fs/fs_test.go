@@ -186,7 +186,7 @@ func testWriteFileSafe(t *testing.T, fs Filesystem) {
 func testWriteFileReader(t *testing.T, fs Filesystem) {
 	data := strings.NewReader("xxxxx")
 
-	size, created, err := fs.WriteFileReader("/foobar", data)
+	size, created, err := fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(5), size)
@@ -211,7 +211,7 @@ func testOpen(t *testing.T, fs Filesystem) {
 	file := fs.Open("/foobar")
 	require.Nil(t, file)
 
-	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("xxxxx"))
+	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("xxxxx"), -1)
 	require.NoError(t, err)
 
 	file = fs.Open("/foobar")
@@ -232,7 +232,7 @@ func testRemove(t *testing.T, fs Filesystem) {
 
 	data := strings.NewReader("xxxxx")
 
-	fs.WriteFileReader("/foobar", data)
+	fs.WriteFileReader("/foobar", data, -1)
 
 	size = fs.Remove("/foobar")
 
@@ -251,7 +251,7 @@ func testRemove(t *testing.T, fs Filesystem) {
 func testFiles(t *testing.T, fs Filesystem) {
 	require.Equal(t, int64(0), fs.Files())
 
-	fs.WriteFileReader("/foobar.txt", strings.NewReader("bar"))
+	fs.WriteFileReader("/foobar.txt", strings.NewReader("bar"), -1)
 
 	require.Equal(t, int64(1), fs.Files())
 
@@ -267,7 +267,7 @@ func testFiles(t *testing.T, fs Filesystem) {
 func testReplace(t *testing.T, fs Filesystem) {
 	data := strings.NewReader("xxxxx")
 
-	size, created, err := fs.WriteFileReader("/foobar", data)
+	size, created, err := fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(5), size)
@@ -284,7 +284,7 @@ func testReplace(t *testing.T, fs Filesystem) {
 
 	data = strings.NewReader("yyy")
 
-	size, created, err = fs.WriteFileReader("/foobar", data)
+	size, created, err = fs.WriteFileReader("/foobar", data, -1)
 
 	require.Nil(t, err)
 	require.Equal(t, int64(3), size)
@@ -301,12 +301,12 @@ func testReplace(t *testing.T, fs Filesystem) {
 }
 
 func testList(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/foobar1", strings.NewReader("a"))
-	fs.WriteFileReader("/foobar2", strings.NewReader("bb"))
-	fs.WriteFileReader("/foobar3", strings.NewReader("ccc"))
-	fs.WriteFileReader("/foobar4", strings.NewReader("dddd"))
-	fs.WriteFileReader("/path/foobar3", strings.NewReader("ccc"))
-	fs.WriteFileReader("/path/to/foobar4", strings.NewReader("dddd"))
+	fs.WriteFileReader("/foobar1", strings.NewReader("a"), -1)
+	fs.WriteFileReader("/foobar2", strings.NewReader("bb"), -1)
+	fs.WriteFileReader("/foobar3", strings.NewReader("ccc"), -1)
+	fs.WriteFileReader("/foobar4", strings.NewReader("dddd"), -1)
+	fs.WriteFileReader("/path/foobar3", strings.NewReader("ccc"), -1)
+	fs.WriteFileReader("/path/to/foobar4", strings.NewReader("dddd"), -1)
 
 	cur, max := fs.Size()
 
@@ -337,10 +337,10 @@ func testList(t *testing.T, fs Filesystem) {
 }
 
 func testListGlob(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/foobar1", strings.NewReader("a"))
-	fs.WriteFileReader("/path/foobar2", strings.NewReader("a"))
-	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("a"))
-	fs.WriteFileReader("/foobar4", strings.NewReader("a"))
+	fs.WriteFileReader("/foobar1", strings.NewReader("a"), -1)
+	fs.WriteFileReader("/path/foobar2", strings.NewReader("a"), -1)
+	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("a"), -1)
+	fs.WriteFileReader("/foobar4", strings.NewReader("a"), -1)
 
 	cur := fs.Files()
 
@@ -376,10 +376,10 @@ func testListGlob(t *testing.T, fs Filesystem) {
 }
 
 func testListSize(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/a", strings.NewReader("a"))
-	fs.WriteFileReader("/aa", strings.NewReader("aa"))
-	fs.WriteFileReader("/aaa", strings.NewReader("aaa"))
-	fs.WriteFileReader("/aaaa", strings.NewReader("aaaa"))
+	fs.WriteFileReader("/a", strings.NewReader("a"), -1)
+	fs.WriteFileReader("/aa", strings.NewReader("aa"), -1)
+	fs.WriteFileReader("/aaa", strings.NewReader("aaa"), -1)
+	fs.WriteFileReader("/aaaa", strings.NewReader("aaaa"), -1)
 
 	cur := fs.Files()
 
@@ -411,13 +411,13 @@ func testListSize(t *testing.T, fs Filesystem) {
 }
 
 func testListModified(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/a", strings.NewReader("a"))
+	fs.WriteFileReader("/a", strings.NewReader("a"), -1)
 	time.Sleep(500 * time.Millisecond)
-	fs.WriteFileReader("/b", strings.NewReader("b"))
+	fs.WriteFileReader("/b", strings.NewReader("b"), -1)
 	time.Sleep(500 * time.Millisecond)
-	fs.WriteFileReader("/c", strings.NewReader("c"))
+	fs.WriteFileReader("/c", strings.NewReader("c"), -1)
 	time.Sleep(500 * time.Millisecond)
-	fs.WriteFileReader("/d", strings.NewReader("d"))
+	fs.WriteFileReader("/d", strings.NewReader("d"), -1)
 
 	cur := fs.Files()
 
@@ -463,10 +463,10 @@ func testListModified(t *testing.T, fs Filesystem) {
 }
 
 func testRemoveAll(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/foobar1", strings.NewReader("abc"))
-	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"))
-	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"))
-	fs.WriteFileReader("/foobar4", strings.NewReader("abc"))
+	fs.WriteFileReader("/foobar1", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/foobar4", strings.NewReader("abc"), -1)
 
 	cur := fs.Files()
 
@@ -483,10 +483,10 @@ func testRemoveAll(t *testing.T, fs Filesystem) {
 }
 
 func testRemoveList(t *testing.T, fs Filesystem) {
-	fs.WriteFileReader("/foobar1", strings.NewReader("abc"))
-	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"))
-	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"))
-	fs.WriteFileReader("/foobar4", strings.NewReader("abc"))
+	fs.WriteFileReader("/foobar1", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/path/foobar2", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/path/to/foobar3", strings.NewReader("abc"), -1)
+	fs.WriteFileReader("/foobar4", strings.NewReader("abc"), -1)
 
 	cur := fs.Files()
 
@@ -513,7 +513,7 @@ func testData(t *testing.T, fs Filesystem) {
 
 	data1 := strings.NewReader(data)
 
-	_, _, err = fs.WriteFileReader("/foobar", data1)
+	_, _, err = fs.WriteFileReader("/foobar", data1, -1)
 	require.NoError(t, err)
 
 	file = fs.Open("/foobar")
@@ -542,7 +542,7 @@ func testStatDir(t *testing.T, fs Filesystem) {
 	require.NotNil(t, info)
 	require.Equal(t, true, info.IsDir())
 
-	fs.WriteFileReader("/these/are/some/directories/foobar", strings.NewReader("gduwotoxqb"))
+	fs.WriteFileReader("/these/are/some/directories/foobar", strings.NewReader("gduwotoxqb"), -1)
 
 	info, err = fs.Stat("/foobar")
 	require.Error(t, err)
@@ -614,7 +614,7 @@ func testMkdirAll(t *testing.T, fs Filesystem) {
 	require.Equal(t, int64(0), info.Size())
 	require.Equal(t, true, info.IsDir())
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"), -1)
 	require.NoError(t, err)
 
 	err = fs.MkdirAll("/foobar", 0755)
@@ -631,7 +631,7 @@ func testRename(t *testing.T, fs Filesystem) {
 	_, err = fs.Stat("/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"), -1)
 	require.NoError(t, err)
 
 	_, err = fs.Stat("/foobar")
@@ -654,10 +654,10 @@ func testRenameOverwrite(t *testing.T, fs Filesystem) {
 	_, err = fs.Stat("/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"))
+	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"), -1)
 	require.NoError(t, err)
 
 	_, err = fs.Stat("/foobar")
@@ -688,7 +688,7 @@ func testSymlink(t *testing.T, fs Filesystem) {
 	err := fs.Symlink("/foobar", "/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
 	err = fs.Symlink("/foobar", "/foobaz")
@@ -729,7 +729,7 @@ func testSymlinkOpenStat(t *testing.T, fs Filesystem) {
 		return
 	}
 
-	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
 	err = fs.Symlink("/foobar", "/foobaz")
@@ -756,7 +756,7 @@ func testSymlinkOpenStat(t *testing.T, fs Filesystem) {
 }
 
 func testStat(t *testing.T, fs Filesystem) {
-	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
 	file := fs.Open("/foobar")
@@ -781,7 +781,7 @@ func testCopy(t *testing.T, fs Filesystem) {
 	_, err = fs.Stat("/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("gduwotoxqb"), -1)
 	require.NoError(t, err)
 
 	_, err = fs.Stat("/foobar")
@@ -804,10 +804,10 @@ func testCopyOverwrite(t *testing.T, fs Filesystem) {
 	_, err = fs.Stat("/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"))
+	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"), -1)
 	require.NoError(t, err)
 
 	_, err = fs.Stat("/foobar")
@@ -838,10 +838,10 @@ func testSymlinkErrors(t *testing.T, fs Filesystem) {
 	err := fs.Symlink("/foobar", "/foobaz")
 	require.Error(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"))
+	_, _, err = fs.WriteFileReader("/foobar", strings.NewReader("foobar"), -1)
 	require.NoError(t, err)
 
-	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"))
+	_, _, err = fs.WriteFileReader("/foobaz", strings.NewReader("foobaz"), -1)
 	require.NoError(t, err)
 
 	err = fs.Symlink("/foobar", "/foobaz")

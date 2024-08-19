@@ -19,6 +19,8 @@ const NOTIFY_LEADER = 1
 const NOTIFY_EMERGENCY = 2
 
 func (c *cluster) monitorLeadership() {
+	defer c.shutdownWg.Done()
+
 	// We use the notify channel we configured Raft with, NOT Raft's
 	// leaderCh, which is only notified best-effort. Doing this ensures
 	// that we get all notifications in order, which is required for
@@ -449,7 +451,7 @@ type processOpError struct {
 	err       error
 }
 
-func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpError {
+func (c *cluster) applyOpStack(stack []interface{}, term uint64, runners int) []processOpError {
 	errors := []processOpError{}
 
 	logger := c.logger.WithFields(log.Fields{
@@ -458,6 +460,7 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 	})
 
 	errChan := make(chan processOpError, len(stack))
+	opChan := make(chan interface{}, len(stack))
 
 	wgReader := sync.WaitGroup{}
 	wgReader.Add(1)
@@ -470,17 +473,27 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 	}(errChan)
 
 	wg := sync.WaitGroup{}
-	for _, op := range stack {
+
+	for i := 0; i < runners; i++ {
 		wg.Add(1)
 
-		go func(errChan chan<- processOpError, op interface{}, logger log.Logger) {
-			opErr := c.applyOp(op, logger)
-			if opErr.err != nil {
-				errChan <- opErr
+		go func(errChan chan<- processOpError, opChan <-chan interface{}, logger log.Logger) {
+			defer wg.Done()
+
+			for op := range opChan {
+				opErr := c.applyOp(op, logger)
+				if opErr.err != nil {
+					errChan <- opErr
+				}
 			}
-			wg.Done()
-		}(errChan, op, logger)
+		}(errChan, opChan, logger)
 	}
+
+	for _, op := range stack {
+		opChan <- op
+	}
+
+	close(opChan)
 
 	wg.Wait()
 
