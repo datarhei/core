@@ -3,7 +3,6 @@ package cluster
 import (
 	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
-	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -19,8 +18,12 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 
 	relocateMap := c.store.ProcessGetRelocateMap()
 	storeNodes := c.store.NodeList()
-	have := c.manager.ClusterProcessList()
 	nodes := c.manager.NodeList()
+	have, err := c.manager.ClusterProcessList()
+	if err != nil {
+		logger.Warn().WithError(err).Log("Failed to retrieve complete process list")
+		return
+	}
 
 	nodesMap := map[string]node.About{}
 
@@ -34,19 +37,13 @@ func (c *cluster) doRelocate(emergency bool, term uint64) {
 		nodesMap[about.ID] = about
 	}
 
-	logger.Debug().WithFields(log.Fields{
-		"relocate": relocate,
-		"have":     have,
-		"nodes":    nodesMap,
-	}).Log("Rebalance")
-
 	opStack, _, relocatedProcessIDs := relocate(have, nodesMap, relocateMap)
 
-	errors := c.applyOpStack(opStack, term)
+	errors := c.applyOpStack(opStack, term, 5)
 
 	for _, e := range errors {
 		// Only apply the command if the error is different.
-		process, err := c.store.ProcessGet(e.processid)
+		process, _, err := c.store.ProcessGet(e.processid)
 		if err != nil {
 			continue
 		}
@@ -200,6 +197,9 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 		haveReferenceAffinity.Move(process.Config.Reference, process.Config.Domain, sourceNodeid, targetNodeid)
 
 		relocatedProcessIDs = append(relocatedProcessIDs, processid)
+
+		// Move only one process at a time.
+		break
 	}
 
 	return opStack, resources.Map(), relocatedProcessIDs

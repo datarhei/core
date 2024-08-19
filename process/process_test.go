@@ -1,12 +1,15 @@
 package process
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/datarhei/core/v16/math/rand"
 	"github.com/stretchr/testify/require"
 )
 
@@ -700,4 +703,64 @@ func TestProcessCallbacksOnBeforeStart(t *testing.T) {
 	lines := parser.Log()
 	require.Equal(t, 1, len(lines))
 	require.Equal(t, "no, not now", lines[0].Data)
+}
+
+func BenchmarkScannerText(b *testing.B) {
+	data := []byte{}
+
+	for i := 0; i < 1000; i++ {
+		line := rand.String(100) + "\n"
+		data = append(data, []byte(line)...)
+	}
+
+	b.ResetTimer()
+
+	lastline := ""
+
+	for i := 0; i < b.N; i++ {
+		r := bytes.NewReader(data)
+		scanner := bufio.NewScanner(r)
+		scanner.Split(bufio.ScanLines)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			lastline = line
+		}
+
+		err := scanner.Err()
+		require.NoError(b, err)
+	}
+
+	fmt.Printf("%s\n", lastline)
+}
+
+func BenchmarkScannerBytes(b *testing.B) {
+	data := []byte{}
+
+	for i := 0; i < 1000; i++ {
+		line := rand.String(100) + "\n"
+		data = append(data, []byte(line)...)
+	}
+
+	b.ResetTimer()
+
+	lastline := []byte{}
+
+	for i := 0; i < b.N; i++ {
+		r := bytes.NewReader(data)
+		scanner := bufio.NewScanner(r)
+		scanner.Split(bufio.ScanLines)
+
+		for scanner.Scan() {
+			line := scanner.Bytes()
+
+			lastline = line
+		}
+
+		err := scanner.Err()
+		require.NoError(b, err)
+	}
+
+	fmt.Printf("%s\n", lastline)
 }

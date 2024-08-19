@@ -16,7 +16,7 @@ init:
 
 ## build: Build core (default)
 build:
-	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} GOARM=${GOARM} go build -o core$(BINSUFFIX) -trimpath
+	CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} GOARM=${GOARM} go build -o core$(BINSUFFIX)
 
 ## swagger: Update swagger API documentation (requires github.com/swaggo/swag)
 swagger:

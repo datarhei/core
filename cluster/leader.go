@@ -19,6 +19,8 @@ const NOTIFY_LEADER = 1
 const NOTIFY_EMERGENCY = 2
 
 func (c *cluster) monitorLeadership() {
+	defer c.shutdownWg.Done()
+
 	// We use the notify channel we configured Raft with, NOT Raft's
 	// leaderCh, which is only notified best-effort. Doing this ensures
 	// that we get all notifications in order, which is required for
@@ -479,7 +481,7 @@ type processOpError struct {
 	err       error
 }
 
-func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpError {
+func (c *cluster) applyOpStack(stack []interface{}, term uint64, runners int) []processOpError {
 	errors := []processOpError{}
 
 	logger := c.logger.WithFields(log.Fields{
@@ -488,6 +490,7 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 	})
 
 	errChan := make(chan processOpError, len(stack))
+	opChan := make(chan interface{}, len(stack))
 
 	wgReader := sync.WaitGroup{}
 	wgReader.Add(1)
@@ -500,17 +503,27 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64) []processOpErro
 	}(errChan)
 
 	wg := sync.WaitGroup{}
-	for _, op := range stack {
+
+	for i := 0; i < runners; i++ {
 		wg.Add(1)
 
-		go func(errChan chan<- processOpError, op interface{}, logger log.Logger) {
-			opErr := c.applyOp(op, logger)
-			if opErr.err != nil {
-				errChan <- opErr
+		go func(errChan chan<- processOpError, opChan <-chan interface{}, logger log.Logger) {
+			defer wg.Done()
+
+			for op := range opChan {
+				opErr := c.applyOp(op, logger)
+				if opErr.err != nil {
+					errChan <- opErr
+				}
 			}
-			wg.Done()
-		}(errChan, op, logger)
+		}(errChan, opChan, logger)
 	}
+
+	for _, op := range stack {
+		opChan <- op
+	}
+
+	close(opChan)
 
 	wg.Wait()
 
@@ -622,6 +635,36 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 				"tonodeid":   v.toNodeid,
 			}).Log("Moving process, adding process")
 			break
+		}
+
+		// Transfer report with best effort, it's ok if it fails.
+		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop")
+		if err == nil {
+			process, err := c.manager.ProcessGet(v.fromNodeid, v.config.ProcessID(), []string{"report"})
+			if err != nil {
+				logger.Info().WithError(err).WithFields(log.Fields{
+					"processid":  v.config.ProcessID(),
+					"fromnodeid": v.fromNodeid,
+					"tonodeid":   v.toNodeid,
+				}).Log("Moving process, get process report")
+			}
+			if process.Report != nil && err == nil {
+				report := process.Report.Marshal()
+				err = c.manager.ProcessReportSet(v.toNodeid, v.config.ProcessID(), &report)
+				if err != nil {
+					logger.Info().WithError(err).WithFields(log.Fields{
+						"processid":  v.config.ProcessID(),
+						"fromnodeid": v.fromNodeid,
+						"tonodeid":   v.toNodeid,
+					}).Log("Moving process, set process report")
+				}
+			}
+		} else {
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid":  v.config.ProcessID(),
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process, stopping process")
 		}
 
 		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())

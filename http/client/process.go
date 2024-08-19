@@ -69,8 +69,7 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
-	config.Metadata = metadata
+	config.Unmarshal(p, metadata)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
@@ -87,8 +86,7 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
-	config.Metadata = metadata
+	config.Unmarshal(p, metadata)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)
@@ -104,13 +102,33 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 	return nil
 }
 
+func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) error {
+	var buf bytes.Buffer
+
+	data := api.ProcessReport{}
+	data.Unmarshal(report)
+
+	e := json.NewEncoder(&buf)
+	e.Encode(data)
+
+	query := &url.Values{}
+	query.Set("domain", id.Domain)
+
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", &buf)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *restclient) ProcessDelete(id app.ProcessID) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	r.call("DELETE", "/v3/process/"+url.PathEscape(id.ID), query, nil, "", nil)
+	_, err := r.call("DELETE", "/v3/process/"+url.PathEscape(id.ID), query, nil, "", nil)
 
-	return nil
+	return err
 }
 
 func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
@@ -125,11 +143,8 @@ func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
 	query.Set("domain", id.Domain)
 
 	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", &buf)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *restclient) ProcessMetadata(id app.ProcessID, key string) (api.Metadata, error) {
@@ -164,11 +179,8 @@ func (r *restclient) ProcessMetadataSet(id app.ProcessID, key string, metadata a
 	query.Set("domain", id.Domain)
 
 	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", &buf)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *restclient) ProcessProbe(id app.ProcessID) (api.Probe, error) {
@@ -192,7 +204,7 @@ func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	var buf bytes.Buffer
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p)
+	config.Unmarshal(p, nil)
 
 	e := json.NewEncoder(&buf)
 	e.Encode(config)

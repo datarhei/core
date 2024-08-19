@@ -1,15 +1,12 @@
 package api
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/cluster/store"
-	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -89,53 +86,16 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 				continue
 			}
 
-			process := h.convertStoreProcessToAPIProcess(p, filter)
+			process := api.Process{}
+			process.UnmarshalStore(p, filter.config, filter.state, filter.report, filter.metadata)
 
 			missing = append(missing, process)
 		}
 	}
 
-	// We're doing some byte-wrangling here because the processes from the nodes
-	// are of type clientapi.Process, the missing processes are from type api.Process.
-	// They are actually the same and converting them is cumbersome. That's why
-	// we're doing the JSON marshalling here and appending these two slices is done
-	// in JSON representation.
+	processes = append(processes, missing...)
 
-	data, err := json.Marshal(processes)
-	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", err.Error())
-	}
-
-	buf := &bytes.Buffer{}
-
-	if len(missing) != 0 {
-		reallyData, err := json.Marshal(missing)
-		if err != nil {
-			return api.Err(http.StatusInternalServerError, "", err.Error())
-		}
-
-		i := bytes.LastIndexByte(data, ']')
-		if i == -1 {
-			return api.Err(http.StatusInternalServerError, "", "no valid JSON")
-		}
-
-		if len(processes) != 0 {
-			data[i] = ','
-		} else {
-			data[i] = ' '
-		}
-		buf.Write(data)
-
-		i = bytes.IndexByte(reallyData, '[')
-		if i == -1 {
-			return api.Err(http.StatusInternalServerError, "", "no valid JSON")
-		}
-		buf.Write(reallyData[i+1:])
-	} else {
-		buf.Write(data)
-	}
-
-	return c.Stream(http.StatusOK, "application/json", buf)
+	return c.JSON(http.StatusOK, processes)
 }
 
 func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, _, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
@@ -224,74 +184,6 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 	return final
 }
 
-func (h *ClusterHandler) convertStoreProcessToAPIProcess(p store.Process, filter filter) api.Process {
-	process := api.Process{
-		ID:        p.Config.ID,
-		Owner:     p.Config.Owner,
-		Domain:    p.Config.Domain,
-		Type:      "ffmpeg",
-		Reference: p.Config.Reference,
-		CreatedAt: p.CreatedAt.Unix(),
-		UpdatedAt: p.UpdatedAt.Unix(),
-	}
-
-	if filter.metadata {
-		process.Metadata = p.Metadata
-	}
-
-	if filter.config {
-		config := &api.ProcessConfig{}
-		config.Unmarshal(p.Config)
-
-		process.Config = config
-	}
-
-	if filter.state {
-		process.State = &api.ProcessState{
-			Order:   p.Order,
-			LastLog: p.Error,
-			Resources: api.ProcessUsage{
-				CPU: api.ProcessUsageCPU{
-					NCPU:  api.ToNumber(1),
-					Limit: api.ToNumber(p.Config.LimitCPU),
-				},
-				Memory: api.ProcessUsageMemory{
-					Limit: p.Config.LimitMemory,
-				},
-			},
-			Command: []string{},
-		}
-
-		if len(p.Error) != 0 {
-			process.State.State = "failed"
-		} else {
-			process.State.State = "finished"
-		}
-	}
-
-	if filter.report {
-		process.Report = &api.ProcessReport{
-			ProcessReportEntry: api.ProcessReportEntry{
-				CreatedAt: p.CreatedAt.Unix(),
-				Prelude:   []string{},
-				Log:       [][2]string{},
-				Matches:   []string{},
-			},
-		}
-
-		if len(p.Error) != 0 {
-			process.Report.Prelude = []string{p.Error}
-			process.Report.Log = [][2]string{
-				{strconv.FormatInt(p.CreatedAt.Unix(), 10), p.Error},
-			}
-			process.Report.ExitedAt = p.CreatedAt.Unix()
-			process.Report.ExitState = "failed"
-		}
-	}
-
-	return process
-}
-
 // ProcessGet returns the process with the given ID whereever it's running on the cluster
 // @Summary List a process by its ID
 // @Description List a process by its ID. Use the filter parameter to specifiy the level of detail of the output.
@@ -316,29 +208,27 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "")
 	}
 
-	procs := h.proxy.ProcessList(node.ProcessListOptions{
-		ID:     []string{id},
-		Filter: filter.Slice(),
-		Domain: domain,
-	})
+	pid := app.NewProcessID(id, domain)
 
-	if len(procs) == 0 {
-		// Check the store in the cluster for an undeployed process
-		p, err := h.cluster.Store().ProcessGet(app.NewProcessID(id, domain))
+	// Check the store for the process
+	// TODO: should check the leader because in larger cluster it needs time to get to all followers
+	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+	}
+
+	process := api.Process{}
+	process.UnmarshalStore(p, filter.config, filter.state, filter.report, filter.metadata)
+
+	// Get the actual process data
+	if len(nodeid) != 0 {
+		process, err = h.proxy.ProcessGet(nodeid, pid, filter.Slice())
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
+			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
-
-		process := h.convertStoreProcessToAPIProcess(p, filter)
-
-		return c.JSON(http.StatusOK, process)
 	}
 
-	if procs[0].Domain != domain {
-		return api.Err(http.StatusNotFound, "", "Unknown process ID: %s", id)
-	}
-
-	return c.JSON(http.StatusOK, procs[0])
+	return c.JSON(http.StatusOK, process)
 }
 
 // Add adds a new process to the cluster
@@ -436,13 +326,13 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 
 	pid := process.ProcessID()
 
-	current, err := h.cluster.Store().ProcessGet(pid)
+	current, _, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	// Prefill the config with the current values
-	process.Unmarshal(current.Config)
+	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -641,7 +531,7 @@ func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
 		Domain: domain,
 	}
 
-	nodeid, err := h.proxy.ProcessFindNodeID(pid)
+	nodeid, err := h.cluster.Store().ProcessGetNode(pid)
 	if err != nil {
 		return c.JSON(http.StatusOK, api.Probe{
 			Log: []string{fmt.Sprintf("the process can't be found: %s", err.Error())},

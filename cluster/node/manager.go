@@ -409,12 +409,14 @@ func (p *Manager) FilesystemList(storage, pattern string) []api.FileInfo {
 	return filesList
 }
 
-func (p *Manager) ClusterProcessList() []Process {
+func (p *Manager) ClusterProcessList() ([]Process, error) {
 	processChan := make(chan []Process, 64)
 	processList := []Process{}
+	errorChan := make(chan error, 8)
+	errorList := []error{}
 
 	wgList := sync.WaitGroup{}
-	wgList.Add(1)
+	wgList.Add(2)
 
 	go func() {
 		defer wgList.Done()
@@ -424,53 +426,46 @@ func (p *Manager) ClusterProcessList() []Process {
 		}
 	}()
 
+	go func() {
+		defer wgList.Done()
+
+		for err := range errorChan {
+			errorList = append(errorList, err)
+		}
+	}()
+
 	wg := sync.WaitGroup{}
 
 	p.lock.RLock()
 	for _, n := range p.nodes {
 		wg.Add(1)
 
-		go func(node *Node, p chan<- []Process) {
+		go func(node *Node, p chan<- []Process, e chan<- error) {
 			defer wg.Done()
 
 			processes, err := node.Core().ClusterProcessList()
 			if err != nil {
+				e <- err
 				return
 			}
 
 			p <- processes
-		}(n, processChan)
+		}(n, processChan, errorChan)
 	}
 	p.lock.RUnlock()
 
 	wg.Wait()
 
 	close(processChan)
+	close(errorChan)
 
 	wgList.Wait()
 
-	return processList
-}
-
-func (p *Manager) ProcessFindNodeID(id app.ProcessID) (string, error) {
-	procs := p.ClusterProcessList()
-	nodeid := ""
-
-	for _, p := range procs {
-		if p.Config.ProcessID() != id {
-			continue
-		}
-
-		nodeid = p.NodeID
-
-		break
+	if len(errorList) != 0 {
+		return nil, fmt.Errorf("not all nodes responded wit their process list")
 	}
 
-	if len(nodeid) == 0 {
-		return "", fmt.Errorf("the process '%s' is not registered with any node", id.String())
-	}
-
-	return nodeid, nil
+	return processList, nil
 }
 
 func (p *Manager) FindNodeForResources(nodeid string, cpu float64, memory uint64) string {
@@ -540,6 +535,24 @@ func (p *Manager) ProcessList(options client.ProcessListOptions) []api.Process {
 	return processList
 }
 
+func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (api.Process, error) {
+	node, err := p.NodeGet(nodeid)
+	if err != nil {
+		return api.Process{}, fmt.Errorf("node not found: %w", err)
+	}
+
+	list, err := node.Core().ProcessList(client.ProcessListOptions{
+		ID:     []string{id.ID},
+		Filter: filter,
+		Domain: id.Domain,
+	})
+	if err != nil {
+		return api.Process{}, err
+	}
+
+	return list[0], nil
+}
+
 func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
@@ -565,6 +578,15 @@ func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Con
 	}
 
 	return node.Core().ProcessUpdate(id, config, metadata)
+}
+
+func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.Report) error {
+	node, err := p.NodeGet(nodeid)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	return node.Core().ProcessReportSet(id, report)
 }
 
 func (p *Manager) ProcessCommand(nodeid string, id app.ProcessID, command string) error {

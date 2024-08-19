@@ -36,7 +36,7 @@ func (r *queryResolver) getProcess(id app.ProcessID) (*models.Process, error) {
 		return nil, err
 	}
 
-	report, err := r.Restream.GetProcessLog(id)
+	report, err := r.Restream.GetProcessReport(id)
 	if err != nil {
 		return nil, err
 	}

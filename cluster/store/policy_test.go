@@ -3,8 +3,8 @@ package store
 import (
 	"testing"
 
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +30,7 @@ func TestSetPoliciesCommand(t *testing.T) {
 		Operation: OpSetPolicies,
 		Data: CommandSetPolicies{
 			Name: "foobar",
-			Policies: []access.Policy{
+			Policies: []policy.Policy{
 				{
 					Name:     "bla",
 					Domain:   "bla",
@@ -59,7 +59,7 @@ func TestSetPolicies(t *testing.T) {
 		Name: "foobar",
 	}
 
-	policies := []access.Policy{
+	policies := []policy.Policy{
 		{
 			Name:     "bla",
 			Domain:   "bla",

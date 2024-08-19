@@ -22,8 +22,11 @@ type ClusterNodeResources struct {
 	NCPU         float64 // Number of CPU on this node
 	CPU          float64 // Current CPU load, 0-100*ncpu
 	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64 // Current CPU load of the core itself, 0-100*ncpu
 	Mem          uint64  // Currently used memory in bytes
 	MemLimit     uint64  // Defined memory limit in bytes
+	MemTotal     uint64  // Total available memory in bytes
+	MemCore      uint64  // Current used memory of the core itself in bytes
 	Error        error
 }
 
@@ -145,8 +148,11 @@ func (c *cluster) About() (ClusterAbout, error) {
 				NCPU:         nodeAbout.Resources.NCPU,
 				CPU:          nodeAbout.Resources.CPU,
 				CPULimit:     nodeAbout.Resources.CPULimit,
+				CPUCore:      nodeAbout.Resources.CPUCore,
 				Mem:          nodeAbout.Resources.Mem,
 				MemLimit:     nodeAbout.Resources.MemLimit,
+				MemTotal:     nodeAbout.Resources.MemTotal,
+				MemCore:      nodeAbout.Resources.MemCore,
 				Error:        nodeAbout.Resources.Error,
 			},
 		}

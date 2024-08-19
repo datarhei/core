@@ -93,8 +93,9 @@ type WriteFilesystem interface {
 
 	// WriteFileReader adds a file to the filesystem. Returns the size of the data that has been
 	// stored in bytes and whether the file is new. The size is negative if there was
-	// an error adding the file and error is not nil.
-	WriteFileReader(path string, r io.Reader) (int64, bool, error)
+	// an error adding the file and error is not nil. The size parameter is to suggest a size
+	// for the file to write. Use a negative value if the size is unknown.
+	WriteFileReader(path string, r io.Reader, size int) (int64, bool, error)
 
 	// WriteFile adds a file to the filesystem. Returns the size of the data that has been
 	// stored in bytes and whether the file is new. The size is negative if there was

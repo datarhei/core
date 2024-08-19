@@ -149,6 +149,14 @@ func (rfs *filesystem) UnsetCleanup(id string) {
 }
 
 func (rfs *filesystem) cleanup() {
+	rfs.cleanupLock.RLock()
+	nPatterns := len(rfs.cleanupPatterns)
+	rfs.cleanupLock.RUnlock()
+
+	if nPatterns == 0 {
+		return
+	}
+
 	filesAndDirs := rfs.Filesystem.List("/", fs.ListOptions{})
 	sort.SliceStable(filesAndDirs, func(i, j int) bool { return filesAndDirs[i].ModTime().Before(filesAndDirs[j].ModTime()) })
 

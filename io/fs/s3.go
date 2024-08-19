@@ -347,17 +347,17 @@ func (fs *s3Filesystem) write(path string, r io.Reader) (int64, bool, error) {
 	return info.Size, !overwrite, nil
 }
 
-func (fs *s3Filesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
+func (fs *s3Filesystem) WriteFileReader(path string, r io.Reader, size int) (int64, bool, error) {
 	path = fs.cleanPath(path)
 	return fs.write(path, r)
 }
 
 func (fs *s3Filesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewReader(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
 func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewReader(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
 func (fs *s3Filesystem) Rename(src, dst string) error {

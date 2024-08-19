@@ -20,7 +20,7 @@ func TestReadOnly(t *testing.T) {
 	_, _, err = ro.WriteFile("/readonly.go", []byte("foobar"))
 	require.Error(t, err)
 
-	_, _, err = ro.WriteFileReader("/readonly.go", strings.NewReader("foobar"))
+	_, _, err = ro.WriteFileReader("/readonly.go", strings.NewReader("foobar"), -1)
 	require.Error(t, err)
 
 	_, _, err = ro.WriteFileSafe("/readonly.go", []byte("foobar"))

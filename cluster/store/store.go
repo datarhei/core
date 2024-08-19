@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -21,7 +21,8 @@ type Store interface {
 	OnApply(func(op Operation))
 
 	ProcessList() []Process
-	ProcessGet(id app.ProcessID) (Process, error)
+	ProcessGet(id app.ProcessID) (Process, string, error)
+	ProcessGetNode(id app.ProcessID) (string, error)
 	ProcessGetNodeMap() map[string]string
 	ProcessGetRelocateMap() map[string]string
 
@@ -55,7 +56,7 @@ type Users struct {
 
 type Policies struct {
 	UpdatedAt time.Time
-	Policies  []access.Policy
+	Policies  []policy.Policy
 }
 
 type Value struct {
@@ -153,7 +154,7 @@ type CommandRemoveIdentity struct {
 
 type CommandSetPolicies struct {
 	Name     string
-	Policies []access.Policy
+	Policies []policy.Policy
 }
 
 type CommandCreateLock struct {
@@ -195,7 +196,7 @@ type storeData struct {
 
 	Policies struct {
 		UpdatedAt time.Time
-		Policies  map[string][]access.Policy
+		Policies  map[string][]policy.Policy
 	}
 
 	Locks map[string]time.Time
@@ -216,7 +217,7 @@ func (s *storeData) init() {
 	s.Users.Users = map[string]identity.User{}
 	s.Users.userlist = identity.NewUserList()
 	s.Policies.UpdatedAt = now
-	s.Policies.Policies = map[string][]access.Policy{}
+	s.Policies.Policies = map[string][]policy.Policy{}
 	s.Locks = map[string]time.Time{}
 	s.KVS = map[string]Value{}
 	s.Nodes = map[string]Node{}

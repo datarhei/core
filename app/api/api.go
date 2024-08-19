@@ -28,8 +28,8 @@ import (
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/math/rand"
@@ -670,7 +670,7 @@ func (a *api) start(ctx context.Context) error {
 				return err
 			}
 
-			policyAdapter, err := iamaccess.NewJSONAdapter(rfs, "./policy.json", nil)
+			policyAdapter, err := iampolicy.NewJSONAdapter(rfs, "./policy.json", nil)
 			if err != nil {
 				return err
 			}
@@ -695,7 +695,7 @@ func (a *api) start(ctx context.Context) error {
 			// Check if there are already file created by IAM. If not, create policies
 			// and users based on the config in order to mimic the behaviour before IAM.
 			if len(rfs.List("/", fs.ListOptions{Pattern: "/*.json"})) == 0 {
-				policies := []iamaccess.Policy{
+				policies := []iampolicy.Policy{
 					{
 						Name:     "$anon",
 						Domain:   "$none",
@@ -731,7 +731,7 @@ func (a *api) start(ctx context.Context) error {
 						},
 					}
 
-					policies = append(policies, iamaccess.Policy{
+					policies = append(policies, iampolicy.Policy{
 						Name:     cfg.Storage.Memory.Auth.Username,
 						Domain:   "$none",
 						Types:    []string{"fs"},
@@ -757,7 +757,7 @@ func (a *api) start(ctx context.Context) error {
 							users[s.Auth.Username] = user
 						}
 
-						policies = append(policies, iamaccess.Policy{
+						policies = append(policies, iampolicy.Policy{
 							Name:     s.Auth.Username,
 							Domain:   "$none",
 							Types:    []string{"fs"},
@@ -768,7 +768,7 @@ func (a *api) start(ctx context.Context) error {
 				}
 
 				if cfg.RTMP.Enable && len(cfg.RTMP.Token) == 0 {
-					policies = append(policies, iamaccess.Policy{
+					policies = append(policies, iampolicy.Policy{
 						Name:     "$anon",
 						Domain:   "$none",
 						Types:    []string{"rtmp"},
@@ -778,7 +778,7 @@ func (a *api) start(ctx context.Context) error {
 				}
 
 				if cfg.SRT.Enable && len(cfg.SRT.Token) == 0 {
-					policies = append(policies, iamaccess.Policy{
+					policies = append(policies, iampolicy.Policy{
 						Name:     "$anon",
 						Domain:   "$none",
 						Types:    []string{"srt"},
@@ -1180,7 +1180,7 @@ func (a *api) start(ctx context.Context) error {
 
 	var store restreamstore.Store = nil
 
-	{
+	if !cfg.Cluster.Enable {
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 			Root: cfg.DB.Dir,
 		})
@@ -1989,7 +1989,7 @@ func backupMemFS(target, source fs.Filesystem, patterns []string) error {
 			continue
 		}
 
-		target.WriteFileReader(name, file)
+		target.WriteFileReader(name, file, -1)
 
 		file.Close()
 	}

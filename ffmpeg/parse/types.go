@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/process"
 )
 
 // Duration represents a time.Duration
@@ -500,17 +501,21 @@ type AVstream struct {
 }
 
 type Usage struct {
-	CPU struct {
-		NCPU    float64
-		Average float64
-		Max     float64
-		Limit   float64
-	}
-	Memory struct {
-		Average float64
-		Max     uint64
-		Limit   uint64
-	}
+	CPU    UsageCPU
+	Memory UsageMemory
+}
+
+type UsageCPU struct {
+	NCPU    float64
+	Average float64
+	Max     float64
+	Limit   float64
+}
+
+type UsageMemory struct {
+	Average float64
+	Max     uint64
+	Limit   uint64
 }
 
 type GraphElement struct {
@@ -541,4 +546,29 @@ type GraphMapping struct {
 type StreamMapping struct {
 	Graphs  []GraphElement
 	Mapping []GraphMapping
+}
+
+// Report represents a log report, including the prelude and the last log lines of the process.
+type Report struct {
+	CreatedAt time.Time
+	Prelude   []string
+	Log       []process.Line
+	Matches   []string
+}
+
+// ReportHistoryEntry represents an historical log report, including the exit status of the
+// process and the last progress data.
+type ReportHistoryEntry struct {
+	Report
+
+	ExitedAt  time.Time
+	ExitState string
+	Progress  Progress
+	Usage     Usage
+}
+
+type ReportHistorySearchResult struct {
+	CreatedAt time.Time
+	ExitedAt  time.Time
+	ExitState string
 }

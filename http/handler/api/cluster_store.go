@@ -33,7 +33,8 @@ func (h *ClusterHandler) StoreListProcesses(c echo.Context) error {
 			continue
 		}
 
-		process := h.convertStoreProcessToAPIProcess(p, newFilter(""))
+		process := api.Process{}
+		process.UnmarshalStore(p, true, true, true, true)
 
 		processes = append(processes, process)
 	}
@@ -66,12 +67,13 @@ func (h *ClusterHandler) StoreGetProcess(c echo.Context) error {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
 	}
 
-	p, err := h.cluster.Store().ProcessGet(pid)
+	p, _, err := h.cluster.Store().ProcessGet(pid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
-	process := h.convertStoreProcessToAPIProcess(p, newFilter(""))
+	process := api.Process{}
+	process.UnmarshalStore(p, true, true, true, true)
 
 	return c.JSON(http.StatusOK, process)
 }

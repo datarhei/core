@@ -1,8 +1,8 @@
 package iam
 
 import (
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 )
 
@@ -19,7 +19,7 @@ type IAM interface {
 	HasPolicy(name, domain string, types []string, resource string, actions []string) bool
 	AddPolicy(name, domain string, types []string, resource string, actions []string) error
 	RemovePolicy(name, domain string, types []string, resource string, actions []string) error
-	ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy
+	ListPolicies(name, domain string, types []string, resource string, actions []string) []policy.Policy
 	ReloadPolicies() error
 
 	Validators() []string
@@ -42,13 +42,13 @@ type IAM interface {
 
 type iam struct {
 	im identity.Manager
-	am access.Manager
+	am policy.Manager
 
 	logger log.Logger
 }
 
 type Config struct {
-	PolicyAdapter   access.Adapter
+	PolicyAdapter   policy.Adapter
 	IdentityAdapter identity.Adapter
 	Superuser       identity.User
 	JWTRealm        string
@@ -68,9 +68,10 @@ func New(config Config) (IAM, error) {
 		return nil, err
 	}
 
-	am, err := access.New(access.Config{
-		Adapter: config.PolicyAdapter,
-		Logger:  config.Logger,
+	am, err := policy.New(policy.Config{
+		Superuser: "$superuser",
+		Adapter:   config.PolicyAdapter,
+		Logger:    config.Logger,
 	})
 	if err != nil {
 		return nil, err
@@ -126,16 +127,12 @@ func (i *iam) Enforce(name, domain, rtype, resource, action string) bool {
 		name = "$superuser"
 	}
 
-	ok, rule := i.am.Enforce(name, domain, rtype, resource, action)
+	ok, policy := i.am.Enforce(name, domain, rtype, resource, action)
 
 	if !ok {
 		l.Log("no match")
 	} else {
-		if name == "$superuser" {
-			rule = ""
-		}
-
-		l.WithField("rule", rule).Log("match")
+		l.WithField("policy", policy).Log("match")
 	}
 
 	return ok
@@ -234,11 +231,11 @@ func (i *iam) RemovePolicy(name, domain string, types []string, resource string,
 		}
 	}
 
-	return i.am.RemovePolicy(name, domain, types, resource, actions)
+	return i.am.RemovePolicy(name, domain)
 }
 
-func (i *iam) ListPolicies(name, domain string, types []string, resource string, actions []string) []access.Policy {
-	return i.am.ListPolicies(name, domain, types, resource, actions)
+func (i *iam) ListPolicies(name, domain string, types []string, resource string, actions []string) []policy.Policy {
+	return i.am.ListPolicies(name, domain)
 }
 
 func (i *iam) ReloadPolicies() error {

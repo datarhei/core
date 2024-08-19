@@ -22,6 +22,17 @@ func (i *AVstreamIO) Unmarshal(io *app.AVstreamIO) {
 	i.Size = io.Size
 }
 
+func (i *AVstreamIO) Marshal() app.AVstreamIO {
+	io := app.AVstreamIO{
+		State:  i.State,
+		Packet: i.Packet,
+		Time:   i.Time,
+		Size:   i.Size,
+	}
+
+	return io
+}
+
 type AVstream struct {
 	Input          AVstreamIO `json:"input"`
 	Output         AVstreamIO `json:"output"`
@@ -55,4 +66,23 @@ func (a *AVstream) Unmarshal(av *app.AVstream) {
 
 	a.Input.Unmarshal(&av.Input)
 	a.Output.Unmarshal(&av.Output)
+}
+
+func (a *AVstream) Marshal() *app.AVstream {
+	av := &app.AVstream{
+		Input:          a.Input.Marshal(),
+		Output:         a.Output.Marshal(),
+		Aqueue:         a.Aqueue,
+		Queue:          a.Queue,
+		Dup:            a.Dup,
+		Drop:           a.Drop,
+		Enc:            a.Enc,
+		Looping:        a.Looping,
+		LoopingRuntime: a.LoopingRuntime,
+		Duplicating:    a.Duplicating,
+		GOP:            a.GOP,
+		Mode:           a.Mode,
+	}
+
+	return av
 }

@@ -2,8 +2,8 @@ package forwarder
 
 import (
 	apiclient "github.com/datarhei/core/v16/cluster/client"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 )
 
 func (f *Forwarder) IAMIdentityAdd(origin string, identity iamidentity.User) error {
@@ -38,7 +38,7 @@ func (f *Forwarder) IAMIdentityUpdate(origin, name string, identity iamidentity.
 	return reconstructError(client.IAMIdentityUpdate(origin, name, r))
 }
 
-func (f *Forwarder) IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error {
+func (f *Forwarder) IAMPoliciesSet(origin, name string, policies []iampolicy.Policy) error {
 	if origin == "" {
 		origin = f.ID
 	}

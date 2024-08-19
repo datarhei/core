@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -394,7 +394,7 @@ func TestUpdateIdentityWithPolicies(t *testing.T) {
 		Name: "foobar",
 	}
 
-	policies := []access.Policy{
+	policies := []policy.Policy{
 		{
 			Name:     "bla",
 			Domain:   "bla",

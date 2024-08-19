@@ -23,8 +23,8 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	iampolicy "github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/resources"
@@ -59,6 +59,7 @@ type Cluster interface {
 	HasRaftLeader() bool
 
 	ProcessAdd(origin string, config *app.Config) error
+	ProcessGet(origin string, id app.ProcessID, stale bool) (store.Process, string, error)
 	ProcessRemove(origin string, id app.ProcessID) error
 	ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error
 	ProcessSetCommand(origin string, id app.ProcessID, order string) error
@@ -70,7 +71,7 @@ type Cluster interface {
 	IAMIdentityAdd(origin string, identity iamidentity.User) error
 	IAMIdentityUpdate(origin, name string, identity iamidentity.User) error
 	IAMIdentityRemove(origin string, name string) error
-	IAMPoliciesSet(origin, name string, policies []iamaccess.Policy) error
+	IAMPoliciesSet(origin, name string, policies []iampolicy.Policy) error
 
 	LockCreate(origin string, name string, validUntil time.Time) (*kvs.Lock, error)
 	LockDelete(origin string, name string) error
@@ -143,6 +144,7 @@ type cluster struct {
 	shutdown     bool
 	shutdownCh   chan struct{}
 	shutdownLock sync.Mutex
+	shutdownWg   sync.WaitGroup
 
 	syncInterval           time.Duration
 	nodeRecoverTimeout     time.Duration
@@ -354,7 +356,11 @@ func New(config Config) (Cluster, error) {
 				return nil, err
 			}
 
+			c.shutdownWg.Add(1)
+
 			go func(peerAddress string) {
+				defer c.shutdownWg.Done()
+
 				ticker := time.NewTicker(time.Second)
 				defer ticker.Stop()
 
@@ -389,6 +395,8 @@ func New(config Config) (Cluster, error) {
 			}(peerAddress)
 		}
 	}
+
+	c.shutdownWg.Add(4)
 
 	go c.trackNodeChanges()
 	go c.trackLeaderChanges()
@@ -436,6 +444,8 @@ func (c *cluster) Start(ctx context.Context) error {
 	}
 
 	<-c.shutdownCh
+
+	c.shutdownWg.Wait()
 
 	return nil
 }
@@ -642,9 +652,10 @@ func (c *cluster) Shutdown() error {
 	c.shutdown = true
 	close(c.shutdownCh)
 
+	c.shutdownWg.Wait()
+
 	if c.manager != nil {
 		c.manager.NodesClear()
-		c.manager = nil
 	}
 
 	if c.api != nil {
@@ -656,8 +667,11 @@ func (c *cluster) Shutdown() error {
 
 	if c.raft != nil {
 		c.raft.Shutdown()
-		c.raft = nil
 	}
+
+	// TODO: here might some situations, where the manager is still need from the synchronize loop and will run into a panic
+	c.manager = nil
+	c.raft = nil
 
 	return nil
 }
@@ -908,6 +922,8 @@ func (c *cluster) Snapshot(origin string) (io.ReadCloser, error) {
 }
 
 func (c *cluster) trackNodeChanges() {
+	defer c.shutdownWg.Done()
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -1001,6 +1017,8 @@ func (c *cluster) getClusterBarrier(name string) (bool, error) {
 // trackLeaderChanges registers an Observer with raft in order to receive updates
 // about leader changes, in order to keep the forwarder up to date.
 func (c *cluster) trackLeaderChanges() {
+	defer c.shutdownWg.Done()
+
 	for {
 		select {
 		case leaderAddress := <-c.raftLeaderObservationCh:
@@ -1061,6 +1079,8 @@ func (c *cluster) applyCommand(cmd *store.Command) error {
 }
 
 func (c *cluster) sentinel() {
+	defer c.shutdownWg.Done()
+
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 

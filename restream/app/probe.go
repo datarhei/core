@@ -1,5 +1,7 @@
 package app
 
+import "github.com/datarhei/core/v16/ffmpeg/probe"
+
 type ProbeIO struct {
 	Address string
 
@@ -26,7 +28,38 @@ type ProbeIO struct {
 	Channels uint64
 }
 
+func (p *ProbeIO) UnmarshalProber(pp *probe.ProbeIO) {
+	p.Address = pp.Address
+	p.Index = pp.Index
+	p.Stream = pp.Stream
+	p.Language = pp.Language
+	p.Format = pp.Format
+	p.Type = pp.Type
+	p.Codec = pp.Codec
+	p.Coder = pp.Coder
+	p.Bitrate = pp.Bitrate
+	p.Duration = pp.Duration
+	p.Pixfmt = pp.Pixfmt
+	p.Width = pp.Width
+	p.Height = pp.Height
+	p.FPS = pp.FPS
+	p.Sampling = pp.Sampling
+	p.Layout = pp.Layout
+	p.Channels = pp.Channels
+}
+
 type Probe struct {
 	Streams []ProbeIO
 	Log     []string
+}
+
+func (p *Probe) UnmarshalProber(pp *probe.Probe) {
+	p.Log = make([]string, len(pp.Log))
+	copy(p.Log, pp.Log)
+
+	p.Streams = make([]ProbeIO, len(pp.Streams))
+
+	for i, s := range pp.Streams {
+		p.Streams[i].UnmarshalProber(&s)
+	}
 }

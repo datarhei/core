@@ -113,6 +113,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.GET("/v1/snaphot", a.Snapshot)
 
 	a.router.POST("/v1/process", a.ProcessAdd)
+	a.router.GET("/v1/process/:id", a.ProcessGet)
 	a.router.DELETE("/v1/process/:id", a.ProcessRemove)
 	a.router.PUT("/v1/process/:id", a.ProcessUpdate)
 	a.router.PUT("/v1/process/:id/command", a.ProcessSetCommand)
@@ -186,8 +187,11 @@ func (a *api) About(c echo.Context) error {
 			NCPU:         resources.CPU.NCPU,
 			CPU:          (100 - resources.CPU.Idle) * resources.CPU.NCPU,
 			CPULimit:     resources.CPU.Limit * resources.CPU.NCPU,
+			CPUCore:      resources.CPU.Core * resources.CPU.NCPU,
 			Mem:          resources.Mem.Total - resources.Mem.Available,
-			MemLimit:     resources.Mem.Total,
+			MemLimit:     resources.Mem.Limit,
+			MemTotal:     resources.Mem.Total,
+			MemCore:      resources.Mem.Core,
 		},
 	}
 
@@ -385,6 +389,45 @@ func (a *api) ProcessAdd(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, "OK")
+}
+
+// ProcessGet gets a process from the cluster DB
+// @Summary Get a process
+// @Description Get a process from the cluster DB
+// @Tags v1.0.0
+// @ID cluster-1-get-process
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 404 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/process/{id} [get]
+func (a *api) ProcessGet(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	pid := app.ProcessID{ID: id, Domain: domain}
+
+	process, nodeid, err := a.cluster.Store().ProcessGet(pid)
+	if err != nil {
+		return ErrFromClusterError(err)
+	}
+
+	res := client.GetProcessResponse{
+		Process: process,
+		NodeID:  nodeid,
+	}
+
+	return c.JSON(http.StatusOK, res)
 }
 
 // ProcessRemove removes a process from the cluster DB

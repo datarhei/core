@@ -121,7 +121,7 @@ type server struct {
 	v3handler struct {
 		log       *api.LogHandler
 		events    *api.EventsHandler
-		restream  *api.ProcessHandler
+		process   *api.ProcessHandler
 		rtmp      *api.RTMPHandler
 		srt       *api.SRTHandler
 		config    *api.ConfigHandler
@@ -267,7 +267,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	)
 
 	if config.Restream != nil {
-		s.v3handler.restream = api.NewProcess(
+		s.v3handler.process = api.NewProcess(
 			config.Restream,
 			config.IAM,
 		)
@@ -618,49 +618,50 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	}
 
 	// v3 Restreamer
-	if s.v3handler.restream != nil {
-		v3.GET("/skills", s.v3handler.restream.Skills)
-		v3.GET("/skills/reload", s.v3handler.restream.ReloadSkills)
+	if s.v3handler.process != nil {
+		v3.GET("/skills", s.v3handler.process.Skills)
+		v3.GET("/skills/reload", s.v3handler.process.ReloadSkills)
 
-		v3.GET("/process", s.v3handler.restream.GetAll)
-		v3.GET("/process/:id", s.v3handler.restream.Get)
+		v3.GET("/process", s.v3handler.process.GetAll)
+		v3.GET("/process/:id", s.v3handler.process.Get)
 
-		v3.GET("/process/:id/config", s.v3handler.restream.GetConfig)
-		v3.GET("/process/:id/state", s.v3handler.restream.GetState)
-		v3.GET("/process/:id/report", s.v3handler.restream.GetReport)
+		v3.GET("/process/:id/config", s.v3handler.process.GetConfig)
+		v3.GET("/process/:id/state", s.v3handler.process.GetState)
+		v3.GET("/process/:id/report", s.v3handler.process.GetReport)
 
-		v3.GET("/process/:id/metadata", s.v3handler.restream.GetProcessMetadata)
-		v3.GET("/process/:id/metadata/:key", s.v3handler.restream.GetProcessMetadata)
+		v3.GET("/process/:id/metadata", s.v3handler.process.GetProcessMetadata)
+		v3.GET("/process/:id/metadata/:key", s.v3handler.process.GetProcessMetadata)
 
-		v3.GET("/metadata", s.v3handler.restream.GetMetadata)
-		v3.GET("/metadata/:key", s.v3handler.restream.GetMetadata)
+		v3.GET("/metadata", s.v3handler.process.GetMetadata)
+		v3.GET("/metadata/:key", s.v3handler.process.GetMetadata)
 
 		if !s.readOnly {
-			v3.POST("/process/probe", s.v3handler.restream.ProbeConfig)
-			v3.GET("/process/:id/probe", s.v3handler.restream.Probe)
-			v3.POST("/process", s.v3handler.restream.Add)
-			v3.PUT("/process/:id", s.v3handler.restream.Update)
-			v3.DELETE("/process/:id", s.v3handler.restream.Delete)
-			v3.PUT("/process/:id/command", s.v3handler.restream.Command)
-			v3.PUT("/process/:id/metadata/:key", s.v3handler.restream.SetProcessMetadata)
-			v3.PUT("/metadata/:key", s.v3handler.restream.SetMetadata)
+			v3.POST("/process/probe", s.v3handler.process.ProbeConfig)
+			v3.GET("/process/:id/probe", s.v3handler.process.Probe)
+			v3.POST("/process", s.v3handler.process.Add)
+			v3.PUT("/process/:id", s.v3handler.process.Update)
+			v3.DELETE("/process/:id", s.v3handler.process.Delete)
+			v3.PUT("/process/:id/command", s.v3handler.process.Command)
+			v3.PUT("/process/:id/report", s.v3handler.process.SetReport)
+			v3.PUT("/process/:id/metadata/:key", s.v3handler.process.SetProcessMetadata)
+			v3.PUT("/metadata/:key", s.v3handler.process.SetMetadata)
 		}
 
 		// v3 Playout
-		v3.GET("/process/:id/playout/:inputid/status", s.v3handler.restream.PlayoutStatus)
-		v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.restream.PlayoutReopenInput)
-		v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.restream.PlayoutKeyframe)
-		v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.restream.PlayoutEncodeErrorframe)
+		v3.GET("/process/:id/playout/:inputid/status", s.v3handler.process.PlayoutStatus)
+		v3.GET("/process/:id/playout/:inputid/reopen", s.v3handler.process.PlayoutReopenInput)
+		v3.GET("/process/:id/playout/:inputid/keyframe/*", s.v3handler.process.PlayoutKeyframe)
+		v3.GET("/process/:id/playout/:inputid/errorframe/encode", s.v3handler.process.PlayoutEncodeErrorframe)
 
 		if !s.readOnly {
-			v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
-			v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.restream.PlayoutSetErrorframe)
+			v3.PUT("/process/:id/playout/:inputid/errorframe/*", s.v3handler.process.PlayoutSetErrorframe)
+			v3.POST("/process/:id/playout/:inputid/errorframe/*", s.v3handler.process.PlayoutSetErrorframe)
 
-			v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.restream.PlayoutSetStream)
+			v3.PUT("/process/:id/playout/:inputid/stream", s.v3handler.process.PlayoutSetStream)
 		}
 
 		// v3 Report
-		v3.GET("/report/process", s.v3handler.restream.SearchReportHistory)
+		v3.GET("/report/process", s.v3handler.process.SearchReportHistory)
 	}
 
 	// v3 Filesystems

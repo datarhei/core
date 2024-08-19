@@ -21,7 +21,7 @@ func (r *readOnlyFilesystem) Symlink(oldname, newname string) error {
 	return os.ErrPermission
 }
 
-func (r *readOnlyFilesystem) WriteFileReader(path string, rd io.Reader) (int64, bool, error) {
+func (r *readOnlyFilesystem) WriteFileReader(path string, rd io.Reader, size int) (int64, bool, error) {
 	return -1, false, os.ErrPermission
 }
 

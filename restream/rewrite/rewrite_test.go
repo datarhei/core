@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/datarhei/core/v16/iam"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func getIAM(enableBasic bool) (iam.IAM, error) {
 		return nil, err
 	}
 
-	policyAdapter, err := iamaccess.NewJSONAdapter(memfs, "./policy.json", nil)
+	policyAdapter, err := policy.NewJSONAdapter(memfs, "./policy.json", nil)
 	if err != nil {
 		return nil, err
 	}

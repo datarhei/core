@@ -4,9 +4,7 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/cluster/store"
-	iamaccess "github.com/datarhei/core/v16/iam/access"
-
-	"github.com/casbin/casbin/v2/model"
+	"github.com/datarhei/core/v16/iam/policy"
 )
 
 type policyAdapter struct {
@@ -15,7 +13,7 @@ type policyAdapter struct {
 	lock    sync.RWMutex
 }
 
-func NewPolicyAdapter(store store.Store) (iamaccess.Adapter, error) {
+func NewPolicyAdapter(store store.Store) (policy.Adapter, error) {
 	a := &policyAdapter{
 		store:   store,
 		domains: map[string]struct{}{},
@@ -24,13 +22,13 @@ func NewPolicyAdapter(store store.Store) (iamaccess.Adapter, error) {
 	return a, nil
 }
 
-func (a *policyAdapter) LoadPolicy(model model.Model) error {
-	policies := a.store.IAMPolicyList()
+func (a *policyAdapter) LoadPolicy(model policy.Model) error {
+	storePolicies := a.store.IAMPolicyList()
 
-	rules := [][]string{}
+	policies := []policy.Policy{}
 	domains := map[string]struct{}{}
 
-	for _, p := range policies.Policies {
+	for _, p := range storePolicies.Policies {
 		if len(p.Domain) == 0 {
 			p.Domain = "$none"
 		}
@@ -39,19 +37,20 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 			p.Types = []string{"$none"}
 		}
 
-		rule := []string{
-			p.Name,
-			p.Domain,
-			iamaccess.EncodeResource(p.Types, p.Resource),
-			iamaccess.EncodeActions(p.Actions),
+		policy := policy.Policy{
+			Name:     p.Name,
+			Domain:   p.Domain,
+			Types:    p.Types,
+			Resource: p.Resource,
+			Actions:  p.Actions,
 		}
 
 		domains[p.Domain] = struct{}{}
 
-		rules = append(rules, rule)
+		policies = append(policies, policy)
 	}
 
-	model.AddPolicies("p", "p", rules)
+	model.AddPolicies(policies)
 
 	a.lock.Lock()
 	a.domains = domains
@@ -60,27 +59,23 @@ func (a *policyAdapter) LoadPolicy(model model.Model) error {
 	return nil
 }
 
-func (a *policyAdapter) SavePolicy(model model.Model) error {
+func (a *policyAdapter) SavePolicy(_ policy.Model) error {
 	return nil
 }
 
-func (a *policyAdapter) AddPolicy(sec, ptype string, rule []string) error {
+func (a *policyAdapter) AddPolicy(_ policy.Policy) error {
 	return nil
 }
 
-func (a *policyAdapter) AddPolicies(sec string, ptype string, rules [][]string) error {
+func (a *policyAdapter) AddPolicies(_ []policy.Policy) error {
 	return nil
 }
 
-func (a *policyAdapter) RemovePolicy(sec string, ptype string, rule []string) error {
+func (a *policyAdapter) RemovePolicy(_ policy.Policy) error {
 	return nil
 }
 
-func (a *policyAdapter) RemovePolicies(sec string, ptype string, rules [][]string) error {
-	return nil
-}
-
-func (a *policyAdapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int, fieldValues ...string) error {
+func (a *policyAdapter) RemovePolicies(_ []policy.Policy) error {
 	return nil
 }
 

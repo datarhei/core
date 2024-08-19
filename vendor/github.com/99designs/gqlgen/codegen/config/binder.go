@@ -61,7 +61,7 @@ func (b *Binder) FindTypeFromName(name string) (types.Type, error) {
 	return b.FindType(pkgName, typeName)
 }
 
-func (b *Binder) FindType(pkgName string, typeName string) (types.Type, error) {
+func (b *Binder) FindType(pkgName, typeName string) (types.Type, error) {
 	if pkgName == "" {
 		if typeName == "map[string]interface{}" {
 			return MapType, nil
@@ -99,7 +99,7 @@ var (
 func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
 	models := b.cfg.Models[name].Model
 	if len(models) == 0 {
-		return nil, fmt.Errorf(name + " not found in typemap")
+		return nil, fmt.Errorf("%s not found in typemap", name)
 	}
 
 	if models[0] == "map[string]interface{}" {
@@ -123,9 +123,9 @@ func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
 	return obj.Type(), nil
 }
 
-func (b *Binder) FindObject(pkgName string, typeName string) (types.Object, error) {
+func (b *Binder) FindObject(pkgName, typeName string) (types.Object, error) {
 	if pkgName == "" {
-		return nil, fmt.Errorf("package cannot be nil")
+		return nil, errors.New("package cannot be nil")
 	}
 
 	pkg := b.pkgs.LoadWithTypes(pkgName)
@@ -349,7 +349,7 @@ func isIntf(t types.Type) bool {
 
 func unwrapOmittable(t types.Type) (types.Type, bool) {
 	if t == nil {
-		return t, false
+		return nil, false
 	}
 	named, ok := t.(*types.Named)
 	if !ok {

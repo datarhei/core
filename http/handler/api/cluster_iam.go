@@ -7,8 +7,8 @@ import (
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/iam/access"
 	"github.com/datarhei/core/v16/iam/identity"
+	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/labstack/echo/v4"
 )
 
@@ -198,14 +198,14 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 		}
 	}
 
-	accessPolicies := []access.Policy{}
+	accessPolicies := []policy.Policy{}
 
 	for _, p := range policies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
 			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 
-		accessPolicies = append(accessPolicies, access.Policy{
+		accessPolicies = append(accessPolicies, policy.Policy{
 			Name:     name,
 			Domain:   p.Domain,
 			Types:    p.Types,

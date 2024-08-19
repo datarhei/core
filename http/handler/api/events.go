@@ -113,7 +113,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 				res.Write([]byte(":keepalive\n\n"))
 				res.Flush()
 			case e := <-evts:
-				event.Marshal(&e)
+				event.Unmarshal(&e)
 
 				if !filterEvent(&event) {
 					continue
@@ -141,7 +141,7 @@ func (h *EventsHandler) Events(c echo.Context) error {
 				res.Write([]byte("{\"event\": \"keepalive\"}\n"))
 				res.Flush()
 			case e := <-evts:
-				event.Marshal(&e)
+				event.Unmarshal(&e)
 
 				if !filterEvent(&event) {
 					continue

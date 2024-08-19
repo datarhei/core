@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ type MemoryInfo struct {
 	Available  uint64 // bytes
 	Used       uint64 // bytes
 	Limit      uint64 // bytes
+	Core       uint64 // bytes
 	Throttling bool
 	Error      error
 }
@@ -31,6 +33,7 @@ type CPUInfo struct {
 	Idle       float64 // percent 0-100
 	Other      float64 // percent 0-100
 	Limit      float64 // percent 0-100
+	Core       float64 // percent 0-100
 	Throttling bool
 	Error      error
 }
@@ -45,6 +48,8 @@ type resources struct {
 	isUnlimited      bool
 	isCPULimiting    bool
 	isMemoryLimiting bool
+
+	self psutil.Process
 
 	cancelObserver context.CancelFunc
 
@@ -137,6 +142,11 @@ func New(config Config) (Resources, error) {
 		"max_memory": r.maxMemory,
 	})
 
+	r.self, err = psutil.NewProcess(int32(os.Getpid()), false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create process observer for self: %w", err)
+	}
+
 	r.logger.Debug().Log("Created")
 
 	r.stopOnce.Do(func() {})
@@ -160,6 +170,7 @@ func (r *resources) Start() {
 func (r *resources) Stop() {
 	r.stopOnce.Do(func() {
 		r.cancelObserver()
+		r.self.Stop()
 
 		r.startOnce = sync.Once{}
 
@@ -326,6 +337,8 @@ func (r *resources) Info() Info {
 
 	cpustat, cpuerr := r.psutil.CPUPercent()
 	memstat, memerr := r.psutil.VirtualMemory()
+	selfcpu, _ := r.self.CPUPercent()
+	selfmem, _ := r.self.VirtualMemory()
 
 	cpuinfo := CPUInfo{
 		NCPU:       r.ncpu,
@@ -334,6 +347,7 @@ func (r *resources) Info() Info {
 		Idle:       cpustat.Idle,
 		Other:      cpustat.Other,
 		Limit:      cpulimit,
+		Core:       selfcpu.System + selfcpu.User + selfcpu.Other,
 		Throttling: cputhrottling,
 		Error:      cpuerr,
 	}
@@ -343,6 +357,7 @@ func (r *resources) Info() Info {
 		Available:  memstat.Available,
 		Used:       memstat.Used,
 		Limit:      memlimit,
+		Core:       selfmem,
 		Throttling: memthrottling,
 		Error:      memerr,
 	}

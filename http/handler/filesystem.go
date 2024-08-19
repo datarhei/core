@@ -115,9 +115,9 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 			}
 
 			c.Response().Header().Set("Content-Range", ranges[0].contentRange(stat.Size()))
-			streamFile = &limitReader{
-				r:    streamFile,
-				size: int(ranges[0].length),
+			streamFile = &io.LimitedReader{
+				R: streamFile,
+				N: ranges[0].length,
 			}
 
 			status = http.StatusPartialContent
@@ -134,7 +134,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	req := c.Request()
 
-	_, created, err := h.FS.Filesystem.WriteFileReader(path, req.Body)
+	_, created, err := h.FS.Filesystem.WriteFileReader(path, req.Body, -1)
 	if err != nil {
 		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
@@ -328,32 +328,6 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fileinfos)
-}
-
-type limitReader struct {
-	r    io.Reader
-	size int
-}
-
-func (l *limitReader) Read(p []byte) (int, error) {
-	if l.size == 0 {
-		return 0, io.EOF
-	}
-
-	len := len(p)
-
-	if len > l.size {
-		p = p[:l.size]
-	}
-
-	i, err := l.r.Read(p)
-	if err != nil {
-		return i, err
-	}
-
-	l.size -= i
-
-	return i, nil
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb

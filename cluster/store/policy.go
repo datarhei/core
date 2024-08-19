@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/datarhei/core/v16/iam/access"
+	"github.com/datarhei/core/v16/iam/policy"
 )
 
 func (s *store) setPolicies(cmd CommandSetPolicies) error {
@@ -80,9 +80,9 @@ func (s *store) IAMIdentityPolicyList(name string) Policies {
 }
 
 // updatePolicy updates a policy such that the resource type is split off the resource
-func (s *store) updatePolicy(p access.Policy) access.Policy {
+func (s *store) updatePolicy(p policy.Policy) policy.Policy {
 	if len(p.Types) == 0 {
-		p.Types, p.Resource = access.DecodeResource(p.Resource)
+		p.Types, p.Resource = policy.DecodeResource(p.Resource)
 	}
 
 	return p

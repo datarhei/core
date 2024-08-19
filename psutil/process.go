@@ -41,6 +41,7 @@ type process struct {
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
 	nTicks           uint64
+	memRSS           uint64
 }
 
 func (u *util) Process(pid int32) (Process, error) {
@@ -60,7 +61,8 @@ func (u *util) Process(pid int32) (Process, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	p.stopTicker = cancel
-	go p.tick(ctx, 1000*time.Millisecond)
+	go p.tickCPU(ctx, time.Second)
+	go p.tickMemory(ctx, time.Second)
 
 	return p, nil
 }
@@ -69,7 +71,7 @@ func NewProcess(pid int32, limit bool) (Process, error) {
 	return DefaultUtil.Process(pid)
 }
 
-func (p *process) tick(ctx context.Context, interval time.Duration) {
+func (p *process) tickCPU(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -78,7 +80,7 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case t := <-ticker.C:
-			stat := p.collect()
+			stat := p.collectCPU()
 
 			p.lock.Lock()
 			p.statPrevious, p.statCurrent = p.statCurrent, stat
@@ -89,7 +91,7 @@ func (p *process) tick(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (p *process) collect() cpuTimesStat {
+func (p *process) collectCPU() cpuTimesStat {
 	stat, err := p.cpuTimes()
 	if err != nil {
 		return cpuTimesStat{
@@ -99,6 +101,33 @@ func (p *process) collect() cpuTimesStat {
 	}
 
 	return *stat
+}
+
+func (p *process) tickMemory(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			rss := p.collectMemory()
+
+			p.lock.Lock()
+			p.memRSS = rss
+			p.lock.Unlock()
+		}
+	}
+}
+
+func (p *process) collectMemory() uint64 {
+	info, err := p.proc.MemoryInfo()
+	if err != nil {
+		return 0
+	}
+
+	return info.RSS
 }
 
 func (p *process) Stop() {
@@ -111,26 +140,6 @@ func (p *process) Suspend() error {
 
 func (p *process) Resume() error {
 	return p.proc.Resume()
-}
-
-func (p *process) cpuTimes() (*cpuTimesStat, error) {
-	times, err := p.proc.Times()
-	if err != nil {
-		return nil, err
-	}
-
-	s := &cpuTimesStat{
-		total:  cpuTotal(times),
-		system: times.System,
-		user:   times.User,
-	}
-
-	s.other = s.total - s.system - s.user
-	if s.other < 0.0001 {
-		s.other = 0
-	}
-
-	return s, nil
 }
 
 func (p *process) CPUPercent() (*CPUInfoStat, error) {
@@ -178,10 +187,8 @@ func (p *process) CPUPercent() (*CPUInfoStat, error) {
 }
 
 func (p *process) VirtualMemory() (uint64, error) {
-	info, err := p.proc.MemoryInfo()
-	if err != nil {
-		return 0, err
-	}
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 
-	return info.RSS, nil
+	return p.memRSS, nil
 }

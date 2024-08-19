@@ -1,6 +1,9 @@
 package api
 
 import (
+	"strconv"
+
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -26,6 +29,114 @@ type Process struct {
 	State     *ProcessState  `json:"state,omitempty"`
 	Report    *ProcessReport `json:"report,omitempty"`
 	Metadata  Metadata       `json:"metadata,omitempty"`
+}
+
+func (p *Process) Unmarshal(ap *app.Process, ac *app.Config, as *app.State, ar *app.Report, am interface{}) {
+	p.ID = ap.ID
+	p.Owner = ap.Owner
+	p.Domain = ap.Domain
+	p.Reference = ap.Reference
+	p.Type = "ffmpeg"
+	p.CreatedAt = ap.CreatedAt
+	p.UpdatedAt = ap.UpdatedAt
+
+	p.Config = nil
+	if ac != nil {
+		p.Config = &ProcessConfig{}
+		p.Config.Unmarshal(ap.Config, nil)
+	}
+
+	p.State = nil
+	if as != nil {
+		p.State = &ProcessState{}
+		p.State.Unmarshal(as)
+	}
+
+	p.Report = nil
+	if ar != nil {
+		p.Report = &ProcessReport{}
+		p.Report.Unmarshal(ar)
+	}
+
+	p.Metadata = nil
+	if am != nil {
+		p.Metadata = NewMetadata(am)
+	}
+}
+
+func (p *Process) UnmarshalStore(s store.Process, config, state, report, metadata bool) {
+	p.ID = s.Config.ID
+	p.Owner = s.Config.Owner
+	p.Domain = s.Config.Domain
+	p.Type = "ffmpeg"
+	p.Reference = s.Config.Reference
+	p.CreatedAt = s.CreatedAt.Unix()
+	p.UpdatedAt = s.UpdatedAt.Unix()
+
+	p.Metadata = nil
+	if metadata {
+		p.Metadata = s.Metadata
+	}
+
+	p.Config = nil
+	if config {
+		config := &ProcessConfig{}
+		config.Unmarshal(s.Config, s.Metadata)
+
+		p.Config = config
+	}
+
+	p.State = nil
+	if state {
+		p.State = &ProcessState{
+			Order:   s.Order,
+			LastLog: s.Error,
+			Resources: ProcessUsage{
+				CPU: ProcessUsageCPU{
+					NCPU:  json.ToNumber(1),
+					Limit: json.ToNumber(s.Config.LimitCPU),
+				},
+				Memory: ProcessUsageMemory{
+					Limit: s.Config.LimitMemory,
+				},
+			},
+			Command: []string{},
+			Progress: &Progress{
+				Input:  []ProgressIO{},
+				Output: []ProgressIO{},
+				Mapping: StreamMapping{
+					Graphs:  []GraphElement{},
+					Mapping: []GraphMapping{},
+				},
+			},
+		}
+
+		if len(s.Error) != 0 {
+			p.State.State = "failed"
+		} else {
+			p.State.State = "deploying"
+		}
+	}
+
+	if report {
+		p.Report = &ProcessReport{
+			ProcessReportEntry: ProcessReportEntry{
+				CreatedAt: s.CreatedAt.Unix(),
+				Prelude:   []string{},
+				Log:       [][2]string{},
+				Matches:   []string{},
+			},
+		}
+
+		if len(s.Error) != 0 {
+			p.Report.Prelude = []string{s.Error}
+			p.Report.Log = [][2]string{
+				{strconv.FormatInt(s.CreatedAt.Unix(), 10), s.Error},
+			}
+			//process.Report.ExitedAt = p.CreatedAt.Unix()
+			//process.Report.ExitState = "failed"
+		}
+	}
 }
 
 // ProcessConfigIO represents an input or output of an ffmpeg process config
@@ -70,7 +181,7 @@ type ProcessConfig struct {
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Marshal converts a process config in API representation to a restreamer process config and metadata
+// Marshal converts a process config in API representation to a core process config and metadata
 func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 	p := &app.Config{
 		ID:             cfg.ID,
@@ -153,8 +264,8 @@ func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {
 	}
 }
 
-// Unmarshal converts a restream process config to a process config in API representation
-func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
+// Unmarshal converts a core process config to a process config in API representation
+func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface{}) {
 	if c == nil {
 		return
 	}
@@ -212,6 +323,8 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config) {
 
 	cfg.LogPatterns = make([]string, len(c.LogPatterns))
 	copy(cfg.LogPatterns, c.LogPatterns)
+
+	cfg.Metadata = metadata
 }
 
 func (p *ProcessConfig) ProcessID() app.ProcessID {
@@ -236,7 +349,7 @@ type ProcessState struct {
 	Command   []string     `json:"command"`
 }
 
-// Unmarshal converts a restreamer ffmpeg process state to a state in API representation
+// Unmarshal converts a core ffmpeg process state to a state in API representation
 func (s *ProcessState) Unmarshal(state *app.State) {
 	if state == nil {
 		return
@@ -249,19 +362,19 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.LastLog = state.LastLog
 	s.Progress = &Progress{}
 	s.Memory = state.Memory
-	s.CPU = ToNumber(state.CPU)
+	s.CPU = json.ToNumber(state.CPU)
 	s.LimitMode = state.LimitMode
 	s.Resources.CPU = ProcessUsageCPU{
-		NCPU:         ToNumber(state.Resources.CPU.NCPU),
-		Current:      ToNumber(state.Resources.CPU.Current),
-		Average:      ToNumber(state.Resources.CPU.Average),
-		Max:          ToNumber(state.Resources.CPU.Max),
-		Limit:        ToNumber(state.Resources.CPU.Limit),
+		NCPU:         json.ToNumber(state.Resources.CPU.NCPU),
+		Current:      json.ToNumber(state.Resources.CPU.Current),
+		Average:      json.ToNumber(state.Resources.CPU.Average),
+		Max:          json.ToNumber(state.Resources.CPU.Max),
+		Limit:        json.ToNumber(state.Resources.CPU.Limit),
 		IsThrottling: state.Resources.CPU.IsThrottling,
 	}
 	s.Resources.Memory = ProcessUsageMemory{
 		Current: state.Resources.Memory.Current,
-		Average: ToNumber(state.Resources.Memory.Average),
+		Average: json.ToNumber(state.Resources.Memory.Average),
 		Max:     state.Resources.Memory.Max,
 		Limit:   state.Resources.Memory.Limit,
 	}
@@ -279,6 +392,43 @@ type ProcessUsageCPU struct {
 	IsThrottling bool        `json:"throttling"`
 }
 
+func (p *ProcessUsageCPU) Unmarshal(pp *app.ProcessUsageCPU) {
+	p.NCPU = json.ToNumber(pp.NCPU)
+	p.Current = json.ToNumber(pp.Current)
+	p.Average = json.ToNumber(pp.Average)
+	p.Max = json.ToNumber(pp.Max)
+	p.Limit = json.ToNumber(pp.Limit)
+	p.IsThrottling = pp.IsThrottling
+}
+
+func (p *ProcessUsageCPU) Marshal() app.ProcessUsageCPU {
+	pp := app.ProcessUsageCPU{
+		IsThrottling: p.IsThrottling,
+	}
+
+	if x, err := p.NCPU.Float64(); err == nil {
+		pp.NCPU = x
+	}
+
+	if x, err := p.Current.Float64(); err == nil {
+		pp.Current = x
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = x
+	}
+
+	if x, err := p.Max.Float64(); err == nil {
+		pp.Max = x
+	}
+
+	if x, err := p.Limit.Float64(); err == nil {
+		pp.Limit = x
+	}
+
+	return pp
+}
+
 type ProcessUsageMemory struct {
 	Current uint64      `json:"cur" format:"uint64"`
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
@@ -286,7 +436,42 @@ type ProcessUsageMemory struct {
 	Limit   uint64      `json:"limit" format:"uint64"`
 }
 
+func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
+	p.Current = pp.Current
+	p.Average = json.ToNumber(pp.Average)
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageMemory) Marshal() app.ProcessUsageMemory {
+	pp := app.ProcessUsageMemory{
+		Current: p.Current,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = x
+	}
+
+	return pp
+}
+
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU    `json:"cpu_usage"`
 	Memory ProcessUsageMemory `json:"memory_bytes"`
+}
+
+func (p *ProcessUsage) Unmarshal(pp *app.ProcessUsage) {
+	p.CPU.Unmarshal(&pp.CPU)
+	p.Memory.Unmarshal(&pp.Memory)
+}
+
+func (p *ProcessUsage) Marshal() app.ProcessUsage {
+	pp := app.ProcessUsage{
+		CPU:    p.CPU.Marshal(),
+		Memory: p.Memory.Marshal(),
+	}
+
+	return pp
 }

@@ -292,18 +292,17 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 			getter += "\treturn interfaceSlice\n"
 			getter += "}"
 			return getter
-		} else {
-			getter := fmt.Sprintf("func (this %s) Get%s() %s { return ", templates.ToGo(model.Name), field.GoName, goType)
-
-			if interfaceFieldTypeIsPointer && !structFieldTypeIsPointer {
-				getter += "&"
-			} else if !interfaceFieldTypeIsPointer && structFieldTypeIsPointer {
-				getter += "*"
-			}
-
-			getter += fmt.Sprintf("this.%s }", field.GoName)
-			return getter
 		}
+		getter := fmt.Sprintf("func (this %s) Get%s() %s { return ", templates.ToGo(model.Name), field.GoName, goType)
+
+		if interfaceFieldTypeIsPointer && !structFieldTypeIsPointer {
+			getter += "&"
+		} else if !interfaceFieldTypeIsPointer && structFieldTypeIsPointer {
+			getter += "*"
+		}
+
+		getter += fmt.Sprintf("this.%s }", field.GoName)
+		return getter
 	}
 	funcMap := template.FuncMap{
 		"getInterfaceByName": getInterfaceByName,
@@ -446,36 +445,67 @@ func (m *Plugin) generateFields(cfg *config.Config, schemaType *ast.Definition) 
 		fields = append(fields, f)
 	}
 
-	// appending extra fields at the end of the fields list.
-	modelcfg := cfg.Models[schemaType.Name]
-	if len(modelcfg.ExtraFields) > 0 {
-		ff := make([]*Field, 0, len(modelcfg.ExtraFields))
-		for fname, fspec := range modelcfg.ExtraFields {
-			ftype := buildType(fspec.Type)
-
-			tag := `json:"-"`
-			if fspec.OverrideTags != "" {
-				tag = fspec.OverrideTags
-			}
-
-			ff = append(ff,
-				&Field{
-					Name:        fname,
-					GoName:      fname,
-					Type:        ftype,
-					Description: fspec.Description,
-					Tag:         tag,
-				})
-		}
-
-		sort.Slice(ff, func(i, j int) bool {
-			return ff[i].Name < ff[j].Name
-		})
-
-		fields = append(fields, ff...)
-	}
+	fields = append(fields, getExtraFields(cfg, schemaType.Name)...)
 
 	return fields, nil
+}
+
+func getExtraFields(cfg *config.Config, modelName string) []*Field {
+	modelcfg := cfg.Models[modelName]
+
+	extraFieldsCount := len(modelcfg.ExtraFields) + len(modelcfg.EmbedExtraFields)
+	if extraFieldsCount == 0 {
+		return nil
+	}
+
+	extraFields := make([]*Field, 0, extraFieldsCount)
+
+	makeExtraField := func(fname string, fspec config.ModelExtraField) *Field {
+		ftype := buildType(fspec.Type)
+
+		tag := `json:"-"`
+		if fspec.OverrideTags != "" {
+			tag = fspec.OverrideTags
+		}
+
+		return &Field{
+			Name:        fname,
+			GoName:      fname,
+			Type:        ftype,
+			Description: fspec.Description,
+			Tag:         tag,
+		}
+	}
+
+	if len(modelcfg.ExtraFields) > 0 {
+		for fname, fspec := range modelcfg.ExtraFields {
+			extraFields = append(extraFields, makeExtraField(fname, fspec))
+		}
+	}
+
+	if len(modelcfg.EmbedExtraFields) > 0 {
+		for _, fspec := range modelcfg.EmbedExtraFields {
+			extraFields = append(extraFields, makeExtraField("", fspec))
+		}
+	}
+
+	sort.Slice(extraFields, func(i, j int) bool {
+		if extraFields[i].Name == "" && extraFields[j].Name == "" {
+			return extraFields[i].Type.String() < extraFields[j].Type.String()
+		}
+
+		if extraFields[i].Name == "" {
+			return false
+		}
+
+		if extraFields[j].Name == "" {
+			return true
+		}
+
+		return extraFields[i].Name < extraFields[j].Name
+	})
+
+	return extraFields
 }
 
 func getStructTagFromField(cfg *config.Config, field *ast.FieldDefinition) string {
@@ -591,7 +621,7 @@ func removeDuplicateTags(t string) string {
 		key := kv[0]
 		value := strings.Join(kv[1:], ":")
 		processed[key] = true
-		if len(returnTags) > 0 {
+		if returnTags != "" {
 			returnTags = " " + returnTags
 		}
 

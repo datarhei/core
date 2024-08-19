@@ -65,14 +65,14 @@ func (r *sizedFilesystem) Resize(size int64) error {
 	return nil
 }
 
-func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader) (int64, bool, error) {
+func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader, sizeHint int) (int64, bool, error) {
 	currentSize, maxSize := r.Size()
 	if maxSize <= 0 {
-		return r.Filesystem.WriteFileReader(path, rd)
+		return r.Filesystem.WriteFileReader(path, rd, sizeHint)
 	}
 
 	data := bytes.Buffer{}
-	size, err := data.ReadFrom(rd)
+	size, err := copyToBufferFromReader(&data, rd, 8*1024)
 	if err != nil {
 		return -1, false, err
 	}
@@ -97,11 +97,11 @@ func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader) (int64, boo
 		}
 	}
 
-	return r.Filesystem.WriteFileReader(path, &data)
+	return r.Filesystem.WriteFileReader(path, &data, int(size))
 }
 
 func (r *sizedFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return r.WriteFileReader(path, bytes.NewBuffer(data))
+	return r.WriteFileReader(path, bytes.NewBuffer(data), len(data))
 }
 
 func (r *sizedFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {

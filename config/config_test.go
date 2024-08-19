@@ -60,12 +60,12 @@ func TestValidateDefault(t *testing.T) {
 	fs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
 
-	size, fresh, err := fs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"))
+	size, fresh, err := fs.WriteFileReader("./mime.types", strings.NewReader("xxxxx"), -1)
 	require.Equal(t, int64(5), size)
 	require.Equal(t, true, fresh)
 	require.NoError(t, err)
 
-	_, _, err = fs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"))
+	_, _, err = fs.WriteFileReader("/bin/ffmpeg", strings.NewReader("xxxxx"), -1)
 	require.NoError(t, err)
 
 	cfg := New(fs)

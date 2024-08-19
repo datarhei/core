@@ -330,7 +330,7 @@ func (fs *diskFilesystem) ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool, error) {
+func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
 	replace := true
@@ -366,7 +366,7 @@ func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader) (int64, bool
 }
 
 func (fs *diskFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
-	return fs.WriteFileReader(path, bytes.NewReader(data))
+	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
 func (fs *diskFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {

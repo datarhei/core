@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"bytes"
 	"strings"
 	"time"
 
@@ -54,14 +55,14 @@ func (p *prober) Probe() Probe {
 	return probe
 }
 
-func (p *prober) Parse(line string) uint64 {
-	if strings.HasPrefix(line, "avstream.progress:") {
+func (p *prober) Parse(line []byte) uint64 {
+	if bytes.HasPrefix(line, []byte("avstream.progress:")) {
 		return 0
 	}
 
 	p.data = append(p.data, process.Line{
 		Timestamp: time.Now(),
-		Data:      line,
+		Data:      string(line),
 	})
 
 	return 0

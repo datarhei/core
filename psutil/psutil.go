@@ -102,6 +102,7 @@ type util struct {
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
 	nTicks           uint64
+	mem              MemoryInfoStat
 }
 
 // New returns a new util, it will be started automatically
@@ -127,6 +128,13 @@ func New(root string) (Util, error) {
 		}
 	}
 
+	mem, err := u.virtualMemory()
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine system memory: %w", err)
+	}
+
+	u.mem = *mem
+
 	u.stopOnce.Do(func() {})
 
 	u.Start()
@@ -139,7 +147,8 @@ func (u *util) Start() {
 		ctx, cancel := context.WithCancel(context.Background())
 		u.stopTicker = cancel
 
-		go u.tick(ctx, 1000*time.Millisecond)
+		go u.tickCPU(ctx, time.Second)
+		go u.tickMemory(ctx, time.Second)
 	})
 }
 
@@ -233,7 +242,7 @@ func (u *util) cgroupCPULimit(version int) (uint64, float64) {
 	return 0, 0
 }
 
-func (u *util) tick(ctx context.Context, interval time.Duration) {
+func (u *util) tickCPU(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -242,7 +251,7 @@ func (u *util) tick(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case t := <-ticker.C:
-			stat := u.collect()
+			stat := u.collectCPU()
 
 			u.lock.Lock()
 			u.statPrevious, u.statCurrent = u.statCurrent, stat
@@ -253,7 +262,7 @@ func (u *util) tick(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (u *util) collect() cpuTimesStat {
+func (u *util) collectCPU() cpuTimesStat {
 	stat, err := u.cpuTimes()
 	if err != nil {
 		return cpuTimesStat{
@@ -263,6 +272,34 @@ func (u *util) collect() cpuTimesStat {
 	}
 
 	return *stat
+}
+
+func (u *util) tickMemory(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			stat := u.collectMemory()
+			if stat != nil {
+				u.lock.Lock()
+				u.mem = *stat
+				u.lock.Unlock()
+			}
+		}
+	}
+}
+
+func (u *util) collectMemory() *MemoryInfoStat {
+	stat, err := u.virtualMemory()
+	if err != nil {
+		return nil
+	}
+
+	return stat
 }
 
 func (u *util) CPUCounts(logical bool) (float64, error) {
@@ -409,7 +446,7 @@ func DiskUsage(path string) (*disk.UsageStat, error) {
 	return DefaultUtil.DiskUsage(path)
 }
 
-func (u *util) VirtualMemory() (*MemoryInfoStat, error) {
+func (u *util) virtualMemory() (*MemoryInfoStat, error) {
 	info, err := mem.VirtualMemory()
 	if err != nil {
 		return nil, err
@@ -429,6 +466,19 @@ func (u *util) VirtualMemory() (*MemoryInfoStat, error) {
 		Available: info.Available,
 		Used:      info.Used,
 	}, nil
+}
+
+func (u *util) VirtualMemory() (*MemoryInfoStat, error) {
+	u.lock.RLock()
+	defer u.lock.RUnlock()
+
+	stat := &MemoryInfoStat{
+		Total:     u.mem.Total,
+		Available: u.mem.Available,
+		Used:      u.mem.Used,
+	}
+
+	return stat, nil
 }
 
 func VirtualMemory() (*MemoryInfoStat, error) {

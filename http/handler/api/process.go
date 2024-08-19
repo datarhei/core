@@ -1,8 +1,8 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -155,7 +155,7 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	for i := 0; i < 8; /*runtime.NumCPU()*/ i++ {
 		wg.Add(1)
 
 		go func(idChan <-chan app.ProcessID) {
@@ -315,7 +315,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	// Prefill the config with the current values
-	process.Unmarshal(current.Config)
+	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -332,11 +332,6 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	config, metadata := process.Marshal()
-
-	tid = app.ProcessID{
-		ID:     id,
-		Domain: domain,
-	}
 
 	if err := h.restream.UpdateProcess(tid, config); err != nil {
 		if err == restream.ErrUnknownProcess {
@@ -355,9 +350,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
-	p, _ := h.getProcess(tid, newFilter("config"))
-
-	return c.JSON(http.StatusOK, p.Config)
+	return c.JSON(http.StatusOK, process)
 }
 
 // Command issues a command to a process
@@ -450,7 +443,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 	}
 
 	config := api.ProcessConfig{}
-	config.Unmarshal(p.Config)
+	config.Unmarshal(p.Config, nil)
 
 	return c.JSON(http.StatusOK, config)
 }
@@ -545,7 +538,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 		Domain: domain,
 	}
 
-	l, err := h.restream.GetProcessLog(tid)
+	l, err := h.restream.GetProcessReport(tid)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
@@ -560,13 +553,15 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 	filteredReport := api.ProcessReport{}
 
 	// Add the current report as a fake history entry
-	report.History = append(report.History, api.ProcessReportEntry{
-		CreatedAt: report.CreatedAt,
-		Prelude:   report.Prelude,
-		Log:       report.Log,
+	report.History = append(report.History, api.ProcessReportHistoryEntry{
+		ProcessReportEntry: api.ProcessReportEntry{
+			CreatedAt: report.CreatedAt,
+			Prelude:   report.Prelude,
+			Log:       report.Log,
+		},
 	})
 
-	entries := []api.ProcessReportEntry{}
+	entries := []api.ProcessReportHistoryEntry{}
 
 	for _, r := range report.History {
 		if createdAt != nil && exitedAt == nil {
@@ -604,6 +599,53 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, filteredReport)
+}
+
+// SetReport sets the report history of a process
+// @Summary Set the report history a process
+// @Description Set the report history a process
+// @Tags v16.?.?
+// @ID process-3-set-report
+// @Accept json
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Domain to act on"
+// @Param report body api.ProcessReport true "Process report"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/process/{id}/report [put]
+func (h *ProcessHandler) SetReport(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+	id := util.PathParam(c, "id")
+
+	fmt.Printf("entering SetReport handler\n")
+
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
+		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
+	}
+
+	tid := app.ProcessID{
+		ID:     id,
+		Domain: domain,
+	}
+
+	report := api.ProcessReport{}
+
+	if err := util.ShouldBindJSON(c, &report); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	appreport := report.Marshal()
+
+	if err := h.restream.SetProcessReport(tid, &appreport); err != nil {
+		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, "OK")
 }
 
 // SearchReportHistory returns a list of matching report references
@@ -1004,50 +1046,40 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 		return api.Process{}, err
 	}
 
-	info := api.Process{
-		ID:        process.ID,
-		Owner:     process.Owner,
-		Domain:    process.Domain,
-		Reference: process.Reference,
-		Type:      "ffmpeg",
-		CoreID:    h.restream.ID(),
-		CreatedAt: process.CreatedAt,
-		UpdatedAt: process.UpdatedAt,
-	}
+	var config *app.Config
+	var state *app.State
+	var report *app.Report
+	var metadata interface{}
 
 	if filter.config {
-		info.Config = &api.ProcessConfig{}
-		info.Config.Unmarshal(process.Config)
+		config = process.Config
 	}
 
 	if filter.state {
-		state, err := h.restream.GetProcessState(id)
+		state, err = h.restream.GetProcessState(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.State = &api.ProcessState{}
-		info.State.Unmarshal(state)
 	}
 
 	if filter.report {
-		log, err := h.restream.GetProcessLog(id)
+		report, err = h.restream.GetProcessReport(id)
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Report = &api.ProcessReport{}
-		info.Report.Unmarshal(log)
 	}
 
 	if filter.metadata {
-		data, err := h.restream.GetProcessMetadata(id, "")
+		metadata, err = h.restream.GetProcessMetadata(id, "")
 		if err != nil {
 			return api.Process{}, err
 		}
-
-		info.Metadata = api.NewMetadata(data)
 	}
+
+	info := api.Process{
+		CoreID: h.restream.ID(),
+	}
+	info.Unmarshal(process, config, state, report, metadata)
 
 	return info, nil
 }
