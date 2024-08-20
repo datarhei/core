@@ -100,7 +100,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 
 	v := peer.CoreAbout()
 
-	version := api.Version{
+	version := api.AboutVersion{
 		Number:   v.Version.Number,
 		Commit:   v.Version.Commit,
 		Branch:   v.Version.Branch,

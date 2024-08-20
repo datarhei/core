@@ -51,6 +51,7 @@ import (
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/session"
@@ -100,6 +101,7 @@ type Config struct {
 	Cluster       cluster.Cluster
 	IAM           iam.IAM
 	IAMSkipper    func(ip string) bool
+	Resources     resources.Resources
 }
 
 type CorsConfig struct {
@@ -251,6 +253,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 	s.handler.about = api.NewAbout(
 		config.Restream,
+		config.Resources,
 		func() []string { return config.IAM.Validators() },
 	)
 
