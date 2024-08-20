@@ -208,6 +208,8 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 
 	if config.Storage == "map" {
 		fs.storage = newMapStorage()
+	} else if config.Storage == "swiss" {
+		fs.storage = newSwissMapStorage()
 	} else {
 		fs.storage = newMapOfStorage()
 	}

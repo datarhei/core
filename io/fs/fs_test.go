@@ -59,8 +59,14 @@ func TestFilesystem(t *testing.T) {
 	os.RemoveAll("./testing/")
 
 	filesystems := map[string]func(string) (Filesystem, error){
-		"memfs": func(name string) (Filesystem, error) {
-			return NewMemFilesystem(MemConfig{})
+		"memfs-map": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "map"})
+		},
+		"memfs-xsync": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "xsync"})
+		},
+		"memfs-swiss": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "swiss"})
 		},
 		"diskfs": func(name string) (Filesystem, error) {
 			return NewRootedDiskFilesystem(RootedDiskConfig{

@@ -13,6 +13,7 @@ require (
 	github.com/caddyserver/certmagic v0.21.3
 	github.com/datarhei/gosrt v0.7.0
 	github.com/datarhei/joy4 v0.0.0-20240603190808-b1407345907e
+	github.com/dolthub/swiss v0.2.1
 	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.22.0
 	github.com/gobwas/glob v0.2.3
@@ -61,6 +62,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dolthub/maphash v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.5 // indirect

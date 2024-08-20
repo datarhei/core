@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/dolthub/swiss"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
@@ -181,4 +182,92 @@ func (m *mapStorage) Range(f func(key string, value *memFile) bool) {
 			break
 		}
 	}
+}
+
+type swissMapStorage struct {
+	lock  *xsync.RBMutex
+	files *swiss.Map[string, *memFile]
+}
+
+func newSwissMapStorage() memStorage {
+	m := &swissMapStorage{
+		lock:  xsync.NewRBMutex(),
+		files: swiss.NewMap[string, *memFile](128),
+	}
+
+	return m
+}
+
+func (m *swissMapStorage) Delete(key string) (*memFile, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	file, hasFile := m.files.Get(key)
+	if !hasFile {
+		return nil, false
+	}
+
+	m.files.Delete(key)
+
+	return file, true
+}
+
+func (m *swissMapStorage) Store(key string, value *memFile) (*memFile, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	file, hasFile := m.files.Get(key)
+	m.files.Put(key, value)
+
+	return file, hasFile
+}
+
+func (m *swissMapStorage) Load(key string) (*memFile, bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	return m.files.Get(key)
+}
+
+func (m *swissMapStorage) LoadAndCopy(key string) (*memFile, bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	v, ok := m.files.Get(key)
+	if !ok {
+		return nil, false
+	}
+
+	f := &memFile{
+		memFileInfo: memFileInfo{
+			name:    v.name,
+			size:    v.size,
+			dir:     v.dir,
+			lastMod: v.lastMod,
+			linkTo:  v.linkTo,
+		},
+		r: nil,
+	}
+
+	if v.data != nil {
+		f.data = bytes.NewBuffer(v.data.Bytes())
+	}
+
+	return f, true
+}
+
+func (m *swissMapStorage) Has(key string) bool {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	return m.files.Has(key)
+}
+
+func (m *swissMapStorage) Range(f func(key string, value *memFile) bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	m.files.Iter(func(key string, value *memFile) bool {
+		return !f(key, value)
+	})
 }
