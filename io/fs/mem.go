@@ -525,6 +525,46 @@ func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, e
 	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
+func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
+	path = fs.cleanPath(path)
+
+	file, hasFile := fs.storage.LoadAndCopy(path)
+	if !hasFile {
+		size, _, err := fs.WriteFileReader(path, r, sizeHint)
+		return size, err
+	}
+
+	size, err := copyToBufferFromReader(file.data, r, 8*1024)
+	if err != nil {
+		fs.logger.WithFields(log.Fields{
+			"path":           path,
+			"filesize_bytes": size,
+			"error":          err,
+		}).Warn().Log("Incomplete file")
+
+		file.Close()
+
+		return -1, fmt.Errorf("incomplete file")
+	}
+
+	file.size += size
+
+	fs.storage.Store(path, file)
+
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
+	fs.currentSize += size
+
+	fs.logger.Debug().WithFields(log.Fields{
+		"path":           file.name,
+		"filesize_bytes": file.size,
+		"size_bytes":     fs.currentSize,
+	}).Log("Appended to file")
+
+	return size, nil
+}
+
 func (fs *memFilesystem) Purge(size int64) int64 {
 	files := []*memFile{}
 

@@ -108,6 +108,10 @@ type WriteFilesystem interface {
 	// an error adding the file and error is not nil.
 	WriteFileSafe(path string, data []byte) (int64, bool, error)
 
+	// AppendFileReader appends the contents from reader to the file at path. If the file doesn't
+	// exist, it will be created. The number of written bytes will be returned, -1 otherwise.
+	AppendFileReader(path string, r io.Reader, size int) (int64, error)
+
 	// MkdirAll creates a directory named path, along with any necessary parents, and returns nil,
 	// or else returns an error. The permission bits perm (before umask) are used for all directories
 	// that MkdirAll creates. If path is already a directory, MkdirAll does nothing and returns nil.

@@ -9,11 +9,27 @@ import (
 )
 
 type memStorage interface {
+	// Delete deletes a file from the storage.
 	Delete(key string) (*memFile, bool)
+
+	// Store stores a file to the storage. If there's already a file with
+	// the same key, that value will be returned and replaced with the
+	// new file.
 	Store(key string, value *memFile) (*memFile, bool)
+
+	// Load loads a file from the storage. This is a references to the file,
+	// i.e. all changes to the file will be reflected on the storage.
 	Load(key string) (value *memFile, ok bool)
+
+	// LoadAndCopy loads a file from the storage. The returned file is a copy
+	// and can be modified without modifying the file on the storage.
 	LoadAndCopy(key string) (value *memFile, ok bool)
+
+	// Has checks whether a file exists at path.
 	Has(key string) bool
+
+	// Range ranges over all files on the storage. The callback needs to return
+	// false in order to stop the iteration.
 	Range(f func(key string, value *memFile) bool)
 }
 

@@ -360,6 +360,25 @@ func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, er
 	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
 }
 
+func (fs *s3Filesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
+	path = fs.cleanPath(path)
+
+	ctx := context.Background()
+
+	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
+	if err != nil {
+		size, _, err := fs.write(path, r)
+		return size, err
+	}
+
+	buffer := bytes.Buffer{}
+	buffer.ReadFrom(object)
+	buffer.ReadFrom(r)
+
+	size, _, err := fs.write(path, &buffer)
+	return size, err
+}
+
 func (fs *s3Filesystem) Rename(src, dst string) error {
 	src = fs.cleanPath(src)
 	dst = fs.cleanPath(dst)
