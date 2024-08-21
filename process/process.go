@@ -43,7 +43,7 @@ type Process interface {
 	// running or not.
 	IsRunning() bool
 
-	// Limit enabled or disables CPU and memory limiting. CPU will be throttled
+	// Limit enables or disables CPU and memory limiting. CPU will be throttled
 	// into the configured limit. If memory consumption is above the configured
 	// limit, the process will be killed.
 	Limit(cpu, memory bool) error
