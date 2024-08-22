@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -624,4 +625,26 @@ func (p *Manager) ProcessProbeConfig(nodeid string, config *app.Config) (api.Pro
 	}
 
 	return node.Core().ProcessProbeConfig(config)
+}
+
+func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
+	eventChan := make(chan api.Event, 128)
+
+	p.lock.RLock()
+	for _, n := range p.nodes {
+		go func(node *Node, e chan<- api.Event) {
+			eventChan, err := node.Core().Events(ctx, filters)
+			if err != nil {
+				return
+			}
+
+			for event := range eventChan {
+				event.CoreID = node.id
+				e <- event
+			}
+		}(n, eventChan)
+	}
+	p.lock.RUnlock()
+
+	return eventChan, nil
 }

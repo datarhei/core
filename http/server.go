@@ -762,6 +762,8 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.FilesystemListFiles)
 
+		v3.POST("/cluster/events", s.v3handler.cluster.Events)
+
 		if !s.readOnly {
 			v3.PUT("/cluster/transfer/:id", s.v3handler.cluster.TransferLeadership)
 			v3.PUT("/cluster/leave", s.v3handler.cluster.Leave)
