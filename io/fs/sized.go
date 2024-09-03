@@ -135,34 +135,40 @@ func (r *sizedFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, 
 	return r.Filesystem.WriteFileSafe(path, data)
 }
 
+func (r *sizedFilesystem) AppendFileReader(path string, rd io.Reader, sizeHint int) (int64, error) {
+	currentSize, maxSize := r.Size()
+	if maxSize <= 0 {
+		return r.Filesystem.AppendFileReader(path, rd, sizeHint)
+	}
+
+	data := bytes.Buffer{}
+	size, err := copyToBufferFromReader(&data, rd, 8*1024)
+	if err != nil {
+		return -1, err
+	}
+
+	// Calculate the new size of the filesystem
+	newSize := currentSize + size
+
+	// If the the new size is larger than the allowed size, we have to free
+	// some space.
+	if newSize > maxSize {
+		if !r.purge {
+			return -1, fmt.Errorf("not enough space on device")
+		}
+
+		if r.Purge(size) < size {
+			return -1, fmt.Errorf("not enough space on device")
+		}
+	}
+
+	return r.Filesystem.AppendFileReader(path, &data, int(size))
+}
+
 func (r *sizedFilesystem) Purge(size int64) int64 {
 	if purger, ok := r.Filesystem.(PurgeFilesystem); ok {
 		return purger.Purge(size)
 	}
 
 	return 0
-	/*
-	   files := r.Filesystem.List("/", "")
-
-	   	sort.Slice(files, func(i, j int) bool {
-	   		return files[i].ModTime().Before(files[j].ModTime())
-	   	})
-
-	   var freed int64 = 0
-
-	   	for _, f := range files {
-	   		r.Filesystem.Remove(f.Name())
-	   		size -= f.Size()
-	   		freed += f.Size()
-	   		r.currentSize -= f.Size()
-
-	   		if size <= 0 {
-	   			break
-	   		}
-	   	}
-
-	   files = nil
-
-	   return freed
-	*/
 }

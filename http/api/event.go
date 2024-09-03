@@ -15,6 +15,7 @@ type Event struct {
 	Component string `json:"event"`
 	Message   string `json:"message"`
 	Caller    string `json:"caller"`
+	CoreID    string `json:"core_id,omitempty"`
 
 	Data map[string]string `json:"data"`
 }
@@ -66,8 +67,14 @@ func (e *Event) Filter(ef *EventFilter) bool {
 		}
 	}
 
-	if ef.reCaller != nil {
+	if len(e.Caller) != 0 && ef.reCaller != nil {
 		if !ef.reCaller.MatchString(e.Caller) {
+			return false
+		}
+	}
+
+	if len(e.CoreID) != 0 && ef.reCoreID != nil {
+		if !ef.reCoreID.MatchString(e.CoreID) {
 			return false
 		}
 	}
@@ -91,11 +98,13 @@ type EventFilter struct {
 	Message   string            `json:"message"`
 	Level     string            `json:"level"`
 	Caller    string            `json:"caller"`
+	CoreID    string            `json:"core_id"`
 	Data      map[string]string `json:"data"`
 
 	reMessage *regexp.Regexp
 	reLevel   *regexp.Regexp
 	reCaller  *regexp.Regexp
+	reCoreID  *regexp.Regexp
 	reData    map[string]*regexp.Regexp
 }
 
@@ -129,6 +138,15 @@ func (ef *EventFilter) Compile() error {
 		}
 
 		ef.reCaller = r
+	}
+
+	if len(ef.CoreID) != 0 {
+		r, err := regexp.Compile("(?i)" + ef.CoreID)
+		if err != nil {
+			return err
+		}
+
+		ef.reCoreID = r
 	}
 
 	ef.reData = make(map[string]*regexp.Regexp)

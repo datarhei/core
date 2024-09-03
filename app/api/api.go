@@ -1500,6 +1500,7 @@ func (a *api) start(ctx context.Context) error {
 
 			return false
 		},
+		Resources: a.resources,
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

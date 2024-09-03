@@ -4,15 +4,32 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/dolthub/swiss"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
 type memStorage interface {
+	// Delete deletes a file from the storage.
 	Delete(key string) (*memFile, bool)
+
+	// Store stores a file to the storage. If there's already a file with
+	// the same key, that value will be returned and replaced with the
+	// new file.
 	Store(key string, value *memFile) (*memFile, bool)
+
+	// Load loads a file from the storage. This is a references to the file,
+	// i.e. all changes to the file will be reflected on the storage.
 	Load(key string) (value *memFile, ok bool)
+
+	// LoadAndCopy loads a file from the storage. The returned file is a copy
+	// and can be modified without modifying the file on the storage.
 	LoadAndCopy(key string) (value *memFile, ok bool)
+
+	// Has checks whether a file exists at path.
 	Has(key string) bool
+
+	// Range ranges over all files on the storage. The callback needs to return
+	// false in order to stop the iteration.
 	Range(f func(key string, value *memFile) bool)
 }
 
@@ -181,4 +198,92 @@ func (m *mapStorage) Range(f func(key string, value *memFile) bool) {
 			break
 		}
 	}
+}
+
+type swissMapStorage struct {
+	lock  *xsync.RBMutex
+	files *swiss.Map[string, *memFile]
+}
+
+func newSwissMapStorage() memStorage {
+	m := &swissMapStorage{
+		lock:  xsync.NewRBMutex(),
+		files: swiss.NewMap[string, *memFile](128),
+	}
+
+	return m
+}
+
+func (m *swissMapStorage) Delete(key string) (*memFile, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	file, hasFile := m.files.Get(key)
+	if !hasFile {
+		return nil, false
+	}
+
+	m.files.Delete(key)
+
+	return file, true
+}
+
+func (m *swissMapStorage) Store(key string, value *memFile) (*memFile, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	file, hasFile := m.files.Get(key)
+	m.files.Put(key, value)
+
+	return file, hasFile
+}
+
+func (m *swissMapStorage) Load(key string) (*memFile, bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	return m.files.Get(key)
+}
+
+func (m *swissMapStorage) LoadAndCopy(key string) (*memFile, bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	v, ok := m.files.Get(key)
+	if !ok {
+		return nil, false
+	}
+
+	f := &memFile{
+		memFileInfo: memFileInfo{
+			name:    v.name,
+			size:    v.size,
+			dir:     v.dir,
+			lastMod: v.lastMod,
+			linkTo:  v.linkTo,
+		},
+		r: nil,
+	}
+
+	if v.data != nil {
+		f.data = bytes.NewBuffer(v.data.Bytes())
+	}
+
+	return f, true
+}
+
+func (m *swissMapStorage) Has(key string) bool {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	return m.files.Has(key)
+}
+
+func (m *swissMapStorage) Range(f func(key string, value *memFile) bool) {
+	token := m.lock.RLock()
+	defer m.lock.RUnlock(token)
+
+	m.files.Iter(func(key string, value *memFile) bool {
+		return !f(key, value)
+	})
 }

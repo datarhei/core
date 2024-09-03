@@ -199,12 +199,6 @@ func (r *registry) sessionPersister(pattern *strftime.Strftime, bufferDuration t
 	buffer := &bytes.Buffer{}
 	path := pattern.FormatString(time.Now())
 
-	file := r.persist.fs.Open(path)
-	if file != nil {
-		buffer.ReadFrom(file)
-		file.Close()
-	}
-
 	enc := json.NewEncoder(buffer)
 
 	ticker := time.NewTicker(bufferDuration)
@@ -222,7 +216,7 @@ loop:
 			currentPath := pattern.FormatString(session.ClosedAt)
 			if currentPath != path && session.ClosedAt.After(splitTime) {
 				if buffer.Len() > 0 {
-					_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
+					_, err := r.persist.fs.AppendFileReader(path, buffer, -1)
 					if err != nil {
 						r.logger.Error().WithError(err).WithField("path", path).Log("")
 					}
@@ -239,7 +233,7 @@ loop:
 			enc.Encode(&session)
 		case t := <-ticker.C:
 			if buffer.Len() > 0 {
-				_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
+				_, err := r.persist.fs.AppendFileReader(path, buffer, -1)
 				if err != nil {
 					r.logger.Error().WithError(err).WithField("path", path).Log("")
 				} else {
@@ -260,7 +254,7 @@ loop:
 	}
 
 	if buffer.Len() > 0 {
-		_, _, err := r.persist.fs.WriteFileSafe(path, buffer.Bytes())
+		_, err := r.persist.fs.AppendFileReader(path, buffer, -1)
 		if err != nil {
 			r.logger.Error().WithError(err).WithField("path", path).Log("")
 		} else {

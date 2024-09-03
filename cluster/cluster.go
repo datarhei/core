@@ -648,10 +648,6 @@ func (c *cluster) Shutdown() error {
 		c.raft.Shutdown()
 	}
 
-	// TODO: here might some situations, where the manager is still need from the synchronize loop and will run into a panic
-	c.manager = nil
-	c.raft = nil
-
 	return nil
 }
 

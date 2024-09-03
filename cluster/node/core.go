@@ -164,8 +164,9 @@ func (n *Core) connect() error {
 		Address: u.String(),
 		Client: &http.Client{
 			Transport: tr,
-			Timeout:   5 * time.Second,
+			Timeout:   0,
 		},
+		Timeout: 5 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("creating client failed (%s): %w", address, err)
@@ -267,7 +268,6 @@ type CoreVersion struct {
 }
 
 func (n *Core) About() (CoreAbout, error) {
-
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -807,4 +807,16 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 	}
 
 	return processes, nil
+}
+
+func (n *Core) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		return nil, ErrNoPeer
+	}
+
+	return client.Events(ctx, filters)
 }

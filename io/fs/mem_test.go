@@ -30,66 +30,6 @@ func TestMemFromDir(t *testing.T) {
 	}, names)
 }
 
-func BenchmarkMemList(b *testing.B) {
-	mem, err := NewMemFilesystem(MemConfig{})
-	require.NoError(b, err)
-
-	for i := 0; i < 1000; i++ {
-		id := rand.StringAlphanumeric(8)
-		path := fmt.Sprintf("/%d/%s.dat", i, id)
-		mem.WriteFile(path, []byte("foobar"))
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		mem.List("/", ListOptions{
-			Pattern: "/5/**",
-		})
-	}
-}
-
-func BenchmarkMemRemoveList(b *testing.B) {
-	mem, err := NewMemFilesystem(MemConfig{})
-	require.NoError(b, err)
-
-	for i := 0; i < 1000; i++ {
-		id := rand.StringAlphanumeric(8)
-		path := fmt.Sprintf("/%d/%s.dat", i, id)
-		mem.WriteFile(path, []byte("foobar"))
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		mem.RemoveList("/", ListOptions{
-			Pattern: "/5/**",
-		})
-	}
-}
-
-func BenchmarkMemReadFile(b *testing.B) {
-	mem, err := NewMemFilesystem(MemConfig{})
-	require.NoError(b, err)
-
-	nFiles := 1000
-
-	for i := 0; i < nFiles; i++ {
-		path := fmt.Sprintf("/%d.dat", i)
-		mem.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
-	}
-
-	r := gorand.New(gorand.NewSource(42))
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		num := r.Intn(nFiles)
-		f := mem.Open("/" + strconv.Itoa(num) + ".dat")
-		f.Close()
-	}
-}
-
 func TestWriteWhileRead(t *testing.T) {
 	fs, err := NewMemFilesystem(MemConfig{})
 	require.NoError(t, err)
@@ -108,29 +48,101 @@ func TestWriteWhileRead(t *testing.T) {
 	require.Equal(t, []byte("xxxxx"), data)
 }
 
-func BenchmarkMemWriteFile(b *testing.B) {
-	mem, err := NewMemFilesystem(MemConfig{})
-	require.NoError(b, err)
+func BenchmarkMemStorages(b *testing.B) {
+	storages := []string{
+		"map",
+		"xsync",
+		"swiss",
+	}
 
+	benchmarks := map[string]func(*testing.B, Filesystem){
+		"list":           benchmarkMemList,
+		"removeList":     benchmarkMemRemoveList,
+		"readFile":       benchmarkMemReadFile,
+		"writeFile":      benchmarkMemWriteFile,
+		"readWhileWrite": benchmarkMemReadFileWhileWriting,
+	}
+
+	for name, fn := range benchmarks {
+		for _, storage := range storages {
+			mem, err := NewMemFilesystem(MemConfig{Storage: storage})
+			require.NoError(b, err)
+
+			b.Run(name+"-"+storage, func(b *testing.B) {
+				fn(b, mem)
+			})
+		}
+	}
+}
+
+func benchmarkMemList(b *testing.B, fs Filesystem) {
+	for i := 0; i < 1000; i++ {
+		id := rand.StringAlphanumeric(8)
+		path := fmt.Sprintf("/%d/%s.dat", i, id)
+		fs.WriteFile(path, []byte("foobar"))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		fs.List("/", ListOptions{
+			Pattern: "/5/**",
+		})
+	}
+}
+
+func benchmarkMemRemoveList(b *testing.B, fs Filesystem) {
+	for i := 0; i < 1000; i++ {
+		id := rand.StringAlphanumeric(8)
+		path := fmt.Sprintf("/%d/%s.dat", i, id)
+		fs.WriteFile(path, []byte("foobar"))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		fs.RemoveList("/", ListOptions{
+			Pattern: "/5/**",
+		})
+	}
+}
+
+func benchmarkMemReadFile(b *testing.B, fs Filesystem) {
+	nFiles := 1000
+
+	for i := 0; i < nFiles; i++ {
+		path := fmt.Sprintf("/%d.dat", i)
+		fs.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
+	}
+
+	r := gorand.New(gorand.NewSource(42))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		num := r.Intn(nFiles)
+		f := fs.Open("/" + strconv.Itoa(num) + ".dat")
+		f.Close()
+	}
+}
+
+func benchmarkMemWriteFile(b *testing.B, fs Filesystem) {
 	nFiles := 50000
 
 	for i := 0; i < nFiles; i++ {
 		path := fmt.Sprintf("/%d.dat", i)
-		mem.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
+		fs.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
 	}
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		path := fmt.Sprintf("/%d.dat", i%nFiles)
-		mem.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
+		fs.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
 	}
 }
 
-func BenchmarkMemReadFileWhileWriting(b *testing.B) {
-	mem, err := NewMemFilesystem(MemConfig{})
-	require.NoError(b, err)
-
+func benchmarkMemReadFileWhileWriting(b *testing.B, fs Filesystem) {
 	nReaders := 500
 	nWriters := 1000
 	nFiles := 30
@@ -148,7 +160,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 		go func(ctx context.Context, from int) {
 			for i := 0; i < nFiles; i++ {
 				path := fmt.Sprintf("/%d.dat", from+i)
-				mem.WriteFile(path, data)
+				fs.WriteFile(path, data)
 			}
 
 			ticker := time.NewTicker(40 * time.Millisecond)
@@ -163,7 +175,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 				case <-ticker.C:
 					num := gorand.Intn(nFiles) + from
 					path := fmt.Sprintf("/%d.dat", num)
-					mem.WriteFile(path, data)
+					fs.WriteFile(path, data)
 				}
 			}
 		}(ctx, i*nFiles)
@@ -183,7 +195,7 @@ func BenchmarkMemReadFileWhileWriting(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				num := gorand.Intn(nWriters * nFiles)
-				f := mem.Open("/" + strconv.Itoa(num) + ".dat")
+				f := fs.Open("/" + strconv.Itoa(num) + ".dat")
 				f.Close()
 			}
 		}()

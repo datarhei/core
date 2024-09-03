@@ -425,6 +425,7 @@ func (l *limiter) Limit(cpu, memory bool) error {
 // limitCPU will limit the CPU usage of this process. The limit is the max. CPU usage
 // normed to 0-1. The interval defines how long a time slot is that will be splitted
 // into sleeping and working.
+// Inspired by https://github.com/opsengine/cpulimit
 func (l *limiter) limitCPU(ctx context.Context, limit float64, interval time.Duration) {
 	defer func() {
 		l.lock.Lock()
