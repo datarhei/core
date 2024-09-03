@@ -448,11 +448,11 @@ func (t *task) Config() *app.Config {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
-	if t.config == nil {
+	if t.process == nil {
 		return nil
 	}
 
-	return t.config.Clone()
+	return t.process.Config.Clone()
 }
 
 func (t *task) Destroy() {
