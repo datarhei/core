@@ -991,6 +991,378 @@ func TestParserProgressPlayout(t *testing.T) {
 	}, progress)
 }
 
+func TestParserProgressPlayoutVideo(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":11,"size_kb":226,"size_bytes":42}],"outputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":0,"q":0.0,"size_kb":0,"size_bytes":5,"extradata_size_bytes":32},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`))
+	parser.Parse([]byte(`avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""},"video":{"queue":99,"dup":5,"drop":96,"enc":23,"input":{"state":"running","packet":248,"size_kb":1250,"time":8},"output":{"state":"running","packet":149,"size_kb":748,"time":5},"codec":"h264","profile":578,"level":31,"pix_fmt":"yuv420p","width":1280,"height":720},"audio":{"queue":175,"dup":0,"drop":0,"enc":1,"input":{"state":"running","packet":431,"size_kb":4,"time":8},"output":{"state":"running","packet":256,"size_kb":1,"time":5},"codec":"aac","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1}}`))
+
+	progress := parser.Progress()
+
+	require.Equal(t, Progress{
+		Started: true,
+		Input: []ProgressIO{
+			{
+				Address:   "playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
+				Index:     0,
+				Stream:    0,
+				Format:    "playout",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "h264",
+				Frame:     7,
+				Keyframe:  1,
+				FPS:       0,
+				Packet:    11,
+				PPS:       0,
+				Size:      42,
+				Bitrate:   0,
+				Pixfmt:    "yuvj420p",
+				Quantizer: 0,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream: &AVstream{
+					Input: AVstreamIO{
+						State:  "running",
+						Packet: 248,
+						Time:   8,
+						Size:   1250 * 1024,
+					},
+					Output: AVstreamIO{
+						State:  "running",
+						Packet: 149,
+						Time:   5,
+						Size:   748 * 1024,
+					},
+					Aqueue:      0,
+					Queue:       99,
+					Dup:         5,
+					Drop:        96,
+					Enc:         23,
+					Looping:     true,
+					Duplicating: true,
+					GOP:         "key",
+					Mode:        "live",
+					Swap: AVStreamSwap{
+						URL:       "",
+						Status:    "waiting",
+						LastURL:   "",
+						LastError: "",
+					},
+					Codec:   "h264",
+					Profile: 578,
+					Level:   31,
+					Pixfmt:  "yuv420p",
+					Width:   1280,
+					Height:  720,
+				},
+			},
+		},
+		Output: []ProgressIO{
+			{
+				Address:   "/dev/null",
+				Index:     0,
+				Stream:    0,
+				Format:    "flv",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "libx264",
+				Frame:     7,
+				Keyframe:  1,
+				FPS:       0,
+				Packet:    0,
+				PPS:       0,
+				Size:      5,
+				Bitrate:   0,
+				Extradata: 32,
+				Pixfmt:    "yuvj420p",
+				Quantizer: 0,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream:  nil,
+			},
+			{
+				Address:   "/dev/null",
+				Index:     1,
+				Stream:    0,
+				Format:    "mp4",
+				Type:      "video",
+				Codec:     "h264",
+				Coder:     "copy",
+				Frame:     11,
+				FPS:       0,
+				Packet:    11,
+				PPS:       0,
+				Size:      231424,
+				Bitrate:   0,
+				Pixfmt:    "yuvj420p",
+				Quantizer: -1,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream:  nil,
+			},
+		},
+		Frame:     7,
+		Packet:    0,
+		FPS:       0,
+		PPS:       0,
+		Quantizer: 0,
+		Size:      231424,
+		Time:      0.56,
+		Bitrate:   0,
+		Speed:     0.4,
+		Drop:      0,
+		Dup:       0,
+	}, progress)
+}
+
+func TestParserProgressPlayoutAudioVideo(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"playout:http://192.168.1.220/memfs/source.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":578,"level":31,"fps":25.000000,"pix_fmt":"yuv420p","width":1280,"height":720},{"url":"playout:http://192.168.1.220/memfs/source.m3u8","format":"playout","index":0,"stream":1,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"pipe:","format":"null","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":578,"level":31,"fps":25.000000,"pix_fmt":"yuv420p","width":1280,"height":720},{"url":"pipe:","format":"null","index":0,"stream":1,"type":"audio","codec":"aac","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":25.000,"max":25.000,"avg":25.000},"gop":{"min":50.000,"max":50.000,"avg":50.000},"frame":101,"keyframe":3,"packet":101,"size_kb":518,"size_bytes":530273},{"index":0,"stream":1,"framerate":{"min":43.083,"max":43.083,"avg":43.083},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":174,"keyframe":174,"packet":174,"size_kb":1,"size_bytes":713}],"outputs":[{"index":0,"stream":0,"framerate":{"min":25.000,"max":25.000,"avg":25.000},"gop":{"min":50.000,"max":50.000,"avg":50.000},"frame":101,"keyframe":3,"packet":101,"q":-1.0,"size_kb":518,"size_bytes":530273,"extradata_size_bytes":0},{"index":0,"stream":1,"framerate":{"min":43.083,"max":43.083,"avg":43.083},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":174,"keyframe":174,"packet":174,"size_kb":1,"size_bytes":713,"extradata_size_bytes":0}],"frame":101,"packet":101,"q":-1.0,"size_kb":519,"size_bytes":530986,"time":"0h0m4.3s","speed":1,"dup":0,"drop":0}`))
+	parser.Parse([]byte(`avstream.progress:{"id":"playout:http://192.168.1.220/memfs/source.m3u8","url":"http://192.168.1.220/memfs/source.m3u8","stream":0,"queue":124,"aqueue":218,"dup":0,"drop":0,"enc":0,"looping":true,"looping_runtime":42,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":679,"size_kb":1255,"time":7},"output":{"state":"running","packet":337,"size_kb":628,"time":4},"video":{"queue":124,"dup":1,"drop":2,"enc":3,"input":{"state":"running","packet":248,"size_kb":1250,"time":7},"output":{"state":"running","packet":124,"size_kb":627,"time":4},"codec":"h264","profile":578,"level":31,"pix_fmt":"yuv420p","width":1280,"height":720},"audio":{"queue":218,"dup":5,"drop":6,"enc":1,"input":{"state":"running","packet":431,"size_kb":4,"time":7},"output":{"state":"running","packet":213,"size_kb":0,"time":4},"codec":"aac","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`))
+
+	progress := parser.Progress()
+
+	require.Equal(t, Progress{
+		Started: true,
+		Input: []ProgressIO{
+			{
+				Address:  "playout:http://192.168.1.220/memfs/source.m3u8",
+				Index:    0,
+				Stream:   0,
+				Format:   "playout",
+				Type:     "video",
+				Codec:    "h264",
+				Coder:    "h264",
+				Profile:  578,
+				Level:    31,
+				Frame:    101,
+				Keyframe: 3,
+				Framerate: struct {
+					Min     float64
+					Max     float64
+					Average float64
+				}{25, 25, 25},
+				FPS:       0,
+				Packet:    101,
+				PPS:       0,
+				Size:      530273,
+				Bitrate:   0,
+				Pixfmt:    "yuv420p",
+				Quantizer: 0,
+				Width:     1280,
+				Height:    720,
+				Samplefmt: "",
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream: &AVstream{
+					Input: AVstreamIO{
+						State:  "running",
+						Packet: 248,
+						Time:   7,
+						Size:   1250 * 1024,
+					},
+					Output: AVstreamIO{
+						State:  "running",
+						Packet: 124,
+						Time:   4,
+						Size:   642048,
+					},
+					Aqueue:         0,
+					Queue:          124,
+					Dup:            1,
+					Drop:           2,
+					Enc:            3,
+					Looping:        true,
+					LoopingRuntime: 42,
+					Duplicating:    true,
+					GOP:            "key",
+					Mode:           "live",
+					Swap: AVStreamSwap{
+						URL:       "",
+						Status:    "waiting",
+						LastURL:   "",
+						LastError: "",
+					},
+					Codec:   "h264",
+					Profile: 578,
+					Level:   31,
+					Pixfmt:  "yuv420p",
+					Width:   1280,
+					Height:  720,
+				},
+			},
+			{
+				Address:  "playout:http://192.168.1.220/memfs/source.m3u8",
+				Index:    0,
+				Stream:   1,
+				Format:   "playout",
+				Type:     "audio",
+				Codec:    "aac",
+				Coder:    "aac",
+				Profile:  1,
+				Level:    -99,
+				Frame:    174,
+				Keyframe: 174,
+				Framerate: struct {
+					Min     float64
+					Max     float64
+					Average float64
+				}{43.083, 43.083, 43.083},
+				FPS:       0,
+				Packet:    174,
+				PPS:       0,
+				Size:      713,
+				Bitrate:   0,
+				Pixfmt:    "",
+				Quantizer: 0,
+				Width:     0,
+				Height:    0,
+				Samplefmt: "fltp",
+				Sampling:  44100,
+				Layout:    "mono",
+				Channels:  1,
+				AVstream: &AVstream{
+					Input: AVstreamIO{
+						State:  "running",
+						Packet: 431,
+						Time:   7,
+						Size:   4096,
+					},
+					Output: AVstreamIO{
+						State:  "running",
+						Packet: 213,
+						Time:   4,
+						Size:   0,
+					},
+					Aqueue:         0,
+					Queue:          218,
+					Dup:            5,
+					Drop:           6,
+					Enc:            1,
+					Looping:        true,
+					LoopingRuntime: 42,
+					Duplicating:    true,
+					GOP:            "key",
+					Mode:           "live",
+					Swap: AVStreamSwap{
+						URL:       "",
+						Status:    "waiting",
+						LastURL:   "",
+						LastError: "",
+					},
+					Codec:     "aac",
+					Profile:   1,
+					Level:     -99,
+					Pixfmt:    "",
+					Width:     0,
+					Height:    0,
+					Samplefmt: "fltp",
+					Sampling:  44100,
+					Layout:    "mono",
+					Channels:  1,
+				},
+			},
+		},
+		Output: []ProgressIO{
+			{
+				Address:  "pipe:",
+				Index:    0,
+				Stream:   0,
+				Format:   "null",
+				Type:     "video",
+				Codec:    "h264",
+				Coder:    "copy",
+				Profile:  578,
+				Level:    31,
+				Frame:    101,
+				Keyframe: 3,
+				Framerate: struct {
+					Min     float64
+					Max     float64
+					Average float64
+				}{25, 25, 25},
+				FPS:       0,
+				Packet:    101,
+				PPS:       0,
+				Size:      530273,
+				Bitrate:   0,
+				Extradata: 0,
+				Pixfmt:    "yuv420p",
+				Quantizer: -1,
+				Width:     1280,
+				Height:    720,
+				Sampling:  0,
+				Layout:    "",
+				Channels:  0,
+				AVstream:  nil,
+			},
+			{
+				Address:  "pipe:",
+				Index:    0,
+				Stream:   1,
+				Format:   "null",
+				Type:     "audio",
+				Codec:    "aac",
+				Coder:    "copy",
+				Profile:  1,
+				Level:    -99,
+				Frame:    174,
+				Keyframe: 174,
+				Framerate: struct {
+					Min     float64
+					Max     float64
+					Average float64
+				}{43.083, 43.083, 43.083},
+				FPS:       0,
+				Packet:    174,
+				PPS:       0,
+				Size:      713,
+				Bitrate:   0,
+				Pixfmt:    "",
+				Quantizer: 0,
+				Width:     0,
+				Height:    0,
+				Samplefmt: "fltp",
+				Sampling:  44100,
+				Layout:    "mono",
+				Channels:  1,
+				AVstream:  nil,
+			},
+		},
+		Frame:     101,
+		Packet:    101,
+		FPS:       0,
+		PPS:       0,
+		Quantizer: -1,
+		Size:      530986,
+		Time:      4.3,
+		Bitrate:   0,
+		Speed:     1,
+		Drop:      0,
+		Dup:       0,
+	}, progress)
+}
+
 func TestParserStreamMapping(t *testing.T) {
 	parser := New(Config{
 		LogLines: 20,

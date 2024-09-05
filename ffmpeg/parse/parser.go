@@ -653,7 +653,7 @@ func (p *parser) Progress() Progress {
 			continue
 		}
 
-		progress.Input[i].AVstream = av.export()
+		progress.Input[i].AVstream = av.export(io.Type)
 	}
 
 	progress.Started = p.stats.initialized
