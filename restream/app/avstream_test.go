@@ -68,6 +68,16 @@ func TestAVstream(t *testing.T) {
 			LastURL:   "fjfd",
 			LastError: "none",
 		},
+		Codec:     "h264",
+		Profile:   858,
+		Level:     64,
+		Pixfmt:    "yuv420p",
+		Width:     1920,
+		Height:    1080,
+		Samplefmt: "fltp",
+		Sampling:  44100,
+		Layout:    "stereo",
+		Channels:  42,
 	}
 
 	p := AVstream{}

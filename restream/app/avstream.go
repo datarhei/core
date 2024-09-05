@@ -67,12 +67,27 @@ type AVstream struct {
 	Mode           string // "file" or "live"
 	Debug          interface{}
 	Swap           AVStreamSwap
+
+	// Codec parameter
+	Codec     string
+	Profile   int
+	Level     int
+	Pixfmt    string
+	Width     uint64
+	Height    uint64
+	Samplefmt string
+	Sampling  uint64
+	Layout    string
+	Channels  uint64
 }
 
 func (a *AVstream) UnmarshalParser(p *parse.AVstream) {
 	if p == nil {
 		return
 	}
+
+	a.Input.UnmarshalParser(&p.Input)
+	a.Output.UnmarshalParser(&p.Output)
 
 	a.Aqueue = p.Aqueue
 	a.Queue = p.Queue
@@ -85,8 +100,17 @@ func (a *AVstream) UnmarshalParser(p *parse.AVstream) {
 	a.GOP = p.GOP
 	a.Mode = p.Mode
 	a.Swap.UnmarshalParser(&p.Swap)
-	a.Input.UnmarshalParser(&p.Input)
-	a.Output.UnmarshalParser(&p.Output)
+
+	a.Codec = p.Codec
+	a.Profile = p.Profile
+	a.Level = p.Level
+	a.Pixfmt = p.Pixfmt
+	a.Width = p.Width
+	a.Height = p.Height
+	a.Samplefmt = p.Samplefmt
+	a.Sampling = p.Sampling
+	a.Layout = p.Layout
+	a.Channels = p.Channels
 }
 
 func (a *AVstream) MarshalParser() *parse.AVstream {
@@ -105,6 +129,16 @@ func (a *AVstream) MarshalParser() *parse.AVstream {
 		Mode:           a.Mode,
 		Debug:          a.Debug,
 		Swap:           a.Swap.MarshalParser(),
+		Codec:          a.Codec,
+		Profile:        a.Profile,
+		Level:          a.Level,
+		Pixfmt:         a.Pixfmt,
+		Width:          a.Width,
+		Height:         a.Height,
+		Samplefmt:      a.Samplefmt,
+		Sampling:       a.Sampling,
+		Layout:         a.Layout,
+		Channels:       a.Channels,
 	}
 
 	return p
