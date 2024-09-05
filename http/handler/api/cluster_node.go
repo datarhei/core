@@ -86,7 +86,7 @@ func (h *ClusterHandler) NodeGet(c echo.Context) error {
 // @ID cluster-3-get-node-version
 // @Produce json
 // @Param id path string true "Node ID"
-// @Success 200 {object} api.Version
+// @Success 200 {object} api.AboutVersion
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/version [get]

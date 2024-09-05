@@ -1,22 +1,5 @@
 basePath: /
 definitions:
-  access.Policy:
-    properties:
-      actions:
-        items:
-          type: string
-        type: array
-      domain:
-        type: string
-      name:
-        type: string
-      resource:
-        type: string
-      types:
-        items:
-          type: string
-        type: array
-    type: object
   app.Config:
     properties:
       autostart:
@@ -41,7 +24,7 @@ definitions:
         description: seconds
         type: integer
       logPatterns:
-        description: will we interpreted as regular expressions
+        description: will be interpreted as regular expressions
         items:
           type: string
         type: array
@@ -145,7 +128,7 @@ definitions:
     properties:
       policies:
         items:
-          $ref: '#/definitions/access.Policy'
+          $ref: '#/definitions/policy.Policy'
         type: array
     type: object
   client.SetProcessCommandRequest:
@@ -658,6 +641,23 @@ definitions:
         type: array
       token:
         description: Tokens/Streamkey for RTMP and SRT
+        items:
+          type: string
+        type: array
+    type: object
+  policy.Policy:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      domain:
+        type: string
+      name:
+        type: string
+      resource:
+        type: string
+      types:
         items:
           type: string
         type: array
@@ -1408,6 +1408,45 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Remove a process
+      tags:
+      - v1.0.0
+    get:
+      description: Get a process from the cluster DB
+      operationId: cluster-1-get-process
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain to act on
+        in: query
+        name: domain
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Get a process
       tags:
       - v1.0.0
     put:
