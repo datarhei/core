@@ -19,6 +19,8 @@ type ProgressIO struct {
 	Type      string
 	Codec     string
 	Coder     string
+	Profile   int
+	Level     int
 	Frame     uint64 // counter
 	Keyframe  uint64 // counter
 	Framerate ProgressIOFramerate
@@ -53,6 +55,8 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.Type = pp.Type
 	p.Codec = pp.Codec
 	p.Coder = pp.Coder
+	p.Profile = pp.Profile
+	p.Level = pp.Level
 	p.Frame = pp.Frame
 	p.Keyframe = pp.Keyframe
 	p.Framerate = pp.Framerate
@@ -88,6 +92,8 @@ func (p *ProgressIO) MarshalParser() parse.ProgressIO {
 		Type:      p.Type,
 		Codec:     p.Codec,
 		Coder:     p.Coder,
+		Profile:   p.Profile,
+		Level:     p.Level,
 		Frame:     p.Frame,
 		Keyframe:  p.Keyframe,
 		Framerate: p.Framerate,

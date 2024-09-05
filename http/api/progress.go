@@ -23,6 +23,8 @@ type ProgressIO struct {
 	Type      string              `json:"type"`
 	Codec     string              `json:"codec"`
 	Coder     string              `json:"coder"`
+	Profile   int                 `json:"profile"`
+	Level     int                 `json:"level"`
 	Frame     uint64              `json:"frame" format:"uint64"`
 	Keyframe  uint64              `json:"keyframe" format:"uint64"`
 	Framerate ProgressIOFramerate `json:"framerate"`
@@ -63,6 +65,8 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 	i.Type = io.Type
 	i.Codec = io.Codec
 	i.Coder = io.Coder
+	i.Profile = io.Profile
+	i.Level = io.Level
 	i.Frame = io.Frame
 	i.Keyframe = io.Keyframe
 	i.Framerate.Min = json.ToNumber(io.Framerate.Min)
@@ -99,6 +103,8 @@ func (i *ProgressIO) Marshal() app.ProgressIO {
 		Type:      i.Type,
 		Codec:     i.Codec,
 		Coder:     i.Coder,
+		Profile:   i.Profile,
+		Level:     i.Level,
 		Frame:     i.Frame,
 		Keyframe:  i.Keyframe,
 		Packet:    i.Packet,

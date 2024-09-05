@@ -97,6 +97,8 @@ func TestProgressIO(t *testing.T) {
 		Type:     "video",
 		Codec:    "x",
 		Coder:    "y",
+		Profile:  848,
+		Level:    48,
 		Frame:    133,
 		Keyframe: 39,
 		Framerate: app.ProgressIOFramerate{
@@ -138,6 +140,8 @@ func TestProgressIOAVstream(t *testing.T) {
 		Type:     "video",
 		Codec:    "x",
 		Coder:    "y",
+		Profile:  848,
+		Level:    48,
 		Frame:    133,
 		Keyframe: 39,
 		Framerate: app.ProgressIOFramerate{
@@ -205,6 +209,8 @@ func TestProgress(t *testing.T) {
 				Type:     "video",
 				Codec:    "x",
 				Coder:    "y",
+				Profile:  848,
+				Level:    48,
 				Frame:    133,
 				Keyframe: 39,
 				Framerate: app.ProgressIOFramerate{
@@ -262,6 +268,8 @@ func TestProgress(t *testing.T) {
 				Type:     "video",
 				Codec:    "x",
 				Coder:    "y",
+				Profile:  848,
+				Level:    48,
 				Frame:    133,
 				Keyframe: 39,
 				Framerate: app.ProgressIOFramerate{

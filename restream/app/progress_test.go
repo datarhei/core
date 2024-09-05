@@ -16,6 +16,8 @@ func TestProgressIO(t *testing.T) {
 		Type:     "video",
 		Codec:    "h264",
 		Coder:    "libx264",
+		Profile:  848,
+		Level:    48,
 		Frame:    39,
 		Keyframe: 433,
 		Framerate: struct {
@@ -61,6 +63,8 @@ func TestProgressIOWithAVstream(t *testing.T) {
 		Type:     "video",
 		Codec:    "h264",
 		Coder:    "libx264",
+		Profile:  848,
+		Level:    48,
 		Frame:    39,
 		Keyframe: 433,
 		Framerate: struct {
@@ -219,6 +223,8 @@ func TestProgress(t *testing.T) {
 				Type:     "video",
 				Codec:    "h264",
 				Coder:    "libx264",
+				Profile:  848,
+				Level:    48,
 				Frame:    39,
 				Keyframe: 433,
 				Framerate: struct {
@@ -286,6 +292,8 @@ func TestProgress(t *testing.T) {
 				Type:     "video",
 				Codec:    "h264",
 				Coder:    "libx264",
+				Profile:  848,
+				Level:    48,
 				Frame:    39,
 				Keyframe: 433,
 				Framerate: struct {
