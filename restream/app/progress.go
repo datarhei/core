@@ -36,9 +36,10 @@ type ProgressIO struct {
 	Height    uint64
 
 	// Audio
-	Sampling uint64
-	Layout   string
-	Channels uint64
+	Samplefmt string
+	Sampling  uint64
+	Layout    string
+	Channels  uint64
 
 	// avstream
 	AVstream *AVstream
@@ -65,6 +66,7 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.Quantizer = pp.Quantizer
 	p.Width = pp.Width
 	p.Height = pp.Height
+	p.Samplefmt = pp.Samplefmt
 	p.Sampling = pp.Sampling
 	p.Layout = pp.Layout
 	p.Channels = pp.Channels
@@ -99,6 +101,7 @@ func (p *ProgressIO) MarshalParser() parse.ProgressIO {
 		Quantizer: p.Quantizer,
 		Width:     p.Width,
 		Height:    p.Height,
+		Samplefmt: p.Samplefmt,
 		Sampling:  p.Sampling,
 		Layout:    p.Layout,
 		Channels:  p.Channels,
