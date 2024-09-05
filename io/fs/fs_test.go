@@ -877,7 +877,7 @@ func testAppend(t *testing.T, fs Filesystem) {
 	file := fs.Open("/foobar")
 	require.NotNil(t, file)
 
-	data, err := io.ReadAll(file)
+	data, _ := io.ReadAll(file)
 	require.Equal(t, []byte("part1part2"), data)
 }
 
@@ -888,6 +888,6 @@ func testAppendCreate(t *testing.T, fs Filesystem) {
 	file := fs.Open("/foobar")
 	require.NotNil(t, file)
 
-	data, err := io.ReadAll(file)
+	data, _ := io.ReadAll(file)
 	require.Equal(t, []byte("part1"), data)
 }
