@@ -106,6 +106,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 	haveReferenceAffinity := NewReferenceAffinity(have)
 
 	opStack := []interface{}{}
+	opBudget := 100
 
 	// Check for any requested relocations.
 	for processid, targetNodeid := range relocateMap {
@@ -190,6 +191,8 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 			order:      process.Order,
 		})
 
+		opBudget -= 5
+
 		// Adjust the resources.
 		resources.Move(targetNodeid, sourceNodeid, process.CPU, process.Mem)
 
@@ -199,7 +202,9 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 		relocatedProcessIDs = append(relocatedProcessIDs, processid)
 
 		// Move only one process at a time.
-		break
+		if opBudget <= 0 {
+			break
+		}
 	}
 
 	return opStack, resources.Map(), relocatedProcessIDs
