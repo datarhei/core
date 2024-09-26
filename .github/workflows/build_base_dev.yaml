@@ -25,6 +25,11 @@ jobs:
                       golang: golang:1.22-alpine3.20
                       platforms: linux/amd64
                       branch: dev
+                    - os: ubuntu
+                      os_version: "24.04"
+                      golang: golang:1.22-alpine3.20
+                      platforms: linux/amd64
+                      branch: dev
 
         steps:
             - name: Checkout

@@ -19,7 +19,7 @@ jobs:
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                     - os: ubuntu
-                      os_version: "22.04"
+                      os_version: "24.04"
                       golang: golang:1.22-alpine3.20
                       platforms: linux/amd64
                       branch: vod
