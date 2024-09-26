@@ -41,7 +41,7 @@ jobs:
                       platforms: linux/amd64
                       branch: dev
                       prefix: cuda-
-                      latest: yes
+                      latest: no
                     - core_os: ubuntu24.04
                       ffmpeg: "6.1.1-cuda"
                       ffmpeg_os: ubuntu24.04
