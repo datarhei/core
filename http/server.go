@@ -488,9 +488,10 @@ func (s *server) HTTPStatus() map[int]uint64 {
 
 func (s *server) setRoutes() {
 	gzipMiddleware := mwcompress.NewWithConfig(mwcompress.Config{
+		Skipper:   mwcompress.ContentTypeSkipper(nil),
 		Level:     mwcompress.BestSpeed,
 		MinLength: 1000,
-		Skipper:   mwcompress.ContentTypeSkipper(nil),
+		Schemes:   []mwcompress.Scheme{mwcompress.GzipScheme},
 	})
 
 	// API router grouo
@@ -532,6 +533,7 @@ func (s *server) setRoutes() {
 				Skipper:   mwcompress.ContentTypeSkipper(s.gzip.mimetypes),
 				Level:     mwcompress.BestSpeed,
 				MinLength: 1000,
+				Schemes:   []mwcompress.Scheme{mwcompress.GzipScheme},
 			}))
 		}
 

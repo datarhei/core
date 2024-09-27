@@ -81,7 +81,7 @@ var DefaultConfig = Config{
 	Skipper:   middleware.DefaultSkipper,
 	Level:     DefaultCompression,
 	MinLength: 0,
-	Schemes:   []Scheme{GzipScheme, ZstdScheme},
+	Schemes:   []Scheme{GzipScheme},
 }
 
 // ContentTypesSkipper returns a Skipper based on the list of content types
