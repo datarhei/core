@@ -380,8 +380,8 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		"text/html",
 		"text/javascript",
 		"application/json",
-		"application/x-mpegurl",
-		"application/vnd.apple.mpegurl",
+		//"application/x-mpegurl",
+		//"application/vnd.apple.mpegurl",
 		"image/svg+xml",
 	}
 
