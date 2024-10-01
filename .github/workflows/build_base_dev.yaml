@@ -17,17 +17,17 @@ jobs:
                 include:
                     - os: alpine
                       os_version: "3.20"
-                      golang: golang:1.22-alpine3.20
+                      golang: golang:1.23-alpine3.20
                       platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
                       branch: dev
                     - os: ubuntu
                       os_version: "22.04"
-                      golang: golang:1.22-alpine3.20
+                      golang: golang:1.23-alpine3.20
                       platforms: linux/amd64
                       branch: dev
                     - os: ubuntu
                       os_version: "24.04"
-                      golang: golang:1.22-alpine3.20
+                      golang: golang:1.23-alpine3.20
                       platforms: linux/amd64
                       branch: dev
 
