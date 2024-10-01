@@ -187,7 +187,7 @@ func (r *restream) Start() {
 			t.Restore()
 
 			// The filesystem cleanup rules can be set
-			r.setCleanup(id, t.Config())
+			r.setCleanup(id, t.config)
 
 			return true
 		})
@@ -1168,7 +1168,7 @@ func (r *restream) updateProcess(id app.ProcessID, config *app.Config) error {
 	r.tasks.Store(tid, t)
 
 	// set filesystem cleanup rules
-	r.setCleanup(tid, t.Config())
+	r.setCleanup(tid, t.config)
 
 	t.Restore()
 
@@ -1376,7 +1376,7 @@ func (r *restream) reloadProcess(id app.ProcessID) error {
 	r.tasks.Store(tid, t)
 
 	// set filesystem cleanup rules
-	r.setCleanup(tid, t.Config())
+	r.setCleanup(tid, t.config)
 
 	t.Restore()
 
