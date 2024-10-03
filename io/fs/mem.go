@@ -411,17 +411,9 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	return nil
 }
 
-var chunkPool = sync.Pool{
-	New: func() interface{} {
-		chunk := make([]byte, 128*1024)
-		return &chunk
-	},
-}
-
 func copyToBufferFromReader(buf *bytes.Buffer, r io.Reader, _ int) (int64, error) {
-	chunkPtr := chunkPool.Get().(*[]byte)
-	chunk := *chunkPtr
-	defer chunkPool.Put(chunkPtr)
+	chunkData := [128 * 1024]byte{}
+	chunk := chunkData[0:]
 
 	size := int64(0)
 
@@ -466,7 +458,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 		data: &bytes.Buffer{},
 	}
 
-	if sizeHint > 0 {
+	if sizeHint > 0 && sizeHint < 5*1024*1024 {
 		newFile.data.Grow(sizeHint)
 	}
 
