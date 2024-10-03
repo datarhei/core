@@ -1,4 +1,4 @@
-ARG GOLANG_IMAGE=golang:1.22-alpine3.20
+ARG GOLANG_IMAGE=golang:1.23-alpine3.20
 ARG BUILD_IMAGE=alpine:3.20
 
 # Cross-Compilation

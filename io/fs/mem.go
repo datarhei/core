@@ -110,6 +110,7 @@ func (f *memFile) Close() error {
 	}
 
 	f.r = nil
+	f.data.Reset()
 	f.data = nil
 
 	return nil
