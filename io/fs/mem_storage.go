@@ -21,10 +21,6 @@ type memStorage interface {
 	// i.e. all changes to the file will be reflected on the storage.
 	Load(key string) (value *memFile, ok bool)
 
-	// LoadAndCopy loads a file from the storage. The returned file is a copy
-	// and can be modified without modifying the file on the storage.
-	LoadAndCopy(key string) (value *memFile, ok bool)
-
 	// Has checks whether a file exists at path.
 	Has(key string) bool
 
@@ -66,33 +62,6 @@ func (m *mapOfStorage) Load(key string) (*memFile, bool) {
 	defer m.lock.RUnlock(token)
 
 	return m.files.Load(key)
-}
-
-func (m *mapOfStorage) LoadAndCopy(key string) (*memFile, bool) {
-	token := m.lock.RLock()
-	defer m.lock.RUnlock(token)
-
-	v, ok := m.files.Load(key)
-	if !ok {
-		return nil, false
-	}
-
-	f := &memFile{
-		memFileInfo: memFileInfo{
-			name:    v.name,
-			size:    v.size,
-			dir:     v.dir,
-			lastMod: v.lastMod,
-			linkTo:  v.linkTo,
-		},
-		r: nil,
-	}
-
-	if v.data != nil {
-		f.data = bytes.NewBuffer(v.data.Bytes())
-	}
-
-	return f, true
 }
 
 func (m *mapOfStorage) Has(key string) bool {

@@ -48,6 +48,34 @@ func TestWriteWhileRead(t *testing.T) {
 	require.Equal(t, []byte("xxxxx"), data)
 }
 
+func TestCopy(t *testing.T) {
+	fs, err := NewMemFilesystem(MemConfig{})
+	require.NoError(t, err)
+
+	_, _, err = fs.WriteFile("/foobar", []byte("xxxxx"))
+	require.NoError(t, err)
+
+	data, err := fs.ReadFile("/foobar")
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("xxxxx"), data)
+
+	err = fs.Copy("/foobar", "/barfoo")
+	require.NoError(t, err)
+
+	data, err = fs.ReadFile("/barfoo")
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("xxxxx"), data)
+
+	fs.Remove("/foobar")
+
+	data, err = fs.ReadFile("/barfoo")
+	require.NoError(t, err)
+
+	require.Equal(t, []byte("xxxxx"), data)
+}
+
 func BenchmarkMemStorages(b *testing.B) {
 	storages := []string{
 		"map",
