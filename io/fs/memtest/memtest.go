@@ -30,6 +30,7 @@ func main() {
 	oInterval := 1 // seconds
 	oSize := 2     // megabytes
 	oLimit := false
+	oGC := 0
 
 	flag.StringVar(&oStorage, "storage", "mapof", "type of mem storage implementation (mapof, map, swiss)")
 	flag.IntVar(&oWriters, "writers", 500, "number of concurrent writers")
@@ -38,6 +39,7 @@ func main() {
 	flag.IntVar(&oInterval, "interval", 1, "interval for writing files in seconds")
 	flag.IntVar(&oSize, "size", 2048, "size of files to write in kilobytes")
 	flag.BoolVar(&oLimit, "limit", false, "set memory limit")
+	flag.IntVar(&oGC, "gc", 0, "force garbage collector")
 
 	flag.Parse()
 
@@ -175,13 +177,13 @@ func main() {
 		defer ticker.Stop()
 
 		nMallocs := uint64(0)
+		m := runtime.MemStats{}
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				m := runtime.MemStats{}
 				runtime.ReadMemStats(&m)
 
 				size, _ := memfs.Size()
@@ -203,6 +205,22 @@ func main() {
 			}
 		}
 	}(ctx, memfs)
+
+	if oGC > 0 {
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(time.Duration(oGC) * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					debug.FreeOSMemory()
+				}
+			}
+		}(ctx)
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
