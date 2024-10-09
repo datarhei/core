@@ -42,16 +42,22 @@ type Config struct {
 	OmitRootModels                bool                       `yaml:"omit_root_models,omitempty"`
 	OmitResolverFields            bool                       `yaml:"omit_resolver_fields,omitempty"`
 	OmitPanicHandler              bool                       `yaml:"omit_panic_handler,omitempty"`
-	StructFieldsAlwaysPointers    bool                       `yaml:"struct_fields_always_pointers,omitempty"`
-	ReturnPointersInUmarshalInput bool                       `yaml:"return_pointers_in_unmarshalinput,omitempty"`
-	ResolversAlwaysReturnPointers bool                       `yaml:"resolvers_always_return_pointers,omitempty"`
-	NullableInputOmittable        bool                       `yaml:"nullable_input_omittable,omitempty"`
-	EnableModelJsonOmitemptyTag   *bool                      `yaml:"enable_model_json_omitempty_tag,omitempty"`
-	SkipValidation                bool                       `yaml:"skip_validation,omitempty"`
-	SkipModTidy                   bool                       `yaml:"skip_mod_tidy,omitempty"`
-	Sources                       []*ast.Source              `yaml:"-"`
-	Packages                      *code.Packages             `yaml:"-"`
-	Schema                        *ast.Schema                `yaml:"-"`
+	// If this is set to true, argument directives that
+	// decorate a field with a null value will still be called.
+	//
+	// This enables argumment directives to not just mutate
+	// argument values but to set them even if they're null.
+	CallArgumentDirectivesWithNull bool           `yaml:"call_argument_directives_with_null,omitempty"`
+	StructFieldsAlwaysPointers     bool           `yaml:"struct_fields_always_pointers,omitempty"`
+	ReturnPointersInUnmarshalInput bool           `yaml:"return_pointers_in_unmarshalinput,omitempty"`
+	ResolversAlwaysReturnPointers  bool           `yaml:"resolvers_always_return_pointers,omitempty"`
+	NullableInputOmittable         bool           `yaml:"nullable_input_omittable,omitempty"`
+	EnableModelJsonOmitemptyTag    *bool          `yaml:"enable_model_json_omitempty_tag,omitempty"`
+	SkipValidation                 bool           `yaml:"skip_validation,omitempty"`
+	SkipModTidy                    bool           `yaml:"skip_mod_tidy,omitempty"`
+	Sources                        []*ast.Source  `yaml:"-"`
+	Packages                       *code.Packages `yaml:"-"`
+	Schema                         *ast.Schema    `yaml:"-"`
 
 	// Deprecated: use Federation instead. Will be removed next release
 	Federated bool `yaml:"federated,omitempty"`
@@ -62,15 +68,15 @@ var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 // DefaultConfig creates a copy of the default config
 func DefaultConfig() *Config {
 	return &Config{
-		SchemaFilename:                StringList{"schema.graphql"},
-		Model:                         PackageConfig{Filename: "models_gen.go"},
-		Exec:                          ExecConfig{Filename: "generated.go"},
-		Directives:                    map[string]DirectiveConfig{},
-		Models:                        TypeMap{},
-		StructFieldsAlwaysPointers:    true,
-		ReturnPointersInUmarshalInput: false,
-		ResolversAlwaysReturnPointers: true,
-		NullableInputOmittable:        false,
+		SchemaFilename:                 StringList{"schema.graphql"},
+		Model:                          PackageConfig{Filename: "models_gen.go"},
+		Exec:                           ExecConfig{Filename: "generated.go"},
+		Directives:                     map[string]DirectiveConfig{},
+		Models:                         TypeMap{},
+		StructFieldsAlwaysPointers:     true,
+		ReturnPointersInUnmarshalInput: false,
+		ResolversAlwaysReturnPointers:  true,
+		NullableInputOmittable:         false,
 	}
 }
 
@@ -320,21 +326,30 @@ func (c *Config) injectTypesFromSchema() error {
 			}
 		}
 
-		if schemaType.Kind == ast.Object || schemaType.Kind == ast.InputObject {
+		if schemaType.Kind == ast.Object ||
+			schemaType.Kind == ast.InputObject ||
+			schemaType.Kind == ast.Interface {
 			for _, field := range schemaType.Fields {
 				if fd := field.Directives.ForName("goField"); fd != nil {
 					forceResolver := c.Models[schemaType.Name].Fields[field.Name].Resolver
-					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
-
 					if ra := fd.Arguments.ForName("forceResolver"); ra != nil {
 						if fr, err := ra.Value.Value(nil); err == nil {
 							forceResolver = fr.(bool)
 						}
 					}
 
+					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
 					if na := fd.Arguments.ForName("name"); na != nil {
 						if fr, err := na.Value.Value(nil); err == nil {
 							fieldName = fr.(string)
+						}
+					}
+
+					omittable := c.Models[schemaType.Name].Fields[field.Name].Omittable
+					if arg := fd.Arguments.ForName("omittable"); arg != nil {
+						if k, err := arg.Value.Value(nil); err == nil {
+							val := k.(bool)
+							omittable = &val
 						}
 					}
 
@@ -349,6 +364,7 @@ func (c *Config) injectTypesFromSchema() error {
 					c.Models[schemaType.Name].Fields[field.Name] = TypeMapField{
 						FieldName: fieldName,
 						Resolver:  forceResolver,
+						Omittable: omittable,
 					}
 				}
 			}
@@ -449,6 +465,7 @@ type TypeMapEntry struct {
 type TypeMapField struct {
 	Resolver        bool   `yaml:"resolver"`
 	FieldName       string `yaml:"fieldName"`
+	Omittable       *bool  `yaml:"omittable"`
 	GeneratedMethod string `yaml:"-"`
 }
 
@@ -659,6 +676,16 @@ func (tm TypeMap) ForceGenerate(name string, forceGenerate bool) {
 
 type DirectiveConfig struct {
 	SkipRuntime bool `yaml:"skip_runtime"`
+
+	// If the directive implementation is statically defined, don't provide a hook for it
+	// in the generated server. This is useful for directives that are implemented
+	// by plugins or the runtime itself.
+	//
+	// The function implemmentation should be provided here as a string.
+	//
+	// The function should have the following signature:
+	// func(ctx context.Context, obj any, next graphql.Resolver[, directive arguments if any]) (res any, err error)
+	Implementation *string
 }
 
 func inStrSlice(haystack []string, needle string) bool {

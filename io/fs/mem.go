@@ -15,6 +15,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 )
 
 // MemConfig is the config that is required for creating
@@ -126,37 +127,10 @@ func (f *memFile) free() {
 	f.data = nil
 }
 
-type fileDataPool struct {
-	pool sync.Pool
-}
-
-var pool *fileDataPool = nil
-
-func NewFileDataPool() *fileDataPool {
-	p := &fileDataPool{
-		pool: sync.Pool{
-			New: func() any {
-				return &bytes.Buffer{}
-			},
-		},
-	}
-
-	return p
-}
-
-func (p *fileDataPool) Get() *bytes.Buffer {
-	buf := p.pool.Get().(*bytes.Buffer)
-	buf.Reset()
-
-	return buf
-}
-
-func (p *fileDataPool) Put(buf *bytes.Buffer) {
-	p.pool.Put(buf)
-}
+var pool *mem.BufferPool = nil
 
 func init() {
-	pool = NewFileDataPool()
+	pool = mem.NewBufferPool()
 }
 
 type memFilesystem struct {

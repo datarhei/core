@@ -29,7 +29,7 @@ func (h *handler) handleHLS(c echo.Context, ctxuser string, data map[string]inte
 	return next(c)
 }
 
-func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
+func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 	path := req.URL.Path
 
@@ -97,7 +97,7 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 	return next(c)
 }
 
-func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
+func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 	res := c.Response()
 

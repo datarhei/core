@@ -15,7 +15,7 @@ func NewGzip(level Level) Compression {
 	gzipLevel := gzip.DefaultCompression
 	if level == BestCompression {
 		gzipLevel = gzip.BestCompression
-	} else {
+	} else if level == BestSpeed {
 		gzipLevel = gzip.BestSpeed
 	}
 

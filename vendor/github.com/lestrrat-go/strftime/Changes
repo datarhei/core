@@ -1,6 +1,13 @@
 Changes
 =======
 
+v1.1.0 - 28 Aug 2024
+[Miscellaneous]
+  * github.com/pkg/errors has been removed (it has been two years :)
+  * Updated build/test actions
+  * Updated minimum required go version to go 1.21
+  * Fix week number handling
+
 v1.0.6 - 20 Apr 2022
 [Miscellaneous]
   * Minimum go version is now go 1.13

@@ -495,18 +495,18 @@ func wordWalker(str string, f func(*wordInfo)) {
 		if initialisms[upperWord] {
 			// If the uppercase word (string(runes[w:i]) is "ID" or "IP"
 			// AND
-			// the word is the first two characters of the str
+			// the word is the first two characters of the current word
 			// AND
 			// that is not the end of the word
 			// AND
-			// the length of the string is greater than 3
+			// the length of the remaining string is greater than 3
 			// AND
 			// the third rune is an uppercase one
 			// THEN
 			// do NOT count this as an initialism.
 			switch upperWord {
 			case "ID", "IP":
-				if word == str[:2] && !eow && len(str) > 3 && unicode.IsUpper(runes[3]) {
+				if remainingRunes := runes[w:]; word == string(remainingRunes[:2]) && !eow && len(remainingRunes) > 3 && unicode.IsUpper(remainingRunes[3]) {
 					continue
 				}
 			}
@@ -694,7 +694,7 @@ var pkgReplacer = strings.NewReplacer(
 func TypeIdentifier(t types.Type) string {
 	res := ""
 	for {
-		switch it := t.(type) {
+		switch it := code.Unalias(t).(type) {
 		case *types.Pointer:
 			t.Underlying()
 			res += "ᚖ"
@@ -771,6 +771,8 @@ var CommonInitialisms = map[string]bool{
 	"XMPP":  true,
 	"XSRF":  true,
 	"XSS":   true,
+	"AWS":   true,
+	"GCP":   true,
 }
 
 // GetInitialisms returns the initialisms to capitalize in Go names. If unchanged, default initialisms will be returned

@@ -45,7 +45,11 @@ func Generate(cfg *config.Config, option ...Option) error {
 				}
 			}
 		}
-		plugins = append([]plugin.Plugin{federation.New(cfg.Federation.Version)}, plugins...)
+		federationPlugin, err := federation.New(cfg.Federation.Version, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to construct the Federation plugin: %w", err)
+		}
+		plugins = append([]plugin.Plugin{federationPlugin}, plugins...)
 	}
 
 	for _, o := range option {
@@ -58,6 +62,13 @@ func Generate(cfg *config.Config, option ...Option) error {
 				cfg.Sources = append(cfg.Sources, s)
 			}
 		}
+		if inj, ok := p.(plugin.EarlySourcesInjector); ok {
+			s, err := inj.InjectSourcesEarly()
+			if err != nil {
+				return fmt.Errorf("%s: %w", p.Name(), err)
+			}
+			cfg.Sources = append(cfg.Sources, s...)
+		}
 	}
 
 	if err := cfg.LoadSchema(); err != nil {
@@ -69,6 +80,13 @@ func Generate(cfg *config.Config, option ...Option) error {
 			if s := inj.InjectSourceLate(cfg.Schema); s != nil {
 				cfg.Sources = append(cfg.Sources, s)
 			}
+		}
+		if inj, ok := p.(plugin.LateSourcesInjector); ok {
+			s, err := inj.InjectSourcesLate(cfg.Schema)
+			if err != nil {
+				return fmt.Errorf("%s: %w", p.Name(), err)
+			}
+			cfg.Sources = append(cfg.Sources, s...)
 		}
 	}
 

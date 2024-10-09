@@ -36,7 +36,7 @@ func (c *Config) NewBinder() *Binder {
 }
 
 func (b *Binder) TypePosition(typ types.Type) token.Position {
-	named, isNamed := typ.(*types.Named)
+	named, isNamed := code.Unalias(typ).(*types.Named)
 	if !isNamed {
 		return token.Position{
 			Filename: "unknown",
@@ -77,10 +77,11 @@ func (b *Binder) FindType(pkgName, typeName string) (types.Type, error) {
 		return nil, err
 	}
 
-	if fun, isFunc := obj.(*types.Func); isFunc {
-		return fun.Type().(*types.Signature).Params().At(0).Type(), nil
+	t := code.Unalias(obj.Type())
+	if _, isFunc := obj.(*types.Func); isFunc {
+		return code.Unalias(t.(*types.Signature).Params().At(0).Type()), nil
 	}
-	return obj.Type(), nil
+	return t, nil
 }
 
 func (b *Binder) InstantiateType(orig types.Type, targs []types.Type) (types.Type, error) {
@@ -120,7 +121,7 @@ func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
 		return nil, err
 	}
 
-	return obj.Type(), nil
+	return code.Unalias(obj.Type()), nil
 }
 
 func (b *Binder) FindObject(pkgName, typeName string) (types.Object, error) {
@@ -193,19 +194,19 @@ func (b *Binder) PointerTo(ref *TypeReference) *TypeReference {
 
 // TypeReference is used by args and field types. The Definition can refer to both input and output types.
 type TypeReference struct {
-	Definition              *ast.Definition
-	GQL                     *ast.Type
-	GO                      types.Type  // Type of the field being bound. Could be a pointer or a value type of Target.
-	Target                  types.Type  // The actual type that we know how to bind to. May require pointer juggling when traversing to fields.
-	CastType                types.Type  // Before calling marshalling functions cast from/to this base type
-	Marshaler               *types.Func // When using external marshalling functions this will point to the Marshal function
-	Unmarshaler             *types.Func // When using external marshalling functions this will point to the Unmarshal function
-	IsMarshaler             bool        // Does the type implement graphql.Marshaler and graphql.Unmarshaler
-	IsOmittable             bool        // Is the type wrapped with Omittable
-	IsContext               bool        // Is the Marshaler/Unmarshaller the context version; applies to either the method or interface variety.
-	PointersInUmarshalInput bool        // Inverse values and pointers in return.
-	IsRoot                  bool        // Is the type a root level definition such as Query, Mutation or Subscription
-	EnumValues              []EnumValueReference
+	Definition               *ast.Definition
+	GQL                      *ast.Type
+	GO                       types.Type  // Type of the field being bound. Could be a pointer or a value type of Target.
+	Target                   types.Type  // The actual type that we know how to bind to. May require pointer juggling when traversing to fields.
+	CastType                 types.Type  // Before calling marshalling functions cast from/to this base type
+	Marshaler                *types.Func // When using external marshalling functions this will point to the Marshal function
+	Unmarshaler              *types.Func // When using external marshalling functions this will point to the Unmarshal function
+	IsMarshaler              bool        // Does the type implement graphql.Marshaler and graphql.Unmarshaler
+	IsOmittable              bool        // Is the type wrapped with Omittable
+	IsContext                bool        // Is the Marshaler/Unmarshaller the context version; applies to either the method or interface variety.
+	PointersInUnmarshalInput bool        // Inverse values and pointers in return.
+	IsRoot                   bool        // Is the type a root level definition such as Query, Mutation or Subscription
+	EnumValues               []EnumValueReference
 }
 
 func (ref *TypeReference) Elem() *TypeReference {
@@ -264,13 +265,13 @@ func (ref *TypeReference) IsPtrToIntf() bool {
 }
 
 func (ref *TypeReference) IsNamed() bool {
-	_, isSlice := ref.GO.(*types.Named)
-	return isSlice
+	_, ok := ref.GO.(*types.Named)
+	return ok
 }
 
 func (ref *TypeReference) IsStruct() bool {
-	_, isStruct := ref.GO.Underlying().(*types.Struct)
-	return isStruct
+	_, ok := ref.GO.Underlying().(*types.Struct)
+	return ok
 }
 
 func (ref *TypeReference) IsScalar() bool {
@@ -362,6 +363,9 @@ func unwrapOmittable(t types.Type) (types.Type, bool) {
 }
 
 func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret *TypeReference, err error) {
+	if bindTarget != nil {
+		bindTarget = code.Unalias(bindTarget)
+	}
 	if innerType, ok := unwrapOmittable(bindTarget); ok {
 		if schemaType.NonNull {
 			return nil, fmt.Errorf("%s is wrapped with Omittable but non-null", schemaType.Name())
@@ -433,28 +437,28 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 		if err != nil {
 			return nil, err
 		}
-
+		t := code.Unalias(obj.Type())
 		if values := b.enumValues(def); len(values) > 0 {
 			err = b.enumReference(ref, obj, values)
 			if err != nil {
 				return nil, err
 			}
 		} else if fun, isFunc := obj.(*types.Func); isFunc {
-			ref.GO = fun.Type().(*types.Signature).Params().At(0).Type()
-			ref.IsContext = fun.Type().(*types.Signature).Results().At(0).Type().String() == "github.com/99designs/gqlgen/graphql.ContextMarshaler"
+			ref.GO = code.Unalias(t.(*types.Signature).Params().At(0).Type())
+			ref.IsContext = code.Unalias(t.(*types.Signature).Results().At(0).Type()).String() == "github.com/99designs/gqlgen/graphql.ContextMarshaler"
 			ref.Marshaler = fun
 			ref.Unmarshaler = types.NewFunc(0, fun.Pkg(), "Unmarshal"+typeName, nil)
-		} else if hasMethod(obj.Type(), "MarshalGQLContext") && hasMethod(obj.Type(), "UnmarshalGQLContext") {
-			ref.GO = obj.Type()
+		} else if hasMethod(t, "MarshalGQLContext") && hasMethod(t, "UnmarshalGQLContext") {
+			ref.GO = t
 			ref.IsContext = true
 			ref.IsMarshaler = true
-		} else if hasMethod(obj.Type(), "MarshalGQL") && hasMethod(obj.Type(), "UnmarshalGQL") {
-			ref.GO = obj.Type()
+		} else if hasMethod(t, "MarshalGQL") && hasMethod(t, "UnmarshalGQL") {
+			ref.GO = t
 			ref.IsMarshaler = true
-		} else if underlying := basicUnderlying(obj.Type()); def.IsLeafType() && underlying != nil && underlying.Kind() == types.String {
+		} else if underlying := basicUnderlying(t); def.IsLeafType() && underlying != nil && underlying.Kind() == types.String {
 			// TODO delete before v1. Backwards compatibility case for named types wrapping strings (see #595)
 
-			ref.GO = obj.Type()
+			ref.GO = t
 			ref.CastType = underlying
 
 			underlyingRef, err := b.TypeReference(&ast.Type{NamedType: "String"}, nil)
@@ -465,7 +469,7 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 			ref.Marshaler = underlyingRef.Marshaler
 			ref.Unmarshaler = underlyingRef.Unmarshaler
 		} else {
-			ref.GO = obj.Type()
+			ref.GO = t
 		}
 
 		ref.Target = ref.GO
@@ -478,7 +482,7 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 			ref.GO = bindTarget
 		}
 
-		ref.PointersInUmarshalInput = b.cfg.ReturnPointersInUmarshalInput
+		ref.PointersInUnmarshalInput = b.cfg.ReturnPointersInUnmarshalInput
 
 		return ref, nil
 	}
@@ -516,6 +520,10 @@ func (b *Binder) CopyModifiersFromAst(t *ast.Type, base types.Type) types.Type {
 }
 
 func IsNilable(t types.Type) bool {
+	// Note that we use types.Unalias rather than code.Unalias here
+	// because we want to always check the underlying type.
+	// code.Unalias only unwraps aliases in Go 1.23
+	t = types.Unalias(t)
 	if namedType, isNamed := t.(*types.Named); isNamed {
 		return IsNilable(namedType.Underlying())
 	}
@@ -587,10 +595,11 @@ func (b *Binder) enumReference(ref *TypeReference, obj types.Object, values map[
 		return fmt.Errorf("not all enum values are binded for %v", ref.Definition.Name)
 	}
 
-	if fn, ok := obj.Type().(*types.Signature); ok {
-		ref.GO = fn.Params().At(0).Type()
+	t := code.Unalias(obj.Type())
+	if fn, ok := t.(*types.Signature); ok {
+		ref.GO = code.Unalias(fn.Params().At(0).Type())
 	} else {
-		ref.GO = obj.Type()
+		ref.GO = t
 	}
 
 	str, err := b.TypeReference(&ast.Type{NamedType: "String"}, nil)
@@ -618,9 +627,10 @@ func (b *Binder) enumReference(ref *TypeReference, obj types.Object, values map[
 			return err
 		}
 
-		if !types.AssignableTo(valueObj.Type(), ref.GO) {
+		valueTyp := code.Unalias(valueObj.Type())
+		if !types.AssignableTo(valueTyp, ref.GO) {
 			return fmt.Errorf("wrong type: %v, for enum value: %v, expected type: %v, of enum: %v",
-				valueObj.Type(), value.Name, ref.GO, ref.Definition.Name)
+				valueTyp, value.Name, ref.GO, ref.Definition.Name)
 		}
 
 		switch valueObj.(type) {

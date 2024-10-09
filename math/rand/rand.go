@@ -21,6 +21,12 @@ var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 var lock sync.Mutex
 
 func StringWithCharset(length int, charset string) string {
+	b := BytesWithCharset(length, charset)
+
+	return string(b)
+}
+
+func BytesWithCharset(length int, charset string) []byte {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -29,7 +35,7 @@ func StringWithCharset(length int, charset string) string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 
-	return string(b)
+	return b
 }
 
 func StringLetters(length int) string {
@@ -46,4 +52,8 @@ func StringAlphanumeric(length int) string {
 
 func String(length int) string {
 	return StringWithCharset(length, CharsetAll)
+}
+
+func Bytes(length int) []byte {
+	return BytesWithCharset(length, CharsetAll)
 }

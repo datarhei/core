@@ -17,7 +17,6 @@ type FS struct {
 
 	DefaultFile        string
 	DefaultContentType string
-	Gzip               bool
 
 	Filesystem fs.Filesystem
 

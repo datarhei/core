@@ -1,12 +1,12 @@
 package strftime
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/lestrrat-go/strftime/internal/errors"
 )
 
 type compileHandler interface {
@@ -62,7 +62,7 @@ func compile(handler compileHandler, p string, ds SpecificationSet) error {
 
 		specification, err := ds.Lookup(p[1])
 		if err != nil {
-			return errors.Wrap(err, `pattern compilation failed`)
+			return fmt.Errorf("pattern compilation failed: %w", err)
 		}
 
 		handler.handle(specification)
@@ -127,14 +127,14 @@ func Format(p string, t time.Time, options ...Option) (string, error) {
 	// TODO: this may be premature optimization
 	ds, err := getSpecificationSetFor(options...)
 	if err != nil {
-		return "", errors.Wrap(err, `failed to get specification set`)
+		return "", fmt.Errorf("failed to get specification set: %w", err)
 	}
 	h := getFmtAppendExecutor()
 	defer releasdeFmtAppendExecutor(h)
 
 	h.t = t
 	if err := compile(h, p, ds); err != nil {
-		return "", errors.Wrap(err, `failed to compile format`)
+		return "", fmt.Errorf("failed to compile format: %w", err)
 	}
 
 	return string(h.dst), nil
@@ -152,14 +152,14 @@ func New(p string, options ...Option) (*Strftime, error) {
 	// TODO: this may be premature optimization
 	ds, err := getSpecificationSetFor(options...)
 	if err != nil {
-		return nil, errors.Wrap(err, `failed to get specification set`)
+		return nil, fmt.Errorf("failed to get specification set: %w", err)
 	}
 
 	var h appenderListBuilder
 	h.list = &combiningAppend{}
 
 	if err := compile(&h, p, ds); err != nil {
-		return nil, errors.Wrap(err, `failed to compile format`)
+		return nil, fmt.Errorf("failed to compile format: %w", err)
 	}
 
 	return &Strftime{

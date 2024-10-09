@@ -58,15 +58,15 @@ func (rcr *nopReadCloseResetter) Reset(r io.Reader) error {
 	return resetter.Reset(r)
 }
 
-func getTestcases() map[Scheme]func(r io.Reader) (ReadCloseResetter, error) {
-	return map[Scheme]func(r io.Reader) (ReadCloseResetter, error){
-		GzipScheme: func(r io.Reader) (ReadCloseResetter, error) {
+func getTestcases() map[string]func(r io.Reader) (ReadCloseResetter, error) {
+	return map[string]func(r io.Reader) (ReadCloseResetter, error){
+		"gzip": func(r io.Reader) (ReadCloseResetter, error) {
 			return gzip.NewReader(r)
 		},
-		BrotliScheme: func(r io.Reader) (ReadCloseResetter, error) {
+		"br": func(r io.Reader) (ReadCloseResetter, error) {
 			return &nopReadCloseResetter{brotli.NewReader(r)}, nil
 		},
-		ZstdScheme: func(r io.Reader) (ReadCloseResetter, error) {
+		"zstd": func(r io.Reader) (ReadCloseResetter, error) {
 			reader, err := zstd.NewReader(r)
 			return &nopReadCloseResetter{reader}, err
 		},
@@ -77,18 +77,18 @@ func TestCompress(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme, reader := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
+			ctx := e.NewContext(req, rec)
 
 			// Skip if no Accept-Encoding header
-			h := NewWithConfig(Config{Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+			handler := NewWithConfig(Config{Schemes: []string{scheme}})(func(c echo.Context) error {
 				c.Response().Write([]byte("test")) // For Content-Type sniffing
 				return nil
 			})
-			h(c)
+			handler(ctx)
 
 			assert := assert.New(t)
 
@@ -96,15 +96,15 @@ func TestCompress(t *testing.T) {
 
 			// Compression
 			req = httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec = httptest.NewRecorder()
-			c = e.NewContext(req, rec)
-			h(c)
-			assert.Equal(scheme.String(), rec.Header().Get(echo.HeaderContentEncoding))
+			ctx = e.NewContext(req, rec)
+			handler(ctx)
+			assert.Equal(scheme, rec.Header().Get(echo.HeaderContentEncoding))
 			assert.Contains(rec.Header().Get(echo.HeaderContentType), echo.MIMETextPlain)
 			r, err := reader(rec.Body)
 			if assert.NoError(err) {
-				buf := new(bytes.Buffer)
+				buf := &bytes.Buffer{}
 				defer r.Close()
 				buf.ReadFrom(r)
 				assert.Equal("test", buf.String())
@@ -112,11 +112,11 @@ func TestCompress(t *testing.T) {
 
 			// Gzip chunked
 			req = httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec = httptest.NewRecorder()
 
-			c = e.NewContext(req, rec)
-			NewWithConfig(Config{Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+			ctx = e.NewContext(req, rec)
+			NewWithConfig(Config{Schemes: []string{scheme}})(func(c echo.Context) error {
 				c.Response().Header().Set("Content-Type", "text/event-stream")
 				c.Response().Header().Set("Transfer-Encoding", "chunked")
 
@@ -126,7 +126,7 @@ func TestCompress(t *testing.T) {
 
 				// Read the first part of the data
 				assert.True(rec.Flushed)
-				assert.Equal(scheme.String(), rec.Header().Get(echo.HeaderContentEncoding))
+				assert.Equal(scheme, rec.Header().Get(echo.HeaderContentEncoding))
 
 				// Write and flush the second part of the data
 				c.Response().Write([]byte("tost\n"))
@@ -135,7 +135,7 @@ func TestCompress(t *testing.T) {
 				// Write the final part of the data and return
 				c.Response().Write([]byte("tast"))
 				return nil
-			})(c)
+			})(ctx)
 
 			buf := new(bytes.Buffer)
 			r.Reset(rec.Body)
@@ -146,14 +146,53 @@ func TestCompress(t *testing.T) {
 	}
 }
 
+func TestCompressWithPassthrough(t *testing.T) {
+	schemes := getTestcases()
+
+	for scheme, reader := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			e := echo.New()
+			e.Use(NewWithConfig(Config{MinLength: 5, Schemes: []string{scheme}, ContentTypes: []string{"text/compress"}}))
+			e.GET("/plain", func(c echo.Context) error {
+				c.Response().Header().Set("Content-Type", "text/plain")
+				c.Response().Write([]byte("testtest"))
+				return nil
+			})
+			e.GET("/compress", func(c echo.Context) error {
+				c.Response().Header().Set("Content-Type", "text/compress")
+				c.Response().Write([]byte("testtest"))
+				return nil
+			})
+			req := httptest.NewRequest(http.MethodGet, "/plain", nil)
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			assert.Equal(t, "", rec.Header().Get(echo.HeaderContentEncoding))
+			assert.Contains(t, rec.Body.String(), "testtest")
+
+			req = httptest.NewRequest(http.MethodGet, "/compress", nil)
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
+			rec = httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			assert.Equal(t, scheme, rec.Header().Get(echo.HeaderContentEncoding))
+			r, err := reader(rec.Body)
+			if assert.NoError(t, err) {
+				buf := new(bytes.Buffer)
+				defer r.Close()
+				buf.ReadFrom(r)
+				assert.Equal(t, "testtest", buf.String())
+			}
+		})
+	}
+}
+
 func TestCompressWithMinLength(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme, reader := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
-			// Invalid level
-			e.Use(NewWithConfig(Config{MinLength: 5, Schemes: []Scheme{scheme}}))
+			e.Use(NewWithConfig(Config{MinLength: 5, Schemes: []string{scheme}}))
 			e.GET("/", func(c echo.Context) error {
 				c.Response().Write([]byte("test"))
 				return nil
@@ -163,17 +202,17 @@ func TestCompressWithMinLength(t *testing.T) {
 				return nil
 			})
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
 			assert.Equal(t, "", rec.Header().Get(echo.HeaderContentEncoding))
 			assert.Contains(t, rec.Body.String(), "test")
 
 			req = httptest.NewRequest(http.MethodGet, "/foobar", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec = httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
-			assert.Equal(t, scheme.String(), rec.Header().Get(echo.HeaderContentEncoding))
+			assert.Equal(t, scheme, rec.Header().Get(echo.HeaderContentEncoding))
 			r, err := reader(rec.Body)
 			if assert.NoError(t, err) {
 				buf := new(bytes.Buffer)
@@ -185,17 +224,60 @@ func TestCompressWithMinLength(t *testing.T) {
 	}
 }
 
+func TestCompressWithAroundMinLength(t *testing.T) {
+	schemes := getTestcases()
+	minLength := 1000
+
+	for scheme, reader := range schemes {
+		for i := minLength - 64; i < minLength+64; i++ {
+			name := fmt.Sprintf("%s-%d", scheme, i)
+
+			t.Run(name, func(t *testing.T) {
+				data := rand.Bytes(i)
+				e := echo.New()
+				e.Use(NewWithConfig(Config{MinLength: minLength, Schemes: []string{scheme}}))
+				e.GET("/", func(c echo.Context) error {
+					c.Response().Write(data[:1])
+					c.Response().Write(data[1:])
+					return nil
+				})
+				req := httptest.NewRequest(http.MethodGet, "/", nil)
+				req.Header.Set(echo.HeaderAcceptEncoding, scheme)
+				rec := httptest.NewRecorder()
+				e.ServeHTTP(rec, req)
+
+				if i < minLength {
+					assert.Equal(t, "", rec.Header().Get(echo.HeaderContentEncoding))
+					res, err := io.ReadAll(rec.Body)
+					if assert.NoError(t, err) {
+						assert.Equal(t, data, res)
+					}
+				} else {
+					assert.Equal(t, scheme, rec.Header().Get(echo.HeaderContentEncoding))
+					r, err := reader(rec.Body)
+					if assert.NoError(t, err) {
+						buf := new(bytes.Buffer)
+						defer r.Close()
+						buf.ReadFrom(r)
+						assert.Equal(t, data, buf.Bytes())
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestCompressNoContent(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
-			h := NewWithConfig(Config{Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+			h := NewWithConfig(Config{Schemes: []string{scheme}})(func(c echo.Context) error {
 				return c.NoContent(http.StatusNoContent)
 			})
 			if assert.NoError(t, h(c)) {
@@ -211,17 +293,17 @@ func TestCompressEmpty(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme, reader := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
-			h := NewWithConfig(Config{Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+			h := NewWithConfig(Config{Schemes: []string{scheme}})(func(c echo.Context) error {
 				return c.String(http.StatusOK, "")
 			})
 			if assert.NoError(t, h(c)) {
-				assert.Equal(t, scheme.String(), rec.Header().Get(echo.HeaderContentEncoding))
+				assert.Equal(t, scheme, rec.Header().Get(echo.HeaderContentEncoding))
 				assert.Equal(t, "text/plain; charset=UTF-8", rec.Header().Get(echo.HeaderContentType))
 				r, err := reader(rec.Body)
 				if assert.NoError(t, err) {
@@ -238,14 +320,14 @@ func TestCompressErrorReturned(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
-			e.Use(NewWithConfig(Config{Schemes: []Scheme{scheme}}))
+			e.Use(NewWithConfig(Config{Schemes: []string{scheme}}))
 			e.GET("/", func(c echo.Context) error {
 				return echo.ErrNotFound
 			})
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
 			assert.Equal(t, http.StatusNotFound, rec.Code)
@@ -259,12 +341,12 @@ func TestCompressWithStatic(t *testing.T) {
 	schemes := getTestcases()
 
 	for scheme, reader := range schemes {
-		t.Run(scheme.String(), func(t *testing.T) {
+		t.Run(scheme, func(t *testing.T) {
 			e := echo.New()
-			e.Use(NewWithConfig(Config{Schemes: []Scheme{scheme}}))
+			e.Use(NewWithConfig(Config{Schemes: []string{scheme}}))
 			e.Static("/test", "./")
 			req := httptest.NewRequest(http.MethodGet, "/test/compress.go", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
 			assert.Equal(t, http.StatusOK, rec.Code)
@@ -292,17 +374,17 @@ func BenchmarkCompress(b *testing.B) {
 
 	for i := 1; i <= 18; i++ {
 		datalen := 2 << i
-		data := []byte(rand.String(datalen))
+		data := rand.Bytes(datalen)
 
 		for scheme := range schemes {
-			name := fmt.Sprintf("%s-%d", scheme.String(), datalen)
+			name := fmt.Sprintf("%s-%d", scheme, datalen)
 			b.Run(name, func(b *testing.B) {
 				e := echo.New()
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+				req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 
-				h := NewWithConfig(Config{Level: BestSpeed, Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+				h := NewWithConfig(Config{Level: BestSpeed, Schemes: []string{scheme}})(func(c echo.Context) error {
 					c.Response().Write(data)
 					return nil
 				})
@@ -327,13 +409,13 @@ func BenchmarkCompressJSON(b *testing.B) {
 	schemes := getTestcases()
 
 	for scheme := range schemes {
-		b.Run(scheme.String(), func(b *testing.B) {
+		b.Run(scheme, func(b *testing.B) {
 			e := echo.New()
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Header.Set(echo.HeaderAcceptEncoding, scheme.String())
+			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
 
-			h := NewWithConfig(Config{Level: BestSpeed, Schemes: []Scheme{scheme}})(func(c echo.Context) error {
+			h := NewWithConfig(Config{Level: BestSpeed, Schemes: []string{scheme}})(func(c echo.Context) error {
 				c.Response().Write(data)
 				return nil
 			})

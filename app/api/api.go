@@ -1427,7 +1427,6 @@ func (a *api) start(ctx context.Context) error {
 			Password:           "",
 			DefaultFile:        "index.html",
 			DefaultContentType: "text/html",
-			Gzip:               true,
 			Filesystem:         a.diskfs,
 			Cache:              a.cache,
 		},
@@ -1440,7 +1439,6 @@ func (a *api) start(ctx context.Context) error {
 			Password:           cfg.Storage.Memory.Auth.Password,
 			DefaultFile:        "",
 			DefaultContentType: "application/data",
-			Gzip:               true,
 			Filesystem:         a.memfs,
 			Cache:              nil,
 		},
@@ -1456,7 +1454,6 @@ func (a *api) start(ctx context.Context) error {
 			Password:           s3.Auth.Password,
 			DefaultFile:        "",
 			DefaultContentType: "application/data",
-			Gzip:               true,
 			Filesystem:         a.s3fs[s3.Name],
 			Cache:              a.cache,
 		})
@@ -1469,7 +1466,7 @@ func (a *api) start(ctx context.Context) error {
 		Restream:      a.restream,
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
-		MimeTypesFile: cfg.Storage.MimeTypes,
+		MimeTypesFile: cfg.Storage.MimeTypesFile,
 		Filesystems:   httpfilesystems,
 		IPLimiter:     iplimiter,
 		Profiling:     cfg.Debug.Profiling,
@@ -1501,6 +1498,11 @@ func (a *api) start(ctx context.Context) error {
 			return false
 		},
 		Resources: a.resources,
+		Compress: http.CompressConfig{
+			Encoding:  cfg.Compress.Encoding,
+			MimeTypes: cfg.Compress.MimeTypes,
+			MinLength: cfg.Compress.MinLength,
+		},
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

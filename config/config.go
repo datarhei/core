@@ -94,6 +94,7 @@ func (d *Config) Clone() *Config {
 	data.Log = d.Log
 	data.DB = d.DB
 	data.Host = d.Host
+	data.Compress = d.Compress
 	data.API = d.API
 	data.TLS = d.TLS
 	data.Storage = d.Storage
@@ -112,6 +113,9 @@ func (d *Config) Clone() *Config {
 	data.Log.Topics = slices.Copy(d.Log.Topics)
 
 	data.Host.Name = slices.Copy(d.Host.Name)
+
+	data.Compress.Encoding = slices.Copy(d.Compress.Encoding)
+	data.Compress.MimeTypes = slices.Copy(d.Compress.MimeTypes)
 
 	data.API.Access.HTTP.Allow = slices.Copy(d.API.Access.HTTP.Allow)
 	data.API.Access.HTTP.Block = slices.Copy(d.API.Access.HTTP.Block)
@@ -164,6 +168,21 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.Host.Name, []string{}, ","), "host.name", "CORE_HOST_NAME", nil, "Comma separated list of public host/domain names or IPs", false, false)
 	d.vars.Register(value.NewBool(&d.Host.Auto, true), "host.auto", "CORE_HOST_AUTO", nil, "Enable detection of public IP addresses", false, false)
 
+	d.vars.Register(value.NewStringList(&d.Compress.Encoding, []string{"gzip"}, ","), "compress.encoding", "CORE_COMPRESS_ENCODING", nil, "Comma separated list of content encodings", false, false)
+	d.vars.Register(value.NewStringList(&d.Compress.MimeTypes, []string{
+		"text/plain",
+		"text/html",
+		"text/css",
+		"text/javascript",
+		"application/json",
+		"application/x-mpegurl",
+		"application/vnd.apple.mpegurl",
+		"image/svg+xml",
+		"text/event-stream",
+		"application/x-json-stream",
+	}, ","), "compress.mimetypes", "CORE_COMPRESS_MIMETYPES", nil, "Comma separated list of mimetypes to compress", false, false)
+	d.vars.Register(value.NewInt(&d.Compress.MinLength, 1000), "compress.min_length", "CORE_COMPRESS_MIN_LENGTH", nil, "Minimum size before compression will be used", false, false)
+
 	// API
 	d.vars.Register(value.NewBool(&d.API.ReadOnly, false), "api.read_only", "CORE_API_READ_ONLY", nil, "Allow only ready only access to the API", false, false)
 	d.vars.Register(value.NewCIDRList(&d.API.Access.HTTP.Allow, []string{}, ","), "api.access.http.allow", "CORE_API_ACCESS_HTTP_ALLOW", nil, "List of IPs in CIDR notation (HTTP traffic)", false, false)
@@ -193,7 +212,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEY_FILE", []string{"CORE_TLS_KEYFILE"}, "Path to key file in PEM format", false, false)
 
 	// Storage
-	d.vars.Register(value.NewFile(&d.Storage.MimeTypes, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
+	d.vars.Register(value.NewFile(&d.Storage.MimeTypesFile, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
 
 	// Storage (Disk)
 	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data", d.fs), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)

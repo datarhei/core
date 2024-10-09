@@ -51,7 +51,7 @@ func TestConfigSetConflict(t *testing.T) {
 	router, _ := getDummyConfigRouter(t)
 
 	cfg := config.New(nil)
-	cfg.Storage.MimeTypes = "/path/to/mime.types"
+	cfg.Storage.MimeTypesFile = "/path/to/mime.types"
 
 	var data bytes.Buffer
 
