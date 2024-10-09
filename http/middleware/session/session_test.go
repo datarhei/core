@@ -1,6 +1,8 @@
 package session
 
 import (
+	"bytes"
+	"net/http"
 	"testing"
 
 	"github.com/datarhei/core/v16/encoding/json"
@@ -133,4 +135,30 @@ func TestVerifySessionMultipleRemote(t *testing.T) {
 
 	_, err = verifySession(rawdata, "/memfs/6faad99a-c440-4df1-9344-963869718d8d/main.m3u8", "http://bar.example.com")
 	require.Error(t, err)
+}
+
+func TestHeaderSize(t *testing.T) {
+	header := http.Header{}
+
+	header.Add("Content-Type", "application/json")
+	header.Add("Content-Encoding", "gzip")
+
+	buffer := &bytes.Buffer{}
+	size := headerSize(header, buffer)
+
+	require.Equal(t, "Content-Encoding: gzip\r\nContent-Type: application/json\r\n", buffer.String())
+	require.Equal(t, int64(56), size)
+}
+
+func BenchmarkHeaderSize(b *testing.B) {
+	header := http.Header{}
+
+	header.Add("Content-Type", "application/json")
+	header.Add("Content-Encoding", "gzip")
+
+	buffer := &bytes.Buffer{}
+
+	for i := 0; i < b.N; i++ {
+		headerSize(header, buffer)
+	}
 }

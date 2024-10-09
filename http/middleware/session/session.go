@@ -13,6 +13,7 @@ import (
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/session"
 	"github.com/lithammer/shortuuid/v4"
@@ -44,6 +45,8 @@ type handler struct {
 
 	rxsegments map[string]int64
 	lock       sync.Mutex
+
+	bufferPool *mem.BufferPool
 }
 
 // New returns a new session middleware with default config
@@ -75,6 +78,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		hlsIngressCollector: config.HLSIngressCollector,
 		reSessionID:         regexp.MustCompile(`^[` + regexp.QuoteMeta(shortuuid.DefaultAlphabet) + `]{22}$`),
 		rxsegments:          make(map[string]int64),
+		bufferPool:          mem.NewBufferPool(),
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -173,43 +177,42 @@ func verifySession(raw interface{}, path, referrer string) (map[string]interface
 	return data, nil
 }
 
-func headerSize(header http.Header) int64 {
-	var buffer bytes.Buffer
-
-	header.Write(&buffer)
+func headerSize(header http.Header, buffer *bytes.Buffer) int64 {
+	buffer.Reset()
+	header.Write(buffer)
 
 	return int64(buffer.Len())
 }
 
-type fakeReader struct {
+type bodysizeReader struct {
 	reader io.ReadCloser
 	size   int64
 }
 
-func (r *fakeReader) Read(b []byte) (int, error) {
+func (r *bodysizeReader) Read(b []byte) (int, error) {
 	n, err := r.reader.Read(b)
 	r.size += int64(n)
 
 	return n, err
 }
 
-func (r *fakeReader) Close() error {
+func (r *bodysizeReader) Close() error {
 	return r.reader.Close()
 }
 
-type fakeWriter struct {
+type bodysizeWriter struct {
 	http.ResponseWriter
 	size int64
 	code int
 }
 
-func (w *fakeWriter) WriteHeader(statusCode int) {
+func (w *bodysizeWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 
 	w.code = statusCode
 }
 
-func (w *fakeWriter) Write(body []byte) (int, error) {
+func (w *bodysizeWriter) Write(body []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(body)
 
 	w.size += int64(n)
@@ -217,7 +220,7 @@ func (w *fakeWriter) Write(body []byte) (int, error) {
 	return n, err
 }
 
-func (w *fakeWriter) Flush() {
+func (w *bodysizeWriter) Flush() {
 	flusher, ok := w.ResponseWriter.(http.Flusher)
 	if ok {
 		flusher.Flush()
