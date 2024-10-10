@@ -16,7 +16,7 @@ type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
 	Logger  log.Logger
-	Status  func(code int)
+	Status  func(code int, method, path string, size int64, ttfb time.Duration)
 }
 
 var DefaultConfig = Config{
@@ -76,10 +76,15 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			res.Writer = writer
 			req.Body = reader
 
+			if w.ttfb.IsZero() {
+				w.ttfb = start
+			}
+
 			latency := time.Since(start)
+			ttfb := time.Since(w.ttfb)
 
 			if config.Status != nil {
-				config.Status(res.Status)
+				config.Status(res.Status, req.Method, c.Path(), w.size, ttfb)
 			}
 
 			if raw != "" {
@@ -87,16 +92,17 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			}
 
 			logger := config.Logger.WithFields(log.Fields{
-				"client":        c.RealIP(),
-				"method":        req.Method,
-				"path":          path,
-				"proto":         req.Proto,
-				"status":        res.Status,
-				"status_text":   http.StatusText(res.Status),
-				"tx_size_bytes": w.size,
-				"rx_size_bytes": r.size,
-				"latency_ms":    latency.Milliseconds(),
-				"user_agent":    req.Header.Get("User-Agent"),
+				"client":          c.RealIP(),
+				"method":          req.Method,
+				"path":            path,
+				"proto":           req.Proto,
+				"status":          res.Status,
+				"status_text":     http.StatusText(res.Status),
+				"tx_size_bytes":   w.size,
+				"rx_size_bytes":   r.size,
+				"latency_ms":      latency.Milliseconds(),
+				"latency_ttfb_ms": ttfb.Milliseconds(),
+				"user_agent":      req.Header.Get("User-Agent"),
 			})
 
 			logger.Debug().Log("")
@@ -110,12 +116,16 @@ type sizeWriter struct {
 	http.ResponseWriter
 
 	size int64
+	ttfb time.Time
 }
 
 func (w *sizeWriter) Write(body []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(body)
 
 	w.size += int64(n)
+	if w.ttfb.IsZero() {
+		w.ttfb = time.Now()
+	}
 
 	return n, err
 }

@@ -30,9 +30,11 @@ package http
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
@@ -166,7 +168,7 @@ type server struct {
 
 	metrics struct {
 		lock   sync.Mutex
-		status map[int]uint64
+		status map[string]uint64
 	}
 }
 
@@ -186,7 +188,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		readOnly:      config.ReadOnly,
 	}
 
-	s.metrics.status = map[int]uint64{}
+	s.metrics.status = map[string]uint64{}
 
 	s.filesystems = map[string]*filesystem{}
 
@@ -344,11 +346,13 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 	s.middleware.log = mwlog.NewWithConfig(mwlog.Config{
 		Logger: s.logger,
-		Status: func(code int) {
+		Status: func(code int, method, path string, size int64, ttfb time.Duration) {
+			key := fmt.Sprintf("%d:%s:%s", code, method, path)
+
 			s.metrics.lock.Lock()
 			defer s.metrics.lock.Unlock()
 
-			s.metrics.status[code]++
+			s.metrics.status[key]++
 		},
 	})
 
@@ -483,15 +487,13 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func (s *server) HTTPStatus() map[int]uint64 {
-	status := map[int]uint64{}
+func (s *server) HTTPStatus() map[string]uint64 {
+	status := map[string]uint64{}
 
 	s.metrics.lock.Lock()
 	defer s.metrics.lock.Unlock()
 
-	for code, value := range s.metrics.status {
-		status[code] = value
-	}
+	maps.Copy(status, s.metrics.status)
 
 	return status
 }
