@@ -196,9 +196,9 @@ func (r *registry) sessionPersister(pattern *strftime.Strftime, bufferDuration t
 		"buffer":  bufferDuration,
 	}).Log("Session persister started")
 
-	buffer := &bytes.Buffer{}
 	path := pattern.FormatString(time.Now())
 
+	buffer := &bytes.Buffer{}
 	enc := json.NewEncoder(buffer)
 
 	ticker := time.NewTicker(bufferDuration)

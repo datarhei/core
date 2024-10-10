@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"net/url"
 	"strings"
 
@@ -66,15 +65,16 @@ func (r *restclient) Process(id app.ProcessID, filter []string) (api.Process, er
 }
 
 func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) error {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, metadata)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(config)
 
-	_, err := r.call("POST", "/v3/process", nil, nil, "application/json", &buf)
+	_, err := r.call("POST", "/v3/process", nil, nil, "application/json", buf)
 	if err != nil {
 		return err
 	}
@@ -83,18 +83,19 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 }
 
 func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]interface{}) error {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, metadata)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(config)
 
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", buf)
 	if err != nil {
 		return err
 	}
@@ -103,18 +104,19 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 }
 
 func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) error {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
 	data := api.ProcessReport{}
 	data.Unmarshal(report)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(data)
 
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", buf)
 	if err != nil {
 		return err
 	}
@@ -132,9 +134,10 @@ func (r *restclient) ProcessDelete(id app.ProcessID) error {
 }
 
 func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(api.Command{
 		Command: command,
 	})
@@ -142,7 +145,7 @@ func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", buf)
 
 	return err
 }
@@ -170,15 +173,16 @@ func (r *restclient) ProcessMetadata(id app.ProcessID, key string) (api.Metadata
 }
 
 func (r *restclient) ProcessMetadataSet(id app.ProcessID, key string, metadata api.Metadata) error {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(metadata)
 
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", &buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", buf)
 
 	return err
 }
@@ -201,15 +205,17 @@ func (r *restclient) ProcessProbe(id app.ProcessID) (api.Probe, error) {
 
 func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	var probe api.Probe
-	var buf bytes.Buffer
+
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, nil)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(config)
 
-	data, err := r.call("POST", "/v3/process/probe", nil, nil, "application/json", &buf)
+	data, err := r.call("POST", "/v3/process/probe", nil, nil, "application/json", buf)
 	if err != nil {
 		return probe, err
 	}

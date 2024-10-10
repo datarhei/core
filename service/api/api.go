@@ -11,6 +11,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 )
 
 type API interface {
@@ -227,8 +228,10 @@ func (a *api) call(method, path string, body io.Reader) ([]byte, error) {
 }
 
 func (a *api) Monitor(id string, monitordata MonitorData) (MonitorResponse, error) {
-	var data bytes.Buffer
-	encoder := json.NewEncoder(&data)
+	data := mem.Get()
+	defer mem.Put(data)
+
+	encoder := json.NewEncoder(data)
 	if err := encoder.Encode(monitordata); err != nil {
 		return MonitorResponse{}, err
 	}
@@ -240,7 +243,7 @@ func (a *api) Monitor(id string, monitordata MonitorData) (MonitorResponse, erro
 		}
 	*/
 
-	response, err := a.callWithRetry(http.MethodPut, "api/v1/core/monitor/"+id, &data)
+	response, err := a.callWithRetry(http.MethodPut, "api/v1/core/monitor/"+id, data)
 	if err != nil {
 		return MonitorResponse{}, fmt.Errorf("error sending request: %w", err)
 	}

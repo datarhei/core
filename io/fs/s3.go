@@ -14,6 +14,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -275,7 +276,7 @@ func (fs *s3Filesystem) ReadFile(path string) ([]byte, error) {
 
 	defer file.Close()
 
-	buf := &bytes.Buffer{}
+	buf := mem.Get() // here we take out a buffer for good
 
 	_, err := buf.ReadFrom(file)
 	if err != nil {
@@ -371,11 +372,13 @@ func (fs *s3Filesystem) AppendFileReader(path string, r io.Reader, sizeHint int)
 		return size, err
 	}
 
-	buffer := bytes.Buffer{}
+	buffer := mem.Get()
+	defer mem.Put(buffer)
+
 	buffer.ReadFrom(object)
 	buffer.ReadFrom(r)
 
-	size, _, err := fs.write(path, &buffer)
+	size, _, err := fs.write(path, buffer)
 	return size, err
 }
 

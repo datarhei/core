@@ -31,3 +31,17 @@ func (p *BufferPool) Get() *bytes.Buffer {
 func (p *BufferPool) Put(buf *bytes.Buffer) {
 	p.pool.Put(buf)
 }
+
+var DefaultBufferPool *BufferPool
+
+func init() {
+	DefaultBufferPool = NewBufferPool()
+}
+
+func Get() *bytes.Buffer {
+	return DefaultBufferPool.Get()
+}
+
+func Put(buf *bytes.Buffer) {
+	DefaultBufferPool.Put(buf)
+}

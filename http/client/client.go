@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/Masterminds/semver/v3"
@@ -199,6 +199,8 @@ type restclient struct {
 		connectedCore *semver.Version
 		methods       map[string][]apiconstraint
 	}
+
+	pool *mem.BufferPool
 }
 
 // New returns a new REST API client for the given config. The error is non-nil
@@ -212,6 +214,7 @@ func New(config Config) (RestClient, error) {
 		auth0Token:    config.Auth0Token,
 		client:        config.Client,
 		clientTimeout: config.Timeout,
+		pool:          mem.NewBufferPool(),
 	}
 
 	if len(config.AccessToken) != 0 {
@@ -652,12 +655,13 @@ func (r *restclient) login() error {
 		login.Password = r.password
 	}
 
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(login)
 
-	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", &buf)
+	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", buf)
 	if err != nil {
 		return err
 	}

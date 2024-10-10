@@ -379,10 +379,12 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 		}
 	}
 
-	data := make([]byte, file.data.Len())
-	copy(data, file.data.Bytes())
+	data := pool.Get()
 
-	return data, nil
+	data.Grow(file.data.Len())
+	data.Write(file.data.Bytes())
+
+	return data.Bytes(), nil
 }
 
 func (fs *memFilesystem) Symlink(oldname, newname string) error {

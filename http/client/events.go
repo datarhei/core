@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -11,15 +10,16 @@ import (
 )
 
 func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
-	var buf bytes.Buffer
+	buf := r.pool.Get()
+	defer r.pool.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(filters)
 
 	header := make(http.Header)
 	header.Set("Accept", "application/x-json-stream")
 
-	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", &buf)
+	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", buf)
 	if err != nil {
 		return nil, err
 	}

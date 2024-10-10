@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -31,7 +32,7 @@ func NewHLSRewrite() echo.MiddlewareFunc {
 }
 
 type hlsrewrite struct {
-	pathPrefix string
+	pathPrefix []byte
 }
 
 func NewHLSRewriteWithConfig(config HLSRewriteConfig) echo.MiddlewareFunc {
@@ -47,7 +48,7 @@ func NewHLSRewriteWithConfig(config HLSRewriteConfig) echo.MiddlewareFunc {
 	}
 
 	hls := hlsrewrite{
-		pathPrefix: pathPrefix,
+		pathPrefix: []byte(pathPrefix),
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -91,6 +92,7 @@ func (h *hlsrewrite) rewrite(c echo.Context, next echo.HandlerFunc) error {
 		// the data that we need to rewrite.
 		rewriter = &hlsRewriter{
 			ResponseWriter: res.Writer,
+			buffer:         mem.Get(),
 		}
 
 		res.Writer = rewriter
@@ -104,16 +106,20 @@ func (h *hlsrewrite) rewrite(c echo.Context, next echo.HandlerFunc) error {
 	res.Writer = writer
 
 	if rewrite {
-		if res.Status != 200 {
+		if res.Status == 200 {
+			// Rewrite the data befor sending it to the client
+			buffer := mem.Get()
+			defer mem.Put(buffer)
+
+			rewriter.rewrite(h.pathPrefix, buffer)
+
+			res.Header().Set("Cache-Control", "private")
+			res.Write(buffer.Bytes())
+		} else {
 			res.Write(rewriter.buffer.Bytes())
-			return nil
 		}
 
-		// Rewrite the data befor sending it to the client
-		rewriter.rewrite(h.pathPrefix)
-
-		res.Header().Set("Cache-Control", "private")
-		res.Write(rewriter.buffer.Bytes())
+		mem.Put(rewriter.buffer)
 	}
 
 	return nil
@@ -121,7 +127,7 @@ func (h *hlsrewrite) rewrite(c echo.Context, next echo.HandlerFunc) error {
 
 type hlsRewriter struct {
 	http.ResponseWriter
-	buffer bytes.Buffer
+	buffer *bytes.Buffer
 }
 
 func (g *hlsRewriter) Write(data []byte) (int, error) {
@@ -131,34 +137,29 @@ func (g *hlsRewriter) Write(data []byte) (int, error) {
 	return w, err
 }
 
-func (g *hlsRewriter) rewrite(pathPrefix string) {
-	var buffer bytes.Buffer
-
+func (g *hlsRewriter) rewrite(pathPrefix []byte, buffer *bytes.Buffer) {
 	// Find all URLS in the .m3u8 and add the session ID to the query string
-	scanner := bufio.NewScanner(&g.buffer)
+	scanner := bufio.NewScanner(g.buffer)
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := scanner.Bytes()
 
 		// Write empty lines unmodified
 		if len(line) == 0 {
-			buffer.WriteString(line + "\n")
+			buffer.Write(line)
+			buffer.WriteByte('\n')
 			continue
 		}
 
 		// Write comments unmodified
-		if strings.HasPrefix(line, "#") {
-			buffer.WriteString(line + "\n")
+		if line[0] == '#' {
+			buffer.Write(line)
+			buffer.WriteByte('\n')
 			continue
 		}
 
 		// Rewrite
-		line = strings.TrimPrefix(line, pathPrefix)
-		buffer.WriteString(line + "\n")
+		line = bytes.TrimPrefix(line, pathPrefix)
+		buffer.Write(line)
+		buffer.WriteByte('\n')
 	}
-
-	if err := scanner.Err(); err != nil {
-		return
-	}
-
-	g.buffer = buffer
 }

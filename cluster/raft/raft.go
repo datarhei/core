@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 	"go.etcd.io/bbolt"
 
 	"github.com/hashicorp/go-hclog"
@@ -359,14 +359,14 @@ func (r *raft) Snapshot() (io.ReadCloser, error) {
 		Data:     base64.StdEncoding.EncodeToString(data),
 	}
 
-	buffer := bytes.Buffer{}
-	enc := json.NewEncoder(&buffer)
+	buffer := mem.Get()
+	enc := json.NewEncoder(buffer)
 	err = enc.Encode(snapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return &readCloserWrapper{&buffer}, nil
+	return &readCloserWrapper{buffer}, nil
 }
 
 func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
