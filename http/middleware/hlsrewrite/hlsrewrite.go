@@ -127,7 +127,7 @@ func (h *hlsrewrite) rewrite(c echo.Context, next echo.HandlerFunc) error {
 
 type hlsRewriter struct {
 	http.ResponseWriter
-	buffer *bytes.Buffer
+	buffer *mem.Buffer
 }
 
 func (g *hlsRewriter) Write(data []byte) (int, error) {
@@ -137,9 +137,9 @@ func (g *hlsRewriter) Write(data []byte) (int, error) {
 	return w, err
 }
 
-func (g *hlsRewriter) rewrite(pathPrefix []byte, buffer *bytes.Buffer) {
+func (g *hlsRewriter) rewrite(pathPrefix []byte, buffer *mem.Buffer) {
 	// Find all URLS in the .m3u8 and add the session ID to the query string
-	scanner := bufio.NewScanner(g.buffer)
+	scanner := bufio.NewScanner(g.buffer.Reader())
 	for scanner.Scan() {
 		line := scanner.Bytes()
 

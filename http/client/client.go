@@ -661,7 +661,7 @@ func (r *restclient) login() error {
 	e := json.NewEncoder(buf)
 	e.Encode(login)
 
-	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", buf)
+	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", buf.Reader())
 	if err != nil {
 		return err
 	}

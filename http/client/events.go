@@ -19,7 +19,7 @@ func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-ch
 	header := make(http.Header)
 	header.Set("Accept", "application/x-json-stream")
 
-	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", buf)
+	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", buf.Reader())
 	if err != nil {
 		return nil, err
 	}

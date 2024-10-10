@@ -1,7 +1,6 @@
 package session
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -177,7 +176,7 @@ func verifySession(raw interface{}, path, referrer string) (map[string]interface
 	return data, nil
 }
 
-func headerSize(header http.Header, buffer *bytes.Buffer) int64 {
+func headerSize(header http.Header, buffer *mem.Buffer) int64 {
 	buffer.Reset()
 	header.Write(buffer)
 

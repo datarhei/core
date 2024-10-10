@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -15,7 +16,6 @@ import (
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/mem"
 	"go.etcd.io/bbolt"
 
 	"github.com/hashicorp/go-hclog"
@@ -318,18 +318,6 @@ func (r *raft) LeadershipTransfer(id string) error {
 	return nil
 }
 
-type readCloserWrapper struct {
-	io.Reader
-}
-
-func (rcw *readCloserWrapper) Read(p []byte) (int, error) {
-	return rcw.Reader.Read(p)
-}
-
-func (rcw *readCloserWrapper) Close() error {
-	return nil
-}
-
 type Snapshot struct {
 	Metadata *hcraft.SnapshotMeta
 	Data     string
@@ -359,14 +347,14 @@ func (r *raft) Snapshot() (io.ReadCloser, error) {
 		Data:     base64.StdEncoding.EncodeToString(data),
 	}
 
-	buffer := mem.Get()
+	buffer := &bytes.Buffer{}
 	enc := json.NewEncoder(buffer)
 	err = enc.Encode(snapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return &readCloserWrapper{buffer}, nil
+	return io.NopCloser(buffer), nil
 }
 
 func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {

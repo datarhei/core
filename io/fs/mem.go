@@ -2,7 +2,6 @@ package fs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -69,8 +68,8 @@ func (f *memFileInfo) IsDir() bool {
 
 type memFile struct {
 	memFileInfo
-	data *bytes.Buffer // Contents of the file
-	r    *bytes.Reader
+	data *mem.Buffer // Contents of the file
+	r    io.ReadSeeker
 }
 
 func (f *memFile) Name() string {
@@ -380,9 +379,7 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	}
 
 	data := pool.Get()
-
-	data.Grow(file.data.Len())
-	data.Write(file.data.Bytes())
+	file.data.WriteTo(data)
 
 	return data.Bytes(), nil
 }
@@ -433,35 +430,6 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	return nil
 }
 
-func copyToBufferFromReader(buf *bytes.Buffer, r io.Reader, _ int) (int64, error) {
-	chunkData := [128 * 1024]byte{}
-	chunk := chunkData[0:]
-
-	size := int64(0)
-
-	for {
-		n, err := r.Read(chunk)
-		if n != 0 {
-			buf.Write(chunk[:n])
-			size += int64(n)
-		}
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return size, nil
-			}
-
-			return size, err
-		}
-
-		if n == 0 {
-			break
-		}
-	}
-
-	return size, nil
-}
-
 func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
@@ -480,11 +448,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 		data: pool.Get(),
 	}
 
-	if sizeHint > 0 && sizeHint < 5*1024*1024 {
-		newFile.data.Grow(sizeHint)
-	}
-
-	size, err := copyToBufferFromReader(newFile.data, r, 8*1024)
+	size, err := newFile.data.ReadFrom(r)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
 			"path":           path,
@@ -558,10 +522,9 @@ func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int
 		data: pool.Get(),
 	}
 
-	newFile.data.Grow(file.data.Len())
-	newFile.data.Write(file.data.Bytes())
+	file.data.WriteTo(newFile.data)
 
-	size, err := copyToBufferFromReader(newFile.data, r, 8*1024)
+	size, err := newFile.data.ReadFrom(r)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
 			"path":           path,
@@ -720,8 +683,7 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 		data: pool.Get(),
 	}
 
-	dstFile.data.Grow(srcFile.data.Len())
-	dstFile.data.Write(srcFile.data.Bytes())
+	srcFile.data.WriteTo(dstFile.data)
 
 	f, replace := fs.storage.Store(dst, dstFile)
 

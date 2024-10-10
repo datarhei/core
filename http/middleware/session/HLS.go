@@ -3,7 +3,6 @@ package session
 
 import (
 	"bufio"
-	"bytes"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
 	"github.com/lithammer/shortuuid/v4"
 
@@ -233,7 +233,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 
 type segmentReader struct {
 	reader io.ReadCloser
-	buffer *bytes.Buffer
+	buffer *mem.Buffer
 	size   int64
 }
 
@@ -255,7 +255,7 @@ func (r *segmentReader) getSegments(dir string) []string {
 	segments := []string{}
 
 	// Find all segment URLs in the .m3u8
-	scanner := bufio.NewScanner(r.buffer)
+	scanner := bufio.NewScanner(r.buffer.Reader())
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -299,7 +299,7 @@ func (r *segmentReader) getSegments(dir string) []string {
 
 type sessionRewriter struct {
 	http.ResponseWriter
-	buffer *bytes.Buffer
+	buffer *mem.Buffer
 }
 
 func (g *sessionRewriter) Write(data []byte) (int, error) {
@@ -307,11 +307,11 @@ func (g *sessionRewriter) Write(data []byte) (int, error) {
 	return g.buffer.Write(data)
 }
 
-func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *bytes.Buffer) {
+func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *mem.Buffer) {
 	isMaster := false
 
 	// Find all URLS in the .m3u8 and add the session ID to the query string
-	scanner := bufio.NewScanner(g.buffer)
+	scanner := bufio.NewScanner(g.buffer.Reader())
 	for scanner.Scan() {
 		byteline := scanner.Bytes()
 

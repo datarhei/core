@@ -2,7 +2,6 @@ package compress
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -55,7 +54,7 @@ type compressResponseWriter struct {
 	wroteBody           bool
 	minLength           int
 	minLengthExceeded   bool
-	buffer              *bytes.Buffer
+	buffer              *mem.Buffer
 	code                int
 	headerContentLength string
 	scheme              string

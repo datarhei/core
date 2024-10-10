@@ -71,8 +71,10 @@ func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader, sizeHint in
 		return r.Filesystem.WriteFileReader(path, rd, sizeHint)
 	}
 
-	data := bytes.Buffer{}
-	size, err := copyToBufferFromReader(&data, rd, 8*1024)
+	data := pool.Get()
+	defer pool.Put(data)
+
+	size, err := data.ReadFrom(rd)
 	if err != nil {
 		return -1, false, err
 	}
@@ -97,7 +99,7 @@ func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader, sizeHint in
 		}
 	}
 
-	return r.Filesystem.WriteFileReader(path, &data, int(size))
+	return r.Filesystem.WriteFileReader(path, data.Reader(), int(size))
 }
 
 func (r *sizedFilesystem) WriteFile(path string, data []byte) (int64, bool, error) {
@@ -141,8 +143,10 @@ func (r *sizedFilesystem) AppendFileReader(path string, rd io.Reader, sizeHint i
 		return r.Filesystem.AppendFileReader(path, rd, sizeHint)
 	}
 
-	data := bytes.Buffer{}
-	size, err := copyToBufferFromReader(&data, rd, 8*1024)
+	data := pool.Get()
+	defer pool.Put(data)
+
+	size, err := data.ReadFrom(rd)
 	if err != nil {
 		return -1, err
 	}
@@ -162,7 +166,7 @@ func (r *sizedFilesystem) AppendFileReader(path string, rd io.Reader, sizeHint i
 		}
 	}
 
-	return r.Filesystem.AppendFileReader(path, &data, int(size))
+	return r.Filesystem.AppendFileReader(path, data.Reader(), int(size))
 }
 
 func (r *sizedFilesystem) Purge(size int64) int64 {

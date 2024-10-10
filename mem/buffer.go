@@ -2,46 +2,90 @@ package mem
 
 import (
 	"bytes"
-	"sync"
+	"errors"
+	"io"
 )
 
-type BufferPool struct {
-	pool sync.Pool
+type Buffer struct {
+	data bytes.Buffer
 }
 
-func NewBufferPool() *BufferPool {
-	p := &BufferPool{
-		pool: sync.Pool{
-			New: func() any {
-				return &bytes.Buffer{}
-			},
-		},
+// Len returns the length of the buffer.
+func (b *Buffer) Len() int {
+	return b.data.Len()
+}
+
+// Bytes returns the buffer, but keeps ownership.
+func (b *Buffer) Bytes() []byte {
+	return b.data.Bytes()
+}
+
+// WriteTo writes the bytes to the writer.
+func (b *Buffer) WriteTo(w io.Writer) (int64, error) {
+	n, err := w.Write(b.data.Bytes())
+	return int64(n), err
+}
+
+// Reset empties the buffer and keeps it's capacity.
+func (b *Buffer) Reset() {
+	b.data.Reset()
+}
+
+// Write appends to the buffer.
+func (b *Buffer) Write(p []byte) (int, error) {
+	return b.data.Write(p)
+}
+
+// ReadFrom reads from the reader and appends to the buffer.
+func (b *Buffer) ReadFrom(r io.Reader) (int64, error) {
+	if br, ok := r.(*bytes.Reader); ok {
+		b.data.Grow(br.Len())
 	}
 
-	return p
+	chunkData := [128 * 1024]byte{}
+	chunk := chunkData[0:]
+
+	size := int64(0)
+
+	for {
+		n, err := r.Read(chunk)
+		if n != 0 {
+			b.data.Write(chunk[:n])
+			size += int64(n)
+		}
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return size, nil
+			}
+
+			return size, err
+		}
+
+		if n == 0 {
+			break
+		}
+	}
+
+	return size, nil
 }
 
-func (p *BufferPool) Get() *bytes.Buffer {
-	buf := p.pool.Get().(*bytes.Buffer)
-	buf.Reset()
-
-	return buf
+// WriteByte appends a byte to the buffer.
+func (b *Buffer) WriteByte(c byte) error {
+	return b.data.WriteByte(c)
 }
 
-func (p *BufferPool) Put(buf *bytes.Buffer) {
-	p.pool.Put(buf)
+// WriteString appends a string to the buffer.
+func (b *Buffer) WriteString(s string) (n int, err error) {
+	return b.data.WriteString(s)
 }
 
-var DefaultBufferPool *BufferPool
-
-func init() {
-	DefaultBufferPool = NewBufferPool()
+// Reader returns a bytes.Reader based on the data in the buffer.
+func (b *Buffer) Reader() *bytes.Reader {
+	return bytes.NewReader(b.Bytes())
 }
 
-func Get() *bytes.Buffer {
-	return DefaultBufferPool.Get()
-}
-
-func Put(buf *bytes.Buffer) {
-	DefaultBufferPool.Put(buf)
+// String returns the data in the buffer a string.
+func (b *Buffer) String() string {
+	return b.data.String()
 }

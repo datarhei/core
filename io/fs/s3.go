@@ -378,7 +378,7 @@ func (fs *s3Filesystem) AppendFileReader(path string, r io.Reader, sizeHint int)
 	buffer.ReadFrom(object)
 	buffer.ReadFrom(r)
 
-	size, _, err := fs.write(path, buffer)
+	size, _, err := fs.write(path, buffer.Reader())
 	return size, err
 }
 

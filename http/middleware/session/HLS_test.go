@@ -19,7 +19,7 @@ func TestHLSSegmentReader(t *testing.T) {
 
 	br := &segmentReader{
 		reader: io.NopCloser(r),
-		buffer: &bytes.Buffer{},
+		buffer: &mem.Buffer{},
 	}
 
 	_, err = io.ReadAll(br)
@@ -66,7 +66,7 @@ func TestHLSRewrite(t *testing.T) {
 	require.NoError(t, err)
 
 	br := &sessionRewriter{
-		buffer: &bytes.Buffer{},
+		buffer: &mem.Buffer{},
 	}
 
 	_, err = br.Write(data)
@@ -75,7 +75,7 @@ func TestHLSRewrite(t *testing.T) {
 	u, err := url.Parse("http://example.com/test.m3u8")
 	require.NoError(t, err)
 
-	buffer := &bytes.Buffer{}
+	buffer := &mem.Buffer{}
 
 	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
 

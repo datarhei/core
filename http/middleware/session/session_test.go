@@ -1,11 +1,11 @@
 package session
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
 	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/mem"
 
 	"github.com/stretchr/testify/require"
 )
@@ -143,7 +143,7 @@ func TestHeaderSize(t *testing.T) {
 	header.Add("Content-Type", "application/json")
 	header.Add("Content-Encoding", "gzip")
 
-	buffer := &bytes.Buffer{}
+	buffer := &mem.Buffer{}
 	size := headerSize(header, buffer)
 
 	require.Equal(t, "Content-Encoding: gzip\r\nContent-Type: application/json\r\n", buffer.String())
@@ -156,7 +156,7 @@ func BenchmarkHeaderSize(b *testing.B) {
 	header.Add("Content-Type", "application/json")
 	header.Add("Content-Encoding", "gzip")
 
-	buffer := &bytes.Buffer{}
+	buffer := &mem.Buffer{}
 
 	for i := 0; i < b.N; i++ {
 		headerSize(header, buffer)

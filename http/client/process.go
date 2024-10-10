@@ -74,7 +74,7 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 	e := json.NewEncoder(buf)
 	e.Encode(config)
 
-	_, err := r.call("POST", "/v3/process", nil, nil, "application/json", buf)
+	_, err := r.call("POST", "/v3/process", nil, nil, "application/json", buf.Reader())
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", buf.Reader())
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) erro
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/report", query, nil, "application/json", buf.Reader())
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/command", query, nil, "application/json", buf.Reader())
 
 	return err
 }
@@ -182,7 +182,7 @@ func (r *restclient) ProcessMetadataSet(id app.ProcessID, key string, metadata a
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
-	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", buf)
+	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID)+"/metadata/"+url.PathEscape(key), query, nil, "application/json", buf.Reader())
 
 	return err
 }
@@ -215,7 +215,7 @@ func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	e := json.NewEncoder(buf)
 	e.Encode(config)
 
-	data, err := r.call("POST", "/v3/process/probe", nil, nil, "application/json", buf)
+	data, err := r.call("POST", "/v3/process/probe", nil, nil, "application/json", buf.Reader())
 	if err != nil {
 		return probe, err
 	}

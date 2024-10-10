@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"bytes"
 	"sync"
 
 	"github.com/dolthub/swiss"
@@ -122,33 +121,6 @@ func (m *mapStorage) Load(key string) (*memFile, bool) {
 	return v, ok
 }
 
-func (m *mapStorage) LoadAndCopy(key string) (*memFile, bool) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	v, ok := m.files[key]
-	if !ok {
-		return nil, false
-	}
-
-	f := &memFile{
-		memFileInfo: memFileInfo{
-			name:    v.name,
-			size:    v.size,
-			dir:     v.dir,
-			lastMod: v.lastMod,
-			linkTo:  v.linkTo,
-		},
-		r: nil,
-	}
-
-	if v.data != nil {
-		f.data = bytes.NewBuffer(v.data.Bytes())
-	}
-
-	return f, true
-}
-
 func (m *mapStorage) Has(key string) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -212,33 +184,6 @@ func (m *swissMapStorage) Load(key string) (*memFile, bool) {
 	defer m.lock.RUnlock(token)
 
 	return m.files.Get(key)
-}
-
-func (m *swissMapStorage) LoadAndCopy(key string) (*memFile, bool) {
-	token := m.lock.RLock()
-	defer m.lock.RUnlock(token)
-
-	v, ok := m.files.Get(key)
-	if !ok {
-		return nil, false
-	}
-
-	f := &memFile{
-		memFileInfo: memFileInfo{
-			name:    v.name,
-			size:    v.size,
-			dir:     v.dir,
-			lastMod: v.lastMod,
-			linkTo:  v.linkTo,
-		},
-		r: nil,
-	}
-
-	if v.data != nil {
-		f.data = bytes.NewBuffer(v.data.Bytes())
-	}
-
-	return f, true
 }
 
 func (m *swissMapStorage) Has(key string) bool {

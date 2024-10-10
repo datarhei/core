@@ -1,10 +1,10 @@
 package hlsrewrite
 
 import (
-	"bytes"
 	"os"
 	"testing"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,12 +16,12 @@ func TestRewrite(t *testing.T) {
 	require.NoError(t, err)
 
 	r := &hlsRewriter{
-		buffer: &bytes.Buffer{},
+		buffer: &mem.Buffer{},
 	}
 
 	r.Write(data)
 
-	buffer := &bytes.Buffer{}
+	buffer := &mem.Buffer{}
 	prefix := []byte("/path/to/foobar/")
 	r.rewrite(prefix, buffer)
 
@@ -33,10 +33,10 @@ func BenchmarkRewrite(b *testing.B) {
 	require.NoError(b, err)
 
 	r := &hlsRewriter{
-		buffer: &bytes.Buffer{},
+		buffer: &mem.Buffer{},
 	}
 
-	buffer := &bytes.Buffer{}
+	buffer := &mem.Buffer{}
 	prefix := []byte("/path/to/foobar/")
 
 	for i := 0; i < b.N; i++ {
