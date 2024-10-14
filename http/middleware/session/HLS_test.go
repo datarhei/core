@@ -39,8 +39,6 @@ func TestHLSSegmentReader(t *testing.T) {
 }
 
 func BenchmarkHLSSegmentReader(b *testing.B) {
-	pool := mem.NewBufferPool()
-
 	data, err := os.ReadFile("./fixtures/segments.txt")
 	require.NoError(b, err)
 
@@ -51,13 +49,13 @@ func BenchmarkHLSSegmentReader(b *testing.B) {
 		rd.Reset(data)
 		br := &segmentReader{
 			reader: io.NopCloser(r),
-			buffer: pool.Get(),
+			buffer: mem.Get(),
 		}
 
 		_, err := io.ReadAll(br)
 		require.NoError(b, err)
 
-		pool.Put(br.buffer)
+		mem.Put(br.buffer)
 	}
 }
 
@@ -86,8 +84,6 @@ func TestHLSRewrite(t *testing.T) {
 }
 
 func BenchmarkHLSRewrite(b *testing.B) {
-	pool := mem.NewBufferPool()
-
 	data, err := os.ReadFile("./fixtures/segments.txt")
 	require.NoError(b, err)
 
@@ -96,17 +92,17 @@ func BenchmarkHLSRewrite(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		br := &sessionRewriter{
-			buffer: pool.Get(),
+			buffer: mem.Get(),
 		}
 
 		_, err = br.Write(data)
 		require.NoError(b, err)
 
-		buffer := pool.Get()
+		buffer := mem.Get()
 
 		br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
 
-		pool.Put(br.buffer)
-		pool.Put(buffer)
+		mem.Put(br.buffer)
+		mem.Put(buffer)
 	}
 }

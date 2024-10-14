@@ -39,7 +39,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 		reader := req.Body
 		r := &segmentReader{
 			reader: req.Body,
-			buffer: h.bufferPool.Get(),
+			buffer: mem.Get(),
 		}
 		req.Body = r
 
@@ -47,7 +47,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 			req.Body = reader
 
 			if r.size == 0 {
-				h.bufferPool.Put(r.buffer)
+				mem.Put(r.buffer)
 				return
 			}
 
@@ -60,10 +60,10 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 				h.hlsIngressCollector.Extra(path, data)
 			}
 
-			buffer := h.bufferPool.Get()
+			buffer := mem.Get()
 			h.hlsIngressCollector.Ingress(path, headerSize(req.Header, buffer))
 			h.hlsIngressCollector.Ingress(path, r.size)
-			h.bufferPool.Put(buffer)
+			mem.Put(buffer)
 
 			segments := r.getSegments(urlpath.Dir(path))
 
@@ -79,7 +79,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 				h.lock.Unlock()
 			}
 
-			h.bufferPool.Put(r.buffer)
+			mem.Put(r.buffer)
 		}()
 	} else if strings.HasSuffix(path, ".ts") {
 		// Get the size of the .ts file and store it in the ts-map for later use.
@@ -93,11 +93,11 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 			req.Body = reader
 
 			if r.size != 0 {
-				buffer := h.bufferPool.Get()
+				buffer := mem.Get()
 				h.lock.Lock()
 				h.rxsegments[path] = r.size + headerSize(req.Header, buffer)
 				h.lock.Unlock()
-				h.bufferPool.Put(buffer)
+				mem.Put(buffer)
 			}
 		}()
 	}
@@ -179,7 +179,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		// the data that we need to rewrite.
 		rewriter = &sessionRewriter{
 			ResponseWriter: res.Writer,
-			buffer:         h.bufferPool.Get(),
+			buffer:         mem.Get(),
 		}
 
 		res.Writer = rewriter
@@ -197,11 +197,11 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	if rewrite {
 		if res.Status < 200 || res.Status >= 300 {
 			res.Write(rewriter.buffer.Bytes())
-			h.bufferPool.Put(rewriter.buffer)
+			mem.Put(rewriter.buffer)
 			return nil
 		}
 
-		buffer := h.bufferPool.Get()
+		buffer := mem.Get()
 
 		// Rewrite the data befor sending it to the client
 		rewriter.rewriteHLS(sessionID, c.Request().URL, buffer)
@@ -209,17 +209,17 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		res.Header().Set("Cache-Control", "private")
 		res.Write(buffer.Bytes())
 
-		h.bufferPool.Put(buffer)
-		h.bufferPool.Put(rewriter.buffer)
+		mem.Put(buffer)
+		mem.Put(rewriter.buffer)
 	}
 
 	if isM3U8 || isTS {
 		if res.Status >= 200 && res.Status < 300 {
 			// Collect how many bytes we've written in this session
-			buffer := h.bufferPool.Get()
+			buffer := mem.Get()
 			h.hlsEgressCollector.Egress(sessionID, headerSize(res.Header(), buffer))
 			h.hlsEgressCollector.Egress(sessionID, res.Size)
-			h.bufferPool.Put(buffer)
+			mem.Put(buffer)
 
 			if isTS {
 				// Activate the session. If the session is already active, this is a noop

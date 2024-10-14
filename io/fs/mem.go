@@ -111,25 +111,12 @@ func (f *memFile) Close() error {
 
 	f.r = nil
 
-	return nil
-}
-
-func (f *memFile) free() {
-	f.Close()
-
-	if f.data == nil {
-		return
+	if f.data != nil {
+		mem.Put(f.data)
+		f.data = nil
 	}
 
-	pool.Put(f.data)
-
-	f.data = nil
-}
-
-var pool *mem.BufferPool = nil
-
-func init() {
-	pool = mem.NewBufferPool()
+	return nil
 }
 
 type memFilesystem struct {
@@ -331,24 +318,13 @@ func (fs *memFilesystem) Files() int64 {
 func (fs *memFilesystem) Open(path string) File {
 	path = fs.cleanPath(path)
 
-	file, ok := fs.storage.Load(path)
+	newFile, ok := fs.storage.LoadAndCopy(path)
 	if !ok {
 		return nil
 	}
 
-	newFile := &memFile{
-		memFileInfo: memFileInfo{
-			name:    file.name,
-			size:    file.size,
-			dir:     file.dir,
-			lastMod: file.lastMod,
-			linkTo:  file.linkTo,
-		},
-		data: file.data,
-	}
-
-	if len(file.linkTo) != 0 {
-		file, ok := fs.storage.Load(file.linkTo)
+	if len(newFile.linkTo) != 0 {
+		file, ok := fs.storage.LoadAndCopy(newFile.linkTo)
 		if !ok {
 			return nil
 		}
@@ -358,7 +334,7 @@ func (fs *memFilesystem) Open(path string) File {
 		newFile.size = file.size
 	}
 
-	newFile.r = bytes.NewReader(newFile.data.Bytes())
+	newFile.r = newFile.data.Reader()
 
 	return newFile
 }
@@ -366,22 +342,19 @@ func (fs *memFilesystem) Open(path string) File {
 func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	path = fs.cleanPath(path)
 
-	file, ok := fs.storage.Load(path)
+	file, ok := fs.storage.LoadAndCopy(path)
 	if !ok {
 		return nil, ErrNotExist
 	}
 
 	if len(file.linkTo) != 0 {
-		file, ok = fs.storage.Load(file.linkTo)
+		file, ok = fs.storage.LoadAndCopy(file.linkTo)
 		if !ok {
 			return nil, ErrNotExist
 		}
 	}
 
-	data := pool.Get()
-	file.data.WriteTo(data)
-
-	return data.Bytes(), nil
+	return file.data.Bytes(), nil
 }
 
 func (fs *memFilesystem) Symlink(oldname, newname string) error {
@@ -421,7 +394,7 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	defer fs.sizeLock.Unlock()
 
 	if replaced {
-		oldFile.free()
+		oldFile.Close()
 		fs.currentSize -= oldFile.size
 	}
 
@@ -445,7 +418,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 			size:    0,
 			lastMod: time.Now(),
 		},
-		data: pool.Get(),
+		data: mem.Get(),
 	}
 
 	size, err := newFile.data.ReadFrom(r)
@@ -456,7 +429,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 			"error":          err,
 		}).Warn().Log("Incomplete file")
 
-		newFile.free()
+		newFile.Close()
 
 		return -1, false, fmt.Errorf("incomplete file")
 	}
@@ -473,7 +446,7 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		oldFile.free()
+		oldFile.Close()
 
 		fs.currentSize -= oldFile.size
 	}
@@ -506,25 +479,13 @@ func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, e
 func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
 	path = fs.cleanPath(path)
 
-	file, hasFile := fs.storage.Load(path)
+	file, hasFile := fs.storage.LoadAndCopy(path)
 	if !hasFile {
 		size, _, err := fs.WriteFileReader(path, r, sizeHint)
 		return size, err
 	}
 
-	newFile := &memFile{
-		memFileInfo: memFileInfo{
-			name:    path,
-			dir:     false,
-			size:    0,
-			lastMod: time.Now(),
-		},
-		data: pool.Get(),
-	}
-
-	file.data.WriteTo(newFile.data)
-
-	size, err := newFile.data.ReadFrom(r)
+	size, err := file.data.ReadFrom(r)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
 			"path":           path,
@@ -532,20 +493,21 @@ func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int
 			"error":          err,
 		}).Warn().Log("Incomplete file")
 
-		newFile.free()
+		file.Close()
 
 		return -1, fmt.Errorf("incomplete file")
 	}
 
 	file.size += size
+	file.lastMod = time.Now()
 
-	oldFile, replace := fs.storage.Store(path, newFile)
+	oldFile, replace := fs.storage.Store(path, file)
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		oldFile.free()
+		oldFile.Close()
 	}
 
 	fs.currentSize += size
@@ -584,7 +546,7 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 		fs.currentSize -= f.size
 		fs.sizeLock.Unlock()
 
-		f.free()
+		f.Close()
 
 		fs.logger.WithFields(log.Fields{
 			"path":           f.name,
@@ -644,7 +606,7 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		dstFile.free()
+		dstFile.Close()
 
 		fs.currentSize -= dstFile.size
 	}
@@ -664,28 +626,18 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 		return os.ErrInvalid
 	}
 
-	srcFile, ok := fs.storage.Load(src)
+	file, ok := fs.storage.LoadAndCopy(src)
 	if !ok {
 		return ErrNotExist
 	}
 
-	if srcFile.dir {
+	if file.dir {
 		return ErrNotExist
 	}
 
-	dstFile := &memFile{
-		memFileInfo: memFileInfo{
-			name:    dst,
-			dir:     false,
-			size:    srcFile.size,
-			lastMod: time.Now(),
-		},
-		data: pool.Get(),
-	}
+	file.lastMod = time.Now()
 
-	srcFile.data.WriteTo(dstFile.data)
-
-	f, replace := fs.storage.Store(dst, dstFile)
+	replacedFile, replace := fs.storage.Store(dst, file)
 
 	if !replace {
 		fs.dirs.Add(dst)
@@ -695,11 +647,11 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		f.free()
-		fs.currentSize -= f.size
+		replacedFile.Close()
+		fs.currentSize -= replacedFile.size
 	}
 
-	fs.currentSize += dstFile.size
+	fs.currentSize += file.size
 
 	return nil
 }
@@ -763,7 +715,7 @@ func (fs *memFilesystem) Remove(path string) int64 {
 func (fs *memFilesystem) remove(path string) int64 {
 	file, ok := fs.storage.Delete(path)
 	if ok {
-		file.free()
+		file.Close()
 
 		fs.dirs.Remove(path)
 
@@ -853,7 +805,7 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 
 		fs.dirs.Remove(file.name)
 
-		file.free()
+		file.Close()
 	}
 
 	fs.sizeLock.Lock()

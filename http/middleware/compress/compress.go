@@ -138,8 +138,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		zstdCompressor = NewZstd(config.Level)
 	}
 
-	bufferPool := mem.NewBufferPool()
-
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if config.Skipper(c) {
@@ -171,7 +169,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				rw := res.Writer
 				compressor.Reset(rw)
 
-				buffer := bufferPool.Get()
+				buffer := mem.Get()
 
 				grw := &compressResponseWriter{
 					Compressor:     compressor,
@@ -208,7 +206,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						}
 					}
 					compressor.Close()
-					bufferPool.Put(buffer)
+					mem.Put(buffer)
 					compress.Release(compressor)
 				}()
 

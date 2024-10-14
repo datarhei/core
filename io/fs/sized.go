@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+
+	"github.com/datarhei/core/v16/mem"
 )
 
 type SizedFilesystem interface {
@@ -71,8 +73,8 @@ func (r *sizedFilesystem) WriteFileReader(path string, rd io.Reader, sizeHint in
 		return r.Filesystem.WriteFileReader(path, rd, sizeHint)
 	}
 
-	data := pool.Get()
-	defer pool.Put(data)
+	data := mem.Get()
+	defer mem.Put(data)
 
 	size, err := data.ReadFrom(rd)
 	if err != nil {
@@ -143,8 +145,8 @@ func (r *sizedFilesystem) AppendFileReader(path string, rd io.Reader, sizeHint i
 		return r.Filesystem.AppendFileReader(path, rd, sizeHint)
 	}
 
-	data := pool.Get()
-	defer pool.Put(data)
+	data := mem.Get()
+	defer mem.Put(data)
 
 	size, err := data.ReadFrom(rd)
 	if err != nil {

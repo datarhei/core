@@ -7,11 +7,12 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 )
 
 func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	e := json.NewEncoder(buf)
 	e.Encode(filters)

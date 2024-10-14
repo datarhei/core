@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -65,8 +66,8 @@ func (r *restclient) Process(id app.ProcessID, filter []string) (api.Process, er
 }
 
 func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) error {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, metadata)
@@ -83,8 +84,8 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 }
 
 func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]interface{}) error {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, metadata)
@@ -104,8 +105,8 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 }
 
 func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) error {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	data := api.ProcessReport{}
 	data.Unmarshal(report)
@@ -134,8 +135,8 @@ func (r *restclient) ProcessDelete(id app.ProcessID) error {
 }
 
 func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	e := json.NewEncoder(buf)
 	e.Encode(api.Command{
@@ -173,8 +174,8 @@ func (r *restclient) ProcessMetadata(id app.ProcessID, key string) (api.Metadata
 }
 
 func (r *restclient) ProcessMetadataSet(id app.ProcessID, key string, metadata api.Metadata) error {
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	e := json.NewEncoder(buf)
 	e.Encode(metadata)
@@ -206,8 +207,8 @@ func (r *restclient) ProcessProbe(id app.ProcessID) (api.Probe, error) {
 func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	var probe api.Probe
 
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	config := api.ProcessConfig{}
 	config.Unmarshal(p, nil)

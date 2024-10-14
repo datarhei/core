@@ -3,6 +3,7 @@ package session
 import (
 	"net/url"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
 )
@@ -45,7 +46,7 @@ func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface
 	h.httpCollector.Extra(id, data)
 
 	defer func() {
-		buffer := h.bufferPool.Get()
+		buffer := mem.Get()
 
 		req.Body = reader
 		h.httpCollector.Ingress(id, r.size+headerSize(req.Header, buffer))
@@ -58,7 +59,7 @@ func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface
 
 		h.httpCollector.Close(id)
 
-		h.bufferPool.Put(buffer)
+		mem.Put(buffer)
 	}()
 
 	return next(c)

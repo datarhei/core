@@ -44,8 +44,6 @@ type handler struct {
 
 	rxsegments map[string]int64
 	lock       sync.Mutex
-
-	bufferPool *mem.BufferPool
 }
 
 // New returns a new session middleware with default config
@@ -77,7 +75,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		hlsIngressCollector: config.HLSIngressCollector,
 		reSessionID:         regexp.MustCompile(`^[` + regexp.QuoteMeta(shortuuid.DefaultAlphabet) + `]{22}$`),
 		rxsegments:          make(map[string]int64),
-		bufferPool:          mem.NewBufferPool(),
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {

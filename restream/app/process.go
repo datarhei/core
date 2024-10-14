@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/process"
 )
 
@@ -156,7 +157,8 @@ func (config *Config) String() string {
 }
 
 func (config *Config) Hash() []byte {
-	b := bytes.Buffer{}
+	b := mem.Get()
+	defer mem.Put(b)
 
 	b.WriteString(config.ID)
 	b.WriteString(config.Reference)

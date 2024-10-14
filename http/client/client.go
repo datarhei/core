@@ -199,8 +199,6 @@ type restclient struct {
 		connectedCore *semver.Version
 		methods       map[string][]apiconstraint
 	}
-
-	pool *mem.BufferPool
 }
 
 // New returns a new REST API client for the given config. The error is non-nil
@@ -214,7 +212,6 @@ func New(config Config) (RestClient, error) {
 		auth0Token:    config.Auth0Token,
 		client:        config.Client,
 		clientTimeout: config.Timeout,
-		pool:          mem.NewBufferPool(),
 	}
 
 	if len(config.AccessToken) != 0 {
@@ -655,8 +652,8 @@ func (r *restclient) login() error {
 		login.Password = r.password
 	}
 
-	buf := r.pool.Get()
-	defer r.pool.Put(buf)
+	buf := mem.Get()
+	defer mem.Put(buf)
 
 	e := json.NewEncoder(buf)
 	e.Encode(login)

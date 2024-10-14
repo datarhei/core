@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -88,13 +87,13 @@ func (e statusError) Is(target error) bool {
 
 type copyReader struct {
 	reader io.Reader
-	copy   *bytes.Buffer
+	copy   *mem.Buffer
 }
 
 func newCopyReader(r io.Reader) io.Reader {
 	c := &copyReader{
 		reader: r,
-		copy:   new(bytes.Buffer),
+		copy:   mem.Get(),
 	}
 
 	return c
@@ -106,8 +105,8 @@ func (c *copyReader) Read(p []byte) (int, error) {
 	c.copy.Write(p)
 
 	if err == io.EOF {
-		c.reader = c.copy
-		c.copy = &bytes.Buffer{}
+		c.reader = c.copy.Reader()
+		c.copy = mem.Get()
 	}
 
 	return i, err
