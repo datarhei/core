@@ -9,6 +9,7 @@ import (
 
 type selfCollector struct {
 	bufferAllocDescr       *metric.Description
+	bufferReuseDescr       *metric.Description
 	bufferRecycleDescr     *metric.Description
 	bufferDumpDescr        *metric.Description
 	bufferDefaultSizeDescr *metric.Description
@@ -28,6 +29,7 @@ func NewSelfCollector() metric.Collector {
 	c := &selfCollector{}
 
 	c.bufferAllocDescr = metric.NewDesc("self_bufferpool_alloc", "Number of buffer allocations", nil)
+	c.bufferReuseDescr = metric.NewDesc("self_bufferpool_reuse", "Number of buffer reuses", nil)
 	c.bufferRecycleDescr = metric.NewDesc("self_bufferpool_recycle", "Number of buffer recycles", nil)
 	c.bufferDumpDescr = metric.NewDesc("self_bufferpool_dump", "Number of buffer dumps", nil)
 	c.bufferDefaultSizeDescr = metric.NewDesc("self_bufferpool_default_size", "Default buffer size", nil)
@@ -54,6 +56,7 @@ func (c *selfCollector) Prefix() string {
 func (c *selfCollector) Describe() []*metric.Description {
 	return []*metric.Description{
 		c.bufferAllocDescr,
+		c.bufferReuseDescr,
 		c.bufferRecycleDescr,
 		c.bufferDumpDescr,
 		c.bufferDefaultSizeDescr,
@@ -75,6 +78,7 @@ func (c *selfCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
 	metrics.Add(metric.NewValue(c.bufferAllocDescr, float64(bufferstats.Alloc)))
+	metrics.Add(metric.NewValue(c.bufferReuseDescr, float64(bufferstats.Reuse)))
 	metrics.Add(metric.NewValue(c.bufferRecycleDescr, float64(bufferstats.Recycle)))
 	metrics.Add(metric.NewValue(c.bufferDumpDescr, float64(bufferstats.Dump)))
 	metrics.Add(metric.NewValue(c.bufferDefaultSizeDescr, float64(bufferstats.DefaultSize)))
