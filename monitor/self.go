@@ -20,6 +20,8 @@ type selfCollector struct {
 	heapIdleDescr    *metric.Description
 	heapInuseDescr   *metric.Description
 	heapObjectsDescr *metric.Description
+	mallocsDescr     *metric.Description
+	freesDescr       *metric.Description
 }
 
 func NewSelfCollector() metric.Collector {
@@ -32,11 +34,13 @@ func NewSelfCollector() metric.Collector {
 	c.bufferMaxSizeDescr = metric.NewDesc("self_bufferpool_max_size", "Max. buffer size for recycling", nil)
 
 	c.heapAllocDescr = metric.NewDesc("self_mem_heap_alloc_bytes", "Number of bytes allocated on the heap", nil)
-	c.totalAllocDescr = metric.NewDesc("self_mem_total_alloc_bytes", "Number of bytes allocated since start", nil)
+	c.totalAllocDescr = metric.NewDesc("self_mem_total_alloc_bytes", "Cumulative count of bytes allocated since start", nil)
 	c.heapSysDescr = metric.NewDesc("self_mem_heap_sys_bytes", "Number of bytes obtained from OS", nil)
 	c.heapIdleDescr = metric.NewDesc("self_mem_heap_idle_bytes", "Number of unused bytes", nil)
 	c.heapInuseDescr = metric.NewDesc("self_mem_heap_inuse_bytes", "Number of used bytes", nil)
 	c.heapObjectsDescr = metric.NewDesc("self_mem_heap_objects", "Number of objects in heap", nil)
+	c.mallocsDescr = metric.NewDesc("self_mem_mallocs", "Cumulative count of heap objects allocated", nil)
+	c.freesDescr = metric.NewDesc("self_mem_frees", "Cumulative count of heap objects freed", nil)
 
 	return c
 }
@@ -60,6 +64,8 @@ func (c *selfCollector) Describe() []*metric.Description {
 		c.heapIdleDescr,
 		c.heapInuseDescr,
 		c.heapObjectsDescr,
+		c.mallocsDescr,
+		c.freesDescr,
 	}
 }
 
@@ -82,7 +88,9 @@ func (c *selfCollector) Collect() metric.Metrics {
 	metrics.Add(metric.NewValue(c.heapSysDescr, float64(memstats.HeapSys)))
 	metrics.Add(metric.NewValue(c.heapIdleDescr, float64(memstats.HeapIdle)))
 	metrics.Add(metric.NewValue(c.heapInuseDescr, float64(memstats.HeapInuse)))
-	metrics.Add(metric.NewValue(c.heapObjectsDescr, float64(memstats.Mallocs-memstats.Frees)))
+	metrics.Add(metric.NewValue(c.heapObjectsDescr, float64(memstats.HeapObjects)))
+	metrics.Add(metric.NewValue(c.mallocsDescr, float64(memstats.Mallocs)))
+	metrics.Add(metric.NewValue(c.freesDescr, float64(memstats.Frees)))
 
 	return metrics
 }
