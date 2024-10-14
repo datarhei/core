@@ -1235,6 +1235,7 @@ func (a *api) start(ctx context.Context) error {
 	for name, fs := range a.s3fs {
 		metrics.Register(monitor.NewFilesystemCollector(name, fs))
 	}
+	metrics.Register(monitor.NewSelfCollector())
 	metrics.Register(monitor.NewRestreamCollector(a.restream))
 	metrics.Register(monitor.NewFFmpegCollector(a.ffmpeg))
 	metrics.Register(monitor.NewSessionCollector(a.sessions, []string{}))

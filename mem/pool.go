@@ -26,7 +26,20 @@ type BufferPool struct {
 	defaultSize uint64
 	maxSize     uint64
 
+	alloc   uint64
+	recycle uint64
+	dump    uint64
+
 	pool sync.Pool
+}
+
+type PoolStats struct {
+	Alloc   uint64
+	Recycle uint64
+	Dump    uint64
+
+	DefaultSize uint64
+	MaxSize     uint64
 }
 
 func NewBufferPool() *BufferPool {
@@ -37,11 +50,25 @@ func NewBufferPool() *BufferPool {
 	return p
 }
 
+func (p *BufferPool) Stats() PoolStats {
+	s := PoolStats{
+		Alloc:       atomic.LoadUint64(&p.alloc),
+		Recycle:     atomic.LoadUint64(&p.recycle),
+		Dump:        atomic.LoadUint64(&p.dump),
+		DefaultSize: atomic.LoadUint64(&p.defaultSize),
+		MaxSize:     atomic.LoadUint64(&p.maxSize),
+	}
+
+	return s
+}
+
 func (p *BufferPool) Get() *Buffer {
 	v := p.pool.Get()
 	if v != nil {
 		return v.(*Buffer)
 	}
+
+	atomic.AddUint64(&p.alloc, 1)
 
 	return &Buffer{
 		data: make([]byte, 0, atomic.LoadUint64(&p.defaultSize)),
@@ -59,6 +86,10 @@ func (p *BufferPool) Put(buf *Buffer) {
 	if maxSize == 0 || cap(buf.data) <= maxSize {
 		buf.Reset()
 		p.pool.Put(buf)
+
+		atomic.AddUint64(&p.recycle, 1)
+	} else {
+		atomic.AddUint64(&p.dump, 1)
 	}
 }
 
@@ -138,6 +169,10 @@ var DefaultBufferPool *BufferPool
 
 func init() {
 	DefaultBufferPool = NewBufferPool()
+}
+
+func Stats() PoolStats {
+	return DefaultBufferPool.Stats()
 }
 
 func Get() *Buffer {
