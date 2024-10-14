@@ -847,6 +847,7 @@ func (a *api) start(ctx context.Context) error {
 				"type": "mem",
 				"name": "mem",
 			}),
+			Storage: "swiss",
 		}
 		var memfs fs.Filesystem = nil
 		if len(cfg.Storage.Memory.Backup.Dir) != 0 {

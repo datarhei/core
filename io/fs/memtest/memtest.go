@@ -29,8 +29,9 @@ func main() {
 	oFiles := 15
 	oInterval := 1 // seconds
 	oSize := 2     // megabytes
-	oLimit := false
+	oLimit := -1
 	oGC := 0
+	oFree := 0
 
 	flag.StringVar(&oStorage, "storage", "mapof", "type of mem storage implementation (mapof, map, swiss)")
 	flag.IntVar(&oWriters, "writers", 500, "number of concurrent writers")
@@ -38,8 +39,9 @@ func main() {
 	flag.IntVar(&oFiles, "files", 15, "number of files to keep per writer")
 	flag.IntVar(&oInterval, "interval", 1, "interval for writing files in seconds")
 	flag.IntVar(&oSize, "size", 2048, "size of files to write in kilobytes")
-	flag.BoolVar(&oLimit, "limit", false, "set memory limit")
-	flag.IntVar(&oGC, "gc", 0, "force garbage collector")
+	flag.IntVar(&oLimit, "limit", -1, "set memory limit, 0 for automatic, otherwise memory in MB")
+	flag.IntVar(&oGC, "gc", 100, "GC percentage")
+	flag.IntVar(&oFree, "free", 0, "force freeing memory")
 
 	flag.Parse()
 
@@ -47,9 +49,14 @@ func main() {
 
 	fmt.Printf("Expecting effective memory consumption of %.1fGB\n", estimatedSize)
 
-	if oLimit {
-		fmt.Printf("Setting memory limit to %.1fGB\n", estimatedSize*1.5)
-		debug.SetMemoryLimit(int64(estimatedSize * 1.5))
+	if oLimit >= 0 {
+		limitSize := estimatedSize * 1.5 * 1024 * 1024 * 1024
+		if oLimit > 0 {
+			limitSize = float64(oLimit) * 1024 * 1024
+		}
+
+		fmt.Printf("Setting memory limit to %.1fGB\n", limitSize/1024/1024/1024)
+		debug.SetMemoryLimit(int64(limitSize))
 	}
 
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{
@@ -206,9 +213,11 @@ func main() {
 		}
 	}(ctx, memfs)
 
-	if oGC > 0 {
+	debug.SetGCPercent(oGC)
+
+	if oFree > 0 {
 		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Duration(oGC) * time.Second)
+			ticker := time.NewTicker(time.Duration(oFree) * time.Second)
 			defer ticker.Stop()
 
 			for {

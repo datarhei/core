@@ -105,8 +105,10 @@ func (f *memFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (f *memFile) Close() error {
+	var err error = nil
+
 	if f.r == nil {
-		return io.EOF
+		err = io.EOF
 	}
 
 	f.r = nil
@@ -116,7 +118,7 @@ func (f *memFile) Close() error {
 		f.data = nil
 	}
 
-	return nil
+	return err
 }
 
 type memFilesystem struct {
