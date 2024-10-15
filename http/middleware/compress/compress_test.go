@@ -168,7 +168,7 @@ func TestCompressWithPassthrough(t *testing.T) {
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
 			assert.Equal(t, "", rec.Header().Get(echo.HeaderContentEncoding))
-			assert.Contains(t, rec.Body.String(), "testtest")
+			assert.Equal(t, rec.Body.String(), "testtest")
 
 			req = httptest.NewRequest(http.MethodGet, "/compress", nil)
 			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
@@ -206,7 +206,7 @@ func TestCompressWithMinLength(t *testing.T) {
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
 			assert.Equal(t, "", rec.Header().Get(echo.HeaderContentEncoding))
-			assert.Contains(t, rec.Body.String(), "test")
+			assert.Equal(t, rec.Body.String(), "test")
 
 			req = httptest.NewRequest(http.MethodGet, "/foobar", nil)
 			req.Header.Set(echo.HeaderAcceptEncoding, scheme)
