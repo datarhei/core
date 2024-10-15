@@ -204,6 +204,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 							grw.buffer.WriteTo(rw)
 							compressor.Reset(io.Discard)
 						}
+					} else {
+						compressor.Reset(io.Discard)
 					}
 					compressor.Close()
 					mem.Put(buffer)
