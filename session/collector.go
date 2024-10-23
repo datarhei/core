@@ -9,9 +9,8 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/math/average"
 	"github.com/datarhei/core/v16/net"
-
-	"github.com/prep/average"
 )
 
 // Session represents an active session
@@ -239,8 +238,8 @@ type collector struct {
 	maxTxBitrate float64
 	maxSessions  uint64
 
-	rxBitrate *average.SlidingWindow
-	txBitrate *average.SlidingWindow
+	rxBitrate *average.SMA
+	txBitrate *average.SMA
 
 	collectHistory bool
 	history        history
@@ -410,8 +409,8 @@ func (c *collector) start() {
 
 	c.running = true
 
-	c.rxBitrate, _ = average.New(averageWindow, averageGranularity)
-	c.txBitrate, _ = average.New(averageWindow, averageGranularity)
+	c.rxBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
+	c.txBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
 }
 
 func (c *collector) stop() {
@@ -648,7 +647,7 @@ func (c *collector) Ingress(id string, size int64) {
 	}
 
 	if sess.Ingress(size) {
-		c.rxBitrate.Add(size * 8)
+		c.rxBitrate.Add(float64(size) * 8)
 		c.rxBytes += uint64(size)
 	}
 }
@@ -667,7 +666,7 @@ func (c *collector) Egress(id string, size int64) {
 	}
 
 	if sess.Egress(size) {
-		c.txBitrate.Add(size * 8)
+		c.txBitrate.Add(float64(size) * 8)
 		c.txBytes += uint64(size)
 	}
 }
@@ -709,11 +708,11 @@ func (c *collector) IsSessionsExceeded() bool {
 }
 
 func (c *collector) IngressBitrate() float64 {
-	return c.rxBitrate.Average(averageWindow)
+	return c.rxBitrate.Average()
 }
 
 func (c *collector) EgressBitrate() float64 {
-	return c.txBitrate.Average(averageWindow)
+	return c.txBitrate.Average()
 }
 
 func (c *collector) MaxIngressBitrate() float64 {

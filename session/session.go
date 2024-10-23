@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/prep/average"
+	"github.com/datarhei/core/v16/math/average"
 )
 
 type session struct {
@@ -27,10 +27,10 @@ type session struct {
 	timeout  time.Duration
 	callback func(*session)
 
-	rxBitrate *average.SlidingWindow
+	rxBitrate *average.SMA
 	rxBytes   uint64
 
-	txBitrate *average.SlidingWindow
+	txBitrate *average.SMA
 	txBytes   uint64
 
 	tickerStop context.CancelFunc
@@ -59,8 +59,8 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 	s.peer = ""
 	s.extra = map[string]interface{}{}
 
-	s.rxBitrate, _ = average.New(averageWindow, averageGranularity)
-	s.txBitrate, _ = average.New(averageWindow, averageGranularity)
+	s.rxBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
+	s.txBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
 
 	s.topRxBitrate = 0.0
 	s.topTxBitrate = 0.0
@@ -105,8 +105,8 @@ func (s *session) close() {
 		s.tickerStop = nil
 	}
 
-	s.rxBitrate.Stop()
-	s.txBitrate.Stop()
+	s.rxBitrate.Reset()
+	s.txBitrate.Reset()
 	go s.callback(s)
 }
 
@@ -157,10 +157,10 @@ func (s *session) Ingress(size int64) bool {
 	s.stale.Stop()
 	s.stale.Reset(s.timeout)
 
-	s.rxBitrate.Add(size * 8)
+	s.rxBitrate.Add(float64(size) * 8)
 	s.rxBytes += uint64(size)
 
-	bitrate := s.rxBitrate.Average(averageWindow)
+	bitrate := s.rxBitrate.Average()
 	if bitrate > s.topRxBitrate {
 		s.topRxBitrate = bitrate
 	}
@@ -183,10 +183,10 @@ func (s *session) Egress(size int64) bool {
 	s.stale.Stop()
 	s.stale.Reset(s.timeout)
 
-	s.txBitrate.Add(size * 8)
+	s.txBitrate.Add(float64(size) * 8)
 	s.txBytes += uint64(size)
 
-	bitrate := s.txBitrate.Average(averageWindow)
+	bitrate := s.txBitrate.Average()
 	if bitrate > s.topTxBitrate {
 		s.topTxBitrate = bitrate
 	}
@@ -199,11 +199,11 @@ func (s *session) Egress(size int64) bool {
 }
 
 func (s *session) RxBitrate() float64 {
-	return s.rxBitrate.Average(averageWindow)
+	return s.rxBitrate.Average()
 }
 
 func (s *session) TxBitrate() float64 {
-	return s.txBitrate.Average(averageWindow)
+	return s.txBitrate.Average()
 }
 
 func (s *session) TopRxBitrate() float64 {
