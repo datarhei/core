@@ -703,7 +703,7 @@ func (p *process) start() error {
 
 	p.pid = int32(p.cmd.Process.Pid)
 
-	if proc, err := psutil.NewProcess(p.pid, false); err == nil {
+	if proc, err := psutil.NewProcess(p.pid); err == nil {
 		p.limits.Start(proc)
 	}
 

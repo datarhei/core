@@ -71,7 +71,7 @@ func (u *util) Process(pid int32) (Process, error) {
 	return p, nil
 }
 
-func NewProcess(pid int32, limit bool) (Process, error) {
+func NewProcess(pid int32) (Process, error) {
 	return DefaultUtil.Process(pid)
 }
 
