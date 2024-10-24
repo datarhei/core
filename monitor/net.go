@@ -33,7 +33,7 @@ func (c *netCollector) Describe() []*metric.Description {
 func (c *netCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	devs, err := psutil.NetIOCounters(true)
+	devs, err := psutil.Network()
 	if err != nil {
 		return metrics
 	}

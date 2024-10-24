@@ -143,7 +143,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
-		if haveP.Throttling {
+		if haveP.Resources.Throttling {
 			resources.Throttling(haveP.NodeID, true)
 		}
 	}
@@ -182,7 +182,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 				processid: haveP.Config.ProcessID(),
 			})
 
-			resources.Remove(haveP.NodeID, haveP.CPU, haveP.Mem)
+			resources.Remove(haveP.NodeID, ResourcesFromProcess(haveP.Resources))
 
 			continue
 		}
@@ -219,7 +219,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 				})
 
 				// Release the resources.
-				resources.Remove(haveP.NodeID, haveP.CPU, haveP.Mem)
+				resources.Remove(haveP.NodeID, ResourcesFromProcess(haveP.Resources))
 			}
 		}
 
@@ -229,7 +229,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 	for _, haveP := range wantOrderStart {
 		nodeid := haveP.NodeID
 
-		resources.Add(nodeid, haveP.Config.LimitCPU, haveP.Config.LimitMemory)
+		resources.Add(nodeid, ResourcesFromConfig(haveP.Config))
 
 		// TODO: check if the current node has actually enough resources available,
 		// otherwise it needs to be moved somewhere else. If the node doesn't
@@ -347,7 +347,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 		// Try to add the process to a node where other processes with the same reference currently reside.
 		raNodes := haveReferenceAffinity.Nodes(wantP.Config.Reference, wantP.Config.Domain)
 		for _, raNodeid := range raNodes {
-			if resources.HasNodeEnough(raNodeid, wantP.Config.LimitCPU, wantP.Config.LimitMemory) {
+			if resources.HasNodeEnough(raNodeid, ResourcesFromConfig(wantP.Config)) {
 				nodeid = raNodeid
 				break
 			}
@@ -355,7 +355,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 
 		// Find the node with the most resources available.
 		if len(nodeid) == 0 {
-			nodes := resources.FindBestNodes(wantP.Config.LimitCPU, wantP.Config.LimitMemory)
+			nodes := resources.FindBestNodes(ResourcesFromConfig(wantP.Config))
 			if len(nodes) > 0 {
 				nodeid = nodes[0]
 			}
@@ -372,7 +372,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 			opBudget -= 3
 
 			// Consume the resources
-			resources.Add(nodeid, wantP.Config.LimitCPU, wantP.Config.LimitMemory)
+			resources.Add(nodeid, ResourcesFromConfig(wantP.Config))
 
 			reality[pid] = nodeid
 

@@ -6,6 +6,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os/exec"
+	"regexp"
+	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -47,11 +50,19 @@ func (u *Utilization) UnmarshalText(text []byte) error {
 }
 
 type Process struct {
-	PID    int32     `xml:"pid"`
-	Memory Megabytes `xml:"used_memory"`
+	Index  int
+	PID    int32
+	Memory uint64 // bytes
+
+	Usage   float64 // percent 0-100
+	Encoder float64 // percent 0-100
+	Decoder float64 // percent 0-100
+
+	lastSeen time.Time
 }
 
 type GPUStats struct {
+	ID           string `xml:"id,attr"`
 	Name         string `xml:"product_name"`
 	Architecture string `xml:"product_architecture"`
 
@@ -59,31 +70,17 @@ type GPUStats struct {
 	MemoryUsed  Megabytes `xml:"fb_memory_usage>used"`
 
 	Usage        Utilization `xml:"utilization>gpu_util"`
-	MemoryUsage  Utilization `xml:"utilization>memory_util"`
-	EncoderUsage Utilization `xml:"utilization>encoder_util"`
-	DecoderUsage Utilization `xml:"utilization>decoder_util"`
-
-	Process []Process `xml:"processes>process_info"`
+	UsageEncoder Utilization `xml:"utilization>encoder_util"`
+	UsageDecoder Utilization `xml:"utilization>decoder_util"`
 }
 
 type Stats struct {
 	GPU []GPUStats `xml:"gpu"`
 }
 
-func parse(data []byte) (Stats, error) {
-	nv := Stats{}
-
-	err := xml.Unmarshal(data, &nv)
-	if err != nil {
-		return nv, fmt.Errorf("parsing report: %w", err)
-	}
-
-	return nv, nil
-}
-
 type nvidia struct {
-	cmd *exec.Cmd
-	wr  *writer
+	wrQuery   *writerQuery
+	wrProcess *writerProcess
 
 	lock    sync.RWMutex
 	cancel  context.CancelFunc
@@ -97,33 +94,33 @@ type dummy struct{}
 func (d *dummy) Count() (int, error)                    { return 0, nil }
 func (d *dummy) Stats() ([]gpu.Stats, error)            { return nil, nil }
 func (d *dummy) Process(pid int32) (gpu.Process, error) { return gpu.Process{}, gpu.ErrProcessNotFound }
+func (d *dummy) Close()                                 {}
 
-type writer struct {
-	buf bytes.Buffer
-	ch  chan Stats
+type writerQuery struct {
+	buf        bytes.Buffer
+	ch         chan Stats
+	terminator []byte
 }
 
-var terminator = []byte("</nvidia_smi_log>\n")
-
-func (w *writer) Write(data []byte) (int, error) {
+func (w *writerQuery) Write(data []byte) (int, error) {
 	n, err := w.buf.Write(data)
 	if err != nil {
 		return n, err
 	}
 
 	for {
-		idx := bytes.Index(w.buf.Bytes(), terminator)
+		idx := bytes.Index(w.buf.Bytes(), w.terminator)
 		if idx == -1 {
 			break
 		}
 
-		content := make([]byte, idx+len(terminator))
+		content := make([]byte, idx+len(w.terminator))
 		n, err := w.buf.Read(content)
 		if err != nil || n != len(content) {
 			break
 		}
 
-		s, err := parse(content)
+		s, err := w.parse(content)
 		if err != nil {
 			continue
 		}
@@ -134,19 +131,132 @@ func (w *writer) Write(data []byte) (int, error) {
 	return n, nil
 }
 
+func (w *writerQuery) parse(data []byte) (Stats, error) {
+	nv := Stats{}
+
+	err := xml.Unmarshal(data, &nv)
+	if err != nil {
+		return nv, fmt.Errorf("parsing report: %w", err)
+	}
+
+	return nv, nil
+}
+
+type writerProcess struct {
+	buf        bytes.Buffer
+	ch         chan Process
+	re         *regexp.Regexp
+	terminator []byte
+}
+
+func (w *writerProcess) Write(data []byte) (int, error) {
+	n, err := w.buf.Write(data)
+	if err != nil {
+		return n, err
+	}
+
+	for {
+		idx := bytes.Index(w.buf.Bytes(), w.terminator)
+		if idx == -1 {
+			break
+		}
+
+		content := make([]byte, idx+len(w.terminator))
+		n, err := w.buf.Read(content)
+		if err != nil || n != len(content) {
+			break
+		}
+
+		s, err := w.parse(content)
+		if err != nil {
+			continue
+		}
+
+		w.ch <- s
+	}
+
+	return n, nil
+}
+
+func (w *writerProcess) parse(data []byte) (Process, error) {
+	p := Process{}
+
+	if len(data) == 0 {
+		return p, fmt.Errorf("empty line")
+	}
+
+	if data[0] == '#' {
+		return p, fmt.Errorf("comment")
+	}
+
+	matches := w.re.FindStringSubmatch(string(data))
+	if matches == nil {
+		return p, fmt.Errorf("no matches found")
+	}
+
+	if len(matches) != 7 {
+		return p, fmt.Errorf("not the expected number of matches found")
+	}
+
+	if d, err := strconv.ParseInt(matches[1], 10, 0); err == nil {
+		p.Index = int(d)
+	}
+
+	if d, err := strconv.ParseInt(matches[2], 10, 32); err == nil {
+		p.PID = int32(d)
+	}
+
+	if matches[3][0] != '-' {
+		if d, err := strconv.ParseFloat(matches[3], 64); err == nil {
+			p.Usage = d
+		}
+	}
+
+	if matches[4][0] != '-' {
+		if d, err := strconv.ParseFloat(matches[4], 64); err == nil {
+			p.Encoder = d
+		}
+	}
+
+	if matches[5][0] != '-' {
+		if d, err := strconv.ParseFloat(matches[5], 64); err == nil {
+			p.Decoder = d
+		}
+	}
+
+	if d, err := strconv.ParseUint(matches[6], 10, 64); err == nil {
+		p.Memory = d * 1024 * 1024
+	}
+
+	return p, nil
+}
+
 func New(path string) gpu.GPU {
 	if len(path) == 0 {
 		path = "nvidia-smi"
 	}
 
-	_, err := exec.LookPath(path)
+	path, err := exec.LookPath(path)
 	if err != nil {
 		return &dummy{}
 	}
 
 	n := &nvidia{
-		wr: &writer{
-			ch: make(chan Stats, 1),
+		wrQuery: &writerQuery{
+			ch:         make(chan Stats, 1),
+			terminator: []byte("</nvidia_smi_log>\n"),
+		},
+		wrProcess: &writerProcess{
+			ch: make(chan Process, 32),
+			// # gpu        pid  type    sm   mem   enc   dec    fb   command
+			// # Idx          #   C/G     %     %     %     %    MB   name
+			//     0       7372     C     2     0     2     -   136   ffmpeg
+			//     0      12176     C     5     2     3     7   782   ffmpeg
+			//     0      20035     C     8     2     4     1  1145   ffmpeg
+			//     0      20141     C     2     1     1     3   429   ffmpeg
+			//     0      29591     C     2     1     -     2   435   ffmpeg
+			re:         regexp.MustCompile(`^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`),
+			terminator: []byte("\n"),
 		},
 		process: map[int32]Process{},
 	}
@@ -154,7 +264,8 @@ func New(path string) gpu.GPU {
 	ctx, cancel := context.WithCancel(context.Background())
 	n.cancel = cancel
 
-	go n.runner(ctx, path)
+	go n.runnerQuery(ctx, path)
+	go n.runnerProcess(ctx, path)
 	go n.reader(ctx)
 
 	return n
@@ -165,13 +276,18 @@ func (n *nvidia) reader(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case stats := <-n.wr.ch:
+		case stats := <-n.wrQuery.ch:
 			n.lock.Lock()
 			n.stats = stats
-			n.process = map[int32]Process{}
-			for _, g := range n.stats.GPU {
-				for _, p := range g.Process {
-					n.process[p.PID] = p
+			n.lock.Unlock()
+		case process := <-n.wrProcess.ch:
+			process.lastSeen = time.Now()
+			n.lock.Lock()
+			n.process[process.PID] = process
+
+			for pid, p := range n.process {
+				if time.Since(p.lastSeen) > 11*time.Second {
+					delete(n.process, pid)
 				}
 			}
 			n.lock.Unlock()
@@ -179,11 +295,11 @@ func (n *nvidia) reader(ctx context.Context) {
 	}
 }
 
-func (n *nvidia) runner(ctx context.Context, path string) {
+func (n *nvidia) runnerQuery(ctx context.Context, path string) {
 	for {
-		n.cmd = exec.Command(path, "-q", "-x", "-l", "1")
-		n.cmd.Stdout = n.wr
-		err := n.cmd.Start()
+		cmd := exec.CommandContext(ctx, path, "-q", "-x", "-l", "1")
+		cmd.Stdout = n.wrQuery
+		err := cmd.Start()
 		if err != nil {
 			n.lock.Lock()
 			n.err = err
@@ -193,7 +309,35 @@ func (n *nvidia) runner(ctx context.Context, path string) {
 			continue
 		}
 
-		err = n.cmd.Wait()
+		err = cmd.Wait()
+
+		n.lock.Lock()
+		n.err = err
+		n.lock.Unlock()
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
+}
+
+func (n *nvidia) runnerProcess(ctx context.Context, path string) {
+	for {
+		cmd := exec.CommandContext(ctx, path, "pmon", "-s", "um", "-d", "5")
+		cmd.Stdout = n.wrProcess
+		err := cmd.Start()
+		if err != nil {
+			n.lock.Lock()
+			n.err = err
+			n.lock.Unlock()
+
+			time.Sleep(3 * time.Second)
+			continue
+		}
+
+		err = cmd.Wait()
 
 		n.lock.Lock()
 		n.err = err
@@ -219,39 +363,55 @@ func (n *nvidia) Count() (int, error) {
 }
 
 func (n *nvidia) Stats() ([]gpu.Stats, error) {
-	s := []gpu.Stats{}
+	stats := []gpu.Stats{}
 
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 
 	if n.err != nil {
-		return s, n.err
+		return stats, n.err
 	}
 
 	for _, nv := range n.stats.GPU {
-		stats := gpu.Stats{
+		s := gpu.Stats{
+			ID:           nv.ID,
 			Name:         nv.Name,
 			Architecture: nv.Architecture,
 			MemoryTotal:  uint64(nv.MemoryTotal),
 			MemoryUsed:   uint64(nv.MemoryUsed),
 			Usage:        float64(nv.Usage),
-			MemoryUsage:  float64(nv.MemoryUsage),
-			EncoderUsage: float64(nv.EncoderUsage),
-			DecoderUsage: float64(nv.DecoderUsage),
+			Encoder:      float64(nv.UsageEncoder),
+			Decoder:      float64(nv.UsageDecoder),
 			Process:      []gpu.Process{},
 		}
 
-		for _, p := range nv.Process {
-			stats.Process = append(stats.Process, gpu.Process{
-				PID:    p.PID,
-				Memory: uint64(p.Memory),
-			})
-		}
-
-		s = append(s, stats)
+		stats = append(stats, s)
 	}
 
-	return s, nil
+	for _, p := range n.process {
+		if p.Index >= len(stats) {
+			continue
+		}
+
+		stats[p.Index].Process = append(stats[p.Index].Process, gpu.Process{
+			PID:     p.PID,
+			Index:   p.Index,
+			Memory:  p.Memory,
+			Usage:   p.Usage,
+			Encoder: p.Encoder,
+			Decoder: p.Decoder,
+		})
+	}
+
+	for i := range stats {
+		p := stats[i].Process
+		slices.SortFunc(p, func(a, b gpu.Process) int {
+			return int(a.PID - b.PID)
+		})
+		stats[i].Process = p
+	}
+
+	return stats, nil
 }
 
 func (n *nvidia) Process(pid int32) (gpu.Process, error) {
@@ -259,14 +419,18 @@ func (n *nvidia) Process(pid int32) (gpu.Process, error) {
 	defer n.lock.RUnlock()
 
 	p, hasProcess := n.process[pid]
-	if !hasProcess {
-		return gpu.Process{}, gpu.ErrProcessNotFound
+	if hasProcess {
+		return gpu.Process{
+			PID:     p.PID,
+			Index:   p.Index,
+			Memory:  p.Memory,
+			Usage:   p.Usage,
+			Encoder: p.Encoder,
+			Decoder: p.Decoder,
+		}, nil
 	}
 
-	return gpu.Process{
-		PID:    p.PID,
-		Memory: uint64(p.Memory),
-	}, nil
+	return gpu.Process{Index: -1}, gpu.ErrProcessNotFound
 }
 
 func (n *nvidia) Close() {
@@ -279,6 +443,4 @@ func (n *nvidia) Close() {
 
 	n.cancel()
 	n.cancel = nil
-
-	n.cmd.Process.Kill()
 }

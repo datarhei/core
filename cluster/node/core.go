@@ -747,16 +747,62 @@ func (n *Core) MediaGetInfo(prefix, path string) (int64, time.Time, error) {
 }
 
 type Process struct {
-	NodeID     string
-	Order      string
-	State      string
+	NodeID    string
+	Order     string
+	State     string
+	Resources ProcessResources
+	Runtime   time.Duration
+	UpdatedAt time.Time
+	Config    *app.Config
+	Metadata  map[string]interface{}
+}
+
+type ProcessResources struct {
 	CPU        float64 // Current CPU load of this process, 0-100*ncpu
 	Mem        uint64  // Currently consumed memory of this process in bytes
+	GPU        ProcessGPUResources
 	Throttling bool
-	Runtime    time.Duration
-	UpdatedAt  time.Time
-	Config     *app.Config
-	Metadata   map[string]interface{}
+}
+
+type ProcessGPUResources struct {
+	Index   int     // GPU number
+	Usage   float64 // Current GPU load, 0-100
+	Encoder float64 // Current GPU encoder load, 0-100
+	Decoder float64 // Current GPU decoder load, 0-100
+	Mem     uint64  // Currently consumed GPU memory of this process in bytes
+}
+
+func (p *ProcessResources) Marshal(a *api.ProcessUsage) {
+	p.Throttling = a.CPU.IsThrottling
+
+	if x, err := a.CPU.Current.Float64(); err == nil {
+		p.CPU = x
+	} else {
+		p.CPU = 0
+	}
+
+	p.Mem = a.Memory.Current
+
+	if x, err := a.GPU.Usage.Current.Float64(); err == nil {
+		p.GPU.Usage = x
+	} else {
+		p.GPU.Usage = 0
+	}
+
+	if x, err := a.GPU.Encoder.Current.Float64(); err == nil {
+		p.GPU.Encoder = x
+	} else {
+		p.GPU.Encoder = 0
+	}
+
+	if x, err := a.GPU.Decoder.Current.Float64(); err == nil {
+		p.GPU.Decoder = x
+	} else {
+		p.GPU.Decoder = 0
+	}
+
+	p.GPU.Mem = a.GPU.Memory.Current
+	p.GPU.Index = a.GPU.Index
 }
 
 func (n *Core) ClusterProcessList() ([]Process, error) {
@@ -780,21 +826,15 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 			p.Config = &api.ProcessConfig{}
 		}
 
-		cpu, err := p.State.Resources.CPU.Current.Float64()
-		if err != nil {
-			cpu = 0
+		process := Process{
+			NodeID:    nodeid,
+			Order:     p.State.Order,
+			State:     p.State.State,
+			Runtime:   time.Duration(p.State.Runtime) * time.Second,
+			UpdatedAt: time.Unix(p.UpdatedAt, 0),
 		}
 
-		process := Process{
-			NodeID:     nodeid,
-			Order:      p.State.Order,
-			State:      p.State.State,
-			Mem:        p.State.Resources.Memory.Current,
-			CPU:        cpu,
-			Throttling: p.State.Resources.CPU.IsThrottling,
-			Runtime:    time.Duration(p.State.Runtime) * time.Second,
-			UpdatedAt:  time.Unix(p.UpdatedAt, 0),
-		}
+		process.Resources.Marshal(&p.State.Resources)
 
 		config, _ := p.Config.Marshal()
 

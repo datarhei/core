@@ -44,11 +44,11 @@ func (c *memCollector) Describe() []*metric.Description {
 func (c *memCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	_, limit := c.resources.Limits()
+	_, limit, _, _ := c.resources.Limits()
 
 	metrics.Add(metric.NewValue(c.limitDescr, float64(limit)))
 
-	_, memory := c.resources.ShouldLimit()
+	_, memory, _ := c.resources.ShouldLimit()
 	throttling := .0
 	if memory {
 		throttling = 1
@@ -56,7 +56,7 @@ func (c *memCollector) Collect() metric.Metrics {
 
 	metrics.Add(metric.NewValue(c.throttleDescr, throttling))
 
-	stat, err := psutil.VirtualMemory()
+	stat, err := psutil.Memory()
 	if err != nil {
 		return metrics
 	}

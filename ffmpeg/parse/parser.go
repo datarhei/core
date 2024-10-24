@@ -619,7 +619,7 @@ func (p *parser) Stop(state string, pusage process.Usage) {
 	usage.CPU.Max = pusage.CPU.Max
 	usage.CPU.Limit = pusage.CPU.Limit
 
-	usage.Memory.Average = pusage.Memory.Average
+	usage.Memory.Average = uint64(pusage.Memory.Average)
 	usage.Memory.Max = pusage.Memory.Max
 	usage.Memory.Limit = pusage.Memory.Limit
 

@@ -193,11 +193,13 @@ func TestSynchronizeOrderStop(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -285,11 +287,13 @@ func TestSynchronizeOrderStart(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "stop",
-			State:     "finished",
-			CPU:       0,
-			Mem:       0,
+			NodeID: "node1",
+			Order:  "stop",
+			State:  "finished",
+			Resources: node.ProcessResources{
+				CPU: 0,
+				Mem: 0,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -388,11 +392,13 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node2",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -490,11 +496,13 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node2",
-			Order:     "start",
-			State:     "running",
-			CPU:       1,
-			Mem:       1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 2,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -882,11 +890,13 @@ func TestSynchronizeRemove(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar",
@@ -967,11 +977,13 @@ func TestSynchronizeAddRemove(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -1064,11 +1076,13 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:          "foobar",
@@ -1133,11 +1147,13 @@ func TestSynchronizeUpdate(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:          "foobar",
@@ -1217,11 +1233,13 @@ func TestSynchronizeUpdateMetadata(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:          "foobar",
@@ -1313,11 +1331,13 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -1397,11 +1417,13 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -1493,11 +1515,13 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -1589,11 +1613,13 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 
 	have := []node.Process{
 		{
-			NodeID:    "node1",
-			Order:     "start",
-			State:     "running",
-			CPU:       12,
-			Mem:       5,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime:   42,
 			UpdatedAt: now,
 			Config: &app.Config{
@@ -1655,22 +1681,26 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 func TestRebalanceNothingToDo(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     35,
-			Mem:     20,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 35,
+				Mem: 20,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -1711,33 +1741,39 @@ func TestRebalanceNothingToDo(t *testing.T) {
 func TestRebalanceOverload(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     35,
-			Mem:     20,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 35,
+				Mem: 20,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     17,
-			Mem:     31,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 17,
+				Mem: 31,
+			},
 			Runtime: 27,
 			Config: &app.Config{
 				ID: "foobar3",
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -1806,33 +1842,39 @@ func TestRebalanceOverload(t *testing.T) {
 func TestRebalanceSkip(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     35,
-			Mem:     20,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 35,
+				Mem: 20,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     17,
-			Mem:     31,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 17,
+				Mem: 31,
+			},
 			Runtime: 27,
 			Config: &app.Config{
 				ID: "foobar3",
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -1908,22 +1950,26 @@ func TestRebalanceSkip(t *testing.T) {
 func TestRebalanceReferenceAffinity(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 1,
 			Config: &app.Config{
 				ID:        "foobar2",
@@ -1931,11 +1977,13 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar3",
@@ -1943,11 +1991,13 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar4",
@@ -1955,11 +2005,13 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar5",
@@ -2048,33 +2100,39 @@ func TestRebalanceReferenceAffinity(t *testing.T) {
 func TestRebalanceRelocateTarget(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     35,
-			Mem:     20,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 35,
+				Mem: 20,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     17,
-			Mem:     31,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 17,
+				Mem: 31,
+			},
 			Runtime: 27,
 			Config: &app.Config{
 				ID: "foobar3",
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -2165,33 +2223,39 @@ func TestRebalanceRelocateTarget(t *testing.T) {
 func TestRebalanceRelocateAny(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     35,
-			Mem:     20,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 35,
+				Mem: 20,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     17,
-			Mem:     31,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 17,
+				Mem: 31,
+			},
 			Runtime: 27,
 			Config: &app.Config{
 				ID: "foobar3",
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     12,
-			Mem:     5,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 12,
+				Mem: 5,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar2",
@@ -2319,7 +2383,10 @@ func TestFindBestNodesForProcess(t *testing.T) {
 
 	resources := NewResourcePlanner(nodes)
 
-	list := resources.FindBestNodes(35, 20)
+	list := resources.FindBestNodes(Resources{
+		CPU: 35,
+		Mem: 20,
+	})
 
 	require.Equal(t, []string{"node3", "node2", "node1"}, list)
 }
@@ -2433,7 +2500,10 @@ func TestFindBestNodesForProcess2(t *testing.T) {
 		},
 	}
 
-	list := resources.FindBestNodes(4.0, 45*1024*1024)
+	list := resources.FindBestNodes(Resources{
+		CPU: 4.0,
+		Mem: 45 * 1024 * 1024,
+	})
 
 	require.Equal(t, []string{"node10", "node8", "node7", "node1", "node5", "node12", "node4", "node3", "node13", "node6", "node11", "node2"}, list)
 }
@@ -2441,11 +2511,13 @@ func TestFindBestNodesForProcess2(t *testing.T) {
 func TestCreateNodeProcessMap(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "finished",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "finished",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 1,
 			Config: &app.Config{
 				ID:        "foobar7",
@@ -2453,11 +2525,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "failed",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "failed",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 1,
 			Config: &app.Config{
 				ID:        "foobar8",
@@ -2465,22 +2539,26 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 1,
 			Config: &app.Config{
 				ID:        "foobar2",
@@ -2488,11 +2566,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 67,
 			Config: &app.Config{
 				ID:        "foobar3",
@@ -2500,11 +2580,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar6",
@@ -2512,11 +2594,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 41,
 			Config: &app.Config{
 				ID:        "foobar4",
@@ -2524,11 +2608,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar5",
@@ -2542,11 +2628,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 	require.Equal(t, map[string][]node.Process{
 		"node1": {
 			{
-				NodeID:  "node1",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node1",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 1,
 				Config: &app.Config{
 					ID:        "foobar2",
@@ -2554,11 +2642,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 				},
 			},
 			{
-				NodeID:  "node1",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node1",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 42,
 				Config: &app.Config{
 					ID: "foobar1",
@@ -2567,11 +2657,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 		},
 		"node2": {
 			{
-				NodeID:  "node2",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node2",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 42,
 				Config: &app.Config{
 					ID:        "foobar6",
@@ -2579,11 +2671,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 				},
 			},
 			{
-				NodeID:  "node2",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node2",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 67,
 				Config: &app.Config{
 					ID:        "foobar3",
@@ -2593,11 +2687,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 		},
 		"node3": {
 			{
-				NodeID:  "node3",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node3",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 41,
 				Config: &app.Config{
 					ID:        "foobar4",
@@ -2605,11 +2701,13 @@ func TestCreateNodeProcessMap(t *testing.T) {
 				},
 			},
 			{
-				NodeID:  "node3",
-				Order:   "start",
-				State:   "running",
-				CPU:     1,
-				Mem:     1,
+				NodeID: "node3",
+				Order:  "start",
+				State:  "running",
+				Resources: node.ProcessResources{
+					CPU: 1,
+					Mem: 1,
+				},
 				Runtime: 42,
 				Config: &app.Config{
 					ID:        "foobar5",
@@ -2623,22 +2721,26 @@ func TestCreateNodeProcessMap(t *testing.T) {
 func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 	processes := []node.Process{
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID: "foobar1",
 			},
 		},
 		{
-			NodeID:  "node1",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node1",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 1,
 			Config: &app.Config{
 				ID:        "foobar2",
@@ -2646,11 +2748,13 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar3",
@@ -2658,11 +2762,13 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node2",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node2",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar3",
@@ -2670,11 +2776,13 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar4",
@@ -2682,11 +2790,13 @@ func TestCreateReferenceAffinityNodeMap(t *testing.T) {
 			},
 		},
 		{
-			NodeID:  "node3",
-			Order:   "start",
-			State:   "running",
-			CPU:     1,
-			Mem:     1,
+			NodeID: "node3",
+			Order:  "start",
+			State:  "running",
+			Resources: node.ProcessResources{
+				CPU: 1,
+				Mem: 1,
+			},
 			Runtime: 42,
 			Config: &app.Config{
 				ID:        "foobar5",

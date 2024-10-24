@@ -1261,7 +1261,7 @@ func TestReplacer(t *testing.T) {
 
 	require.Equal(t, wantprocess, process)
 
-	resolveDynamicPlaceholder(process, replacer)
+	resolveDynamicPlaceholder(process, replacer, nil, nil)
 
 	wantprocess.Input = []app.ConfigIO{
 		{
@@ -1531,7 +1531,7 @@ func TestProcessLimit(t *testing.T) {
 
 	status := task.ffmpeg.Status()
 
-	ncpu, err := psutil.CPUCounts(true)
+	ncpu, err := psutil.CPUCounts()
 	require.NoError(t, err)
 
 	require.Equal(t, ncpu*process.LimitCPU, status.CPU.Limit)

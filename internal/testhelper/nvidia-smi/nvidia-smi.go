@@ -1,4 +1,22 @@
-<?xml version="1.0" ?>
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"time"
+)
+
+var pmondata = `# gpu        pid  type    sm   mem   enc   dec    fb   command
+# Idx          #   C/G     %     %     %     %    MB   name
+    0       7372     C     2     0     2     -   136   ffmpeg         
+    0      12176     C     5     2     3     7   782   ffmpeg         
+    1      20035     C     8     2     4     1  1145   ffmpeg         
+    1      20141     C     2     1     1     3   429   ffmpeg         
+    0      29591     C     2     1     -     2   435   ffmpeg   `
+
+var querydata = `<?xml version="1.0" ?>
 <!DOCTYPE nvidia_smi_log SYSTEM "nvsmi_device_v12.dtd">
 <nvidia_smi_log>
     <timestamp>Mon Jul 15 13:41:56 2024</timestamp>
@@ -438,6 +456,18 @@
             </supported_mem_clock>
         </supported_clocks>
         <processes>
+            <process_info>
+                <pid>10131</pid>
+                <type>C</type>
+                <process_name>ffmpeg</process_name>
+                <used_memory>389 MiB</used_memory>
+            </process_info>
+            <process_info>
+                <pid>13597</pid>
+                <type>C</type>
+                <process_name>ffmpeg</process_name>
+                <used_memory>1054 MiB</used_memory>
+            </process_info>
         </processes>
         <accounted_processes>
         </accounted_processes>
@@ -879,6 +909,12 @@
             </supported_mem_clock>
         </supported_clocks>
         <processes>
+            <process_info>
+                <pid>16870</pid>
+                <type>C</type>
+                <process_name>ffmpeg</process_name>
+                <used_memory>549 MiB</used_memory>
+            </process_info>
         </processes>
         <accounted_processes>
         </accounted_processes>
@@ -887,4 +923,51 @@
         </capabilities>
     </gpu>
 
-</nvidia_smi_log>
+</nvidia_smi_log>`
+
+func main() {
+	if len(os.Args) == 1 {
+		os.Exit(1)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if os.Args[1] == "pmon" {
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					fmt.Fprintf(os.Stdout, "%s\n", pmondata)
+				}
+			}
+		}(ctx)
+	} else {
+		go func(ctx context.Context) {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					fmt.Fprintf(os.Stdout, "%s\n", querydata)
+				}
+			}
+		}(ctx)
+	}
+
+	// Wait for interrupt signal to gracefully shutdown the app
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+
+	cancel()
+
+	os.Exit(0)
+}

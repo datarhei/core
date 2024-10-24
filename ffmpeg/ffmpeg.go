@@ -29,23 +29,26 @@ type FFmpeg interface {
 }
 
 type ProcessConfig struct {
-	Reconnect      bool                    // Whether to reconnect
-	ReconnectDelay time.Duration           // Duration until next reconnect
-	StaleTimeout   time.Duration           // Duration to wait until killing the process if there is no progress in the process
-	Timeout        time.Duration           // Duration to wait until killing the process
-	LimitCPU       float64                 // Kill the process if the CPU usage in percent is above this value.
-	LimitMemory    uint64                  // Kill the process if the memory consumption in bytes is above this value.
-	LimitDuration  time.Duration           // Kill the process if the limits are exceeded for this duration.
-	LimitMode      string                  // How to limit the process, "hard" or "soft"
-	Scheduler      string                  // A scheduler for starting the process, either a concrete date (RFC3339) or in crontab syntax
-	Args           []string                // Arguments for the process
-	Parser         process.Parser          // Parser for the process output
-	Logger         log.Logger              // Logger
-	OnArgs         func([]string) []string // Callback before starting the process to retrieve new arguments
-	OnBeforeStart  func() error            // Callback which is called before the process will be started. If error is non-nil, the start will be refused.
-	OnStart        func()                  // Callback called after process has been started
-	OnExit         func(state string)      // Callback called after the process stopped with exit state as argument
-	OnStateChange  func(from, to string)   // Callback called on state change
+	Reconnect       bool                             // Whether to reconnect
+	ReconnectDelay  time.Duration                    // Duration until next reconnect
+	StaleTimeout    time.Duration                    // Duration to wait until killing the process if there is no progress in the process
+	Timeout         time.Duration                    // Duration to wait until killing the process
+	LimitCPU        float64                          // Kill the process if the CPU usage in percent is above this value.
+	LimitMemory     uint64                           // Kill the process if the memory consumption in bytes is above this value.
+	LimitGPUUsage   float64                          // Kill the process id the GPU usage (general) in percent is above this value.
+	LimitGPUEncoder float64                          // Kill the process id the GPU usage (encoder) in percent is above this value.
+	LimitGPUDecoder float64                          // Kill the process id the GPU usage (decoder) in percent is above this value.
+	LimitGPUMemory  uint64                           // Kill the process if the GPU memory consumption in bytes is above this value.
+	LimitDuration   time.Duration                    // Kill the process if the limits are exceeded for this duration.
+	LimitMode       string                           // How to limit the process, "hard" or "soft"
+	Scheduler       string                           // A scheduler for starting the process, either a concrete date (RFC3339) or in crontab syntax
+	Args            []string                         // Arguments for the process
+	Parser          process.Parser                   // Parser for the process output
+	Logger          log.Logger                       // Logger
+	OnBeforeStart   func([]string) ([]string, error) // Callback which is called before the process will be started. The string slice is the list of arguments which can be modified. If error is non-nil, the start will be refused.
+	OnStart         func()                           // Callback called after process has been started
+	OnExit          func(state string)               // Callback called after the process stopped with exit state as argument
+	OnStateChange   func(from, to string)            // Callback called on state change
 }
 
 // Config is the configuration for ffmpeg that is part of the configuration
@@ -138,23 +141,26 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 	}
 
 	ffmpeg, err := process.New(process.Config{
-		Binary:         f.binary,
-		Args:           config.Args,
-		Reconnect:      config.Reconnect,
-		ReconnectDelay: config.ReconnectDelay,
-		StaleTimeout:   config.StaleTimeout,
-		Timeout:        config.Timeout,
-		LimitCPU:       config.LimitCPU,
-		LimitMemory:    config.LimitMemory,
-		LimitDuration:  config.LimitDuration,
-		LimitMode:      limitMode,
-		Scheduler:      scheduler,
-		Parser:         config.Parser,
-		Logger:         config.Logger,
-		OnArgs:         config.OnArgs,
-		OnBeforeStart:  config.OnBeforeStart,
-		OnStart:        config.OnStart,
-		OnExit:         config.OnExit,
+		Binary:          f.binary,
+		Args:            config.Args,
+		Reconnect:       config.Reconnect,
+		ReconnectDelay:  config.ReconnectDelay,
+		StaleTimeout:    config.StaleTimeout,
+		Timeout:         config.Timeout,
+		LimitCPU:        config.LimitCPU,
+		LimitMemory:     config.LimitMemory,
+		LimitGPUUsage:   config.LimitGPUUsage,
+		LimitGPUEncoder: config.LimitGPUEncoder,
+		LimitGPUDecoder: config.LimitGPUDecoder,
+		LimitGPUMemory:  config.LimitGPUMemory,
+		LimitDuration:   config.LimitDuration,
+		LimitMode:       limitMode,
+		Scheduler:       scheduler,
+		Parser:          config.Parser,
+		Logger:          config.Logger,
+		OnBeforeStart:   config.OnBeforeStart,
+		OnStart:         config.OnStart,
+		OnExit:          config.OnExit,
 		OnStateChange: func(from, to string) {
 			f.statesLock.Lock()
 			switch to {

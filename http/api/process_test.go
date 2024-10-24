@@ -56,6 +56,33 @@ func TestProcessUsage(t *testing.T) {
 			Max:     150,
 			Limit:   200,
 		},
+		GPU: app.ProcessUsageGPU{
+			Index: 3,
+			Memory: app.ProcessUsageGPUMemory{
+				Current: 48,
+				Average: 43,
+				Max:     88,
+				Limit:   34,
+			},
+			Usage: app.ProcessUsageGPUUsage{
+				Current: 47,
+				Average: 22,
+				Max:     90,
+				Limit:   80,
+			},
+			Encoder: app.ProcessUsageGPUUsage{
+				Current: 48,
+				Average: 46,
+				Max:     74,
+				Limit:   46,
+			},
+			Decoder: app.ProcessUsageGPUUsage{
+				Current: 21,
+				Average: 42,
+				Max:     30,
+				Limit:   99,
+			},
+		},
 	}
 
 	p := ProcessUsage{}
@@ -103,7 +130,13 @@ func TestProcessConfig(t *testing.T) {
 		LogPatterns:    []string{"bla", "blubb"},
 		LimitCPU:       10,
 		LimitMemory:    100 * 1024 * 1024,
-		LimitWaitFor:   20,
+		LimitGPU: app.ConfigLimitGPU{
+			Usage:   50,
+			Encoder: 90,
+			Decoder: 80,
+			Memory:  24 * 1024 * 1024 * 1024,
+		},
+		LimitWaitFor: 20,
 	}
 
 	p := ProcessConfig{}

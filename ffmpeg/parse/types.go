@@ -576,6 +576,7 @@ type AVstream struct {
 type Usage struct {
 	CPU    UsageCPU
 	Memory UsageMemory
+	GPU    UsageGPU
 }
 
 type UsageCPU struct {
@@ -586,7 +587,27 @@ type UsageCPU struct {
 }
 
 type UsageMemory struct {
+	Average uint64
+	Max     uint64
+	Limit   uint64
+}
+
+type UsageGPU struct {
+	Index   int
+	Usage   UsageGPUUsage
+	Encoder UsageGPUUsage
+	Decoder UsageGPUUsage
+	Memory  UsageGPUMemory
+}
+
+type UsageGPUUsage struct {
 	Average float64
+	Max     float64
+	Limit   float64
+}
+
+type UsageGPUMemory struct {
+	Average uint64
 	Max     uint64
 	Limit   uint64
 }

@@ -47,29 +47,44 @@ func init() {
 	DefaultUtil, _ = New("/sys/fs/cgroup")
 }
 
-type MemoryInfoStat struct {
+type DiskInfo struct {
+	Path        string
+	Fstype      string
+	Total       uint64
+	Used        uint64
+	InodesTotal uint64
+	InodesUsed  uint64
+}
+
+type MemoryInfo struct {
 	Total     uint64 // bytes
 	Available uint64 // bytes
 	Used      uint64 // bytes
 }
 
-type CPUInfoStat struct {
+type NetworkInfo struct {
+	Name      string // interface name
+	BytesSent uint64 // number of bytes sent
+	BytesRecv uint64 // number of bytes received
+}
+
+type CPUInfo struct {
 	System float64 // percent 0-100
 	User   float64 // percent 0-100
 	Idle   float64 // percent 0-100
 	Other  float64 // percent 0-100
 }
 
-type GPUInfoStat struct {
-	Name string
+type GPUInfo struct {
+	Index int    // Index of the GPU
+	Name  string // Name of the GPU (not populated for a specific process)
 
-	MemoryTotal uint64 // bytes
+	MemoryTotal uint64 // bytes (not populated for a specific process)
 	MemoryUsed  uint64 // bytes
 
-	Usage        float64 // percent 0-100
-	MemoryUsage  float64 // percent 0-100
-	EncoderUsage float64 // percent 0-100
-	DecoderUsage float64 // percent 0-100
+	Usage   float64 // percent 0-100
+	Encoder float64 // percent 0-100
+	Decoder float64 // percent 0-100
 }
 
 type cpuTimesStat struct {
@@ -85,18 +100,23 @@ type Util interface {
 	Stop()
 
 	// CPUCounts returns the number of cores, either logical or physical.
-	CPUCounts(logical bool) (float64, error)
+	CPUCounts() (float64, error)
 
-	// GPUCounts returns the number of GPU cores.
-	GPUCounts() (float64, error)
-
-	// CPUPercent returns the current CPU load in percent. The values range
+	// CPU returns the current CPU load in percent. The values range
 	// from 0 to 100, independently of the number of logical cores.
-	CPUPercent() (*CPUInfoStat, error)
-	DiskUsage(path string) (*disk.UsageStat, error)
-	VirtualMemory() (*MemoryInfoStat, error)
-	NetIOCounters(pernic bool) ([]net.IOCountersStat, error)
-	GPUStats() ([]GPUInfoStat, error)
+	CPU() (*CPUInfo, error)
+
+	// Disk returns the current usage of the partition specified by the path.
+	Disk(path string) (*DiskInfo, error)
+
+	// Memory return the current memory usage.
+	Memory() (*MemoryInfo, error)
+
+	// Network returns the current network interface statistics per network adapter.
+	Network() ([]NetworkInfo, error)
+
+	// GPU return the current usage for each CPU.
+	GPU() ([]GPUInfo, error)
 
 	// Process returns a process observer for a process with the given pid.
 	Process(pid int32) (Process, error)
@@ -120,7 +140,7 @@ type util struct {
 	statPrevious     cpuTimesStat
 	statPreviousTime time.Time
 	nTicks           uint64
-	mem              MemoryInfoStat
+	mem              MemoryInfo
 }
 
 // New returns a new util, it will be started automatically
@@ -140,7 +160,7 @@ func New(root string) (Util, error) {
 
 	if u.ncpu == 0 {
 		var err error
-		u.ncpu, err = u.CPUCounts(true)
+		u.ncpu, err = u.CPUCounts()
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +331,7 @@ func (u *util) tickMemory(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func (u *util) collectMemory() *MemoryInfoStat {
+func (u *util) collectMemory() *MemoryInfo {
 	stat, err := u.virtualMemory()
 	if err != nil {
 		return nil
@@ -320,12 +340,12 @@ func (u *util) collectMemory() *MemoryInfoStat {
 	return stat
 }
 
-func (u *util) CPUCounts(logical bool) (float64, error) {
+func (u *util) CPUCounts() (float64, error) {
 	if u.hasCgroup && u.ncpu > 0 {
 		return u.ncpu, nil
 	}
 
-	ncpu, err := cpu.Counts(logical)
+	ncpu, err := cpu.Counts(true)
 	if err != nil {
 		return 0, err
 	}
@@ -333,18 +353,8 @@ func (u *util) CPUCounts(logical bool) (float64, error) {
 	return float64(ncpu), nil
 }
 
-func CPUCounts(logical bool) (float64, error) {
-	return DefaultUtil.CPUCounts(logical)
-}
-
-func (u *util) GPUCounts() (float64, error) {
-	count, err := nvidia.Default.Count()
-
-	return float64(count), err
-}
-
-func GPUCounts() (float64, error) {
-	return DefaultUtil.GPUCounts()
+func CPUCounts() (float64, error) {
+	return DefaultUtil.CPUCounts()
 }
 
 // cpuTimes returns the current cpu usage times in seconds.
@@ -381,7 +391,7 @@ func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	return s, nil
 }
 
-func (u *util) CPUPercent() (*CPUInfoStat, error) {
+func (u *util) CPU() (*CPUInfo, error) {
 	var total float64
 
 	for {
@@ -406,7 +416,7 @@ func (u *util) CPUPercent() (*CPUInfoStat, error) {
 		total = (u.statCurrent.total - u.statPrevious.total)
 	}
 
-	s := &CPUInfoStat{
+	s := &CPUInfo{
 		System: 0,
 		User:   0,
 		Idle:   100,
@@ -429,8 +439,8 @@ func (u *util) CPUPercent() (*CPUInfoStat, error) {
 	return s, nil
 }
 
-func CPUPercent() (*CPUInfoStat, error) {
-	return DefaultUtil.CPUPercent()
+func CPUPercent() (*CPUInfo, error) {
+	return DefaultUtil.CPU()
 }
 
 func (u *util) cgroupCPUTimes(version int) (*cpuTimesStat, error) {
@@ -466,15 +476,29 @@ func (u *util) cgroupCPUTimes(version int) (*cpuTimesStat, error) {
 	return info, nil
 }
 
-func (u *util) DiskUsage(path string) (*disk.UsageStat, error) {
-	return disk.Usage(path)
+func (u *util) Disk(path string) (*DiskInfo, error) {
+	usage, err := disk.Usage(path)
+	if err != nil {
+		return nil, err
+	}
+
+	info := &DiskInfo{
+		Path:        usage.Path,
+		Fstype:      usage.Fstype,
+		Total:       usage.Total,
+		Used:        usage.Used,
+		InodesTotal: usage.InodesTotal,
+		InodesUsed:  usage.InodesUsed,
+	}
+
+	return info, nil
 }
 
-func DiskUsage(path string) (*disk.UsageStat, error) {
-	return DefaultUtil.DiskUsage(path)
+func Disk(path string) (*DiskInfo, error) {
+	return DefaultUtil.Disk(path)
 }
 
-func (u *util) virtualMemory() (*MemoryInfoStat, error) {
+func (u *util) virtualMemory() (*MemoryInfo, error) {
 	info, err := mem.VirtualMemory()
 	if err != nil {
 		return nil, err
@@ -489,18 +513,18 @@ func (u *util) virtualMemory() (*MemoryInfoStat, error) {
 		}
 	}
 
-	return &MemoryInfoStat{
+	return &MemoryInfo{
 		Total:     info.Total,
 		Available: info.Available,
 		Used:      info.Used,
 	}, nil
 }
 
-func (u *util) VirtualMemory() (*MemoryInfoStat, error) {
+func (u *util) Memory() (*MemoryInfo, error) {
 	u.lock.RLock()
 	defer u.lock.RUnlock()
 
-	stat := &MemoryInfoStat{
+	stat := &MemoryInfo{
 		Total:     u.mem.Total,
 		Available: u.mem.Available,
 		Used:      u.mem.Used,
@@ -509,12 +533,12 @@ func (u *util) VirtualMemory() (*MemoryInfoStat, error) {
 	return stat, nil
 }
 
-func VirtualMemory() (*MemoryInfoStat, error) {
-	return DefaultUtil.VirtualMemory()
+func Memory() (*MemoryInfo, error) {
+	return DefaultUtil.Memory()
 }
 
-func (u *util) cgroupVirtualMemory(version int) (*MemoryInfoStat, error) {
-	info := &MemoryInfoStat{}
+func (u *util) cgroupVirtualMemory(version int) (*MemoryInfo, error) {
+	info := &MemoryInfo{}
 
 	if version == 1 {
 		lines, err := u.readFile("memory/memory.limit_in_bytes")
@@ -569,12 +593,27 @@ func (u *util) cgroupVirtualMemory(version int) (*MemoryInfoStat, error) {
 	return info, nil
 }
 
-func (u *util) NetIOCounters(pernic bool) ([]net.IOCountersStat, error) {
-	return net.IOCounters(pernic)
+func (u *util) Network() ([]NetworkInfo, error) {
+	netio, err := net.IOCounters(true)
+	if err != nil {
+		return nil, err
+	}
+
+	info := []NetworkInfo{}
+
+	for _, io := range netio {
+		info = append(info, NetworkInfo{
+			Name:      io.Name,
+			BytesSent: io.BytesSent,
+			BytesRecv: io.BytesRecv,
+		})
+	}
+
+	return info, nil
 }
 
-func NetIOCounters(pernic bool) ([]net.IOCountersStat, error) {
-	return DefaultUtil.NetIOCounters(pernic)
+func Network() ([]NetworkInfo, error) {
+	return DefaultUtil.Network()
 }
 
 func (u *util) readFile(path string) ([]string, error) {
@@ -613,29 +652,28 @@ func cpuTotal(c *cpu.TimesStat) float64 {
 		c.Softirq + c.Steal + c.Guest + c.GuestNice
 }
 
-func (u *util) GPUStats() ([]GPUInfoStat, error) {
+func (u *util) GPU() ([]GPUInfo, error) {
 	nvstats, err := nvidia.Default.Stats()
 	if err != nil {
 		return nil, err
 	}
 
-	stats := []GPUInfoStat{}
+	stats := []GPUInfo{}
 
 	for _, nv := range nvstats {
-		stats = append(stats, GPUInfoStat{
-			Name:         nv.Name,
-			MemoryTotal:  nv.MemoryTotal,
-			MemoryUsed:   nv.MemoryUsed,
-			Usage:        nv.Usage,
-			MemoryUsage:  nv.MemoryUsage,
-			EncoderUsage: nv.EncoderUsage,
-			DecoderUsage: nv.DecoderUsage,
+		stats = append(stats, GPUInfo{
+			Name:        nv.Name,
+			MemoryTotal: nv.MemoryTotal,
+			MemoryUsed:  nv.MemoryUsed,
+			Usage:       nv.Usage,
+			Encoder:     nv.Encoder,
+			Decoder:     nv.Decoder,
 		})
 	}
 
 	return stats, nil
 }
 
-func GPUStats() ([]GPUInfoStat, error) {
-	return DefaultUtil.GPUStats()
+func GPU() ([]GPUInfo, error) {
+	return DefaultUtil.GPU()
 }

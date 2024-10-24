@@ -3,6 +3,7 @@ package restream
 import (
 	"errors"
 	"maps"
+	"sync/atomic"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
@@ -31,7 +32,8 @@ type task struct {
 	parser    parse.Parser
 	playout   map[string]int
 	logger    log.Logger
-	usesDisk  bool // Whether this task uses the disk
+	usesDisk  bool         // Whether this task uses the disk
+	hwdevice  atomic.Int32 // Index of the GPU this task uses
 	metadata  map[string]interface{}
 
 	lock *xsync.RBMutex
@@ -234,8 +236,47 @@ func (t *task) State() (*app.State, error) {
 	state.Memory = status.Memory.Current
 	state.CPU = status.CPU.Current / status.CPU.NCPU
 	state.LimitMode = status.LimitMode
-	state.Resources.CPU = status.CPU
-	state.Resources.Memory = status.Memory
+	state.Resources.CPU = app.ProcessUsageCPU{
+		NCPU:         status.CPU.NCPU,
+		Current:      status.CPU.Current,
+		Average:      status.CPU.Average,
+		Max:          status.CPU.Max,
+		Limit:        status.CPU.Limit,
+		IsThrottling: status.CPU.IsThrottling,
+	}
+	state.Resources.Memory = app.ProcessUsageMemory{
+		Current: status.Memory.Current,
+		Average: status.Memory.Average,
+		Max:     status.Memory.Max,
+		Limit:   status.Memory.Limit,
+	}
+	state.Resources.GPU = app.ProcessUsageGPU{
+		Index: status.GPU.Index,
+		Usage: app.ProcessUsageGPUUsage{
+			Current: status.GPU.Usage.Current,
+			Average: status.GPU.Usage.Average,
+			Max:     status.GPU.Usage.Max,
+			Limit:   status.GPU.Usage.Limit,
+		},
+		Encoder: app.ProcessUsageGPUUsage{
+			Current: status.GPU.Encoder.Current,
+			Average: status.GPU.Encoder.Average,
+			Max:     status.GPU.Encoder.Max,
+			Limit:   status.GPU.Encoder.Limit,
+		},
+		Decoder: app.ProcessUsageGPUUsage{
+			Current: status.GPU.Decoder.Current,
+			Average: status.GPU.Decoder.Average,
+			Max:     status.GPU.Decoder.Max,
+			Limit:   status.GPU.Decoder.Limit,
+		},
+		Memory: app.ProcessUsageGPUMemory{
+			Current: status.GPU.Memory.Current,
+			Average: status.GPU.Memory.Average,
+			Max:     status.GPU.Memory.Max,
+			Limit:   status.GPU.Memory.Limit,
+		},
+	}
 	state.Duration = status.Duration.Round(10 * time.Millisecond).Seconds()
 	state.Reconnect = -1
 	state.Command = status.CommandArgs
@@ -420,7 +461,7 @@ func (t *task) ExportMetadata() map[string]interface{} {
 	return t.metadata
 }
 
-func (t *task) Limit(cpu, memory bool) bool {
+func (t *task) Limit(cpu, memory, gpu bool) bool {
 	token := t.lock.RLock()
 	defer t.lock.RUnlock(token)
 
@@ -428,9 +469,17 @@ func (t *task) Limit(cpu, memory bool) bool {
 		return false
 	}
 
-	t.ffmpeg.Limit(cpu, memory)
+	t.ffmpeg.Limit(cpu, memory, gpu)
 
 	return true
+}
+
+func (t *task) SetHWDevice(index int) {
+	t.hwdevice.Store(int32(index))
+}
+
+func (t *task) GetHWDevice() int {
+	return int(t.hwdevice.Load())
 }
 
 func (t *task) Equal(config *app.Config) bool {

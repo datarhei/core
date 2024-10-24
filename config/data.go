@@ -184,8 +184,10 @@ type Data struct {
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
 	Resources struct {
-		MaxCPUUsage    float64 `json:"max_cpu_usage"`    // percent 0-100
-		MaxMemoryUsage float64 `json:"max_memory_usage"` // percent 0-100
+		MaxCPUUsage       float64 `json:"max_cpu_usage"`        // percent 0-100
+		MaxMemoryUsage    float64 `json:"max_memory_usage"`     // percent 0-100
+		MaxGPUUsage       float64 `json:"max_gpu_usage"`        // percent 0-100
+		MaxGPUMemoryUsage float64 `json:"max_gpu_memory_usage"` // percent 0-100
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`

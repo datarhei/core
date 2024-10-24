@@ -606,21 +606,15 @@ func TestProcessCallbacks(t *testing.T) {
 			"2",
 		},
 		Reconnect: false,
-		OnArgs: func(a []string) []string {
-			lock.Lock()
-			defer lock.Unlock()
-
-			args = make([]string, len(a))
-			copy(args, a)
-			return a
-		},
-		OnBeforeStart: func() error {
+		OnBeforeStart: func(a []string) ([]string, error) {
 			lock.Lock()
 			defer lock.Unlock()
 
 			onBeforeStart = true
 
-			return nil
+			args = make([]string, len(a))
+			copy(args, a)
+			return a, nil
 		},
 		OnStart: func() {
 			lock.Lock()
@@ -681,8 +675,8 @@ func TestProcessCallbacksOnBeforeStart(t *testing.T) {
 		Parser:         parser,
 		Reconnect:      true,
 		ReconnectDelay: 10 * time.Second,
-		OnBeforeStart: func() error {
-			return fmt.Errorf("no, not now")
+		OnBeforeStart: func(a []string) ([]string, error) {
+			return a, fmt.Errorf("no, not now")
 		},
 	})
 	require.NoError(t, err)

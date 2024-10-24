@@ -37,7 +37,7 @@ func (c *diskCollector) Describe() []*metric.Description {
 func (c *diskCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	stat, err := psutil.DiskUsage(c.path)
+	stat, err := psutil.Disk(c.path)
 	if err != nil {
 		return metrics
 	}

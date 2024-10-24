@@ -5,24 +5,28 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/psutil/gpu/nvidia"
 	psprocess "github.com/shirou/gopsutil/v3/process"
 )
 
 type Process interface {
-	// CPUPercent returns the current CPU load for this process only. The values
+	// CPU returns the current CPU load for this process only. The values
 	// are normed to the range of 0 to 100.
-	CPUPercent() (*CPUInfoStat, error)
+	CPU() (*CPUInfo, error)
 
-	// VirtualMemory returns the current memory usage in bytes of this process only.
-	VirtualMemory() (uint64, error)
+	// Memory returns the current memory usage in bytes of this process only.
+	Memory() (uint64, error)
+
+	// GPU returns the current GPU memory in bytes and usage in percent (0-100) of this process only.
+	GPU() (*GPUInfo, error)
 
 	// Stop will stop collecting CPU and memory data for this process.
 	Stop()
 
-	// Suspend will send SIGSTOP to the process
+	// Suspend will send SIGSTOP to the process.
 	Suspend() error
 
-	// Resume will send SIGCONT to the process
+	// Resume will send SIGCONT to the process.
 	Resume() error
 }
 
@@ -142,7 +146,7 @@ func (p *process) Resume() error {
 	return p.proc.Resume()
 }
 
-func (p *process) CPUPercent() (*CPUInfoStat, error) {
+func (p *process) CPU() (*CPUInfo, error) {
 	var diff float64
 
 	for {
@@ -167,7 +171,7 @@ func (p *process) CPUPercent() (*CPUInfoStat, error) {
 		diff = p.statCurrentTime.Sub(p.statPreviousTime).Seconds() * p.ncpu
 	}
 
-	s := &CPUInfoStat{
+	s := &CPUInfo{
 		System: 0,
 		User:   0,
 		Idle:   0,
@@ -186,9 +190,28 @@ func (p *process) CPUPercent() (*CPUInfoStat, error) {
 	return s, nil
 }
 
-func (p *process) VirtualMemory() (uint64, error) {
+func (p *process) Memory() (uint64, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.memRSS, nil
+}
+
+func (p *process) GPU() (*GPUInfo, error) {
+	info := &GPUInfo{
+		Index: -1,
+	}
+
+	proc, err := nvidia.Default.Process(p.pid)
+	if err != nil {
+		return info, nil
+	}
+
+	info.Index = proc.Index
+	info.MemoryUsed = proc.Memory
+	info.Usage = proc.Usage
+	info.Encoder = proc.Encoder
+	info.Decoder = proc.Decoder
+
+	return info, nil
 }

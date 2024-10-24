@@ -18,16 +18,27 @@ type ClusterRaft struct {
 }
 
 type ClusterNodeResources struct {
-	IsThrottling bool    // Whether this core is currently throttling
-	NCPU         float64 // Number of CPU on this node
-	CPU          float64 // Current CPU load, 0-100*ncpu
-	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
-	CPUCore      float64 // Current CPU load of the core itself, 0-100*ncpu
-	Mem          uint64  // Currently used memory in bytes
-	MemLimit     uint64  // Defined memory limit in bytes
-	MemTotal     uint64  // Total available memory in bytes
-	MemCore      uint64  // Current used memory of the core itself in bytes
+	IsThrottling bool                      // Whether this core is currently throttling
+	NCPU         float64                   // Number of CPU on this node
+	CPU          float64                   // Current CPU load, 0-100*ncpu
+	CPULimit     float64                   // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64                   // Current CPU load of the core itself, 0-100*ncpu
+	Mem          uint64                    // Currently used memory in bytes
+	MemLimit     uint64                    // Defined memory limit in bytes
+	MemTotal     uint64                    // Total available memory in bytes
+	MemCore      uint64                    // Current used memory of the core itself in bytes
+	GPU          []ClusterNodeGPUResources // GPU resources
 	Error        error
+}
+
+type ClusterNodeGPUResources struct {
+	Mem        uint64  // Currently used memory in bytes
+	MemLimit   uint64  // Defined memory limit in bytes
+	MemTotal   uint64  // Total available memory in bytes
+	Usage      float64 // Current general usage, 0-100
+	UsageLimit float64 // Defined general usage limit, 0-100
+	Encoder    float64 // Current encoder usage, 0-100
+	Decoder    float64 // Current decoder usage, 0-100
 }
 
 type ClusterNode struct {
@@ -155,6 +166,19 @@ func (c *cluster) About() (ClusterAbout, error) {
 				MemCore:      nodeAbout.Resources.MemCore,
 				Error:        nodeAbout.Resources.Error,
 			},
+		}
+
+		if len(nodeAbout.Resources.GPU) != 0 {
+			node.Resources.GPU = make([]ClusterNodeGPUResources, len(nodeAbout.Resources.GPU))
+			for i, gpu := range nodeAbout.Resources.GPU {
+				node.Resources.GPU[i].Mem = gpu.Mem
+				node.Resources.GPU[i].MemLimit = gpu.MemLimit
+				node.Resources.GPU[i].MemTotal = gpu.MemTotal
+				node.Resources.GPU[i].Usage = gpu.Usage
+				node.Resources.GPU[i].UsageLimit = gpu.UsageLimit
+				node.Resources.GPU[i].Encoder = gpu.Encoder
+				node.Resources.GPU[i].Decoder = gpu.Decoder
+			}
 		}
 
 		if s, ok := serversMap[nodeAbout.ID]; ok {

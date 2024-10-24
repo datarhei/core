@@ -83,17 +83,28 @@ type AboutResponse struct {
 	Resources AboutResponseResources `json:"resources"`
 }
 
+type AboutResponseGPUResources struct {
+	Mem        uint64  `json:"memory_bytes"`       // Currently used memory in bytes
+	MemLimit   uint64  `json:"memory_limit_bytes"` // Defined memory limit in bytes
+	MemTotal   uint64  `json:"memory_total_bytes"` // Total available memory in bytes
+	Usage      float64 `json:"usage"`              // Current general usage, 0-100
+	Encoder    float64 `json:"encoder"`            // Current encoder usage, 0-100
+	Decoder    float64 `json:"decoder"`            // Current decoder usage, 0-100
+	UsageLimit float64 `json:"usage_limit"`        // Defined general usage limit, 0-100
+}
+
 type AboutResponseResources struct {
-	IsThrottling bool    `json:"is_throttling"`      // Whether this core is currently throttling
-	NCPU         float64 `json:"ncpu"`               // Number of CPU on this node
-	CPU          float64 `json:"cpu"`                // Current CPU load, 0-100*ncpu
-	CPULimit     float64 `json:"cpu_limit"`          // Defined CPU load limit, 0-100*ncpu
-	CPUCore      float64 `json:"cpu_core"`           // Current CPU load of the core itself, 0-100*ncpu
-	Mem          uint64  `json:"memory_bytes"`       // Currently used memory in bytes
-	MemLimit     uint64  `json:"memory_limit_bytes"` // Defined memory limit in bytes
-	MemTotal     uint64  `json:"memory_total_bytes"` // Total available memory in bytes
-	MemCore      uint64  `json:"memory_core_bytes"`  // Current used memory of the core itself in bytes
-	Error        string  `json:"error"`              // Last error
+	IsThrottling bool                        `json:"is_throttling"`      // Whether this core is currently throttling
+	NCPU         float64                     `json:"ncpu"`               // Number of CPU on this node
+	CPU          float64                     `json:"cpu"`                // Current CPU load, 0-100*ncpu
+	CPULimit     float64                     `json:"cpu_limit"`          // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64                     `json:"cpu_core"`           // Current CPU load of the core itself, 0-100*ncpu
+	Mem          uint64                      `json:"memory_bytes"`       // Currently used memory in bytes
+	MemLimit     uint64                      `json:"memory_limit_bytes"` // Defined memory limit in bytes
+	MemTotal     uint64                      `json:"memory_total_bytes"` // Total available memory in bytes
+	MemCore      uint64                      `json:"memory_core_bytes"`  // Current used memory of the core itself in bytes
+	GPU          []AboutResponseGPUResources `json:"gpu"`                // Currently used GPU resources
+	Error        string                      `json:"error"`              // Last error
 }
 
 type SetNodeStateRequest struct {

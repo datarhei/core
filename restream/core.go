@@ -279,13 +279,14 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 	defer ticker.Stop()
 
 	limitCPU, limitMemory := false, false
+	var limitGPUs []bool = nil
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			cpu, memory := rsc.ShouldLimit()
+			cpu, memory, gpu := rsc.ShouldLimit()
 
 			hasChanges := false
 
@@ -299,17 +300,34 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 				hasChanges = true
 			}
 
+			if limitGPUs == nil {
+				limitGPUs = make([]bool, len(gpu))
+			}
+
+			for i, g := range gpu {
+				if g != limitGPUs[i] {
+					limitGPUs[i] = g
+					hasChanges = true
+				}
+			}
+
 			if !hasChanges {
 				break
 			}
 
 			r.tasks.Range(func(id app.ProcessID, t *task) bool {
-				if t.Limit(limitCPU, limitMemory) {
+				limitGPU := false
+				gpuindex := t.GetHWDevice()
+				if gpuindex >= 0 {
+					limitGPU = limitGPUs[gpuindex]
+				}
+				if t.Limit(limitCPU, limitMemory, limitGPU) {
 					r.logger.Debug().WithFields(log.Fields{
 						"limit_cpu":    limitCPU,
 						"limit_memory": limitMemory,
+						"limit_gpu":    limitGPU,
 						"id":           id,
-					}).Log("Limiting process CPU and memory consumption")
+					}).Log("Limiting process CPU, memory, and GPU consumption")
 				}
 
 				return true
@@ -391,7 +409,11 @@ func (r *restream) load() error {
 		// Validate config with all placeholders replaced. However, we need to take care
 		// that the config with the task keeps its dynamic placeholders for process starts.
 		config := t.config.Clone()
-		resolveDynamicPlaceholder(config, r.replace)
+		resolveDynamicPlaceholder(config, r.replace, map[string]string{
+			"hwdevice": "0",
+		}, map[string]string{
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
 
 		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
@@ -414,30 +436,23 @@ func (r *restream) load() error {
 		}
 
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
-			Reconnect:      t.config.Reconnect,
-			ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
-			StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-			Timeout:        time.Duration(t.config.Timeout) * time.Second,
-			LimitCPU:       t.config.LimitCPU,
-			LimitMemory:    t.config.LimitMemory,
-			LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-			LimitMode:      limitMode,
-			Scheduler:      t.config.Scheduler,
-			Args:           t.command,
-			Parser:         t.parser,
-			Logger:         t.logger,
-			OnArgs:         r.onArgs(t.config.Clone()),
-			OnBeforeStart: func() error {
-				if !r.enableSoftLimit {
-					return nil
-				}
-
-				if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
-					return err
-				}
-
-				return nil
-			},
+			Reconnect:       t.config.Reconnect,
+			ReconnectDelay:  time.Duration(t.config.ReconnectDelay) * time.Second,
+			StaleTimeout:    time.Duration(t.config.StaleTimeout) * time.Second,
+			Timeout:         time.Duration(t.config.Timeout) * time.Second,
+			LimitCPU:        t.config.LimitCPU,
+			LimitMemory:     t.config.LimitMemory,
+			LimitGPUUsage:   t.config.LimitGPU.Usage,
+			LimitGPUEncoder: t.config.LimitGPU.Encoder,
+			LimitGPUDecoder: t.config.LimitGPU.Decoder,
+			LimitGPUMemory:  t.config.LimitGPU.Memory,
+			LimitDuration:   time.Duration(t.config.LimitWaitFor) * time.Second,
+			LimitMode:       limitMode,
+			Scheduler:       t.config.Scheduler,
+			Args:            t.command,
+			Parser:          t.parser,
+			Logger:          t.logger,
+			OnBeforeStart:   r.onBeforeStart(t.config.Clone()),
 		})
 		if err != nil {
 			return true
@@ -578,7 +593,11 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		// Validate config with all placeholders replaced. However, we need to take care
 		// that the config with the task keeps its dynamic placeholders for process starts.
 		config := t.config.Clone()
-		resolveDynamicPlaceholder(config, r.replace)
+		resolveDynamicPlaceholder(config, r.replace, map[string]string{
+			"hwdevice": "0",
+		}, map[string]string{
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
 
 		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
@@ -600,30 +619,23 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	}
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
-		Reconnect:      t.config.Reconnect,
-		ReconnectDelay: time.Duration(t.config.ReconnectDelay) * time.Second,
-		StaleTimeout:   time.Duration(t.config.StaleTimeout) * time.Second,
-		Timeout:        time.Duration(t.config.Timeout) * time.Second,
-		LimitCPU:       t.config.LimitCPU,
-		LimitMemory:    t.config.LimitMemory,
-		LimitDuration:  time.Duration(t.config.LimitWaitFor) * time.Second,
-		LimitMode:      limitMode,
-		Scheduler:      t.config.Scheduler,
-		Args:           t.command,
-		Parser:         t.parser,
-		Logger:         t.logger,
-		OnArgs:         r.onArgs(t.config.Clone()),
-		OnBeforeStart: func() error {
-			if !r.enableSoftLimit {
-				return nil
-			}
-
-			if err := r.resources.Request(t.config.LimitCPU, t.config.LimitMemory); err != nil {
-				return err
-			}
-
-			return nil
-		},
+		Reconnect:       t.config.Reconnect,
+		ReconnectDelay:  time.Duration(t.config.ReconnectDelay) * time.Second,
+		StaleTimeout:    time.Duration(t.config.StaleTimeout) * time.Second,
+		Timeout:         time.Duration(t.config.Timeout) * time.Second,
+		LimitCPU:        t.config.LimitCPU,
+		LimitMemory:     t.config.LimitMemory,
+		LimitGPUUsage:   t.config.LimitGPU.Usage,
+		LimitGPUEncoder: t.config.LimitGPU.Encoder,
+		LimitGPUDecoder: t.config.LimitGPU.Decoder,
+		LimitGPUMemory:  t.config.LimitGPU.Memory,
+		LimitDuration:   time.Duration(t.config.LimitWaitFor) * time.Second,
+		LimitMode:       limitMode,
+		Scheduler:       t.config.Scheduler,
+		Args:            t.command,
+		Parser:          t.parser,
+		Logger:          t.logger,
+		OnBeforeStart:   r.onBeforeStart(t.config.Clone()),
 	})
 	if err != nil {
 		return nil, err
@@ -636,21 +648,45 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	return t, nil
 }
 
-// onArgs is a callback that gets called by a process before it will be started.
-// It evalutes the dynamic placeholders in a process config and returns the
-// resulting command line to the process.
-func (r *restream) onArgs(cfg *app.Config) func([]string) []string {
-	return func(args []string) []string {
+// onBeforeStart is a callback that gets called by a process before it will be started.
+// It evalutes the dynamic placeholders in a process config and returns the resulting command line to the process.
+func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, error) {
+	return func(args []string) ([]string, error) {
+		selectedGPU := -1
+		if r.enableSoftLimit {
+			res, err := r.resources.Request(resources.Request{
+				CPU:        cfg.LimitCPU,
+				Memory:     cfg.LimitMemory,
+				GPUUsage:   cfg.LimitGPU.Usage,
+				GPUEncoder: cfg.LimitGPU.Encoder,
+				GPUDecoder: cfg.LimitGPU.Decoder,
+				GPUMemory:  cfg.LimitGPU.Memory,
+			})
+			if err != nil {
+				return []string{}, err
+			}
+
+			selectedGPU = res.GPU
+		}
+
+		if t, hasTask := r.tasks.Load(cfg.ProcessID()); hasTask {
+			t.SetHWDevice(selectedGPU)
+		}
+
 		config := cfg.Clone()
 
-		resolveDynamicPlaceholder(config, r.replace)
+		resolveDynamicPlaceholder(config, r.replace, map[string]string{
+			"hwdevice": fmt.Sprintf("%d", selectedGPU),
+		}, map[string]string{
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
 
 		_, err := validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
-			return []string{}
+			return []string{}, err
 		}
 
-		return config.CreateCommand()
+		return config.CreateCommand(), nil
 	}
 }
 
@@ -1448,7 +1484,11 @@ func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 		return probe
 	}
 
-	resolveDynamicPlaceholder(config, r.replace)
+	resolveDynamicPlaceholder(config, r.replace, map[string]string{
+		"hwdevice": "0",
+	}, map[string]string{
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
 
 	_, err = validateConfig(config, r.fs.list, r.ffmpeg)
 	if err != nil {
@@ -1712,22 +1752,26 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 
 // resolveDynamicPlaceholder replaces placeholders in the config that should be replaced at process start.
 // The config will be modified in place.
-func resolveDynamicPlaceholder(config *app.Config, r replace.Replacer) {
-	vars := map[string]string{
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	}
+func resolveDynamicPlaceholder(config *app.Config, r replace.Replacer, values map[string]string, vars map[string]string) {
+	placeholders := []string{"date", "hwdevice"}
 
 	for i, option := range config.Options {
-		option = r.Replace(option, "date", "", vars, config, "global")
+		for _, placeholder := range placeholders {
+			option = r.Replace(option, placeholder, values[placeholder], vars, config, "global")
+		}
 
 		config.Options[i] = option
 	}
 
 	for i, input := range config.Input {
-		input.Address = r.Replace(input.Address, "date", "", vars, config, "input")
+		for _, placeholder := range placeholders {
+			input.Address = r.Replace(input.Address, placeholder, values[placeholder], vars, config, "input")
+		}
 
 		for j, option := range input.Options {
-			option = r.Replace(option, "date", "", vars, config, "input")
+			for _, placeholder := range placeholders {
+				option = r.Replace(option, placeholder, values[placeholder], vars, config, "input")
+			}
 
 			input.Options[j] = option
 		}
@@ -1736,16 +1780,22 @@ func resolveDynamicPlaceholder(config *app.Config, r replace.Replacer) {
 	}
 
 	for i, output := range config.Output {
-		output.Address = r.Replace(output.Address, "date", "", vars, config, "output")
+		for _, placeholder := range placeholders {
+			output.Address = r.Replace(output.Address, placeholder, values[placeholder], vars, config, "output")
+		}
 
 		for j, option := range output.Options {
-			option = r.Replace(option, "date", "", vars, config, "output")
+			for _, placeholder := range placeholders {
+				option = r.Replace(option, placeholder, values[placeholder], vars, config, "output")
+			}
 
 			output.Options[j] = option
 		}
 
 		for j, cleanup := range output.Cleanup {
-			cleanup.Pattern = r.Replace(cleanup.Pattern, "date", "", vars, config, "output")
+			for _, placeholder := range placeholders {
+				cleanup.Pattern = r.Replace(cleanup.Pattern, placeholder, values[placeholder], vars, config, "output")
+			}
 
 			output.Cleanup[j] = cleanup
 		}

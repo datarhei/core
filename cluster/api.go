@@ -195,6 +195,19 @@ func (a *api) About(c echo.Context) error {
 		},
 	}
 
+	if len(resources.GPU.GPU) != 0 {
+		about.Resources.GPU = make([]client.AboutResponseGPUResources, len(resources.GPU.GPU))
+		for i, gpu := range resources.GPU.GPU {
+			about.Resources.GPU[i].Mem = gpu.MemoryUsed
+			about.Resources.GPU[i].MemLimit = gpu.MemoryLimit
+			about.Resources.GPU[i].MemTotal = gpu.MemoryTotal
+			about.Resources.GPU[i].Usage = gpu.Usage
+			about.Resources.GPU[i].UsageLimit = gpu.UsageLimit
+			about.Resources.GPU[i].Encoder = gpu.Encoder
+			about.Resources.GPU[i].Decoder = gpu.Decoder
+		}
+	}
+
 	if err != nil {
 		about.Resources.Error = err.Error()
 	}

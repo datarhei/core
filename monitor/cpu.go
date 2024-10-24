@@ -33,7 +33,7 @@ func NewCPUCollector(rsc resources.Resources) metric.Collector {
 	c.limitDescr = metric.NewDesc("cpu_limit", "Percentage of CPU to be consumed", nil)
 	c.throttleDescr = metric.NewDesc("cpu_throttling", "Whether the CPU is currently throttled", nil)
 
-	if ncpu, err := psutil.CPUCounts(true); err == nil {
+	if ncpu, err := psutil.CPUCounts(); err == nil {
 		c.ncpu = ncpu
 	}
 
@@ -63,11 +63,11 @@ func (c *cpuCollector) Collect() metric.Metrics {
 
 	metrics.Add(metric.NewValue(c.ncpuDescr, c.ncpu))
 
-	limit, _ := c.resources.Limits()
+	limit, _, _, _ := c.resources.Limits()
 
 	metrics.Add(metric.NewValue(c.limitDescr, limit))
 
-	cpu, _ := c.resources.ShouldLimit()
+	cpu, _, _ := c.resources.ShouldLimit()
 	throttling := .0
 	if cpu {
 		throttling = 1

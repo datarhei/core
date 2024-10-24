@@ -371,9 +371,11 @@ func (a *api) start(ctx context.Context) error {
 	}
 
 	resources, err := resources.New(resources.Config{
-		MaxCPU:    cfg.Resources.MaxCPUUsage,
-		MaxMemory: cfg.Resources.MaxMemoryUsage,
-		Logger:    a.log.logger.core.WithComponent("Resources"),
+		MaxCPU:       cfg.Resources.MaxCPUUsage,
+		MaxMemory:    cfg.Resources.MaxMemoryUsage,
+		MaxGPU:       cfg.Resources.MaxGPUUsage,
+		MaxGPUMemory: cfg.Resources.MaxGPUMemoryUsage,
+		Logger:       a.log.logger.core.WithComponent("Resources"),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize resource manager: %w", err)
