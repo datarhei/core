@@ -1307,6 +1307,14 @@ const docTemplateClusterAPI = `{
                     "description": "percent",
                     "type": "number"
                 },
+                "limitGPU": {
+                    "description": "GPU limits",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/app.ConfigLimitGPU"
+                        }
+                    ]
+                },
                 "limitMemory": {
                     "description": "bytes",
                     "type": "integer"
@@ -1398,6 +1406,27 @@ const docTemplateClusterAPI = `{
                 },
                 "purgeOnDelete": {
                     "type": "boolean"
+                }
+            }
+        },
+        "app.ConfigLimitGPU": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "encoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "memory": {
+                    "description": "bytes",
+                    "type": "integer"
+                },
+                "usage": {
+                    "description": "percent 0-100",
+                    "type": "number"
                 }
             }
         },
@@ -1669,6 +1698,26 @@ const docTemplateClusterAPI = `{
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -1858,6 +1907,14 @@ const docTemplateClusterAPI = `{
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },

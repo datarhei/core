@@ -17,6 +17,10 @@ definitions:
       limitCPU:
         description: percent
         type: number
+      limitGPU:
+        allOf:
+        - $ref: '#/definitions/app.ConfigLimitGPU'
+        description: GPU limits
       limitMemory:
         description: bytes
         type: integer
@@ -80,6 +84,21 @@ definitions:
         type: string
       purgeOnDelete:
         type: boolean
+    type: object
+  app.ConfigLimitGPU:
+    properties:
+      decoder:
+        description: percent 0-100
+        type: number
+      encoder:
+        description: percent 0-100
+        type: number
+      memory:
+        description: bytes
+        type: integer
+      usage:
+        description: percent 0-100
+        type: number
     type: object
   client.AddIdentityRequest:
     properties:
@@ -256,6 +275,19 @@ definitions:
             format: int64
             type: integer
         type: object
+      compress:
+        properties:
+          encoding:
+            items:
+              type: string
+            type: array
+          mimetypes:
+            items:
+              type: string
+            type: array
+          min_length:
+            type: integer
+        type: object
       created_at:
         description: When this config has been persisted
         type: string
@@ -385,6 +417,12 @@ definitions:
       resources:
         properties:
           max_cpu_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_memory_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_usage:
             description: percent 0-100
             type: number
           max_memory_usage:

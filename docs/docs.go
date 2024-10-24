@@ -5726,6 +5726,26 @@ const docTemplate = `{
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -5915,6 +5935,14 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },
@@ -7056,6 +7084,19 @@ const docTemplate = `{
                 "cpu_usage": {
                     "type": "number"
                 },
+                "gpu_decoder": {
+                    "type": "number"
+                },
+                "gpu_encoder": {
+                    "type": "number"
+                },
+                "gpu_memory_mbytes": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "gpu_usage": {
+                    "type": "number"
+                },
                 "memory_mbytes": {
                     "type": "integer",
                     "format": "uint64"
@@ -7230,6 +7271,9 @@ const docTemplate = `{
                 "cpu_usage": {
                     "$ref": "#/definitions/api.ProcessUsageCPU"
                 },
+                "gpu": {
+                    "$ref": "#/definitions/api.ProcessUsageGPU"
+                },
                 "memory_bytes": {
                     "$ref": "#/definitions/api.ProcessUsageMemory"
                 }
@@ -7258,11 +7302,70 @@ const docTemplate = `{
                 }
             }
         },
-        "api.ProcessUsageMemory": {
+        "api.ProcessUsageGPU": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                },
+                "encoder": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "memory_bytes": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUMemory"
+                },
+                "usage": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                }
+            }
+        },
+        "api.ProcessUsageGPUMemory": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "cur": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "limit": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "max": {
+                    "type": "integer",
+                    "format": "uint64"
+                }
+            }
+        },
+        "api.ProcessUsageGPUUsage": {
             "type": "object",
             "properties": {
                 "avg": {
                     "type": "number"
+                },
+                "cur": {
+                    "type": "number"
+                },
+                "limit": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ProcessUsageMemory": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "cur": {
                     "type": "integer",
@@ -8113,6 +8216,26 @@ const docTemplate = `{
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -8302,6 +8425,14 @@ const docTemplate = `{
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },
