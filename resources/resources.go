@@ -113,16 +113,14 @@ type resources struct {
 
 	cancelObserver context.CancelFunc
 
-	lock      sync.RWMutex
-	startOnce sync.Once
-	stopOnce  sync.Once
+	lock     sync.RWMutex
+	stopOnce sync.Once
 
 	logger log.Logger
 }
 
 type Resources interface {
-	Start()
-	Stop()
+	Cancel()
 
 	// HasLimits returns whether any limits have been set.
 	HasLimits() bool
@@ -243,30 +241,23 @@ func New(config Config) (Resources, error) {
 
 	r.logger.Debug().Log("Created")
 
-	r.stopOnce.Do(func() {})
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancelObserver = cancel
+
+	go r.observe(ctx, time.Second)
+
+	r.stopOnce = sync.Once{}
+
+	r.logger.Info().Log("Started")
 
 	return r, nil
 }
 
-func (r *resources) Start() {
-	r.startOnce.Do(func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		r.cancelObserver = cancel
-
-		go r.observe(ctx, time.Second)
-
-		r.stopOnce = sync.Once{}
-
-		r.logger.Info().Log("Started")
-	})
-}
-
-func (r *resources) Stop() {
+func (r *resources) Cancel() {
 	r.stopOnce.Do(func() {
 		r.cancelObserver()
-		r.self.Stop()
-
-		r.startOnce = sync.Once{}
+		r.psutil.Cancel()
+		r.self.Cancel()
 
 		r.logger.Info().Log("Stopped")
 	})

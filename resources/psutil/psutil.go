@@ -90,8 +90,7 @@ type cpuTimesStat struct {
 }
 
 type Util interface {
-	Start()
-	Stop()
+	Cancel()
 
 	// CPUCounts returns the number of cores, either logical or physical.
 	CPUCounts() (float64, error)
@@ -178,24 +177,18 @@ func New(root string, gpu psutilgpu.GPU) (Util, error) {
 		u.gpu = psutilgpu.NewNilGPU()
 	}
 
-	u.stopOnce.Do(func() {})
+	ctx, cancel := context.WithCancel(context.Background())
+	u.stopTicker = cancel
 
-	u.Start()
+	go u.tickCPU(ctx, time.Second)
+	go u.tickMemory(ctx, time.Second)
+
+	u.stopOnce = sync.Once{}
 
 	return u, nil
 }
 
-func (u *util) Start() {
-	u.startOnce.Do(func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		u.stopTicker = cancel
-
-		go u.tickCPU(ctx, time.Second)
-		go u.tickMemory(ctx, time.Second)
-	})
-}
-
-func (u *util) Stop() {
+func (u *util) Cancel() {
 	u.stopOnce.Do(func() {
 		u.stopTicker()
 

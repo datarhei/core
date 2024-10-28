@@ -367,7 +367,7 @@ func (l *limiter) Stop() {
 
 	l.cancel()
 
-	l.proc.Stop()
+	l.proc.Cancel()
 	l.proc = nil
 
 	l.reset()

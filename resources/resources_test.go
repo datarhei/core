@@ -49,8 +49,8 @@ func newUtil(ngpu int) *util {
 	return u
 }
 
-func (u *util) Start() {}
-func (u *util) Stop()  {}
+func (u *util) Start()  {}
+func (u *util) Cancel() {}
 
 func (u *util) CPUCounts() (float64, error) {
 	return 2, nil
@@ -122,7 +122,7 @@ func (p *process) GPU() (*psutil.GPUInfo, error) {
 		Decoder:     7,
 	}, nil
 }
-func (p *process) Stop()          {}
+func (p *process) Cancel()        {}
 func (p *process) Suspend() error { return nil }
 func (p *process) Resume() error  { return nil }
 
@@ -198,8 +198,6 @@ func TestMemoryLimit(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.True(t, limit)
@@ -207,7 +205,7 @@ func TestMemoryLimit(t *testing.T) {
 	_, err = r.Request(Request{CPU: 5, Memory: 10})
 	require.Error(t, err)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestMemoryUnlimit(t *testing.T) {
@@ -250,8 +248,6 @@ func TestMemoryUnlimit(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.True(t, limit)
@@ -293,7 +289,7 @@ func TestMemoryUnlimit(t *testing.T) {
 
 	require.False(t, limit)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestCPULimit(t *testing.T) {
@@ -334,8 +330,6 @@ func TestCPULimit(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.True(t, limit)
@@ -343,7 +337,7 @@ func TestCPULimit(t *testing.T) {
 	_, err = r.Request(Request{CPU: 5, Memory: 10})
 	require.Error(t, err)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestCPUUnlimit(t *testing.T) {
@@ -386,8 +380,6 @@ func TestCPUUnlimit(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.True(t, limit)
@@ -429,7 +421,7 @@ func TestCPUUnlimit(t *testing.T) {
 
 	require.False(t, limit)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestGPULimitMemory(t *testing.T) {
@@ -472,8 +464,6 @@ func TestGPULimitMemory(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.Contains(t, limit, true)
@@ -481,7 +471,7 @@ func TestGPULimitMemory(t *testing.T) {
 	_, err = r.Request(Request{CPU: 5, Memory: 10, GPUUsage: 10, GPUMemory: 10})
 	require.Error(t, err)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestGPUUnlimitMemory(t *testing.T) {
@@ -526,8 +516,6 @@ func TestGPUUnlimitMemory(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.Contains(t, limit, true)
@@ -567,7 +555,7 @@ func TestGPUUnlimitMemory(t *testing.T) {
 
 	require.NotContains(t, limit, true)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestGPULimitMemorySome(t *testing.T) {
@@ -610,8 +598,6 @@ func TestGPULimitMemorySome(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.Equal(t, []bool{false, false, true, true}, limit)
@@ -619,7 +605,7 @@ func TestGPULimitMemorySome(t *testing.T) {
 	_, err = r.Request(Request{CPU: 5, Memory: 10, GPUUsage: 10, GPUMemory: 10})
 	require.NoError(t, err)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestGPULimitUsage(t *testing.T) {
@@ -662,8 +648,6 @@ func TestGPULimitUsage(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.Equal(t, []bool{true, false, false}, limit)
@@ -674,7 +658,7 @@ func TestGPULimitUsage(t *testing.T) {
 	_, err = r.Request(Request{CPU: 5, Memory: 10, GPUEncoder: 10, GPUMemory: 10})
 	require.NoError(t, err)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestGPUUnlimitUsage(t *testing.T) {
@@ -719,8 +703,6 @@ func TestGPUUnlimitUsage(t *testing.T) {
 		}
 	}()
 
-	r.Start()
-
 	wg.Wait()
 
 	require.Equal(t, []bool{true, false, false}, limit)
@@ -761,7 +743,7 @@ func TestGPUUnlimitUsage(t *testing.T) {
 
 	require.Equal(t, []bool{false, false, false}, limit)
 
-	r.Stop()
+	r.Cancel()
 }
 
 func TestRequestCPU(t *testing.T) {

@@ -385,8 +385,6 @@ func (a *api) start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize resource manager: %w", err)
 	}
 
-	resources.Start()
-
 	a.resources = resources
 
 	if cfg.Sessions.Enable {
@@ -1915,7 +1913,7 @@ func (a *api) stop() {
 
 	// Stop resource observer
 	if a.resources != nil {
-		a.resources.Stop()
+		a.resources.Cancel()
 	}
 
 	// Stop the session tracker

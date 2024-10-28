@@ -20,8 +20,8 @@ type Process interface {
 	// GPU returns the current GPU memory in bytes and usage in percent (0-100) of this process only.
 	GPU() (*GPUInfo, error)
 
-	// Stop will stop collecting CPU and memory data for this process.
-	Stop()
+	// Cancel will stop collecting CPU and memory data for this process.
+	Cancel()
 
 	// Suspend will send SIGSTOP to the process.
 	Suspend() error
@@ -133,7 +133,7 @@ func (p *process) collectMemory() uint64 {
 	return info.RSS
 }
 
-func (p *process) Stop() {
+func (p *process) Cancel() {
 	p.stopTicker()
 }
 

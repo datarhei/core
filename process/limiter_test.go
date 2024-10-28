@@ -37,7 +37,7 @@ func (p *psproc) GPU() (*psutil.GPUInfo, error) {
 	}, nil
 }
 
-func (p *psproc) Stop()          {}
+func (p *psproc) Cancel()        {}
 func (p *psproc) Suspend() error { return nil }
 func (p *psproc) Resume() error  { return nil }
 
