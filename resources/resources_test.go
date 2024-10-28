@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources/psutil"
 
 	"github.com/stretchr/testify/require"
 )

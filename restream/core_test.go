@@ -16,7 +16,8 @@ import (
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
+	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -32,12 +33,18 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
 	}
 
+	psutil, err := psutil.New("", nil)
+	if err != nil {
+		return nil, err
+	}
+
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
 		Binary:           binary,
 		LogHistoryLength: 3,
 		Portrange:        portrange,
 		ValidatorInput:   validatorIn,
 		ValidatorOutput:  validatorOut,
+		PSUtil:           psutil,
 	})
 	if err != nil {
 		return nil, err
@@ -81,11 +88,19 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
+	resources, err := resources.New(resources.Config{
+		PSUtil: psutil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	rs, err := New(Config{
 		FFmpeg:      ffmpeg,
 		Replace:     replacer,
 		Filesystems: []fs.Filesystem{memfs},
 		Rewrite:     rewriter,
+		Resources:   resources,
 	})
 	if err != nil {
 		return nil, err
@@ -1531,8 +1546,7 @@ func TestProcessLimit(t *testing.T) {
 
 	status := task.ffmpeg.Status()
 
-	ncpu, err := psutil.CPUCounts()
-	require.NoError(t, err)
+	ncpu := rs.resources.Info().CPU.NCPU
 
 	require.Equal(t, ncpu*process.LimitCPU, status.CPU.Limit)
 	require.Equal(t, process.LimitMemory, status.Memory.Limit)

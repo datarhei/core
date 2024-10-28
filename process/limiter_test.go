@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources/psutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -52,11 +52,12 @@ func TestCPULimit(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			CPU: 42,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -88,12 +89,13 @@ func TestCPULimitWaitFor(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			CPU:     42,
 			WaitFor: 3 * time.Second,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -125,11 +127,12 @@ func TestMemoryLimit(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			Memory: 42,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -161,12 +164,13 @@ func TestMemoryLimitWaitFor(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			Memory:  42,
 			WaitFor: 3 * time.Second,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -198,11 +202,12 @@ func TestGPUMemoryLimit(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			GPUMemory: 42,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -234,12 +239,13 @@ func TestGPUMemoryLimitWaitFor(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			GPUMemory: 42,
 			WaitFor:   3 * time.Second,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -271,12 +277,13 @@ func TestMemoryLimitSoftMode(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			Memory: 42,
 			Mode:   LimitModeSoft,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})
@@ -310,12 +317,13 @@ func TestGPUMemoryLimitSoftMode(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 
-		l := NewLimiter(LimiterConfig{
+		l, _ := NewLimiter(LimiterConfig{
 			GPUMemory: 42,
 			Mode:      LimitModeSoft,
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
+			PSUtil: newPSUtil(),
 		})
 
 		l.Start(&psproc{})

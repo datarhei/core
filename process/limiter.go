@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources/psutil"
 )
 
 type Usage struct {
@@ -257,7 +257,7 @@ type limiter struct {
 }
 
 // NewLimiter returns a new Limiter
-func NewLimiter(config LimiterConfig) Limiter {
+func NewLimiter(config LimiterConfig) (Limiter, error) {
 	l := &limiter{
 		waitFor: config.WaitFor,
 		onLimit: config.OnLimit,
@@ -278,7 +278,7 @@ func NewLimiter(config LimiterConfig) Limiter {
 	}
 
 	if l.psutil == nil {
-		l.psutil = psutil.DefaultUtil
+		return nil, fmt.Errorf("no psutil provided")
 	}
 
 	if ncpu, err := l.psutil.CPUCounts(); err != nil {
@@ -318,7 +318,7 @@ func NewLimiter(config LimiterConfig) Limiter {
 		"mode":       mode,
 	})
 
-	return l
+	return l, nil
 }
 
 func (l *limiter) reset() {

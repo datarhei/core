@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/datarhei/core/v16/slices"
 )
 
@@ -16,6 +16,21 @@ type Info struct {
 	Mem MemoryInfo
 	CPU CPUInfo
 	GPU GPUInfo
+}
+
+type DiskInfo struct {
+	Path        string
+	Fstype      string
+	Total       uint64
+	Used        uint64
+	InodesTotal uint64
+	InodesUsed  uint64
+}
+
+type NetworkInfo struct {
+	Name      string // interface name
+	BytesSent uint64 // number of bytes sent
+	BytesRecv uint64 // number of bytes received
 }
 
 type MemoryInfo struct {
@@ -123,6 +138,9 @@ type Resources interface {
 
 	// Info returns the current resource usage.
 	Info() Info
+
+	Disk(path string) (*DiskInfo, error)
+	Network() ([]NetworkInfo, error)
 }
 
 type Config struct {
@@ -136,7 +154,11 @@ type Config struct {
 
 func New(config Config) (Resources, error) {
 	if config.PSUtil == nil {
-		config.PSUtil = psutil.DefaultUtil
+		psutil, err := psutil.New("", nil)
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize psutils: %w", err)
+		}
+		config.PSUtil = psutil
 	}
 
 	gpu, err := config.PSUtil.GPU()
@@ -571,4 +593,41 @@ func (r *resources) Info() Info {
 	}
 
 	return i
+}
+
+func (r *resources) Disk(path string) (*DiskInfo, error) {
+	info, err := r.psutil.Disk(path)
+	if err != nil {
+		return nil, err
+	}
+
+	diskinfo := &DiskInfo{
+		Path:        info.Path,
+		Fstype:      info.Fstype,
+		Total:       info.Total,
+		Used:        info.Used,
+		InodesTotal: info.InodesTotal,
+		InodesUsed:  info.InodesUsed,
+	}
+
+	return diskinfo, nil
+}
+
+func (r *resources) Network() ([]NetworkInfo, error) {
+	netio, err := r.psutil.Network()
+	if err != nil {
+		return nil, err
+	}
+
+	info := []NetworkInfo{}
+
+	for _, io := range netio {
+		info = append(info, NetworkInfo{
+			Name:      io.Name,
+			BytesSent: io.BytesSent,
+			BytesRecv: io.BytesRecv,
+		})
+	}
+
+	return info, nil
 }

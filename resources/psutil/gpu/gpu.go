@@ -43,3 +43,14 @@ type GPU interface {
 }
 
 var ErrProcessNotFound = errors.New("process not found")
+
+type dummy struct{}
+
+func (d *dummy) Count() (int, error)                { return 0, nil }
+func (d *dummy) Stats() ([]Stats, error)            { return nil, nil }
+func (d *dummy) Process(pid int32) (Process, error) { return Process{}, ErrProcessNotFound }
+func (d *dummy) Close()                             {}
+
+func NewNilGPU() GPU {
+	return &dummy{}
+}

@@ -8,7 +8,7 @@ import (
 )
 
 func getUtil(path string) *util {
-	u, _ := New(path)
+	u, _ := New(path, nil)
 
 	return u.(*util)
 }

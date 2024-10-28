@@ -36,8 +36,8 @@ import (
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
-	"github.com/datarhei/core/v16/psutil"
 	"github.com/datarhei/core/v16/resources"
+	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -127,8 +127,6 @@ type api struct {
 	state  string
 
 	undoMaxprocs func()
-
-	process psutil.Process
 }
 
 // ErrConfigReload is an error returned to indicate that a reload of
@@ -370,12 +368,18 @@ func (a *api) start(ctx context.Context) error {
 		debug.SetMemoryLimit(math.MaxInt64)
 	}
 
+	psutil, err := psutil.New("", nil)
+	if err != nil {
+		return fmt.Errorf("failed to initialize psutils: %w", err)
+	}
+
 	resources, err := resources.New(resources.Config{
 		MaxCPU:       cfg.Resources.MaxCPUUsage,
 		MaxMemory:    cfg.Resources.MaxMemoryUsage,
 		MaxGPU:       cfg.Resources.MaxGPUUsage,
 		MaxGPUMemory: cfg.Resources.MaxGPUMemoryUsage,
 		Logger:       a.log.logger.core.WithComponent("Resources"),
+		PSUtil:       psutil,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize resource manager: %w", err)
@@ -509,6 +513,7 @@ func (a *api) start(ctx context.Context) error {
 		ValidatorOutput:         validatorOut,
 		Portrange:               portrange,
 		Collector:               a.sessions.Collector("ffmpeg"),
+		PSUtil:                  psutil,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create ffmpeg: %w", err)
@@ -1230,8 +1235,8 @@ func (a *api) start(ctx context.Context) error {
 	metrics.Register(monitor.NewUptimeCollector())
 	metrics.Register(monitor.NewCPUCollector(a.resources))
 	metrics.Register(monitor.NewMemCollector(a.resources))
-	metrics.Register(monitor.NewNetCollector())
-	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base")))
+	metrics.Register(monitor.NewNetCollector(a.resources))
+	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base"), a.resources))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))
 	metrics.Register(monitor.NewFilesystemCollector("memfs", a.memfs))
 	for name, fs := range a.s3fs {
@@ -1886,11 +1891,6 @@ func (a *api) stop() {
 	if a.service != nil {
 		a.service.Stop()
 		a.service = nil
-	}
-
-	if a.process != nil {
-		a.process.Stop()
-		a.process = nil
 	}
 
 	// Unregister all collectors

@@ -18,7 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources/psutil"
 )
 
 // Process represents a process and ways to control it
@@ -71,6 +71,7 @@ type Config struct {
 	OnStart         func()                                // A callback which is called after the process started.
 	OnExit          func(state string)                    // A callback which is called after the process exited with the exit state.
 	OnStateChange   func(from, to string)                 // A callback which is called after a state changed.
+	PSUtil          psutil.Util
 	Logger          log.Logger
 }
 
@@ -244,6 +245,7 @@ type process struct {
 	}
 	limits    Limiter
 	scheduler Scheduler
+	psutil    psutil.Util
 }
 
 var _ Process = &process{}
@@ -257,6 +259,11 @@ func New(config Config) (Process, error) {
 		parser:    config.Parser,
 		logger:    config.Logger,
 		scheduler: config.Scheduler,
+		psutil:    config.PSUtil,
+	}
+
+	if p.psutil == nil {
+		return nil, fmt.Errorf("no psutils given")
 	}
 
 	p.args = make([]string, len(config.Args))
@@ -267,6 +274,10 @@ func New(config Config) (Process, error) {
 	// reflected in the resulting state.
 	if len(p.binary) == 0 {
 		return nil, fmt.Errorf("no valid binary given")
+	}
+
+	if p.psutil == nil {
+		return nil, fmt.Errorf("no psutils provided")
 	}
 
 	if p.parser == nil {
@@ -297,7 +308,7 @@ func New(config Config) (Process, error) {
 	p.callbacks.onExit = config.OnExit
 	p.callbacks.onStateChange = config.OnStateChange
 
-	p.limits = NewLimiter(LimiterConfig{
+	limits, err := NewLimiter(LimiterConfig{
 		CPU:        config.LimitCPU,
 		Memory:     config.LimitMemory,
 		GPUUsage:   config.LimitGPUUsage,
@@ -322,7 +333,12 @@ func New(config Config) (Process, error) {
 			}).Warn().Log("Killed because limits are exceeded")
 			p.Kill(false, fmt.Sprintf("Killed because limits are exceeded (mode: %s, tolerance: %s): %.2f (%.2f) CPU, %d (%d) bytes memory, %.2f/%.2f/%.2f (%.2f) GPU usage, %d (%d) bytes GPU memory", config.LimitMode.String(), config.LimitDuration.String(), cpu, config.LimitCPU, memory, config.LimitMemory, gpuusage, gpuencoder, gpudecoder, config.LimitGPUUsage, gpumemory, config.LimitGPUMemory))
 		},
+		PSUtil: p.psutil,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize limiter")
+	}
+	p.limits = limits
 
 	p.logger.Info().Log("Created")
 	p.debuglogger.Debug().Log("Created")
@@ -703,7 +719,7 @@ func (p *process) start() error {
 
 	p.pid = int32(p.cmd.Process.Pid)
 
-	if proc, err := psutil.NewProcess(p.pid); err == nil {
+	if proc, err := p.psutil.Process(p.pid); err == nil {
 		p.limits.Start(proc)
 	}
 

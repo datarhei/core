@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil/gpu/nvidia"
+	"github.com/datarhei/core/v16/resources/psutil/gpu"
 	psprocess "github.com/shirou/gopsutil/v3/process"
 )
 
@@ -46,6 +46,8 @@ type process struct {
 	statPreviousTime time.Time
 	nTicks           uint64
 	memRSS           uint64
+
+	gpu gpu.GPU
 }
 
 func (u *util) Process(pid int32) (Process, error) {
@@ -54,6 +56,7 @@ func (u *util) Process(pid int32) (Process, error) {
 		hasCgroup: u.hasCgroup,
 		cpuLimit:  u.cpuLimit,
 		ncpu:      u.ncpu,
+		gpu:       u.gpu,
 	}
 
 	proc, err := psprocess.NewProcess(pid)
@@ -69,10 +72,6 @@ func (u *util) Process(pid int32) (Process, error) {
 	go p.tickMemory(ctx, time.Second)
 
 	return p, nil
-}
-
-func NewProcess(pid int32) (Process, error) {
-	return DefaultUtil.Process(pid)
 }
 
 func (p *process) tickCPU(ctx context.Context, interval time.Duration) {
@@ -202,7 +201,7 @@ func (p *process) GPU() (*GPUInfo, error) {
 		Index: -1,
 	}
 
-	proc, err := nvidia.Default.Process(p.pid)
+	proc, err := p.gpu.Process(p.pid)
 	if err != nil {
 		return info, nil
 	}

@@ -12,14 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil/gpu"
+	"github.com/datarhei/core/v16/resources/psutil/gpu"
 )
-
-var Default gpu.GPU
-
-func init() {
-	Default = New("")
-}
 
 type Megabytes uint64
 

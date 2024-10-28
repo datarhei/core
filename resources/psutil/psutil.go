@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil/gpu/nvidia"
+	psutilgpu "github.com/datarhei/core/v16/resources/psutil/gpu"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -40,12 +40,6 @@ var cgroup2Files = []string{
 // https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/resource_management_guide/sec-cpuacct
 // https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/resource_management_guide/sect-cpu-example_usage
 // https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
-
-var DefaultUtil Util
-
-func init() {
-	DefaultUtil, _ = New("/sys/fs/cgroup")
-}
 
 type DiskInfo struct {
 	Path        string
@@ -141,10 +135,16 @@ type util struct {
 	statPreviousTime time.Time
 	nTicks           uint64
 	mem              MemoryInfo
+
+	gpu psutilgpu.GPU
 }
 
 // New returns a new util, it will be started automatically
-func New(root string) (Util, error) {
+func New(root string, gpu psutilgpu.GPU) (Util, error) {
+	if len(root) == 0 {
+		root = "/sys/fs/cgroup"
+	}
+
 	u := &util{
 		root: os.DirFS(root),
 	}
@@ -172,6 +172,11 @@ func New(root string) (Util, error) {
 	}
 
 	u.mem = *mem
+
+	u.gpu = gpu
+	if u.gpu == nil {
+		u.gpu = psutilgpu.NewNilGPU()
+	}
 
 	u.stopOnce.Do(func() {})
 
@@ -353,10 +358,6 @@ func (u *util) CPUCounts() (float64, error) {
 	return float64(ncpu), nil
 }
 
-func CPUCounts() (float64, error) {
-	return DefaultUtil.CPUCounts()
-}
-
 // cpuTimes returns the current cpu usage times in seconds.
 func (u *util) cpuTimes() (*cpuTimesStat, error) {
 	if u.hasCgroup && u.cpuLimit > 0 {
@@ -439,10 +440,6 @@ func (u *util) CPU() (*CPUInfo, error) {
 	return s, nil
 }
 
-func CPUPercent() (*CPUInfo, error) {
-	return DefaultUtil.CPU()
-}
-
 func (u *util) cgroupCPUTimes(version int) (*cpuTimesStat, error) {
 	info := &cpuTimesStat{}
 
@@ -494,10 +491,6 @@ func (u *util) Disk(path string) (*DiskInfo, error) {
 	return info, nil
 }
 
-func Disk(path string) (*DiskInfo, error) {
-	return DefaultUtil.Disk(path)
-}
-
 func (u *util) virtualMemory() (*MemoryInfo, error) {
 	info, err := mem.VirtualMemory()
 	if err != nil {
@@ -531,10 +524,6 @@ func (u *util) Memory() (*MemoryInfo, error) {
 	}
 
 	return stat, nil
-}
-
-func Memory() (*MemoryInfo, error) {
-	return DefaultUtil.Memory()
 }
 
 func (u *util) cgroupVirtualMemory(version int) (*MemoryInfo, error) {
@@ -612,10 +601,6 @@ func (u *util) Network() ([]NetworkInfo, error) {
 	return info, nil
 }
 
-func Network() ([]NetworkInfo, error) {
-	return DefaultUtil.Network()
-}
-
 func (u *util) readFile(path string) ([]string, error) {
 	file, err := u.root.Open(path)
 	if err != nil {
@@ -653,7 +638,7 @@ func cpuTotal(c *cpu.TimesStat) float64 {
 }
 
 func (u *util) GPU() ([]GPUInfo, error) {
-	nvstats, err := nvidia.Default.Stats()
+	nvstats, err := u.gpu.Stats()
 	if err != nil {
 		return nil, err
 	}
@@ -672,8 +657,4 @@ func (u *util) GPU() ([]GPUInfo, error) {
 	}
 
 	return stats, nil
-}
-
-func GPU() ([]GPUInfo, error) {
-	return DefaultUtil.GPU()
 }

@@ -2,19 +2,21 @@ package monitor
 
 import (
 	"github.com/datarhei/core/v16/monitor/metric"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
 )
 
 type diskCollector struct {
-	path string
+	path      string
+	resources resources.Resources
 
 	totalDescr *metric.Description
 	usageDescr *metric.Description
 }
 
-func NewDiskCollector(path string) metric.Collector {
+func NewDiskCollector(path string, rsc resources.Resources) metric.Collector {
 	c := &diskCollector{
-		path: path,
+		path:      path,
+		resources: rsc,
 	}
 
 	c.totalDescr = metric.NewDesc("disk_total", "Total size of the disk in bytes", []string{"path"})
@@ -37,7 +39,7 @@ func (c *diskCollector) Describe() []*metric.Description {
 func (c *diskCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	stat, err := psutil.Disk(c.path)
+	stat, err := c.resources.Disk(c.path)
 	if err != nil {
 		return metrics
 	}

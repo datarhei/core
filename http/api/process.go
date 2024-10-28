@@ -155,13 +155,13 @@ type ProcessConfigIOCleanup struct {
 }
 
 type ProcessConfigLimits struct {
-	CPU        float64 `json:"cpu_usage" jsonschema:"minimum=0"`
-	Memory     uint64  `json:"memory_mbytes" jsonschema:"minimum=0" format:"uint64"`
-	GPUUsage   float64 `json:"gpu_usage" jsonschema:"minimum=0"`
-	GPUEncoder float64 `json:"gpu_encoder" jsonschema:"minimum=0"`
-	GPUDecoder float64 `json:"gpu_decoder" jsonschema:"minimum=0"`
-	GPUMemory  uint64  `json:"gpu_memory_mbytes" jsonschema:"minimum=0" format:"uint64"`
-	WaitFor    uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`
+	CPU        float64 `json:"cpu_usage" jsonschema:"minimum=0"`                         // percent 0-100*ncpu
+	Memory     uint64  `json:"memory_mbytes" jsonschema:"minimum=0" format:"uint64"`     // megabytes
+	GPUUsage   float64 `json:"gpu_usage" jsonschema:"minimum=0"`                         // percent 0-100
+	GPUEncoder float64 `json:"gpu_encoder" jsonschema:"minimum=0"`                       // percent 0-100
+	GPUDecoder float64 `json:"gpu_decoder" jsonschema:"minimum=0"`                       // percent 0-100
+	GPUMemory  uint64  `json:"gpu_memory_mbytes" jsonschema:"minimum=0" format:"uint64"` // megabytes
+	WaitFor    uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`   // seconds
 }
 
 // ProcessConfig represents the configuration of an ffmpeg process
