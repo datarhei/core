@@ -12,3 +12,15 @@ func New() resources.Resources {
 
 	return res
 }
+
+func NewWithLimits() resources.Resources {
+	res, _ := resources.New(resources.Config{
+		MaxCPU:       100,
+		MaxMemory:    100,
+		MaxGPU:       100,
+		MaxGPUMemory: 100,
+		PSUtil:       psutil.New(1),
+	})
+
+	return res
+}
