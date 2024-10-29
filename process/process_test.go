@@ -235,7 +235,7 @@ func TestProcessFailed(t *testing.T) {
 }
 
 func TestFFmpegWaitStop(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigintwait", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigintwait")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -266,7 +266,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 }
 
 func TestFFmpegKill(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -292,7 +292,7 @@ func TestFFmpegKill(t *testing.T) {
 }
 
 func TestProcessForceKill(t *testing.T) {
-	binary, err := testhelper.BuildBinary("ignoresigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("ignoresigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -326,7 +326,7 @@ func TestProcessForceKill(t *testing.T) {
 }
 
 func TestProcessDuration(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, err := New(Config{

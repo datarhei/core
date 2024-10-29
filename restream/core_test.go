@@ -13,11 +13,10 @@ import (
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/iam/policy"
+	"github.com/datarhei/core/v16/internal/mock/resources"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/resources"
-	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -28,22 +27,12 @@ import (
 )
 
 func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer) (Restreamer, error) {
-	binary, err := testhelper.BuildBinary("ffmpeg", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("ffmpeg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
 	}
 
-	psutil, err := psutil.New("", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resources, err := resources.New(resources.Config{
-		PSUtil: psutil,
-	})
-	if err != nil {
-		return nil, err
-	}
+	resources := resources.New()
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
 		Binary:           binary,

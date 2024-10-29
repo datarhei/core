@@ -35,7 +35,7 @@ func TestNewInvalidBinary(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	binary, err := testhelper.BuildBinary("ffmpeg", "../../internal/testhelper")
+	binary, err := testhelper.BuildBinary("ffmpeg")
 	require.NoError(t, err, "Failed to build helper program")
 
 	skills, err := New(binary)
@@ -326,7 +326,7 @@ func TestEqualEmptySkills(t *testing.T) {
 }
 
 func TestEqualSkills(t *testing.T) {
-	binary, err := testhelper.BuildBinary("ffmpeg", "../../internal/testhelper")
+	binary, err := testhelper.BuildBinary("ffmpeg")
 	require.NoError(t, err, "Failed to build helper program")
 
 	s1, err := New(binary)

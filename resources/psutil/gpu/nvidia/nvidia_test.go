@@ -280,7 +280,7 @@ func TestWriterProcess(t *testing.T) {
 }
 
 func TestNvidiaGPUCount(t *testing.T) {
-	binary, err := testhelper.BuildBinary("nvidia-smi", "../../../../internal/testhelper")
+	binary, err := testhelper.BuildBinary("nvidia-smi")
 	require.NoError(t, err, "Failed to build helper program")
 
 	nv := New(binary)
@@ -299,7 +299,7 @@ func TestNvidiaGPUCount(t *testing.T) {
 }
 
 func TestNvidiaGPUStats(t *testing.T) {
-	binary, err := testhelper.BuildBinary("nvidia-smi", "../../../../internal/testhelper")
+	binary, err := testhelper.BuildBinary("nvidia-smi")
 	require.NoError(t, err, "Failed to build helper program")
 
 	nv := New(binary)
@@ -400,7 +400,7 @@ func TestNvidiaGPUStats(t *testing.T) {
 }
 
 func TestNvidiaGPUProcess(t *testing.T) {
-	binary, err := testhelper.BuildBinary("nvidia-smi", "../../../../internal/testhelper")
+	binary, err := testhelper.BuildBinary("nvidia-smi")
 	require.NoError(t, err, "Failed to build helper program")
 
 	nv := New(binary)

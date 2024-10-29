@@ -2,83 +2,22 @@ package mock
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/validator"
-	"github.com/datarhei/core/v16/internal/testhelper"
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/resources"
-	"github.com/datarhei/core/v16/resources/psutil"
-	"github.com/datarhei/core/v16/restream"
-	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 
 	"github.com/invopop/jsonschema"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
 )
-
-func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
-	binary, err := testhelper.BuildBinary("ffmpeg", filepath.Join(pathPrefix, "../../internal/testhelper"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to build helper program: %w", err)
-	}
-
-	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create memory filesystem: %w", err)
-	}
-
-	store, err := jsonstore.New(jsonstore.Config{
-		Filesystem: memfs,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	psutil, err := psutil.New("", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resources, err := resources.New(resources.Config{
-		PSUtil: psutil,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
-		Binary:           binary,
-		MaxLogLines:      100,
-		LogHistoryLength: 3,
-		Resource:         resources,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	rs, err := restream.New(restream.Config{
-		Store:       store,
-		FFmpeg:      ffmpeg,
-		Filesystems: []fs.Filesystem{memfs},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return rs, nil
-}
 
 func DummyEcho() *echo.Echo {
 	router := echo.New()

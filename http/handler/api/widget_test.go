@@ -8,10 +8,11 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
+	mockrs "github.com/datarhei/core/v16/internal/mock/restream"
 	"github.com/datarhei/core/v16/restream"
-	"github.com/stretchr/testify/require"
 
 	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/require"
 )
 
 func getDummyWidgetHandler(rs restream.Restreamer) (*WidgetHandler, error) {
@@ -37,7 +38,7 @@ func getDummyWidgetRouter(rs restream.Restreamer) (*echo.Echo, error) {
 }
 
 func TestWidget(t *testing.T) {
-	rs, err := mock.DummyRestreamer("../../mock")
+	rs, err := mockrs.New(nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	router, err := getDummyWidgetRouter(rs)

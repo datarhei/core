@@ -6,129 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/resources/psutil"
+	"github.com/datarhei/core/v16/internal/mock/psutil"
 
 	"github.com/stretchr/testify/require"
 )
 
-type mockUtil struct {
-	lock sync.Mutex
-
-	cpu psutil.CPUInfo
-	mem psutil.MemoryInfo
-	gpu []psutil.GPUInfo
-}
-
-func newMockUtil(ngpu int) *mockUtil {
-	u := &mockUtil{
-		cpu: psutil.CPUInfo{
-			System: 10,
-			User:   50,
-			Idle:   35,
-			Other:  5,
-		},
-		mem: psutil.MemoryInfo{
-			Total:     200,
-			Available: 40,
-			Used:      160,
-		},
-	}
-
-	for i := 0; i < ngpu; i++ {
-		u.gpu = append(u.gpu, psutil.GPUInfo{
-			Index:       i,
-			Name:        "L4",
-			MemoryTotal: 24 * 1024 * 1024 * 1024,
-			MemoryUsed:  uint64(12+i) * 1024 * 1024 * 1024,
-			Usage:       50 - float64((i+1)*5),
-			Encoder:     50 - float64((i+1)*10),
-			Decoder:     50 - float64((i+1)*3),
-		})
-	}
-
-	return u
-}
-
-func (u *mockUtil) Start()  {}
-func (u *mockUtil) Cancel() {}
-
-func (u *mockUtil) CPUCounts() (float64, error) {
-	return 2, nil
-}
-
-func (u *mockUtil) CPU() (*psutil.CPUInfo, error) {
-	u.lock.Lock()
-	defer u.lock.Unlock()
-
-	cpu := u.cpu
-
-	return &cpu, nil
-}
-
-func (u *mockUtil) Disk(path string) (*psutil.DiskInfo, error) {
-	return &psutil.DiskInfo{}, nil
-}
-
-func (u *mockUtil) Memory() (*psutil.MemoryInfo, error) {
-	u.lock.Lock()
-	defer u.lock.Unlock()
-
-	mem := u.mem
-
-	return &mem, nil
-}
-
-func (u *mockUtil) Network() ([]psutil.NetworkInfo, error) {
-	return nil, nil
-}
-
-func (u *mockUtil) GPU() ([]psutil.GPUInfo, error) {
-	u.lock.Lock()
-	defer u.lock.Unlock()
-
-	gpu := []psutil.GPUInfo{}
-
-	gpu = append(gpu, u.gpu...)
-
-	return gpu, nil
-}
-
-func (u *mockUtil) Process(pid int32) (psutil.Process, error) {
-	return &mockProcess{}, nil
-}
-
-type mockProcess struct{}
-
-func (p *mockProcess) CPU() (*psutil.CPUInfo, error) {
-	s := &psutil.CPUInfo{
-		System: 1,
-		User:   2,
-		Idle:   0,
-		Other:  3,
-	}
-
-	return s, nil
-}
-
-func (p *mockProcess) Memory() (uint64, error) { return 42, nil }
-func (p *mockProcess) GPU() (*psutil.GPUInfo, error) {
-	return &psutil.GPUInfo{
-		Index:       0,
-		Name:        "L4",
-		MemoryTotal: 128,
-		MemoryUsed:  42,
-		Usage:       5,
-		Encoder:     9,
-		Decoder:     7,
-	}, nil
-}
-func (p *mockProcess) Cancel()        {}
-func (p *mockProcess) Suspend() error { return nil }
-func (p *mockProcess) Resume() error  { return nil }
-
 func TestConfigNoLimits(t *testing.T) {
 	_, err := New(Config{
-		PSUtil: newMockUtil(0),
+		PSUtil: psutil.New(0),
 	})
 	require.NoError(t, err)
 }
@@ -137,7 +22,7 @@ func TestConfigWrongLimits(t *testing.T) {
 	_, err := New(Config{
 		MaxCPU:    102,
 		MaxMemory: 573,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 	})
 	require.Error(t, err)
 
@@ -146,7 +31,7 @@ func TestConfigWrongLimits(t *testing.T) {
 		MaxMemory:    0,
 		MaxGPU:       101,
 		MaxGPUMemory: 103,
-		PSUtil:       newMockUtil(0),
+		PSUtil:       psutil.New(0),
 	})
 	require.NoError(t, err)
 
@@ -155,7 +40,7 @@ func TestConfigWrongLimits(t *testing.T) {
 		MaxMemory:    0,
 		MaxGPU:       101,
 		MaxGPUMemory: 103,
-		PSUtil:       newMockUtil(1),
+		PSUtil:       psutil.New(1),
 	})
 	require.Error(t, err)
 }
@@ -164,7 +49,7 @@ func TestMemoryLimit(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    100,
 		MaxMemory: 150. / 200. * 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -209,7 +94,7 @@ func TestMemoryLimit(t *testing.T) {
 }
 
 func TestMemoryUnlimit(t *testing.T) {
-	util := newMockUtil(0)
+	util := psutil.New(0)
 
 	r, err := New(Config{
 		MaxCPU:    100,
@@ -255,9 +140,9 @@ func TestMemoryUnlimit(t *testing.T) {
 	_, limit, _ = r.ShouldLimit()
 	require.True(t, limit)
 
-	util.lock.Lock()
-	util.mem.Used = 140
-	util.lock.Unlock()
+	util.Lock.Lock()
+	util.MemInfo.Used = 140
+	util.Lock.Unlock()
 
 	wg.Add(1)
 
@@ -296,7 +181,7 @@ func TestCPULimit(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    50.,
 		MaxMemory: 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -341,7 +226,7 @@ func TestCPULimit(t *testing.T) {
 }
 
 func TestCPUUnlimit(t *testing.T) {
-	util := newMockUtil(0)
+	util := psutil.New(0)
 
 	r, err := New(Config{
 		MaxCPU:    50.,
@@ -387,9 +272,9 @@ func TestCPUUnlimit(t *testing.T) {
 	limit, _, _ = r.ShouldLimit()
 	require.True(t, limit)
 
-	util.lock.Lock()
-	util.cpu.User = 20
-	util.lock.Unlock()
+	util.Lock.Lock()
+	util.CPUInfo.User = 20
+	util.Lock.Unlock()
 
 	wg.Add(1)
 
@@ -430,7 +315,7 @@ func TestGPULimitMemory(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       100,
 		MaxGPUMemory: 20,
-		PSUtil:       newMockUtil(2),
+		PSUtil:       psutil.New(2),
 		Logger:       nil,
 	})
 	require.NoError(t, err)
@@ -475,7 +360,7 @@ func TestGPULimitMemory(t *testing.T) {
 }
 
 func TestGPUUnlimitMemory(t *testing.T) {
-	util := newMockUtil(2)
+	util := psutil.New(2)
 
 	r, err := New(Config{
 		MaxCPU:       100,
@@ -520,10 +405,10 @@ func TestGPUUnlimitMemory(t *testing.T) {
 
 	require.Contains(t, limit, true)
 
-	util.lock.Lock()
-	util.gpu[0].MemoryUsed = 10
-	util.gpu[1].MemoryUsed = 10
-	util.lock.Unlock()
+	util.Lock.Lock()
+	util.GPUInfo[0].MemoryUsed = 10
+	util.GPUInfo[1].MemoryUsed = 10
+	util.Lock.Unlock()
 
 	wg.Add(1)
 
@@ -564,7 +449,7 @@ func TestGPULimitMemorySome(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       100,
 		MaxGPUMemory: 14. / 24. * 100.,
-		PSUtil:       newMockUtil(4),
+		PSUtil:       psutil.New(4),
 		Logger:       nil,
 	})
 	require.NoError(t, err)
@@ -614,7 +499,7 @@ func TestGPULimitUsage(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       40,
 		MaxGPUMemory: 100,
-		PSUtil:       newMockUtil(3),
+		PSUtil:       psutil.New(3),
 		Logger:       nil,
 	})
 	require.NoError(t, err)
@@ -662,7 +547,7 @@ func TestGPULimitUsage(t *testing.T) {
 }
 
 func TestGPUUnlimitUsage(t *testing.T) {
-	util := newMockUtil(3)
+	util := psutil.New(3)
 
 	r, err := New(Config{
 		MaxCPU:       100,
@@ -707,11 +592,11 @@ func TestGPUUnlimitUsage(t *testing.T) {
 
 	require.Equal(t, []bool{true, false, false}, limit)
 
-	util.lock.Lock()
-	util.gpu[0].Usage = 30
-	util.gpu[0].Encoder = 30
-	util.gpu[0].Decoder = 30
-	util.lock.Unlock()
+	util.Lock.Lock()
+	util.GPUInfo[0].Usage = 30
+	util.GPUInfo[0].Encoder = 30
+	util.GPUInfo[0].Decoder = 30
+	util.Lock.Unlock()
 
 	wg.Add(1)
 
@@ -749,7 +634,7 @@ func TestGPUUnlimitUsage(t *testing.T) {
 func TestRequestCPU(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU: 70.,
-		PSUtil: newMockUtil(0),
+		PSUtil: psutil.New(0),
 	})
 	require.NoError(t, err)
 
@@ -766,7 +651,7 @@ func TestRequestCPU(t *testing.T) {
 func TestRequestMemory(t *testing.T) {
 	r, err := New(Config{
 		MaxMemory: 170. / 200. * 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 	})
 	require.NoError(t, err)
 
@@ -784,7 +669,7 @@ func TestRequestNoGPU(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    100,
 		MaxMemory: 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 	})
 	require.NoError(t, err)
 
@@ -796,7 +681,7 @@ func TestRequestInvalidGPURequest(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    100,
 		MaxMemory: 100,
-		PSUtil:    newMockUtil(1),
+		PSUtil:    psutil.New(1),
 	})
 	require.NoError(t, err)
 
@@ -813,7 +698,7 @@ func TestRequestGPULimitsOneGPU(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       50,
 		MaxGPUMemory: 60,
-		PSUtil:       newMockUtil(1),
+		PSUtil:       psutil.New(1),
 	})
 	require.NoError(t, err)
 
@@ -840,7 +725,7 @@ func TestRequestGPULimitsMoreGPU(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       60,
 		MaxGPUMemory: 60,
-		PSUtil:       newMockUtil(2),
+		PSUtil:       psutil.New(2),
 	})
 	require.NoError(t, err)
 
@@ -856,7 +741,7 @@ func TestHasLimits(t *testing.T) {
 	r, err := New(Config{
 		MaxCPU:    70.,
 		MaxMemory: 170. / 200. * 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -866,7 +751,7 @@ func TestHasLimits(t *testing.T) {
 	r, err = New(Config{
 		MaxCPU:    100,
 		MaxMemory: 100,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -876,7 +761,7 @@ func TestHasLimits(t *testing.T) {
 	r, err = New(Config{
 		MaxCPU:    0,
 		MaxMemory: 0,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -887,7 +772,7 @@ func TestHasLimits(t *testing.T) {
 		MaxCPU:    0,
 		MaxMemory: 0,
 		MaxGPU:    10,
-		PSUtil:    newMockUtil(1),
+		PSUtil:    psutil.New(1),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -898,7 +783,7 @@ func TestHasLimits(t *testing.T) {
 		MaxCPU:    0,
 		MaxMemory: 0,
 		MaxGPU:    10,
-		PSUtil:    newMockUtil(0),
+		PSUtil:    psutil.New(0),
 		Logger:    nil,
 	})
 	require.NoError(t, err)
@@ -912,7 +797,7 @@ func TestInfo(t *testing.T) {
 		MaxMemory:    90,
 		MaxGPU:       11,
 		MaxGPUMemory: 50,
-		PSUtil:       newMockUtil(2),
+		PSUtil:       psutil.New(2),
 	})
 	require.NoError(t, err)
 
