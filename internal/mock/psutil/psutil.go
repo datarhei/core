@@ -114,7 +114,7 @@ func (p *mockPSUtilProcess) GPU() (*psutil.GPUInfo, error) {
 		MemoryUsed:  42,
 		Usage:       5,
 		Encoder:     9,
-		Decoder:     7,
+		Decoder:     11,
 	}, nil
 }
 func (p *mockPSUtilProcess) Cancel()        {}

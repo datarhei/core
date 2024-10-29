@@ -198,12 +198,13 @@ type States struct {
 
 // Process represents a ffmpeg process
 type process struct {
-	binary string
-	args   []string
-	cmd    *exec.Cmd
-	pid    int32
-	stdout io.ReadCloser
-	state  struct {
+	binary  string
+	args    []string
+	cmdArgs []string
+	cmd     *exec.Cmd
+	pid     int32
+	stdout  io.ReadCloser
+	state   struct {
 		state  stateType
 		time   time.Time
 		states States
@@ -268,6 +269,8 @@ func New(config Config) (Process, error) {
 
 	p.args = make([]string, len(config.Args))
 	copy(p.args, config.Args)
+	p.cmdArgs = make([]string, len(config.Args))
+	copy(p.cmdArgs, config.Args)
 
 	// This is a loose check on purpose. If the e.g. the binary
 	// doesn't exist or it is not executable, it will be
@@ -560,8 +563,8 @@ func (p *process) Status() Status {
 		},
 	}
 
-	s.CommandArgs = make([]string, len(p.args))
-	copy(s.CommandArgs, p.args)
+	s.CommandArgs = make([]string, len(p.cmdArgs))
+	copy(s.CommandArgs, p.cmdArgs)
 
 	if order == "start" && !state.IsRunning() {
 		p.reconn.lock.Lock()
@@ -664,6 +667,8 @@ func (p *process) start() error {
 
 			return err
 		}
+
+		p.cmdArgs = args
 	}
 
 	p.cmd = exec.Command(p.binary, args...)

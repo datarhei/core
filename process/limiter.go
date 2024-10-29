@@ -467,9 +467,9 @@ func (l *limiter) collect() {
 	l.lastUsage.Memory.Max = l.memory.Max()
 
 	l.lastUsage.GPU.Index = gindex
-	l.lastUsage.GPU.Memory.Current = l.gpu.memory.Current() * 100
-	l.lastUsage.GPU.Memory.Average = l.gpu.memory.Avg() * 100
-	l.lastUsage.GPU.Memory.Max = l.gpu.memory.Max() * 100
+	l.lastUsage.GPU.Memory.Current = l.gpu.memory.Current()
+	l.lastUsage.GPU.Memory.Average = l.gpu.memory.Avg()
+	l.lastUsage.GPU.Memory.Max = l.gpu.memory.Max()
 
 	l.lastUsage.GPU.Usage.Current = l.gpu.usage.Current() * 100
 	l.lastUsage.GPU.Usage.Average = l.gpu.usage.Avg() * 100
