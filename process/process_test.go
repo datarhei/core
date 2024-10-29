@@ -10,13 +10,18 @@ import (
 
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/math/rand"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/stretchr/testify/require"
 )
 
-func newPSUtil() psutil.Util {
+func newResources() resources.Resources {
 	util, _ := psutil.New("", nil)
-	return util
+	res, _ := resources.New(resources.Config{
+		PSUtil: util,
+	})
+
+	return res
 }
 
 func TestProcess(t *testing.T) {
@@ -27,7 +32,7 @@ func TestProcess(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 0,
-		PSUtil:       newPSUtil(),
+		Resources:    newResources(),
 	})
 
 	require.Equal(t, "finished", p.Status().State)
@@ -66,7 +71,7 @@ func TestReconnectProcess(t *testing.T) {
 		OnExit: func(string) {
 			wg.Done()
 		},
-		PSUtil: newPSUtil(),
+		Resources: newResources(),
 	})
 
 	p.Start()
@@ -112,7 +117,7 @@ func TestStaleProcess(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 2 * time.Second,
-		PSUtil:       newPSUtil(),
+		Resources:    newResources(),
 	})
 
 	p.Start()
@@ -135,7 +140,7 @@ func TestStaleReconnectProcess(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 2 * time.Second,
 		StaleTimeout:   3 * time.Second,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -166,7 +171,7 @@ func TestNonExistingProcess(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 5 * time.Second,
 		StaleTimeout:   0,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -191,7 +196,7 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 2 * time.Second,
 		StaleTimeout:   0,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -215,7 +220,7 @@ func TestProcessFailed(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 0,
-		PSUtil:       newPSUtil(),
+		Resources:    newResources(),
 	})
 
 	p.Start()
@@ -241,7 +246,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 		OnExit: func(state string) {
 			time.Sleep(3 * time.Second)
 		},
-		PSUtil: newPSUtil(),
+		Resources: newResources(),
 	})
 
 	err = p.Start()
@@ -269,7 +274,7 @@ func TestFFmpegKill(t *testing.T) {
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
-		PSUtil:       newPSUtil(),
+		Resources:    newResources(),
 	})
 
 	err = p.Start()
@@ -295,7 +300,7 @@ func TestProcessForceKill(t *testing.T) {
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
-		PSUtil:       newPSUtil(),
+		Resources:    newResources(),
 	})
 
 	err = p.Start()
@@ -325,10 +330,10 @@ func TestProcessDuration(t *testing.T) {
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, err := New(Config{
-		Binary:  binary,
-		Args:    []string{},
-		Timeout: 3 * time.Second,
-		PSUtil:  newPSUtil(),
+		Binary:    binary,
+		Args:      []string{},
+		Timeout:   3 * time.Second,
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 
@@ -375,7 +380,7 @@ func TestProcessSchedulePointInTime(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
-		PSUtil:    newPSUtil(),
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -417,7 +422,7 @@ func TestProcessSchedulePointInTimeGone(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
-		PSUtil:    newPSUtil(),
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -443,7 +448,7 @@ func TestProcessScheduleCron(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
-		PSUtil:    newPSUtil(),
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -474,7 +479,7 @@ func TestProcessDelayNoScheduler(t *testing.T) {
 		Binary:         "sleep",
 		Reconnect:      false,
 		ReconnectDelay: 5 * time.Second,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -491,7 +496,7 @@ func TestProcessDelayNoScheduler(t *testing.T) {
 		Binary:         "sleep",
 		Reconnect:      true,
 		ReconnectDelay: 5 * time.Second,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -515,7 +520,7 @@ func TestProcessDelaySchedulerNoReconnect(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -537,7 +542,7 @@ func TestProcessDelaySchedulerNoReconnect(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -561,7 +566,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -583,7 +588,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -605,7 +610,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 10 * time.Second,
 		Scheduler:      s,
-		PSUtil:         newPSUtil(),
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -663,7 +668,7 @@ func TestProcessCallbacks(t *testing.T) {
 
 			onState = append(onState, from+"/"+to)
 		},
-		PSUtil: newPSUtil(),
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 
@@ -706,7 +711,7 @@ func TestProcessCallbacksOnBeforeStart(t *testing.T) {
 		OnBeforeStart: func(a []string) ([]string, error) {
 			return a, fmt.Errorf("no, not now")
 		},
-		PSUtil: newPSUtil(),
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 

@@ -139,6 +139,8 @@ type Resources interface {
 
 	Disk(path string) (*DiskInfo, error)
 	Network() ([]NetworkInfo, error)
+
+	Process(pid int32) (Process, error)
 }
 
 type Config struct {
@@ -621,4 +623,109 @@ func (r *resources) Network() ([]NetworkInfo, error) {
 	}
 
 	return info, nil
+}
+
+func (r *resources) Process(pid int32) (Process, error) {
+	proc, err := r.psutil.Process(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	p := &process{
+		proc: proc,
+	}
+
+	return p, nil
+}
+
+type Process interface {
+	Info() (ProcessInfo, error)
+
+	// Cancel will stop collecting CPU and memory data for this process.
+	Cancel()
+
+	// Suspend will send SIGSTOP to the process.
+	Suspend() error
+
+	// Resume will send SIGCONT to the process.
+	Resume() error
+}
+
+type process struct {
+	proc psutil.Process
+}
+
+type ProcessInfoCPU struct {
+	System float64 // percent 0-100
+	User   float64 // percent 0-100
+	Idle   float64 // percent 0-100
+	Other  float64 // percent 0-100
+}
+
+type ProcessInfoGPU struct {
+	Index int    // Index of the GPU
+	Name  string // Name of the GPU (not populated for a specific process)
+
+	MemoryTotal uint64 // bytes (not populated for a specific process)
+	MemoryUsed  uint64 // bytes
+
+	Usage   float64 // percent 0-100
+	Encoder float64 // percent 0-100
+	Decoder float64 // percent 0-100
+}
+
+type ProcessInfo struct {
+	CPU    ProcessInfoCPU
+	Memory uint64
+	GPU    ProcessInfoGPU
+}
+
+func (p *process) Info() (ProcessInfo, error) {
+	cpu, err := p.proc.CPU()
+	if err != nil {
+		return ProcessInfo{}, err
+	}
+
+	mem, err := p.proc.Memory()
+	if err != nil {
+		return ProcessInfo{}, err
+	}
+
+	gpu, err := p.proc.GPU()
+	if err != nil {
+		return ProcessInfo{}, err
+	}
+
+	pi := ProcessInfo{
+		CPU: ProcessInfoCPU{
+			System: cpu.System,
+			User:   cpu.User,
+			Idle:   cpu.Idle,
+			Other:  cpu.Other,
+		},
+		Memory: mem,
+		GPU: ProcessInfoGPU{
+			Index:       gpu.Index,
+			Name:        gpu.Name,
+			MemoryTotal: gpu.MemoryTotal,
+			MemoryUsed:  gpu.MemoryUsed,
+			Usage:       gpu.Usage,
+			Encoder:     gpu.Encoder,
+			Decoder:     gpu.Decoder,
+		},
+	}
+
+	return pi, nil
+}
+
+func (p *process) Cancel() {
+	p.proc.Cancel()
+}
+
+func (p *process) Suspend() error {
+	return p.proc.Suspend()
+}
+
+func (p *process) Resume() error {
+	return p.proc.Resume()
 }

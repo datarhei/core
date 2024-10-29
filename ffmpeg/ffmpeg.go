@@ -12,7 +12,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/resources/psutil"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/session"
 )
 
@@ -64,7 +64,7 @@ type Config struct {
 	ValidatorOutput         Validator
 	Portrange               net.Portranger
 	Collector               session.Collector
-	PSUtil                  psutil.Util
+	Resource                resources.Resources
 }
 
 type ffmpeg struct {
@@ -83,17 +83,17 @@ type ffmpeg struct {
 	states     process.States
 	statesLock sync.RWMutex
 
-	psutil psutil.Util
+	resources resources.Resources
 }
 
 func New(config Config) (FFmpeg, error) {
 	f := &ffmpeg{}
 
-	if config.PSUtil == nil {
-		return nil, fmt.Errorf("psutils required")
+	if config.Resource == nil {
+		return nil, fmt.Errorf("resources are required")
 	}
 
-	f.psutil = config.PSUtil
+	f.resources = config.Resource
 
 	binary, err := exec.LookPath(config.Binary)
 	if err != nil {
@@ -194,7 +194,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 				config.OnStateChange(from, to)
 			}
 		},
-		PSUtil: f.psutil,
+		Resources: f.resources,
 	})
 
 	return ffmpeg, err

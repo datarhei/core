@@ -38,13 +38,20 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		return nil, err
 	}
 
+	resources, err := resources.New(resources.Config{
+		PSUtil: psutil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
 		Binary:           binary,
 		LogHistoryLength: 3,
 		Portrange:        portrange,
 		ValidatorInput:   validatorIn,
 		ValidatorOutput:  validatorOut,
-		PSUtil:           psutil,
+		Resource:         resources,
 	})
 	if err != nil {
 		return nil, err
@@ -83,13 +90,6 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 
 	rewriter, err := rewrite.New(rewrite.Config{
 		IAM: iam,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	resources, err := resources.New(resources.Config{
-		PSUtil: psutil,
 	})
 	if err != nil {
 		return nil, err

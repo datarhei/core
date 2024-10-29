@@ -5,41 +5,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/resources/psutil"
+	"github.com/datarhei/core/v16/resources"
 
 	"github.com/stretchr/testify/require"
 )
 
-type psproc struct{}
+type proc struct{}
 
-func (p *psproc) CPU() (*psutil.CPUInfo, error) {
-	return &psutil.CPUInfo{
-		System: 50,
-		User:   0,
-		Idle:   0,
-		Other:  0,
-	}, nil
+func (p *proc) Info() (resources.ProcessInfo, error) {
+	info := resources.ProcessInfo{
+		CPU: resources.ProcessInfoCPU{
+			System: 50,
+			User:   0,
+			Idle:   0,
+			Other:  0,
+		},
+		Memory: 197,
+		GPU: resources.ProcessInfoGPU{
+			Index:       0,
+			Name:        "L4",
+			MemoryTotal: 128,
+			MemoryUsed:  91,
+			Usage:       3,
+			Encoder:     9,
+			Decoder:     5,
+		},
+	}
+
+	return info, nil
 }
 
-func (p *psproc) Memory() (uint64, error) {
-	return 197, nil
-}
-
-func (p *psproc) GPU() (*psutil.GPUInfo, error) {
-	return &psutil.GPUInfo{
-		Index:       0,
-		Name:        "L4",
-		MemoryTotal: 128,
-		MemoryUsed:  91,
-		Usage:       3,
-		Encoder:     9,
-		Decoder:     5,
-	}, nil
-}
-
-func (p *psproc) Cancel()        {}
-func (p *psproc) Suspend() error { return nil }
-func (p *psproc) Resume() error  { return nil }
+func (p *proc) Cancel()        {}
+func (p *proc) Suspend() error { return nil }
+func (p *proc) Resume() error  { return nil }
 
 func TestCPULimit(t *testing.T) {
 	lock := sync.Mutex{}
@@ -57,10 +55,9 @@ func TestCPULimit(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -95,10 +92,9 @@ func TestCPULimitWaitFor(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -132,10 +128,9 @@ func TestMemoryLimit(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -170,10 +165,9 @@ func TestMemoryLimitWaitFor(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -207,10 +201,9 @@ func TestGPUMemoryLimit(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -245,10 +238,9 @@ func TestGPUMemoryLimitWaitFor(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		wg.Wait()
@@ -283,10 +275,9 @@ func TestMemoryLimitSoftMode(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		l.Limit(false, true, false)
@@ -323,10 +314,9 @@ func TestGPUMemoryLimitSoftMode(t *testing.T) {
 			OnLimit: func(float64, uint64, float64, float64, float64, uint64) {
 				wg.Done()
 			},
-			PSUtil: newPSUtil(),
 		})
 
-		l.Start(&psproc{})
+		l.Start(&proc{})
 		defer l.Stop()
 
 		l.Limit(false, false, true)

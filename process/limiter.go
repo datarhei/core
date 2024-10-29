@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/resources/psutil"
+	"github.com/datarhei/core/v16/resources"
 )
 
 type Usage struct {
@@ -85,13 +85,13 @@ type LimiterConfig struct {
 	WaitFor    time.Duration // Duration for one of the limits has to be above the limit until OnLimit gets triggered.
 	OnLimit    LimitFunc     // Function to be triggered if limits are exceeded.
 	Mode       LimitMode     // How to limit CPU usage.
-	PSUtil     psutil.Util
+	NCPU       float64       // Number of available CPU
 	Logger     log.Logger
 }
 
 type Limiter interface {
 	// Start starts the limiter with a psutil.Process.
-	Start(process psutil.Process) error
+	Start(process resources.Process) error
 
 	// Stop stops the limiter. The limiter can be reused by calling Start() again
 	Stop()
@@ -226,11 +226,9 @@ func (x *metric[T]) IsExceeded(waitFor time.Duration, mode LimitMode) bool {
 }
 
 type limiter struct {
-	psutil psutil.Util
-
 	ncpu       float64
 	ncpuFactor float64
-	proc       psutil.Process
+	proc       resources.Process
 	lock       sync.RWMutex
 	cancel     context.CancelFunc
 	onLimit    LimitFunc
@@ -259,11 +257,15 @@ type limiter struct {
 // NewLimiter returns a new Limiter
 func NewLimiter(config LimiterConfig) (Limiter, error) {
 	l := &limiter{
+		ncpu:    config.NCPU,
 		waitFor: config.WaitFor,
 		onLimit: config.OnLimit,
 		mode:    config.Mode,
-		psutil:  config.PSUtil,
 		logger:  config.Logger,
+	}
+
+	if l.ncpu <= 0 {
+		l.ncpu = 1
 	}
 
 	l.cpu.SetLimit(config.CPU / 100)
@@ -275,16 +277,6 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 
 	if l.logger == nil {
 		l.logger = log.New("")
-	}
-
-	if l.psutil == nil {
-		return nil, fmt.Errorf("no psutil provided")
-	}
-
-	if ncpu, err := l.psutil.CPUCounts(); err != nil {
-		l.ncpu = 1
-	} else {
-		l.ncpu = ncpu
 	}
 
 	l.lastUsage.CPU.NCPU = l.ncpu
@@ -333,7 +325,7 @@ func (l *limiter) reset() {
 	l.gpu.decoder.Reset()
 }
 
-func (l *limiter) Start(process psutil.Process) error {
+func (l *limiter) Start(process resources.Process) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -396,28 +388,24 @@ func (l *limiter) collect() {
 		return
 	}
 
-	mstat, merr := proc.Memory()
-	cpustat, cerr := proc.CPU()
-	gstat, gerr := proc.GPU()
+	pinfo, err := proc.Info()
+
+	//mstat, merr := proc.Memory()
+	//cpustat, cerr := proc.CPU()
+	//gstat, gerr := proc.GPU()
 	gindex := -1
 
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	if merr == nil {
-		l.memory.Update(mstat)
-	}
-
-	if cerr == nil {
-		l.cpu.Update((cpustat.System + cpustat.User + cpustat.Other) / 100)
-	}
-
-	if gerr == nil {
-		l.gpu.memory.Update(gstat.MemoryUsed)
-		l.gpu.usage.Update(gstat.Usage / 100)
-		l.gpu.encoder.Update(gstat.Encoder / 100)
-		l.gpu.decoder.Update(gstat.Decoder / 100)
-		gindex = gstat.Index
+	if err == nil {
+		l.memory.Update(pinfo.Memory)
+		l.cpu.Update((pinfo.CPU.System + pinfo.CPU.User + pinfo.CPU.Other) / 100)
+		l.gpu.memory.Update(pinfo.GPU.MemoryUsed)
+		l.gpu.usage.Update(pinfo.GPU.Usage / 100)
+		l.gpu.encoder.Update(pinfo.GPU.Encoder / 100)
+		l.gpu.decoder.Update(pinfo.GPU.Decoder / 100)
+		gindex = pinfo.GPU.Index
 	}
 
 	isLimitExceeded := false

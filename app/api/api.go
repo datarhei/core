@@ -38,6 +38,7 @@ import (
 	"github.com/datarhei/core/v16/prometheus"
 	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/resources/psutil"
+	"github.com/datarhei/core/v16/resources/psutil/gpu/nvidia"
 	"github.com/datarhei/core/v16/restream"
 	restreamapp "github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -368,7 +369,7 @@ func (a *api) start(ctx context.Context) error {
 		debug.SetMemoryLimit(math.MaxInt64)
 	}
 
-	psutil, err := psutil.New("", nil)
+	psutil, err := psutil.New("", nvidia.New(""))
 	if err != nil {
 		return fmt.Errorf("failed to initialize psutils: %w", err)
 	}
@@ -511,7 +512,7 @@ func (a *api) start(ctx context.Context) error {
 		ValidatorOutput:         validatorOut,
 		Portrange:               portrange,
 		Collector:               a.sessions.Collector("ffmpeg"),
-		PSUtil:                  psutil,
+		Resource:                a.resources,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create ffmpeg: %w", err)

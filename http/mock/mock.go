@@ -17,6 +17,7 @@ import (
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/datarhei/core/v16/restream"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
@@ -50,11 +51,18 @@ func DummyRestreamer(pathPrefix string) (restream.Restreamer, error) {
 		return nil, err
 	}
 
+	resources, err := resources.New(resources.Config{
+		PSUtil: psutil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
 		Binary:           binary,
 		MaxLogLines:      100,
 		LogHistoryLength: 3,
-		PSUtil:           psutil,
+		Resource:         resources,
 	})
 	if err != nil {
 		return nil, err
