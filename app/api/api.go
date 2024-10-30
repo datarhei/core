@@ -1234,6 +1234,7 @@ func (a *api) start(ctx context.Context) error {
 	metrics.Register(monitor.NewUptimeCollector())
 	metrics.Register(monitor.NewCPUCollector(a.resources))
 	metrics.Register(monitor.NewMemCollector(a.resources))
+	metrics.Register(monitor.NewGPUCollector(a.resources))
 	metrics.Register(monitor.NewNetCollector(a.resources))
 	metrics.Register(monitor.NewDiskCollector(a.diskfs.Metadata("base"), a.resources))
 	metrics.Register(monitor.NewFilesystemCollector("diskfs", a.diskfs))
