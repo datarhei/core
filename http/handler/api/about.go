@@ -71,6 +71,7 @@ func (p *AboutHandler) About(c echo.Context) error {
 
 	if p.resources != nil {
 		res := p.resources.Info()
+
 		about.Resources.IsThrottling = res.CPU.Throttling
 		about.Resources.NCPU = res.CPU.NCPU
 		about.Resources.CPU = (100 - res.CPU.Idle) * res.CPU.NCPU
@@ -80,6 +81,19 @@ func (p *AboutHandler) About(c echo.Context) error {
 		about.Resources.MemLimit = res.Mem.Limit
 		about.Resources.MemTotal = res.Mem.Total
 		about.Resources.MemCore = res.Mem.Core
+
+		about.Resources.GPU = make([]api.AboutGPUResources, len(res.GPU.GPU))
+		for i, gpu := range res.GPU.GPU {
+			about.Resources.GPU[i] = api.AboutGPUResources{
+				Mem:        gpu.MemoryUsed,
+				MemLimit:   gpu.MemoryLimit,
+				MemTotal:   gpu.MemoryTotal,
+				Usage:      gpu.Usage,
+				UsageLimit: gpu.UsageLimit,
+				Encoder:    gpu.Encoder,
+				Decoder:    gpu.Decoder,
+			}
+		}
 	}
 
 	return c.JSON(http.StatusOK, about)

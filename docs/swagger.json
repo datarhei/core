@@ -5201,6 +5201,39 @@
                 }
             }
         },
+        "api.AboutGPUResources": {
+            "type": "object",
+            "properties": {
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "usage_decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_general": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
         "api.AboutResources": {
             "type": "object",
             "properties": {
@@ -5215,6 +5248,13 @@
                 "cpu_used": {
                     "description": "Current CPU load, 0-100*ncpu",
                     "type": "number"
+                },
+                "gpu": {
+                    "description": "GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.AboutGPUResources"
+                    }
                 },
                 "is_throttling": {
                     "description": "Whether this core is currently throttling",
@@ -7075,26 +7115,33 @@
             "type": "object",
             "properties": {
                 "cpu_usage": {
+                    "description": "percent 0-100*ncpu",
                     "type": "number"
                 },
                 "gpu_decoder": {
+                    "description": "percent 0-100",
                     "type": "number"
                 },
                 "gpu_encoder": {
+                    "description": "percent 0-100",
                     "type": "number"
                 },
                 "gpu_memory_mbytes": {
+                    "description": "megabytes",
                     "type": "integer",
                     "format": "uint64"
                 },
                 "gpu_usage": {
+                    "description": "percent 0-100",
                     "type": "number"
                 },
                 "memory_mbytes": {
+                    "description": "megabytes",
                     "type": "integer",
                     "format": "uint64"
                 },
                 "waitfor_seconds": {
+                    "description": "seconds",
                     "type": "integer",
                     "format": "uint64"
                 }
