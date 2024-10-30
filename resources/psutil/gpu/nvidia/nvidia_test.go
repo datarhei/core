@@ -3,10 +3,8 @@ package nvidia
 import (
 	"bytes"
 	"os"
-	"regexp"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/resources/psutil/gpu"
@@ -17,9 +15,7 @@ func TestParseQuery(t *testing.T) {
 	data, err := os.ReadFile("./fixtures/query1.xml")
 	require.NoError(t, err)
 
-	wr := &writerQuery{}
-
-	nv, err := wr.parse(data)
+	nv, err := parseQuery(data)
 	require.NoError(t, err)
 
 	require.Equal(t, Stats{
@@ -40,7 +36,7 @@ func TestParseQuery(t *testing.T) {
 	data, err = os.ReadFile("./fixtures/query2.xml")
 	require.NoError(t, err)
 
-	nv, err = wr.parse(data)
+	nv, err = parseQuery(data)
 	require.NoError(t, err)
 
 	require.Equal(t, Stats{
@@ -71,7 +67,7 @@ func TestParseQuery(t *testing.T) {
 	data, err = os.ReadFile("./fixtures/query3.xml")
 	require.NoError(t, err)
 
-	nv, err = wr.parse(data)
+	nv, err = parseQuery(data)
 	require.NoError(t, err)
 
 	require.Equal(t, Stats{
@@ -93,15 +89,11 @@ func TestParseProcess(t *testing.T) {
 	data, err := os.ReadFile("./fixtures/process.txt")
 	require.NoError(t, err)
 
-	wr := &writerProcess{
-		re: regexp.MustCompile(`^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`),
-	}
-
 	lines := bytes.Split(data, []byte("\n"))
 	process := map[int32]Process{}
 
 	for _, line := range lines {
-		p, err := wr.parse(line)
+		p, err := parseProcess(line)
 		if err != nil {
 			continue
 		}
@@ -151,6 +143,25 @@ func TestParseProcess(t *testing.T) {
 			Decoder: 1,
 		},
 	}, process)
+}
+
+func TestParseProcessNoProcesses(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/process_noprocesses.txt")
+	require.NoError(t, err)
+
+	lines := bytes.Split(data, []byte("\n"))
+	process := map[int32]Process{}
+
+	for _, line := range lines {
+		p, err := parseProcess(line)
+		if err != nil {
+			continue
+		}
+
+		process[p.PID] = p
+	}
+
+	require.Equal(t, map[int32]Process{}, process)
 }
 
 func TestWriterQuery(t *testing.T) {
@@ -213,7 +224,6 @@ func TestWriterProcess(t *testing.T) {
 
 	wr := &writerProcess{
 		ch:         make(chan Process, 32),
-		re:         regexp.MustCompile(`^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`),
 		terminator: []byte("\n"),
 	}
 
@@ -292,10 +302,9 @@ func TestNvidiaGPUCount(t *testing.T) {
 	_, ok := nv.(*dummy)
 	require.False(t, ok)
 
-	require.Eventually(t, func() bool {
-		count, _ := nv.Count()
-		return count != 0
-	}, 5*time.Second, time.Second)
+	count, err := nv.Count()
+	require.NoError(t, err)
+	require.NotEqual(t, 0, count)
 }
 
 func TestNvidiaGPUStats(t *testing.T) {
@@ -310,24 +319,6 @@ func TestNvidiaGPUStats(t *testing.T) {
 
 	_, ok := nv.(*dummy)
 	require.False(t, ok)
-
-	require.Eventually(t, func() bool {
-		stats, _ := nv.Stats()
-
-		if len(stats) != 2 {
-			return false
-		}
-
-		if len(stats[0].Process) != 3 {
-			return false
-		}
-
-		if len(stats[1].Process) != 2 {
-			return false
-		}
-
-		return true
-	}, 5*time.Second, time.Second)
 
 	stats, err := nv.Stats()
 	require.NoError(t, err)
@@ -411,11 +402,6 @@ func TestNvidiaGPUProcess(t *testing.T) {
 
 	_, ok := nv.(*dummy)
 	require.False(t, ok)
-
-	require.Eventually(t, func() bool {
-		_, err := nv.Process(12176)
-		return err == nil
-	}, 5*time.Second, time.Second)
 
 	proc, err := nv.Process(12176)
 	require.NoError(t, err)

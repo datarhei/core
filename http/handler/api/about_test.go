@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
+	"github.com/datarhei/core/v16/internal/mock/resources"
 	"github.com/datarhei/core/v16/internal/mock/restream"
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +21,7 @@ func getDummyAboutRouter() (*echo.Echo, error) {
 		return nil, err
 	}
 
-	handler := NewAbout(rs, nil, func() []string { return []string{} })
+	handler := NewAbout(rs, resources.New(), func() []string { return []string{} })
 
 	router.Add("GET", "/", handler.About)
 

@@ -114,7 +114,7 @@ func (w *writerQuery) Write(data []byte) (int, error) {
 			break
 		}
 
-		s, err := w.parse(content)
+		s, err := parseQuery(content)
 		if err != nil {
 			continue
 		}
@@ -125,7 +125,7 @@ func (w *writerQuery) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-func (w *writerQuery) parse(data []byte) (Stats, error) {
+func parseQuery(data []byte) (Stats, error) {
 	nv := Stats{}
 
 	err := xml.Unmarshal(data, &nv)
@@ -139,7 +139,6 @@ func (w *writerQuery) parse(data []byte) (Stats, error) {
 type writerProcess struct {
 	buf        bytes.Buffer
 	ch         chan Process
-	re         *regexp.Regexp
 	terminator []byte
 }
 
@@ -161,7 +160,7 @@ func (w *writerProcess) Write(data []byte) (int, error) {
 			break
 		}
 
-		s, err := w.parse(content)
+		s, err := parseProcess(content)
 		if err != nil {
 			continue
 		}
@@ -172,7 +171,19 @@ func (w *writerProcess) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-func (w *writerProcess) parse(data []byte) (Process, error) {
+const processMatcher = `^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`
+
+// # gpu        pid  type    sm   mem   enc   dec    fb   command
+// # Idx          #   C/G     %     %     %     %    MB   name
+//
+//	0       7372     C     2     0     2     -   136   ffmpeg
+//	0      12176     C     5     2     3     7   782   ffmpeg
+//	0      20035     C     8     2     4     1  1145   ffmpeg
+//	0      20141     C     2     1     1     3   429   ffmpeg
+//	0      29591     C     2     1     -     2   435   ffmpeg
+var reProcessMatcher = regexp.MustCompile(processMatcher)
+
+func parseProcess(data []byte) (Process, error) {
 	p := Process{}
 
 	if len(data) == 0 {
@@ -183,7 +194,7 @@ func (w *writerProcess) parse(data []byte) (Process, error) {
 		return p, fmt.Errorf("comment")
 	}
 
-	matches := w.re.FindStringSubmatch(string(data))
+	matches := reProcessMatcher.FindStringSubmatch(string(data))
 	if matches == nil {
 		return p, fmt.Errorf("no matches found")
 	}
@@ -236,31 +247,38 @@ func New(path string) gpu.GPU {
 	}
 
 	n := &nvidia{
-		wrQuery: &writerQuery{
-			ch:         make(chan Stats, 1),
-			terminator: []byte("</nvidia_smi_log>\n"),
-		},
-		wrProcess: &writerProcess{
-			ch: make(chan Process, 32),
-			// # gpu        pid  type    sm   mem   enc   dec    fb   command
-			// # Idx          #   C/G     %     %     %     %    MB   name
-			//     0       7372     C     2     0     2     -   136   ffmpeg
-			//     0      12176     C     5     2     3     7   782   ffmpeg
-			//     0      20035     C     8     2     4     1  1145   ffmpeg
-			//     0      20141     C     2     1     1     3   429   ffmpeg
-			//     0      29591     C     2     1     -     2   435   ffmpeg
-			re:         regexp.MustCompile(`^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`),
-			terminator: []byte("\n"),
-		},
 		process: map[int32]Process{},
+	}
+
+	stats, err := n.runQueryOnce(path)
+	if err != nil {
+		return &dummy{}
+	}
+
+	n.stats = stats
+
+	process, err := n.runProcessOnce(path)
+	if err != nil {
+		return &dummy{}
+	}
+
+	n.process = process
+
+	n.wrQuery = &writerQuery{
+		ch:         make(chan Stats, 1),
+		terminator: []byte("</nvidia_smi_log>\n"),
+	}
+	n.wrProcess = &writerProcess{
+		ch:         make(chan Process, 32),
+		terminator: []byte("\n"),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	n.cancel = cancel
 
+	go n.reader(ctx)
 	go n.runnerQuery(ctx, path)
 	go n.runnerProcess(ctx, path)
-	go n.reader(ctx)
 
 	return n
 }
@@ -289,6 +307,32 @@ func (n *nvidia) reader(ctx context.Context) {
 	}
 }
 
+func (n *nvidia) runQueryOnce(path string) (Stats, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	data := &bytes.Buffer{}
+
+	cmd := exec.CommandContext(ctx, path, "-q", "-x")
+	cmd.Stdout = data
+	err := cmd.Start()
+	if err != nil {
+		return Stats{}, err
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return Stats{}, err
+	}
+
+	stats, err := parseQuery(data.Bytes())
+	if err != nil {
+		return Stats{}, err
+	}
+
+	return stats, nil
+}
+
 func (n *nvidia) runnerQuery(ctx context.Context, path string) {
 	for {
 		cmd := exec.CommandContext(ctx, path, "-q", "-x", "-l", "1")
@@ -315,6 +359,40 @@ func (n *nvidia) runnerQuery(ctx context.Context, path string) {
 		default:
 		}
 	}
+}
+
+func (n *nvidia) runProcessOnce(path string) (map[int32]Process, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	data := &bytes.Buffer{}
+
+	cmd := exec.CommandContext(ctx, path, "pmon", "-s", "um", "-c", "1")
+	cmd.Stdout = data
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := bytes.Split(data.Bytes(), []byte{'\n'})
+
+	process := map[int32]Process{}
+
+	for _, line := range lines {
+		p, err := parseProcess(line)
+		if err != nil {
+			continue
+		}
+
+		process[p.PID] = p
+	}
+
+	return process, nil
 }
 
 func (n *nvidia) runnerProcess(ctx context.Context, path string) {

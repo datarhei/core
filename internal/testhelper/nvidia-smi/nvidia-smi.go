@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"time"
 )
 
@@ -931,41 +932,53 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	wait := false
 
 	if os.Args[1] == "pmon" {
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
+		if slices.Contains(os.Args[1:], "-c") {
+			fmt.Fprintf(os.Stdout, "%s\n", pmondata)
+		} else {
+			go func(ctx context.Context) {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					fmt.Fprintf(os.Stdout, "%s\n", pmondata)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						fmt.Fprintf(os.Stdout, "%s\n", pmondata)
+					}
 				}
-			}
-		}(ctx)
+			}(ctx)
+		}
 	} else {
-		go func(ctx context.Context) {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
+		if !slices.Contains(os.Args[1:], "-l") {
+			fmt.Fprintf(os.Stdout, "%s\n", querydata)
+		} else {
+			wait = true
+			go func(ctx context.Context) {
+				ticker := time.NewTicker(time.Second)
+				defer ticker.Stop()
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					fmt.Fprintf(os.Stdout, "%s\n", querydata)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						fmt.Fprintf(os.Stdout, "%s\n", querydata)
+					}
 				}
-			}
-		}(ctx)
+			}(ctx)
+		}
 	}
 
-	// Wait for interrupt signal to gracefully shutdown the app
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
+	if wait {
+		// Wait for interrupt signal to gracefully shutdown the app
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, os.Interrupt)
+		<-quit
+	}
 
 	cancel()
 
