@@ -667,6 +667,8 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 			}
 
 			selectedGPU = res.GPU
+		} else {
+			selectedGPU = 0
 		}
 
 		if t, hasTask := r.tasks.Load(cfg.ProcessID()); hasTask {
