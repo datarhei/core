@@ -19,6 +19,8 @@ type ProgressIO struct {
 	Type      string
 	Codec     string
 	Coder     string
+	Profile   int
+	Level     int
 	Frame     uint64 // counter
 	Keyframe  uint64 // counter
 	Framerate ProgressIOFramerate
@@ -36,9 +38,10 @@ type ProgressIO struct {
 	Height    uint64
 
 	// Audio
-	Sampling uint64
-	Layout   string
-	Channels uint64
+	Samplefmt string
+	Sampling  uint64
+	Layout    string
+	Channels  uint64
 
 	// avstream
 	AVstream *AVstream
@@ -52,6 +55,8 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.Type = pp.Type
 	p.Codec = pp.Codec
 	p.Coder = pp.Coder
+	p.Profile = pp.Profile
+	p.Level = pp.Level
 	p.Frame = pp.Frame
 	p.Keyframe = pp.Keyframe
 	p.Framerate = pp.Framerate
@@ -65,6 +70,7 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.Quantizer = pp.Quantizer
 	p.Width = pp.Width
 	p.Height = pp.Height
+	p.Samplefmt = pp.Samplefmt
 	p.Sampling = pp.Sampling
 	p.Layout = pp.Layout
 	p.Channels = pp.Channels
@@ -86,6 +92,8 @@ func (p *ProgressIO) MarshalParser() parse.ProgressIO {
 		Type:      p.Type,
 		Codec:     p.Codec,
 		Coder:     p.Coder,
+		Profile:   p.Profile,
+		Level:     p.Level,
 		Frame:     p.Frame,
 		Keyframe:  p.Keyframe,
 		Framerate: p.Framerate,
@@ -99,6 +107,7 @@ func (p *ProgressIO) MarshalParser() parse.ProgressIO {
 		Quantizer: p.Quantizer,
 		Width:     p.Width,
 		Height:    p.Height,
+		Samplefmt: p.Samplefmt,
 		Sampling:  p.Sampling,
 		Layout:    p.Layout,
 		Channels:  p.Channels,

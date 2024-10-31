@@ -4,17 +4,9 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	timesrc "github.com/datarhei/core/v16/time"
 )
-
-type TimeSource interface {
-	Now() time.Time
-}
-
-type StdTimeSource struct{}
-
-func (s *StdTimeSource) Now() time.Time {
-	return time.Now()
-}
 
 type CacheEntry[T any] struct {
 	value      T
@@ -22,20 +14,20 @@ type CacheEntry[T any] struct {
 }
 
 type Cache[T any] struct {
-	ts        TimeSource
+	ts        timesrc.Source
 	lock      sync.Mutex
 	entries   map[string]CacheEntry[T]
 	lastPurge time.Time
 }
 
-func NewCache[T any](ts TimeSource) *Cache[T] {
+func NewCache[T any](ts timesrc.Source) *Cache[T] {
 	c := &Cache[T]{
 		ts:      ts,
 		entries: map[string]CacheEntry[T]{},
 	}
 
 	if c.ts == nil {
-		c.ts = &StdTimeSource{}
+		c.ts = &timesrc.StdSource{}
 	}
 
 	c.lastPurge = c.ts.Now()

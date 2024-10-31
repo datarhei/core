@@ -14,6 +14,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -275,7 +276,7 @@ func (fs *s3Filesystem) ReadFile(path string) ([]byte, error) {
 
 	defer file.Close()
 
-	buf := &bytes.Buffer{}
+	buf := mem.Get() // here we take out a buffer for good
 
 	_, err := buf.ReadFrom(file)
 	if err != nil {
@@ -358,6 +359,27 @@ func (fs *s3Filesystem) WriteFile(path string, data []byte) (int64, bool, error)
 
 func (fs *s3Filesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
 	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
+}
+
+func (fs *s3Filesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
+	path = fs.cleanPath(path)
+
+	ctx := context.Background()
+
+	object, err := fs.client.GetObject(ctx, fs.bucket, path, minio.GetObjectOptions{})
+	if err != nil {
+		size, _, err := fs.write(path, r)
+		return size, err
+	}
+
+	buffer := mem.Get()
+	defer mem.Put(buffer)
+
+	buffer.ReadFrom(object)
+	buffer.ReadFrom(r)
+
+	size, _, err := fs.write(path, buffer.Reader())
+	return size, err
 }
 
 func (fs *s3Filesystem) Rename(src, dst string) error {

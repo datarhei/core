@@ -5,6 +5,12 @@ definitions:
       aqueue:
         format: uint64
         type: integer
+      channels:
+        format: uint64
+        type: integer
+      codec:
+        description: Codec parameter
+        type: string
       drop:
         format: uint64
         type: integer
@@ -18,8 +24,15 @@ definitions:
         type: integer
       gop:
         type: string
+      height:
+        format: uint64
+        type: integer
       input:
         $ref: '#/definitions/api.AVstreamIO'
+      layout:
+        type: string
+      level:
+        type: integer
       looping:
         type: boolean
       looping_runtime:
@@ -29,7 +42,19 @@ definitions:
         type: string
       output:
         $ref: '#/definitions/api.AVstreamIO'
+      pix_fmt:
+        type: string
+      profile:
+        type: integer
       queue:
+        format: uint64
+        type: integer
+      sample_fmt:
+        type: string
+      sampling_hz:
+        format: uint64
+        type: integer
+      width:
         format: uint64
         type: integer
     type: object
@@ -63,10 +88,87 @@ definitions:
         type: string
       name:
         type: string
+      resources:
+        $ref: '#/definitions/api.AboutResources'
       uptime_seconds:
         type: integer
       version:
-        $ref: '#/definitions/api.Version'
+        $ref: '#/definitions/api.AboutVersion'
+    type: object
+  api.AboutGPUResources:
+    properties:
+      memory_limit_bytes:
+        description: Defined memory limit in bytes
+        type: integer
+      memory_total_bytes:
+        description: Total available memory in bytes
+        type: integer
+      memory_used_bytes:
+        description: Currently used memory in bytes
+        type: integer
+      usage_decoder:
+        description: Current decoder usage, 0-100
+        type: number
+      usage_encoder:
+        description: Current encoder usage, 0-100
+        type: number
+      usage_general:
+        description: Current general usage, 0-100
+        type: number
+      usage_limit:
+        description: Defined general usage limit, 0-100
+        type: number
+    type: object
+  api.AboutResources:
+    properties:
+      cpu_core:
+        description: Current CPU load of the core itself, 0-100*ncpu
+        type: number
+      cpu_limit:
+        description: Defined CPU load limit, 0-100*ncpu
+        type: number
+      cpu_used:
+        description: Current CPU load, 0-100*ncpu
+        type: number
+      gpu:
+        description: GPU resources
+        items:
+          $ref: '#/definitions/api.AboutGPUResources'
+        type: array
+      is_throttling:
+        description: Whether this core is currently throttling
+        type: boolean
+      memory_core_bytes:
+        description: Current used memory of the core itself in bytes
+        type: integer
+      memory_limit_bytes:
+        description: Defined memory limit in bytes
+        type: integer
+      memory_total_bytes:
+        description: Total available memory in bytes
+        type: integer
+      memory_used_bytes:
+        description: Currently used memory in bytes
+        type: integer
+      ncpu:
+        description: Number of CPU on this node
+        type: number
+    type: object
+  api.AboutVersion:
+    properties:
+      arch:
+        type: string
+      build_date:
+        description: RFC3339
+        type: string
+      compiler:
+        type: string
+      number:
+        type: string
+      repository_branch:
+        type: string
+      repository_commit:
+        type: string
     type: object
   api.ClusterAbout:
     properties:
@@ -181,6 +283,30 @@ definitions:
         description: unix timestamp
         type: integer
     type: object
+  api.ClusterNodeGPUResources:
+    properties:
+      memory_limit_bytes:
+        description: Defined memory limit in bytes
+        type: integer
+      memory_total_bytes:
+        description: Total available memory in bytes
+        type: integer
+      memory_used_bytes:
+        description: Currently used memory in bytes
+        type: integer
+      usage_decoder:
+        description: Current decoder usage, 0-100
+        type: number
+      usage_encoder:
+        description: Current encoder usage, 0-100
+        type: number
+      usage_general:
+        description: Current general usage, 0-100
+        type: number
+      usage_limit:
+        description: Defined general usage limit, 0-100
+        type: number
+    type: object
   api.ClusterNodeID:
     properties:
       id:
@@ -188,6 +314,9 @@ definitions:
     type: object
   api.ClusterNodeResources:
     properties:
+      cpu_core:
+        description: percent 0-100*ncpu
+        type: number
       cpu_limit:
         description: percent 0-100*npcu
         type: number
@@ -196,9 +325,20 @@ definitions:
         type: number
       error:
         type: string
+      gpu:
+        description: GPU resources
+        items:
+          $ref: '#/definitions/api.ClusterNodeGPUResources'
+        type: array
       is_throttling:
         type: boolean
+      memory_core_bytes:
+        description: bytes
+        type: integer
       memory_limit_bytes:
+        description: bytes
+        type: integer
+      memory_total_bytes:
         description: bytes
         type: integer
       memory_used_bytes:
@@ -362,6 +502,19 @@ definitions:
             format: int64
             type: integer
         type: object
+      compress:
+        properties:
+          encoding:
+            items:
+              type: string
+            type: array
+          mimetypes:
+            items:
+              type: string
+            type: array
+          min_length:
+            type: integer
+        type: object
       created_at:
         description: When this config has been persisted
         type: string
@@ -491,6 +644,12 @@ definitions:
       resources:
         properties:
           max_cpu_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_memory_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_usage:
             description: percent 0-100
             type: number
           max_memory_usage:
@@ -710,6 +869,8 @@ definitions:
     properties:
       caller:
         type: string
+      core_id:
+        type: string
       data:
         additionalProperties:
           type: string
@@ -727,6 +888,8 @@ definitions:
   api.EventFilter:
     properties:
       caller:
+        type: string
+      core_id:
         type: string
       data:
         additionalProperties:
@@ -1252,11 +1415,27 @@ definitions:
   api.ProcessConfigLimits:
     properties:
       cpu_usage:
+        description: percent 0-100*ncpu
+        type: number
+      gpu_decoder:
+        description: percent 0-100
+        type: number
+      gpu_encoder:
+        description: percent 0-100
+        type: number
+      gpu_memory_mbytes:
+        description: megabytes
+        format: uint64
+        type: integer
+      gpu_usage:
+        description: percent 0-100
         type: number
       memory_mbytes:
+        description: megabytes
         format: uint64
         type: integer
       waitfor_seconds:
+        description: seconds
         format: uint64
         type: integer
     type: object
@@ -1371,6 +1550,8 @@ definitions:
     properties:
       cpu_usage:
         $ref: '#/definitions/api.ProcessUsageCPU'
+      gpu:
+        $ref: '#/definitions/api.ProcessUsageGPU'
       memory_bytes:
         $ref: '#/definitions/api.ProcessUsageMemory'
     type: object
@@ -1389,10 +1570,50 @@ definitions:
       throttling:
         type: boolean
     type: object
-  api.ProcessUsageMemory:
+  api.ProcessUsageGPU:
+    properties:
+      decoder:
+        $ref: '#/definitions/api.ProcessUsageGPUUsage'
+      encoder:
+        $ref: '#/definitions/api.ProcessUsageGPUUsage'
+      index:
+        type: integer
+      memory_bytes:
+        $ref: '#/definitions/api.ProcessUsageGPUMemory'
+      usage:
+        $ref: '#/definitions/api.ProcessUsageGPUUsage'
+    type: object
+  api.ProcessUsageGPUMemory:
+    properties:
+      avg:
+        format: uint64
+        type: integer
+      cur:
+        format: uint64
+        type: integer
+      limit:
+        format: uint64
+        type: integer
+      max:
+        format: uint64
+        type: integer
+    type: object
+  api.ProcessUsageGPUUsage:
     properties:
       avg:
         type: number
+      cur:
+        type: number
+      limit:
+        type: number
+      max:
+        type: number
+    type: object
+  api.ProcessUsageMemory:
+    properties:
+      avg:
+        format: uint64
+        type: integer
       cur:
         format: uint64
         type: integer
@@ -1490,6 +1711,8 @@ definitions:
         type: integer
       layout:
         type: string
+      level:
+        type: integer
       packet:
         format: uint64
         type: integer
@@ -1498,10 +1721,14 @@ definitions:
         type: string
       pps:
         type: number
+      profile:
+        type: integer
       q:
         type: number
-      sampling_hz:
+      sample_fmt:
         description: Audio
+        type: string
+      sampling_hz:
         format: uint64
         type: integer
       size_kb:
@@ -2030,6 +2257,19 @@ definitions:
             format: int64
             type: integer
         type: object
+      compress:
+        properties:
+          encoding:
+            items:
+              type: string
+            type: array
+          mimetypes:
+            items:
+              type: string
+            type: array
+          min_length:
+            type: integer
+        type: object
       created_at:
         description: When this config has been persisted
         type: string
@@ -2159,6 +2399,12 @@ definitions:
       resources:
         properties:
           max_cpu_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_memory_usage:
+            description: percent 0-100
+            type: number
+          max_gpu_usage:
             description: percent 0-100
             type: number
           max_memory_usage:
@@ -2513,22 +2759,6 @@ definitions:
           $ref: '#/definitions/api.GraphMapping'
         type: array
     type: object
-  api.Version:
-    properties:
-      arch:
-        type: string
-      build_date:
-        description: RFC3339
-        type: string
-      compiler:
-        type: string
-      number:
-        type: string
-      repository_branch:
-        type: string
-      repository_commit:
-        type: string
-    type: object
   api.WidgetProcess:
     properties:
       current_sessions:
@@ -2836,6 +3066,31 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of identities in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/events:
+    post:
+      consumes:
+      - application/json
+      description: Stream of events of whats happening on each node in the cluster
+      operationId: cluster-3-events
+      parameters:
+      - description: Event filters
+        in: body
+        name: filters
+        schema:
+          $ref: '#/definitions/api.EventFilters'
+      produces:
+      - text/event-stream
+      - application/x-json-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Event'
+      security:
+      - ApiKeyAuth: []
+      summary: Stream of events
       tags:
       - v16.?.?
   /api/v3/cluster/fs/{storage}:
@@ -3577,7 +3832,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.Version'
+            $ref: '#/definitions/api.AboutVersion'
         "404":
           description: Not Found
           schema:

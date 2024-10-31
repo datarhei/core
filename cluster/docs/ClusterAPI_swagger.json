@@ -58,7 +58,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/client.AboutResponse"
                         }
                     },
                     "500": {
@@ -761,6 +761,64 @@
             }
         },
         "/v1/process/{id}": {
+            "get": {
+                "description": "Get a process from the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Get a process",
+                "operationId": "cluster-1-get-process",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain to act on",
+                        "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/client.GetProcessResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            },
             "put": {
                 "description": "Replace an existing process in the cluster DB",
                 "consumes": [
@@ -1217,32 +1275,6 @@
         }
     },
     "definitions": {
-        "access.Policy": {
-            "type": "object",
-            "properties": {
-                "actions": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "domain": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "resource": {
-                    "type": "string"
-                },
-                "types": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "app.Config": {
             "type": "object",
             "properties": {
@@ -1268,6 +1300,14 @@
                     "description": "percent",
                     "type": "number"
                 },
+                "limitGPU": {
+                    "description": "GPU limits",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/app.ConfigLimitGPU"
+                        }
+                    ]
+                },
                 "limitMemory": {
                     "description": "bytes",
                     "type": "integer"
@@ -1277,7 +1317,7 @@
                     "type": "integer"
                 },
                 "logPatterns": {
-                    "description": "will we interpreted as regular expressions",
+                    "description": "will be interpreted as regular expressions",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -1362,6 +1402,132 @@
                 }
             }
         },
+        "app.ConfigLimitGPU": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "encoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "memory": {
+                    "description": "bytes",
+                    "type": "integer"
+                },
+                "usage": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                }
+            }
+        },
+        "client.AboutResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "resources": {
+                    "$ref": "#/definitions/client.AboutResponseResources"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "client.AboutResponseGPUResources": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "memory_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "usage": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
+        "client.AboutResponseResources": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "description": "Current CPU load, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_core": {
+                    "description": "Current CPU load of the core itself, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_limit": {
+                    "description": "Defined CPU load limit, 0-100*ncpu",
+                    "type": "number"
+                },
+                "error": {
+                    "description": "Last error",
+                    "type": "string"
+                },
+                "gpu": {
+                    "description": "Currently used GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/client.AboutResponseGPUResources"
+                    }
+                },
+                "is_throttling": {
+                    "description": "Whether this core is currently throttling",
+                    "type": "boolean"
+                },
+                "memory_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "memory_core_bytes": {
+                    "description": "Current used memory of the core itself in bytes",
+                    "type": "integer"
+                },
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "ncpu": {
+                    "description": "Number of CPU on this node",
+                    "type": "number"
+                }
+            }
+        },
         "client.AddIdentityRequest": {
             "type": "object",
             "properties": {
@@ -1375,6 +1541,17 @@
             "properties": {
                 "config": {
                     "$ref": "#/definitions/app.Config"
+                }
+            }
+        },
+        "client.GetProcessResponse": {
+            "type": "object",
+            "properties": {
+                "nodeid": {
+                    "type": "string"
+                },
+                "process": {
+                    "$ref": "#/definitions/github_com_datarhei_core_v16_cluster_store.Process"
                 }
             }
         },
@@ -1436,7 +1613,7 @@
                 "policies": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/access.Policy"
+                        "$ref": "#/definitions/policy.Policy"
                     }
                 }
             }
@@ -1630,6 +1807,26 @@
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -1819,6 +2016,14 @@
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },
@@ -2114,6 +2319,30 @@
                 }
             }
         },
+        "github_com_datarhei_core_v16_cluster_store.Process": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/app.Config"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "order": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "identity.Auth0Tenant": {
             "type": "object",
             "properties": {
@@ -2203,6 +2432,32 @@
                 },
                 "token": {
                     "description": "Tokens/Streamkey for RTMP and SRT",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "policy.Policy": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "types": {
                     "type": "array",
                     "items": {
                         "type": "string"

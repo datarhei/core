@@ -2,7 +2,6 @@ package fs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 )
 
 // MemConfig is the config that is required for creating
@@ -68,8 +68,8 @@ func (f *memFileInfo) IsDir() bool {
 
 type memFile struct {
 	memFileInfo
-	data *bytes.Buffer // Contents of the file
-	r    *bytes.Reader
+	data *mem.Buffer // Contents of the file
+	r    io.ReadSeeker
 }
 
 func (f *memFile) Name() string {
@@ -105,14 +105,20 @@ func (f *memFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (f *memFile) Close() error {
-	if f.data == nil {
-		return io.EOF
+	var err error = nil
+
+	if f.r == nil {
+		err = io.EOF
 	}
 
 	f.r = nil
-	f.data = nil
 
-	return nil
+	if f.data != nil {
+		mem.Put(f.data)
+		f.data = nil
+	}
+
+	return err
 }
 
 type memFilesystem struct {
@@ -208,6 +214,8 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 
 	if config.Storage == "map" {
 		fs.storage = newMapStorage()
+	} else if config.Storage == "swiss" {
+		fs.storage = newSwissMapStorage()
 	} else {
 		fs.storage = newMapOfStorage()
 	}
@@ -312,32 +320,23 @@ func (fs *memFilesystem) Files() int64 {
 func (fs *memFilesystem) Open(path string) File {
 	path = fs.cleanPath(path)
 
-	file, ok := fs.storage.LoadAndCopy(path)
+	newFile, ok := fs.storage.LoadAndCopy(path)
 	if !ok {
 		return nil
 	}
 
-	newFile := &memFile{
-		memFileInfo: memFileInfo{
-			name:    file.name,
-			lastMod: file.lastMod,
-			linkTo:  file.linkTo,
-		},
-	}
-
-	if len(file.linkTo) != 0 {
-		file.Close()
-
-		file, ok = fs.storage.LoadAndCopy(file.linkTo)
+	if len(newFile.linkTo) != 0 {
+		file, ok := fs.storage.LoadAndCopy(newFile.linkTo)
 		if !ok {
 			return nil
 		}
+
+		newFile.lastMod = file.lastMod
+		newFile.data = file.data
+		newFile.size = file.size
 	}
 
-	newFile.lastMod = file.lastMod
-	newFile.data = file.data
-	newFile.size = file.size
-	newFile.r = bytes.NewReader(file.data.Bytes())
+	newFile.r = newFile.data.Reader()
 
 	return newFile
 }
@@ -351,15 +350,12 @@ func (fs *memFilesystem) ReadFile(path string) ([]byte, error) {
 	}
 
 	if len(file.linkTo) != 0 {
-		file.Close()
-
 		file, ok = fs.storage.LoadAndCopy(file.linkTo)
 		if !ok {
 			return nil, ErrNotExist
 		}
 	}
 
-	defer file.Close()
 	return file.data.Bytes(), nil
 }
 
@@ -409,43 +405,6 @@ func (fs *memFilesystem) Symlink(oldname, newname string) error {
 	return nil
 }
 
-var chunkPool = sync.Pool{
-	New: func() interface{} {
-		chunk := make([]byte, 128*1024)
-		return &chunk
-	},
-}
-
-func copyToBufferFromReader(buf *bytes.Buffer, r io.Reader, _ int) (int64, error) {
-	chunkPtr := chunkPool.Get().(*[]byte)
-	chunk := *chunkPtr
-	defer chunkPool.Put(chunkPtr)
-
-	size := int64(0)
-
-	for {
-		n, err := r.Read(chunk)
-		if n != 0 {
-			buf.Write(chunk[:n])
-			size += int64(n)
-		}
-
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return size, nil
-			}
-
-			return size, err
-		}
-
-		if n == 0 {
-			break
-		}
-	}
-
-	return size, nil
-}
-
 func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int) (int64, bool, error) {
 	path = fs.cleanPath(path)
 
@@ -461,14 +420,10 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 			size:    0,
 			lastMod: time.Now(),
 		},
-		data: &bytes.Buffer{},
+		data: mem.Get(),
 	}
 
-	if sizeHint > 0 {
-		newFile.data.Grow(sizeHint)
-	}
-
-	size, err := copyToBufferFromReader(newFile.data, r, 8*1024)
+	size, err := newFile.data.ReadFrom(r)
 	if err != nil {
 		fs.logger.WithFields(log.Fields{
 			"path":           path,
@@ -521,6 +476,51 @@ func (fs *memFilesystem) WriteFile(path string, data []byte) (int64, bool, error
 
 func (fs *memFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, error) {
 	return fs.WriteFileReader(path, bytes.NewReader(data), len(data))
+}
+
+func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
+	path = fs.cleanPath(path)
+
+	file, hasFile := fs.storage.LoadAndCopy(path)
+	if !hasFile {
+		size, _, err := fs.WriteFileReader(path, r, sizeHint)
+		return size, err
+	}
+
+	size, err := file.data.ReadFrom(r)
+	if err != nil {
+		fs.logger.WithFields(log.Fields{
+			"path":           path,
+			"filesize_bytes": size,
+			"error":          err,
+		}).Warn().Log("Incomplete file")
+
+		file.Close()
+
+		return -1, fmt.Errorf("incomplete file")
+	}
+
+	file.size += size
+	file.lastMod = time.Now()
+
+	oldFile, replace := fs.storage.Store(path, file)
+
+	fs.sizeLock.Lock()
+	defer fs.sizeLock.Unlock()
+
+	if replace {
+		oldFile.Close()
+	}
+
+	fs.currentSize += size
+
+	fs.logger.Debug().WithFields(log.Fields{
+		"path":           file.name,
+		"filesize_bytes": file.size,
+		"size_bytes":     fs.currentSize,
+	}).Log("Appended to file")
+
+	return size, nil
 }
 
 func (fs *memFilesystem) Purge(size int64) int64 {
@@ -628,27 +628,18 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 		return os.ErrInvalid
 	}
 
-	srcFile, ok := fs.storage.LoadAndCopy(src)
+	file, ok := fs.storage.LoadAndCopy(src)
 	if !ok {
 		return ErrNotExist
 	}
 
-	if srcFile.dir {
-		srcFile.Close()
+	if file.dir {
 		return ErrNotExist
 	}
 
-	dstFile := &memFile{
-		memFileInfo: memFileInfo{
-			name:    dst,
-			dir:     false,
-			size:    srcFile.size,
-			lastMod: time.Now(),
-		},
-		data: srcFile.data,
-	}
+	file.lastMod = time.Now()
 
-	f, replace := fs.storage.Store(dst, dstFile)
+	replacedFile, replace := fs.storage.Store(dst, file)
 
 	if !replace {
 		fs.dirs.Add(dst)
@@ -658,11 +649,11 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		f.Close()
-		fs.currentSize -= f.size
+		replacedFile.Close()
+		fs.currentSize -= replacedFile.size
 	}
 
-	fs.currentSize += dstFile.size
+	fs.currentSize += file.size
 
 	return nil
 }

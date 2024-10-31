@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
-func BuildBinary(name, pathprefix string) (string, error) {
-	dir := filepath.Join(pathprefix, name)
+func BuildBinary(name string) (string, error) {
+	_, filename, _, _ := runtime.Caller(0)
+	dir := filepath.Join(filepath.Dir(filename), name)
 	aout := filepath.Join(dir, name)
 
 	err := exec.Command("go", "build", "-o", aout, dir).Run()

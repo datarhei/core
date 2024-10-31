@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 )
 
 type API interface {
@@ -87,13 +87,13 @@ func (e statusError) Is(target error) bool {
 
 type copyReader struct {
 	reader io.Reader
-	copy   *bytes.Buffer
+	copy   *mem.Buffer
 }
 
 func newCopyReader(r io.Reader) io.Reader {
 	c := &copyReader{
 		reader: r,
-		copy:   new(bytes.Buffer),
+		copy:   mem.Get(),
 	}
 
 	return c
@@ -105,8 +105,8 @@ func (c *copyReader) Read(p []byte) (int, error) {
 	c.copy.Write(p)
 
 	if err == io.EOF {
-		c.reader = c.copy
-		c.copy = &bytes.Buffer{}
+		c.reader = c.copy.Reader()
+		c.copy = mem.Get()
 	}
 
 	return i, err
@@ -227,8 +227,10 @@ func (a *api) call(method, path string, body io.Reader) ([]byte, error) {
 }
 
 func (a *api) Monitor(id string, monitordata MonitorData) (MonitorResponse, error) {
-	var data bytes.Buffer
-	encoder := json.NewEncoder(&data)
+	data := mem.Get()
+	defer mem.Put(data)
+
+	encoder := json.NewEncoder(data)
 	if err := encoder.Encode(monitordata); err != nil {
 		return MonitorResponse{}, err
 	}
@@ -240,7 +242,7 @@ func (a *api) Monitor(id string, monitordata MonitorData) (MonitorResponse, erro
 		}
 	*/
 
-	response, err := a.callWithRetry(http.MethodPut, "api/v1/core/monitor/"+id, &data)
+	response, err := a.callWithRetry(http.MethodPut, "api/v1/core/monitor/"+id, data.Reader())
 	if err != nil {
 		return MonitorResponse{}, fmt.Errorf("error sending request: %w", err)
 	}

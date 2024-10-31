@@ -32,6 +32,11 @@ type Data struct {
 		Name []string `json:"name"`
 		Auto bool     `json:"auto"`
 	} `json:"host"`
+	Compress struct {
+		Encoding  []string `json:"encoding"`
+		MimeTypes []string `json:"mimetypes"`
+		MinLength int      `json:"min_length" jsonschema:"minimum=0"`
+	} `json:"compress"`
 	API struct {
 		ReadOnly bool `json:"read_only"`
 		Access   struct {
@@ -100,7 +105,7 @@ type Data struct {
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
-		MimeTypes string `json:"mimetypes_file"`
+		MimeTypesFile string `json:"mimetypes_file"`
 	} `json:"storage"`
 	RTMP struct {
 		Enable     bool   `json:"enable"`
@@ -179,8 +184,10 @@ type Data struct {
 		UIPath          string            `json:"ui_path"`
 	} `json:"router"`
 	Resources struct {
-		MaxCPUUsage    float64 `json:"max_cpu_usage"`    // percent 0-100
-		MaxMemoryUsage float64 `json:"max_memory_usage"` // percent 0-100
+		MaxCPUUsage       float64 `json:"max_cpu_usage"`        // percent 0-100
+		MaxMemoryUsage    float64 `json:"max_memory_usage"`     // percent 0-100
+		MaxGPUUsage       float64 `json:"max_gpu_usage"`        // percent 0-100
+		MaxGPUMemoryUsage float64 `json:"max_gpu_memory_usage"` // percent 0-100
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`
@@ -260,7 +267,7 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Router.BlockedPrefixes = slices.Copy(d.Router.BlockedPrefixes)
 	data.Router.Routes = copy.StringMap(d.Router.Routes)
 
-	data.Storage.MimeTypes = d.Storage.MimeTypes
+	data.Storage.MimeTypesFile = d.Storage.MimeTypes
 
 	data.Storage.CORS = d.Storage.CORS
 	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)
@@ -368,7 +375,7 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.TLS.CertFile = d.TLS.CertFile
 	data.TLS.KeyFile = d.TLS.KeyFile
 
-	data.Storage.MimeTypes = d.Storage.MimeTypes
+	data.Storage.MimeTypes = d.Storage.MimeTypesFile
 
 	data.Storage.CORS = d.Storage.CORS
 	data.Storage.CORS.Origins = slices.Copy(d.Storage.CORS.Origins)

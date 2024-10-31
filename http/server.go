@@ -30,9 +30,11 @@ package http
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
@@ -51,6 +53,7 @@ import (
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/prometheus"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/session"
@@ -100,10 +103,18 @@ type Config struct {
 	Cluster       cluster.Cluster
 	IAM           iam.IAM
 	IAMSkipper    func(ip string) bool
+	Resources     resources.Resources
+	Compress      CompressConfig
 }
 
 type CorsConfig struct {
 	Origins []string
+}
+
+type CompressConfig struct {
+	Encoding  []string
+	MimeTypes []string
+	MinLength int
 }
 
 type server struct {
@@ -141,8 +152,10 @@ type server struct {
 		iam        echo.MiddlewareFunc
 	}
 
-	gzip struct {
+	compress struct {
+		encoding  []string
 		mimetypes []string
+		minLength int
 	}
 
 	filesystems map[string]*filesystem
@@ -155,7 +168,7 @@ type server struct {
 
 	metrics struct {
 		lock   sync.Mutex
-		status map[int]uint64
+		status map[string]uint64
 	}
 }
 
@@ -175,7 +188,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		readOnly:      config.ReadOnly,
 	}
 
-	s.metrics.status = map[int]uint64{}
+	s.metrics.status = map[string]uint64{}
 
 	s.filesystems = map[string]*filesystem{}
 
@@ -251,6 +264,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 	s.handler.about = api.NewAbout(
 		config.Restream,
+		config.Resources,
 		func() []string { return config.IAM.Validators() },
 	)
 
@@ -332,11 +346,13 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 	s.middleware.log = mwlog.NewWithConfig(mwlog.Config{
 		Logger: s.logger,
-		Status: func(code int) {
+		Status: func(code int, method, path string, size int64, ttfb time.Duration) {
+			key := fmt.Sprintf("%d:%s:%s", code, method, path)
+
 			s.metrics.lock.Lock()
 			defer s.metrics.lock.Unlock()
 
-			s.metrics.status[code]++
+			s.metrics.status[key]++
 		},
 	})
 
@@ -372,15 +388,9 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		IAM:       config.IAM,
 	}, "/api/graph/query")
 
-	s.gzip.mimetypes = []string{
-		"text/plain",
-		"text/html",
-		"text/javascript",
-		"application/json",
-		"application/x-mpegurl",
-		"application/vnd.apple.mpegurl",
-		"image/svg+xml",
-	}
+	s.compress.encoding = config.Compress.Encoding
+	s.compress.mimetypes = config.Compress.MimeTypes
+	s.compress.minLength = config.Compress.MinLength
 
 	s.router = echo.New()
 	s.router.JSONSerializer = &GoJSONSerializer{}
@@ -405,6 +415,13 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	}
 
 	s.router.Use(s.middleware.iam)
+
+	s.router.Use(mwcompress.NewWithConfig(mwcompress.Config{
+		Level:        mwcompress.BestSpeed,
+		MinLength:    config.Compress.MinLength,
+		Schemes:      config.Compress.Encoding,
+		ContentTypes: config.Compress.MimeTypes,
+	}))
 
 	s.router.Use(mwsession.NewWithConfig(mwsession.Config{
 		HLSIngressCollector: config.Sessions.Collector("hlsingress"),
@@ -470,26 +487,18 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func (s *server) HTTPStatus() map[int]uint64 {
-	status := map[int]uint64{}
+func (s *server) HTTPStatus() map[string]uint64 {
+	status := map[string]uint64{}
 
 	s.metrics.lock.Lock()
 	defer s.metrics.lock.Unlock()
 
-	for code, value := range s.metrics.status {
-		status[code] = value
-	}
+	maps.Copy(status, s.metrics.status)
 
 	return status
 }
 
 func (s *server) setRoutes() {
-	gzipMiddleware := mwcompress.NewWithConfig(mwcompress.Config{
-		Level:     mwcompress.BestSpeed,
-		MinLength: 1000,
-		Skipper:   mwcompress.ContentTypeSkipper(nil),
-	})
-
 	// API router grouo
 	api := s.router.Group("/api")
 
@@ -505,7 +514,6 @@ func (s *server) setRoutes() {
 
 	// Swagger API documentation router group
 	doc := s.router.Group("/api/swagger/*")
-	doc.Use(gzipMiddleware)
 	doc.GET("", echoSwagger.WrapHandler)
 
 	// Mount filesystems
@@ -523,14 +531,6 @@ func (s *server) setRoutes() {
 			MimeTypesFile:      s.mimeTypesFile,
 			DefaultContentType: filesystem.DefaultContentType,
 		}))
-
-		if filesystem.Gzip {
-			fs.Use(mwcompress.NewWithConfig(mwcompress.Config{
-				Skipper:   mwcompress.ContentTypeSkipper(s.gzip.mimetypes),
-				Level:     mwcompress.BestSpeed,
-				MinLength: 1000,
-			}))
-		}
 
 		if filesystem.Cache != nil {
 			mwcache := mwcache.NewWithConfig(mwcache.Config{
@@ -585,7 +585,7 @@ func (s *server) setRoutes() {
 
 	// GraphQL
 	graphql := api.Group("/graph")
-	graphql.Use(gzipMiddleware)
+	//graphql.Use(gzipMiddleware)
 
 	graphql.GET("", s.handler.graph.Playground)
 	graphql.POST("/query", s.handler.graph.Query)
@@ -593,7 +593,7 @@ func (s *server) setRoutes() {
 	// APIv3 router group
 	v3 := api.Group("/v3")
 
-	v3.Use(gzipMiddleware)
+	//v3.Use(gzipMiddleware)
 
 	s.setRoutesV3(v3)
 }
@@ -758,6 +758,8 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/node/:id/state", s.v3handler.cluster.NodeGetState)
 
 		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.FilesystemListFiles)
+
+		v3.POST("/cluster/events", s.v3handler.cluster.Events)
 
 		if !s.readOnly {
 			v3.PUT("/cluster/transfer/:id", s.v3handler.cluster.TransferLeadership)

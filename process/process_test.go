@@ -10,8 +10,19 @@ import (
 
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/math/rand"
+	"github.com/datarhei/core/v16/resources"
+	"github.com/datarhei/core/v16/resources/psutil"
 	"github.com/stretchr/testify/require"
 )
+
+func newResources() resources.Resources {
+	util, _ := psutil.New("", nil)
+	res, _ := resources.New(resources.Config{
+		PSUtil: util,
+	})
+
+	return res
+}
 
 func TestProcess(t *testing.T) {
 	p, _ := New(Config{
@@ -21,6 +32,7 @@ func TestProcess(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 0,
+		Resources:    newResources(),
 	})
 
 	require.Equal(t, "finished", p.Status().State)
@@ -59,6 +71,7 @@ func TestReconnectProcess(t *testing.T) {
 		OnExit: func(string) {
 			wg.Done()
 		},
+		Resources: newResources(),
 	})
 
 	p.Start()
@@ -104,6 +117,7 @@ func TestStaleProcess(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 2 * time.Second,
+		Resources:    newResources(),
 	})
 
 	p.Start()
@@ -126,6 +140,7 @@ func TestStaleReconnectProcess(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 2 * time.Second,
 		StaleTimeout:   3 * time.Second,
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -156,6 +171,7 @@ func TestNonExistingProcess(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 5 * time.Second,
 		StaleTimeout:   0,
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -180,6 +196,7 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 2 * time.Second,
 		StaleTimeout:   0,
+		Resources:      newResources(),
 	})
 
 	p.Start()
@@ -203,6 +220,7 @@ func TestProcessFailed(t *testing.T) {
 		},
 		Reconnect:    false,
 		StaleTimeout: 0,
+		Resources:    newResources(),
 	})
 
 	p.Start()
@@ -217,7 +235,7 @@ func TestProcessFailed(t *testing.T) {
 }
 
 func TestFFmpegWaitStop(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigintwait", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigintwait")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -228,6 +246,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 		OnExit: func(state string) {
 			time.Sleep(3 * time.Second)
 		},
+		Resources: newResources(),
 	})
 
 	err = p.Start()
@@ -247,7 +266,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 }
 
 func TestFFmpegKill(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -255,6 +274,7 @@ func TestFFmpegKill(t *testing.T) {
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
+		Resources:    newResources(),
 	})
 
 	err = p.Start()
@@ -272,7 +292,7 @@ func TestFFmpegKill(t *testing.T) {
 }
 
 func TestProcessForceKill(t *testing.T) {
-	binary, err := testhelper.BuildBinary("ignoresigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("ignoresigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, _ := New(Config{
@@ -280,6 +300,7 @@ func TestProcessForceKill(t *testing.T) {
 		Args:         []string{},
 		Reconnect:    false,
 		StaleTimeout: 0,
+		Resources:    newResources(),
 	})
 
 	err = p.Start()
@@ -305,13 +326,14 @@ func TestProcessForceKill(t *testing.T) {
 }
 
 func TestProcessDuration(t *testing.T) {
-	binary, err := testhelper.BuildBinary("sigint", "../internal/testhelper")
+	binary, err := testhelper.BuildBinary("sigint")
 	require.NoError(t, err, "Failed to build helper program")
 
 	p, err := New(Config{
-		Binary:  binary,
-		Args:    []string{},
-		Timeout: 3 * time.Second,
+		Binary:    binary,
+		Args:      []string{},
+		Timeout:   3 * time.Second,
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 
@@ -358,6 +380,7 @@ func TestProcessSchedulePointInTime(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -399,6 +422,7 @@ func TestProcessSchedulePointInTimeGone(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -424,6 +448,7 @@ func TestProcessScheduleCron(t *testing.T) {
 		},
 		Reconnect: false,
 		Scheduler: s,
+		Resources: newResources(),
 	})
 
 	status := p.Status()
@@ -454,6 +479,7 @@ func TestProcessDelayNoScheduler(t *testing.T) {
 		Binary:         "sleep",
 		Reconnect:      false,
 		ReconnectDelay: 5 * time.Second,
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -470,6 +496,7 @@ func TestProcessDelayNoScheduler(t *testing.T) {
 		Binary:         "sleep",
 		Reconnect:      true,
 		ReconnectDelay: 5 * time.Second,
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -493,6 +520,7 @@ func TestProcessDelaySchedulerNoReconnect(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -514,6 +542,7 @@ func TestProcessDelaySchedulerNoReconnect(t *testing.T) {
 		Reconnect:      false,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -537,6 +566,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
+		Resources:      newResources(),
 	})
 
 	px := p.(*process)
@@ -558,6 +588,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 1 * time.Second,
 		Scheduler:      s,
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -579,6 +610,7 @@ func TestProcessDelaySchedulerReconnect(t *testing.T) {
 		Reconnect:      true,
 		ReconnectDelay: 10 * time.Second,
 		Scheduler:      s,
+		Resources:      newResources(),
 	})
 
 	px = p.(*process)
@@ -606,21 +638,15 @@ func TestProcessCallbacks(t *testing.T) {
 			"2",
 		},
 		Reconnect: false,
-		OnArgs: func(a []string) []string {
-			lock.Lock()
-			defer lock.Unlock()
-
-			args = make([]string, len(a))
-			copy(args, a)
-			return a
-		},
-		OnBeforeStart: func() error {
+		OnBeforeStart: func(a []string) ([]string, error) {
 			lock.Lock()
 			defer lock.Unlock()
 
 			onBeforeStart = true
 
-			return nil
+			args = make([]string, len(a))
+			copy(args, a)
+			return a, nil
 		},
 		OnStart: func() {
 			lock.Lock()
@@ -642,6 +668,7 @@ func TestProcessCallbacks(t *testing.T) {
 
 			onState = append(onState, from+"/"+to)
 		},
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 
@@ -681,9 +708,10 @@ func TestProcessCallbacksOnBeforeStart(t *testing.T) {
 		Parser:         parser,
 		Reconnect:      true,
 		ReconnectDelay: 10 * time.Second,
-		OnBeforeStart: func() error {
-			return fmt.Errorf("no, not now")
+		OnBeforeStart: func(a []string) ([]string, error) {
+			return a, fmt.Errorf("no, not now")
 		},
+		Resources: newResources(),
 	})
 	require.NoError(t, err)
 

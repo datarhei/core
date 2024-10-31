@@ -46,12 +46,18 @@ func TestConfigHash(t *testing.T) {
 		LogPatterns:    []string{"^libx264"},
 		LimitCPU:       50,
 		LimitMemory:    3 * 1024 * 1024,
-		LimitWaitFor:   20,
+		LimitGPU: ConfigLimitGPU{
+			Usage:   10,
+			Encoder: 42,
+			Decoder: 14,
+			Memory:  500 * 1024 * 1024,
+		},
+		LimitWaitFor: 20,
 	}
 
 	hash1 := config.Hash()
 
-	require.Equal(t, []byte{0x7e, 0xae, 0x5b, 0xc3, 0xad, 0xe3, 0x9a, 0xfc, 0xd3, 0x49, 0x15, 0x28, 0x93, 0x17, 0xc5, 0xbf}, hash1)
+	require.Equal(t, []byte{0x5e, 0x85, 0xc3, 0xc5, 0x44, 0xfd, 0x3e, 0x10, 0x13, 0x76, 0x36, 0x8b, 0xbe, 0x7e, 0xa6, 0xbb}, hash1)
 
 	config.Reconnect = false
 

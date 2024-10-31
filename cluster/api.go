@@ -171,7 +171,7 @@ func (a *api) Version(c echo.Context) error {
 // @Tags v1.0.0
 // @ID cluster-1-about
 // @Produce json
-// @Success 200 {string} About
+// @Success 200 {object} client.AboutResponse
 // @Success 500 {object} Error
 // @Router /v1/about [get]
 func (a *api) About(c echo.Context) error {
@@ -193,6 +193,19 @@ func (a *api) About(c echo.Context) error {
 			MemTotal:     resources.Mem.Total,
 			MemCore:      resources.Mem.Core,
 		},
+	}
+
+	if len(resources.GPU.GPU) != 0 {
+		about.Resources.GPU = make([]client.AboutResponseGPUResources, len(resources.GPU.GPU))
+		for i, gpu := range resources.GPU.GPU {
+			about.Resources.GPU[i].Mem = gpu.MemoryUsed
+			about.Resources.GPU[i].MemLimit = gpu.MemoryLimit
+			about.Resources.GPU[i].MemTotal = gpu.MemoryTotal
+			about.Resources.GPU[i].Usage = gpu.Usage
+			about.Resources.GPU[i].UsageLimit = gpu.UsageLimit
+			about.Resources.GPU[i].Encoder = gpu.Encoder
+			about.Resources.GPU[i].Decoder = gpu.Decoder
+		}
 	}
 
 	if err != nil {
@@ -400,7 +413,7 @@ func (a *api) ProcessAdd(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Domain to act on"
 // @Param X-Cluster-Origin header string false "Origin ID of request"
-// @Success 200 {string} string
+// @Success 200 {object} client.GetProcessResponse
 // @Failure 404 {object} Error
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error

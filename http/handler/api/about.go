@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream"
 
 	"github.com/labstack/echo/v4"
@@ -14,15 +15,17 @@ import (
 // The AboutHandler type provides handler functions for retrieving details
 // about the API version and build infos.
 type AboutHandler struct {
-	restream restream.Restreamer
-	auths    func() []string
+	restream  restream.Restreamer
+	resources resources.Resources
+	auths     func() []string
 }
 
 // NewAbout returns a new About type
-func NewAbout(restream restream.Restreamer, auths func() []string) *AboutHandler {
+func NewAbout(restream restream.Restreamer, resources resources.Resources, auths func() []string) *AboutHandler {
 	return &AboutHandler{
-		restream: restream,
-		auths:    auths,
+		restream:  restream,
+		resources: resources,
+		auths:     auths,
 	}
 }
 
@@ -41,7 +44,7 @@ func (p *AboutHandler) About(c echo.Context) error {
 		return c.JSON(http.StatusOK, api.MinimalAbout{
 			App:   app.Name,
 			Auths: p.auths(),
-			Version: api.VersionMinimal{
+			Version: api.AboutVersionMinimal{
 				Number: app.Version.MajorString(),
 			},
 		})
@@ -56,7 +59,7 @@ func (p *AboutHandler) About(c echo.Context) error {
 		ID:        p.restream.ID(),
 		CreatedAt: createdAt.Format(time.RFC3339),
 		Uptime:    uint64(time.Since(createdAt).Seconds()),
-		Version: api.Version{
+		Version: api.AboutVersion{
 			Number:   app.Version.String(),
 			Commit:   app.Commit,
 			Branch:   app.Branch,
@@ -64,6 +67,33 @@ func (p *AboutHandler) About(c echo.Context) error {
 			Arch:     app.Arch,
 			Compiler: app.Compiler,
 		},
+	}
+
+	if p.resources != nil {
+		res := p.resources.Info()
+
+		about.Resources.IsThrottling = res.CPU.Throttling
+		about.Resources.NCPU = res.CPU.NCPU
+		about.Resources.CPU = (100 - res.CPU.Idle) * res.CPU.NCPU
+		about.Resources.CPULimit = res.CPU.Limit * res.CPU.NCPU
+		about.Resources.CPUCore = res.CPU.Core * res.CPU.NCPU
+		about.Resources.Mem = res.Mem.Total - res.Mem.Available
+		about.Resources.MemLimit = res.Mem.Limit
+		about.Resources.MemTotal = res.Mem.Total
+		about.Resources.MemCore = res.Mem.Core
+
+		about.Resources.GPU = make([]api.AboutGPUResources, len(res.GPU.GPU))
+		for i, gpu := range res.GPU.GPU {
+			about.Resources.GPU[i] = api.AboutGPUResources{
+				Mem:        gpu.MemoryUsed,
+				MemLimit:   gpu.MemoryLimit,
+				MemTotal:   gpu.MemoryTotal,
+				Usage:      gpu.Usage,
+				UsageLimit: gpu.UsageLimit,
+				Encoder:    gpu.Encoder,
+				Decoder:    gpu.Decoder,
+			}
+		}
 	}
 
 	return c.JSON(http.StatusOK, about)

@@ -46,12 +46,27 @@ type AVstream struct {
 	Duplicating    bool       `json:"duplicating"`
 	GOP            string     `json:"gop"`
 	Mode           string     `json:"mode"`
+
+	// Codec parameter
+	Codec     string `json:"codec"`
+	Profile   int    `json:"profile"`
+	Level     int    `json:"level"`
+	Pixfmt    string `json:"pix_fmt,omitempty"`
+	Width     uint64 `json:"width,omitempty" format:"uint64"`
+	Height    uint64 `json:"height,omitempty" format:"uint64"`
+	Samplefmt string `json:"sample_fmt,omitempty"`
+	Sampling  uint64 `json:"sampling_hz,omitempty" format:"uint64"`
+	Layout    string `json:"layout,omitempty"`
+	Channels  uint64 `json:"channels,omitempty" format:"uint64"`
 }
 
 func (a *AVstream) Unmarshal(av *app.AVstream) {
 	if av == nil {
 		return
 	}
+
+	a.Input.Unmarshal(&av.Input)
+	a.Output.Unmarshal(&av.Output)
 
 	a.Aqueue = av.Aqueue
 	a.Queue = av.Queue
@@ -64,8 +79,16 @@ func (a *AVstream) Unmarshal(av *app.AVstream) {
 	a.GOP = av.GOP
 	a.Mode = av.Mode
 
-	a.Input.Unmarshal(&av.Input)
-	a.Output.Unmarshal(&av.Output)
+	a.Codec = av.Codec
+	a.Profile = av.Profile
+	a.Level = av.Level
+	a.Pixfmt = av.Pixfmt
+	a.Width = av.Width
+	a.Height = av.Height
+	a.Samplefmt = av.Samplefmt
+	a.Sampling = av.Sampling
+	a.Layout = av.Layout
+	a.Channels = av.Channels
 }
 
 func (a *AVstream) Marshal() *app.AVstream {
@@ -82,6 +105,16 @@ func (a *AVstream) Marshal() *app.AVstream {
 		Duplicating:    a.Duplicating,
 		GOP:            a.GOP,
 		Mode:           a.Mode,
+		Codec:          a.Codec,
+		Profile:        a.Profile,
+		Level:          a.Level,
+		Pixfmt:         a.Pixfmt,
+		Width:          a.Width,
+		Height:         a.Height,
+		Samplefmt:      a.Samplefmt,
+		Sampling:       a.Sampling,
+		Layout:         a.Layout,
+		Channels:       a.Channels,
 	}
 
 	return av

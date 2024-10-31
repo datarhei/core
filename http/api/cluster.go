@@ -39,16 +39,27 @@ type ClusterNodeCore struct {
 }
 
 type ClusterNodeResources struct {
-	IsThrottling bool    `json:"is_throttling"`
-	NCPU         float64 `json:"ncpu"`
-	CPU          float64 `json:"cpu_used"`           // percent 0-100*npcu
-	CPULimit     float64 `json:"cpu_limit"`          // percent 0-100*npcu
-	CPUCore      float64 `json:"cpu_core"`           // percent 0-100*ncpu
-	Mem          uint64  `json:"memory_used_bytes"`  // bytes
-	MemLimit     uint64  `json:"memory_limit_bytes"` // bytes
-	MemTotal     uint64  `json:"memory_total_bytes"` // bytes
-	MemCore      uint64  `json:"memory_core_bytes"`  // bytes
-	Error        string  `json:"error"`
+	IsThrottling bool                      `json:"is_throttling"`
+	NCPU         float64                   `json:"ncpu"`
+	CPU          float64                   `json:"cpu_used"`           // percent 0-100*npcu
+	CPULimit     float64                   `json:"cpu_limit"`          // percent 0-100*npcu
+	CPUCore      float64                   `json:"cpu_core"`           // percent 0-100*ncpu
+	Mem          uint64                    `json:"memory_used_bytes"`  // bytes
+	MemLimit     uint64                    `json:"memory_limit_bytes"` // bytes
+	MemTotal     uint64                    `json:"memory_total_bytes"` // bytes
+	MemCore      uint64                    `json:"memory_core_bytes"`  // bytes
+	GPU          []ClusterNodeGPUResources `json:"gpu"`                // GPU resources
+	Error        string                    `json:"error"`
+}
+
+type ClusterNodeGPUResources struct {
+	Mem        uint64  `json:"memory_used_bytes"`  // Currently used memory in bytes
+	MemLimit   uint64  `json:"memory_limit_bytes"` // Defined memory limit in bytes
+	MemTotal   uint64  `json:"memory_total_bytes"` // Total available memory in bytes
+	Usage      float64 `json:"usage_general"`      // Current general usage, 0-100
+	UsageLimit float64 `json:"usage_limit"`        // Defined general usage limit, 0-100
+	Encoder    float64 `json:"usage_encoder"`      // Current encoder usage, 0-100
+	Decoder    float64 `json:"usage_decoder"`      // Current decoder usage, 0-100
 }
 
 type ClusterRaft struct {

@@ -3,3 +3,4 @@ testhelper/sigint/sigint
 testhelper/sigintwait/sigintwait
 testhelper/sigpropagate/sigpropagate
 testhelper/ffmpeg/ffmpeg
+testhelper/nvidia-smi/nvidia-smi

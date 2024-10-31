@@ -74,43 +74,97 @@ func (avswap *ffmpegAVStreamSwap) export() AVStreamSwap {
 	}
 }
 
-type ffmpegAVstream struct {
-	Input          ffmpegAVstreamIO   `json:"input"`
-	Output         ffmpegAVstreamIO   `json:"output"`
-	Address        string             `json:"id"`
-	URL            string             `json:"url"`
-	Stream         uint64             `json:"stream"`
-	Aqueue         uint64             `json:"aqueue"`
-	Queue          uint64             `json:"queue"`
-	Dup            uint64             `json:"dup"`
-	Drop           uint64             `json:"drop"`
-	Enc            uint64             `json:"enc"`
-	Looping        bool               `json:"looping"`
-	LoopingRuntime uint64             `json:"looping_runtime"`
-	Duplicating    bool               `json:"duplicating"`
-	GOP            string             `json:"gop"`
-	Mode           string             `json:"mode"`
-	Debug          interface{}        `json:"debug"`
-	Swap           ffmpegAVStreamSwap `json:"swap"`
+type ffmpegAVStreamTrack struct {
+	Queue     uint64           `json:"queue"`
+	Dup       uint64           `json:"dup"`
+	Drop      uint64           `json:"drop"`
+	Enc       uint64           `json:"enc"`
+	Input     ffmpegAVstreamIO `json:"input"`
+	Output    ffmpegAVstreamIO `json:"output"`
+	Codec     string           `json:"codec"`
+	Profile   int              `json:"profile"`
+	Level     int              `json:"level"`
+	Pixfmt    string           `json:"pix_fmt"`
+	Width     uint64           `json:"width"`
+	Height    uint64           `json:"height"`
+	Samplefmt string           `json:"sample_fmt"`
+	Sampling  uint64           `json:"sampling_hz"`
+	Layout    string           `json:"layout"`
+	Channels  uint64           `json:"channels"`
 }
 
-func (av *ffmpegAVstream) export() *AVstream {
-	return &AVstream{
-		Aqueue:         av.Aqueue,
-		Queue:          av.Queue,
-		Drop:           av.Drop,
-		Dup:            av.Dup,
-		Enc:            av.Enc,
+type ffmpegAVstream struct {
+	Input          ffmpegAVstreamIO    `json:"input"`
+	Output         ffmpegAVstreamIO    `json:"output"`
+	Audio          ffmpegAVStreamTrack `json:"audio"`
+	Video          ffmpegAVStreamTrack `json:"video"`
+	Address        string              `json:"id"`
+	URL            string              `json:"url"`
+	Stream         uint64              `json:"stream"`
+	Aqueue         uint64              `json:"aqueue"`
+	Queue          uint64              `json:"queue"`
+	Dup            uint64              `json:"dup"`
+	Drop           uint64              `json:"drop"`
+	Enc            uint64              `json:"enc"`
+	Looping        bool                `json:"looping"`
+	LoopingRuntime uint64              `json:"looping_runtime"`
+	Duplicating    bool                `json:"duplicating"`
+	GOP            string              `json:"gop"`
+	Mode           string              `json:"mode"`
+	Debug          interface{}         `json:"debug"`
+	Swap           ffmpegAVStreamSwap  `json:"swap"`
+}
+
+func (av *ffmpegAVstream) export(trackType string) *AVstream {
+	avs := &AVstream{
 		Looping:        av.Looping,
 		LoopingRuntime: av.LoopingRuntime,
 		Duplicating:    av.Duplicating,
 		GOP:            av.GOP,
 		Mode:           av.Mode,
-		Input:          av.Input.export(),
-		Output:         av.Output.export(),
 		Debug:          av.Debug,
 		Swap:           av.Swap.export(),
 	}
+
+	hasTracks := len(av.Video.Codec) != 0
+
+	if hasTracks {
+		var track *ffmpegAVStreamTrack = nil
+
+		if trackType == "audio" {
+			track = &av.Audio
+		} else {
+			track = &av.Video
+		}
+
+		avs.Queue = track.Queue
+		avs.Drop = track.Drop
+		avs.Dup = track.Dup
+		avs.Enc = track.Enc
+		avs.Input = track.Input.export()
+		avs.Output = track.Output.export()
+
+		avs.Codec = track.Codec
+		avs.Profile = track.Profile
+		avs.Level = track.Level
+		avs.Pixfmt = track.Pixfmt
+		avs.Width = track.Width
+		avs.Height = track.Height
+		avs.Samplefmt = track.Samplefmt
+		avs.Sampling = track.Sampling
+		avs.Layout = track.Layout
+		avs.Channels = track.Channels
+	} else {
+		avs.Queue = av.Queue
+		avs.Aqueue = av.Aqueue
+		avs.Drop = av.Drop
+		avs.Dup = av.Dup
+		avs.Enc = av.Enc
+		avs.Input = av.Input.export()
+		avs.Output = av.Output.export()
+	}
+
+	return avs
 }
 
 type ffmpegProgressIO struct {
@@ -218,6 +272,8 @@ type ffmpegProcessIO struct {
 	Type    string `json:"type"`
 	Codec   string `json:"codec"`
 	Coder   string `json:"coder"`
+	Profile int    `json:"profile"`
+	Level   int    `json:"level"`
 
 	// video
 	Pixfmt string `json:"pix_fmt"`
@@ -225,26 +281,30 @@ type ffmpegProcessIO struct {
 	Height uint64 `json:"height"`
 
 	// audio
-	Sampling uint64 `json:"sampling_hz"`
-	Layout   string `json:"layout"`
-	Channels uint64 `json:"channels"`
+	Samplefmt string `json:"sample_fmt"`
+	Sampling  uint64 `json:"sampling_hz"`
+	Layout    string `json:"layout"`
+	Channels  uint64 `json:"channels"`
 }
 
 func (io *ffmpegProcessIO) export() ProgressIO {
 	return ProgressIO{
-		Address:  io.Address,
-		Format:   io.Format,
-		Index:    io.Index,
-		Stream:   io.Stream,
-		Type:     io.Type,
-		Codec:    io.Codec,
-		Coder:    io.Coder,
-		Pixfmt:   io.Pixfmt,
-		Width:    io.Width,
-		Height:   io.Height,
-		Sampling: io.Sampling,
-		Layout:   io.Layout,
-		Channels: io.Channels,
+		Address:   io.Address,
+		Format:    io.Format,
+		Index:     io.Index,
+		Stream:    io.Stream,
+		Type:      io.Type,
+		Codec:     io.Codec,
+		Coder:     io.Coder,
+		Profile:   io.Profile,
+		Level:     io.Level,
+		Pixfmt:    io.Pixfmt,
+		Width:     io.Width,
+		Height:    io.Height,
+		Samplefmt: io.Samplefmt,
+		Sampling:  io.Sampling,
+		Layout:    io.Layout,
+		Channels:  io.Channels,
 	}
 }
 
@@ -422,6 +482,8 @@ type ProgressIO struct {
 	Type      string
 	Codec     string
 	Coder     string
+	Profile   int
+	Level     int
 	Frame     uint64
 	Keyframe  uint64
 	Framerate struct {
@@ -443,9 +505,10 @@ type ProgressIO struct {
 	Height    uint64
 
 	// Audio
-	Sampling uint64
-	Layout   string
-	Channels uint64
+	Samplefmt string
+	Sampling  uint64 // Hz
+	Layout    string // mono, stereo, ...
+	Channels  uint64
 
 	// avstream
 	AVstream *AVstream
@@ -498,11 +561,22 @@ type AVstream struct {
 	Mode           string
 	Debug          interface{}
 	Swap           AVStreamSwap
+	Codec          string
+	Profile        int
+	Level          int
+	Pixfmt         string
+	Width          uint64
+	Height         uint64
+	Samplefmt      string
+	Sampling       uint64
+	Layout         string
+	Channels       uint64
 }
 
 type Usage struct {
 	CPU    UsageCPU
 	Memory UsageMemory
+	GPU    UsageGPU
 }
 
 type UsageCPU struct {
@@ -513,7 +587,27 @@ type UsageCPU struct {
 }
 
 type UsageMemory struct {
+	Average uint64
+	Max     uint64
+	Limit   uint64
+}
+
+type UsageGPU struct {
+	Index   int
+	Usage   UsageGPUUsage
+	Encoder UsageGPUUsage
+	Decoder UsageGPUUsage
+	Memory  UsageGPUMemory
+}
+
+type UsageGPUUsage struct {
 	Average float64
+	Max     float64
+	Limit   float64
+}
+
+type UsageGPUMemory struct {
+	Average uint64
 	Max     uint64
 	Limit   uint64
 }

@@ -123,7 +123,20 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 			MemLimit:     node.Resources.MemLimit,
 			MemTotal:     node.Resources.MemTotal,
 			MemCore:      node.Resources.MemCore,
+			GPU:          []api.ClusterNodeGPUResources{},
 		},
+	}
+
+	for _, gpu := range node.Resources.GPU {
+		n.Resources.GPU = append(n.Resources.GPU, api.ClusterNodeGPUResources{
+			Mem:        gpu.Mem,
+			MemLimit:   gpu.MemLimit,
+			MemTotal:   gpu.MemTotal,
+			Usage:      gpu.Usage,
+			UsageLimit: gpu.UsageLimit,
+			Encoder:    gpu.Encoder,
+			Decoder:    gpu.Decoder,
+		})
 	}
 
 	if node.Error != nil {

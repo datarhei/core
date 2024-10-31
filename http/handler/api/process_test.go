@@ -14,6 +14,7 @@ import (
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/iam/policy"
+	"github.com/datarhei/core/v16/internal/mock/restream"
 	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
@@ -27,7 +28,7 @@ type Response struct {
 }
 
 func getDummyRestreamHandler() (*ProcessHandler, error) {
-	rs, err := mock.DummyRestreamer("../../mock")
+	rs, err := restream.New(nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}

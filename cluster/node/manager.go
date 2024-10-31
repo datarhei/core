@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -154,7 +155,7 @@ func (p *Manager) NodeGet(id string) (*Node, error) {
 
 	node, ok := p.nodes[id]
 	if !ok {
-		return nil, fmt.Errorf("node not found")
+		return nil, fmt.Errorf("node not found: %s", id)
 	}
 
 	return node, nil
@@ -538,7 +539,7 @@ func (p *Manager) ProcessList(options client.ProcessListOptions) []api.Process {
 func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (api.Process, error) {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return api.Process{}, fmt.Errorf("node not found: %w", err)
+		return api.Process{}, err
 	}
 
 	list, err := node.Core().ProcessList(client.ProcessListOptions{
@@ -550,13 +551,17 @@ func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (
 		return api.Process{}, err
 	}
 
+	if len(list) == 0 {
+		return api.Process{}, fmt.Errorf("process not found")
+	}
+
 	return list[0], nil
 }
 
 func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return err
 	}
 
 	return node.Core().ProcessAdd(config, metadata)
@@ -565,7 +570,7 @@ func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[str
 func (p *Manager) ProcessDelete(nodeid string, id app.ProcessID) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return err
 	}
 
 	return node.Core().ProcessDelete(id)
@@ -574,7 +579,7 @@ func (p *Manager) ProcessDelete(nodeid string, id app.ProcessID) error {
 func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return err
 	}
 
 	return node.Core().ProcessUpdate(id, config, metadata)
@@ -583,7 +588,7 @@ func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Con
 func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.Report) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return err
 	}
 
 	return node.Core().ProcessReportSet(id, report)
@@ -592,7 +597,7 @@ func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.
 func (p *Manager) ProcessCommand(nodeid string, id app.ProcessID, command string) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
+		return err
 	}
 
 	return node.Core().ProcessCommand(id, command)
@@ -604,7 +609,7 @@ func (p *Manager) ProcessProbe(nodeid string, id app.ProcessID) (api.Probe, erro
 		probe := api.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process %s should reside on, doesn't exist", nodeid, id.String())},
 		}
-		return probe, fmt.Errorf("node not found: %w", err)
+		return probe, err
 	}
 
 	return node.Core().ProcessProbe(id)
@@ -616,8 +621,30 @@ func (p *Manager) ProcessProbeConfig(nodeid string, config *app.Config) (api.Pro
 		probe := api.Probe{
 			Log: []string{fmt.Sprintf("the node %s where the process config should be probed on, doesn't exist", nodeid)},
 		}
-		return probe, fmt.Errorf("node not found: %w", err)
+		return probe, err
 	}
 
 	return node.Core().ProcessProbeConfig(config)
+}
+
+func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
+	eventChan := make(chan api.Event, 128)
+
+	p.lock.RLock()
+	for _, n := range p.nodes {
+		go func(node *Node, e chan<- api.Event) {
+			eventChan, err := node.Core().Events(ctx, filters)
+			if err != nil {
+				return
+			}
+
+			for event := range eventChan {
+				event.CoreID = node.id
+				e <- event
+			}
+		}(n, eventChan)
+	}
+	p.lock.RUnlock()
+
+	return eventChan, nil
 }

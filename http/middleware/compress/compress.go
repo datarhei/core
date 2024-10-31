@@ -2,14 +2,14 @@ package compress
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 
+	"github.com/datarhei/core/v16/mem"
+	"github.com/datarhei/core/v16/slices"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -27,8 +27,11 @@ type Config struct {
 	// is used. Optional. Default value 0
 	MinLength int
 
-	// Schemes is a list of enabled compressiond. Optional. Default [GzipScheme, ZstdScheme]
-	Schemes []Scheme
+	// Schemes is a list of enabled compressiond. Optional. Default [gzip]
+	Schemes []string
+
+	// List of content type to compress. If empty, everything will be compressed
+	ContentTypes []string
 }
 
 type Compression interface {
@@ -46,27 +49,18 @@ type Compressor interface {
 type compressResponseWriter struct {
 	Compressor
 	http.ResponseWriter
+	hasHeader           bool
 	wroteHeader         bool
 	wroteBody           bool
 	minLength           int
 	minLengthExceeded   bool
-	buffer              *bytes.Buffer
+	buffer              *mem.Buffer
 	code                int
 	headerContentLength string
 	scheme              string
+	contentTypes        []string
+	passThrough         bool
 }
-
-type Scheme string
-
-func (s Scheme) String() string {
-	return string(s)
-}
-
-const (
-	GzipScheme   Scheme = "gzip"
-	BrotliScheme Scheme = "br"
-	ZstdScheme   Scheme = "zstd"
-)
 
 type Level int
 
@@ -78,33 +72,11 @@ const (
 
 // DefaultConfig is the default Gzip middleware config.
 var DefaultConfig = Config{
-	Skipper:   middleware.DefaultSkipper,
-	Level:     DefaultCompression,
-	MinLength: 0,
-	Schemes:   []Scheme{GzipScheme, ZstdScheme},
-}
-
-// ContentTypesSkipper returns a Skipper based on the list of content types
-// that should be compressed. If the list is empty, all responses will be
-// compressed.
-func ContentTypeSkipper(contentTypes []string) middleware.Skipper {
-	return func(c echo.Context) bool {
-		// If no allowed content types are given, compress all
-		if len(contentTypes) == 0 {
-			return false
-		}
-
-		// Iterate through the allowed content types and don't skip if the content type matches
-		responseContentType := c.Response().Header().Get(echo.HeaderContentType)
-
-		for _, contentType := range contentTypes {
-			if strings.Contains(responseContentType, contentType) {
-				return false
-			}
-		}
-
-		return true
-	}
+	Skipper:      middleware.DefaultSkipper,
+	Level:        DefaultCompression,
+	MinLength:    0,
+	Schemes:      []string{"gzip"},
+	ContentTypes: []string{},
 }
 
 // New returns a middleware which compresses HTTP response using a compression
@@ -133,38 +105,38 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.Schemes = DefaultConfig.Schemes
 	}
 
+	contentTypes := slices.Copy(config.ContentTypes)
+
 	gzipEnable := false
 	brotliEnable := false
 	zstdEnable := false
 
 	for _, s := range config.Schemes {
 		switch s {
-		case GzipScheme:
+		case "gzip":
 			gzipEnable = true
-		case BrotliScheme:
+		case "br":
 			brotliEnable = true
-		case ZstdScheme:
+		case "zstd":
 			zstdEnable = true
 		}
 	}
 
-	var gzipPool Compression
-	var brotliPool Compression
-	var zstdPool Compression
+	var gzipCompressor Compression
+	var brotliCompressor Compression
+	var zstdCompressor Compression
 
 	if gzipEnable {
-		gzipPool = NewGzip(config.Level)
+		gzipCompressor = NewGzip(config.Level)
 	}
 
 	if brotliEnable {
-		brotliPool = NewBrotli(config.Level)
+		brotliCompressor = NewBrotli(config.Level)
 	}
 
 	if zstdEnable {
-		zstdPool = NewZstd(config.Level)
+		zstdCompressor = NewZstd(config.Level)
 	}
-
-	bpool := bufferPool()
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -173,62 +145,71 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			}
 
 			res := c.Response()
-			res.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
 			encodings := c.Request().Header.Get(echo.HeaderAcceptEncoding)
 
-			var pool Compression
-			var scheme Scheme
+			var compress Compression
+			var scheme string
 
-			if zstdEnable && strings.Contains(encodings, ZstdScheme.String()) {
-				pool = zstdPool
-				scheme = ZstdScheme
-			} else if brotliEnable && strings.Contains(encodings, BrotliScheme.String()) {
-				pool = brotliPool
-				scheme = BrotliScheme
-			} else if gzipEnable && strings.Contains(encodings, GzipScheme.String()) {
-				pool = gzipPool
-				scheme = GzipScheme
+			if zstdEnable && strings.Contains(encodings, "zstd") {
+				compress = zstdCompressor
+				scheme = "zstd"
+			} else if brotliEnable && strings.Contains(encodings, "br") {
+				compress = brotliCompressor
+				scheme = "br"
+			} else if gzipEnable && strings.Contains(encodings, "gzip") {
+				compress = gzipCompressor
+				scheme = "gzip"
 			}
 
-			if pool != nil {
-				w := pool.Acquire()
-				if w == nil {
+			if compress != nil {
+				compressor := compress.Acquire()
+				if compressor == nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, fmt.Errorf("failed to acquire compressor for %s", scheme))
 				}
 				rw := res.Writer
-				w.Reset(rw)
+				compressor.Reset(rw)
 
-				buf := bpool.Get().(*bytes.Buffer)
-				buf.Reset()
+				buffer := mem.Get()
 
-				grw := &compressResponseWriter{Compressor: w, ResponseWriter: rw, minLength: config.MinLength, buffer: buf, scheme: scheme.String()}
+				grw := &compressResponseWriter{
+					Compressor:     compressor,
+					ResponseWriter: rw,
+					minLength:      config.MinLength,
+					buffer:         buffer,
+					scheme:         scheme,
+					contentTypes:   contentTypes,
+				}
 
 				defer func() {
-					if !grw.wroteBody {
-						if res.Header().Get(echo.HeaderContentEncoding) == scheme.String() {
-							res.Header().Del(echo.HeaderContentEncoding)
-						}
-						// We have to reset response to it's pristine state when
-						// nothing is written to body or error is returned.
-						// See issue #424, #407.
-						res.Writer = rw
-						w.Reset(io.Discard)
-					} else if !grw.minLengthExceeded {
-						// If the minimum content length hasn't exceeded, write the uncompressed response
-						res.Writer = rw
-						if grw.wroteHeader {
-							// Restore Content-Length header in case it was deleted
-							if len(grw.headerContentLength) != 0 {
-								grw.Header().Set(echo.HeaderContentLength, grw.headerContentLength)
+					if !grw.passThrough {
+						if !grw.wroteBody {
+							if res.Header().Get(echo.HeaderContentEncoding) == scheme {
+								res.Header().Del(echo.HeaderContentEncoding)
 							}
-							grw.ResponseWriter.WriteHeader(grw.code)
+							// We have to reset response to it's pristine state when
+							// nothing is written to body or error is returned.
+							// See issue #424, #407.
+							res.Writer = rw
+							compressor.Reset(io.Discard)
+						} else if !grw.minLengthExceeded {
+							// If the minimum content length hasn't exceeded, write the uncompressed response
+							res.Writer = rw
+							if grw.wroteHeader {
+								// Restore Content-Length header in case it was deleted
+								if len(grw.headerContentLength) != 0 {
+									grw.Header().Set(echo.HeaderContentLength, grw.headerContentLength)
+								}
+								grw.ResponseWriter.WriteHeader(grw.code)
+							}
+							grw.buffer.WriteTo(rw)
+							compressor.Reset(io.Discard)
 						}
-						grw.buffer.WriteTo(rw)
-						w.Reset(io.Discard)
+					} else {
+						compressor.Reset(io.Discard)
 					}
-					w.Close()
-					bpool.Put(buf)
-					pool.Release(w)
+					compressor.Close()
+					mem.Put(buffer)
+					compress.Release(compressor)
 				}()
 
 				res.Writer = grw
@@ -241,15 +222,35 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 func (w *compressResponseWriter) WriteHeader(code int) {
 	if code == http.StatusNoContent { // Issue #489
-		w.ResponseWriter.Header().Del(echo.HeaderContentEncoding)
+		w.Header().Del(echo.HeaderContentEncoding)
 	}
 	w.headerContentLength = w.Header().Get(echo.HeaderContentLength)
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
 
-	w.wroteHeader = true
+	if !w.canCompress(w.Header().Get(echo.HeaderContentType)) {
+		w.passThrough = true
+	}
+
+	w.hasHeader = true
 
 	// Delay writing of the header until we know if we'll actually compress the response
 	w.code = code
+}
+
+func (w *compressResponseWriter) canCompress(responseContentType string) bool {
+	// If no content types are given, compress all
+	if len(w.contentTypes) == 0 {
+		return true
+	}
+
+	// Iterate through the allowed content types and don't skip if the content type matches
+	for _, contentType := range w.contentTypes {
+		if strings.Contains(responseContentType, contentType) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (w *compressResponseWriter) Write(b []byte) (int, error) {
@@ -259,6 +260,18 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 
 	w.wroteBody = true
 
+	if !w.hasHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if w.passThrough {
+		if !w.wroteHeader {
+			w.ResponseWriter.WriteHeader(w.code)
+			w.wroteHeader = true
+		}
+		return w.ResponseWriter.Write(b)
+	}
+
 	if !w.minLengthExceeded {
 		n, err := w.buffer.Write(b)
 
@@ -267,8 +280,10 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 
 			// The minimum length is exceeded, add Content-Encoding header and write the header
 			w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
-			if w.wroteHeader {
+			w.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
+			if w.hasHeader {
 				w.ResponseWriter.WriteHeader(w.code)
+				w.wroteHeader = true
 			}
 
 			return w.Compressor.Write(w.buffer.Bytes())
@@ -281,12 +296,31 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *compressResponseWriter) Flush() {
+	if !w.hasHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if w.passThrough {
+		if !w.wroteHeader {
+			w.ResponseWriter.WriteHeader(w.code)
+			w.wroteHeader = true
+		}
+
+		if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+			flusher.Flush()
+		}
+
+		return
+	}
+
 	if !w.minLengthExceeded {
 		// Enforce compression
 		w.minLengthExceeded = true
 		w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
-		if w.wroteHeader {
+		w.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
+		if w.hasHeader {
 			w.ResponseWriter.WriteHeader(w.code)
+			w.wroteHeader = true
 		}
 
 		w.Compressor.Write(w.buffer.Bytes())
@@ -307,13 +341,4 @@ func (w *compressResponseWriter) Push(target string, opts *http.PushOptions) err
 		return p.Push(target, opts)
 	}
 	return http.ErrNotSupported
-}
-
-func bufferPool() sync.Pool {
-	return sync.Pool{
-		New: func() interface{} {
-			b := &bytes.Buffer{}
-			return b
-		},
-	}
 }

@@ -141,17 +141,28 @@ type About struct {
 	SpawnedAt   time.Time
 }
 
+type ResourcesGPU struct {
+	Mem        uint64  // Currently used memory in bytes
+	MemLimit   uint64  // Defined memory limit in bytes
+	MemTotal   uint64  // Total available memory in bytes
+	Usage      float64 // Current general usage, 0-100
+	UsageLimit float64 // Defined general usage limit, 0-100
+	Encoder    float64 // Current encoder usage, 0-100
+	Decoder    float64 // Current decoder usage, 0-100
+}
+
 type Resources struct {
-	IsThrottling bool    // Whether this core is currently throttling
-	NCPU         float64 // Number of CPU on this node
-	CPU          float64 // Current CPU load, 0-100*ncpu
-	CPULimit     float64 // Defined CPU load limit, 0-100*ncpu
-	CPUCore      float64 // Current CPU load of the core itself, 0-100*ncpu
-	Mem          uint64  // Currently used memory in bytes
-	MemLimit     uint64  // Defined memory limit in bytes
-	MemTotal     uint64  // Total available memory in bytes
-	MemCore      uint64  // Current used memory of the core itself in bytes
-	Error        error   // Last error
+	IsThrottling bool           // Whether this core is currently throttling
+	NCPU         float64        // Number of CPU on this node
+	CPU          float64        // Current CPU load, 0-100*ncpu
+	CPULimit     float64        // Defined CPU load limit, 0-100*ncpu
+	CPUCore      float64        // Current CPU load of the core itself, 0-100*ncpu
+	Mem          uint64         // Currently used memory in bytes
+	MemLimit     uint64         // Defined memory limit in bytes
+	MemTotal     uint64         // Total available memory in bytes
+	MemCore      uint64         // Current used memory of the core itself in bytes
+	GPU          []ResourcesGPU // Currently used GPU resources
+	Error        error          // Last error
 }
 
 func (n *Node) About() About {
@@ -518,6 +529,20 @@ func (n *Node) ping(ctx context.Context, interval time.Duration) {
 						Error:        nil,
 					},
 				}
+
+				if len(about.Resources.GPU) != 0 {
+					n.nodeAbout.Resources.GPU = make([]ResourcesGPU, len(about.Resources.GPU))
+					for i, gpu := range about.Resources.GPU {
+						n.nodeAbout.Resources.GPU[i].Mem = gpu.Mem
+						n.nodeAbout.Resources.GPU[i].MemLimit = gpu.MemLimit
+						n.nodeAbout.Resources.GPU[i].MemTotal = gpu.MemTotal
+						n.nodeAbout.Resources.GPU[i].Usage = gpu.Usage
+						n.nodeAbout.Resources.GPU[i].UsageLimit = gpu.UsageLimit
+						n.nodeAbout.Resources.GPU[i].Encoder = gpu.Encoder
+						n.nodeAbout.Resources.GPU[i].Decoder = gpu.Decoder
+					}
+				}
+
 				if len(about.Resources.Error) != 0 {
 					n.nodeAbout.Resources.Error = errors.New(about.Resources.Error)
 				}

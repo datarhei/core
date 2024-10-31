@@ -86,7 +86,7 @@ func (h *ClusterHandler) NodeGet(c echo.Context) error {
 // @ID cluster-3-get-node-version
 // @Produce json
 // @Param id path string true "Node ID"
-// @Success 200 {object} api.Version
+// @Success 200 {object} api.AboutVersion
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/version [get]
@@ -100,7 +100,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 
 	v := peer.CoreAbout()
 
-	version := api.Version{
+	version := api.AboutVersion{
 		Number:   v.Version.Number,
 		Commit:   v.Version.Commit,
 		Branch:   v.Version.Branch,
@@ -373,7 +373,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 	processes := []api.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process", p.Config.ID, "read") {
+		if !h.iam.Enforce(ctxuser, domain, "process", p.ID, "read") {
 			continue
 		}
 

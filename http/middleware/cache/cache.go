@@ -2,13 +2,13 @@
 package cache
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"path"
 	"strings"
 
 	"github.com/datarhei/core/v16/http/cache"
+	"github.com/datarhei/core/v16/mem"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -78,6 +78,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 				w := &cacheWriter{
 					header: writer.Header().Clone(),
+					body:   mem.Get(),
 				}
 				res.Writer = w
 
@@ -170,7 +171,7 @@ type cacheObject struct {
 type cacheWriter struct {
 	code   int
 	header http.Header
-	body   bytes.Buffer
+	body   *mem.Buffer
 }
 
 func (w *cacheWriter) Header() http.Header {

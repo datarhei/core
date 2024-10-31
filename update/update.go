@@ -1,7 +1,6 @@
 package update
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/monitor/metric"
 	"golang.org/x/mod/semver"
 )
@@ -156,15 +156,16 @@ func (s *checker) check() error {
 		Timeout:   5 * time.Second,
 	}
 
-	var data bytes.Buffer
-	encoder := json.NewEncoder(&data)
+	data := mem.Get()
+	defer mem.Put(data)
+	encoder := json.NewEncoder(data)
 	if err := encoder.Encode(&request); err != nil {
 		return err
 	}
 
 	s.logger.Debug().WithField("request", data.String()).Log("")
 
-	req, err := http.NewRequest(http.MethodPut, "https://service.datarhei.com/api/v1/app_version", &data)
+	req, err := http.NewRequest(http.MethodPut, "https://service.datarhei.com/api/v1/app_version", data.Reader())
 	if err != nil {
 		return err
 	}

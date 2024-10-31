@@ -155,9 +155,13 @@ type ProcessConfigIOCleanup struct {
 }
 
 type ProcessConfigLimits struct {
-	CPU     float64 `json:"cpu_usage" jsonschema:"minimum=0"`
-	Memory  uint64  `json:"memory_mbytes" jsonschema:"minimum=0" format:"uint64"`
-	WaitFor uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`
+	CPU        float64 `json:"cpu_usage" jsonschema:"minimum=0"`                         // percent 0-100*ncpu
+	Memory     uint64  `json:"memory_mbytes" jsonschema:"minimum=0" format:"uint64"`     // megabytes
+	GPUUsage   float64 `json:"gpu_usage" jsonschema:"minimum=0"`                         // percent 0-100
+	GPUEncoder float64 `json:"gpu_encoder" jsonschema:"minimum=0"`                       // percent 0-100
+	GPUDecoder float64 `json:"gpu_decoder" jsonschema:"minimum=0"`                       // percent 0-100
+	GPUMemory  uint64  `json:"gpu_memory_mbytes" jsonschema:"minimum=0" format:"uint64"` // megabytes
+	WaitFor    uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`   // seconds
 }
 
 // ProcessConfig represents the configuration of an ffmpeg process
@@ -197,7 +201,13 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 		Scheduler:      cfg.Scheduler,
 		LimitCPU:       cfg.Limits.CPU,
 		LimitMemory:    cfg.Limits.Memory * 1024 * 1024,
-		LimitWaitFor:   cfg.Limits.WaitFor,
+		LimitGPU: app.ConfigLimitGPU{
+			Usage:   cfg.Limits.GPUUsage,
+			Encoder: cfg.Limits.GPUEncoder,
+			Decoder: cfg.Limits.GPUDecoder,
+			Memory:  cfg.Limits.GPUMemory * 1024 * 1024,
+		},
+		LimitWaitFor: cfg.Limits.WaitFor,
 	}
 
 	cfg.generateInputOutputIDs(cfg.Input)
@@ -283,6 +293,10 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 	cfg.Scheduler = c.Scheduler
 	cfg.Limits.CPU = c.LimitCPU
 	cfg.Limits.Memory = c.LimitMemory / 1024 / 1024
+	cfg.Limits.GPUUsage = c.LimitGPU.Usage
+	cfg.Limits.GPUEncoder = c.LimitGPU.Encoder
+	cfg.Limits.GPUDecoder = c.LimitGPU.Decoder
+	cfg.Limits.GPUMemory = c.LimitGPU.Memory / 1024 / 1024
 	cfg.Limits.WaitFor = c.LimitWaitFor
 
 	cfg.Options = make([]string, len(c.Options))
@@ -364,20 +378,7 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.Memory = state.Memory
 	s.CPU = json.ToNumber(state.CPU)
 	s.LimitMode = state.LimitMode
-	s.Resources.CPU = ProcessUsageCPU{
-		NCPU:         json.ToNumber(state.Resources.CPU.NCPU),
-		Current:      json.ToNumber(state.Resources.CPU.Current),
-		Average:      json.ToNumber(state.Resources.CPU.Average),
-		Max:          json.ToNumber(state.Resources.CPU.Max),
-		Limit:        json.ToNumber(state.Resources.CPU.Limit),
-		IsThrottling: state.Resources.CPU.IsThrottling,
-	}
-	s.Resources.Memory = ProcessUsageMemory{
-		Current: state.Resources.Memory.Current,
-		Average: json.ToNumber(state.Resources.Memory.Average),
-		Max:     state.Resources.Memory.Max,
-		Limit:   state.Resources.Memory.Limit,
-	}
+	s.Resources.Unmarshal(&state.Resources)
 	s.Command = state.Command
 
 	s.Progress.Unmarshal(&state.Progress)
@@ -430,15 +431,15 @@ func (p *ProcessUsageCPU) Marshal() app.ProcessUsageCPU {
 }
 
 type ProcessUsageMemory struct {
-	Current uint64      `json:"cur" format:"uint64"`
-	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
-	Max     uint64      `json:"max" format:"uint64"`
-	Limit   uint64      `json:"limit" format:"uint64"`
+	Current uint64 `json:"cur" format:"uint64"`
+	Average uint64 `json:"avg" format:"uint64"`
+	Max     uint64 `json:"max" format:"uint64"`
+	Limit   uint64 `json:"limit" format:"uint64"`
 }
 
 func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
 	p.Current = pp.Current
-	p.Average = json.ToNumber(pp.Average)
+	p.Average = pp.Average
 	p.Max = pp.Max
 	p.Limit = pp.Limit
 }
@@ -446,12 +447,98 @@ func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
 func (p *ProcessUsageMemory) Marshal() app.ProcessUsageMemory {
 	pp := app.ProcessUsageMemory{
 		Current: p.Current,
+		Average: p.Average,
 		Max:     p.Max,
 		Limit:   p.Limit,
 	}
 
+	return pp
+}
+
+type ProcessUsageGPUMemory struct {
+	Current uint64 `json:"cur" format:"uint64"`
+	Average uint64 `json:"avg" format:"uint64"`
+	Max     uint64 `json:"max" format:"uint64"`
+	Limit   uint64 `json:"limit" format:"uint64"`
+}
+
+func (p *ProcessUsageGPUMemory) Unmarshal(pp *app.ProcessUsageGPUMemory) {
+	p.Current = pp.Current
+	p.Average = pp.Average
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageGPUMemory) Marshal() app.ProcessUsageGPUMemory {
+	pp := app.ProcessUsageGPUMemory{
+		Current: p.Current,
+		Average: p.Average,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	return pp
+}
+
+type ProcessUsageGPUUsage struct {
+	Current json.Number `json:"cur" swaggertype:"number" jsonschema:"type=number"`
+	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max     json.Number `json:"max" swaggertype:"number" jsonschema:"type=number"`
+	Limit   json.Number `json:"limit" swaggertype:"number" jsonschema:"type=number"`
+}
+
+func (p *ProcessUsageGPUUsage) Unmarshal(pp *app.ProcessUsageGPUUsage) {
+	p.Current = json.ToNumber(pp.Current)
+	p.Average = json.ToNumber(pp.Average)
+	p.Max = json.ToNumber(pp.Max)
+	p.Limit = json.ToNumber(pp.Limit)
+}
+
+func (p *ProcessUsageGPUUsage) Marshal() app.ProcessUsageGPUUsage {
+	pp := app.ProcessUsageGPUUsage{}
+
+	if x, err := p.Current.Float64(); err == nil {
+		pp.Current = x
+	}
+
 	if x, err := p.Average.Float64(); err == nil {
 		pp.Average = x
+	}
+
+	if x, err := p.Max.Float64(); err == nil {
+		pp.Max = x
+	}
+
+	if x, err := p.Limit.Float64(); err == nil {
+		pp.Limit = x
+	}
+
+	return pp
+}
+
+type ProcessUsageGPU struct {
+	Index   int                   `json:"index"`
+	Memory  ProcessUsageGPUMemory `json:"memory_bytes"`
+	Usage   ProcessUsageGPUUsage  `json:"usage"`
+	Encoder ProcessUsageGPUUsage  `json:"encoder"`
+	Decoder ProcessUsageGPUUsage  `json:"decoder"`
+}
+
+func (p *ProcessUsageGPU) Unmarshal(pp *app.ProcessUsageGPU) {
+	p.Index = pp.Index
+	p.Memory.Unmarshal(&pp.Memory)
+	p.Usage.Unmarshal(&pp.Usage)
+	p.Encoder.Unmarshal(&pp.Encoder)
+	p.Decoder.Unmarshal(&pp.Decoder)
+}
+
+func (p *ProcessUsageGPU) Marshal() app.ProcessUsageGPU {
+	pp := app.ProcessUsageGPU{
+		Index:   p.Index,
+		Memory:  p.Memory.Marshal(),
+		Usage:   p.Usage.Marshal(),
+		Encoder: p.Encoder.Marshal(),
+		Decoder: p.Decoder.Marshal(),
 	}
 
 	return pp
@@ -460,17 +547,20 @@ func (p *ProcessUsageMemory) Marshal() app.ProcessUsageMemory {
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU    `json:"cpu_usage"`
 	Memory ProcessUsageMemory `json:"memory_bytes"`
+	GPU    ProcessUsageGPU    `json:"gpu"`
 }
 
 func (p *ProcessUsage) Unmarshal(pp *app.ProcessUsage) {
 	p.CPU.Unmarshal(&pp.CPU)
 	p.Memory.Unmarshal(&pp.Memory)
+	p.GPU.Unmarshal(&pp.GPU)
 }
 
 func (p *ProcessUsage) Marshal() app.ProcessUsage {
 	pp := app.ProcessUsage{
 		CPU:    p.CPU.Marshal(),
 		Memory: p.Memory.Marshal(),
+		GPU:    p.GPU.Marshal(),
 	}
 
 	return pp

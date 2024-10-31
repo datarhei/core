@@ -1,6 +1,7 @@
 package restream
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,10 +13,11 @@ import (
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/iam/policy"
+	mock "github.com/datarhei/core/v16/internal/mock/resources"
 	"github.com/datarhei/core/v16/internal/testhelper"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream/app"
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
@@ -25,10 +27,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer) (Restreamer, error) {
-	binary, err := testhelper.BuildBinary("ffmpeg", "../internal/testhelper")
+func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer, limits bool) (Restreamer, error) {
+	binary, err := testhelper.BuildBinary("ffmpeg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
+	}
+
+	var res resources.Resources
+	if limits {
+		res = mock.NewWithLimits()
+	} else {
+		res = mock.New()
 	}
 
 	ffmpeg, err := ffmpeg.New(ffmpeg.Config{
@@ -37,6 +46,7 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		Portrange:        portrange,
 		ValidatorInput:   validatorIn,
 		ValidatorOutput:  validatorOut,
+		Resource:         res,
 	})
 	if err != nil {
 		return nil, err
@@ -85,6 +95,7 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		Replace:     replacer,
 		Filesystems: []fs.Filesystem{memfs},
 		Rewrite:     rewriter,
+		Resources:   res,
 	})
 	if err != nil {
 		return nil, err
@@ -131,7 +142,7 @@ func getDummyProcess() *app.Config {
 }
 
 func TestAddProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -153,7 +164,7 @@ func TestAddProcess(t *testing.T) {
 }
 
 func TestAutostartProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -170,7 +181,7 @@ func TestAutostartProcess(t *testing.T) {
 }
 
 func TestAddInvalidProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	// Invalid process ID
@@ -238,7 +249,7 @@ func TestAddInvalidProcess(t *testing.T) {
 }
 
 func TestRemoveProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -255,7 +266,7 @@ func TestRemoveProcess(t *testing.T) {
 }
 
 func TestUpdateProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process1 := getDummyProcess()
@@ -306,7 +317,7 @@ func TestUpdateProcess(t *testing.T) {
 }
 
 func TestUpdateSameHashProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	config := getDummyProcess()
@@ -335,7 +346,7 @@ func TestUpdateSameHashProcess(t *testing.T) {
 }
 
 func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	p := getDummyProcess()
@@ -389,7 +400,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 }
 
 func TestUpdateProcessMetadataTransfer(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	p := getDummyProcess()
@@ -424,7 +435,7 @@ func TestUpdateProcessMetadataTransfer(t *testing.T) {
 }
 
 func TestGetProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process1 := getDummyProcess()
@@ -491,7 +502,7 @@ func TestGetProcess(t *testing.T) {
 }
 
 func TestStartProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -517,8 +528,101 @@ func TestStartProcess(t *testing.T) {
 	rs.StopProcess(tid)
 }
 
+func TestStartProcessWithLimits(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, true)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.LimitCPU = 1
+	process.LimitMemory = 1
+	process.LimitGPU = app.ConfigLimitGPU{
+		Usage:   1,
+		Encoder: 1,
+		Decoder: 1,
+		Memory:  1,
+	}
+	process.Options = append(process.Options, "-hwdevice", "{hwdevice}")
+	tid := app.ProcessID{ID: process.ID}
+
+	rs.AddProcess(process)
+
+	err = rs.StartProcess(tid)
+	require.Equal(t, nil, err, "should be able to start existing process")
+
+	state, _ := rs.GetProcessState(tid)
+	require.Equal(t, "start", state.Order, "Process should be started")
+
+	require.Equal(t, []string{
+		"-loglevel", "info", "-hwdevice", "0", "-f", "lavfi", "-re", "-i", "testsrc=size=1280x720:rate=25", "-codec", "copy", "-f", "null", "-",
+	}, state.Command)
+
+	rs.StopProcess(tid)
+}
+
+func TestProcessResources(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	tid := app.ProcessID{ID: process.ID}
+
+	rs.AddProcess(process)
+
+	err = rs.StartProcess(tid)
+	require.Equal(t, nil, err, "should be able to start existing process")
+
+	time.Sleep(2 * time.Second)
+
+	state, _ := rs.GetProcessState(tid)
+	require.Equal(t, "start", state.Order, "Process should be started")
+
+	require.Equal(t, app.ProcessUsage{
+		CPU: app.ProcessUsageCPU{
+			NCPU:         2,
+			Current:      12,
+			Average:      12,
+			Max:          12,
+			Limit:        0,
+			IsThrottling: false,
+		},
+		Memory: app.ProcessUsageMemory{
+			Current: 42,
+			Average: 42,
+			Max:     42,
+			Limit:   0,
+		},
+		GPU: app.ProcessUsageGPU{
+			Index: 0,
+			Usage: app.ProcessUsageGPUUsage{
+				Current: 5,
+				Average: 5,
+				Max:     5,
+				Limit:   0,
+			},
+			Encoder: app.ProcessUsageGPUUsage{
+				Current: 9,
+				Average: 9,
+				Max:     9,
+				Limit:   0,
+			},
+			Decoder: app.ProcessUsageGPUUsage{
+				Current: 11,
+				Average: 11,
+				Max:     11,
+				Limit:   0,
+			},
+			Memory: app.ProcessUsageGPUMemory{
+				Current: 42,
+				Average: 42,
+				Max:     42,
+				Limit:   0,
+			},
+		},
+	}, state.Resources)
+}
+
 func TestStopProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -544,7 +648,7 @@ func TestStopProcess(t *testing.T) {
 }
 
 func TestRestartProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -570,7 +674,7 @@ func TestRestartProcess(t *testing.T) {
 }
 
 func TestReloadProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -602,7 +706,7 @@ func TestReloadProcess(t *testing.T) {
 }
 
 func TestParseProcessPattern(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -625,7 +729,7 @@ func TestParseProcessPattern(t *testing.T) {
 }
 
 func TestProbeProcess(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -635,7 +739,7 @@ func TestProbeProcess(t *testing.T) {
 }
 
 func TestProbeProcessWithReference(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -651,7 +755,7 @@ func TestProbeProcessWithReference(t *testing.T) {
 }
 
 func TestProcessMetadata(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -676,7 +780,7 @@ func TestProcessMetadata(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -715,7 +819,7 @@ func TestLog(t *testing.T) {
 }
 
 func TestLogTransfer(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -741,7 +845,7 @@ func TestLogTransfer(t *testing.T) {
 }
 
 func TestPlayoutNoRange(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -765,7 +869,7 @@ func TestPlayoutRange(t *testing.T) {
 	portrange, err := net.NewPortrange(3000, 3001)
 	require.NoError(t, err)
 
-	rs, err := getDummyRestreamer(portrange, nil, nil, nil)
+	rs, err := getDummyRestreamer(portrange, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -821,7 +925,7 @@ func TestParseAddressReference(t *testing.T) {
 }
 
 func TestAddressReference(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process1 := getDummyProcess()
@@ -852,7 +956,7 @@ func TestAddressReference(t *testing.T) {
 }
 
 func TestTeeAddressReference(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process1 := getDummyProcess()
@@ -898,7 +1002,7 @@ func TestTeeAddressReference(t *testing.T) {
 }
 
 func TestConfigValidation(t *testing.T) {
-	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	rs := rsi.(*restream)
@@ -946,7 +1050,7 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestConfigValidationWithMkdir(t *testing.T) {
-	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	rs := rsi.(*restream)
@@ -990,7 +1094,7 @@ func TestConfigValidationFFmpeg(t *testing.T) {
 	valOut, err := ffmpeg.NewValidator([]string{"^https?://", "^rtmp://"}, nil)
 	require.NoError(t, err)
 
-	rsi, err := getDummyRestreamer(nil, valIn, valOut, nil)
+	rsi, err := getDummyRestreamer(nil, valIn, valOut, nil, false)
 	require.NoError(t, err)
 
 	rs := rsi.(*restream)
@@ -1016,7 +1120,7 @@ func TestConfigValidationFFmpeg(t *testing.T) {
 }
 
 func TestOutputAddressValidation(t *testing.T) {
-	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	rs := rsi.(*restream)
@@ -1057,7 +1161,7 @@ func TestOutputAddressValidation(t *testing.T) {
 }
 
 func TestMetadata(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -1137,7 +1241,7 @@ func TestReplacer(t *testing.T) {
 		Input: []app.ConfigIO{
 			{
 				ID:      "in_{processid}_{reference}",
-				Address: "input:{inputid}_process:{processid}_reference:{reference}_diskfs:{diskfs}/disk.txt_memfs:{memfs}/mem.txt_fsdisk:{fs:disk}/fsdisk.txt_fsmem:{fs:mem}/fsmem.txt_rtmp:{rtmp,name=pmtr}_srt:{srt,name=trs}_rtmp:{rtmp,name=$inputid}",
+				Address: "input:{inputid}_process:{processid}_reference:{reference}_diskfs:{diskfs}/disk.txt_memfs:{memfs}/mem.txt_fsdisk:{fs:disk}/fsdisk.txt_fsmem:{fs:mem}/fsmem.txt_rtmp:{rtmp,name=pmtr}_srt:{srt,name=trs}_rtmp:{rtmp,name=$inputid}_hwdevice:{hwdevice}",
 				Options: []string{
 					"-f",
 					"lavfi",
@@ -1149,6 +1253,7 @@ func TestReplacer(t *testing.T) {
 					"memfs:{memfs}/mem.txt",
 					"fsdisk:{fs:disk}/fsdisk_{date,format=%Y%m%d_%H%M%S}.txt",
 					"fsmem:{fs:mem}/$inputid.txt",
+					"hwdevice:{hwdevice}",
 				},
 			},
 		},
@@ -1186,6 +1291,7 @@ func TestReplacer(t *testing.T) {
 			"{memfs}/foobar_in_mem.txt",
 			"{fs:disk}/foobar_on_disk_aswell.txt",
 			"{fs:mem}/foobar_in_mem_aswell.txt",
+			"hwdevice:{hwdevice}",
 		},
 		Reconnect:      true,
 		ReconnectDelay: 10,
@@ -1202,7 +1308,7 @@ func TestReplacer(t *testing.T) {
 		Input: []app.ConfigIO{
 			{
 				ID:      "in_314159265359_refref",
-				Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar",
+				Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar_hwdevice:{hwdevice}",
 				Options: []string{
 					"-f",
 					"lavfi",
@@ -1214,6 +1320,7 @@ func TestReplacer(t *testing.T) {
 					"memfs:http://localhost/mnt/memfs/mem.txt",
 					"fsdisk:/mnt/diskfs/fsdisk_{date,format=%Y%m%d_%H%M%S}.txt",
 					"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+					"hwdevice:{hwdevice}",
 				},
 			},
 		},
@@ -1251,6 +1358,7 @@ func TestReplacer(t *testing.T) {
 			"{memfs}/foobar_in_mem.txt",
 			"/mnt/diskfs/foobar_on_disk_aswell.txt",
 			"http://localhost/mnt/memfs/foobar_in_mem_aswell.txt",
+			"hwdevice:{hwdevice}",
 		},
 		Reconnect:      true,
 		ReconnectDelay: 10,
@@ -1260,12 +1368,23 @@ func TestReplacer(t *testing.T) {
 
 	require.Equal(t, wantprocess, process)
 
-	resolveDynamicPlaceholder(process, replacer)
+	resolveDynamicPlaceholder(process, replacer, map[string]string{
+		"hwdevice": fmt.Sprintf("%d", -1),
+	}, nil)
 
+	wantprocess.Options = []string{
+		"-loglevel",
+		"info",
+		"/mnt/diskfs/foobar_on_disk.txt",
+		"{memfs}/foobar_in_mem.txt",
+		"/mnt/diskfs/foobar_on_disk_aswell.txt",
+		"http://localhost/mnt/memfs/foobar_in_mem_aswell.txt",
+		"hwdevice:-1",
+	}
 	wantprocess.Input = []app.ConfigIO{
 		{
 			ID:      "in_314159265359_refref",
-			Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar",
+			Address: "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar_hwdevice:-1",
 			Options: []string{
 				"-f",
 				"lavfi",
@@ -1277,6 +1396,7 @@ func TestReplacer(t *testing.T) {
 				"memfs:http://localhost/mnt/memfs/mem.txt",
 				"fsdisk:/mnt/diskfs/fsdisk_20191012_072050.txt",
 				"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+				"hwdevice:-1",
 			},
 		},
 	}
@@ -1339,7 +1459,7 @@ func TestProcessReplacer(t *testing.T) {
 		"latency": "20000", // 20 milliseconds, FFmpeg requires microseconds
 	})
 
-	rsi, err := getDummyRestreamer(nil, nil, nil, replacer)
+	rsi, err := getDummyRestreamer(nil, nil, nil, replacer, false)
 	require.NoError(t, err)
 
 	process := &app.Config{
@@ -1360,6 +1480,7 @@ func TestProcessReplacer(t *testing.T) {
 					"memfs:{memfs}/mem.txt",
 					"fsdisk:{fs:disk}/fsdisk_{date,format=%Y%m%d_%H%M%S}.txt",
 					"fsmem:{fs:mem}/$inputid.txt",
+					"hwdevice:{hwdevice}",
 				},
 			},
 		},
@@ -1397,6 +1518,7 @@ func TestProcessReplacer(t *testing.T) {
 			"{memfs}/foobar_in_mem.txt",
 			"{fs:disk}/foobar_on_disk_aswell.txt",
 			"{fs:mem}/foobar_in_mem_aswell.txt",
+			"hwdevice:{hwdevice}",
 		},
 		Reconnect:      true,
 		ReconnectDelay: 10,
@@ -1428,6 +1550,7 @@ func TestProcessReplacer(t *testing.T) {
 					"memfs:http://localhost/mnt/memfs/mem.txt",
 					"fsdisk:/mnt/diskfs/fsdisk_{date,format=%Y%m%d_%H%M%S}.txt",
 					"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+					"hwdevice:{hwdevice}",
 				},
 				Cleanup: []app.ConfigIOCleanup{},
 			},
@@ -1466,6 +1589,7 @@ func TestProcessReplacer(t *testing.T) {
 			"{memfs}/foobar_in_mem.txt",
 			"/mnt/diskfs/foobar_on_disk_aswell.txt",
 			"http://localhost/mnt/memfs/foobar_in_mem_aswell.txt",
+			"hwdevice:{hwdevice}",
 		},
 		Reconnect:      true,
 		ReconnectDelay: 10,
@@ -1478,10 +1602,53 @@ func TestProcessReplacer(t *testing.T) {
 	require.True(t, ok)
 
 	require.Equal(t, process, task.config)
+
+	err = rsi.StartProcess(app.ProcessID{ID: "314159265359"})
+	require.NoError(t, err)
+
+	state, err := rsi.GetProcessState(app.ProcessID{ID: "314159265359"})
+	require.NoError(t, err)
+
+	require.Equal(t, []string{
+		"-loglevel",
+		"info",
+		"/mnt/diskfs/foobar_on_disk.txt",
+		"{memfs}/foobar_in_mem.txt",
+		"/mnt/diskfs/foobar_on_disk_aswell.txt",
+		"http://localhost/mnt/memfs/foobar_in_mem_aswell.txt",
+		"hwdevice:0",
+		"-f",
+		"lavfi",
+		"-re",
+		"input:in_314159265359_refref",
+		"process:314159265359",
+		"reference:refref",
+		"diskfs:/mnt/diskfs/disk.txt",
+		"memfs:http://localhost/mnt/memfs/mem.txt",
+		"fsdisk:/mnt/diskfs/fsdisk_20191012_072050.txt",
+		"fsmem:http://localhost/mnt/memfs/$inputid.txt",
+		"hwdevice:0",
+		"-i",
+		"input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/pmtr?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=20000&streamid=trs,mode:request,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/in_314159265359_refref?token=foobar",
+		"-codec",
+		"copy",
+		"-f",
+		"null",
+		"output:out_314159265359_refref",
+		"process:314159265359",
+		"reference:refref",
+		"diskfs:/mnt/diskfs/disk.txt",
+		"memfs:http://localhost/mnt/memfs/mem.txt",
+		"fsdisk:/mnt/diskfs/fsdisk.txt",
+		"fsmem:http://localhost/mnt/memfs/$outputid.txt",
+		"output:out_314159265359_refref_process:314159265359_reference:refref_diskfs:/mnt/diskfs/disk.txt_memfs:http://localhost/mnt/memfs/mem.txt_fsdisk:/mnt/diskfs/fsdisk.txt_fsmem:http://localhost/mnt/memfs/fsmem.txt_rtmp:rtmp://localhost/app/314159265359?token=foobar_srt:srt://localhost:6000?mode=caller&transtype=live&latency=42&streamid=refref,mode:publish,token:abcfoobar&passphrase=secret_rtmp:rtmp://localhost/app/out_314159265359_refref?token=foobar",
+	}, state.Command)
+
+	rsi.StopProcess(app.ProcessID{ID: "314159265359"})
 }
 
 func TestProcessLogPattern(t *testing.T) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -1512,7 +1679,7 @@ func TestProcessLogPattern(t *testing.T) {
 }
 
 func TestProcessLimit(t *testing.T) {
-	rsi, err := getDummyRestreamer(nil, nil, nil, nil)
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
 
 	process := getDummyProcess()
@@ -1530,15 +1697,14 @@ func TestProcessLimit(t *testing.T) {
 
 	status := task.ffmpeg.Status()
 
-	ncpu, err := psutil.CPUCounts(true)
-	require.NoError(t, err)
+	ncpu := rs.resources.Info().CPU.NCPU
 
 	require.Equal(t, ncpu*process.LimitCPU, status.CPU.Limit)
 	require.Equal(t, process.LimitMemory, status.Memory.Limit)
 }
 
 func BenchmarkGetProcessIDs(b *testing.B) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(b, err)
 
 	for i := 0; i < 1000; i++ {
@@ -1559,7 +1725,7 @@ func BenchmarkGetProcessIDs(b *testing.B) {
 }
 
 func BenchmarkGetProcess(b *testing.B) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(b, err)
 
 	for i := 0; i < 1000; i++ {
@@ -1583,7 +1749,7 @@ func BenchmarkGetProcess(b *testing.B) {
 }
 
 func BenchmarkGetProcessState(b *testing.B) {
-	rs, err := getDummyRestreamer(nil, nil, nil, nil)
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(b, err)
 
 	n := 10
@@ -1613,4 +1779,98 @@ func BenchmarkGetProcessState(b *testing.B) {
 	for i := 0; i < n; i++ {
 		rs.DeleteProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""))
 	}
+}
+
+func TestProcessCleanup(t *testing.T) {
+	rsi, err := getDummyRestreamer(nil, nil, nil, nil, false)
+	require.NoError(t, err)
+
+	rsi.Start()
+
+	rs := rsi.(*restream)
+
+	memfs, ok := rs.fs.list[0].(fs.Filesystem)
+	require.True(t, ok)
+
+	for i := 0; i < 10; i++ {
+		memfs.WriteFileReader(fmt.Sprintf("/foobar_%02d.dat", i), bytes.NewReader([]byte("hello")), -1)
+	}
+
+	files := memfs.List("/", fs.ListOptions{
+		Pattern: "/foobar_*",
+	})
+	require.Equal(t, 10, len(files))
+
+	process := getDummyProcess()
+	process.ID = "foobar"
+	output := process.Output[0]
+	output.Cleanup = append(output.Cleanup, app.ConfigIOCleanup{
+		Pattern:       "mem:/{processid}_*",
+		MaxFiles:      5,
+		MaxFileAge:    0,
+		PurgeOnDelete: true,
+	})
+	process.Output[0] = output
+
+	err = rsi.AddProcess(process)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		files := memfs.List("/", fs.ListOptions{
+			Pattern: "/foobar_*",
+		})
+
+		return len(files) == 5
+	}, 15*time.Second, time.Second)
+
+	rsi.Stop()
+
+	for i := 0; i < 10; i++ {
+		memfs.WriteFileReader(fmt.Sprintf("/foobar_%02d.dat", i), bytes.NewReader([]byte("hello")), -1)
+	}
+
+	files = memfs.List("/", fs.ListOptions{
+		Pattern: "/foobar_*",
+	})
+	require.Equal(t, 10, len(files))
+
+	rsi.ReloadProcess(app.ProcessID{ID: process.ID})
+
+	rsi.Start()
+
+	require.Eventually(t, func() bool {
+		files := memfs.List("/", fs.ListOptions{
+			Pattern: "/foobar_*",
+		})
+
+		return len(files) == 5
+	}, 15*time.Second, time.Second)
+
+	rsi.Stop()
+
+	for i := 0; i < 10; i++ {
+		memfs.WriteFileReader(fmt.Sprintf("/foobar_%02d.dat", i), bytes.NewReader([]byte("hello")), -1)
+	}
+
+	files = memfs.List("/", fs.ListOptions{
+		Pattern: "/foobar_*",
+	})
+	require.Equal(t, 10, len(files))
+
+	process.Reference = "foobar"
+	rsi.UpdateProcess(app.ProcessID{ID: process.ID}, process)
+
+	rsi.Start()
+
+	require.Eventually(t, func() bool {
+		files := memfs.List("/", fs.ListOptions{
+			Pattern: "/foobar_*",
+		})
+
+		return len(files) == 5
+	}, 15*time.Second, time.Second)
+
+	rsi.Stop()
+
+	//task, ok := rs.tasks.Load(app.ProcessID{ID: process.ID})
 }

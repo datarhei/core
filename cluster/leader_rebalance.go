@@ -78,7 +78,7 @@ func rebalance(have []node.Process, nodes map[string]node.About) ([]interface{},
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
-		if haveP.Throttling {
+		if haveP.Resources.Throttling {
 			resources.Throttling(haveP.NodeID, true)
 		}
 	}
@@ -126,7 +126,7 @@ func rebalance(have []node.Process, nodes map[string]node.About) ([]interface{},
 						continue
 					}
 
-					if resources.HasNodeEnough(raNodeid, p.Config.LimitCPU, p.Config.LimitMemory) {
+					if resources.HasNodeEnough(raNodeid, ResourcesFromConfig(p.Config)) {
 						availableNodeid = raNodeid
 						break
 					}
@@ -135,7 +135,7 @@ func rebalance(have []node.Process, nodes map[string]node.About) ([]interface{},
 
 			// Find the best node with enough resources available.
 			if len(availableNodeid) == 0 {
-				nodes := resources.FindBestNodes(p.Config.LimitCPU, p.Config.LimitMemory)
+				nodes := resources.FindBestNodes(ResourcesFromConfig(p.Config))
 				for _, nodeid := range nodes {
 					if nodeid == overloadedNodeid {
 						continue
@@ -169,7 +169,7 @@ func rebalance(have []node.Process, nodes map[string]node.About) ([]interface{},
 			processes[i] = p
 
 			// Adjust the resources.
-			resources.Move(availableNodeid, overloadedNodeid, p.CPU, p.Mem)
+			resources.Move(availableNodeid, overloadedNodeid, ResourcesFromProcess(p.Resources))
 
 			// Adjust the reference affinity.
 			haveReferenceAffinity.Move(p.Config.Reference, p.Config.Domain, overloadedNodeid, availableNodeid)

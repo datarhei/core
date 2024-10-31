@@ -18,7 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/datarhei/core/v16/resources"
 )
 
 // Process represents a process and ways to control it
@@ -43,32 +43,36 @@ type Process interface {
 	// running or not.
 	IsRunning() bool
 
-	// Limit enabled or disables CPU and memory limiting. CPU will be throttled
+	// Limit enables or disables CPU and memory limiting. CPU will be throttled
 	// into the configured limit. If memory consumption is above the configured
 	// limit, the process will be killed.
-	Limit(cpu, memory bool) error
+	Limit(cpu, memory, gpu bool) error
 }
 
 // Config is the configuration of a process
 type Config struct {
-	Binary         string                       // Path to the ffmpeg binary.
-	Args           []string                     // List of arguments for the binary.
-	Reconnect      bool                         // Whether to restart the process if it exited.
-	ReconnectDelay time.Duration                // Duration to wait before restarting the process.
-	StaleTimeout   time.Duration                // Kill the process after this duration if it doesn't produce any output.
-	Timeout        time.Duration                // Kill the process after this duration.
-	LimitCPU       float64                      // Kill the process if the CPU usage in percent is above this value.
-	LimitMemory    uint64                       // Kill the process if the memory consumption in bytes is above this value.
-	LimitDuration  time.Duration                // Kill the process if the limits are exceeded for this duration.
-	LimitMode      LimitMode                    // Select limiting mode
-	Scheduler      Scheduler                    // A scheduler.
-	Parser         Parser                       // A parser for the output of the process.
-	OnArgs         func(args []string) []string // A callback which is called right before the process will start with the command args.
-	OnBeforeStart  func() error                 // A callback which is called before the process will be started. If error is non-nil, the start will be refused.
-	OnStart        func()                       // A callback which is called after the process started.
-	OnExit         func(state string)           // A callback which is called after the process exited with the exit state.
-	OnStateChange  func(from, to string)        // A callback which is called after a state changed.
-	Logger         log.Logger
+	Binary          string                                // Path to the ffmpeg binary.
+	Args            []string                              // List of arguments for the binary.
+	Reconnect       bool                                  // Whether to restart the process if it exited.
+	ReconnectDelay  time.Duration                         // Duration to wait before restarting the process.
+	StaleTimeout    time.Duration                         // Kill the process after this duration if it doesn't produce any output.
+	Timeout         time.Duration                         // Kill the process after this duration.
+	LimitCPU        float64                               // Kill the process if the CPU usage in percent is above this value, in percent 0-100 in hard mode, 0-100*ncpu in soft mode.
+	LimitMemory     uint64                                // Kill the process if the memory consumption in bytes is above this value.
+	LimitGPUUsage   float64                               // Kill the process if the GPU usage in percent is above this value, in percent 0-100.
+	LimitGPUEncoder float64                               // Kill the process if the GPU encoder usage in percent is above this value, in percent 0-100.
+	LimitGPUDecoder float64                               // Kill the process if the GPU decoder usage in percent is above this value, in percent 0-100.
+	LimitGPUMemory  uint64                                // Kill the process if the GPU memory consumption in bytes is above this value.
+	LimitDuration   time.Duration                         // Kill the process if the limits are exceeded for this duration.
+	LimitMode       LimitMode                             // Select limiting mode
+	Scheduler       Scheduler                             // A scheduler.
+	Parser          Parser                                // A parser for the output of the process.
+	OnBeforeStart   func(args []string) ([]string, error) // A callback which is called before the process will be started. The string slice is the arguments of the command line. If error is non-nil, the start will be refused.
+	OnStart         func()                                // A callback which is called after the process started.
+	OnExit          func(state string)                    // A callback which is called after the process exited with the exit state.
+	OnStateChange   func(from, to string)                 // A callback which is called after a state changed.
+	Resources       resources.Resources
+	Logger          log.Logger
 }
 
 // Status represents the current status of a process
@@ -81,20 +85,47 @@ type Status struct {
 	Time        time.Time     // Time is the time of the last change of the state
 	CommandArgs []string      // Currently running command arguments
 	LimitMode   string        // The limiting mode
-	CPU         struct {
-		NCPU         float64 // Number of logical CPUs
-		Current      float64 // Currently consumed CPU in percent
-		Average      float64 // Average consumed CPU in percent
-		Max          float64 // Max. consumed CPU in percent
-		Limit        float64 // Usage limit in percent
-		IsThrottling bool    // Whether the CPU is currently limited
-	} // Used CPU in percent
-	Memory struct {
-		Current uint64  // Currently consumed memory in bytes
-		Average float64 // Average consumed memory in bytes
-		Max     uint64  // Max. consumed memory in bytes
-		Limit   uint64  // Usage limit in bytes
-	} // Used memory in bytes
+	CPU         StatusCPU     // CPU consumption in percent
+	Memory      StatusMemory  // Memory consumption in bytes
+	GPU         StatusGPU     // GPU consumption
+}
+
+type StatusCPU struct {
+	NCPU         float64 // Number of logical CPUs
+	Current      float64 // Currently consumed CPU in percent
+	Average      float64 // Average consumed CPU in percent
+	Max          float64 // Max. consumed CPU in percent
+	Limit        float64 // Usage limit in percent
+	IsThrottling bool    // Whether the CPU is currently limited
+}
+
+type StatusMemory struct {
+	Current uint64 // Currently consumed memory in bytes
+	Average uint64 // Average consumed memory in bytes
+	Max     uint64 // Max. consumed memory in bytes
+	Limit   uint64 // Usage limit in bytes
+}
+
+type StatusGPUMemory struct {
+	Current uint64 // Currently consumed memory in bytes
+	Average uint64 // Average consumed memory in bytes
+	Max     uint64 // Max. consumed memory in bytes
+	Limit   uint64 // Usage limit in bytes
+}
+
+type StatusGPUUsage struct {
+	Current float64 // Currently consumed GPU usage in percent
+	Average float64 // Average consumed GPU usage in percent
+	Max     float64 // Max. consumed GPU usage in percent
+	Limit   float64 // Usage limit in percent
+}
+
+type StatusGPU struct {
+	Index   int
+	Memory  StatusGPUMemory // GPU memory consumption
+	Usage   StatusGPUUsage  // GPU usage in percent
+	Encoder StatusGPUUsage  // GPU encoder usage in percent
+	Decoder StatusGPUUsage  // GPU decoder usage in percent
 }
 
 // States
@@ -167,12 +198,13 @@ type States struct {
 
 // Process represents a ffmpeg process
 type process struct {
-	binary string
-	args   []string
-	cmd    *exec.Cmd
-	pid    int32
-	stdout io.ReadCloser
-	state  struct {
+	binary  string
+	args    []string
+	cmdArgs []string
+	cmd     *exec.Cmd
+	pid     int32
+	stdout  io.ReadCloser
+	state   struct {
 		state  stateType
 		time   time.Time
 		states States
@@ -206,8 +238,7 @@ type process struct {
 	logger         log.Logger
 	debuglogger    log.Logger
 	callbacks      struct {
-		onArgs        func(args []string) []string
-		onBeforeStart func() error
+		onBeforeStart func(args []string) ([]string, error)
 		onStart       func()
 		onExit        func(state string)
 		onStateChange func(from, to string)
@@ -215,6 +246,7 @@ type process struct {
 	}
 	limits    Limiter
 	scheduler Scheduler
+	resources resources.Resources
 }
 
 var _ Process = &process{}
@@ -228,10 +260,17 @@ func New(config Config) (Process, error) {
 		parser:    config.Parser,
 		logger:    config.Logger,
 		scheduler: config.Scheduler,
+		resources: config.Resources,
+	}
+
+	if p.resources == nil {
+		return nil, fmt.Errorf("resources are required")
 	}
 
 	p.args = make([]string, len(config.Args))
 	copy(p.args, config.Args)
+	p.cmdArgs = make([]string, len(config.Args))
+	copy(p.cmdArgs, config.Args)
 
 	// This is a loose check on purpose. If the e.g. the binary
 	// doesn't exist or it is not executable, it will be
@@ -263,30 +302,44 @@ func New(config Config) (Process, error) {
 	p.stale.last = time.Now()
 	p.stale.timeout = config.StaleTimeout
 
-	p.callbacks.onArgs = config.OnArgs
 	p.callbacks.onBeforeStart = config.OnBeforeStart
 	p.callbacks.onStart = config.OnStart
 	p.callbacks.onExit = config.OnExit
 	p.callbacks.onStateChange = config.OnStateChange
 
-	p.limits = NewLimiter(LimiterConfig{
-		CPU:     config.LimitCPU,
-		Memory:  config.LimitMemory,
-		WaitFor: config.LimitDuration,
-		Mode:    config.LimitMode,
-		Logger:  p.logger.WithComponent("ProcessLimiter"),
-		OnLimit: func(cpu float64, memory uint64) {
+	ncpu := p.resources.Info().CPU.NCPU
+
+	limits, err := NewLimiter(LimiterConfig{
+		CPU:        config.LimitCPU,
+		NCPU:       ncpu,
+		Memory:     config.LimitMemory,
+		GPUUsage:   config.LimitGPUUsage,
+		GPUEncoder: config.LimitGPUEncoder,
+		GPUDecoder: config.LimitGPUDecoder,
+		GPUMemory:  config.LimitGPUMemory,
+		WaitFor:    config.LimitDuration,
+		Mode:       config.LimitMode,
+		Logger:     p.logger.WithComponent("ProcessLimiter"),
+		OnLimit: func(cpu float64, memory uint64, gpuusage, gpuencoder, gpudecoder float64, gpumemory uint64) {
 			if !p.isRunning() {
 				return
 			}
 
 			p.logger.WithFields(log.Fields{
-				"cpu":    cpu,
-				"memory": memory,
+				"cpu":        cpu,
+				"memory":     memory,
+				"gpuusage":   gpuusage,
+				"gpuencoder": gpuencoder,
+				"gpudecoder": gpudecoder,
+				"gpumemmory": gpumemory,
 			}).Warn().Log("Killed because limits are exceeded")
-			p.Kill(false, fmt.Sprintf("Killed because limits are exceeded (mode: %s, tolerance: %s): %.2f (%.2f) CPU, %d (%d) bytes memory", config.LimitMode.String(), config.LimitDuration.String(), cpu, config.LimitCPU, memory, config.LimitMemory))
+			p.Kill(false, fmt.Sprintf("Killed because limits are exceeded (mode: %s, tolerance: %s): %.2f (%.2f) CPU, %d (%d) bytes memory, %.2f/%.2f/%.2f (%.2f) GPU usage, %d (%d) bytes GPU memory", config.LimitMode.String(), config.LimitDuration.String(), cpu, config.LimitCPU, memory, config.LimitMemory, gpuusage, gpuencoder, gpudecoder, config.LimitGPUUsage, gpumemory, config.LimitGPUMemory))
 		},
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize limiter")
+	}
+	p.limits = limits
 
 	p.logger.Info().Log("Created")
 	p.debuglogger.Debug().Log("Created")
@@ -467,12 +520,51 @@ func (p *process) Status() Status {
 		Duration:  time.Since(stateTime),
 		Time:      stateTime,
 		LimitMode: p.limits.Mode().String(),
-		CPU:       usage.CPU,
-		Memory:    usage.Memory,
+		CPU: StatusCPU{
+			NCPU:         usage.CPU.NCPU,
+			Current:      usage.CPU.Current,
+			Average:      usage.CPU.Average,
+			Max:          usage.CPU.Max,
+			Limit:        usage.CPU.Limit,
+			IsThrottling: usage.CPU.IsThrottling,
+		},
+		Memory: StatusMemory{
+			Current: usage.Memory.Current,
+			Average: uint64(usage.Memory.Average),
+			Max:     usage.Memory.Max,
+			Limit:   usage.Memory.Limit,
+		},
+		GPU: StatusGPU{
+			Index: usage.GPU.Index,
+			Memory: StatusGPUMemory{
+				Current: usage.GPU.Memory.Current,
+				Average: uint64(usage.GPU.Memory.Average),
+				Max:     usage.GPU.Memory.Max,
+				Limit:   usage.GPU.Memory.Limit,
+			},
+			Usage: StatusGPUUsage{
+				Current: usage.GPU.Usage.Current,
+				Average: usage.GPU.Usage.Average,
+				Max:     usage.GPU.Usage.Max,
+				Limit:   usage.GPU.Usage.Limit,
+			},
+			Encoder: StatusGPUUsage{
+				Current: usage.GPU.Encoder.Current,
+				Average: usage.GPU.Encoder.Average,
+				Max:     usage.GPU.Encoder.Max,
+				Limit:   usage.GPU.Encoder.Limit,
+			},
+			Decoder: StatusGPUUsage{
+				Current: usage.GPU.Decoder.Current,
+				Average: usage.GPU.Decoder.Average,
+				Max:     usage.GPU.Decoder.Max,
+				Limit:   usage.GPU.Decoder.Limit,
+			},
+		},
 	}
 
-	s.CommandArgs = make([]string, len(p.args))
-	copy(s.CommandArgs, p.args)
+	s.CommandArgs = make([]string, len(p.cmdArgs))
+	copy(s.CommandArgs, p.cmdArgs)
 
 	if order == "start" && !state.IsRunning() {
 		p.reconn.lock.Lock()
@@ -488,7 +580,7 @@ func (p *process) IsRunning() bool {
 	return p.isRunning()
 }
 
-func (p *process) Limit(cpu, memory bool) error {
+func (p *process) Limit(cpu, memory, gpu bool) error {
 	if !p.isRunning() {
 		return nil
 	}
@@ -498,11 +590,12 @@ func (p *process) Limit(cpu, memory bool) error {
 	}
 
 	p.logger.Warn().WithFields(log.Fields{
-		"limit_cpu":    cpu,
-		"limit_memory": memory,
+		"limit_cpu":       cpu,
+		"limit_memory":    memory,
+		"limit_gpumemory": gpu,
 	}).Log("Limiter triggered")
 
-	return p.limits.Limit(cpu, memory)
+	return p.limits.Limit(cpu, memory, gpu)
 }
 
 // Start will start the process and sets the order to "start". If the
@@ -559,11 +652,23 @@ func (p *process) start() error {
 
 	args := p.args
 
-	if p.callbacks.onArgs != nil {
+	if p.callbacks.onBeforeStart != nil {
 		args = make([]string, len(p.args))
 		copy(args, p.args)
 
-		args = p.callbacks.onArgs(args)
+		args, err = p.callbacks.onBeforeStart(args)
+		if err != nil {
+			p.setState(stateFailed)
+
+			p.parser.Parse([]byte(err.Error()))
+			p.logger.WithError(err).Error().Log("Starting failed")
+
+			p.reconnect(p.delay(stateFailed))
+
+			return err
+		}
+
+		p.cmdArgs = args
 	}
 
 	p.cmd = exec.Command(p.binary, args...)
@@ -580,19 +685,6 @@ func (p *process) start() error {
 		p.reconnect(p.delay(stateFailed))
 
 		return err
-	}
-
-	if p.callbacks.onBeforeStart != nil {
-		if err := p.callbacks.onBeforeStart(); err != nil {
-			p.setState(stateFailed)
-
-			p.parser.Parse([]byte(err.Error()))
-			p.logger.WithError(err).Error().Log("Starting failed")
-
-			p.reconnect(p.delay(stateFailed))
-
-			return err
-		}
 	}
 
 	if err := p.cmd.Start(); err != nil {
@@ -630,7 +722,7 @@ func (p *process) start() error {
 
 	p.pid = int32(p.cmd.Process.Pid)
 
-	if proc, err := psutil.NewProcess(p.pid, false); err == nil {
+	if proc, err := p.resources.Process(p.pid); err == nil {
 		p.limits.Start(proc)
 	}
 

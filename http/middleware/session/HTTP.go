@@ -3,11 +3,12 @@ package session
 import (
 	"net/url"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/shortuuid/v4"
 )
 
-func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
+func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 	res := c.Response()
 
@@ -30,13 +31,13 @@ func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]int
 	id := shortuuid.New()
 
 	reader := req.Body
-	r := &fakeReader{
+	r := &bodysizeReader{
 		reader: req.Body,
 	}
 	req.Body = r
 
 	writer := res.Writer
-	w := &fakeWriter{
+	w := &bodysizeWriter{
 		ResponseWriter: res.Writer,
 	}
 	res.Writer = w
@@ -44,19 +45,21 @@ func (h *handler) handleHTTP(c echo.Context, ctxuser string, data map[string]int
 	h.httpCollector.RegisterAndActivate(id, "", location, referrer)
 	h.httpCollector.Extra(id, data)
 
-	defer h.httpCollector.Close(id)
-
 	defer func() {
+		buffer := mem.Get()
+
 		req.Body = reader
-		h.httpCollector.Ingress(id, r.size+headerSize(req.Header))
-	}()
+		h.httpCollector.Ingress(id, r.size+headerSize(req.Header, buffer))
 
-	defer func() {
 		res.Writer = writer
 
-		h.httpCollector.Egress(id, w.size+headerSize(res.Header()))
+		h.httpCollector.Egress(id, w.size+headerSize(res.Header(), buffer))
 		data["code"] = res.Status
 		h.httpCollector.Extra(id, data)
+
+		h.httpCollector.Close(id)
+
+		mem.Put(buffer)
 	}()
 
 	return next(c)

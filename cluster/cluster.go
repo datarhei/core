@@ -641,7 +641,7 @@ func (c *cluster) CertManager() autocert.Manager {
 }
 
 func (c *cluster) Shutdown() error {
-	c.logger.Info().Log("Shutting down cluster")
+	c.logger.Info().Log("Shutting down cluster ...")
 	c.shutdownLock.Lock()
 	defer c.shutdownLock.Unlock()
 
@@ -652,9 +652,14 @@ func (c *cluster) Shutdown() error {
 	c.shutdown = true
 	close(c.shutdownCh)
 
+	c.logger.Info().Log("Waiting for all routines to exit ...")
+
 	c.shutdownWg.Wait()
 
+	c.logger.Info().Log("All routines exited ...")
+
 	if c.manager != nil {
+		c.logger.Info().Log("Shutting down node manager ...")
 		c.manager.NodesClear()
 	}
 
@@ -662,16 +667,17 @@ func (c *cluster) Shutdown() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		c.logger.Info().Log("Shutting down API ...")
+
 		c.api.Shutdown(ctx)
 	}
 
 	if c.raft != nil {
+		c.logger.Info().Log("Shutting down raft ...")
 		c.raft.Shutdown()
 	}
 
-	// TODO: here might some situations, where the manager is still need from the synchronize loop and will run into a panic
-	c.manager = nil
-	c.raft = nil
+	c.logger.Info().Log("Cluster stopped")
 
 	return nil
 }
@@ -1055,7 +1061,7 @@ func (c *cluster) trackLeaderChanges() {
 			if !isNodeInCluster {
 				// We're not anymore part of the cluster, shutdown
 				c.logger.Warn().WithField("id", c.nodeID).Log("This node left the cluster. Shutting down.")
-				c.Shutdown()
+				go c.Shutdown()
 			}
 
 		case <-c.shutdownCh:

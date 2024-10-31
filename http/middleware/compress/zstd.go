@@ -15,7 +15,7 @@ func NewZstd(level Level) Compression {
 	zstdLevel := zstd.SpeedDefault
 	if level == BestCompression {
 		zstdLevel = zstd.SpeedBestCompression
-	} else {
+	} else if level == BestSpeed {
 		zstdLevel = zstd.SpeedFastest
 	}
 

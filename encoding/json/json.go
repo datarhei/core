@@ -2,10 +2,9 @@
 package json
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
-
-	"github.com/goccy/go-json"
 )
 
 type UnmarshalTypeError = json.UnmarshalTypeError

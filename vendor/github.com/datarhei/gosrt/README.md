@@ -42,7 +42,7 @@ The parts that are implemented are based on what has been published in the SRT R
 
 ## Requirements
 
-A Go version of 1.18+ is required.
+A Go version of 1.20+ is required.
 
 ## Installation
 
@@ -89,38 +89,41 @@ if err != nil {
 }
 
 for {
-    conn, mode, err := ln.Accept(func(req ConnRequest) ConnType {
-        // check connection request
-        return srt.REJECT
-    })
+    req, err := ln.Accept2()
     if err != nil {
         // handle error
     }
 
-    if mode == srt.REJECT {
-        // rejected connection, ignore
-        continue
-    }
+    go func(req ConnRequest) {
+        // check connection request by inspecting the connection request
+        // and either rejecting it ...
 
-    if mode == srt.PUBLISH {
-        go handlePublish(conn)
-    } else { // srt.SUBSCRIBE
-        go handleSubscribe(conn)
-    }
+        if somethingIsWrong {
+            req.Reject(srt.REJ_PEER)
+            return
+        }
+
+        // ... or accepting it ...
+
+        conn, err := req.Accept()
+        if err != nil {
+            return
+        }
+
+        // ... and decide whether it is a publishing or subscribing connection.
+
+        if publish {
+            handlePublish(conn)
+        } else {
+            handleSubscribe(conn)
+        }
+    }(req)
 }
 ```
 
 In the `contrib/server` directory you'll find a complete example of a SRT server. For your convenience
-this modules provides the `Server` type which is a light framework for creating your own SRT server. The
+this module provides the `Server` type which is a light framework for creating your own SRT server. The
 example server is based on this type.
-
-### PUBLISH / SUBSCRIBE
-
-The `Accept` function from the `Listener` expects a function that handles the connection requests. It can
-return 3 different values: `srt.PUBLISH`, `srt.SUBSCRIBE`, and `srt.REJECT`. `srt.PUBLISH` means that the
-server expects the caller to send data, whereas `srt.SUBSCRIBE` means that the server will send data to
-the caller. This is opiniated towards a streaming server, however in your implementation of a listener
-you are free to handle connections requests to your liking.
 
 ## Contributed client
 

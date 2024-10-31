@@ -396,6 +396,46 @@
                 }
             }
         },
+        "/api/v3/cluster/events": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stream of events of whats happening on each node in the cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream",
+                    "application/x-json-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Stream of events",
+                "operationId": "cluster-3-events",
+                "parameters": [
+                    {
+                        "description": "Event filters",
+                        "name": "filters",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.EventFilters"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.Event"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/fs/{storage}": {
             "get": {
                 "security": [
@@ -1532,7 +1572,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.Version"
+                            "$ref": "#/definitions/api.AboutVersion"
                         }
                     },
                     "404": {
@@ -5031,6 +5071,14 @@
                     "type": "integer",
                     "format": "uint64"
                 },
+                "channels": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "codec": {
+                    "description": "Codec parameter",
+                    "type": "string"
+                },
                 "drop": {
                     "type": "integer",
                     "format": "uint64"
@@ -5049,8 +5097,18 @@
                 "gop": {
                     "type": "string"
                 },
+                "height": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
                 "input": {
                     "$ref": "#/definitions/api.AVstreamIO"
+                },
+                "layout": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
                 },
                 "looping": {
                     "type": "boolean"
@@ -5065,7 +5123,24 @@
                 "output": {
                     "$ref": "#/definitions/api.AVstreamIO"
                 },
+                "pix_fmt": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "integer"
+                },
                 "queue": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "sample_fmt": {
+                    "type": "string"
+                },
+                "sampling_hz": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "width": {
                     "type": "integer",
                     "format": "uint64"
                 }
@@ -5115,11 +5190,119 @@
                 "name": {
                     "type": "string"
                 },
+                "resources": {
+                    "$ref": "#/definitions/api.AboutResources"
+                },
                 "uptime_seconds": {
                     "type": "integer"
                 },
                 "version": {
-                    "$ref": "#/definitions/api.Version"
+                    "$ref": "#/definitions/api.AboutVersion"
+                }
+            }
+        },
+        "api.AboutGPUResources": {
+            "type": "object",
+            "properties": {
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "usage_decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_general": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
+        "api.AboutResources": {
+            "type": "object",
+            "properties": {
+                "cpu_core": {
+                    "description": "Current CPU load of the core itself, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_limit": {
+                    "description": "Defined CPU load limit, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_used": {
+                    "description": "Current CPU load, 0-100*ncpu",
+                    "type": "number"
+                },
+                "gpu": {
+                    "description": "GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.AboutGPUResources"
+                    }
+                },
+                "is_throttling": {
+                    "description": "Whether this core is currently throttling",
+                    "type": "boolean"
+                },
+                "memory_core_bytes": {
+                    "description": "Current used memory of the core itself in bytes",
+                    "type": "integer"
+                },
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "ncpu": {
+                    "description": "Number of CPU on this node",
+                    "type": "number"
+                }
+            }
+        },
+        "api.AboutVersion": {
+            "type": "object",
+            "properties": {
+                "arch": {
+                    "type": "string"
+                },
+                "build_date": {
+                    "description": "RFC3339",
+                    "type": "string"
+                },
+                "compiler": {
+                    "type": "string"
+                },
+                "number": {
+                    "type": "string"
+                },
+                "repository_branch": {
+                    "type": "string"
+                },
+                "repository_commit": {
+                    "type": "string"
                 }
             }
         },
@@ -5294,6 +5477,39 @@
                 }
             }
         },
+        "api.ClusterNodeGPUResources": {
+            "type": "object",
+            "properties": {
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "usage_decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_general": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
         "api.ClusterNodeID": {
             "type": "object",
             "properties": {
@@ -5305,6 +5521,10 @@
         "api.ClusterNodeResources": {
             "type": "object",
             "properties": {
+                "cpu_core": {
+                    "description": "percent 0-100*ncpu",
+                    "type": "number"
+                },
                 "cpu_limit": {
                     "description": "percent 0-100*npcu",
                     "type": "number"
@@ -5316,10 +5536,25 @@
                 "error": {
                     "type": "string"
                 },
+                "gpu": {
+                    "description": "GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterNodeGPUResources"
+                    }
+                },
                 "is_throttling": {
                     "type": "boolean"
                 },
+                "memory_core_bytes": {
+                    "description": "bytes",
+                    "type": "integer"
+                },
                 "memory_limit_bytes": {
+                    "description": "bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
                     "description": "bytes",
                     "type": "integer"
                 },
@@ -5564,6 +5799,26 @@
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -5753,6 +6008,14 @@
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },
@@ -6081,6 +6344,9 @@
                 "caller": {
                     "type": "string"
                 },
+                "core_id": {
+                    "type": "string"
+                },
                 "data": {
                     "type": "object",
                     "additionalProperties": {
@@ -6106,6 +6372,9 @@
             "type": "object",
             "properties": {
                 "caller": {
+                    "type": "string"
+                },
+                "core_id": {
                     "type": "string"
                 },
                 "data": {
@@ -6886,13 +7155,33 @@
             "type": "object",
             "properties": {
                 "cpu_usage": {
+                    "description": "percent 0-100*ncpu",
+                    "type": "number"
+                },
+                "gpu_decoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "gpu_encoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "gpu_memory_mbytes": {
+                    "description": "megabytes",
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "gpu_usage": {
+                    "description": "percent 0-100",
                     "type": "number"
                 },
                 "memory_mbytes": {
+                    "description": "megabytes",
                     "type": "integer",
                     "format": "uint64"
                 },
                 "waitfor_seconds": {
+                    "description": "seconds",
                     "type": "integer",
                     "format": "uint64"
                 }
@@ -7062,6 +7351,9 @@
                 "cpu_usage": {
                     "$ref": "#/definitions/api.ProcessUsageCPU"
                 },
+                "gpu": {
+                    "$ref": "#/definitions/api.ProcessUsageGPU"
+                },
                 "memory_bytes": {
                     "$ref": "#/definitions/api.ProcessUsageMemory"
                 }
@@ -7090,11 +7382,70 @@
                 }
             }
         },
-        "api.ProcessUsageMemory": {
+        "api.ProcessUsageGPU": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                },
+                "encoder": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "memory_bytes": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUMemory"
+                },
+                "usage": {
+                    "$ref": "#/definitions/api.ProcessUsageGPUUsage"
+                }
+            }
+        },
+        "api.ProcessUsageGPUMemory": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "cur": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "limit": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "max": {
+                    "type": "integer",
+                    "format": "uint64"
+                }
+            }
+        },
+        "api.ProcessUsageGPUUsage": {
             "type": "object",
             "properties": {
                 "avg": {
                     "type": "number"
+                },
+                "cur": {
+                    "type": "number"
+                },
+                "limit": {
+                    "type": "number"
+                },
+                "max": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ProcessUsageMemory": {
+            "type": "object",
+            "properties": {
+                "avg": {
+                    "type": "integer",
+                    "format": "uint64"
                 },
                 "cur": {
                     "type": "integer",
@@ -7235,6 +7586,9 @@
                 "layout": {
                     "type": "string"
                 },
+                "level": {
+                    "type": "integer"
+                },
                 "packet": {
                     "type": "integer",
                     "format": "uint64"
@@ -7246,11 +7600,17 @@
                 "pps": {
                     "type": "number"
                 },
+                "profile": {
+                    "type": "integer"
+                },
                 "q": {
                     "type": "number"
                 },
-                "sampling_hz": {
+                "sample_fmt": {
                     "description": "Audio",
+                    "type": "string"
+                },
+                "sampling_hz": {
                     "type": "integer",
                     "format": "uint64"
                 },
@@ -7936,6 +8296,26 @@
                         }
                     }
                 },
+                "compress": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "min_length": {
+                            "type": "integer"
+                        }
+                    }
+                },
                 "created_at": {
                     "description": "When this config has been persisted",
                     "type": "string"
@@ -8125,6 +8505,14 @@
                     "type": "object",
                     "properties": {
                         "max_cpu_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_memory_usage": {
+                            "description": "percent 0-100",
+                            "type": "number"
+                        },
+                        "max_gpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
                         },
@@ -8660,30 +9048,6 @@
                     "items": {
                         "$ref": "#/definitions/api.GraphMapping"
                     }
-                }
-            }
-        },
-        "api.Version": {
-            "type": "object",
-            "properties": {
-                "arch": {
-                    "type": "string"
-                },
-                "build_date": {
-                    "description": "RFC3339",
-                    "type": "string"
-                },
-                "compiler": {
-                    "type": "string"
-                },
-                "number": {
-                    "type": "string"
-                },
-                "repository_branch": {
-                    "type": "string"
-                },
-                "repository_commit": {
-                    "type": "string"
                 }
             }
         },

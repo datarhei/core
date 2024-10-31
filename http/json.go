@@ -14,11 +14,8 @@ type GoJSONSerializer struct{}
 
 // Serialize converts an interface into a json and writes it to the response.
 // You can optionally use the indent parameter to produce pretty JSONs.
-func (d GoJSONSerializer) Serialize(c echo.Context, i interface{}, indent string) error {
+func (d GoJSONSerializer) Serialize(c echo.Context, i interface{}, _ string) error {
 	enc := json.NewEncoder(c.Response())
-	if indent != "" {
-		enc.SetIndent("", indent)
-	}
 	return enc.Encode(i)
 }
 

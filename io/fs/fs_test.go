@@ -59,8 +59,14 @@ func TestFilesystem(t *testing.T) {
 	os.RemoveAll("./testing/")
 
 	filesystems := map[string]func(string) (Filesystem, error){
-		"memfs": func(name string) (Filesystem, error) {
-			return NewMemFilesystem(MemConfig{})
+		"memfs-map": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "map"})
+		},
+		"memfs-xsync": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "xsync"})
+		},
+		"memfs-swiss": func(name string) (Filesystem, error) {
+			return NewMemFilesystem(MemConfig{Storage: "swiss"})
 		},
 		"diskfs": func(name string) (Filesystem, error) {
 			return NewRootedDiskFilesystem(RootedDiskConfig{
@@ -109,6 +115,8 @@ func TestFilesystem(t *testing.T) {
 		"symlinkErrors":   testSymlinkErrors,
 		"symlinkOpenStat": testSymlinkOpenStat,
 		"open":            testOpen,
+		"append":          testAppend,
+		"appendCreate":    testAppendCreate,
 	}
 
 	for fsname, fs := range filesystems {
@@ -119,6 +127,11 @@ func TestFilesystem(t *testing.T) {
 				}
 				filesystem, err := fs(name)
 				require.NoError(t, err)
+
+				if fsname == "s3fs" {
+					filesystem.RemoveList("/", ListOptions{Pattern: "/**"})
+				}
+
 				test(t, filesystem)
 			})
 		}
@@ -852,4 +865,29 @@ func testSymlinkErrors(t *testing.T, fs Filesystem) {
 
 	err = fs.Symlink("/bazfoo", "/barfoo")
 	require.Error(t, err)
+}
+
+func testAppend(t *testing.T, fs Filesystem) {
+	_, _, err := fs.WriteFileReader("/foobar", strings.NewReader("part1"), -1)
+	require.NoError(t, err)
+
+	_, err = fs.AppendFileReader("/foobar", strings.NewReader("part2"), -1)
+	require.NoError(t, err)
+
+	file := fs.Open("/foobar")
+	require.NotNil(t, file)
+
+	data, _ := io.ReadAll(file)
+	require.Equal(t, []byte("part1part2"), data)
+}
+
+func testAppendCreate(t *testing.T, fs Filesystem) {
+	_, err := fs.AppendFileReader("/foobar", strings.NewReader("part1"), -1)
+	require.NoError(t, err)
+
+	file := fs.Open("/foobar")
+	require.NotNil(t, file)
+
+	data, _ := io.ReadAll(file)
+	require.Equal(t, []byte("part1"), data)
 }

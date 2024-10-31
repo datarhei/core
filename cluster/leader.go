@@ -183,6 +183,22 @@ func (c *cluster) monitorLeadership() {
 				c.leaderLock.Unlock()
 			}
 		case <-c.shutdownCh:
+			if weAreFollowerCh != nil {
+				close(weAreFollowerCh)
+			}
+
+			if weAreLeaderCh != nil {
+				close(weAreLeaderCh)
+			}
+
+			if weAreEmergencyLeaderCh != nil {
+				close(weAreEmergencyLeaderCh)
+			}
+
+			leaderLoop.Wait()
+			emergencyLeaderLoop.Wait()
+			followerLoop.Wait()
+
 			return
 		}
 	}

@@ -1,25 +1,26 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 )
 
 func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
-	var buf bytes.Buffer
+	buf := mem.Get()
+	defer mem.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(filters)
 
 	header := make(http.Header)
 	header.Set("Accept", "application/x-json-stream")
 
-	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", &buf)
+	stream, err := r.stream(ctx, "POST", "/v3/events", nil, header, "application/json", buf.Reader())
 	if err != nil {
 		return nil, err
 	}

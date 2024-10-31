@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/process"
 )
 
@@ -78,13 +79,21 @@ type Config struct {
 	Reconnect      bool
 	ReconnectDelay uint64 // seconds
 	Autostart      bool
-	StaleTimeout   uint64   // seconds
-	Timeout        uint64   // seconds
-	Scheduler      string   // crontab pattern or RFC3339 timestamp
-	LogPatterns    []string // will be interpreted as regular expressions
-	LimitCPU       float64  // percent
-	LimitMemory    uint64   // bytes
-	LimitWaitFor   uint64   // seconds
+	StaleTimeout   uint64         // seconds
+	Timeout        uint64         // seconds
+	Scheduler      string         // crontab pattern or RFC3339 timestamp
+	LogPatterns    []string       // will be interpreted as regular expressions
+	LimitCPU       float64        // percent
+	LimitMemory    uint64         // bytes
+	LimitGPU       ConfigLimitGPU // GPU limits
+	LimitWaitFor   uint64         // seconds
+}
+
+type ConfigLimitGPU struct {
+	Usage   float64 // percent 0-100
+	Encoder float64 // percent 0-100
+	Decoder float64 // percent 0-100
+	Memory  uint64  // bytes
 }
 
 func (config *Config) Clone() *Config {
@@ -102,6 +111,7 @@ func (config *Config) Clone() *Config {
 		Scheduler:      config.Scheduler,
 		LimitCPU:       config.LimitCPU,
 		LimitMemory:    config.LimitMemory,
+		LimitGPU:       config.LimitGPU,
 		LimitWaitFor:   config.LimitWaitFor,
 	}
 
@@ -156,7 +166,8 @@ func (config *Config) String() string {
 }
 
 func (config *Config) Hash() []byte {
-	b := bytes.Buffer{}
+	b := mem.Get()
+	defer mem.Put(b)
 
 	b.WriteString(config.ID)
 	b.WriteString(config.Reference)
@@ -173,6 +184,10 @@ func (config *Config) Hash() []byte {
 	b.WriteString(strconv.FormatUint(config.LimitMemory, 10))
 	b.WriteString(strconv.FormatUint(config.LimitWaitFor, 10))
 	b.WriteString(strconv.FormatFloat(config.LimitCPU, 'f', -1, 64))
+	b.WriteString(strconv.FormatFloat(config.LimitGPU.Usage, 'f', -1, 64))
+	b.WriteString(strconv.FormatFloat(config.LimitGPU.Encoder, 'f', -1, 64))
+	b.WriteString(strconv.FormatFloat(config.LimitGPU.Decoder, 'f', -1, 64))
+	b.WriteString(strconv.FormatUint(config.LimitGPU.Memory, 10))
 
 	for _, x := range config.Input {
 		b.WriteString(x.HashString())
@@ -292,7 +307,7 @@ type State struct {
 	Memory    uint64        // Current memory consumption in bytes
 	CPU       float64       // Current CPU consumption in percent
 	LimitMode string        // How the process is limited (hard or soft)
-	Resources ProcessUsage  // Current resource usage, include CPU and memory consumption
+	Resources ProcessUsage  // Current resource usage, include CPU, memory and GPU consumption
 	Command   []string      // ffmpeg command line parameters
 }
 
@@ -324,10 +339,10 @@ func (p *ProcessUsageCPU) MarshalParser() parse.UsageCPU {
 }
 
 type ProcessUsageMemory struct {
-	Current uint64  // bytes
-	Average float64 // bytes
-	Max     uint64  // bytes
-	Limit   uint64  // bytes
+	Current uint64 // bytes
+	Average uint64 // bytes
+	Max     uint64 // bytes
+	Limit   uint64 // bytes
 }
 
 func (p *ProcessUsageMemory) UnmarshalParser(pp *parse.UsageMemory) {
@@ -346,20 +361,97 @@ func (p *ProcessUsageMemory) MarshalParser() parse.UsageMemory {
 	return pp
 }
 
+type ProcessUsageGPU struct {
+	Index   int
+	Usage   ProcessUsageGPUUsage
+	Encoder ProcessUsageGPUUsage
+	Decoder ProcessUsageGPUUsage
+	Memory  ProcessUsageGPUMemory
+}
+
+func (p *ProcessUsageGPU) UnmarshalParser(pp *parse.UsageGPU) {
+	p.Index = pp.Index
+	p.Usage.UnmarshalParser(&pp.Usage)
+	p.Encoder.UnmarshalParser(&pp.Encoder)
+	p.Decoder.UnmarshalParser(&pp.Decoder)
+	p.Memory.UnmarshalParser(&pp.Memory)
+}
+
+func (p *ProcessUsageGPU) MarshalParser() parse.UsageGPU {
+	pp := parse.UsageGPU{
+		Index:   p.Index,
+		Usage:   p.Usage.MarshalParser(),
+		Encoder: p.Encoder.MarshalParser(),
+		Decoder: p.Decoder.MarshalParser(),
+		Memory:  p.Memory.MarshalParser(),
+	}
+
+	return pp
+}
+
+type ProcessUsageGPUUsage struct {
+	Current float64 // percent 0-100
+	Average float64 // percent 0-100
+	Max     float64 // percent 0-100
+	Limit   float64 // percent 0-100
+}
+
+func (p *ProcessUsageGPUUsage) UnmarshalParser(pp *parse.UsageGPUUsage) {
+	p.Average = pp.Average
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageGPUUsage) MarshalParser() parse.UsageGPUUsage {
+	pp := parse.UsageGPUUsage{
+		Average: p.Average,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	return pp
+}
+
+type ProcessUsageGPUMemory struct {
+	Current uint64 // bytes
+	Average uint64 // bytes
+	Max     uint64 // bytes
+	Limit   uint64 // bytes
+}
+
+func (p *ProcessUsageGPUMemory) UnmarshalParser(pp *parse.UsageGPUMemory) {
+	p.Average = pp.Average
+	p.Max = pp.Max
+	p.Limit = pp.Limit
+}
+
+func (p *ProcessUsageGPUMemory) MarshalParser() parse.UsageGPUMemory {
+	pp := parse.UsageGPUMemory{
+		Average: p.Average,
+		Max:     p.Max,
+		Limit:   p.Limit,
+	}
+
+	return pp
+}
+
 type ProcessUsage struct {
 	CPU    ProcessUsageCPU
 	Memory ProcessUsageMemory
+	GPU    ProcessUsageGPU
 }
 
 func (p *ProcessUsage) UnmarshalParser(pp *parse.Usage) {
 	p.CPU.UnmarshalParser(&pp.CPU)
 	p.Memory.UnmarshalParser(&pp.Memory)
+	p.GPU.UnmarshalParser(&pp.GPU)
 }
 
 func (p *ProcessUsage) MarshalParser() parse.Usage {
 	pp := parse.Usage{
 		CPU:    p.CPU.MarshalParser(),
 		Memory: p.Memory.MarshalParser(),
+		GPU:    p.GPU.MarshalParser(),
 	}
 
 	return pp

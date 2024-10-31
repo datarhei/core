@@ -403,6 +403,31 @@ func (fs *diskFilesystem) WriteFileSafe(path string, data []byte) (int64, bool, 
 	return int64(size), !replace, nil
 }
 
+func (fs *diskFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int) (int64, error) {
+	path = fs.cleanPath(path)
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return -1, fmt.Errorf("creating file failed: %w", err)
+	}
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return -1, err
+	}
+
+	defer f.Close()
+
+	size, err := f.ReadFrom(r)
+	if err != nil {
+		return -1, fmt.Errorf("reading data failed: %w", err)
+	}
+
+	fs.lastSizeCheck = time.Time{}
+
+	return size, nil
+}
+
 func (fs *diskFilesystem) Rename(src, dst string) error {
 	src = fs.cleanPath(src)
 	dst = fs.cleanPath(dst)

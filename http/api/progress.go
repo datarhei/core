@@ -23,6 +23,8 @@ type ProgressIO struct {
 	Type      string              `json:"type"`
 	Codec     string              `json:"codec"`
 	Coder     string              `json:"coder"`
+	Profile   int                 `json:"profile"`
+	Level     int                 `json:"level"`
 	Frame     uint64              `json:"frame" format:"uint64"`
 	Keyframe  uint64              `json:"keyframe" format:"uint64"`
 	Framerate ProgressIOFramerate `json:"framerate"`
@@ -40,9 +42,10 @@ type ProgressIO struct {
 	Height    uint64      `json:"height,omitempty" format:"uint64"`
 
 	// Audio
-	Sampling uint64 `json:"sampling_hz,omitempty" format:"uint64"`
-	Layout   string `json:"layout,omitempty"`
-	Channels uint64 `json:"channels,omitempty" format:"uint64"`
+	Samplefmt string `json:"sample_fmt,omitempty"`
+	Sampling  uint64 `json:"sampling_hz,omitempty" format:"uint64"`
+	Layout    string `json:"layout,omitempty"`
+	Channels  uint64 `json:"channels,omitempty" format:"uint64"`
 
 	// avstream
 	AVstream *AVstream `json:"avstream" jsonschema:"anyof_type=null;object"`
@@ -62,6 +65,8 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 	i.Type = io.Type
 	i.Codec = io.Codec
 	i.Coder = io.Coder
+	i.Profile = io.Profile
+	i.Level = io.Level
 	i.Frame = io.Frame
 	i.Keyframe = io.Keyframe
 	i.Framerate.Min = json.ToNumber(io.Framerate.Min)
@@ -77,6 +82,7 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 	i.Quantizer = json.ToNumber(io.Quantizer)
 	i.Width = io.Width
 	i.Height = io.Height
+	i.Samplefmt = io.Samplefmt
 	i.Sampling = io.Sampling
 	i.Layout = io.Layout
 	i.Channels = io.Channels
@@ -97,6 +103,8 @@ func (i *ProgressIO) Marshal() app.ProgressIO {
 		Type:      i.Type,
 		Codec:     i.Codec,
 		Coder:     i.Coder,
+		Profile:   i.Profile,
+		Level:     i.Level,
 		Frame:     i.Frame,
 		Keyframe:  i.Keyframe,
 		Packet:    i.Packet,
@@ -105,6 +113,7 @@ func (i *ProgressIO) Marshal() app.ProgressIO {
 		Pixfmt:    i.Pixfmt,
 		Width:     i.Width,
 		Height:    i.Height,
+		Samplefmt: i.Samplefmt,
 		Sampling:  i.Sampling,
 		Layout:    i.Layout,
 		Channels:  i.Channels,

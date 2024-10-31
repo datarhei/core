@@ -95,7 +95,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 
 	// Mark nodes as throttling where at least one process is still throttling
 	for _, haveP := range have {
-		if haveP.Throttling {
+		if haveP.Resources.Throttling {
 			resources.Throttling(haveP.NodeID, true)
 		}
 	}
@@ -106,6 +106,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 	haveReferenceAffinity := NewReferenceAffinity(have)
 
 	opStack := []interface{}{}
+	opBudget := 100
 
 	// Check for any requested relocations.
 	for processid, targetNodeid := range relocateMap {
@@ -135,7 +136,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 		if len(targetNodeid) != 0 {
 			_, hasNode := nodes[targetNodeid]
 
-			if !hasNode || !resources.HasNodeEnough(targetNodeid, process.Config.LimitCPU, process.Config.LimitMemory) {
+			if !hasNode || !resources.HasNodeEnough(targetNodeid, ResourcesFromConfig(process.Config)) {
 				targetNodeid = ""
 			}
 		}
@@ -151,7 +152,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 						continue
 					}
 
-					if resources.HasNodeEnough(raNodeid, process.Config.LimitCPU, process.Config.LimitMemory) {
+					if resources.HasNodeEnough(raNodeid, ResourcesFromConfig(process.Config)) {
 						targetNodeid = raNodeid
 						break
 					}
@@ -160,7 +161,7 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 
 			// Find the best node with enough resources available.
 			if len(targetNodeid) == 0 {
-				nodes := resources.FindBestNodes(process.Config.LimitCPU, process.Config.LimitMemory)
+				nodes := resources.FindBestNodes(ResourcesFromConfig(process.Config))
 				for _, nodeid := range nodes {
 					if nodeid == sourceNodeid {
 						continue
@@ -190,8 +191,10 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 			order:      process.Order,
 		})
 
+		opBudget -= 5
+
 		// Adjust the resources.
-		resources.Move(targetNodeid, sourceNodeid, process.CPU, process.Mem)
+		resources.Move(targetNodeid, sourceNodeid, ResourcesFromProcess(process.Resources))
 
 		// Adjust the reference affinity.
 		haveReferenceAffinity.Move(process.Config.Reference, process.Config.Domain, sourceNodeid, targetNodeid)
@@ -199,7 +202,9 @@ func relocate(have []node.Process, nodes map[string]node.About, relocateMap map[
 		relocatedProcessIDs = append(relocatedProcessIDs, processid)
 
 		// Move only one process at a time.
-		break
+		if opBudget <= 0 {
+			break
+		}
 	}
 
 	return opStack, resources.Map(), relocatedProcessIDs

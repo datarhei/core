@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"github.com/datarhei/core/v16/monitor/metric"
-	"github.com/datarhei/core/v16/psutil"
 	"github.com/datarhei/core/v16/resources"
 )
 
@@ -15,13 +14,11 @@ type cpuCollector struct {
 	limitDescr    *metric.Description
 	throttleDescr *metric.Description
 
-	ncpu      float64
 	resources resources.Resources
 }
 
 func NewCPUCollector(rsc resources.Resources) metric.Collector {
 	c := &cpuCollector{
-		ncpu:      1,
 		resources: rsc,
 	}
 
@@ -32,10 +29,6 @@ func NewCPUCollector(rsc resources.Resources) metric.Collector {
 	c.otherDescr = metric.NewDesc("cpu_other", "Percentage of CPU used for other subsystems", nil)
 	c.limitDescr = metric.NewDesc("cpu_limit", "Percentage of CPU to be consumed", nil)
 	c.throttleDescr = metric.NewDesc("cpu_throttling", "Whether the CPU is currently throttled", nil)
-
-	if ncpu, err := psutil.CPUCounts(true); err == nil {
-		c.ncpu = ncpu
-	}
 
 	return c
 }
@@ -61,29 +54,23 @@ func (c *cpuCollector) Describe() []*metric.Description {
 func (c *cpuCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	metrics.Add(metric.NewValue(c.ncpuDescr, c.ncpu))
+	rinfo := c.resources.Info()
 
-	limit, _ := c.resources.Limits()
+	metrics.Add(metric.NewValue(c.ncpuDescr, rinfo.CPU.NCPU))
 
-	metrics.Add(metric.NewValue(c.limitDescr, limit))
+	metrics.Add(metric.NewValue(c.limitDescr, rinfo.CPU.Limit))
 
-	cpu, _ := c.resources.ShouldLimit()
 	throttling := .0
-	if cpu {
+	if rinfo.CPU.Throttling {
 		throttling = 1
 	}
 
 	metrics.Add(metric.NewValue(c.throttleDescr, throttling))
 
-	stat, err := psutil.CPUPercent()
-	if err != nil {
-		return metrics
-	}
-
-	metrics.Add(metric.NewValue(c.systemDescr, stat.System))
-	metrics.Add(metric.NewValue(c.userDescr, stat.User))
-	metrics.Add(metric.NewValue(c.idleDescr, stat.Idle))
-	metrics.Add(metric.NewValue(c.otherDescr, stat.Other))
+	metrics.Add(metric.NewValue(c.systemDescr, rinfo.CPU.System))
+	metrics.Add(metric.NewValue(c.userDescr, rinfo.CPU.User))
+	metrics.Add(metric.NewValue(c.idleDescr, rinfo.CPU.Idle))
+	metrics.Add(metric.NewValue(c.otherDescr, rinfo.CPU.Other))
 
 	return metrics
 }

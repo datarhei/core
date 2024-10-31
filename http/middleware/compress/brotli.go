@@ -15,7 +15,7 @@ func NewBrotli(level Level) Compression {
 	brotliLevel := brotli.DefaultCompression
 	if level == BestCompression {
 		brotliLevel = brotli.BestCompression
-	} else {
+	} else if level == BestSpeed {
 		brotliLevel = brotli.BestSpeed
 	}
 

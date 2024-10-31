@@ -1,7 +1,7 @@
 package monitor
 
 import (
-	"strconv"
+	"strings"
 
 	"github.com/datarhei/core/v16/http/server"
 	"github.com/datarhei/core/v16/monitor/metric"
@@ -19,7 +19,7 @@ func NewHTTPCollector(name string, handler server.Server) metric.Collector {
 		name:    name,
 	}
 
-	c.statusDescr = metric.NewDesc("http_status", "Total return status", []string{"name", "code"})
+	c.statusDescr = metric.NewDesc("http_status", "Total return status count", []string{"name", "code", "method", "path"})
 
 	return c
 }
@@ -39,8 +39,9 @@ func (c *httpCollector) Collect() metric.Metrics {
 
 	metrics := metric.NewMetrics()
 
-	for code, count := range status {
-		metrics.Add(metric.NewValue(c.statusDescr, float64(count), c.name, strconv.Itoa(code)))
+	for key, count := range status {
+		vals := strings.SplitN(key, ":", 3)
+		metrics.Add(metric.NewValue(c.statusDescr, float64(count), c.name, vals[0], vals[1], vals[2]))
 	}
 
 	return metrics

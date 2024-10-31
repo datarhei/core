@@ -6,6 +6,8 @@ import (
 
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
+	"github.com/datarhei/core/v16/internal/mock/resources"
+	"github.com/datarhei/core/v16/internal/mock/restream"
 	"github.com/stretchr/testify/require"
 
 	"github.com/labstack/echo/v4"
@@ -14,12 +16,12 @@ import (
 func getDummyAboutRouter() (*echo.Echo, error) {
 	router := mock.DummyEcho()
 
-	rs, err := mock.DummyRestreamer("../../mock")
+	rs, err := restream.New(nil, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	handler := NewAbout(rs, func() []string { return []string{} })
+	handler := NewAbout(rs, resources.New(), func() []string { return []string{} })
 
 	router.Add("GET", "/", handler.About)
 

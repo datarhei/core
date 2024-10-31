@@ -1,6 +1,7 @@
 package value
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -309,4 +310,57 @@ func (u *Float64) Validate() error {
 
 func (u *Float64) IsEmpty() bool {
 	return float64(*u) == 0
+}
+
+// float64 range
+
+type Float64Range struct {
+	p    *float64
+	from float64
+	to   float64
+}
+
+func NewFloatRange(p *float64, val, from, to float64) *Float64Range {
+	v := &Float64Range{
+		p:    p,
+		from: from,
+		to:   to,
+	}
+
+	*p = val
+
+	return v
+}
+
+func (s *Float64Range) Set(val string) error {
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return err
+	}
+
+	*s.p = v
+
+	return nil
+}
+
+func (s *Float64Range) String() string {
+	if s.IsEmpty() {
+		return "(empty)"
+	}
+
+	return fmt.Sprintf("%.3f", *s.p)
+}
+
+func (s *Float64Range) Validate() error {
+	val := *s.p
+
+	if val < s.from || val > s.to {
+		return fmt.Errorf("value %f is not in range [%f, %f]", val, s.from, s.to)
+	}
+
+	return nil
+}
+
+func (s *Float64Range) IsEmpty() bool {
+	return *s.p == 0
 }

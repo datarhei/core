@@ -36,13 +36,13 @@ var (
 	secondsNumberZeroPad        = StdlibFormat("05")
 	hms                         = StdlibFormat("15:04:05")
 	tab                         = Verbatim("\t")
-	weekNumberSundayOrigin      = weeknumberOffset(0) // week number of the year, Sunday first
+	weekNumberSundayOrigin      = weeknumberOffset(true) // week number of the year, Sunday first
 	weekdayMondayOrigin         = weekday(1)
 	// monday as the first day, and 01 as the first value
 	weekNumberMondayOriginOneOrigin = AppendFunc(appendWeekNumber)
 	eby                             = StdlibFormat("_2-Jan-2006")
 	// monday as the first day, and 00 as the first value
-	weekNumberMondayOrigin = weeknumberOffset(1) // week number of the year, Monday first
+	weekNumberMondayOrigin = weeknumberOffset(false) // week number of the year, Monday first
 	weekdaySundayOrigin    = weekday(0)
 	natReprTime            = StdlibFormat("15:04:05") // national representation of the time XXX is this correct?
 	natReprDate            = StdlibFormat("01/02/06") // national representation of the date XXX is this correct?
@@ -243,20 +243,16 @@ func (v weekday) Append(b []byte, t time.Time) []byte {
 	return append(b, byte(n+48))
 }
 
-type weeknumberOffset int
+type weeknumberOffset bool
 
 func (v weeknumberOffset) Append(b []byte, t time.Time) []byte {
-	yd := t.YearDay()
-	offset := int(t.Weekday()) - int(v)
-	if offset < 0 {
-		offset += 7
+	offset := int(t.Weekday())
+	if v {
+		offset = 6 - offset
+	} else if offset != 0 {
+		offset = 7 - offset
 	}
-
-	if yd < offset {
-		return append(b, '0', '0')
-	}
-
-	n := ((yd - offset) / 7) + 1
+	n := (t.YearDay() + offset) / 7
 	if n < 10 {
 		b = append(b, '0')
 	}

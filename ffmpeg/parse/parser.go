@@ -410,23 +410,15 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 	}
 
-	p.averager.main.fps.Add(int64(p.stats.main.diff.frame))
-	p.averager.main.pps.Add(int64(p.stats.main.diff.packet))
-	p.averager.main.bitrate.Add(int64(p.stats.main.diff.size) * 8)
-
-	p.progress.ffmpeg.FPS = p.averager.main.fps.Average(p.averager.window)
-	p.progress.ffmpeg.PPS = p.averager.main.pps.Average(p.averager.window)
-	p.progress.ffmpeg.Bitrate = p.averager.main.bitrate.Average(p.averager.window)
+	p.progress.ffmpeg.FPS = p.averager.main.fps.AddAndAverage(float64(p.stats.main.diff.frame))
+	p.progress.ffmpeg.PPS = p.averager.main.pps.AddAndAverage(float64(p.stats.main.diff.packet))
+	p.progress.ffmpeg.Bitrate = p.averager.main.bitrate.AddAndAverage(float64(p.stats.main.diff.size) * 8)
 
 	if len(p.averager.input) != 0 && len(p.averager.input) == len(p.progress.ffmpeg.Input) {
 		for i := range p.progress.ffmpeg.Input {
-			p.averager.input[i].fps.Add(int64(p.stats.input[i].diff.frame))
-			p.averager.input[i].pps.Add(int64(p.stats.input[i].diff.packet))
-			p.averager.input[i].bitrate.Add(int64(p.stats.input[i].diff.size) * 8)
-
-			p.progress.ffmpeg.Input[i].FPS = p.averager.input[i].fps.Average(p.averager.window)
-			p.progress.ffmpeg.Input[i].PPS = p.averager.input[i].pps.Average(p.averager.window)
-			p.progress.ffmpeg.Input[i].Bitrate = p.averager.input[i].bitrate.Average(p.averager.window)
+			p.progress.ffmpeg.Input[i].FPS = p.averager.input[i].fps.AddAndAverage(float64(p.stats.input[i].diff.frame))
+			p.progress.ffmpeg.Input[i].PPS = p.averager.input[i].pps.AddAndAverage(float64(p.stats.input[i].diff.packet))
+			p.progress.ffmpeg.Input[i].Bitrate = p.averager.input[i].bitrate.AddAndAverage(float64(p.stats.input[i].diff.size) * 8)
 
 			if p.collector.IsCollectableIP(p.process.input[i].IP) {
 				p.collector.Activate("")
@@ -437,13 +429,9 @@ func (p *parser) Parse(line []byte) uint64 {
 
 	if len(p.averager.output) != 0 && len(p.averager.output) == len(p.progress.ffmpeg.Output) {
 		for i := range p.progress.ffmpeg.Output {
-			p.averager.output[i].fps.Add(int64(p.stats.output[i].diff.frame))
-			p.averager.output[i].pps.Add(int64(p.stats.output[i].diff.packet))
-			p.averager.output[i].bitrate.Add(int64(p.stats.output[i].diff.size) * 8)
-
-			p.progress.ffmpeg.Output[i].FPS = p.averager.output[i].fps.Average(p.averager.window)
-			p.progress.ffmpeg.Output[i].PPS = p.averager.output[i].pps.Average(p.averager.window)
-			p.progress.ffmpeg.Output[i].Bitrate = p.averager.output[i].bitrate.Average(p.averager.window)
+			p.progress.ffmpeg.Output[i].FPS = p.averager.output[i].fps.AddAndAverage(float64(p.stats.output[i].diff.frame))
+			p.progress.ffmpeg.Output[i].PPS = p.averager.output[i].pps.AddAndAverage(float64(p.stats.output[i].diff.packet))
+			p.progress.ffmpeg.Output[i].Bitrate = p.averager.output[i].bitrate.AddAndAverage(float64(p.stats.output[i].diff.size) * 8)
 
 			if p.collector.IsCollectableIP(p.process.output[i].IP) {
 				p.collector.Activate("")
@@ -631,7 +619,7 @@ func (p *parser) Stop(state string, pusage process.Usage) {
 	usage.CPU.Max = pusage.CPU.Max
 	usage.CPU.Limit = pusage.CPU.Limit
 
-	usage.Memory.Average = pusage.Memory.Average
+	usage.Memory.Average = uint64(pusage.Memory.Average)
 	usage.Memory.Max = pusage.Memory.Max
 	usage.Memory.Limit = pusage.Memory.Limit
 
@@ -653,7 +641,7 @@ func (p *parser) Progress() Progress {
 			continue
 		}
 
-		progress.Input[i].AVstream = av.export()
+		progress.Input[i].AVstream = av.export(io.Type)
 	}
 
 	progress.Started = p.stats.initialized

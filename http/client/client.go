@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/Masterminds/semver/v3"
@@ -167,8 +167,13 @@ type Config struct {
 	// Auth0Token is a valid Auth0 token to authorize access to the API.
 	Auth0Token string
 
-	// Client is a HTTPClient that will be used for the API calls. Optional.
+	// Client is a HTTPClient that will be used for the API calls. Optional. Don't
+	// set a timeout in the client if you want to use the timeout in this config.
 	Client HTTPClient
+
+	// Timeout is the timeout for the whole connection. Don't set a timeout in
+	// the optional HTTPClient as it will override this timeout.
+	Timeout time.Duration
 }
 
 type apiconstraint struct {
@@ -178,16 +183,17 @@ type apiconstraint struct {
 
 // restclient implements the RestClient interface.
 type restclient struct {
-	address      string
-	prefix       string
-	accessToken  Token
-	refreshToken Token
-	username     string
-	password     string
-	auth0Token   string
-	client       HTTPClient
-	about        api.About
-	aboutLock    sync.RWMutex
+	address       string
+	prefix        string
+	accessToken   Token
+	refreshToken  Token
+	username      string
+	password      string
+	auth0Token    string
+	client        HTTPClient
+	clientTimeout time.Duration
+	about         api.About
+	aboutLock     sync.RWMutex
 
 	version struct {
 		connectedCore *semver.Version
@@ -199,12 +205,13 @@ type restclient struct {
 // in case of an error.
 func New(config Config) (RestClient, error) {
 	r := &restclient{
-		address:    config.Address,
-		prefix:     "/api",
-		username:   config.Username,
-		password:   config.Password,
-		auth0Token: config.Auth0Token,
-		client:     config.Client,
+		address:       config.Address,
+		prefix:        "/api",
+		username:      config.Username,
+		password:      config.Password,
+		auth0Token:    config.Auth0Token,
+		client:        config.Client,
+		clientTimeout: config.Timeout,
 	}
 
 	if len(config.AccessToken) != 0 {
@@ -645,12 +652,13 @@ func (r *restclient) login() error {
 		login.Password = r.password
 	}
 
-	var buf bytes.Buffer
+	buf := mem.Get()
+	defer mem.Put(buf)
 
-	e := json.NewEncoder(&buf)
+	e := json.NewEncoder(buf)
 	e.Encode(login)
 
-	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", &buf)
+	req, err := http.NewRequest("POST", r.address+r.prefix+"/login", buf.Reader())
 	if err != nil {
 		return err
 	}
@@ -806,26 +814,11 @@ func (r *restclient) info() (api.About, error) {
 }
 
 func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
-	/*
-		fmt.Printf("%s %s\n", req.Method, req.URL)
-		for key, value := range req.Header {
-			for _, v := range value {
-				fmt.Printf("%s: %s\n", key, v)
-			}
-		}
-		fmt.Printf("\n")
-	*/
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return -1, nil, err
 	}
-	/*
-		for key, value := range resp.Header {
-			for _, v := range value {
-				fmt.Printf("%s: %s\n", key, v)
-			}
-		}
-	*/
+
 	reader := resp.Body
 
 	contentEncoding := resp.Header.Get("Content-Encoding")
@@ -923,7 +916,7 @@ func (r *restclient) stream(ctx context.Context, method, path string, query *url
 }
 
 func (r *restclient) call(method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), r.clientTimeout)
 	defer cancel()
 
 	body, err := r.stream(ctx, method, path, query, header, contentType, data)

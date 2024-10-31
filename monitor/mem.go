@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"github.com/datarhei/core/v16/monitor/metric"
-	"github.com/datarhei/core/v16/psutil"
 	"github.com/datarhei/core/v16/resources"
 )
 
@@ -44,25 +43,19 @@ func (c *memCollector) Describe() []*metric.Description {
 func (c *memCollector) Collect() metric.Metrics {
 	metrics := metric.NewMetrics()
 
-	_, limit := c.resources.Limits()
+	rinfo := c.resources.Info()
 
-	metrics.Add(metric.NewValue(c.limitDescr, float64(limit)))
+	metrics.Add(metric.NewValue(c.limitDescr, float64(rinfo.Mem.Limit)))
 
-	_, memory := c.resources.ShouldLimit()
 	throttling := .0
-	if memory {
+	if rinfo.Mem.Throttling {
 		throttling = 1
 	}
 
 	metrics.Add(metric.NewValue(c.throttleDescr, throttling))
 
-	stat, err := psutil.VirtualMemory()
-	if err != nil {
-		return metrics
-	}
-
-	metrics.Add(metric.NewValue(c.totalDescr, float64(stat.Total)))
-	metrics.Add(metric.NewValue(c.freeDescr, float64(stat.Available)))
+	metrics.Add(metric.NewValue(c.totalDescr, float64(rinfo.Mem.Total)))
+	metrics.Add(metric.NewValue(c.freeDescr, float64(rinfo.Mem.Available)))
 
 	return metrics
 }

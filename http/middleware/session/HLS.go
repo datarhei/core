@@ -3,7 +3,6 @@ package session
 
 import (
 	"bufio"
-	"bytes"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
 	"github.com/lithammer/shortuuid/v4"
 
@@ -29,7 +29,7 @@ func (h *handler) handleHLS(c echo.Context, ctxuser string, data map[string]inte
 	return next(c)
 }
 
-func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
+func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 	path := req.URL.Path
 
@@ -37,8 +37,9 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 		// Read out the path of the .ts files and look them up in the ts-map.
 		// Add it as ingress for the respective "sessionId". The "sessionId" is the .m3u8 file name.
 		reader := req.Body
-		r := &bodyReader{
+		r := &segmentReader{
 			reader: req.Body,
+			buffer: mem.Get(),
 		}
 		req.Body = r
 
@@ -46,6 +47,7 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 			req.Body = reader
 
 			if r.size == 0 {
+				mem.Put(r.buffer)
 				return
 			}
 
@@ -58,8 +60,10 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 				h.hlsIngressCollector.Extra(path, data)
 			}
 
-			h.hlsIngressCollector.Ingress(path, headerSize(req.Header))
+			buffer := mem.Get()
+			h.hlsIngressCollector.Ingress(path, headerSize(req.Header, buffer))
 			h.hlsIngressCollector.Ingress(path, r.size)
+			mem.Put(buffer)
 
 			segments := r.getSegments(urlpath.Dir(path))
 
@@ -74,6 +78,8 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 				}
 				h.lock.Unlock()
 			}
+
+			mem.Put(r.buffer)
 		}()
 	} else if strings.HasSuffix(path, ".ts") {
 		// Get the size of the .ts file and store it in the ts-map for later use.
@@ -87,9 +93,11 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 			req.Body = reader
 
 			if r.size != 0 {
+				buffer := mem.Get()
 				h.lock.Lock()
-				h.rxsegments[path] = r.size + headerSize(req.Header)
+				h.rxsegments[path] = r.size + headerSize(req.Header, buffer)
 				h.lock.Unlock()
+				mem.Put(buffer)
 			}
 		}()
 	}
@@ -97,7 +105,7 @@ func (h *handler) handleHLSIngress(c echo.Context, ctxuser string, data map[stri
 	return next(c)
 }
 
-func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
+func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 	res := c.Response()
 
@@ -171,6 +179,7 @@ func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[strin
 		// the data that we need to rewrite.
 		rewriter = &sessionRewriter{
 			ResponseWriter: res.Writer,
+			buffer:         mem.Get(),
 		}
 
 		res.Writer = rewriter
@@ -188,21 +197,29 @@ func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[strin
 	if rewrite {
 		if res.Status < 200 || res.Status >= 300 {
 			res.Write(rewriter.buffer.Bytes())
+			mem.Put(rewriter.buffer)
 			return nil
 		}
 
+		buffer := mem.Get()
+
 		// Rewrite the data befor sending it to the client
-		rewriter.rewriteHLS(sessionID, c.Request().URL)
+		rewriter.rewriteHLS(sessionID, c.Request().URL, buffer)
 
 		res.Header().Set("Cache-Control", "private")
-		res.Write(rewriter.buffer.Bytes())
+		res.Write(buffer.Bytes())
+
+		mem.Put(buffer)
+		mem.Put(rewriter.buffer)
 	}
 
 	if isM3U8 || isTS {
 		if res.Status >= 200 && res.Status < 300 {
 			// Collect how many bytes we've written in this session
-			h.hlsEgressCollector.Egress(sessionID, headerSize(res.Header()))
+			buffer := mem.Get()
+			h.hlsEgressCollector.Egress(sessionID, headerSize(res.Header(), buffer))
 			h.hlsEgressCollector.Egress(sessionID, res.Size)
+			mem.Put(buffer)
 
 			if isTS {
 				// Activate the session. If the session is already active, this is a noop
@@ -214,13 +231,13 @@ func (h *handler) handleHLSEgress(c echo.Context, ctxuser string, data map[strin
 	return nil
 }
 
-type bodyReader struct {
+type segmentReader struct {
 	reader io.ReadCloser
-	buffer bytes.Buffer
+	buffer *mem.Buffer
 	size   int64
 }
 
-func (r *bodyReader) Read(b []byte) (int, error) {
+func (r *segmentReader) Read(b []byte) (int, error) {
 	n, err := r.reader.Read(b)
 	if n > 0 {
 		r.buffer.Write(b[:n])
@@ -230,15 +247,15 @@ func (r *bodyReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func (r *bodyReader) Close() error {
+func (r *segmentReader) Close() error {
 	return r.reader.Close()
 }
 
-func (r *bodyReader) getSegments(dir string) []string {
+func (r *segmentReader) getSegments(dir string) []string {
 	segments := []string{}
 
 	// Find all segment URLs in the .m3u8
-	scanner := bufio.NewScanner(&r.buffer)
+	scanner := bufio.NewScanner(r.buffer.Reader())
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -280,65 +297,49 @@ func (r *bodyReader) getSegments(dir string) []string {
 	return segments
 }
 
-type bodysizeReader struct {
-	reader io.ReadCloser
-	size   int64
-}
-
-func (r *bodysizeReader) Read(b []byte) (int, error) {
-	n, err := r.reader.Read(b)
-	r.size += int64(n)
-
-	return n, err
-}
-
-func (r *bodysizeReader) Close() error {
-	return r.reader.Close()
-}
-
 type sessionRewriter struct {
 	http.ResponseWriter
-	buffer bytes.Buffer
+	buffer *mem.Buffer
 }
 
 func (g *sessionRewriter) Write(data []byte) (int, error) {
 	// Write the data into internal buffer for later rewrite
-	w, err := g.buffer.Write(data)
-
-	return w, err
+	return g.buffer.Write(data)
 }
 
-func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
-	var buffer bytes.Buffer
-
+func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *mem.Buffer) {
 	isMaster := false
 
 	// Find all URLS in the .m3u8 and add the session ID to the query string
-	scanner := bufio.NewScanner(&g.buffer)
+	scanner := bufio.NewScanner(g.buffer.Reader())
 	for scanner.Scan() {
-		line := scanner.Text()
+		byteline := scanner.Bytes()
 
 		// Write empty lines unmodified
-		if len(line) == 0 {
-			buffer.WriteString(line + "\n")
+		if len(byteline) == 0 {
+			buffer.Write(byteline)
+			buffer.WriteByte('\n')
 			continue
 		}
 
 		// Write comments unmodified
-		if strings.HasPrefix(line, "#") {
-			buffer.WriteString(line + "\n")
+		if byteline[0] == '#' {
+			buffer.Write(byteline)
+			buffer.WriteByte('\n')
 			continue
 		}
 
-		u, err := url.Parse(line)
+		u, err := url.Parse(string(byteline))
 		if err != nil {
-			buffer.WriteString(line + "\n")
+			buffer.Write(byteline)
+			buffer.WriteByte('\n')
 			continue
 		}
 
 		// Write anything that doesn't end in .m3u8 or .ts unmodified
 		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") {
-			buffer.WriteString(line + "\n")
+			buffer.Write(byteline)
+			buffer.WriteByte('\n')
 			continue
 		}
 
@@ -407,6 +408,4 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 
 		buffer.WriteString(urlpath.Base(requestURL.Path) + "?" + q.Encode())
 	}
-
-	g.buffer = buffer
 }

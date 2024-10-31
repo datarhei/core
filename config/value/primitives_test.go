@@ -165,3 +165,29 @@ func TestFloat64Value(t *testing.T) {
 
 	require.Equal(t, float64(77.7), x)
 }
+
+func TestFloat64RangeValue(t *testing.T) {
+	var x float64
+
+	val := NewFloatRange(&x, 11.1, 0, 100)
+
+	require.Equal(t, "11.100", val.String())
+	require.NoError(t, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	x = 42.5
+
+	require.Equal(t, "42.500", val.String())
+	require.NoError(t, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+
+	val.Set("77.7")
+
+	require.Equal(t, float64(77.7), x)
+
+	val.Set("101.9")
+
+	require.Equal(t, "101.900", val.String())
+	require.Error(t, val.Validate())
+	require.Equal(t, false, val.IsEmpty())
+}
