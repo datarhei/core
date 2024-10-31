@@ -390,9 +390,6 @@ func (l *limiter) collect() {
 
 	pinfo, err := proc.Info()
 
-	//mstat, merr := proc.Memory()
-	//cpustat, cerr := proc.CPU()
-	//gstat, gerr := proc.GPU()
 	gindex := -1
 
 	l.lock.Lock()
