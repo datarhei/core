@@ -575,8 +575,11 @@ func (r *resources) Info() Info {
 			Encoder:         g.Encoder,
 			Decoder:         g.Decoder,
 			UsageLimit:      gpulimit,
-			Throttling:      gputhrottling[i],
 		})
+
+		if i < len(gputhrottling) {
+			gpuinfo.GPU[i].Throttling = gputhrottling[i]
+		}
 	}
 
 	i := Info{
