@@ -5484,6 +5484,39 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterNodeGPUResources": {
+            "type": "object",
+            "properties": {
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "memory_used_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "usage_decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "usage_general": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
         "api.ClusterNodeID": {
             "type": "object",
             "properties": {
@@ -5509,6 +5542,13 @@ const docTemplate = `{
                 },
                 "error": {
                     "type": "string"
+                },
+                "gpu": {
+                    "description": "GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterNodeGPUResources"
+                    }
                 },
                 "is_throttling": {
                     "type": "boolean"

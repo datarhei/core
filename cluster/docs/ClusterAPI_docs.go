@@ -65,7 +65,7 @@ const docTemplateClusterAPI = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/client.AboutResponse"
                         }
                     },
                     "500": {
@@ -803,7 +803,7 @@ const docTemplateClusterAPI = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/client.GetProcessResponse"
                         }
                     },
                     "404": {
@@ -1430,6 +1430,111 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "client.AboutResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "resources": {
+                    "$ref": "#/definitions/client.AboutResponseResources"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "client.AboutResponseGPUResources": {
+            "type": "object",
+            "properties": {
+                "decoder": {
+                    "description": "Current decoder usage, 0-100",
+                    "type": "number"
+                },
+                "encoder": {
+                    "description": "Current encoder usage, 0-100",
+                    "type": "number"
+                },
+                "memory_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "usage": {
+                    "description": "Current general usage, 0-100",
+                    "type": "number"
+                },
+                "usage_limit": {
+                    "description": "Defined general usage limit, 0-100",
+                    "type": "number"
+                }
+            }
+        },
+        "client.AboutResponseResources": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "description": "Current CPU load, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_core": {
+                    "description": "Current CPU load of the core itself, 0-100*ncpu",
+                    "type": "number"
+                },
+                "cpu_limit": {
+                    "description": "Defined CPU load limit, 0-100*ncpu",
+                    "type": "number"
+                },
+                "error": {
+                    "description": "Last error",
+                    "type": "string"
+                },
+                "gpu": {
+                    "description": "Currently used GPU resources",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/client.AboutResponseGPUResources"
+                    }
+                },
+                "is_throttling": {
+                    "description": "Whether this core is currently throttling",
+                    "type": "boolean"
+                },
+                "memory_bytes": {
+                    "description": "Currently used memory in bytes",
+                    "type": "integer"
+                },
+                "memory_core_bytes": {
+                    "description": "Current used memory of the core itself in bytes",
+                    "type": "integer"
+                },
+                "memory_limit_bytes": {
+                    "description": "Defined memory limit in bytes",
+                    "type": "integer"
+                },
+                "memory_total_bytes": {
+                    "description": "Total available memory in bytes",
+                    "type": "integer"
+                },
+                "ncpu": {
+                    "description": "Number of CPU on this node",
+                    "type": "number"
+                }
+            }
+        },
         "client.AddIdentityRequest": {
             "type": "object",
             "properties": {
@@ -1443,6 +1548,17 @@ const docTemplateClusterAPI = `{
             "properties": {
                 "config": {
                     "$ref": "#/definitions/app.Config"
+                }
+            }
+        },
+        "client.GetProcessResponse": {
+            "type": "object",
+            "properties": {
+                "nodeid": {
+                    "type": "string"
+                },
+                "process": {
+                    "$ref": "#/definitions/github_com_datarhei_core_v16_cluster_store.Process"
                 }
             }
         },
@@ -2207,6 +2323,30 @@ const docTemplateClusterAPI = `{
                 "version": {
                     "type": "integer",
                     "format": "int64"
+                }
+            }
+        },
+        "github_com_datarhei_core_v16_cluster_store.Process": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "$ref": "#/definitions/app.Config"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "order": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
                 }
             }
         },

@@ -171,7 +171,7 @@ func (a *api) Version(c echo.Context) error {
 // @Tags v1.0.0
 // @ID cluster-1-about
 // @Produce json
-// @Success 200 {string} About
+// @Success 200 {object} client.AboutResponse
 // @Success 500 {object} Error
 // @Router /v1/about [get]
 func (a *api) About(c echo.Context) error {
@@ -413,7 +413,7 @@ func (a *api) ProcessAdd(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Domain to act on"
 // @Param X-Cluster-Origin header string false "Origin ID of request"
-// @Success 200 {string} string
+// @Success 200 {object} client.GetProcessResponse
 // @Failure 404 {object} Error
 // @Failure 500 {object} Error
 // @Failure 508 {object} Error
