@@ -148,33 +148,24 @@ func (p *process) Resume() error {
 func (p *process) CPU() (*CPUInfo, error) {
 	var diff float64
 
-	for {
-		p.lock.RLock()
-		nTicks := p.nTicks
-		p.lock.RUnlock()
-
-		if nTicks < 2 {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		break
-	}
-
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-
-	if p.hasCgroup && p.cpuLimit > 0 {
-		diff = float64(p.cpuLimit) * (p.statCurrentTime.Sub(p.statPreviousTime)).Seconds() / 1e9
-	} else {
-		diff = p.statCurrentTime.Sub(p.statPreviousTime).Seconds() * p.ncpu
-	}
 
 	s := &CPUInfo{
 		System: 0,
 		User:   0,
 		Idle:   0,
 		Other:  0,
+	}
+
+	if p.nTicks < 2 {
+		return s, nil
+	}
+
+	if p.hasCgroup && p.cpuLimit > 0 {
+		diff = float64(p.cpuLimit) * (p.statCurrentTime.Sub(p.statPreviousTime)).Seconds() / 1e9
+	} else {
+		diff = p.statCurrentTime.Sub(p.statPreviousTime).Seconds() * p.ncpu
 	}
 
 	if diff <= 0 {
