@@ -63,6 +63,7 @@ type GPUInfo struct {
 
 type GPUInfoStat struct {
 	Index int
+	ID    string
 	Name  string
 
 	// Memory
@@ -566,6 +567,7 @@ func (r *resources) Info() Info {
 	for i, g := range gpustat {
 		gpuinfo.GPU = append(gpuinfo.GPU, GPUInfoStat{
 			Index:           g.Index,
+			ID:              g.ID,
 			Name:            g.Name,
 			MemoryTotal:     g.MemoryTotal,
 			MemoryUsed:      g.MemoryUsed,
@@ -666,11 +668,9 @@ type ProcessInfoCPU struct {
 }
 
 type ProcessInfoGPU struct {
-	Index int    // Index of the GPU
-	Name  string // Name of the GPU (not populated for a specific process)
+	Index int // Index of the GPU
 
-	MemoryTotal uint64 // bytes (not populated for a specific process)
-	MemoryUsed  uint64 // bytes
+	MemoryUsed uint64 // bytes
 
 	Usage   float64 // percent 0-100
 	Encoder float64 // percent 0-100
@@ -708,13 +708,11 @@ func (p *process) Info() (ProcessInfo, error) {
 		},
 		Memory: mem,
 		GPU: ProcessInfoGPU{
-			Index:       gpu.Index,
-			Name:        gpu.Name,
-			MemoryTotal: gpu.MemoryTotal,
-			MemoryUsed:  gpu.MemoryUsed,
-			Usage:       gpu.Usage,
-			Encoder:     gpu.Encoder,
-			Decoder:     gpu.Decoder,
+			Index:      gpu.Index,
+			MemoryUsed: gpu.MemoryUsed,
+			Usage:      gpu.Usage,
+			Encoder:    gpu.Encoder,
+			Decoder:    gpu.Decoder,
 		},
 	}
 

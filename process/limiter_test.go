@@ -22,13 +22,11 @@ func (p *proc) Info() (resources.ProcessInfo, error) {
 		},
 		Memory: 197,
 		GPU: resources.ProcessInfoGPU{
-			Index:       0,
-			Name:        "L4",
-			MemoryTotal: 128,
-			MemoryUsed:  91,
-			Usage:       3,
-			Encoder:     9,
-			Decoder:     5,
+			Index:      0,
+			MemoryUsed: 91,
+			Usage:      3,
+			Encoder:    9,
+			Decoder:    5,
 		},
 	}
 

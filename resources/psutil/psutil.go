@@ -71,6 +71,7 @@ type CPUInfo struct {
 
 type GPUInfo struct {
 	Index int    // Index of the GPU
+	ID    string // Physical ID of the GPU (not populated for a specific process)
 	Name  string // Name of the GPU (not populated for a specific process)
 
 	MemoryTotal uint64 // bytes (not populated for a specific process)
@@ -638,8 +639,10 @@ func (u *util) GPU() ([]GPUInfo, error) {
 
 	stats := []GPUInfo{}
 
-	for _, nv := range nvstats {
+	for i, nv := range nvstats {
 		stats = append(stats, GPUInfo{
+			Index:       i,
+			ID:          nv.ID,
 			Name:        nv.Name,
 			MemoryTotal: nv.MemoryTotal,
 			MemoryUsed:  nv.MemoryUsed,

@@ -32,6 +32,7 @@ func New(ngpu int) *MockPSUtil {
 	for i := 0; i < ngpu; i++ {
 		u.GPUInfo = append(u.GPUInfo, psutil.GPUInfo{
 			Index:       i,
+			ID:          "00000000:01:00.0",
 			Name:        "L4",
 			MemoryTotal: 24 * 1024 * 1024 * 1024,
 			MemoryUsed:  uint64(12+i) * 1024 * 1024 * 1024,

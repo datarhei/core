@@ -828,6 +828,7 @@ func TestInfo(t *testing.T) {
 			NGPU: 2,
 			GPU: []GPUInfoStat{{
 				Index:           0,
+				ID:              "00000000:01:00.0",
 				Name:            "L4",
 				MemoryTotal:     24 * 1024 * 1024 * 1024,
 				MemoryUsed:      12 * 1024 * 1024 * 1024,
@@ -839,6 +840,7 @@ func TestInfo(t *testing.T) {
 				UsageLimit:      11,
 			}, {
 				Index:           1,
+				ID:              "00000000:01:00.0",
 				Name:            "L4",
 				MemoryTotal:     24 * 1024 * 1024 * 1024,
 				MemoryUsed:      13 * 1024 * 1024 * 1024,
