@@ -12,6 +12,7 @@ type Process struct {
 }
 
 type Stats struct {
+	Index        int
 	ID           string
 	Name         string
 	Architecture string

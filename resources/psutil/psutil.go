@@ -639,9 +639,9 @@ func (u *util) GPU() ([]GPUInfo, error) {
 
 	stats := []GPUInfo{}
 
-	for i, nv := range nvstats {
+	for _, nv := range nvstats {
 		stats = append(stats, GPUInfo{
-			Index:       i,
+			Index:       nv.Index,
 			ID:          nv.ID,
 			Name:        nv.Name,
 			MemoryTotal: nv.MemoryTotal,

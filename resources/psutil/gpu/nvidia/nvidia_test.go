@@ -324,6 +324,7 @@ func TestNvidiaGPUStats(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []gpu.Stats{
 		{
+			Index:        0,
 			ID:           "00000000:01:00.0",
 			Name:         "NVIDIA L4",
 			Architecture: "Ada Lovelace",
@@ -360,6 +361,7 @@ func TestNvidiaGPUStats(t *testing.T) {
 			},
 		},
 		{
+			Index:        1,
 			ID:           "00000000:C1:00.0",
 			Name:         "NVIDIA L4",
 			Architecture: "Ada Lovelace",

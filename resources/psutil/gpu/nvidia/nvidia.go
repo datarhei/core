@@ -444,8 +444,9 @@ func (n *nvidia) Stats() ([]gpu.Stats, error) {
 		return stats, n.err
 	}
 
-	for _, nv := range n.stats.GPU {
+	for i, nv := range n.stats.GPU {
 		s := gpu.Stats{
+			Index:        i,
 			ID:           nv.ID,
 			Name:         nv.Name,
 			Architecture: nv.Architecture,
