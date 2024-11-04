@@ -137,7 +137,7 @@ func (h *hls) handleIngress(c echo.Context, next echo.HandlerFunc) error {
 				h.lock.Unlock()
 			}
 		}()
-	} else if strings.HasSuffix(path, ".ts") {
+	} else if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") {
 		// Get the size of the .ts file and store it in the ts-map for later use.
 		reader := req.Body
 		r := &bodysizeReader{
@@ -171,7 +171,7 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 	sessionID := c.QueryParam("session")
 
 	isM3U8 := strings.HasSuffix(path, ".m3u8")
-	isTS := strings.HasSuffix(path, ".ts")
+	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
 
 	rewrite := false
 
@@ -257,12 +257,12 @@ func (h *hls) handleEgress(c echo.Context, next echo.HandlerFunc) error {
 		res.Write(rewriter.buffer.Bytes())
 	}
 
-	if isM3U8 || isTS {
+	if isM3U8 || isSegment {
 		// Collect how many bytes we've written in this session
 		h.egressCollector.Egress(sessionID, headerSize(res.Header()))
 		h.egressCollector.Egress(sessionID, res.Size)
 
-		if isTS {
+		if isSegment {
 			// Activate the session. If the session is already active, this is a noop
 			h.egressCollector.Activate(sessionID)
 		}
@@ -329,7 +329,7 @@ func (r *bodyReader) getSegments(dir string) []string {
 		}
 
 		// Ignore anything that doesn't end in .ts
-		if !strings.HasSuffix(u.Path, ".ts") {
+		if !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
 			continue
 		}
 
@@ -402,7 +402,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL) {
 		}
 
 		// Write anything that doesn't end in .m3u8 or .ts unmodified
-		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") {
+		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
 			buffer.WriteString(line + "\n")
 			continue
 		}
