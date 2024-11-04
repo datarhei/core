@@ -33,7 +33,10 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 	req := c.Request()
 	path := req.URL.Path
 
-	if strings.HasSuffix(path, ".m3u8") {
+	isM3U8 := strings.HasSuffix(path, ".m3u8")
+	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
+
+	if isM3U8 {
 		// Read out the path of the .ts files and look them up in the ts-map.
 		// Add it as ingress for the respective "sessionId". The "sessionId" is the .m3u8 file name.
 		reader := req.Body
@@ -81,7 +84,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 
 			mem.Put(r.buffer)
 		}()
-	} else if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") {
+	} else if isSegment {
 		// Get the size of the .ts file and store it in the ts-map for later use.
 		reader := req.Body
 		r := &bodysizeReader{
@@ -117,7 +120,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	sessionID := c.QueryParam("session")
 
 	isM3U8 := strings.HasSuffix(path, ".m3u8")
-	isTS := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
+	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
 
 	rewrite := false
 
@@ -213,7 +216,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		mem.Put(rewriter.buffer)
 	}
 
-	if isM3U8 || isTS {
+	if isM3U8 || isSegment {
 		if res.Status >= 200 && res.Status < 300 {
 			// Collect how many bytes we've written in this session
 			buffer := mem.Get()
@@ -221,7 +224,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 			h.hlsEgressCollector.Egress(sessionID, res.Size)
 			mem.Put(buffer)
 
-			if isTS {
+			if isSegment {
 				// Activate the session. If the session is already active, this is a noop
 				h.hlsEgressCollector.Activate(sessionID)
 			}
