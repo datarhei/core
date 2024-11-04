@@ -81,7 +81,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 
 			mem.Put(r.buffer)
 		}()
-	} else if strings.HasSuffix(path, ".ts") {
+	} else if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") {
 		// Get the size of the .ts file and store it in the ts-map for later use.
 		reader := req.Body
 		r := &bodysizeReader{
@@ -117,7 +117,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	sessionID := c.QueryParam("session")
 
 	isM3U8 := strings.HasSuffix(path, ".m3u8")
-	isTS := strings.HasSuffix(path, ".ts")
+	isTS := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
 
 	rewrite := false
 
@@ -281,7 +281,7 @@ func (r *segmentReader) getSegments(dir string) []string {
 		}
 
 		// Ignore anything that doesn't end in .ts
-		if !strings.HasSuffix(u.Path, ".ts") {
+		if !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
 			continue
 		}
 
@@ -337,7 +337,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 		}
 
 		// Write anything that doesn't end in .m3u8 or .ts unmodified
-		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") {
+		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
 			buffer.Write(byteline)
 			buffer.WriteByte('\n')
 			continue

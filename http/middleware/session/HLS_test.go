@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHLSSegmentReader(t *testing.T) {
-	data, err := os.ReadFile("./fixtures/segments.txt")
+func TestHLSSegmentReaderTS(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v6.txt")
 	require.NoError(t, err)
 
 	r := bytes.NewReader(data)
@@ -38,8 +38,33 @@ func TestHLSSegmentReader(t *testing.T) {
 	}, segments)
 }
 
+func TestHLSSegmentReaderMP4(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v7.txt")
+	require.NoError(t, err)
+
+	r := bytes.NewReader(data)
+
+	br := &segmentReader{
+		reader: io.NopCloser(r),
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = io.ReadAll(br)
+	require.NoError(t, err)
+
+	segments := br.getSegments("/foobar")
+	require.Equal(t, []string{
+		"/foobar/test_output_0_0067.mp4",
+		"/foobar/test_output_0_0068.mp4",
+		"/foobar/test_output_0_0069.mp4",
+		"/foobar/test_output_0_0070.mp4",
+		"/foobar/test_output_0_0071.mp4",
+		"/foobar/test_output_0_0072.mp4",
+	}, segments)
+}
+
 func BenchmarkHLSSegmentReader(b *testing.B) {
-	data, err := os.ReadFile("./fixtures/segments.txt")
+	data, err := os.ReadFile("./fixtures/segments_v6.txt")
 	require.NoError(b, err)
 
 	rd := bytes.NewReader(data)
@@ -59,8 +84,8 @@ func BenchmarkHLSSegmentReader(b *testing.B) {
 	}
 }
 
-func TestHLSRewrite(t *testing.T) {
-	data, err := os.ReadFile("./fixtures/segments.txt")
+func TestHLSRewriteTS(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v6.txt")
 	require.NoError(t, err)
 
 	br := &sessionRewriter{
@@ -77,14 +102,38 @@ func TestHLSRewrite(t *testing.T) {
 
 	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
 
-	data, err = os.ReadFile("./fixtures/segments_with_session.txt")
+	data, err = os.ReadFile("./fixtures/segments_v6_with_session.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
+func TestHLSRewriteMP4(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v7.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/segments_v7_with_session.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, data, buffer.Bytes())
 }
 
 func BenchmarkHLSRewrite(b *testing.B) {
-	data, err := os.ReadFile("./fixtures/segments.txt")
+	data, err := os.ReadFile("./fixtures/segments_v6.txt")
 	require.NoError(b, err)
 
 	u, err := url.Parse("http://example.com/test.m3u8")
