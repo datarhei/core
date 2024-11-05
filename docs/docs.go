@@ -7413,8 +7413,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "avg": {
-                    "type": "integer",
-                    "format": "uint64"
+                    "type": "number"
                 },
                 "cur": {
                     "type": "integer",
@@ -7451,8 +7450,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "avg": {
-                    "type": "integer",
-                    "format": "uint64"
+                    "type": "number"
                 },
                 "cur": {
                     "type": "integer",

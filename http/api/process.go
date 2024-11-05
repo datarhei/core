@@ -431,15 +431,15 @@ func (p *ProcessUsageCPU) Marshal() app.ProcessUsageCPU {
 }
 
 type ProcessUsageMemory struct {
-	Current uint64 `json:"cur" format:"uint64"`
-	Average uint64 `json:"avg" format:"uint64"`
-	Max     uint64 `json:"max" format:"uint64"`
-	Limit   uint64 `json:"limit" format:"uint64"`
+	Current uint64      `json:"cur" format:"uint64"`
+	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max     uint64      `json:"max" format:"uint64"`
+	Limit   uint64      `json:"limit" format:"uint64"`
 }
 
 func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
 	p.Current = pp.Current
-	p.Average = pp.Average
+	p.Average = json.ToNumber(float64(pp.Average))
 	p.Max = pp.Max
 	p.Limit = pp.Limit
 }
@@ -447,24 +447,27 @@ func (p *ProcessUsageMemory) Unmarshal(pp *app.ProcessUsageMemory) {
 func (p *ProcessUsageMemory) Marshal() app.ProcessUsageMemory {
 	pp := app.ProcessUsageMemory{
 		Current: p.Current,
-		Average: p.Average,
 		Max:     p.Max,
 		Limit:   p.Limit,
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = uint64(x)
 	}
 
 	return pp
 }
 
 type ProcessUsageGPUMemory struct {
-	Current uint64 `json:"cur" format:"uint64"`
-	Average uint64 `json:"avg" format:"uint64"`
-	Max     uint64 `json:"max" format:"uint64"`
-	Limit   uint64 `json:"limit" format:"uint64"`
+	Current uint64      `json:"cur" format:"uint64"`
+	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
+	Max     uint64      `json:"max" format:"uint64"`
+	Limit   uint64      `json:"limit" format:"uint64"`
 }
 
 func (p *ProcessUsageGPUMemory) Unmarshal(pp *app.ProcessUsageGPUMemory) {
 	p.Current = pp.Current
-	p.Average = pp.Average
+	p.Average = json.ToNumber(float64(pp.Average))
 	p.Max = pp.Max
 	p.Limit = pp.Limit
 }
@@ -472,9 +475,12 @@ func (p *ProcessUsageGPUMemory) Unmarshal(pp *app.ProcessUsageGPUMemory) {
 func (p *ProcessUsageGPUMemory) Marshal() app.ProcessUsageGPUMemory {
 	pp := app.ProcessUsageGPUMemory{
 		Current: p.Current,
-		Average: p.Average,
 		Max:     p.Max,
 		Limit:   p.Limit,
+	}
+
+	if x, err := p.Average.Float64(); err == nil {
+		pp.Average = uint64(x)
 	}
 
 	return pp

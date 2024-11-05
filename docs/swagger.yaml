@@ -1586,8 +1586,7 @@ definitions:
   api.ProcessUsageGPUMemory:
     properties:
       avg:
-        format: uint64
-        type: integer
+        type: number
       cur:
         format: uint64
         type: integer
@@ -1612,8 +1611,7 @@ definitions:
   api.ProcessUsageMemory:
     properties:
       avg:
-        format: uint64
-        type: integer
+        type: number
       cur:
         format: uint64
         type: integer
