@@ -24,7 +24,7 @@ import (
 )
 ```
 
-*Note for v1 and v2 users*: v1 and v2 support is discontinued, so please upgrade to v3. While the API has some breaking changes, the migration should be trivial.
+*Note for pre-v3 users*: v1 and v2 support is discontinued, so please upgrade to v3. While the API has some breaking changes, the migration should be trivial.
 
 ### Counter
 
@@ -66,7 +66,9 @@ m.Store("foo", "bar")
 v, ok := m.Load("foo")
 ```
 
-One important difference with `Map` is that `MapOf` supports arbitrary `comparable` key types:
+Apart from CLHT, `MapOf` borrows ideas from Java's `j.u.c.ConcurrentHashMap` (immutable K/V pair structs instead of atomic snapshots) and C++'s `absl::flat_hash_map` (meta memory and SWAR-based lookups). It also has more dense memory layout when compared with `Map`. Long story short, `MapOf` should be preferred over `Map` when possible.
+
+An important difference with `Map` is that `MapOf` supports arbitrary `comparable` key types:
 
 ```go
 type Point struct {
@@ -77,6 +79,19 @@ m := NewMapOf[Point, int]()
 m.Store(Point{42, 42}, 42)
 v, ok := m.Load(point{42, 42})
 ```
+
+Both maps use the built-in Golang's hash function which has DDOS protection. This means that each map instance gets its own seed number and the hash function uses that seed for hash code calculation. However, for smaller keys this hash function has some overhead. So, if you don't need DDOS protection, you may provide a custom hash function when creating a `MapOf`. For instance, Murmur3 finalizer does a decent job when it comes to integers:
+
+```go
+m := NewMapOfWithHasher[int, int](func(i int, _ uint64) uint64 {
+	h := uint64(i)
+	h = (h ^ (h >> 33)) * 0xff51afd7ed558ccd
+	h = (h ^ (h >> 33)) * 0xc4ceb9fe1a85ec53
+	return h ^ (h >> 33)
+})
+```
+
+When benchmarking concurrent maps, make sure to configure all of the competitors with the same hash function or, at least, take hash function performance into the consideration.
 
 ### MPMCQueue
 
@@ -132,6 +147,19 @@ The idea of the algorithm is to build on top of an existing reader-writer mutex 
 Hence, by the design `RBMutex` is a specialized mutex for scenarios, such as caches, where the vast majority of locks are acquired by readers and write lock acquire attempts are infrequent. In such scenarios, `RBMutex` should perform better than the `sync.RWMutex` on large multicore machines.
 
 `RBMutex` extends `sync.RWMutex` internally and uses it as the "reader bias disabled" fallback, so the same semantics apply. The only noticeable difference is in the reader tokens returned from the `RLock`/`RUnlock` methods.
+
+Apart from blocking methods, `RBMutex` also has methods for optimistic locking:
+```go
+mu := xsync.NewRBMutex()
+if locked, t := mu.TryRLock(); locked {
+	// critical reader section...
+	mu.RUnlock(t)
+}
+if mu.TryLock() {
+	// critical writer section...
+	mu.Unlock()
+}
+```
 
 ## License
 

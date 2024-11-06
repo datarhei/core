@@ -13,7 +13,7 @@ func MarshalInt(i int) Marshaler {
 	})
 }
 
-func UnmarshalInt(v interface{}) (int, error) {
+func UnmarshalInt(v any) (int, error) {
 	switch v := v.(type) {
 	case string:
 		return strconv.Atoi(v)
@@ -23,6 +23,8 @@ func UnmarshalInt(v interface{}) (int, error) {
 		return int(v), nil
 	case json.Number:
 		return strconv.Atoi(string(v))
+	case nil:
+		return 0, nil
 	default:
 		return 0, fmt.Errorf("%T is not an int", v)
 	}
@@ -34,7 +36,7 @@ func MarshalInt64(i int64) Marshaler {
 	})
 }
 
-func UnmarshalInt64(v interface{}) (int64, error) {
+func UnmarshalInt64(v any) (int64, error) {
 	switch v := v.(type) {
 	case string:
 		return strconv.ParseInt(v, 10, 64)
@@ -44,6 +46,8 @@ func UnmarshalInt64(v interface{}) (int64, error) {
 		return v, nil
 	case json.Number:
 		return strconv.ParseInt(string(v), 10, 64)
+	case nil:
+		return 0, nil
 	default:
 		return 0, fmt.Errorf("%T is not an int", v)
 	}
@@ -55,7 +59,7 @@ func MarshalInt32(i int32) Marshaler {
 	})
 }
 
-func UnmarshalInt32(v interface{}) (int32, error) {
+func UnmarshalInt32(v any) (int32, error) {
 	switch v := v.(type) {
 	case string:
 		iv, err := strconv.ParseInt(v, 10, 32)
@@ -73,6 +77,8 @@ func UnmarshalInt32(v interface{}) (int32, error) {
 			return 0, err
 		}
 		return int32(iv), nil
+	case nil:
+		return 0, nil
 	default:
 		return 0, fmt.Errorf("%T is not an int", v)
 	}

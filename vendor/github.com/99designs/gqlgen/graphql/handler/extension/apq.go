@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"errors"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/vektah/gqlparser/v2/gqlerror"
@@ -23,7 +23,7 @@ const (
 // hash in the next request.
 // see https://github.com/apollographql/apollo-link-persisted-queries
 type AutomaticPersistedQuery struct {
-	Cache graphql.Cache
+	Cache graphql.Cache[string]
 }
 
 type ApqStats struct {
@@ -47,7 +47,7 @@ func (a AutomaticPersistedQuery) ExtensionName() string {
 
 func (a AutomaticPersistedQuery) Validate(schema graphql.ExecutableSchema) error {
 	if a.Cache == nil {
-		return fmt.Errorf("AutomaticPersistedQuery.Cache can not be nil")
+		return errors.New("AutomaticPersistedQuery.Cache can not be nil")
 	}
 	return nil
 }
@@ -72,14 +72,14 @@ func (a AutomaticPersistedQuery) MutateOperationParameters(ctx context.Context, 
 
 	fullQuery := false
 	if rawParams.Query == "" {
+		var ok bool
 		// client sent optimistic query hash without query string, get it from the cache
-		query, ok := a.Cache.Get(ctx, extension.Sha256)
+		rawParams.Query, ok = a.Cache.Get(ctx, extension.Sha256)
 		if !ok {
 			err := gqlerror.Errorf(errPersistedQueryNotFound)
 			errcode.Set(err, errPersistedQueryNotFoundCode)
 			return err
 		}
-		rawParams.Query = query.(string)
 	} else {
 		// client sent optimistic query hash with query string, verify and store it
 		if computeQueryHash(rawParams.Query) != extension.Sha256 {

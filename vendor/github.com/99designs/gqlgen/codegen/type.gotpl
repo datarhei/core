@@ -76,9 +76,9 @@
 					return res, graphql.ErrorOnPath(ctx, err)
 				{{- else }}
 					res, err := ec.unmarshalInput{{ $type.GQL.Name }}(ctx, v)
-					{{- if and $type.IsNilable (not $type.IsMap) (not $type.PointersInUmarshalInput) }}
+					{{- if and $type.IsNilable (not $type.IsMap) (not $type.PointersInUnmarshalInput) }}
 						return &res, graphql.ErrorOnPath(ctx, err)
-					{{- else if and (not $type.IsNilable) $type.PointersInUmarshalInput }}
+					{{- else if and (not $type.IsNilable) $type.PointersInUnmarshalInput }}
 						return *res, graphql.ErrorOnPath(ctx, err)
 					{{- else }}
 						return res, graphql.ErrorOnPath(ctx, err)
@@ -115,12 +115,14 @@
 						}
 						ctx := graphql.WithFieldContext(ctx, fc)
 						f := func(i int) {
+							{{- if not $.Config.OmitPanicHandler }}
 							defer func() {
 								if r := recover(); r != nil {
 									ec.Error(ctx, ec.Recover(ctx, r))
 									ret = nil
 								}
 							}()
+							{{- end }}
 							if !isLen1 {
 								defer wg.Done()
 							}

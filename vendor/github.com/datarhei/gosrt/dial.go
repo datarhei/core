@@ -425,6 +425,14 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 		sendTsbpdDelay := uint16(dl.config.PeerLatency.Milliseconds())
 
 		if cif.Version == 5 {
+			if cif.SRTHS == nil {
+				dl.connChan <- connResponse{
+					conn: nil,
+					err:  fmt.Errorf("missing handshake extension"),
+				}
+				return
+			}
+
 			// Check if the peer version is sufficient
 			if cif.SRTHS.SRTVersion < dl.config.MinVersion {
 				dl.sendShutdown(cif.SRTSocketId)

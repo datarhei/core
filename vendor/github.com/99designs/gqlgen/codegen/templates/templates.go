@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/types"
 	"io/fs"
@@ -52,7 +53,7 @@ type Options struct {
 	// FileNotice is notice written below the package line
 	FileNotice string
 	// Data will be passed to the template execution.
-	Data  interface{}
+	Data  any
 	Funcs template.FuncMap
 
 	// Packages cache, you can find me on config.Config
@@ -71,7 +72,7 @@ var (
 // files inside the directory where you wrote the plugin.
 func Render(cfg Options) error {
 	if CurrentImports != nil {
-		panic(fmt.Errorf("recursive or concurrent call to RenderToFile detected"))
+		panic(errors.New("recursive or concurrent call to RenderToFile detected"))
 	}
 	CurrentImports = &Imports{packages: cfg.Packages, destDir: filepath.Dir(cfg.Filename)}
 
@@ -184,7 +185,7 @@ func parseTemplates(cfg Options, t *template.Template) (*template.Template, erro
 	return t, nil
 }
 
-func center(width int, pad string, s string) string {
+func center(width int, pad, s string) string {
 	if len(s)+2 > width {
 		return s
 	}
@@ -206,6 +207,7 @@ func Funcs() template.FuncMap {
 		"call":               Call,
 		"prefixLines":        prefixLines,
 		"notNil":             notNil,
+		"strSplit":           StrSplit,
 		"reserveImport":      CurrentImports.Reserve,
 		"lookupImport":       CurrentImports.Lookup,
 		"go":                 ToGo,
@@ -215,7 +217,7 @@ func Funcs() template.FuncMap {
 		"add": func(a, b int) int {
 			return a + b
 		},
-		"render": func(filename string, tpldata interface{}) (*bytes.Buffer, error) {
+		"render": func(filename string, tpldata any) (*bytes.Buffer, error) {
 			return render(resolveName(filename, 0), tpldata)
 		},
 	}
@@ -493,18 +495,18 @@ func wordWalker(str string, f func(*wordInfo)) {
 		if initialisms[upperWord] {
 			// If the uppercase word (string(runes[w:i]) is "ID" or "IP"
 			// AND
-			// the word is the first two characters of the str
+			// the word is the first two characters of the current word
 			// AND
 			// that is not the end of the word
 			// AND
-			// the length of the string is greater than 3
+			// the length of the remaining string is greater than 3
 			// AND
 			// the third rune is an uppercase one
 			// THEN
 			// do NOT count this as an initialism.
 			switch upperWord {
 			case "ID", "IP":
-				if word == str[:2] && !eow && len(str) > 3 && unicode.IsUpper(runes[3]) {
+				if remainingRunes := runes[w:]; word == string(remainingRunes[:2]) && !eow && len(remainingRunes) > 3 && unicode.IsUpper(remainingRunes[3]) {
 					continue
 				}
 			}
@@ -567,7 +569,7 @@ func rawQuote(s string) string {
 	return "`" + strings.ReplaceAll(s, "`", "`+\"`\"+`") + "`"
 }
 
-func notNil(field string, data interface{}) bool {
+func notNil(field string, data any) bool {
 	v := reflect.ValueOf(data)
 
 	if v.Kind() == reflect.Ptr {
@@ -581,12 +583,16 @@ func notNil(field string, data interface{}) bool {
 	return val.IsValid() && !val.IsNil()
 }
 
-func Dump(val interface{}) string {
+func StrSplit(s, sep string) []string {
+	return strings.Split(s, sep)
+}
+
+func Dump(val any) string {
 	switch val := val.(type) {
 	case int:
 		return strconv.Itoa(val)
 	case int64:
-		return fmt.Sprintf("%d", val)
+		return strconv.FormatInt(val, 10)
 	case float64:
 		return fmt.Sprintf("%f", val)
 	case string:
@@ -595,13 +601,13 @@ func Dump(val interface{}) string {
 		return strconv.FormatBool(val)
 	case nil:
 		return "nil"
-	case []interface{}:
+	case []any:
 		var parts []string
 		for _, part := range val {
 			parts = append(parts, Dump(part))
 		}
 		return "[]interface{}{" + strings.Join(parts, ",") + "}"
-	case map[string]interface{}:
+	case map[string]any:
 		buf := bytes.Buffer{}
 		buf.WriteString("map[string]interface{}{")
 		var keys []string
@@ -641,7 +647,7 @@ func resolveName(name string, skip int) string {
 	return filepath.Join(filepath.Dir(callerFile), name)
 }
 
-func render(filename string, tpldata interface{}) (*bytes.Buffer, error) {
+func render(filename string, tpldata any) (*bytes.Buffer, error) {
 	t := template.New("").Funcs(Funcs())
 
 	b, err := os.ReadFile(filename)
@@ -688,7 +694,7 @@ var pkgReplacer = strings.NewReplacer(
 func TypeIdentifier(t types.Type) string {
 	res := ""
 	for {
-		switch it := t.(type) {
+		switch it := code.Unalias(t).(type) {
 		case *types.Pointer:
 			t.Underlying()
 			res += "ᚖ"
@@ -765,6 +771,8 @@ var CommonInitialisms = map[string]bool{
 	"XMPP":  true,
 	"XSRF":  true,
 	"XSS":   true,
+	"AWS":   true,
+	"GCP":   true,
 }
 
 // GetInitialisms returns the initialisms to capitalize in Go names. If unchanged, default initialisms will be returned

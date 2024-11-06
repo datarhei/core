@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/types"
 	"io"
@@ -40,16 +41,23 @@ type Config struct {
 	OmitGQLGenVersionInFileNotice bool                       `yaml:"omit_gqlgen_version_in_file_notice,omitempty"`
 	OmitRootModels                bool                       `yaml:"omit_root_models,omitempty"`
 	OmitResolverFields            bool                       `yaml:"omit_resolver_fields,omitempty"`
-	StructFieldsAlwaysPointers    bool                       `yaml:"struct_fields_always_pointers,omitempty"`
-	ReturnPointersInUmarshalInput bool                       `yaml:"return_pointers_in_unmarshalinput,omitempty"`
-	ResolversAlwaysReturnPointers bool                       `yaml:"resolvers_always_return_pointers,omitempty"`
-	NullableInputOmittable        bool                       `yaml:"nullable_input_omittable,omitempty"`
-	EnableModelJsonOmitemptyTag   *bool                      `yaml:"enable_model_json_omitempty_tag,omitempty"`
-	SkipValidation                bool                       `yaml:"skip_validation,omitempty"`
-	SkipModTidy                   bool                       `yaml:"skip_mod_tidy,omitempty"`
-	Sources                       []*ast.Source              `yaml:"-"`
-	Packages                      *code.Packages             `yaml:"-"`
-	Schema                        *ast.Schema                `yaml:"-"`
+	OmitPanicHandler              bool                       `yaml:"omit_panic_handler,omitempty"`
+	// If this is set to true, argument directives that
+	// decorate a field with a null value will still be called.
+	//
+	// This enables argumment directives to not just mutate
+	// argument values but to set them even if they're null.
+	CallArgumentDirectivesWithNull bool           `yaml:"call_argument_directives_with_null,omitempty"`
+	StructFieldsAlwaysPointers     bool           `yaml:"struct_fields_always_pointers,omitempty"`
+	ReturnPointersInUnmarshalInput bool           `yaml:"return_pointers_in_unmarshalinput,omitempty"`
+	ResolversAlwaysReturnPointers  bool           `yaml:"resolvers_always_return_pointers,omitempty"`
+	NullableInputOmittable         bool           `yaml:"nullable_input_omittable,omitempty"`
+	EnableModelJsonOmitemptyTag    *bool          `yaml:"enable_model_json_omitempty_tag,omitempty"`
+	SkipValidation                 bool           `yaml:"skip_validation,omitempty"`
+	SkipModTidy                    bool           `yaml:"skip_mod_tidy,omitempty"`
+	Sources                        []*ast.Source  `yaml:"-"`
+	Packages                       *code.Packages `yaml:"-"`
+	Schema                         *ast.Schema    `yaml:"-"`
 
 	// Deprecated: use Federation instead. Will be removed next release
 	Federated bool `yaml:"federated,omitempty"`
@@ -60,15 +68,15 @@ var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 // DefaultConfig creates a copy of the default config
 func DefaultConfig() *Config {
 	return &Config{
-		SchemaFilename:                StringList{"schema.graphql"},
-		Model:                         PackageConfig{Filename: "models_gen.go"},
-		Exec:                          ExecConfig{Filename: "generated.go"},
-		Directives:                    map[string]DirectiveConfig{},
-		Models:                        TypeMap{},
-		StructFieldsAlwaysPointers:    true,
-		ReturnPointersInUmarshalInput: false,
-		ResolversAlwaysReturnPointers: true,
-		NullableInputOmittable:        false,
+		SchemaFilename:                 StringList{"schema.graphql"},
+		Model:                          PackageConfig{Filename: "models_gen.go"},
+		Exec:                           ExecConfig{Filename: "generated.go"},
+		Directives:                     map[string]DirectiveConfig{},
+		Models:                         TypeMap{},
+		StructFieldsAlwaysPointers:     true,
+		ReturnPointersInUnmarshalInput: false,
+		ResolversAlwaysReturnPointers:  true,
+		NullableInputOmittable:         false,
 	}
 }
 
@@ -305,7 +313,7 @@ func (c *Config) injectTypesFromSchema() error {
 
 			if ma := bd.Arguments.ForName("models"); ma != nil {
 				if mvs, err := ma.Value.Value(nil); err == nil {
-					for _, mv := range mvs.([]interface{}) {
+					for _, mv := range mvs.([]any) {
 						c.Models.Add(schemaType.Name, mv.(string))
 					}
 				}
@@ -318,21 +326,30 @@ func (c *Config) injectTypesFromSchema() error {
 			}
 		}
 
-		if schemaType.Kind == ast.Object || schemaType.Kind == ast.InputObject {
+		if schemaType.Kind == ast.Object ||
+			schemaType.Kind == ast.InputObject ||
+			schemaType.Kind == ast.Interface {
 			for _, field := range schemaType.Fields {
 				if fd := field.Directives.ForName("goField"); fd != nil {
 					forceResolver := c.Models[schemaType.Name].Fields[field.Name].Resolver
-					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
-
 					if ra := fd.Arguments.ForName("forceResolver"); ra != nil {
 						if fr, err := ra.Value.Value(nil); err == nil {
 							forceResolver = fr.(bool)
 						}
 					}
 
+					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
 					if na := fd.Arguments.ForName("name"); na != nil {
 						if fr, err := na.Value.Value(nil); err == nil {
 							fieldName = fr.(string)
+						}
+					}
+
+					omittable := c.Models[schemaType.Name].Fields[field.Name].Omittable
+					if arg := fd.Arguments.ForName("omittable"); arg != nil {
+						if k, err := arg.Value.Value(nil); err == nil {
+							val := k.(bool)
+							omittable = &val
 						}
 					}
 
@@ -347,31 +364,18 @@ func (c *Config) injectTypesFromSchema() error {
 					c.Models[schemaType.Name].Fields[field.Name] = TypeMapField{
 						FieldName: fieldName,
 						Resolver:  forceResolver,
+						Omittable: omittable,
 					}
 				}
 			}
 
 			if efds := schemaType.Directives.ForNames("goExtraField"); len(efds) != 0 {
 				for _, efd := range efds {
-					if fn := efd.Arguments.ForName("name"); fn != nil {
-						extraFieldName := ""
-						if fnv, err := fn.Value.Value(nil); err == nil {
-							extraFieldName = fnv.(string)
-						}
-
-						if extraFieldName == "" {
-							return fmt.Errorf(
-								"argument 'name' for directive @goExtraField (src: %s, line: %d) cannot by empty",
-								efd.Position.Src.Name,
-								efd.Position.Line,
-							)
-						}
-
+					if t := efd.Arguments.ForName("type"); t != nil {
 						extraField := ModelExtraField{}
-						if t := efd.Arguments.ForName("type"); t != nil {
-							if tv, err := t.Value.Value(nil); err == nil {
-								extraField.Type = tv.(string)
-							}
+
+						if tv, err := t.Value.Value(nil); err == nil {
+							extraField.Type = tv.(string)
 						}
 
 						if extraField.Type == "" {
@@ -394,13 +398,28 @@ func (c *Config) injectTypesFromSchema() error {
 							}
 						}
 
-						typeMapEntry := c.Models[schemaType.Name]
-						if typeMapEntry.ExtraFields == nil {
-							typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
+						extraFieldName := ""
+						if fn := efd.Arguments.ForName("name"); fn != nil {
+							if fnv, err := fn.Value.Value(nil); err == nil {
+								extraFieldName = fnv.(string)
+							}
 						}
 
-						c.Models[schemaType.Name] = typeMapEntry
-						c.Models[schemaType.Name].ExtraFields[extraFieldName] = extraField
+						if extraFieldName == "" {
+							// Embeddable fields
+							typeMapEntry := c.Models[schemaType.Name]
+							typeMapEntry.EmbedExtraFields = append(typeMapEntry.EmbedExtraFields, extraField)
+							c.Models[schemaType.Name] = typeMapEntry
+						} else {
+							// Regular fields
+							typeMapEntry := c.Models[schemaType.Name]
+							if typeMapEntry.ExtraFields == nil {
+								typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
+							}
+
+							c.Models[schemaType.Name] = typeMapEntry
+							c.Models[schemaType.Name].ExtraFields[extraFieldName] = extraField
+						}
 					}
 				}
 			}
@@ -439,12 +458,14 @@ type TypeMapEntry struct {
 	EnumValues    map[string]EnumValue    `yaml:"enum_values,omitempty"`
 
 	// Key is the Go name of the field.
-	ExtraFields map[string]ModelExtraField `yaml:"extraFields,omitempty"`
+	ExtraFields      map[string]ModelExtraField `yaml:"extraFields,omitempty"`
+	EmbedExtraFields []ModelExtraField          `yaml:"embedExtraFields,omitempty"`
 }
 
 type TypeMapField struct {
 	Resolver        bool   `yaml:"resolver"`
 	FieldName       string `yaml:"fieldName"`
+	Omittable       *bool  `yaml:"omittable"`
 	GeneratedMethod string `yaml:"-"`
 }
 
@@ -480,7 +501,7 @@ type ModelExtraField struct {
 
 type StringList []string
 
-func (a *StringList) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 	var single string
 	err := unmarshal(&single)
 	if err == nil {
@@ -562,11 +583,11 @@ func (c *Config) check() error {
 			Declaree: "federation",
 		})
 		if c.Federation.ImportPath() != c.Exec.ImportPath() {
-			return fmt.Errorf("federation and exec must be in the same package")
+			return errors.New("federation and exec must be in the same package")
 		}
 	}
 	if c.Federated {
-		return fmt.Errorf("federated has been removed, instead use\nfederation:\n    filename: path/to/federated.go")
+		return errors.New("federated has been removed, instead use\nfederation:\n    filename: path/to/federated.go")
 	}
 
 	for importPath, pkg := range fileList {
@@ -641,7 +662,7 @@ func (tm TypeMap) ReferencedPackages() []string {
 	return pkgs
 }
 
-func (tm TypeMap) Add(name string, goType string) {
+func (tm TypeMap) Add(name, goType string) {
 	modelCfg := tm[name]
 	modelCfg.Model = append(modelCfg.Model, goType)
 	tm[name] = modelCfg
@@ -655,6 +676,16 @@ func (tm TypeMap) ForceGenerate(name string, forceGenerate bool) {
 
 type DirectiveConfig struct {
 	SkipRuntime bool `yaml:"skip_runtime"`
+
+	// If the directive implementation is statically defined, don't provide a hook for it
+	// in the generated server. This is useful for directives that are implemented
+	// by plugins or the runtime itself.
+	//
+	// The function implemmentation should be provided here as a string.
+	//
+	// The function should have the following signature:
+	// func(ctx context.Context, obj any, next graphql.Resolver[, directive arguments if any]) (res any, err error)
+	Implementation *string
 }
 
 func inStrSlice(haystack []string, needle string) bool {

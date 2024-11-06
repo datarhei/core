@@ -45,7 +45,11 @@ func Generate(cfg *config.Config, option ...Option) error {
 				}
 			}
 		}
-		plugins = append([]plugin.Plugin{federation.New(cfg.Federation.Version)}, plugins...)
+		federationPlugin, err := federation.New(cfg.Federation.Version, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to construct the Federation plugin: %w", err)
+		}
+		plugins = append([]plugin.Plugin{federationPlugin}, plugins...)
 	}
 
 	for _, o := range option {
@@ -58,6 +62,13 @@ func Generate(cfg *config.Config, option ...Option) error {
 				cfg.Sources = append(cfg.Sources, s)
 			}
 		}
+		if inj, ok := p.(plugin.EarlySourcesInjector); ok {
+			s, err := inj.InjectSourcesEarly()
+			if err != nil {
+				return fmt.Errorf("%s: %w", p.Name(), err)
+			}
+			cfg.Sources = append(cfg.Sources, s...)
+		}
 	}
 
 	if err := cfg.LoadSchema(); err != nil {
@@ -69,6 +80,13 @@ func Generate(cfg *config.Config, option ...Option) error {
 			if s := inj.InjectSourceLate(cfg.Schema); s != nil {
 				cfg.Sources = append(cfg.Sources, s)
 			}
+		}
+		if inj, ok := p.(plugin.LateSourcesInjector); ok {
+			s, err := inj.InjectSourcesLate(cfg.Schema)
+			if err != nil {
+				return fmt.Errorf("%s: %w", p.Name(), err)
+			}
+			cfg.Sources = append(cfg.Sources, s...)
 		}
 	}
 
@@ -90,11 +108,11 @@ func Generate(cfg *config.Config, option ...Option) error {
 		}
 	}
 	// Merge again now that the generated models have been injected into the typemap
-	data_plugins := make([]interface{}, len(plugins))
+	dataPlugins := make([]any, len(plugins))
 	for index := range plugins {
-		data_plugins[index] = plugins[index]
+		dataPlugins[index] = plugins[index]
 	}
-	data, err := codegen.BuildData(cfg, data_plugins...)
+	data, err := codegen.BuildData(cfg, dataPlugins...)
 	if err != nil {
 		return fmt.Errorf("merging type systems failed: %w", err)
 	}

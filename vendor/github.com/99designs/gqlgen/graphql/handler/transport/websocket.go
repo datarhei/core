@@ -193,12 +193,12 @@ func (c *wsConnection) init() bool {
 			}
 		}
 
-		var initAckPayload *InitPayload = nil
+		var initAckPayload *InitPayload
 		if c.InitFunc != nil {
 			var ctx context.Context
 			ctx, initAckPayload, err = c.InitFunc(c.ctx, c.initPayload)
 			if err != nil {
-				c.sendConnectionError(err.Error())
+				c.sendConnectionError("%s", err.Error())
 				c.close(websocket.CloseNormalClosure, "terminated")
 				return false
 			}
@@ -239,7 +239,6 @@ func (c *wsConnection) run() {
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer func() {
 		cancel()
-		c.close(websocket.CloseAbnormalClosure, "unexpected closure")
 	}()
 
 	// If we're running in graphql-ws mode, create a timer that will trigger a
@@ -369,7 +368,7 @@ func (c *wsConnection) closeOnCancel(ctx context.Context) {
 	<-ctx.Done()
 
 	if r := closeReasonForContext(ctx); r != "" {
-		c.sendConnectionError(r)
+		c.sendConnectionError("%s", r)
 	}
 	c.close(websocket.CloseNormalClosure, "terminated")
 }
@@ -480,7 +479,7 @@ func (c *wsConnection) sendError(id string, errors ...*gqlerror.Error) {
 	c.write(&message{t: errorMessageType, id: id, payload: b})
 }
 
-func (c *wsConnection) sendConnectionError(format string, args ...interface{}) {
+func (c *wsConnection) sendConnectionError(format string, args ...any) {
 	b, err := json.Marshal(&gqlerror.Error{Message: fmt.Sprintf(format, args...)})
 	if err != nil {
 		panic(err)
