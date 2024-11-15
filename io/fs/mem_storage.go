@@ -61,7 +61,8 @@ func (m *memStorage) LoadAndCopy(key string) (*memFile, bool) {
 	}
 
 	if v.data != nil {
-		f.data = bytes.NewBuffer(v.data.Bytes())
+		f.data = &bytes.Buffer{}
+		f.data.Write(v.data.Bytes())
 	}
 
 	return f, true

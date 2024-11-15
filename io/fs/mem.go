@@ -67,6 +67,7 @@ func (f *memFileInfo) IsDir() bool {
 type memFile struct {
 	memFileInfo
 	data *bytes.Buffer // Contents of the file
+	r    io.ReadSeeker
 }
 
 func (f *memFile) Name() string {
@@ -86,21 +87,33 @@ func (f *memFile) Stat() (FileInfo, error) {
 }
 
 func (f *memFile) Read(p []byte) (int, error) {
-	if f.data == nil {
+	if f.r == nil {
 		return 0, io.EOF
 	}
 
-	return f.data.Read(p)
+	return f.r.Read(p)
+}
+
+func (f memFile) Seek(offset int64, whence int) (int64, error) {
+	if f.r == nil {
+		return 0, io.EOF
+	}
+
+	return f.r.Seek(offset, whence)
 }
 
 func (f *memFile) Close() error {
-	if f.data == nil {
-		return io.EOF
+	var err error = nil
+
+	if f.r == nil {
+		err = io.EOF
 	}
+
+	f.r = nil
 
 	f.data = nil
 
-	return nil
+	return err
 }
 
 type memFilesystem struct {
@@ -258,7 +271,8 @@ func (fs *memFilesystem) Open(path string) File {
 
 	if file.data != nil {
 		newFile.lastMod = file.lastMod
-		newFile.data = bytes.NewBuffer(file.data.Bytes())
+		newFile.data = file.data
+		newFile.r = bytes.NewReader(file.data.Bytes())
 		newFile.size = int64(newFile.data.Len())
 	}
 

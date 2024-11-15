@@ -31,7 +31,7 @@ type FileInfo interface {
 
 // File provides access to a single file.
 type File interface {
-	io.ReadCloser
+	io.ReadSeekCloser
 
 	// Name returns the Name of the file.
 	Name() string
