@@ -1,5 +1,11 @@
 # Core
 
+### Core v16.16.0 > v?
+
+-   Add support for HTTP range requests
+-   Fix counting HLSv7 sessions [#849](https://github.com/datarhei/restreamer#849)
+-   Update dependencies
+
 ### Core v16.15.0 > v16.16.0
 
 -   Add ConnectionIdleTimeout to RTMP server
