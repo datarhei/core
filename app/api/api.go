@@ -1476,6 +1476,7 @@ func (a *api) start(ctx context.Context) error {
 		Metrics:       a.metrics,
 		Prometheus:    a.prom,
 		MimeTypesFile: cfg.Storage.MimeTypesFile,
+		MimeTypes:     cfg.Storage.MimeTypes,
 		Filesystems:   httpfilesystems,
 		IPLimiter:     iplimiter,
 		Profiling:     cfg.Debug.Profiling,

@@ -1,25 +1,21 @@
 package copy
 
 import (
+	"maps"
+	"slices"
+
 	"github.com/datarhei/core/v16/config/value"
-	"github.com/datarhei/core/v16/slices"
 )
 
 func StringMap(src map[string]string) map[string]string {
-	dst := make(map[string]string)
-
-	for k, v := range src {
-		dst[k] = v
-	}
-
-	return dst
+	return maps.Clone(src)
 }
 
 func TenantSlice(src []value.Auth0Tenant) []value.Auth0Tenant {
-	dst := slices.Copy(src)
+	dst := slices.Clone(src)
 
 	for i, t := range src {
-		dst[i].Users = slices.Copy(t.Users)
+		dst[i].Users = slices.Clone(t.Users)
 	}
 
 	return dst

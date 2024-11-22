@@ -3,6 +3,7 @@ package mime
 
 import (
 	"bufio"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ type Config struct {
 	Skipper middleware.Skipper
 
 	MimeTypesFile      string
+	MimeTypes          map[string]string
 	DefaultContentType string
 }
 
@@ -24,6 +26,7 @@ type Config struct {
 var DefaultConfig = Config{
 	Skipper:            middleware.DefaultSkipper,
 	MimeTypesFile:      "",
+	MimeTypes:          map[string]string{},
 	DefaultContentType: "application/data",
 }
 
@@ -36,7 +39,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		config.Skipper = DefaultConfig.Skipper
 	}
 
-	mimeTypes := loadMimeFile(config.MimeTypesFile)
+	mimeTypes := map[string]string{}
+
+	if len(config.MimeTypesFile) != 0 {
+		mimeTypes = loadMimeFile(config.MimeTypesFile)
+	} else {
+		mimeTypes = maps.Clone(config.MimeTypes)
+	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {

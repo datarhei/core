@@ -105,7 +105,8 @@ type Data struct {
 		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
-		MimeTypesFile string `json:"mimetypes_file"`
+		MimeTypesFile string            `json:"mimetypes_file"`
+		MimeTypes     map[string]string `json:"mimetypes"`
 	} `json:"storage"`
 	RTMP struct {
 		Enable     bool   `json:"enable"`

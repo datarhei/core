@@ -128,6 +128,7 @@ func (d *Config) Clone() *Config {
 	data.Storage.Disk.Cache.Types.Allow = slices.Copy(d.Storage.Disk.Cache.Types.Allow)
 	data.Storage.Disk.Cache.Types.Block = slices.Copy(d.Storage.Disk.Cache.Types.Block)
 	data.Storage.S3 = slices.Copy(d.Storage.S3)
+	data.Storage.MimeTypes = copy.StringMap(d.Storage.MimeTypes)
 
 	data.FFmpeg.Access.Input.Allow = slices.Copy(d.FFmpeg.Access.Input.Allow)
 	data.FFmpeg.Access.Input.Block = slices.Copy(d.FFmpeg.Access.Input.Block)
@@ -212,7 +213,28 @@ func (d *Config) init() {
 	d.vars.Register(value.NewFile(&d.TLS.KeyFile, "", d.fs), "tls.key_file", "CORE_TLS_KEY_FILE", []string{"CORE_TLS_KEYFILE"}, "Path to key file in PEM format", false, false)
 
 	// Storage
-	d.vars.Register(value.NewFile(&d.Storage.MimeTypesFile, "./mime.types", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types", false, false)
+	d.vars.Register(value.NewFile(&d.Storage.MimeTypesFile, "", d.fs), "storage.mimetypes_file", "CORE_STORAGE_MIMETYPES_FILE", []string{"CORE_MIMETYPES_FILE"}, "Path to file with mime-types, takes precedence over storage.mimetypes", false, false)
+	d.vars.Register(value.NewStringMapString(&d.Storage.MimeTypes, map[string]string{
+		".txt":   "text/plain",
+		".htm":   "text/html",
+		".html":  "text/html",
+		".js":    "text/javascript",
+		".css":   "text/css",
+		".json":  "application/json",
+		".m3u8":  "application/vnd.apple.mpegurl",
+		".xml":   "application/xml",
+		".ts":    "video/MP2T",
+		".mp4":   "video/mp4",
+		".jpg":   "image/jpeg",
+		".jpeg":  "image/jpeg",
+		".png":   "image/png",
+		".gif":   "image/gif",
+		".svg":   "image/svg+xml",
+		".ico":   "image/vnd.microsoft.icon",
+		".ttf":   "font/ttf",
+		".woff":  "font/woff",
+		".woff2": "font/woff2",
+	}), "storage.mimetypes", "CORE_STORAGE_MIMETYPES", nil, "List of extension to mime-type mappings", false, false)
 
 	// Storage (Disk)
 	d.vars.Register(value.NewMustDir(&d.Storage.Disk.Dir, "./data", d.fs), "storage.disk.dir", "CORE_STORAGE_DISK_DIR", nil, "Directory on disk, exposed on /", false, false)

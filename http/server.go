@@ -89,6 +89,7 @@ type Config struct {
 	Metrics       monitor.HistoryReader
 	Prometheus    prometheus.Reader
 	MimeTypesFile string
+	MimeTypes     map[string]string
 	Filesystems   []fs.FS
 	IPLimiter     net.IPLimitValidator
 	Profiling     bool
@@ -162,6 +163,7 @@ type server struct {
 
 	router        *echo.Echo
 	mimeTypesFile string
+	mimeTypes     map[string]string
 	profiling     bool
 
 	readOnly bool
@@ -184,6 +186,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s := &server{
 		logger:        config.Logger,
 		mimeTypesFile: config.MimeTypesFile,
+		mimeTypes:     config.MimeTypes,
 		profiling:     config.Profiling,
 		readOnly:      config.ReadOnly,
 	}
@@ -529,6 +532,7 @@ func (s *server) setRoutes() {
 		fs := s.router.Group(mountpoint)
 		fs.Use(mwmime.NewWithConfig(mwmime.Config{
 			MimeTypesFile:      s.mimeTypesFile,
+			MimeTypes:          s.mimeTypes,
 			DefaultContentType: filesystem.DefaultContentType,
 		}))
 
