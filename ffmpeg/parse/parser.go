@@ -235,6 +235,9 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 
 		if isFFmpegInputs {
+			p.lock.progress.Lock()
+			defer p.lock.progress.Unlock()
+
 			if err := p.parseFFmpegIO("input", bytes.TrimPrefix(line, []byte("ffmpeg.inputs:"))); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
@@ -246,6 +249,9 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 
 		if isHLSStreamMap {
+			p.lock.progress.Lock()
+			defer p.lock.progress.Unlock()
+
 			if err := p.parseHLSStreamMap(bytes.TrimPrefix(line, []byte("hls.streammap:"))); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
@@ -257,6 +263,9 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 
 		if isFFmpegOutputs {
+			p.lock.progress.Lock()
+			defer p.lock.progress.Unlock()
+
 			if err := p.parseFFmpegIO("output", bytes.TrimPrefix(line, []byte("ffmpeg.outputs:"))); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
@@ -287,6 +296,9 @@ func (p *parser) Parse(line []byte) uint64 {
 	}
 
 	if isFFmpegMapping {
+		p.lock.progress.Lock()
+		defer p.lock.progress.Unlock()
+
 		if err := p.parseFFmpegMapping(bytes.TrimPrefix(line, []byte("ffmpeg.mapping:"))); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
