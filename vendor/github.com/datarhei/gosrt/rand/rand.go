@@ -12,7 +12,7 @@ func RandomString(length int, charset string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		b[i] = charset[int(j)]
+		b[i] = charset[j]
 	}
 
 	return string(b), nil

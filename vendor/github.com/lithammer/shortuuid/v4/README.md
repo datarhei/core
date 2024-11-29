@@ -1,11 +1,11 @@
 # shortuuid
 
 [![Build Status](https://github.com/lithammer/shortuuid/workflows/CI/badge.svg)](https://github.com/lithammer/shortuuid/actions)
-[![Godoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/lithammer/shortuuid)
+[![Godoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://pkg.go.dev/github.com/lithammer/shortuuid/v4)
 
 A Go library that generates concise, unambiguous, URL-safe UUIDs. Based on and
 compatible with the Python library
-[`shortuuid`](https://github.com/stochastic-technologies/shortuuid).
+[`shortuuid`](https://github.com/skorokithakis/shortuuid).
 
 Often, one needs to use non-sequential IDs in places where users will see them,
 but the IDs must be as concise and easy to use as possible. shortuuid solves
@@ -26,7 +26,8 @@ import (
 )
 
 func main() {
-	u := shortuuid.New() // KwSysDpxcBU9FNhGkn2dCf
+	u := shortuuid.New()
+	fmt.Println(u) // KwSysDpxcBU9FNhGkn2dCf
 }
 ```
 

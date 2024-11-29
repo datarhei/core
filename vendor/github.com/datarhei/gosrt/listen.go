@@ -407,6 +407,14 @@ func (ln *listener) reader(ctx context.Context) {
 				break
 			}
 
+			if !ln.config.AllowPeerIpChange {
+				if p.Header().Addr.String() != conn.RemoteAddr().String() {
+					// ignore the packet, it's not from the expected peer
+					// https://haivision.github.io/srt-rfc/draft-sharabayko-srt.html#name-security-considerations
+					break
+				}
+			}
+
 			conn.push(p)
 		}
 	}

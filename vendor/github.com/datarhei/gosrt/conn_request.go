@@ -7,6 +7,7 @@ import (
 
 	"github.com/datarhei/gosrt/crypto"
 	"github.com/datarhei/gosrt/packet"
+	"github.com/datarhei/gosrt/rand"
 )
 
 // ConnRequest is an incoming connection request
@@ -206,6 +207,18 @@ func newConnRequest(ln *listener, p packet.Packet) *connRequest {
 
 				return nil
 			}
+
+			// We only support live congestion control
+			if cif.HasCongestionCtl && cif.CongestionCtl != "live" {
+				cif.HandshakeType = packet.HandshakeType(REJ_CONGESTION)
+				ln.log("handshake:recv:error", func() string { return "only live congestion control is supported" })
+				p.MarshalCIF(cif)
+				ln.log("handshake:send:dump", func() string { return p.Dump() })
+				ln.log("handshake:send:cif", func() string { return cif.String() })
+				ln.send(p)
+
+				return nil
+			}
 		} else {
 			cif.HandshakeType = packet.HandshakeType(REJ_ROGUE)
 			ln.log("handshake:recv:error", func() string { return fmt.Sprintf("only HSv4 and HSv5 are supported (got HSv%d)", cif.Version) })
@@ -328,6 +341,23 @@ func (req *connRequest) Reject(reason RejectionReason) {
 	delete(req.ln.connReqs, req.socketId)
 }
 
+// generateSocketId generates an SRT SocketID that can be used for this connection
+func (req *connRequest) generateSocketId() (uint32, error) {
+	for i := 0; i < 10; i++ {
+		socketId, err := rand.Uint32()
+		if err != nil {
+			return 0, fmt.Errorf("could not generate random socket id")
+		}
+
+		// check that the socket id is not already in use
+		if _, found := req.ln.conns[socketId]; !found {
+			return socketId, nil
+		}
+	}
+
+	return 0, fmt.Errorf("could not generate unused socketid")
+}
+
 func (req *connRequest) Accept() (Conn, error) {
 	if req.crypto != nil && len(req.passphrase) == 0 {
 		req.Reject(REJ_BADSECRET)
@@ -342,7 +372,10 @@ func (req *connRequest) Accept() (Conn, error) {
 	}
 
 	// Create a new socket ID
-	socketId := uint32(time.Since(req.ln.start).Microseconds())
+	socketId, err := req.generateSocketId()
+	if err != nil {
+		return nil, fmt.Errorf("could not generate socket id: %w", err)
+	}
 
 	// Select the largest TSBPD delay advertised by the caller, but at least 120ms
 	recvTsbpdDelay := uint16(req.config.ReceiverLatency.Milliseconds())

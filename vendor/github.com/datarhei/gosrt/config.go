@@ -15,7 +15,7 @@ const (
 	MIN_PAYLOAD_SIZE    = MIN_MSS_SIZE - UDP_HEADER_SIZE - SRT_HEADER_SIZE
 	MAX_PAYLOAD_SIZE    = MAX_MSS_SIZE - UDP_HEADER_SIZE - SRT_HEADER_SIZE
 	MIN_PASSPHRASE_SIZE = 10
-	MAX_PASSPHRASE_SIZE = 79
+	MAX_PASSPHRASE_SIZE = 80
 	MAX_STREAMID_SIZE   = 512
 	SRT_VERSION         = 0x010401
 )
@@ -169,6 +169,9 @@ type Config struct {
 
 	// An implementation of the Logger interface
 	Logger Logger
+
+	// if a new IP starts sending data on an existing socket id, allow it
+	AllowPeerIpChange bool
 }
 
 // DefaultConfig is the default configuration for a SRT connection
@@ -209,6 +212,7 @@ var defaultConfig Config = Config{
 	TooLatePacketDrop:     true,
 	TransmissionType:      "live",
 	TSBPDMode:             true,
+	AllowPeerIpChange:     false,
 }
 
 // DefaultConfig returns the default configuration for Dial and Listen.
