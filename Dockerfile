@@ -3,7 +3,7 @@ ARG BUILD_IMAGE=alpine:3.19
 
 # Cross-Compilation
 # https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
-FROM --platform=$BUILDPLATFORM $GOLANG_IMAGE as builder
+FROM --platform=$BUILDPLATFORM $GOLANG_IMAGE AS builder
 
 ARG TARGETOS TARGETARCH TARGETVARIANT
 ENV GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$TARGETVARIANT

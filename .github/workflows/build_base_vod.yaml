@@ -14,11 +14,15 @@ jobs:
             matrix:
                 include:
                     - os: alpine
-                      os_version: "3.19"
-                      golang: golang:1.22-alpine3.19
+                      os_version: "3.20"
+                      golang: golang:1.23-alpine3.20
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
-                      key: alpine3.19
+                    - os: ubuntu
+                      os_version: "24.04"
+                      golang: golang:1.23-alpine3.20
+                      platforms: linux/amd64
+                      branch: vod
 
         steps:
             - name: Checkout
