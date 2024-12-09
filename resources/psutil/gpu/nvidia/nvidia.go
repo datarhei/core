@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,6 +141,7 @@ type writerProcess struct {
 	buf        bytes.Buffer
 	ch         chan Process
 	terminator []byte
+	matcher    *processMatcher
 }
 
 func (w *writerProcess) Write(data []byte) (int, error) {
@@ -160,7 +162,7 @@ func (w *writerProcess) Write(data []byte) (int, error) {
 			break
 		}
 
-		s, err := parseProcess(content)
+		s, err := w.matcher.Parse(content)
 		if err != nil {
 			continue
 		}
@@ -171,66 +173,96 @@ func (w *writerProcess) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-const processMatcher = `^\s*([0-9]+)\s+([0-9]+)\s+[A-Z]\s+([0-9-]+)\s+[0-9-]+\s+([0-9-]+)\s+([0-9-]+)\s+([0-9]+).*`
+type processMatcher struct {
+	re      *regexp.Regexp
+	mapping map[string]int
+}
 
-// # gpu        pid  type    sm   mem   enc   dec    fb   command
-// # Idx          #   C/G     %     %     %     %    MB   name
-//
-//	0       7372     C     2     0     2     -   136   ffmpeg
-//	0      12176     C     5     2     3     7   782   ffmpeg
-//	0      20035     C     8     2     4     1  1145   ffmpeg
-//	0      20141     C     2     1     1     3   429   ffmpeg
-//	0      29591     C     2     1     -     2   435   ffmpeg
-var reProcessMatcher = regexp.MustCompile(processMatcher)
+func newProcessMatcher() *processMatcher {
+	m := &processMatcher{
+		re:      regexp.MustCompile(`\s+`),
+		mapping: map[string]int{},
+	}
 
-func parseProcess(data []byte) (Process, error) {
+	return m
+}
+
+func (m *processMatcher) Parse(data []byte) (Process, error) {
 	p := Process{}
 
 	if len(data) == 0 {
 		return p, fmt.Errorf("empty line")
 	}
 
-	if data[0] == '#' {
+	line := string(data)
+
+	if strings.HasPrefix(line, "# gpu") {
+		m.mapping = map[string]int{}
+		columns := m.re.Split(strings.TrimPrefix(line, "# "), -1)
+		for i, column := range columns {
+			m.mapping[column] = i
+		}
+	}
+
+	if line[0] == '#' {
 		return p, fmt.Errorf("comment")
 	}
 
-	matches := reProcessMatcher.FindStringSubmatch(string(data))
-	if matches == nil {
+	columns := m.re.Split(strings.TrimSpace(line), -1)
+	if len(columns) == 0 {
 		return p, fmt.Errorf("no matches found")
 	}
 
-	if len(matches) != 7 {
-		return p, fmt.Errorf("not the expected number of matches found")
+	if columns[0] == line {
+		return p, fmt.Errorf("no matches found")
 	}
 
-	if d, err := strconv.ParseInt(matches[1], 10, 0); err == nil {
-		p.Index = int(d)
-	}
-
-	if d, err := strconv.ParseInt(matches[2], 10, 32); err == nil {
-		p.PID = int32(d)
-	}
-
-	if matches[3][0] != '-' {
-		if d, err := strconv.ParseFloat(matches[3], 64); err == nil {
-			p.Usage = d
+	if index, ok := m.mapping["gpu"]; ok {
+		if d, err := strconv.ParseInt(columns[index], 10, 0); err == nil {
+			p.Index = int(d)
 		}
 	}
 
-	if matches[4][0] != '-' {
-		if d, err := strconv.ParseFloat(matches[4], 64); err == nil {
-			p.Encoder = d
+	if index, ok := m.mapping["pid"]; ok {
+		if d, err := strconv.ParseInt(columns[index], 10, 32); err == nil {
+			p.PID = int32(d)
 		}
 	}
 
-	if matches[5][0] != '-' {
-		if d, err := strconv.ParseFloat(matches[5], 64); err == nil {
-			p.Decoder = d
+	if index, ok := m.mapping["sm"]; ok {
+		if columns[index] != "-" {
+			if d, err := strconv.ParseFloat(columns[index], 64); err == nil {
+				p.Usage = d
+			}
 		}
 	}
 
-	if d, err := strconv.ParseUint(matches[6], 10, 64); err == nil {
-		p.Memory = d * 1024 * 1024
+	if index, ok := m.mapping["enc"]; ok {
+		if columns[index] != "-" {
+			if d, err := strconv.ParseFloat(columns[index], 64); err == nil {
+				p.Encoder = d
+			}
+		}
+	}
+
+	if index, ok := m.mapping["dec"]; ok {
+		if columns[index] != "-" {
+			if d, err := strconv.ParseFloat(columns[index], 64); err == nil {
+				p.Decoder = d
+			}
+		}
+	}
+
+	if index, ok := m.mapping["fb"]; ok {
+		if columns[index] != "-" {
+			if d, err := strconv.ParseUint(columns[index], 10, 64); err == nil {
+				p.Memory = d * 1024 * 1024
+			}
+		}
+	}
+
+	if p.PID == 0 {
+		return p, fmt.Errorf("no process found")
 	}
 
 	return p, nil
@@ -271,6 +303,7 @@ func New(path string) gpu.GPU {
 	n.wrProcess = &writerProcess{
 		ch:         make(chan Process, 32),
 		terminator: []byte("\n"),
+		matcher:    newProcessMatcher(),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -379,12 +412,14 @@ func (n *nvidia) runProcessOnce(path string) (map[int32]Process, error) {
 		return nil, err
 	}
 
+	matcher := newProcessMatcher()
+
 	lines := bytes.Split(data.Bytes(), []byte{'\n'})
 
 	process := map[int32]Process{}
 
 	for _, line := range lines {
-		p, err := parseProcess(line)
+		p, err := matcher.Parse(line)
 		if err != nil {
 			continue
 		}

@@ -85,15 +85,47 @@ func TestParseQuery(t *testing.T) {
 	}, nv)
 }
 
-func TestParseProcess(t *testing.T) {
-	data, err := os.ReadFile("./fixtures/process.txt")
+func TestProcessMatcher(t *testing.T) {
+	matcher := newProcessMatcher()
+
+	_, err := matcher.Parse([]byte("# gpu        pid  type    sm   mem   enc   dec    fb   command"))
+	require.Error(t, err)
+
+	require.Equal(t, map[string]int{
+		"gpu":     0,
+		"pid":     1,
+		"type":    2,
+		"sm":      3,
+		"mem":     4,
+		"enc":     5,
+		"dec":     6,
+		"fb":      7,
+		"command": 8,
+	}, matcher.mapping)
+
+	p, err := matcher.Parse([]byte("    0       7372     C     42     1     12     34   136   ffmpeg "))
 	require.NoError(t, err)
 
+	require.Equal(t, Process{
+		Index:   0,
+		PID:     7372,
+		Memory:  136 * 1024 * 1024,
+		Usage:   42,
+		Encoder: 12,
+		Decoder: 34,
+	}, p)
+}
+
+func TestParseProcess(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/process_1.txt")
+	require.NoError(t, err)
+
+	matcher := newProcessMatcher()
 	lines := bytes.Split(data, []byte("\n"))
 	process := map[int32]Process{}
 
 	for _, line := range lines {
-		p, err := parseProcess(line)
+		p, err := matcher.Parse(line)
 		if err != nil {
 			continue
 		}
@@ -143,17 +175,44 @@ func TestParseProcess(t *testing.T) {
 			Decoder: 1,
 		},
 	}, process)
+
+	data, err = os.ReadFile("./fixtures/process_2.txt")
+	require.NoError(t, err)
+
+	lines = bytes.Split(data, []byte("\n"))
+	process = map[int32]Process{}
+
+	for _, line := range lines {
+		p, err := matcher.Parse(line)
+		if err != nil {
+			continue
+		}
+
+		process[p.PID] = p
+	}
+
+	require.Equal(t, map[int32]Process{
+		3908637: {
+			Index:   0,
+			PID:     3908637,
+			Memory:  1209 * 1024 * 1024,
+			Usage:   5,
+			Encoder: 3,
+			Decoder: 0,
+		},
+	}, process)
 }
 
 func TestParseProcessNoProcesses(t *testing.T) {
 	data, err := os.ReadFile("./fixtures/process_noprocesses.txt")
 	require.NoError(t, err)
 
+	matcher := newProcessMatcher()
 	lines := bytes.Split(data, []byte("\n"))
 	process := map[int32]Process{}
 
 	for _, line := range lines {
-		p, err := parseProcess(line)
+		p, err := matcher.Parse(line)
 		if err != nil {
 			continue
 		}
@@ -219,12 +278,13 @@ func TestWriterQuery(t *testing.T) {
 }
 
 func TestWriterProcess(t *testing.T) {
-	data, err := os.ReadFile("./fixtures/process.txt")
+	data, err := os.ReadFile("./fixtures/process_1.txt")
 	require.NoError(t, err)
 
 	wr := &writerProcess{
 		ch:         make(chan Process, 32),
 		terminator: []byte("\n"),
+		matcher:    newProcessMatcher(),
 	}
 
 	process := map[int32]Process{}
@@ -285,6 +345,44 @@ func TestWriterProcess(t *testing.T) {
 			Usage:   0,
 			Encoder: 1,
 			Decoder: 1,
+		},
+	}, process)
+
+	data, err = os.ReadFile("./fixtures/process_2.txt")
+	require.NoError(t, err)
+
+	wr = &writerProcess{
+		ch:         make(chan Process, 32),
+		terminator: []byte("\n"),
+		matcher:    newProcessMatcher(),
+	}
+
+	process = map[int32]Process{}
+	wg = sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for p := range wr.ch {
+			process[p.PID] = p
+		}
+	}()
+
+	_, err = wr.Write(data)
+	require.NoError(t, err)
+
+	close(wr.ch)
+
+	wg.Wait()
+
+	require.Equal(t, map[int32]Process{
+		3908637: {
+			Index:   0,
+			PID:     3908637,
+			Memory:  1209 * 1024 * 1024,
+			Usage:   5,
+			Encoder: 3,
+			Decoder: 0,
 		},
 	}, process)
 }
