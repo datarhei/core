@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -474,7 +475,7 @@ func (r *resources) Request(req Request) (Response, error) {
 			return res, fmt.Errorf("some GPU resources requested but no GPU available")
 		}
 
-		foundGPU := -1
+		fittingGPU := []psutil.GPUInfo{}
 		for _, g := range gpustat {
 			if req.GPUUsage > 0 && g.Usage+req.GPUUsage > r.maxGPU {
 				logger.Debug().WithFields(log.Fields{"id": g.Index, "cur_gpu": g.Usage}).Log("Rejected, GPU usage limit exceeded")
@@ -499,24 +500,31 @@ func (r *resources) Request(req Request) (Response, error) {
 				continue
 			}
 
-			foundGPU = g.Index
-
-			logger = logger.Debug().WithFields(log.Fields{
-				"cur_gpu":         foundGPU,
-				"cur_gpu_general": g.Usage,
-				"cur_gpu_encoder": g.Encoder,
-				"cur_gpu_decoder": g.Decoder,
-				"cur_gpu_memory":  gpuMemoryUsage,
-			})
-
-			break
+			fittingGPU = append(fittingGPU, g)
 		}
 
-		if foundGPU < 0 {
+		if len(fittingGPU) == 0 {
 			return res, fmt.Errorf("all GPU usage limits are exceeded")
 		}
 
-		res.GPU = foundGPU
+		sort.SliceStable(fittingGPU, func(a, b int) bool {
+			loadA := fittingGPU[a].Usage + fittingGPU[a].Encoder + fittingGPU[a].Decoder
+			loadB := fittingGPU[b].Usage + fittingGPU[b].Encoder + fittingGPU[b].Decoder
+
+			return loadA < loadB
+		})
+
+		foundGPU := fittingGPU[0]
+
+		logger = logger.Debug().WithFields(log.Fields{
+			"cur_gpu":         foundGPU.Index,
+			"cur_gpu_general": foundGPU.Usage,
+			"cur_gpu_encoder": foundGPU.Encoder,
+			"cur_gpu_decoder": foundGPU.Decoder,
+			"cur_gpu_memory":  float64(foundGPU.MemoryUsed) / float64(foundGPU.MemoryTotal) * 100,
+		})
+
+		res.GPU = foundGPU.Index
 	}
 
 	logger.Debug().WithFields(log.Fields{

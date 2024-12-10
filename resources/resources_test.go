@@ -725,16 +725,20 @@ func TestRequestGPULimitsMoreGPU(t *testing.T) {
 		MaxMemory:    100,
 		MaxGPU:       60,
 		MaxGPUMemory: 60,
-		PSUtil:       psutil.New(2),
+		PSUtil:       psutil.New(3),
 	})
 	require.NoError(t, err)
 
 	_, err = r.Request(Request{CPU: 10, Memory: 10, GPUEncoder: 50, GPUMemory: 10})
 	require.Error(t, err)
 
-	res, err := r.Request(Request{CPU: 10, Memory: 10, GPUEncoder: 30, GPUMemory: 10})
+	res, err := r.Request(Request{CPU: 10, Memory: 10, GPUEncoder: 10, GPUMemory: 10})
 	require.NoError(t, err)
-	require.Equal(t, 1, res.GPU)
+	require.Equal(t, 2, res.GPU)
+
+	res, err = r.Request(Request{CPU: 10, Memory: 10, GPUEncoder: 30, GPUMemory: 10})
+	require.NoError(t, err)
+	require.Equal(t, 2, res.GPU)
 }
 
 func TestHasLimits(t *testing.T) {
