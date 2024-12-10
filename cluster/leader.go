@@ -653,34 +653,34 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			}).Log("Moving process, stopping process")
 		}
 
-		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
-		if err != nil {
-			opErr = processOpError{
-				processid: v.config.ProcessID(),
-				err:       err,
-			}
-			logger.Info().WithError(err).WithFields(log.Fields{
-				"processid":  v.config.ProcessID(),
-				"fromnodeid": v.fromNodeid,
-				"tonodeid":   v.toNodeid,
-			}).Log("Moving process, removing process")
-			break
-		}
-
 		if v.order == "start" {
 			err = c.manager.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
 			if err != nil {
-				opErr = processOpError{
-					processid: v.config.ProcessID(),
-					err:       err,
-				}
+				//opErr = processOpError{
+				//	processid: v.config.ProcessID(),
+				//	err:       err,
+				//}
 				logger.Info().WithError(err).WithFields(log.Fields{
 					"processid":  v.config.ProcessID(),
 					"fromnodeid": v.fromNodeid,
 					"tonodeid":   v.toNodeid,
 				}).Log("Moving process, starting process")
-				break
+				// Continue in case the process couldn't start
 			}
+		}
+
+		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
+		if err != nil {
+			//opErr = processOpError{
+			//	processid: v.config.ProcessID(),
+			//	err:       err,
+			//}
+			logger.Info().WithError(err).WithFields(log.Fields{
+				"processid":  v.config.ProcessID(),
+				"fromnodeid": v.fromNodeid,
+				"tonodeid":   v.toNodeid,
+			}).Log("Moving process, removing process")
+			// Continue in case the process couldn't be deleted (will be cleaned up later)
 		}
 
 		opErr = processOpError{
