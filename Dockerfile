@@ -1,5 +1,5 @@
 ARG GOLANG_IMAGE=golang:1.22-alpine3.19
-ARG BUILD_IMAGE=alpine:3.19
+ARG BUILD_IMAGE=alpine:3.21.0
 
 # Cross-Compilation
 # https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
