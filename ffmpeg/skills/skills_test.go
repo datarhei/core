@@ -345,13 +345,64 @@ func TestCodecs(t *testing.T) {
 	}, c)
 }
 
-func TestFormats(t *testing.T) {
+func TestFormatsPre7(t *testing.T) {
 	data := ` DE mpeg            MPEG-1 Systems / MPEG program stream
   E mpeg1video      raw MPEG-1 video
   E mpeg2video      raw MPEG-2 video
  DE mpegts          MPEG-TS (MPEG-2 Transport Stream)
  D  mpegtsraw       raw MPEG-TS (MPEG-2 Transport Stream)
  D  mpegvideo       raw MPEG video`
+
+	f := parseFormats([]byte(data))
+
+	require.Equal(t, ffFormats{
+		Demuxers: []Format{
+			{
+				Id:   "mpeg",
+				Name: "MPEG-1 Systems / MPEG program stream",
+			},
+			{
+				Id:   "mpegts",
+				Name: "MPEG-TS (MPEG-2 Transport Stream)",
+			},
+			{
+				Id:   "mpegtsraw",
+				Name: "raw MPEG-TS (MPEG-2 Transport Stream)",
+			},
+			{
+				Id:   "mpegvideo",
+				Name: "raw MPEG video",
+			},
+		},
+		Muxers: []Format{
+			{
+				Id:   "mpeg",
+				Name: "MPEG-1 Systems / MPEG program stream",
+			},
+			{
+				Id:   "mpeg1video",
+				Name: "raw MPEG-1 video",
+			},
+			{
+				Id:   "mpeg2video",
+				Name: "raw MPEG-2 video",
+			},
+			{
+				Id:   "mpegts",
+				Name: "MPEG-TS (MPEG-2 Transport Stream)",
+			},
+		},
+	}, f)
+}
+
+func TestFormats(t *testing.T) {
+	data := ` DE  mpeg            MPEG-1 Systems / MPEG program stream
+  E  mpeg1video      raw MPEG-1 video
+  E  mpeg2video      raw MPEG-2 video
+ DE  mpegts          MPEG-TS (MPEG-2 Transport Stream)
+ D   mpegtsraw       raw MPEG-TS (MPEG-2 Transport Stream)
+ D   mpegvideo       raw MPEG video
+ D d x11grab         X11 screen capture, using XCB`
 
 	f := parseFormats([]byte(data))
 

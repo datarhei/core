@@ -286,7 +286,7 @@ func formats(binary string) ffFormats {
 func parseFormats(data []byte) ffFormats {
 	formats := ffFormats{}
 
-	re := regexp.MustCompile(`^\s([D ])([E ]) ([0-9A-Za-z_,]+)\s+(.*?)$`)
+	re := regexp.MustCompile(`^\s([D ])([E ])\s+([0-9A-Za-z_,]+)\s+(.*?)$`)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Split(bufio.ScanLines)

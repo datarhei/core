@@ -92,7 +92,7 @@ func parseFramebufferDevice(data *bytes.Buffer) string {
 			format.roffset = parseFramebufferDeviceOffset(matches[1])
 			format.goffset = parseFramebufferDeviceOffset(matches[2])
 			format.boffset = parseFramebufferDeviceOffset(matches[3])
-			format.aoffset = parseFramebufferDeviceOffset(matches[4])
+			//format.aoffset = parseFramebufferDeviceOffset(matches[4])
 		}
 	}
 
