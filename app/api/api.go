@@ -1808,6 +1808,7 @@ func (a *api) stop() {
 	if a.memfs != nil {
 		cfg := a.config.store.GetActive()
 		if len(cfg.Storage.Memory.Backup.Dir) != 0 {
+			// TODO: Add option to disable backup on shutdown? Or only if in maintenance mode? Bur how do I know?
 			diskfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 				Root:   cfg.Storage.Memory.Backup.Dir,
 				Logger: logger,
