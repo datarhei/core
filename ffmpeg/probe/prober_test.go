@@ -170,7 +170,7 @@ func TestJSON(t *testing.T) {
 	prober := New(Config{}).(*prober)
 
 	prober.Parse([]byte("foobar"))
-	prober.Parse([]byte(`ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	prober.Parse([]byte(`[info] ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
 
 	prober.ResetStats()
 

@@ -202,12 +202,12 @@ func New(config Config) Parser {
 
 func (p *parser) Parse(line []byte) uint64 {
 	isDefaultProgress := bytes.HasPrefix(line, []byte("frame="))
-	isFFmpegInputs := bytes.HasPrefix(line, []byte("ffmpeg.inputs:"))
-	isFFmpegOutputs := bytes.HasPrefix(line, []byte("ffmpeg.outputs:"))
-	isFFmpegMapping := bytes.HasPrefix(line, []byte("ffmpeg.mapping:"))
-	isFFmpegProgress := bytes.HasPrefix(line, []byte("ffmpeg.progress:"))
-	isHLSStreamMap := bytes.HasPrefix(line, []byte("hls.streammap:"))
-	isAVstreamProgress := bytes.HasPrefix(line, []byte("avstream.progress:"))
+	isFFmpegInputs := bytes.Contains(line, []byte("ffmpeg.inputs:"))
+	isFFmpegOutputs := bytes.Contains(line, []byte("ffmpeg.outputs:"))
+	isFFmpegMapping := bytes.Contains(line, []byte("ffmpeg.mapping:"))
+	isFFmpegProgress := bytes.Contains(line, []byte("ffmpeg.progress:"))
+	isHLSStreamMap := bytes.Contains(line, []byte("hls.streammap:"))
+	isAVstreamProgress := bytes.Contains(line, []byte("avstream.progress:"))
 
 	p.lock.log.Lock()
 	if p.logStart.IsZero() {
@@ -238,7 +238,8 @@ func (p *parser) Parse(line []byte) uint64 {
 			p.lock.progress.Lock()
 			defer p.lock.progress.Unlock()
 
-			if err := p.parseFFmpegIO("input", bytes.TrimPrefix(line, []byte("ffmpeg.inputs:"))); err != nil {
+			_, line, _ = bytes.Cut(line, []byte("ffmpeg.inputs:"))
+			if err := p.parseFFmpegIO("input", line); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -252,7 +253,8 @@ func (p *parser) Parse(line []byte) uint64 {
 			p.lock.progress.Lock()
 			defer p.lock.progress.Unlock()
 
-			if err := p.parseHLSStreamMap(bytes.TrimPrefix(line, []byte("hls.streammap:"))); err != nil {
+			_, line, _ = bytes.Cut(line, []byte("hls.streammap:"))
+			if err := p.parseHLSStreamMap(line); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -266,7 +268,8 @@ func (p *parser) Parse(line []byte) uint64 {
 			p.lock.progress.Lock()
 			defer p.lock.progress.Unlock()
 
-			if err := p.parseFFmpegIO("output", bytes.TrimPrefix(line, []byte("ffmpeg.outputs:"))); err != nil {
+			_, line, _ = bytes.Cut(line, []byte("ffmpeg.outputs:"))
+			if err := p.parseFFmpegIO("output", line); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -299,7 +302,8 @@ func (p *parser) Parse(line []byte) uint64 {
 		p.lock.progress.Lock()
 		defer p.lock.progress.Unlock()
 
-		if err := p.parseFFmpegMapping(bytes.TrimPrefix(line, []byte("ffmpeg.mapping:"))); err != nil {
+		_, line, _ = bytes.Cut(line, []byte("ffmpeg.mapping:"))
+		if err := p.parseFFmpegMapping(line); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
 				"error": err,
@@ -376,7 +380,8 @@ func (p *parser) Parse(line []byte) uint64 {
 	// Update the progress
 
 	if isAVstreamProgress {
-		if err := p.parseAVstreamProgress(bytes.TrimPrefix(line, []byte("avstream.progress:"))); err != nil {
+		_, line, _ = bytes.Cut(line, []byte("avstream.progress:"))
+		if err := p.parseAVstreamProgress(line); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
 				"error": err,
@@ -395,7 +400,8 @@ func (p *parser) Parse(line []byte) uint64 {
 			return 0
 		}
 	} else if isFFmpegProgress {
-		if err := p.parseFFmpegProgress(bytes.TrimPrefix(line, []byte("ffmpeg.progress:"))); err != nil {
+		_, line, _ = bytes.Cut(line, []byte("ffmpeg.progress:"))
+		if err := p.parseFFmpegProgress(line); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
 				"error": err,
