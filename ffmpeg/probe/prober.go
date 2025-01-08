@@ -56,7 +56,7 @@ func (p *prober) Probe() app.Probe {
 }
 
 func (p *prober) Parse(line string) uint64 {
-	if strings.HasPrefix(line, "avstream.progress:") {
+	if strings.Contains(line, "avstream.progress:") {
 		return 0
 	}
 
@@ -121,10 +121,11 @@ func (p *prober) ResetStats() {
 	prefix := "ffmpeg.inputs:"
 
 	for _, line := range p.data {
-		isFFmpegInputs := strings.HasPrefix(line.Data, prefix)
+		isFFmpegInputs := strings.Contains(line.Data, prefix)
 
 		if isFFmpegInputs {
-			p.parseJSON(strings.TrimPrefix(line.Data, prefix))
+			_, data, _ := strings.Cut(line.Data, prefix)
+			p.parseJSON(data)
 			hasJSON = true
 
 			break
