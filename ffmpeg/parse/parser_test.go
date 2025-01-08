@@ -21,11 +21,9 @@ func TestParserProgress(t *testing.T) {
 	d, _ := time.ParseDuration("3m58s440ms")
 	wantP := app.Progress{
 		Frame:     5968,
-		FPS:       25,
 		Quantizer: 19.4,
 		Size:      453632,
 		Time:      d.Seconds(),
-		Bitrate:   5632,
 		Speed:     0.999,
 		Drop:      3522,
 		Dup:       87463,
@@ -306,7 +304,7 @@ Input #0, playout, from 'https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8
     Stream #0:0: Video: h264 (Baseline) ([27][0][0][0] / 0x001B), yuvj420p(pc, bt709), 1280x720 [SAR 1:1 DAR 16:9], 20.67 fps, 25 tbr, 1000k tbn, 2000k tbc
     Metadata:
       variant_bitrate : 1024000
-ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]
+[info] ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]
 Output #1, mp4, to '/dev/null':
   Metadata:
     encoder         : Lavf58.45.100
@@ -330,20 +328,20 @@ Output #0, flv, to '/dev/null':
       encoder         : Lavc58.91.100 libx264
     Side data:
       cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A
-ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":2,"packet":6,"size_kb":222}],"outputs":[{"index":0,"stream":0,"frame":2,"packet":0,"q":0.0,"size_kb":0},{"index":1,"stream":0,"frame":6,"packet":6,"q":-1.0,"size_kb":222}],"frame":2,"packet":0,"q":0.0,"size_kb":222,"time":"0h0m0.20s","speed":0.281,"dup":0,"drop":0}
+[info] ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":2,"packet":6,"size_kb":222}],"outputs":[{"index":0,"stream":0,"frame":2,"packet":0,"q":0.0,"size_kb":0},{"index":1,"stream":0,"frame":6,"packet":6,"q":-1.0,"size_kb":222}],"frame":2,"packet":0,"q":0.0,"size_kb":222,"time":"0h0m0.20s","speed":0.281,"dup":0,"drop":0}
 [https @ 0x557c840bf480] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8' for reading
 [hls @ 0x7f92a96e8100] Skip ('#EXT-X-VERSION:3')
 [https @ 0x557c840d1080] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720_100793.ts' for reading
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"packet":11,"size_kb":226}],"outputs":[{"index":0,"stream":0,"frame":7,"packet":0,"q":0.0,"size_kb":0},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":10,"packet":14,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":10,"packet":3,"q":16.0,"size_kb":281},{"index":1,"stream":0,"frame":14,"packet":14,"q":-1.0,"size_kb":227}],"frame":10,"packet":3,"q":16.0,"size_kb":508,"time":"0h0m0.68s","speed":0.358,"dup":0,"drop":0}
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":13,"packet":17,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":13,"packet":6,"q":14.0,"size_kb":350},{"index":1,"stream":0,"frame":17,"packet":17,"q":-1.0,"size_kb":227}],"frame":13,"packet":6,"q":14.0,"size_kb":577,"time":"0h0m0.80s","speed":0.333,"dup":0,"drop":0}
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":16,"packet":20,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":16,"packet":9,"q":13.0,"size_kb":489},{"index":1,"stream":0,"frame":20,"packet":20,"q":-1.0,"size_kb":227}],"frame":16,"packet":9,"q":13.0,"size_kb":716,"time":"0h0m0.92s","speed":0.306,"dup":0,"drop":0}
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"packet":11,"size_kb":226}],"outputs":[{"index":0,"stream":0,"frame":7,"packet":0,"q":0.0,"size_kb":0},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":10,"packet":14,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":10,"packet":3,"q":16.0,"size_kb":281},{"index":1,"stream":0,"frame":14,"packet":14,"q":-1.0,"size_kb":227}],"frame":10,"packet":3,"q":16.0,"size_kb":508,"time":"0h0m0.68s","speed":0.358,"dup":0,"drop":0}
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":13,"packet":17,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":13,"packet":6,"q":14.0,"size_kb":350},{"index":1,"stream":0,"frame":17,"packet":17,"q":-1.0,"size_kb":227}],"frame":13,"packet":6,"q":14.0,"size_kb":577,"time":"0h0m0.80s","speed":0.333,"dup":0,"drop":0}
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":16,"packet":20,"size_kb":227}],"outputs":[{"index":0,"stream":0,"frame":16,"packet":9,"q":13.0,"size_kb":489},{"index":1,"stream":0,"frame":20,"packet":20,"q":-1.0,"size_kb":227}],"frame":16,"packet":9,"q":13.0,"size_kb":716,"time":"0h0m0.92s","speed":0.306,"dup":0,"drop":0}
 [https @ 0x557c840bf480] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8' for reading
 [hls @ 0x7f92a96e8100] Skip ('#EXT-X-VERSION:3')
 [https @ 0x557c840d1080] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720_100794.ts' for reading
 [https @ 0x557c840f3180] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720_100795.ts' for reading
-ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb":228}],"outputs":[{"index":0,"stream":0,"frame":20,"packet":20,"q":-1.0,"size_kb":562},{"index":1,"stream":0,"frame":24,"packet":24,"q":-1.0,"size_kb":228}],"frame":20,"packet":20,"q":-1.0,"size_kb":789,"time":"0h0m1.8s","speed":0.245,"dup":0,"drop":0}`
+[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":21,"packet":24,"size_kb":228}],"outputs":[{"index":0,"stream":0,"frame":20,"packet":20,"q":-1.0,"size_kb":562},{"index":1,"stream":0,"frame":24,"packet":24,"q":-1.0,"size_kb":228}],"frame":20,"packet":20,"q":-1.0,"size_kb":789,"time":"0h0m1.8s","speed":0.245,"dup":0,"drop":0}`
 
 	data := strings.Split(rawdata, "\n")
 

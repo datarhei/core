@@ -170,10 +170,10 @@ func New(config Config) Parser {
 
 func (p *parser) Parse(line string) uint64 {
 	isDefaultProgress := strings.HasPrefix(line, "frame=")
-	isFFmpegInputs := strings.HasPrefix(line, "ffmpeg.inputs:")
-	isFFmpegOutputs := strings.HasPrefix(line, "ffmpeg.outputs:")
-	isFFmpegProgress := strings.HasPrefix(line, "ffmpeg.progress:")
-	isAVstreamProgress := strings.HasPrefix(line, "avstream.progress:")
+	isFFmpegInputs := strings.Contains(line, "ffmpeg.inputs:")
+	isFFmpegOutputs := strings.Contains(line, "ffmpeg.outputs:")
+	isFFmpegProgress := strings.Contains(line, "ffmpeg.progress:")
+	isAVstreamProgress := strings.Contains(line, "avstream.progress:")
 
 	if p.logStart.IsZero() {
 		p.lock.log.Lock()
@@ -195,7 +195,8 @@ func (p *parser) Parse(line string) uint64 {
 		}
 
 		if isFFmpegInputs {
-			if err := p.parseIO("input", strings.TrimPrefix(line, "ffmpeg.inputs:")); err != nil {
+			_, line, _ = strings.Cut(line, "ffmpeg.inputs:")
+			if err := p.parseIO("input", line); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -206,7 +207,8 @@ func (p *parser) Parse(line string) uint64 {
 		}
 
 		if isFFmpegOutputs {
-			if err := p.parseIO("output", strings.TrimPrefix(line, "ffmpeg.outputs:")); err != nil {
+			_, line, _ = strings.Cut(line, "ffmpeg.outputs:")
+			if err := p.parseIO("output", line); err != nil {
 				p.logger.WithFields(log.Fields{
 					"line":  line,
 					"error": err,
@@ -293,7 +295,8 @@ func (p *parser) Parse(line string) uint64 {
 	// Update the progress
 
 	if isAVstreamProgress {
-		if err := p.parseAVstreamProgress(strings.TrimPrefix(line, "avstream.progress:")); err != nil {
+		_, line, _ = strings.Cut(line, "avstream.progress:")
+		if err := p.parseAVstreamProgress(line); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
 				"error": err,
@@ -312,7 +315,8 @@ func (p *parser) Parse(line string) uint64 {
 			return 0
 		}
 	} else if isFFmpegProgress {
-		if err := p.parseFFmpegProgress(strings.TrimPrefix(line, "ffmpeg.progress:")); err != nil {
+		_, line, _ = strings.Cut(line, "ffmpeg.progress:")
+		if err := p.parseFFmpegProgress(line); err != nil {
 			p.logger.WithFields(log.Fields{
 				"line":  line,
 				"error": err,
