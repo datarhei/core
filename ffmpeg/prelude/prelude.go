@@ -34,10 +34,11 @@ type IO struct {
 // Parse parses the inputs and outputs from the default FFmpeg output. It returns a list of
 // detected inputs and outputs as well as the number of outputs according to the stream mapping.
 func Parse(lines []string) (inputs, outputs []IO, noutputs int) {
+	reLogline := regexp.MustCompile(`^(?:\[.*? @ .*?\] )?(?:\[[a-z]+\] )?(.*)`)
 	// Input #0, lavfi, from 'testsrc=size=1280x720:rate=25':
 	// Input #1, lavfi, from 'anullsrc=r=44100:cl=stereo':
 	// Output #0, hls, to './data/testsrc.m3u8':
-	reFormat := regexp.MustCompile(`^(?:\[[a-z]+\] )?(Input|Output) #([0-9]+), (.*?), (from|to) '([^']+)`)
+	reFormat := regexp.MustCompile(`^(Input|Output) #([0-9]+), (.*?), (from|to) '([^']+)`)
 
 	// Duration: 00:01:02.28, start: 0.000000, bitrate: 5895 kb/s
 	// Duration: N/A, start: 0.000000, bitrate: 5895 kb/s
@@ -56,8 +57,8 @@ func Parse(lines []string) (inputs, outputs []IO, noutputs int) {
 	reStreamAudio := regexp.MustCompile(`, ([0-9]+) Hz, ([^,]+)`)
 	reStreamBitrate := regexp.MustCompile(`, ([0-9]+) kb/s`)
 
-	reStreamMapping := regexp.MustCompile(`^(?:\[[a-z]+\] )?Stream mapping:`)
-	reStreamMap := regexp.MustCompile(`^(?:\[[a-z]+\])?[\s]+Stream #[0-9]+:[0-9]+`)
+	reStreamMapping := regexp.MustCompile(`^Stream mapping:`)
+	reStreamMap := regexp.MustCompile(`^[\s]+Stream #[0-9]+:[0-9]+`)
 
 	iotype := ""
 	format := ""
@@ -67,6 +68,9 @@ func Parse(lines []string) (inputs, outputs []IO, noutputs int) {
 	streamMapping := false
 
 	for _, line := range lines {
+		matches := reLogline.FindStringSubmatch(line)
+		line := matches[1]
+
 		if reStreamMapping.MatchString(line) {
 			streamMapping = true
 			continue
