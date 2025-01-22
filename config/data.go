@@ -199,6 +199,7 @@ type Data struct {
 		SyncInterval           int64    `json:"sync_interval_sec" format:"int64"`            // seconds
 		NodeRecoverTimeout     int64    `json:"node_recover_timeout_sec" format:"int64"`     // seconds
 		EmergencyLeaderTimeout int64    `json:"emergency_leader_timeout_sec" format:"int64"` // seconds
+		RecoverTimeout         int64    `json:"revocer_timeout_sec" format:"int64"`          // seconds
 		Debug                  struct {
 			DisableFFmpegCheck bool `json:"disable_ffmpeg_check"`
 		} `json:"debug"`

@@ -545,6 +545,7 @@ func (a *api) start(ctx context.Context) error {
 			SyncInterval:           time.Duration(cfg.Cluster.SyncInterval) * time.Second,
 			NodeRecoverTimeout:     time.Duration(cfg.Cluster.NodeRecoverTimeout) * time.Second,
 			EmergencyLeaderTimeout: time.Duration(cfg.Cluster.EmergencyLeaderTimeout) * time.Second,
+			RecoverTimeout:         time.Duration(cfg.Cluster.RecoverTimeout) * time.Second,
 			CoreConfig:             cfg.Clone(),
 			CoreSkills:             a.ffmpeg.Skills(),
 			IPLimiter:              a.sessionsLimiter,

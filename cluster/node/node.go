@@ -16,10 +16,11 @@ import (
 )
 
 type Node struct {
-	id      string
-	address string
-	ips     []string
-	version string
+	id        string
+	address   string
+	ips       []string
+	version   string
+	spawnedAt time.Time
 
 	node            client.APIClient
 	nodeAbout       About
@@ -57,9 +58,10 @@ func New(config Config) *Node {
 	tr.IdleConnTimeout = 30 * time.Second
 
 	n := &Node{
-		id:      config.ID,
-		address: config.Address,
-		version: "0.0.0",
+		id:        config.ID,
+		address:   config.Address,
+		version:   "0.0.0",
+		spawnedAt: time.Now(),
 		node: client.APIClient{
 			Address: config.Address,
 			Client: &http.Client{
@@ -136,6 +138,7 @@ type About struct {
 	Error       error
 	Core        CoreAbout
 	Resources   Resources
+	SpawnedAt   time.Time
 }
 
 type ResourcesGPU struct {
@@ -167,9 +170,10 @@ func (n *Node) About() About {
 	defer n.lock.RUnlock()
 
 	a := About{
-		ID:      n.id,
-		Version: n.version,
-		Address: n.address,
+		ID:        n.id,
+		Version:   n.version,
+		Address:   n.address,
+		SpawnedAt: n.spawnedAt,
 	}
 
 	a.Name = n.coreAbout.Name

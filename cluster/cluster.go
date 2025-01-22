@@ -55,6 +55,7 @@ type Cluster interface {
 	Leave(origin, id string) error              // gracefully remove a node from the cluster
 	TransferLeadership(origin, id string) error // transfer leadership to another node
 	Snapshot(origin string) (io.ReadCloser, error)
+	IsRaftLeader() bool
 	HasRaftLeader() bool
 
 	ProcessAdd(origin string, config *app.Config) error
@@ -108,6 +109,7 @@ type Config struct {
 	SyncInterval           time.Duration // Interval between aligning the process in the cluster DB with the processes on the nodes
 	NodeRecoverTimeout     time.Duration // Timeout for a node to recover before rebalancing the processes
 	EmergencyLeaderTimeout time.Duration // Timeout for establishing the emergency leadership after lost contact to raft leader
+	RecoverTimeout         time.Duration // Timeout for recovering the cluster if there's no raft leader
 
 	CoreConfig *config.Config
 	CoreSkills skills.Skills
@@ -127,7 +129,7 @@ type cluster struct {
 
 	logger log.Logger
 
-	raft                    raft.Raft
+	raft                    raft.RaftRecoverer
 	raftRemoveGracePeriod   time.Duration
 	raftAddress             string
 	raftNotifyCh            chan bool
@@ -136,7 +138,8 @@ type cluster struct {
 
 	store store.Store
 
-	cancelLeaderShip context.CancelFunc
+	cancelLeaderShip   context.CancelFunc
+	cancelFollowerShip context.CancelFunc
 
 	shutdown     bool
 	shutdownCh   chan struct{}
@@ -146,6 +149,7 @@ type cluster struct {
 	syncInterval           time.Duration
 	nodeRecoverTimeout     time.Duration
 	emergencyLeaderTimeout time.Duration
+	recoverTimeout         time.Duration
 
 	forwarder *forwarder.Forwarder
 	api       API
@@ -158,10 +162,12 @@ type cluster struct {
 	hostnames []string
 	stateLock sync.RWMutex
 
-	isRaftLeader  bool
-	hasRaftLeader bool
-	isLeader      bool
-	leaderLock    sync.Mutex
+	isRaftLeader      bool
+	hasRaftLeader     bool
+	isLeader          bool
+	isEmergencyLeader bool
+	lastLeaderChange  time.Time
+	leaderLock        sync.Mutex
 
 	isTLSRequired bool
 	clusterKVS    ClusterKVS
@@ -196,6 +202,7 @@ func New(config Config) (Cluster, error) {
 		syncInterval:           config.SyncInterval,
 		nodeRecoverTimeout:     config.NodeRecoverTimeout,
 		emergencyLeaderTimeout: config.EmergencyLeaderTimeout,
+		recoverTimeout:         config.RecoverTimeout,
 
 		config: config.CoreConfig,
 		skills: config.CoreSkills,
@@ -324,7 +331,7 @@ func New(config Config) (Cluster, error) {
 	c.raftLeaderObservationCh = make(chan string, 16)
 	c.raftEmergencyNotifyCh = make(chan bool, 16)
 
-	raft, err := raft.New(raft.Config{
+	raft, err := raft.NewRecoverer(raft.Config{
 		ID:                  config.NodeID,
 		Path:                config.Path,
 		Address:             config.Address,
@@ -357,11 +364,25 @@ func New(config Config) (Cluster, error) {
 				ticker := time.NewTicker(time.Second)
 				defer ticker.Stop()
 
+				timer := time.NewTimer(c.nodeRecoverTimeout)
+				defer timer.Stop()
+
 				for {
 					select {
 					case <-c.shutdownCh:
 						return
+					case <-timer.C:
+						c.logger.Warn().WithFields(log.Fields{
+							"peer":    peerAddress,
+							"timeout": c.nodeRecoverTimeout,
+						}).Log("Giving up joining cluster via peer")
+						return
 					case <-ticker.C:
+						if c.HasRaftLeader() {
+							c.logger.Warn().WithField("peer", peerAddress).Log("Stop joining cluster via peer, already joined")
+							return
+						}
+
 						err := c.Join("", c.nodeID, c.raftAddress, peerAddress)
 						if err != nil {
 							c.logger.Warn().WithError(err).Log("Join cluster")
@@ -750,11 +771,11 @@ func (c *cluster) Leave(origin, id string) error {
 		return err
 	}
 
-	numPeers := len(servers)
+	numServers := len(servers)
 
 	if id == c.nodeID {
 		// We're going to remove ourselves
-		if numPeers <= 1 {
+		if numServers <= 1 {
 			// Don't do so if we're the only server in the cluster
 			c.logger.Debug().Log("We're the leader without any peers, not doing anything")
 			return nil
@@ -1015,6 +1036,7 @@ func (c *cluster) trackLeaderChanges() {
 			}
 			c.forwarder.SetLeader(leaderAddress)
 			c.leaderLock.Lock()
+			c.lastLeaderChange = time.Now()
 			if len(leaderAddress) == 0 {
 				c.hasRaftLeader = false
 			} else {

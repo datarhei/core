@@ -111,6 +111,7 @@ func (c *cluster) monitorLeadership() {
 				c.leaderLock.Lock()
 				c.isRaftLeader = false
 				c.isLeader = false
+				c.isEmergencyLeader = false
 				c.leaderLock.Unlock()
 			} else if notification == NOTIFY_LEADER {
 				if weAreLeaderCh != nil {
@@ -144,6 +145,7 @@ func (c *cluster) monitorLeadership() {
 				c.leaderLock.Lock()
 				c.isRaftLeader = true
 				c.isLeader = true
+				c.isEmergencyLeader = false
 				c.leaderLock.Unlock()
 			} else if notification == NOTIFY_EMERGENCY {
 				if weAreEmergencyLeaderCh != nil {
@@ -177,6 +179,7 @@ func (c *cluster) monitorLeadership() {
 				c.leaderLock.Lock()
 				c.isRaftLeader = false
 				c.isLeader = true
+				c.isEmergencyLeader = true
 				c.leaderLock.Unlock()
 			}
 		case <-c.shutdownCh:
@@ -318,9 +321,36 @@ func (c *cluster) establishLeadership(ctx context.Context, emergency bool) error
 
 	if !emergency {
 		go c.clearLocks(ctx, time.Minute)
+		go c.clearDeadNodes(ctx, c.syncInterval, c.nodeRecoverTimeout)
 	}
 
 	return nil
+}
+
+func (c *cluster) clearDeadNodes(ctx context.Context, interval, nodeRecoverTimeout time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			nodes := c.manager.NodeList()
+			for _, node := range nodes {
+				about := node.About()
+				if time.Since(about.SpawnedAt) > nodeRecoverTimeout && time.Since(about.LastContact) > nodeRecoverTimeout {
+					c.logger.Warn().WithFields(log.Fields{
+						"id":          about.ID,
+						"after":       nodeRecoverTimeout,
+						"lastContact": about.LastContact,
+						"spawnedAt":   about.SpawnedAt,
+					}).Log("Removing peer from cluster")
+					c.raft.RemoveServer(about.ID)
+				}
+			}
+		}
+	}
 }
 
 func (c *cluster) revokeLeadership() {

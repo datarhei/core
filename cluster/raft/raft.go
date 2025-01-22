@@ -85,6 +85,7 @@ type Server struct {
 }
 
 type Stats struct {
+	Uptime      time.Duration
 	Address     string
 	State       string
 	LastContact time.Duration
@@ -210,6 +211,7 @@ func (r *raft) Servers() ([]Server, error) {
 
 func (r *raft) Stats() Stats {
 	stats := Stats{
+		Uptime:  time.Since(r.raftStart),
 		Address: r.raftAddress,
 	}
 
