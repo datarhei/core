@@ -69,6 +69,51 @@ type Conn interface {
 	Version() uint32
 }
 
+type rtt struct {
+	rtt    float64 // microseconds
+	rttVar float64 // microseconds
+
+	lock sync.RWMutex
+}
+
+func (r *rtt) Recalculate(rtt time.Duration) {
+	// 4.10.  Round-Trip Time Estimation
+	lastRTT := float64(rtt.Microseconds())
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.rtt = r.rtt*0.875 + lastRTT*0.125
+	r.rttVar = r.rttVar*0.75 + math.Abs(r.rtt-lastRTT)*0.25
+}
+
+func (r *rtt) RTT() float64 {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.rtt
+}
+
+func (r *rtt) RTTVar() float64 {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	return r.rttVar
+}
+
+func (r *rtt) NAKInterval() float64 {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	// 4.8.2.  Packet Retransmission (NAKs)
+	nakInterval := (r.rtt + 4*r.rttVar) / 2
+	if nakInterval < 20000 {
+		nakInterval = 20000 // 20ms
+	}
+
+	return nakInterval
+}
+
 type connStats struct {
 	headerSize        uint64
 	pktSentACK        uint64
@@ -108,19 +153,16 @@ type srtConn struct {
 
 	config Config
 
-	cryptoLock             sync.Mutex
 	crypto                 crypto.Crypto
 	keyBaseEncryption      packet.PacketEncryption
 	kmPreAnnounceCountdown uint64
 	kmRefreshCountdown     uint64
 	kmConfirmed            bool
+	cryptoLock             sync.Mutex
 
 	peerIdleTimeout *time.Timer
 
-	rtt    float64 // microseconds
-	rttVar float64 // microseconds
-
-	nakInterval float64
+	rtt rtt // microseconds
 
 	ackLock       sync.RWMutex
 	ackNumbers    map[uint32]time.Time
@@ -232,10 +274,10 @@ func newSRTConn(config srtConnConfig) *srtConn {
 	c.kmRefreshCountdown = c.config.KMRefreshRate
 
 	// 4.10.  Round-Trip Time Estimation
-	c.rtt = float64((100 * time.Millisecond).Microseconds())
-	c.rttVar = float64((50 * time.Millisecond).Microseconds())
-
-	c.nakInterval = float64((20 * time.Millisecond).Microseconds())
+	c.rtt = rtt{
+		rtt:    float64((100 * time.Millisecond).Microseconds()),
+		rttVar: float64((50 * time.Millisecond).Microseconds()),
+	}
 
 	c.networkQueue = make(chan packet.Packet, 1024)
 
@@ -788,7 +830,7 @@ func (c *srtConn) handleNAK(p packet.Packet) {
 
 // handleACKACK updates the RTT and NAK interval for the congestion control.
 func (c *srtConn) handleACKACK(p packet.Packet) {
-	c.ackLock.RLock()
+	c.ackLock.Lock()
 
 	c.statisticsLock.Lock()
 	c.statistics.pktRecvACKACK++
@@ -814,31 +856,17 @@ func (c *srtConn) handleACKACK(p packet.Packet) {
 		}
 	}
 
-	nakInterval := uint64(c.nakInterval)
+	c.ackLock.Unlock()
 
-	c.ackLock.RUnlock()
-
-	c.recv.SetNAKInterval(nakInterval)
+	c.recv.SetNAKInterval(uint64(c.rtt.NAKInterval()))
 }
 
 // recalculateRTT recalculates the RTT based on a full ACK exchange
 func (c *srtConn) recalculateRTT(rtt time.Duration) {
-	// 4.10.  Round-Trip Time Estimation
-	lastRTT := float64(rtt.Microseconds())
-
-	c.rtt = c.rtt*0.875 + lastRTT*0.125
-	c.rttVar = c.rttVar*0.75 + math.Abs(c.rtt-lastRTT)*0.25
-
-	// 4.8.2.  Packet Retransmission (NAKs)
-	nakInterval := (c.rtt + 4*c.rttVar) / 2
-	if nakInterval < 20000 {
-		c.nakInterval = 20000 // 20ms
-	} else {
-		c.nakInterval = nakInterval
-	}
+	c.rtt.Recalculate(rtt)
 
 	c.log("connection:rtt", func() string {
-		return fmt.Sprintf("RTT=%.0fus RTTVar=%.0fus NAKInterval=%.0fms", c.rtt, c.rttVar, c.nakInterval/1000)
+		return fmt.Sprintf("RTT=%.0fus RTTVar=%.0fus NAKInterval=%.0fms", c.rtt.RTT(), c.rtt.RTTVar(), c.rtt.NAKInterval()/1000)
 	})
 }
 
@@ -1219,8 +1247,8 @@ func (c *srtConn) sendACK(seq circular.Number, lite bool) {
 	} else {
 		pps, bps, capacity := c.recv.PacketRate()
 
-		cif.RTT = uint32(c.rtt)
-		cif.RTTVar = uint32(c.rttVar)
+		cif.RTT = uint32(c.rtt.RTT())
+		cif.RTTVar = uint32(c.rtt.RTTVar())
 		cif.AvailableBufferSize = c.config.FC        // TODO: available buffer size (packets)
 		cif.PacketsReceivingRate = uint32(pps)       // packets receiving rate (packets/s)
 		cif.EstimatedLinkCapacity = uint32(capacity) // estimated link capacity (packets/s), not relevant for live mode
@@ -1488,7 +1516,7 @@ func (c *srtConn) Stats(s *Statistics) {
 		UsPktSendPeriod:       send.UsPktSndPeriod,
 		PktFlowWindow:         uint64(c.config.FC),
 		PktFlightSize:         send.PktFlightSize,
-		MsRTT:                 c.rtt / 1000,
+		MsRTT:                 c.rtt.RTT() / 1000,
 		MbpsSentRate:          send.MbpsEstimatedSentBandwidth,
 		MbpsRecvRate:          recv.MbpsEstimatedRecvBandwidth,
 		MbpsLinkCapacity:      recv.MbpsEstimatedLinkCapacity,

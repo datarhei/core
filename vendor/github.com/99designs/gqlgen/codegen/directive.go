@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -143,7 +142,7 @@ func (d *Directive) CallArgs() string {
 	args := []string{"ctx", "obj", "n"}
 
 	for _, arg := range d.Args {
-		args = append(args, "args["+strconv.Quote(arg.Name)+"].("+templates.CurrentImports.LookupType(arg.TypeReference.GO)+")")
+		args = append(args, fmt.Sprintf("args[%q].(%s)", arg.Name, templates.CurrentImports.LookupType(arg.TypeReference.GO)))
 	}
 
 	return strings.Join(args, ", ")
@@ -169,13 +168,13 @@ func (d *Directive) CallName() string {
 }
 
 func (d *Directive) Declaration() string {
-	res := d.CallName() + " func(ctx context.Context, obj interface{}, next graphql.Resolver"
+	res := d.CallName() + " func(ctx context.Context, obj any, next graphql.Resolver"
 
 	for _, arg := range d.Args {
 		res += fmt.Sprintf(", %s %s", templates.ToGoPrivate(arg.Name), templates.CurrentImports.LookupType(arg.TypeReference.GO))
 	}
 
-	res += ") (res interface{}, err error)"
+	res += ") (res any, err error)"
 	return res
 }
 

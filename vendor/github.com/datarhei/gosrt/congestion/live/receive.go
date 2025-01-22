@@ -265,11 +265,7 @@ func (r *receiver) periodicACK(now uint64) (ok bool, sequenceNumber circular.Num
 	}
 
 	minPktTsbpdTime, maxPktTsbpdTime := uint64(0), uint64(0)
-
-	ackSequenceNumber := r.lastDeliveredSequenceNumber
-
-	// Find the sequence number up until we have all in a row.
-	// Where the first gap is (or at the end of the list) is where we can ACK to.
+	ackSequenceNumber := r.lastACKSequenceNumber
 
 	e := r.packetList.Front()
 	if e != nil {
@@ -277,48 +273,41 @@ func (r *receiver) periodicACK(now uint64) (ok bool, sequenceNumber circular.Num
 
 		minPktTsbpdTime = p.Header().PktTsbpdTime
 		maxPktTsbpdTime = p.Header().PktTsbpdTime
+	}
 
-		// If there are packets that should be delivered by now, move foward.
-		if p.Header().PktTsbpdTime <= now {
-			for e = e.Next(); e != nil; e = e.Next() {
-				p = e.Value.(packet.Packet)
+	// Find the sequence number up until we have all in a row.
+	// Where the first gap is (or at the end of the list) is where we can ACK to.
 
-				if p.Header().PktTsbpdTime > now {
-					break
-				}
-			}
+	for e := r.packetList.Front(); e != nil; e = e.Next() {
+		p := e.Value.(packet.Packet)
 
-			ackSequenceNumber = p.Header().PacketSequenceNumber
-			maxPktTsbpdTime = p.Header().PktTsbpdTime
-
-			if e != nil {
-				if e = e.Next(); e != nil {
-					p = e.Value.(packet.Packet)
-				}
-			}
+		// Skip packets that we already ACK'd.
+		if p.Header().PacketSequenceNumber.Lte(ackSequenceNumber) {
+			continue
 		}
 
+		// If there are packets that should have been delivered by now, move forward.
+		if p.Header().PktTsbpdTime <= now {
+			ackSequenceNumber = p.Header().PacketSequenceNumber
+			continue
+		}
+
+		// Check if the packet is the next in the row.
 		if p.Header().PacketSequenceNumber.Equals(ackSequenceNumber.Inc()) {
 			ackSequenceNumber = p.Header().PacketSequenceNumber
-
-			for e = e.Next(); e != nil; e = e.Next() {
-				p = e.Value.(packet.Packet)
-				if !p.Header().PacketSequenceNumber.Equals(ackSequenceNumber.Inc()) {
-					break
-				}
-
-				ackSequenceNumber = p.Header().PacketSequenceNumber
-				maxPktTsbpdTime = p.Header().PktTsbpdTime
-			}
+			maxPktTsbpdTime = p.Header().PktTsbpdTime
+			continue
 		}
 
-		ok = true
-		sequenceNumber = ackSequenceNumber.Inc()
-
-		// Keep track of the last ACK's sequence. with this we can faster ignore
-		// packets that come in that have a lower sequence number.
-		r.lastACKSequenceNumber = ackSequenceNumber
+		break
 	}
+
+	ok = true
+	sequenceNumber = ackSequenceNumber.Inc()
+
+	// Keep track of the last ACK's sequence number. With this we can faster ignore
+	// packets that come in late that have a lower sequence number.
+	r.lastACKSequenceNumber = ackSequenceNumber
 
 	r.lastPeriodicACK = now
 	r.nPackets = 0
@@ -338,13 +327,19 @@ func (r *receiver) periodicNAK(now uint64) (ok bool, from, to circular.Number) {
 
 	// Send a periodic NAK
 
-	ackSequenceNumber := r.lastDeliveredSequenceNumber
+	ackSequenceNumber := r.lastACKSequenceNumber
 
 	// Send a NAK only for the first gap.
 	// Alternatively send a NAK for max. X gaps because the size of the NAK packet is limited.
 	for e := r.packetList.Front(); e != nil; e = e.Next() {
 		p := e.Value.(packet.Packet)
 
+		// Skip packets that we already ACK'd.
+		if p.Header().PacketSequenceNumber.Lte(ackSequenceNumber) {
+			continue
+		}
+
+		// If this packet is not in sequence, we stop here and report that gap.
 		if !p.Header().PacketSequenceNumber.Equals(ackSequenceNumber.Inc()) {
 			nackSequenceNumber := ackSequenceNumber.Inc()
 

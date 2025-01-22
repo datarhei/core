@@ -12,6 +12,12 @@ linters-settings:
       - paramTypeCombine
       - preferFprint
       - yodaStyleExpr
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+      - unusedwrite # TODO: fix and enable
   errcheck:
     exclude-functions:
       - (io.Writer).Write
@@ -59,6 +65,7 @@ linters-settings:
       - bool-compare
       - compares
       - empty
+      - encoded-compare
       - error-is-as
       - error-nil
       - expected-actual
@@ -74,7 +81,9 @@ linters:
   disable-all: true
   enable:
     - bodyclose
+    - copyloopvar
     - dupl
+    - dupword
     - errcheck
     - gocritic
     - gofmt
@@ -84,6 +93,7 @@ linters:
     - ineffassign
     - misspell
     - nakedret
+    - nolintlint
     - perfsprint
     - prealloc
     - revive
