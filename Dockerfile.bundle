@@ -8,6 +8,8 @@ FROM $FFMPEG_IMAGE
 
 COPY --from=core /core /core
 
+RUN rm /core/bin/import /core/bin/ffmigrate
+
 RUN ffmpeg -buildconf
 
 ENV CORE_CONFIGFILE=/core/config/config.json
