@@ -13,16 +13,16 @@ jobs:
         strategy:
             matrix:
                 include:
-                    - core_os: alpine3.20
+                    - core_os: alpine3.21
                       ffmpeg: "7.1"
-                      ffmpeg_os: alpine3.20
+                      ffmpeg_os: alpine3.21
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: dev
                       prefix:
                       latest: yes
-                    - core_os: alpine3.20
+                    - core_os: alpine3.21
                       ffmpeg: "7.1-rpi"
-                      ffmpeg_os: alpine3.20
+                      ffmpeg_os: alpine3.21
                       platforms: linux/arm64,linux/arm/v7
                       branch: dev
                       prefix: rpi-
@@ -37,7 +37,7 @@ jobs:
                     - core_os: ubuntu24.04
                       ffmpeg: "7.1-cuda"
                       ffmpeg_os: ubuntu24.04
-                      ffmpeg_tags: "-cuda12.6.1"
+                      ffmpeg_tags: "-cuda12.8.0"
                       platforms: linux/amd64
                       branch: dev
                       prefix: cuda-
