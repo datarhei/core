@@ -23,4 +23,4 @@ fi
 
 # Now run the core with the possibly converted configuration.
 
-exec ./bin/core
+exec env ./bin/core
