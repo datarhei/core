@@ -436,6 +436,7 @@ func (r *restream) load() error {
 		}
 
 		ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
+			Binary:          t.config.Binary,
 			Reconnect:       t.config.Reconnect,
 			ReconnectDelay:  time.Duration(t.config.ReconnectDelay) * time.Second,
 			StaleTimeout:    time.Duration(t.config.StaleTimeout) * time.Second,
@@ -619,6 +620,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	}
 
 	ffmpeg, err := r.ffmpeg.New(ffmpeg.ProcessConfig{
+		Binary:          t.config.Binary,
 		Reconnect:       t.config.Reconnect,
 		ReconnectDelay:  time.Duration(t.config.ReconnectDelay) * time.Second,
 		StaleTimeout:    time.Duration(t.config.StaleTimeout) * time.Second,

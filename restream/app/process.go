@@ -72,6 +72,7 @@ type Config struct {
 	Reference      string
 	Owner          string
 	Domain         string
+	Binary         string
 	FFVersion      string
 	Input          []ConfigIO
 	Output         []ConfigIO
@@ -102,6 +103,7 @@ func (config *Config) Clone() *Config {
 		Reference:      config.Reference,
 		Owner:          config.Owner,
 		Domain:         config.Domain,
+		Binary:         config.Binary,
 		FFVersion:      config.FFVersion,
 		Reconnect:      config.Reconnect,
 		ReconnectDelay: config.ReconnectDelay,
@@ -173,6 +175,7 @@ func (config *Config) Hash() []byte {
 	b.WriteString(config.Reference)
 	b.WriteString(config.Owner)
 	b.WriteString(config.Domain)
+	b.WriteString(config.Binary)
 	b.WriteString(config.Scheduler)
 	b.WriteString(strings.Join(config.Options, ","))
 	b.WriteString(strings.Join(config.LogPatterns, ","))

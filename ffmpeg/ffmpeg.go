@@ -30,6 +30,7 @@ type FFmpeg interface {
 }
 
 type ProcessConfig struct {
+	Binary          string                           // Override the default binary
 	Reconnect       bool                             // Whether to reconnect
 	ReconnectDelay  time.Duration                    // Duration until next reconnect
 	StaleTimeout    time.Duration                    // Duration to wait until killing the process if there is no progress in the process
@@ -150,8 +151,13 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		limitMode = process.LimitModeSoft
 	}
 
+	binary := f.binary
+	if len(config.Binary) != 0 {
+		binary = config.Binary
+	}
+
 	ffmpeg, err := process.New(process.Config{
-		Binary:          f.binary,
+		Binary:          binary,
 		Args:            config.Args,
 		Reconnect:       config.Reconnect,
 		ReconnectDelay:  config.ReconnectDelay,

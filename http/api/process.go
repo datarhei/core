@@ -169,6 +169,7 @@ type ProcessConfig struct {
 	ID             string                 `json:"id"`
 	Owner          string                 `json:"owner"`
 	Domain         string                 `json:"domain"`
+	Binary         string                 `json:"binary"`
 	Type           string                 `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
 	Reference      string                 `json:"reference"`
 	Input          []ProcessConfigIO      `json:"input" validate:"required"`
@@ -191,6 +192,7 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 		ID:             cfg.ID,
 		Owner:          cfg.Owner,
 		Domain:         cfg.Domain,
+		Binary:         cfg.Binary,
 		Reference:      cfg.Reference,
 		Options:        cfg.Options,
 		Reconnect:      cfg.Reconnect,
@@ -283,6 +285,7 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 	cfg.ID = c.ID
 	cfg.Owner = c.Owner
 	cfg.Domain = c.Domain
+	cfg.Binary = c.Binary
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"
 	cfg.Reconnect = c.Reconnect
