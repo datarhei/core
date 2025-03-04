@@ -77,6 +77,7 @@ type ProcessConfig struct {
 	Reference      string            `json:"reference"`
 	Owner          string            `json:"owner"`
 	Domain         string            `json:"domain"`
+	Binary         string            `json:"binary"`
 	FFVersion      string            `json:"ffversion"`
 	Input          []ProcessConfigIO `json:"input"`
 	Output         []ProcessConfigIO `json:"output"`
@@ -98,6 +99,7 @@ func (p *ProcessConfig) Marshal(a *app.Config) {
 	p.Reference = a.Reference
 	p.Owner = a.Owner
 	p.Domain = a.Domain
+	p.Binary = a.Binary
 	p.FFVersion = a.FFVersion
 	p.Reconnect = a.Reconnect
 	p.ReconnectDelay = a.ReconnectDelay
@@ -132,6 +134,7 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 		Reference:      p.Reference,
 		Owner:          p.Owner,
 		Domain:         p.Domain,
+		Binary:         p.Binary,
 		FFVersion:      p.FFVersion,
 		Input:          []app.ConfigIO{},
 		Output:         []app.ConfigIO{},
