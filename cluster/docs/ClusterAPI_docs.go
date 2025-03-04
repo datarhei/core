@@ -1288,6 +1288,9 @@ const docTemplateClusterAPI = `{
                 "autostart": {
                     "type": "boolean"
                 },
+                "binary": {
+                    "type": "string"
+                },
                 "domain": {
                     "type": "string"
                 },
@@ -1802,6 +1805,11 @@ const docTemplateClusterAPI = `{
                                 "type": "string"
                             }
                         },
+                        "revocer_timeout_sec": {
+                            "description": "seconds",
+                            "type": "integer",
+                            "format": "int64"
+                        },
                         "startup_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
@@ -2275,6 +2283,12 @@ const docTemplateClusterAPI = `{
                                 "purge": {
                                     "type": "boolean"
                                 }
+                            }
+                        },
+                        "mimetypes": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         },
                         "mimetypes_file": {

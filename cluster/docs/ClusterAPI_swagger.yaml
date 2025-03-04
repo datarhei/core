@@ -4,6 +4,8 @@ definitions:
     properties:
       autostart:
         type: boolean
+      binary:
+        type: string
       domain:
         type: string
       ffversion:
@@ -348,6 +350,10 @@ definitions:
             items:
               type: string
             type: array
+          revocer_timeout_sec:
+            description: seconds
+            format: int64
+            type: integer
           startup_timeout_sec:
             description: seconds
             format: int64
@@ -669,6 +675,10 @@ definitions:
                 type: integer
               purge:
                 type: boolean
+            type: object
+          mimetypes:
+            additionalProperties:
+              type: string
             type: object
           mimetypes_file:
             type: string
