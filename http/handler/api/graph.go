@@ -26,7 +26,7 @@ func NewGraph(resolver resolver.Resolver, path string) *GraphHandler {
 		path:     path,
 	}
 
-	g.queryHandler = handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &g.resolver}))
+	g.queryHandler = handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &g.resolver}))
 	g.playgroundHandler = playground.Handler("GraphQL", path)
 
 	return g
