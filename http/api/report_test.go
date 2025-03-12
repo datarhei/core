@@ -147,8 +147,10 @@ func TestProcessReportHistoryEntry(t *testing.T) {
 				Graphs: []app.GraphElement{
 					{
 						Index:     5,
+						ID:        "id",
 						Name:      "foobar",
 						Filter:    "infilter",
+						DstID:     "dstid",
 						DstName:   "outfilter_",
 						DstFilter: "outfilter",
 						Inpad:     "inpad",
@@ -167,6 +169,7 @@ func TestProcessReportHistoryEntry(t *testing.T) {
 						Input:  1,
 						Output: 3,
 						Index:  39,
+						ID:     "id",
 						Name:   "foobar",
 						Copy:   true,
 					},
@@ -339,8 +342,10 @@ func TestProcessReport(t *testing.T) {
 						Graphs: []app.GraphElement{
 							{
 								Index:     5,
+								ID:        "id",
 								Name:      "foobar",
 								Filter:    "infilter",
+								DstID:     "dstid",
 								DstName:   "outfilter_",
 								DstFilter: "outfilter",
 								Inpad:     "inpad",
@@ -359,6 +364,7 @@ func TestProcessReport(t *testing.T) {
 								Input:  1,
 								Output: 3,
 								Index:  39,
+								ID:     "id",
 								Name:   "foobar",
 								Copy:   true,
 							},

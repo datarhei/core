@@ -6503,6 +6503,9 @@
                 "dst_filter": {
                     "type": "string"
                 },
+                "dst_id": {
+                    "type": "string"
+                },
                 "dst_name": {
                     "type": "string"
                 },
@@ -6514,6 +6517,9 @@
                 },
                 "height": {
                     "type": "integer"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "index": {
                     "type": "integer"
@@ -6551,6 +6557,9 @@
             "properties": {
                 "copy": {
                     "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "index": {
                     "type": "integer"

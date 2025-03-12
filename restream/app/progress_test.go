@@ -178,8 +178,10 @@ func TestStreamMapping(t *testing.T) {
 		Graphs: []parse.GraphElement{
 			{
 				Index:     5,
+				ID:        "id",
 				Name:      "foobar",
 				Filter:    "infilter",
+				DstID:     "dstid",
 				DstName:   "outfilter_",
 				DstFilter: "outfilter",
 				Inpad:     "inpad",
@@ -198,6 +200,7 @@ func TestStreamMapping(t *testing.T) {
 				Input:  1,
 				Output: 3,
 				Index:  39,
+				ID:     "id",
 				Name:   "foobar",
 				Copy:   true,
 			},

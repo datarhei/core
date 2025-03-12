@@ -975,6 +975,8 @@ definitions:
     properties:
       dst_filter:
         type: string
+      dst_id:
+        type: string
       dst_name:
         type: string
       filter:
@@ -983,6 +985,8 @@ definitions:
         type: string
       height:
         type: integer
+      id:
+        type: string
       index:
         type: integer
       inpad:
@@ -1008,6 +1012,8 @@ definitions:
     properties:
       copy:
         type: boolean
+      id:
+        type: string
       index:
         type: integer
       input:

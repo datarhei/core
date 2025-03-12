@@ -203,8 +203,10 @@ func (p *Progress) MarshalParser() parse.Progress {
 
 type GraphElement struct {
 	Index     int
+	ID        string
 	Name      string
 	Filter    string
+	DstID     string
 	DstName   string
 	DstFilter string
 	Inpad     string
@@ -220,8 +222,10 @@ type GraphElement struct {
 
 func (g *GraphElement) UnmarshalParser(p *parse.GraphElement) {
 	g.Index = p.Index
+	g.ID = p.ID
 	g.Name = p.Name
 	g.Filter = p.Filter
+	g.DstID = p.DstID
 	g.DstName = p.DstName
 	g.DstFilter = p.DstFilter
 	g.Inpad = p.Inpad
@@ -238,8 +242,10 @@ func (g *GraphElement) UnmarshalParser(p *parse.GraphElement) {
 func (g *GraphElement) MarshalParser() parse.GraphElement {
 	p := parse.GraphElement{
 		Index:     g.Index,
+		ID:        g.ID,
 		Name:      g.Name,
 		Filter:    g.Filter,
+		DstID:     g.DstID,
 		DstName:   g.DstName,
 		DstFilter: g.DstFilter,
 		Inpad:     g.Inpad,
@@ -260,6 +266,7 @@ type GraphMapping struct {
 	Input  int    // Index of input stream, negative if output element
 	Output int    // Index of output stream, negative if input element
 	Index  int    // Index of the graph, negative if streamcopy
+	ID     string // ID of the source resp. destination, empty if streamcopy, the name can be ambigous
 	Name   string // Name of the source resp. destination, empty if streamcopy
 	Copy   bool   // Whether it's a streamcopy i.e. there's no graph
 }
@@ -268,6 +275,7 @@ func (g *GraphMapping) UnmarshalParser(p *parse.GraphMapping) {
 	g.Input = p.Input
 	g.Output = p.Output
 	g.Index = p.Index
+	g.ID = p.ID
 	g.Name = p.Name
 	g.Copy = p.Copy
 }
@@ -277,6 +285,7 @@ func (g *GraphMapping) MarshalParser() parse.GraphMapping {
 		Input:  g.Input,
 		Output: g.Output,
 		Index:  g.Index,
+		ID:     g.ID,
 		Name:   g.Name,
 		Copy:   g.Copy,
 	}

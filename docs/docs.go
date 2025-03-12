@@ -6510,6 +6510,9 @@ const docTemplate = `{
                 "dst_filter": {
                     "type": "string"
                 },
+                "dst_id": {
+                    "type": "string"
+                },
                 "dst_name": {
                     "type": "string"
                 },
@@ -6521,6 +6524,9 @@ const docTemplate = `{
                 },
                 "height": {
                     "type": "integer"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "index": {
                     "type": "integer"
@@ -6558,6 +6564,9 @@ const docTemplate = `{
             "properties": {
                 "copy": {
                     "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "index": {
                     "type": "integer"

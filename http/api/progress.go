@@ -252,8 +252,10 @@ func (p *Progress) Marshal() app.Progress {
 
 type GraphElement struct {
 	Index     int    `json:"index"`
+	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Filter    string `json:"filter"`
+	DstID     string `json:"dst_id"`
 	DstName   string `json:"dst_name"`
 	DstFilter string `json:"dst_filter"`
 	Inpad     string `json:"inpad"`
@@ -269,8 +271,10 @@ type GraphElement struct {
 
 func (g *GraphElement) Unmarshal(a *app.GraphElement) {
 	g.Index = a.Index
+	g.ID = a.ID
 	g.Name = a.Name
 	g.Filter = a.Filter
+	g.DstID = a.DstID
 	g.DstName = a.DstName
 	g.DstFilter = a.DstFilter
 	g.Inpad = a.Inpad
@@ -287,8 +291,10 @@ func (g *GraphElement) Unmarshal(a *app.GraphElement) {
 func (g *GraphElement) Marshal() app.GraphElement {
 	a := app.GraphElement{
 		Index:     g.Index,
+		ID:        g.ID,
 		Name:      g.Name,
 		Filter:    g.Filter,
+		DstID:     g.DstID,
 		DstName:   g.DstName,
 		DstFilter: g.DstFilter,
 		Inpad:     g.Inpad,
@@ -309,6 +315,7 @@ type GraphMapping struct {
 	Input  int    `json:"input"`
 	Output int    `json:"output"`
 	Index  int    `json:"index"`
+	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Copy   bool   `json:"copy"`
 }
@@ -317,6 +324,7 @@ func (g *GraphMapping) Unmarshal(a *app.GraphMapping) {
 	g.Input = a.Input
 	g.Output = a.Output
 	g.Index = a.Index
+	g.ID = a.ID
 	g.Name = a.Name
 	g.Copy = a.Copy
 }
@@ -326,6 +334,7 @@ func (g *GraphMapping) Marshal() app.GraphMapping {
 		Input:  g.Input,
 		Output: g.Output,
 		Index:  g.Index,
+		ID:     g.ID,
 		Name:   g.Name,
 		Copy:   g.Copy,
 	}

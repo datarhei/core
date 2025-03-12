@@ -309,8 +309,10 @@ func (io *ffmpegProcessIO) export() ProgressIO {
 }
 
 type ffmpegGraphElement struct {
+	SrcID     string `json:"src_id"`
 	SrcName   string `json:"src_name"`
 	SrcFilter string `json:"src_filter"`
+	DstID     string `json:"dst_id"`
 	DstName   string `json:"dst_name"`
 	DstFilter string `json:"dst_filter"`
 	Inpad     string `json:"inpad"`
@@ -334,6 +336,7 @@ type ffmpegGraphMapping struct {
 	Output *ffmpegMappingIO `json:"output"`
 	Graph  struct {
 		Index int    `json:"index"`
+		ID    string `json:"id"`
 		Name  string `json:"name"`
 	} `json:"graph"`
 	Copy bool `json:"copy"`
@@ -363,8 +366,10 @@ func (f *ffmpegProcess) ExportMapping() StreamMapping {
 		for _, g := range graph.Graph {
 			e := GraphElement{
 				Index:     graph.Index,
+				ID:        g.SrcID,
 				Name:      g.SrcName,
 				Filter:    g.SrcFilter,
+				DstID:     g.DstID,
 				DstName:   g.DstName,
 				DstFilter: g.DstFilter,
 				Inpad:     g.Inpad,
@@ -387,6 +392,7 @@ func (f *ffmpegProcess) ExportMapping() StreamMapping {
 			Input:  -1,
 			Output: -1,
 			Index:  fm.Graph.Index,
+			ID:     fm.Graph.ID,
 			Name:   fm.Graph.Name,
 			Copy:   fm.Copy,
 		}
@@ -614,8 +620,10 @@ type UsageGPUMemory struct {
 
 type GraphElement struct {
 	Index     int
+	ID        string
 	Name      string
 	Filter    string
+	DstID     string
 	DstName   string
 	DstFilter string
 	Inpad     string
@@ -633,6 +641,7 @@ type GraphMapping struct {
 	Input  int
 	Output int
 	Index  int
+	ID     string
 	Name   string
 	Copy   bool
 }
