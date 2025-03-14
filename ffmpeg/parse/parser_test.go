@@ -1363,7 +1363,7 @@ func TestParserProgressPlayoutAudioVideo(t *testing.T) {
 	}, progress)
 }
 
-func TestParserStreamMapping(t *testing.T) {
+func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 	parser := New(Config{
 		LogLines: 20,
 	}).(*parser)
@@ -1463,7 +1463,7 @@ func TestParserStreamMapping(t *testing.T) {
 	require.Equal(t, uint64(1), progress.Output[3].Stream)
 }
 
-func TestParserHLSMapping(t *testing.T) {
+func TestParserHLSStreamMapping(t *testing.T) {
 	parser := New(Config{
 		LogLines: 20,
 	}).(*parser)
@@ -1493,6 +1493,104 @@ func TestParserHLSMapping(t *testing.T) {
 	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[3].Address)
 	require.Equal(t, uint64(1), progress.Output[3].Index)
 	require.Equal(t, uint64(1), progress.Output[3].Stream)
+}
+
+func TestParserMultiHLSStreamMapping(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	// TODO: multiple HLS outputs
+
+	parser.Parse([]byte(`[info] ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_720.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk_1440.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":2,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`[info] hls.streammap:{"address":"http://127.0.0.1:8080/memfs/live/%v.m3u8","variants":[{"variant":0,"address":"http://127.0.0.1:8080/memfs/live/0.m3u8","streams":[0,2]},{"variant":1,"address":"http://127.0.0.1:8080/memfs/live/1.m3u8","streams":[1,3]}]}`))
+	parser.Parse([]byte(`[info] ffmpeg.outputs:[{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":2560,"height":1440},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":2,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1},{"url":"http://127.0.0.1:8080/memfs/live/%v.m3u8","format":"hls","index":0,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":1467,"size_bytes":1501854},{"index":1,"stream":0,"framerate":{"min":24.975,"max":24.975,"avg":24.975},"frame":149,"keyframe":3,"packet":149,"size_kb":4428,"size_bytes":4534541},{"index":2,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"frame":257,"keyframe":257,"packet":257,"size_kb":257,"size_bytes":263168}],"outputs":[{"index":0,"stream":0,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":1467,"size_bytes":1501923,"extradata_size_bytes":69},{"index":0,"stream":1,"frame":149,"keyframe":3,"packet":149,"q":-1.0,"size_kb":4428,"size_bytes":4534612,"extradata_size_bytes":71},{"index":0,"stream":2,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5},{"index":0,"stream":3,"frame":257,"keyframe":256,"packet":256,"size_kb":1,"size_bytes":1046,"extradata_size_bytes":5}],"frame":149,"packet":149,"q":-1.0,"size_kb":5897,"size_bytes":6038627,"time":"0h0m5.96s","speed":4.79,"dup":0,"drop":0}`))
+
+	progress := parser.Progress()
+
+	require.Equal(t, 3, len(progress.Input))
+	require.Equal(t, 4, len(progress.Output))
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[0].Address)
+	require.Equal(t, uint64(0), progress.Output[0].Index)
+	require.Equal(t, uint64(0), progress.Output[0].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[1].Address)
+	require.Equal(t, uint64(1), progress.Output[1].Index)
+	require.Equal(t, uint64(0), progress.Output[1].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/0.m3u8", progress.Output[2].Address)
+	require.Equal(t, uint64(0), progress.Output[2].Index)
+	require.Equal(t, uint64(1), progress.Output[2].Stream)
+
+	require.Equal(t, "http://127.0.0.1:8080/memfs/live/1.m3u8", progress.Output[3].Address)
+	require.Equal(t, uint64(1), progress.Output[3].Index)
+	require.Equal(t, uint64(1), progress.Output[3].Stream)
+}
+
+func TestParserHLSStreamMappingWithOtherOutputs(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	}).(*parser)
+
+	parser.Parse([]byte(`[info] ffmpeg.inputs:[{"url":"https://cdn.livespotting.com/vpu/ojj7axtx/3j3wr1ua_360.m3u8","format":"hls","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":30,"fps":25.000000,"pix_fmt":"yuv420p","width":640,"height":360},{"url":"https://cdn.livespotting.com/vpu/ojj7axtx/3j3wr1ua_720.m3u8","format":"hls","index":1,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":31,"fps":25.000000,"pix_fmt":"yuv420p","width":1280,"height":720},{"url":"https://cdn.livespotting.com/vpu/ojj7axtx/3j3wr1ua_1080.m3u8","format":"hls","index":2,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440},{"url":"anullsrc=r=44100:cl=mono","format":"lavfi","index":3,"stream":0,"type":"audio","codec":"pcm_u8","coder":"pcm_u8","bitrate_kbps":352,"duration_sec":0.000000,"language":"und","profile":-99,"level":-99,"sample_fmt":"u8","sampling_hz":44100,"layout":"mono","channels":1}]`))
+	parser.Parse([]byte(`[info] hls.streammap:{"address":"%v.m3u8","variants":[{"variant":0,"address":"0.m3u8","streams":[0,3]},{"variant":1,"address":"1.m3u8","streams":[1,4]},{"variant":2,"address":"2.m3u8","streams":[2,5]}]}`))
+	parser.Parse([]byte(`[info] ffmpeg.outputs:[{"url":"%v.jpg","format":"snapshot","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":30,"fps":25.000000,"pix_fmt":"yuv420p","width":640,"height":360},{"url":"%v.jpg","format":"snapshot","index":0,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":31,"fps":25.000000,"pix_fmt":"yuv420p","width":1280,"height":720},{"url":"%v.jpg","format":"snapshot","index":0,"stream":2,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440},{"url":"main.jpg","format":"snapshot","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440},{"url":"main_240.jpg","format":"snapshot","index":2,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440},{"url":"%v.m3u8","format":"hls","index":3,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":30,"fps":25.000000,"pix_fmt":"yuv420p","width":640,"height":360},{"url":"%v.m3u8","format":"hls","index":3,"stream":1,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":31,"fps":25.000000,"pix_fmt":"yuv420p","width":1280,"height":720},{"url":"%v.m3u8","format":"hls","index":3,"stream":2,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440},{"url":"%v.m3u8","format":"hls","index":3,"stream":3,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1},{"url":"%v.m3u8","format":"hls","index":3,"stream":4,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1},{"url":"%v.m3u8","format":"hls","index":3,"stream":5,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":69,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1},{"url":"main_480.jpg","format":"snapshot","index":4,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":77,"level":50,"fps":25.000000,"pix_fmt":"yuv420p","width":2560,"height":1440}]`))
+	parser.Parse([]byte(`[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":39,"keyframe":1,"packet":39,"size_kb":115,"size_bytes":117871},{"index":1,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":39,"keyframe":1,"packet":39,"size_kb":522,"size_bytes":534351},{"index":2,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":39,"keyframe":1,"packet":39,"size_kb":926,"size_bytes":948104},{"index":3,"stream":0,"framerate":{"min":43.066,"max":43.068,"avg":43.066},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":67,"keyframe":67,"packet":67,"size_kb":67,"size_bytes":68608}],"outputs":[{"index":0,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":114,"size_bytes":116461,"extradata_size_bytes":0},{"index":0,"stream":1,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":509,"size_bytes":521170,"extradata_size_bytes":0},{"index":0,"stream":2,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":918,"size_bytes":939676,"extradata_size_bytes":0},{"index":1,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":918,"size_bytes":939676,"extradata_size_bytes":0},{"index":2,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":918,"size_bytes":939676,"extradata_size_bytes":0},{"index":3,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":114,"size_bytes":116461,"extradata_size_bytes":0},{"index":3,"stream":1,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":509,"size_bytes":521170,"extradata_size_bytes":0},{"index":3,"stream":2,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":918,"size_bytes":939676,"extradata_size_bytes":0},{"index":3,"stream":3,"framerate":{"min":43.061,"max":43.083,"avg":43.066},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":65,"keyframe":64,"packet":64,"size_kb":0,"size_bytes":273,"extradata_size_bytes":0},{"index":3,"stream":4,"framerate":{"min":43.061,"max":43.083,"avg":43.066},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":66,"keyframe":64,"packet":64,"size_kb":0,"size_bytes":273,"extradata_size_bytes":0},{"index":3,"stream":5,"framerate":{"min":43.061,"max":43.083,"avg":43.066},"gop":{"min":1.000,"max":1.000,"avg":1.000},"frame":65,"keyframe":64,"packet":64,"size_kb":0,"size_bytes":273,"extradata_size_bytes":0},{"index":4,"stream":0,"framerate":{"min":0.000,"max":0.000,"avg":0.000},"gop":{"min":0.000,"max":0.000,"avg":0.000},"frame":38,"keyframe":1,"packet":38,"q":-1.0,"size_kb":918,"size_bytes":939676,"extradata_size_bytes":0}],"frame":38,"packet":38,"q":-1.0,"size_kb":5834,"size_bytes":5974461,"time":"0h0m1.52s","speed":1.5,"dup":0,"drop":0}`))
+
+	progress := parser.Progress()
+
+	require.Equal(t, 4, len(progress.Input))
+	require.Equal(t, 12, len(progress.Output))
+
+	require.Equal(t, "%v.jpg", progress.Output[0].Address)
+	require.Equal(t, uint64(0), progress.Output[0].Index)
+	require.Equal(t, uint64(0), progress.Output[0].Stream)
+
+	require.Equal(t, "%v.jpg", progress.Output[1].Address)
+	require.Equal(t, uint64(0), progress.Output[1].Index)
+	require.Equal(t, uint64(1), progress.Output[1].Stream)
+
+	require.Equal(t, "%v.jpg", progress.Output[2].Address)
+	require.Equal(t, uint64(0), progress.Output[2].Index)
+	require.Equal(t, uint64(2), progress.Output[2].Stream)
+
+	require.Equal(t, "main.jpg", progress.Output[3].Address)
+	require.Equal(t, uint64(1), progress.Output[3].Index)
+	require.Equal(t, uint64(0), progress.Output[3].Stream)
+
+	require.Equal(t, "main_240.jpg", progress.Output[4].Address)
+	require.Equal(t, uint64(2), progress.Output[4].Index)
+	require.Equal(t, uint64(0), progress.Output[4].Stream)
+
+	require.Equal(t, "0.m3u8", progress.Output[5].Address)
+	require.Equal(t, uint64(3), progress.Output[5].Index)
+	require.Equal(t, uint64(0), progress.Output[5].Stream)
+
+	require.Equal(t, "1.m3u8", progress.Output[6].Address)
+	require.Equal(t, uint64(4), progress.Output[6].Index)
+	require.Equal(t, uint64(0), progress.Output[6].Stream)
+
+	require.Equal(t, "2.m3u8", progress.Output[7].Address)
+	require.Equal(t, uint64(5), progress.Output[7].Index)
+	require.Equal(t, uint64(0), progress.Output[7].Stream)
+
+	require.Equal(t, "0.m3u8", progress.Output[8].Address)
+	require.Equal(t, uint64(3), progress.Output[8].Index)
+	require.Equal(t, uint64(1), progress.Output[8].Stream)
+
+	require.Equal(t, "1.m3u8", progress.Output[9].Address)
+	require.Equal(t, uint64(4), progress.Output[9].Index)
+	require.Equal(t, uint64(1), progress.Output[9].Stream)
+
+	require.Equal(t, "2.m3u8", progress.Output[10].Address)
+	require.Equal(t, uint64(5), progress.Output[10].Index)
+	require.Equal(t, uint64(1), progress.Output[10].Stream)
+
+	require.Equal(t, "main_480.jpg", progress.Output[11].Address)
+	require.Equal(t, uint64(6), progress.Output[11].Index)
+	require.Equal(t, uint64(0), progress.Output[11].Stream)
 }
 
 func TestParserPatterns(t *testing.T) {

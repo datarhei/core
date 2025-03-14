@@ -289,6 +289,7 @@ type ffmpegProcessIO struct {
 
 func (io *ffmpegProcessIO) export() ProgressIO {
 	return ProgressIO{
+		URL:       io.Address,
 		Address:   io.Address,
 		Format:    io.Format,
 		Index:     io.Index,
@@ -447,24 +448,66 @@ func (p *ffmpegProcess) export() Progress {
 	progress.Mapping = p.ExportMapping()
 
 	if p.hlsMapping != nil {
-		for _, variant := range p.hlsMapping.Variants {
-			for s, stream := range variant.Streams {
-				if stream >= len(progress.Output) {
-					continue
-				}
-
-				output := progress.Output[stream]
-
-				output.Address = variant.Address
-				output.Index = variant.Variant
-				output.Stream = uint64(s)
-
-				progress.Output[stream] = output
-			}
-		}
+		progress.Output = applyHLSMapping(progress.Output, p.hlsMapping)
 	}
 
 	return progress
+}
+
+func applyHLSMapping(output []ProgressIO, hlsMapping *ffmpegHLSStreamMap) []ProgressIO {
+	minVariantIndex := int64(-1)
+	maxVariantIndex := int64(-1)
+
+	// Find all outputs matching the address
+	for i, io := range output {
+		if io.Address != hlsMapping.Address {
+			continue
+		}
+
+	bla:
+		for _, variant := range hlsMapping.Variants {
+			for s, stream := range variant.Streams {
+				if io.Stream != uint64(stream) {
+					continue
+				}
+
+				if minVariantIndex == -1 || int64(io.Index) < minVariantIndex {
+					minVariantIndex = int64(io.Index)
+				}
+
+				io.Address = variant.Address
+				io.Index = io.Index + variant.Variant
+				io.Stream = uint64(s)
+
+				if int64(io.Index) > maxVariantIndex {
+					maxVariantIndex = int64(io.Index)
+				}
+
+				break bla
+			}
+		}
+
+		output[i] = io
+	}
+
+	offset := maxVariantIndex - minVariantIndex
+
+	if offset > 0 {
+		// Fix all index values
+		for i, io := range output {
+			if io.Format == "hls" {
+				continue
+			}
+
+			if int64(io.Index) > minVariantIndex {
+				io.Index += uint64(offset)
+			}
+
+			output[i] = io
+		}
+	}
+
+	return output
 }
 
 type ffmpegHLSStreamMap struct {
@@ -479,6 +522,7 @@ type ffmpegHLSVariant struct {
 }
 
 type ProgressIO struct {
+	URL     string
 	Address string
 
 	// General
