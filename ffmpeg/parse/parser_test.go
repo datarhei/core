@@ -864,10 +864,10 @@ func TestParserProgressPlayout(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse([]byte(`[info] ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`[info] ffmpeg.inputs:[{"url":"playout:https://example.com/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
 	parser.Parse([]byte(`[info] ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
 	parser.Parse([]byte(`[info] ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":11,"size_kb":226,"size_bytes":42}],"outputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":0,"q":0.0,"size_kb":0,"size_bytes":5,"extradata_size_bytes":32},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`))
-	parser.Parse([]byte(`[info] avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`))
+	parser.Parse([]byte(`[info] avstream.progress:{"id":"playout:https://example.com/z60wzayk.m3u8","url":"https://example.com/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""}}`))
 
 	progress := parser.Progress()
 
@@ -875,7 +875,8 @@ func TestParserProgressPlayout(t *testing.T) {
 		Started: true,
 		Input: []ProgressIO{
 			{
-				Address:   "playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
+				URL:       "playout:https://example.com/z60wzayk.m3u8",
+				Address:   "playout:https://example.com/z60wzayk.m3u8",
 				Index:     0,
 				Stream:    0,
 				Format:    "playout",
@@ -929,6 +930,7 @@ func TestParserProgressPlayout(t *testing.T) {
 		},
 		Output: []ProgressIO{
 			{
+				URL:       "/dev/null",
 				Address:   "/dev/null",
 				Index:     0,
 				Stream:    0,
@@ -954,6 +956,7 @@ func TestParserProgressPlayout(t *testing.T) {
 				AVstream:  nil,
 			},
 			{
+				URL:       "/dev/null",
 				Address:   "/dev/null",
 				Index:     1,
 				Stream:    0,
@@ -996,10 +999,10 @@ func TestParserProgressPlayoutVideo(t *testing.T) {
 		LogLines: 20,
 	}).(*parser)
 
-	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
+	parser.Parse([]byte(`ffmpeg.inputs:[{"url":"playout:https://example.com/z60wzayk.m3u8","format":"playout","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
 	parser.Parse([]byte(`ffmpeg.outputs:[{"url":"/dev/null","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"libx264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":25.000000,"pix_fmt":"yuvj420p","width":1280,"height":720},{"url":"/dev/null","format":"mp4","index":1,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","fps":20.666666,"pix_fmt":"yuvj420p","width":1280,"height":720}]`))
 	parser.Parse([]byte(`ffmpeg.progress:{"inputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":11,"size_kb":226,"size_bytes":42}],"outputs":[{"index":0,"stream":0,"frame":7,"keyframe":1,"packet":0,"q":0.0,"size_kb":0,"size_bytes":5,"extradata_size_bytes":32},{"index":1,"stream":0,"frame":11,"packet":11,"q":-1.0,"size_kb":226}],"frame":7,"packet":0,"q":0.0,"size_kb":226,"time":"0h0m0.56s","speed":0.4,"dup":0,"drop":0}`))
-	parser.Parse([]byte(`avstream.progress:{"id":"playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","url":"https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""},"video":{"queue":99,"dup":5,"drop":96,"enc":23,"input":{"state":"running","packet":248,"size_kb":1250,"time":8},"output":{"state":"running","packet":149,"size_kb":748,"time":5},"codec":"h264","profile":578,"level":31,"pix_fmt":"yuv420p","width":1280,"height":720},"audio":{"queue":175,"dup":0,"drop":0,"enc":1,"input":{"state":"running","packet":431,"size_kb":4,"time":8},"output":{"state":"running","packet":256,"size_kb":1,"time":5},"codec":"aac","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1}}`))
+	parser.Parse([]byte(`avstream.progress:{"id":"playout:https://example.com/z60wzayk.m3u8","url":"https://example.com/z60wzayk.m3u8","stream":0,"queue":140,"aqueue":42,"dup":5,"drop":8,"enc":7,"looping":true,"duplicating":true,"gop":"key","mode":"live","input":{"state":"running","packet":148,"size_kb":1529,"time":5},"output":{"state":"running","packet":8,"size_kb":128,"time":1},"swap":{"url":"","status":"waiting","lasturl":"","lasterror":""},"video":{"queue":99,"dup":5,"drop":96,"enc":23,"input":{"state":"running","packet":248,"size_kb":1250,"time":8},"output":{"state":"running","packet":149,"size_kb":748,"time":5},"codec":"h264","profile":578,"level":31,"pix_fmt":"yuv420p","width":1280,"height":720},"audio":{"queue":175,"dup":0,"drop":0,"enc":1,"input":{"state":"running","packet":431,"size_kb":4,"time":8},"output":{"state":"running","packet":256,"size_kb":1,"time":5},"codec":"aac","profile":1,"level":-99,"sample_fmt":"fltp","sampling_hz":44100,"layout":"mono","channels":1}}`))
 
 	progress := parser.Progress()
 
@@ -1007,7 +1010,8 @@ func TestParserProgressPlayoutVideo(t *testing.T) {
 		Started: true,
 		Input: []ProgressIO{
 			{
-				Address:   "playout:https://cdn.livespotting.com/vpu/e9slfpe3/z60wzayk.m3u8",
+				URL:       "playout:https://example.com/z60wzayk.m3u8",
+				Address:   "playout:https://example.com/z60wzayk.m3u8",
 				Index:     0,
 				Stream:    0,
 				Format:    "playout",
@@ -1067,6 +1071,7 @@ func TestParserProgressPlayoutVideo(t *testing.T) {
 		},
 		Output: []ProgressIO{
 			{
+				URL:       "/dev/null",
 				Address:   "/dev/null",
 				Index:     0,
 				Stream:    0,
@@ -1092,6 +1097,7 @@ func TestParserProgressPlayoutVideo(t *testing.T) {
 				AVstream:  nil,
 			},
 			{
+				URL:       "/dev/null",
 				Address:   "/dev/null",
 				Index:     1,
 				Stream:    0,
@@ -1145,6 +1151,7 @@ func TestParserProgressPlayoutAudioVideo(t *testing.T) {
 		Started: true,
 		Input: []ProgressIO{
 			{
+				URL:      "playout:http://192.168.1.220/memfs/source.m3u8",
 				Address:  "playout:http://192.168.1.220/memfs/source.m3u8",
 				Index:    0,
 				Stream:   0,
@@ -1212,6 +1219,7 @@ func TestParserProgressPlayoutAudioVideo(t *testing.T) {
 				},
 			},
 			{
+				URL:      "playout:http://192.168.1.220/memfs/source.m3u8",
 				Address:  "playout:http://192.168.1.220/memfs/source.m3u8",
 				Index:    0,
 				Stream:   1,
@@ -1285,6 +1293,7 @@ func TestParserProgressPlayoutAudioVideo(t *testing.T) {
 		},
 		Output: []ProgressIO{
 			{
+				URL:      "pipe:",
 				Address:  "pipe:",
 				Index:    0,
 				Stream:   0,
@@ -1317,6 +1326,7 @@ func TestParserProgressPlayoutAudioVideo(t *testing.T) {
 				AVstream:  nil,
 			},
 			{
+				URL:      "pipe:",
 				Address:  "pipe:",
 				Index:    0,
 				Stream:   1,
