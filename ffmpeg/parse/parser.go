@@ -569,7 +569,7 @@ func (p *parser) parseHLSStreamMap(line []byte) error {
 		return err
 	}
 
-	p.process.hlsMapping = &mapping
+	p.process.hlsMapping = append(p.process.hlsMapping, mapping)
 
 	return nil
 }

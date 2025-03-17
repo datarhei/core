@@ -357,7 +357,7 @@ type ffmpegProcess struct {
 	input      []ffmpegProcessIO
 	output     []ffmpegProcessIO
 	mapping    ffmpegStreamMapping
-	hlsMapping *ffmpegHLSStreamMap
+	hlsMapping []ffmpegHLSStreamMap
 }
 
 func (f *ffmpegProcess) ExportMapping() StreamMapping {
@@ -447,22 +447,26 @@ func (p *ffmpegProcess) export() Progress {
 
 	progress.Mapping = p.ExportMapping()
 
-	if p.hlsMapping != nil {
-		progress.Output = applyHLSMapping(progress.Output, p.hlsMapping)
+	for _, hlsmapping := range p.hlsMapping {
+		progress.Output = applyHLSMapping(progress.Output, hlsmapping)
 	}
 
 	return progress
 }
 
-func applyHLSMapping(output []ProgressIO, hlsMapping *ffmpegHLSStreamMap) []ProgressIO {
-	minVariantIndex := int64(-1)
-	maxVariantIndex := int64(-1)
+func applyHLSMapping(output []ProgressIO, hlsMapping ffmpegHLSStreamMap) []ProgressIO {
+	minVariantIndex := uint64(len(output))
+	maxVariantIndex := uint64(0)
+
+	pivot := -1
 
 	// Find all outputs matching the address
 	for i, io := range output {
 		if io.Address != hlsMapping.Address {
 			continue
 		}
+
+		pivot = i
 
 	bla:
 		for _, variant := range hlsMapping.Variants {
@@ -471,16 +475,16 @@ func applyHLSMapping(output []ProgressIO, hlsMapping *ffmpegHLSStreamMap) []Prog
 					continue
 				}
 
-				if minVariantIndex == -1 || int64(io.Index) < minVariantIndex {
-					minVariantIndex = int64(io.Index)
+				if io.Index < minVariantIndex {
+					minVariantIndex = io.Index
 				}
 
 				io.Address = variant.Address
 				io.Index = io.Index + variant.Variant
 				io.Stream = uint64(s)
 
-				if int64(io.Index) > maxVariantIndex {
-					maxVariantIndex = int64(io.Index)
+				if io.Index > maxVariantIndex {
+					maxVariantIndex = io.Index
 				}
 
 				break bla
@@ -493,17 +497,13 @@ func applyHLSMapping(output []ProgressIO, hlsMapping *ffmpegHLSStreamMap) []Prog
 	offset := maxVariantIndex - minVariantIndex
 
 	if offset > 0 {
-		// Fix all index values
-		for i, io := range output {
-			if io.Format == "hls" {
-				continue
-			}
+		pivot++
 
-			if int64(io.Index) > minVariantIndex {
-				io.Index += uint64(offset)
-			}
+		// Fix all following index values
+		for i, io := range output[pivot:] {
+			io.Index += offset
 
-			output[i] = io
+			output[pivot+i] = io
 		}
 	}
 
