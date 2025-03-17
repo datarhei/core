@@ -289,8 +289,8 @@ func (t *task) State() (*app.State, error) {
 	progress := t.parser.Progress()
 	state.Progress.UnmarshalParser(&progress)
 
-	state.Progress.Input = assignConfigID(state.Progress.Input, t.process.Config.Input)
-	state.Progress.Output = assignConfigID(state.Progress.Output, t.process.Config.Output)
+	state.Progress.Input = assignConfigID(state.Progress.Input, t.config.Input)
+	state.Progress.Output = assignConfigID(state.Progress.Output, t.config.Output)
 
 	return state, nil
 }
@@ -337,8 +337,8 @@ func (t *task) Report() (*app.Report, error) {
 		report.History[i].UnmarshalParser(&h)
 		e := &report.History[i]
 
-		e.Progress.Input = assignConfigID(e.Progress.Input, t.process.Config.Input)
-		e.Progress.Output = assignConfigID(e.Progress.Output, t.process.Config.Input)
+		e.Progress.Input = assignConfigID(e.Progress.Input, t.config.Input)
+		e.Progress.Output = assignConfigID(e.Progress.Output, t.config.Input)
 	}
 
 	return report, nil
