@@ -337,21 +337,8 @@ func (t *task) Report() (*app.Report, error) {
 		report.History[i].UnmarshalParser(&h)
 		e := &report.History[i]
 
-		for i, p := range e.Progress.Input {
-			if int(p.Index) >= len(t.process.Config.Input) {
-				continue
-			}
-
-			e.Progress.Input[i].ID = t.process.Config.Input[p.Index].ID
-		}
-
-		for i, p := range e.Progress.Output {
-			if int(p.Index) >= len(t.process.Config.Output) {
-				continue
-			}
-
-			e.Progress.Output[i].ID = t.process.Config.Output[p.Index].ID
-		}
+		e.Progress.Input = assignConfigID(e.Progress.Input, t.process.Config.Input)
+		e.Progress.Output = assignConfigID(e.Progress.Output, t.process.Config.Input)
 	}
 
 	return report, nil
