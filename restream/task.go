@@ -289,23 +289,26 @@ func (t *task) State() (*app.State, error) {
 	progress := t.parser.Progress()
 	state.Progress.UnmarshalParser(&progress)
 
-	for i, p := range state.Progress.Input {
-		if int(p.Index) >= len(t.process.Config.Input) {
-			continue
-		}
-
-		state.Progress.Input[i].ID = t.process.Config.Input[p.Index].ID
-	}
-
-	for i, p := range state.Progress.Output {
-		if int(p.Index) >= len(t.process.Config.Output) {
-			continue
-		}
-
-		state.Progress.Output[i].ID = t.process.Config.Output[p.Index].ID
-	}
+	state.Progress.Input = assignConfigID(state.Progress.Input, t.process.Config.Input)
+	state.Progress.Output = assignConfigID(state.Progress.Output, t.process.Config.Output)
 
 	return state, nil
+}
+
+func assignConfigID(progress []app.ProgressIO, config []app.ConfigIO) []app.ProgressIO {
+	for i, p := range progress {
+		for _, c := range config {
+			if c.Address != p.URL {
+				continue
+			}
+
+			progress[i].ID = c.ID
+
+			break
+		}
+	}
+
+	return progress
 }
 
 func (t *task) Report() (*app.Report, error) {

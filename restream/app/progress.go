@@ -10,7 +10,8 @@ type ProgressIOFramerate struct {
 
 type ProgressIO struct {
 	ID      string
-	Address string
+	URL     string // The original URL as reported by ffmpeg
+	Address string // A possibly modified URL
 
 	// General
 	Index     uint64
@@ -48,6 +49,7 @@ type ProgressIO struct {
 }
 
 func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
+	p.URL = pp.URL
 	p.Address = pp.Address
 	p.Index = pp.Index
 	p.Stream = pp.Stream
@@ -85,6 +87,7 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 
 func (p *ProgressIO) MarshalParser() parse.ProgressIO {
 	pp := parse.ProgressIO{
+		URL:       p.URL,
 		Address:   p.Address,
 		Index:     p.Index,
 		Stream:    p.Stream,
