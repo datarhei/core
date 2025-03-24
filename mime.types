@@ -7,6 +7,9 @@ application/vnd.apple.mpegurl   .m3u8
 application/xml                 .xml
 video/MP2T                      .ts
 video/mp4                       .mp4
+audio/mp3                       .mp3
+audio/ogg                       .ogg
+audio/wav                       .wav
 image/jpeg                      .jpg .jpeg
 image/png                       .png
 image/gif                       .gif
