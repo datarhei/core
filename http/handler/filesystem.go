@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/handler/util"
@@ -195,6 +196,14 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "a glob pattern is required")
 	}
 
+	path := "/"
+
+	if len(pattern) != 0 {
+		prefix := glob.Prefix(pattern)
+		index := strings.LastIndex(prefix, "/")
+		path = prefix[:index+1]
+	}
+
 	options := fs.ListOptions{
 		Pattern: pattern,
 	}
@@ -229,7 +238,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 		}
 	}
 
-	paths, _ := h.FS.Filesystem.RemoveList("/", options)
+	paths, _ := h.FS.Filesystem.RemoveList(path, options)
 
 	if h.FS.Cache != nil {
 		for _, path := range paths {
@@ -255,6 +264,14 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
+
+	path := "/"
+
+	if len(pattern) != 0 {
+		prefix := glob.Prefix(pattern)
+		index := strings.LastIndex(prefix, "/")
+		path = prefix[:index+1]
+	}
 
 	options := fs.ListOptions{
 		Pattern: pattern,
@@ -290,7 +307,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 		}
 	}
 
-	files := h.FS.Filesystem.List("/", options)
+	files := h.FS.Filesystem.List(path, options)
 
 	var sortFunc func(i, j int) bool
 

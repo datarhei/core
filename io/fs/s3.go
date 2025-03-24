@@ -474,6 +474,7 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 
 	var totalSize int64 = 0
 	files := []string{}
+	recursive := false
 
 	var compiledPattern glob.Glob
 	var err error
@@ -483,7 +484,13 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 		if err != nil {
 			return nil, 0
 		}
+
+		if strings.Contains(options.Pattern, "**") {
+			recursive = true
+		}
 	}
+
+	recursive = true
 
 	objectsCh := make(chan minio.ObjectInfo)
 
@@ -495,7 +502,7 @@ func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, 
 			WithVersions: false,
 			WithMetadata: false,
 			Prefix:       path,
-			Recursive:    true,
+			Recursive:    recursive,
 			MaxKeys:      0,
 			StartAfter:   "",
 			UseV1:        false,
@@ -563,13 +570,20 @@ func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 
 	var compiledPattern glob.Glob
 	var err error
+	recursive := false
 
 	if len(options.Pattern) != 0 {
 		compiledPattern, err = glob.Compile(options.Pattern, '/')
 		if err != nil {
 			return nil
 		}
+
+		if strings.Contains(options.Pattern, "**") {
+			recursive = true
+		}
 	}
+
+	recursive = true
 
 	files := []FileInfo{}
 
@@ -580,7 +594,7 @@ func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
 		WithVersions: false,
 		WithMetadata: false,
 		Prefix:       path,
-		Recursive:    true,
+		Recursive:    recursive,
 		MaxKeys:      0,
 		StartAfter:   "",
 		UseV1:        false,
