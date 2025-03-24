@@ -427,7 +427,7 @@ func (r *resources) Request(req Request) (Response, error) {
 	// Check if the requested resources are valid.
 	if req.CPU <= 0 || req.Memory == 0 {
 		logger.Debug().Log("Rejected, invalid values")
-		return res, fmt.Errorf("the cpu and/or memory values are invalid: cpu=%f, memory=%d", req.CPU, req.Memory)
+		return res, fmt.Errorf("the cpu and/or memory values are invalid. values > 0 are required: cpu=%f, memory=%d", req.CPU, req.Memory)
 	}
 
 	// Get current CPU and memory values.
