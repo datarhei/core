@@ -77,6 +77,7 @@ type Config struct {
 
 // Status represents the current status of a process
 type Status struct {
+	PID         int32         // Last known process ID, -1 if not running
 	State       string        // State is the current state of the process. See stateType for the known states.
 	States      States        // States is the cumulative history of states the process had.
 	Order       string        // Order is the wanted condition of process, either "start" or "stop"
@@ -513,6 +514,7 @@ func (p *process) Status() Status {
 	order := p.getOrder()
 
 	s := Status{
+		PID:       p.pid,
 		State:     state.String(),
 		States:    states,
 		Order:     order,
@@ -786,9 +788,11 @@ func (p *process) Kill(wait bool, reason string) error {
 
 // stop will stop a process considering the current order and state.
 func (p *process) stop(wait bool, reason string) error {
-	// If the process is currently not running, stop the restart timer
+	// Stop the restart timer
+	p.unreconnect()
+
+	// If the process is currently not running, bail out
 	if !p.isRunning() {
-		p.unreconnect()
 		return nil
 	}
 
@@ -876,17 +880,19 @@ func (p *process) stop(wait bool, reason string) error {
 
 // reconnect will setup a timer to restart the process
 func (p *process) reconnect(delay time.Duration) {
+	p.reconn.lock.Lock()
+	defer p.reconn.lock.Unlock()
+
+	if p.reconn.timer != nil {
+		p.reconn.timer.Stop()
+		p.reconn.timer = nil
+	}
+
 	if delay < time.Duration(0) {
 		return
 	}
 
-	// Stop a currently running timer
-	p.unreconnect()
-
 	p.logger.Info().Log("Scheduling restart in %s", delay)
-
-	p.reconn.lock.Lock()
-	defer p.reconn.lock.Unlock()
 
 	p.reconn.reconnectAt = time.Now().Add(delay)
 	p.reconn.timer = time.AfterFunc(delay, func() {
@@ -1008,7 +1014,7 @@ func (p *process) waiter() {
 				"status":      status.ExitStatus(),
 				"exit_code":   exiterr.ExitCode(),
 				"exit_string": exiterr.String(),
-				"signal":      status.Signal(),
+				"signal":      status.Signal().String(),
 			}).Debug().Log("Exited")
 
 			if status.Exited() {
