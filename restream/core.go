@@ -1194,12 +1194,10 @@ func (r *restream) updateProcess(id app.ProcessID, config *app.Config) error {
 	//t.process.CreatedAt = task.process.CreatedAt
 
 	// Transfer the report history to the new process
-	history := task.ExportParserReportHistory()
-	t.ImportParserReportHistory(history)
+	t.ImportParserReportHistory(task.ExportParserReportHistory())
 
 	// Transfer the metadata to the new process
-	metadata := task.ExportMetadata()
-	t.ImportMetadata(metadata)
+	t.ImportMetadata(task.ExportMetadata())
 
 	if err := r.deleteProcess(id); err != nil {
 		return fmt.Errorf("delete process: %w", err)
