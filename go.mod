@@ -35,6 +35,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/prometheus/client_golang v1.20.5
 	github.com/puzpuzpuz/xsync/v3 v3.4.1
+	github.com/sergi/go-diff v1.3.1
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/echo-swagger v1.4.1
