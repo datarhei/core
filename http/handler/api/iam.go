@@ -369,7 +369,7 @@ func (h *IAMHandler) GetIdentity(c echo.Context) error {
 		}
 	}
 
-	iampolicies := h.iam.ListPolicies(name, "", nil, "", nil)
+	iampolicies := h.iam.ListPolicies(iamuser.Name, "", nil, "", nil)
 
 	user := api.IAMUser{}
 	user.Marshal(iamuser, iampolicies)
