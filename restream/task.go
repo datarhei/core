@@ -3,12 +3,12 @@ package restream
 import (
 	"errors"
 	"maps"
-	"sync/atomic"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/math/rand"
 	"github.com/datarhei/core/v16/process"
 	"github.com/datarhei/core/v16/restream/app"
 
@@ -32,11 +32,12 @@ type task struct {
 	parser    parse.Parser
 	playout   map[string]int
 	logger    log.Logger
-	usesDisk  bool         // Whether this task uses the disk
-	hwdevice  atomic.Int32 // Index of the GPU this task uses
+	usesDisk  bool // Whether this task uses the disk
+	hwdevice  int  // Index of the GPU this task uses
 	metadata  map[string]interface{}
 
-	lock *xsync.RBMutex
+	lock   *xsync.RBMutex
+	tokens *xsync.MapOf[string, *xsync.RToken]
 }
 
 func NewTask(process *app.Process, logger log.Logger) *task {
@@ -51,29 +52,55 @@ func NewTask(process *app.Process, logger log.Logger) *task {
 		logger:    logger,
 		metadata:  nil,
 		lock:      xsync.NewRBMutex(),
+		tokens:    xsync.NewMapOf[string, *xsync.RToken](),
 	}
 
 	return t
 }
 
-func (t *task) IsValid() bool {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
+func (t *task) Lock() {
+	t.lock.Lock()
+}
 
+func (t *task) Unlock() {
+	t.lock.Unlock()
+}
+
+func (t *task) RLock() string {
+	token := ""
+	for {
+		token = rand.String(16)
+		rtoken := t.lock.RLock()
+
+		_, loaded := t.tokens.LoadOrStore(token, rtoken)
+		if !loaded {
+			break
+		}
+
+		t.lock.RUnlock(rtoken)
+	}
+
+	return token
+}
+
+func (t *task) Release(token string) {
+	rtoken, ok := t.tokens.LoadAndDelete(token)
+	if !ok {
+		return
+	}
+
+	t.lock.RUnlock(rtoken)
+}
+
+func (t *task) IsValid() bool {
 	return t.valid
 }
 
-func (t *task) Valid(valid bool) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+func (t *task) SetValid(valid bool) {
 	t.valid = valid
 }
 
 func (t *task) UsesDisk() bool {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	return t.usesDisk
 }
 
@@ -90,9 +117,6 @@ func (t *task) String() string {
 
 // Restore restores the task's order
 func (t *task) Restore() error {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if !t.valid {
 		return ErrInvalidProcessConfig
 	}
@@ -116,9 +140,6 @@ func (t *task) Restore() error {
 }
 
 func (t *task) Start() error {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if !t.valid {
 		return ErrInvalidProcessConfig
 	}
@@ -145,9 +166,6 @@ func (t *task) Start() error {
 }
 
 func (t *task) Stop() error {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.ffmpeg == nil {
 		return nil
 	}
@@ -171,9 +189,6 @@ func (t *task) Stop() error {
 
 // Kill stops a process without changing the tasks order
 func (t *task) Kill() {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.ffmpeg == nil {
 		return
 	}
@@ -182,9 +197,6 @@ func (t *task) Kill() {
 }
 
 func (t *task) Restart() error {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if !t.valid {
 		return ErrInvalidProcessConfig
 	}
@@ -206,9 +218,6 @@ func (t *task) Restart() error {
 }
 
 func (t *task) State() (*app.State, error) {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	state := &app.State{}
 
 	if !t.valid {
@@ -312,9 +321,6 @@ func assignConfigID(progress []app.ProgressIO, config []app.ConfigIO) []app.Prog
 }
 
 func (t *task) Report() (*app.Report, error) {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	report := &app.Report{}
 
 	if !t.valid {
@@ -345,9 +351,6 @@ func (t *task) Report() (*app.Report, error) {
 }
 
 func (t *task) SetReport(report *app.Report) error {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if !t.valid {
 		return nil
 	}
@@ -364,9 +367,6 @@ func (t *task) SetReport(report *app.Report) error {
 }
 
 func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.ReportHistorySearchResult {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.parser == nil {
 		return []app.ReportHistorySearchResult{}
 	}
@@ -389,9 +389,6 @@ func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.Repo
 }
 
 func (t *task) SetMetadata(key string, data interface{}) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	if len(key) == 0 {
 		return ErrMetadataKeyRequired
 	}
@@ -414,16 +411,10 @@ func (t *task) SetMetadata(key string, data interface{}) error {
 }
 
 func (t *task) ImportMetadata(m map[string]interface{}) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	t.metadata = m
 }
 
 func (t *task) GetMetadata(key string) (interface{}, error) {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if len(key) == 0 {
 		if t.metadata == nil {
 			return nil, nil
@@ -445,16 +436,10 @@ func (t *task) GetMetadata(key string) (interface{}, error) {
 }
 
 func (t *task) ExportMetadata() map[string]interface{} {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	return t.metadata
 }
 
 func (t *task) Limit(cpu, memory, gpu bool) bool {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.ffmpeg == nil {
 		return false
 	}
@@ -465,17 +450,14 @@ func (t *task) Limit(cpu, memory, gpu bool) bool {
 }
 
 func (t *task) SetHWDevice(index int) {
-	t.hwdevice.Store(int32(index))
+	t.hwdevice = index
 }
 
 func (t *task) GetHWDevice() int {
-	return int(t.hwdevice.Load())
+	return t.hwdevice
 }
 
 func (t *task) Equal(config *app.Config) bool {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.process == nil {
 		return false
 	}
@@ -483,10 +465,15 @@ func (t *task) Equal(config *app.Config) bool {
 	return t.process.Config.Equal(config)
 }
 
-func (t *task) Config() *app.Config {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
+func (t *task) ResolvedConfig() *app.Config {
+	if t.config == nil {
+		return nil
+	}
 
+	return t.config.Clone()
+}
+
+func (t *task) Config() *app.Config {
 	if t.process == nil {
 		return nil
 	}
@@ -496,9 +483,6 @@ func (t *task) Config() *app.Config {
 
 func (t *task) Destroy() {
 	t.Stop()
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	t.valid = false
 	t.process = nil
@@ -510,9 +494,6 @@ func (t *task) Destroy() {
 }
 
 func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	count := 0
 	matches := 0
 
@@ -548,9 +529,6 @@ func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
 }
 
 func (t *task) Process() *app.Process {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.process == nil {
 		return nil
 	}
@@ -559,9 +537,6 @@ func (t *task) Process() *app.Process {
 }
 
 func (t *task) Order() string {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.process == nil {
 		return ""
 	}
@@ -570,9 +545,6 @@ func (t *task) Order() string {
 }
 
 func (t *task) ExportParserReportHistory() []parse.ReportHistoryEntry {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.parser == nil {
 		return nil
 	}
@@ -581,9 +553,6 @@ func (t *task) ExportParserReportHistory() []parse.ReportHistoryEntry {
 }
 
 func (t *task) ImportParserReportHistory(report []parse.ReportHistoryEntry) {
-	token := t.lock.RLock()
-	defer t.lock.RUnlock(token)
-
 	if t.parser == nil {
 		return
 	}

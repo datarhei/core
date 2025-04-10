@@ -17,12 +17,24 @@ func NewStorage() *Storage {
 	return m
 }
 
-func (m *Storage) Range(f func(key app.ProcessID, value *task) bool) {
-	m.tasks.Range(f)
+func (m *Storage) Range(onlyValid bool, f func(key app.ProcessID, value *task, token string) bool) {
+	m.tasks.Range(func(id app.ProcessID, task *task) bool {
+		token := task.RLock()
+		if onlyValid && !task.IsValid() {
+			task.Release(token)
+			return true
+		}
+		return f(id, task, token)
+	})
 }
 
 func (m *Storage) Store(id app.ProcessID, t *task) {
-	m.tasks.Store(id, t)
+	t, ok := m.tasks.LoadAndStore(id, t)
+	if ok {
+		t.Lock()
+		t.Destroy()
+		t.Unlock()
+	}
 }
 
 func (m *Storage) LoadOrStore(id app.ProcessID, t *task) (*task, bool) {
@@ -30,17 +42,41 @@ func (m *Storage) LoadOrStore(id app.ProcessID, t *task) (*task, bool) {
 }
 
 func (m *Storage) Has(id app.ProcessID) bool {
-	_, hasTask := m.Load(id)
+	_, hasTask := m.tasks.Load(id)
 
 	return hasTask
 }
 
-func (m *Storage) Load(id app.ProcessID) (*task, bool) {
-	return m.tasks.Load(id)
+func (m *Storage) Load(id app.ProcessID) (*task, string, bool) {
+	task, ok := m.tasks.Load(id)
+	if !ok {
+		return nil, "", false
+	}
+
+	token := task.RLock()
+	if !task.IsValid() {
+		task.Release(token)
+		return nil, "", false
+	}
+	return task, token, true
+}
+
+func (m *Storage) LoadAndLock(id app.ProcessID) (*task, bool) {
+	task, ok := m.tasks.Load(id)
+	if !ok {
+		return nil, false
+	}
+
+	task.lock.Lock()
+	if !task.IsValid() {
+		task.Unlock()
+		return nil, false
+	}
+	return task, true
 }
 
 func (m *Storage) Delete(id app.ProcessID) bool {
-	if t, ok := m.Load(id); ok {
+	if t, ok := m.tasks.Load(id); ok {
 		m.tasks.Delete(id)
 		t.Destroy()
 		return true

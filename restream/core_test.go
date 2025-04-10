@@ -988,15 +988,15 @@ func TestTeeAddressReference(t *testing.T) {
 
 	r := rs.(*restream)
 
-	task, ok := r.tasks.Load(app.ProcessID{ID: "process2"})
+	task, _, ok := r.tasks.Load(app.ProcessID{ID: "process2"})
 	require.True(t, ok)
 	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
 
-	task, ok = r.tasks.Load(app.ProcessID{ID: "process3"})
+	task, _, ok = r.tasks.Load(app.ProcessID{ID: "process3"})
 	require.True(t, ok)
 	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
 
-	task, ok = r.tasks.Load(app.ProcessID{ID: "process4"})
+	task, _, ok = r.tasks.Load(app.ProcessID{ID: "process4"})
 	require.True(t, ok)
 	require.Equal(t, "rtmp://example.com/live.stream?token=123", task.config.Input[0].Address)
 }
@@ -1598,8 +1598,9 @@ func TestProcessReplacer(t *testing.T) {
 		LogPatterns:    []string{},
 	}
 
-	task, ok := rs.tasks.Load(app.ProcessID{ID: "314159265359"})
+	task, token, ok := rs.tasks.Load(app.ProcessID{ID: "314159265359"})
 	require.True(t, ok)
+	task.Release(token)
 
 	require.Equal(t, process, task.config)
 
@@ -1692,8 +1693,9 @@ func TestProcessLimit(t *testing.T) {
 
 	rs := rsi.(*restream)
 
-	task, ok := rs.tasks.Load(app.ProcessID{ID: process.ID})
+	task, token, ok := rs.tasks.Load(app.ProcessID{ID: process.ID})
 	require.True(t, ok)
+	task.Release(token)
 
 	status := task.ffmpeg.Status()
 
