@@ -796,16 +796,24 @@ func (p *process) stop(wait bool, reason string) error {
 		return nil
 	}
 
+	// If the process in starting state, wait until the process has been started
+	for {
+		if p.getState() == stateStarting {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		break
+	}
+
 	// If the process is already in the finishing state, don't do anything
-	if p.getState() == stateFinishing {
+	if state, _ := p.setState(stateFinishing); state == stateFinishing {
 		return nil
 	}
 
 	p.stopReasonLock.Lock()
 	p.stopReason = reason
 	p.stopReasonLock.Unlock()
-
-	p.setState(stateFinishing)
 
 	p.logger.Info().Log("Stopping")
 	p.debuglogger.WithFields(log.Fields{
