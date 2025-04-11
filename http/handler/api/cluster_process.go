@@ -413,6 +413,9 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 	}
 
 	if err := h.cluster.ProcessSetCommand("", pid, command.Command); err != nil {
+		if cerr, ok := err.(api.Error); ok {
+			return api.Err(cerr.Code, "", "comm failed: %s", cerr.Error())
+		}
 		return api.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
 	}
 

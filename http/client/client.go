@@ -844,7 +844,7 @@ func (r *restclient) request(req *http.Request) (int, io.ReadCloser, error) {
 
 func (r *restclient) stream(ctx context.Context, method, path string, query *url.Values, header http.Header, contentType string, data io.Reader) (io.ReadCloser, error) {
 	if err := r.checkVersion(method, r.prefix+path); err != nil {
-		return nil, err
+		return nil, api.Err(http.StatusNotImplemented, "", "%s", err.Error())
 	}
 
 	u := r.address + r.prefix + path
@@ -854,7 +854,7 @@ func (r *restclient) stream(ctx context.Context, method, path string, query *url
 
 	req, err := http.NewRequestWithContext(ctx, method, u, data)
 	if err != nil {
-		return nil, err
+		return nil, api.Err(http.StatusInternalServerError, "", "create request: %s", err.Error())
 	}
 
 	if header != nil {
@@ -871,7 +871,7 @@ func (r *restclient) stream(ctx context.Context, method, path string, query *url
 		if r.accessToken.IsExpired() {
 			if err := r.refresh(); err != nil {
 				if err := r.login(); err != nil {
-					return nil, err
+					return nil, api.Err(http.StatusUnauthorized, "", "%s", err.Error())
 				}
 			}
 		}
@@ -881,7 +881,7 @@ func (r *restclient) stream(ctx context.Context, method, path string, query *url
 
 	status, body, err := r.request(req)
 	if err != nil {
-		return nil, err
+		return nil, api.Err(http.StatusInternalServerError, "", "request failed: %s", err.Error())
 	}
 
 	if status < 200 || status >= 300 {
@@ -921,12 +921,15 @@ func (r *restclient) call(method, path string, query *url.Values, header http.He
 
 	body, err := r.stream(ctx, method, path, query, header, contentType, data)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", method, path, err)
+		return nil, err
 	}
 
 	defer body.Close()
 
 	x, err := io.ReadAll(body)
+	if err != nil {
+		err = api.Err(http.StatusInternalServerError, "", "read body: %s", err.Error())
+	}
 
 	return x, err
 }

@@ -4971,8 +4971,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5004,6 +5012,18 @@ paths:
           schema: {}
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5144,6 +5164,14 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new process
@@ -5170,12 +5198,20 @@ paths:
           description: OK
           schema:
             type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5209,12 +5245,20 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.Process'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
         "403":
           description: Forbidden
           schema:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5260,6 +5304,10 @@ paths:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5308,6 +5356,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Issue a command to a process
@@ -5345,6 +5397,10 @@ paths:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5388,6 +5444,10 @@ paths:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5437,6 +5497,10 @@ paths:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:
@@ -5770,6 +5834,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the logs of a process
@@ -5815,6 +5883,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
       summary: Set the report history a process
@@ -5851,6 +5923,10 @@ paths:
             $ref: '#/definitions/api.Error'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/api.Error'
       security:

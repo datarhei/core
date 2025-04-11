@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -44,6 +45,8 @@ func NewProcess(restream restream.Restreamer, iam iam.IAM) *ProcessHandler {
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process [post]
 func (h *ProcessHandler) Add(c echo.Context) error {
@@ -82,7 +85,7 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 	config, metadata := process.Marshal()
 
 	if err := h.restream.AddProcess(config); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid process config: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	tid := app.ProcessID{
@@ -203,8 +206,10 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 // @Param domain query string false "Domain to act on"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
+// @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [get]
 func (h *ProcessHandler) Get(c echo.Context) error {
@@ -224,7 +229,7 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 
 	p, err := h.getProcess(tid, newFilter(filter))
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, p)
@@ -239,8 +244,10 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Domain to act on"
 // @Success 200 {string} string
+// @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [delete]
 func (h *ProcessHandler) Delete(c echo.Context) error {
@@ -261,11 +268,11 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 	}
 
 	if err := h.restream.StopProcess(tid); err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	if err := h.restream.DeleteProcess(tid); err != nil {
-		return api.Err(http.StatusInternalServerError, "", "process can't be deleted: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -285,6 +292,7 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [put]
 func (h *ProcessHandler) Update(c echo.Context) error {
@@ -334,11 +342,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	config, metadata := process.Marshal()
 
 	if err := h.restream.UpdateProcess(tid, config); err != nil {
-		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "", "process not found: %s", id)
-		}
-
-		return api.Err(http.StatusBadRequest, "", "process can't be updated: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	tid = app.ProcessID{
@@ -367,6 +371,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/command [put]
 func (h *ProcessHandler) Command(c echo.Context) error {
@@ -403,7 +408,7 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 	}
 
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "command failed: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -421,6 +426,7 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/config [get]
 func (h *ProcessHandler) GetConfig(c echo.Context) error {
@@ -439,7 +445,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 
 	p, err := h.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	config := api.ProcessConfig{}
@@ -460,6 +466,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/state [get]
 func (h *ProcessHandler) GetState(c echo.Context) error {
@@ -478,7 +485,7 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 
 	s, err := h.restream.GetProcessState(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	state := api.ProcessState{}
@@ -501,6 +508,7 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
 func (h *ProcessHandler) GetReport(c echo.Context) error {
@@ -540,7 +548,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 
 	l, err := h.restream.GetProcessReport(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	report := api.ProcessReport{}
@@ -615,6 +623,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [put]
 func (h *ProcessHandler) SetReport(c echo.Context) error {
@@ -642,7 +651,7 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 	appreport := report.Marshal()
 
 	if err := h.restream.SetProcessReport(tid, &appreport); err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -841,6 +850,7 @@ func (h *ProcessHandler) ReloadSkills(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [get]
 func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
@@ -860,11 +870,7 @@ func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 
 	data, err := h.restream.GetProcessMetadata(tid, key)
 	if err != nil {
-		if err == restream.ErrMetadataKeyNotFound {
-			return api.Err(http.StatusNotFound, "", "unknown key: %s", err.Error())
-		}
-
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -884,6 +890,7 @@ func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [put]
 func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
@@ -912,7 +919,7 @@ func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
 	}
 
 	if err := h.restream.SetProcessMetadata(tid, key, data); err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -926,8 +933,10 @@ func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
 // @Produce json
 // @Param key path string true "Key for data store"
 // @Success 200 {object} api.Metadata
-// @Failure 404 {object} api.Error
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [get]
 func (h *ProcessHandler) GetMetadata(c echo.Context) error {
@@ -935,7 +944,7 @@ func (h *ProcessHandler) GetMetadata(c echo.Context) error {
 
 	data, err := h.restream.GetMetadata(key)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "metadata not found: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -951,6 +960,9 @@ func (h *ProcessHandler) GetMetadata(c echo.Context) error {
 // @Param data body api.Metadata true "Arbitrary JSON data"
 // @Success 200 {object} api.Metadata
 // @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [put]
 func (h *ProcessHandler) SetMetadata(c echo.Context) error {
@@ -967,7 +979,7 @@ func (h *ProcessHandler) SetMetadata(c echo.Context) error {
 	}
 
 	if err := h.restream.SetMetadata(key, data); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid metadata: %s", err.Error())
+		return h.apiErrorFromError(err)
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -1082,4 +1094,20 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 	info.Unmarshal(process, config, state, report, metadata)
 
 	return info, nil
+}
+
+func (h *ProcessHandler) apiErrorFromError(err error) error {
+	if errors.Is(err, restream.ErrUnknownProcess) {
+		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+	} else if errors.Is(err, restream.ErrProcessExists) {
+		return api.Err(http.StatusConflict, "", "%s", err.Error())
+	} else if errors.Is(err, restream.ErrInvalidProcessConfig) {
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	} else if errors.Is(err, restream.ErrMetadataKeyNotFound) {
+		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+	} else if errors.Is(err, restream.ErrMetadataKeyRequired) {
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	}
+
+	return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 }

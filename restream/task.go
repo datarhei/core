@@ -1,7 +1,6 @@
 package restream
 
 import (
-	"errors"
 	"maps"
 	"time"
 
@@ -14,10 +13,6 @@ import (
 
 	"github.com/puzpuzpuz/xsync/v3"
 )
-
-var ErrInvalidProcessConfig = errors.New("invalid process config")
-var ErrMetadataKeyNotFound = errors.New("unknown metadata key")
-var ErrMetadataKeyRequired = errors.New("a key for storing metadata is required")
 
 type task struct {
 	valid     bool

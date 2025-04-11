@@ -642,7 +642,7 @@ func TestProcessCommandNotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	command := mock.Read(t, "./fixtures/commandStart.json")
-	mock.Request(t, http.StatusBadRequest, router, "PUT", "/test/command", command)
+	mock.Request(t, http.StatusNotFound, router, "PUT", "/test/command", command)
 }
 
 func TestProcessCommandInvalid(t *testing.T) {

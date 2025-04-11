@@ -2,7 +2,6 @@ package restream
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -527,11 +526,6 @@ func (r *restream) CreatedAt() time.Time {
 	return r.createdAt
 }
 
-var ErrUnknownProcess = errors.New("unknown process")
-var ErrUnknownProcessGroup = errors.New("unknown process group")
-var ErrProcessExists = errors.New("process already exists")
-var ErrForbidden = errors.New("forbidden")
-
 func (r *restream) AddProcess(config *app.Config) error {
 	t, err := r.createTask(config)
 	if err != nil {
@@ -566,7 +560,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	id := strings.TrimSpace(config.ID)
 
 	if len(id) == 0 {
-		return nil, fmt.Errorf("an empty ID is not allowed")
+		return nil, fmt.Errorf("an empty ID is not allowed: %w", ErrInvalidProcessConfig)
 	}
 
 	config.FFVersion = "^" + r.ffmpeg.Skills().FFmpeg.Version
@@ -821,7 +815,7 @@ func (r *restream) unsetPlayoutPorts(t *task) {
 // otherwise nil and whether there is a disk filesystem involved.
 func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmpeg) (bool, error) {
 	if len(config.Input) == 0 {
-		return false, fmt.Errorf("at least one input must be defined for the process '%s'", config.ID)
+		return false, fmt.Errorf("at least one input must be defined for the process '%s': %w", config.ID, ErrInvalidProcessConfig)
 	}
 
 	var err error
@@ -832,11 +826,11 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 		io.ID = strings.TrimSpace(io.ID)
 
 		if len(io.ID) == 0 {
-			return false, fmt.Errorf("empty input IDs are not allowed (process '%s')", config.ID)
+			return false, fmt.Errorf("empty input IDs are not allowed (process '%s': %w)", config.ID, ErrInvalidProcessConfig)
 		}
 
 		if _, found := ids[io.ID]; found {
-			return false, fmt.Errorf("the input ID '%s' is already in use for the process `%s`", io.ID, config.ID)
+			return false, fmt.Errorf("the input ID '%s' is already in use for the process '%s': %w", io.ID, config.ID, ErrInvalidProcessConfig)
 		}
 
 		ids[io.ID] = true
@@ -844,7 +838,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 		io.Address = strings.TrimSpace(io.Address)
 
 		if len(io.Address) == 0 {
-			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty", config.ID, io.ID)
+			return false, fmt.Errorf("the address for input '#%s:%s' must not be empty: %w", config.ID, io.ID, ErrInvalidProcessConfig)
 		}
 
 		maxFails := 0
@@ -866,7 +860,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 	}
 
 	if len(config.Output) == 0 {
-		return false, fmt.Errorf("at least one output must be defined for the process '#%s'", config.ID)
+		return false, fmt.Errorf("at least one output must be defined for the process '#%s': %w", config.ID, ErrInvalidProcessConfig)
 	}
 
 	ids = map[string]bool{}
@@ -876,11 +870,11 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 		io.ID = strings.TrimSpace(io.ID)
 
 		if len(io.ID) == 0 {
-			return false, fmt.Errorf("empty output IDs are not allowed (process '%s')", config.ID)
+			return false, fmt.Errorf("empty output IDs are not allowed (process '%s'): %w", config.ID, ErrInvalidProcessConfig)
 		}
 
 		if _, found := ids[io.ID]; found {
-			return false, fmt.Errorf("the output ID '%s' is already in use for the process `%s`", io.ID, config.ID)
+			return false, fmt.Errorf("the output ID '%s' is already in use for the process '%s': %w", io.ID, config.ID, ErrInvalidProcessConfig)
 		}
 
 		ids[io.ID] = true
@@ -888,7 +882,7 @@ func validateConfig(config *app.Config, fss []rfs.Filesystem, ffmpeg ffmpeg.FFmp
 		io.Address = strings.TrimSpace(io.Address)
 
 		if len(io.Address) == 0 {
-			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty", config.ID, io.ID)
+			return false, fmt.Errorf("the address for output '#%s:%s' must not be empty: %w", config.ID, io.ID, ErrInvalidProcessConfig)
 		}
 
 		maxFails := 0
@@ -932,7 +926,7 @@ func validateInputAddress(address, _ string, ffmpeg ffmpeg.FFmpeg) (string, erro
 	}
 
 	if !ffmpeg.ValidateInputAddress(address) {
-		return address, fmt.Errorf("address is not allowed")
+		return address, fmt.Errorf("address is not allowed: %w", ErrInvalidProcessConfig)
 	}
 
 	return address, nil
@@ -976,7 +970,7 @@ func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (strin
 		}
 
 		if !ffmpeg.ValidateOutputAddress(address) {
-			return address, false, fmt.Errorf("address is not allowed")
+			return address, false, fmt.Errorf("address is not allowed: %w", ErrInvalidProcessConfig)
 		}
 
 		return address, false, nil
@@ -994,18 +988,18 @@ func validateOutputAddress(address, basedir string, ffmpeg ffmpeg.FFmpeg) (strin
 
 	if strings.HasPrefix(address, "/dev/") {
 		if !ffmpeg.ValidateOutputAddress("file:" + address) {
-			return address, false, fmt.Errorf("address is not allowed")
+			return address, false, fmt.Errorf("address is not allowed: %w", ErrInvalidProcessConfig)
 		}
 
 		return "file:" + address, false, nil
 	}
 
 	if !strings.HasPrefix(address, basedir) {
-		return address, false, fmt.Errorf("%s is not inside of %s", address, basedir)
+		return address, false, fmt.Errorf("%s is not inside of %s: %w", address, basedir, ErrInvalidProcessConfig)
 	}
 
 	if !ffmpeg.ValidateOutputAddress("file:" + address) {
-		return address, false, fmt.Errorf("address is not allowed")
+		return address, false, fmt.Errorf("address is not allowed: %w", ErrInvalidProcessConfig)
 	}
 
 	return "file:" + address, true, nil
@@ -1041,7 +1035,7 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 	}
 
 	if matches["id"] == id {
-		return address, fmt.Errorf("self-reference is not allowed (%s)", address)
+		return address, fmt.Errorf("self-reference is not allowed (%s): %w", address, ErrInvalidProcessConfig)
 	}
 
 	var t *task = nil
@@ -1059,7 +1053,7 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 	})
 
 	if t == nil {
-		return address, fmt.Errorf("unknown process '%s' in domain '%s' (%s)", matches["id"], matches["domain"], address)
+		return address, fmt.Errorf("unknown process '%s' in domain '%s' (%s): %w", matches["id"], matches["domain"], address, ErrInvalidProcessConfig)
 	}
 
 	defer t.Release(ttoken)
@@ -1118,12 +1112,12 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 		return r.rewrite.RewriteAddress(addresses[0], t.config.Owner, rewrite.READ), nil
 	}
 
-	return address, fmt.Errorf("the process '%s' in group '%s' has no outputs with the ID '%s' (%s)", matches["id"], matches["group"], matches["output"], address)
+	return address, fmt.Errorf("the process '%s' in group '%s' has no outputs with the ID '%s' (%s): %w", matches["id"], matches["group"], matches["output"], address, ErrInvalidProcessConfig)
 }
 
 func parseAddressReference(address string) (map[string]string, error) {
 	if len(address) == 0 {
-		return nil, fmt.Errorf("empty address")
+		return nil, fmt.Errorf("empty address: %w", ErrInvalidProcessConfig)
 	}
 
 	if address[0] != '#' {
@@ -1161,7 +1155,7 @@ func parseAddressReference(address string) (map[string]string, error) {
 	}
 
 	if idEnd < 0 {
-		return nil, fmt.Errorf("invalid format (%s)", address)
+		return nil, fmt.Errorf("invalid format (%s): %w", address, ErrInvalidProcessConfig)
 	}
 
 	results["id"] = address[1:idEnd]
@@ -1629,7 +1623,7 @@ func (r *restream) GetPlayout(id app.ProcessID, inputid string) (string, error) 
 	defer task.Release(token)
 
 	if !task.IsValid() {
-		return "", fmt.Errorf("invalid process definition")
+		return "", ErrInvalidProcessConfig
 	}
 
 	port, ok := task.playout[inputid]
@@ -1674,7 +1668,7 @@ func (r *restream) SetMetadata(key string, data interface{}) error {
 	defer r.lock.Unlock()
 
 	if len(key) == 0 {
-		return fmt.Errorf("a key for storing the data has to be provided")
+		return ErrMetadataKeyRequired
 	}
 
 	if r.metadata == nil {
