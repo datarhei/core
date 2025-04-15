@@ -685,9 +685,15 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 		if t, token, hasTask := r.tasks.Load(cfg.ProcessID()); hasTask {
 			t.SetHWDevice(selectedGPU)
 			t.Release(token)
+		} else {
+			return []string{}, fmt.Errorf("process with the ID '%s' not found", cfg.ProcessID())
 		}
 
 		config := cfg.Clone()
+
+		if selectedGPU == -1 && hasPlaceholder(config, r.replace, "hwdevice") {
+			return []string{}, fmt.Errorf("no hwdevice found, either not available or no resources requested")
+		}
 
 		resolveDynamicPlaceholder(config, r.replace, map[string]string{
 			"hwdevice": fmt.Sprintf("%d", selectedGPU),
@@ -1864,4 +1870,53 @@ func resolveDynamicPlaceholder(config *app.Config, r replace.Replacer, values ma
 
 		config.Output[i] = output
 	}
+}
+
+// hasPlaceholder checks whether the config has the specified placeholder
+func hasPlaceholder(config *app.Config, r replace.Replacer, placeholder string) bool {
+	for _, option := range config.Options {
+		if r.Has(option, placeholder) {
+			return true
+		}
+	}
+
+	for _, input := range config.Input {
+		if r.Has(input.ID, placeholder) {
+			return true
+		}
+
+		if r.Has(input.Address, placeholder) {
+			return true
+		}
+
+		for _, option := range input.Options {
+			if r.Has(option, placeholder) {
+				return true
+			}
+		}
+	}
+
+	for _, output := range config.Output {
+		if r.Has(output.ID, placeholder) {
+			return true
+		}
+
+		if r.Has(output.Address, placeholder) {
+			return true
+		}
+
+		for _, option := range output.Options {
+			if r.Has(option, placeholder) {
+				return true
+			}
+		}
+
+		for _, cleanup := range output.Cleanup {
+			if r.Has(cleanup.Pattern, placeholder) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

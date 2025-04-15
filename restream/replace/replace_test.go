@@ -172,7 +172,18 @@ func TestParseParams(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		params := r.parseParametes(test[0], nil, map[string]string{"foobar": "def"})
+		params := r.parseParameters(test[0], nil, map[string]string{"foobar": "def"})
 		require.Equal(t, test[1], params["foobar"])
 	}
+}
+
+func TestReplaceHas(t *testing.T) {
+	r := New()
+
+	require.True(t, r.Has("{foobar}", "foobar"))
+	require.False(t, r.Has("{foobar}", "barfoo"))
+	require.True(t, r.Has("{foobar^:}", "foobar"))
+	require.False(t, r.Has("{foobar^:.}", "foobar"))
+	require.True(t, r.Has("{foobar^:,hello=world}", "foobar"))
+	require.True(t, r.Has("{foobar:bla}", "foobar:*"))
 }

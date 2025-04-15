@@ -24,6 +24,9 @@ type Replacer interface {
 	// A placeholder name may consist on of the letters a-z and ':'. The placeholder may contain
 	// a glob pattern to find the appropriate template.
 	Replace(str, placeholder, value string, vars map[string]string, config *app.Config, section string) string
+
+	// Has returns whether the string contains the placeholder
+	Has(str, placeholder string) bool
 }
 
 type replace struct {
@@ -80,7 +83,7 @@ func (r *replacer) Replace(str, placeholder, value string, vars map[string]strin
 			}
 		}
 
-		params := r.parseParametes(matches[3], vars, repl.defaults)
+		params := r.parseParameters(matches[3], vars, repl.defaults)
 
 		v = repl.fn(params, config, section)
 
@@ -100,12 +103,31 @@ func (r *replacer) Replace(str, placeholder, value string, vars map[string]strin
 	return str
 }
 
-// parseParametes parses the parameters of a placeholder. The params string is a comma-separated
+func (r *replacer) Has(str, placeholder string) bool {
+	matches := r.re.FindAllStringSubmatch(str, -1)
+	if len(matches) == 0 {
+		return false
+	}
+
+	for _, match := range matches {
+		if ok, _ := glob.Match(placeholder, match[1], ':'); ok {
+			return true
+		}
+
+		if match[1] == placeholder {
+			return true
+		}
+	}
+
+	return false
+}
+
+// parseParameters parses the parameters of a placeholder. The params string is a comma-separated
 // string of key=value pairs. The key and values can be escaped with an \.
 // The provided defaults will be used as basis. Any parsed key/value from the params might overwrite
 // the default value. Any variables in the values will be replaced by their value from the
 // vars parameter.
-func (r *replacer) parseParametes(params string, vars map[string]string, defaults map[string]string) map[string]string {
+func (r *replacer) parseParameters(params string, vars map[string]string, defaults map[string]string) map[string]string {
 	reSpace := regexp.MustCompile(`^\s+`)
 
 	p := make(map[string]string)
