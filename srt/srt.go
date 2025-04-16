@@ -293,7 +293,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 			req.SetPassphrase(s.passphrase)
 		}
 	} else if req.Version() == 5 {
-		si, err := url.ParseStreamId(streamId)
+		si, err = url.ParseStreamId(streamId)
 		if err != nil {
 			s.log("", "CONNECT", "INVALID", streamId, err.Error(), client)
 			return srt.REJECT
@@ -349,8 +349,10 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	}
 
 	if !s.iam.Enforce(identity, domain, "srt", resource, action) {
-		s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
-		return srt.REJECT
+		if !s.iam.Enforce(identity, domain, "srt", filepath.Join("/", resource), action) {
+			s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
+			return srt.REJECT
+		}
 	}
 
 	return mode
