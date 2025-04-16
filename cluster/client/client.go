@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -235,14 +234,14 @@ func (c *APIClient) Snapshot(origin string) (io.ReadCloser, error) {
 
 func (c *APIClient) stream(method, path, contentType string, data io.Reader, origin string) (io.ReadCloser, error) {
 	if len(c.Address) == 0 {
-		return nil, fmt.Errorf("no address defined")
+		return nil, newError(http.StatusInternalServerError, "no address defined")
 	}
 
 	address := "http://" + c.Address + path
 
 	req, err := http.NewRequest(method, address, data)
 	if err != nil {
-		return nil, err
+		return nil, newError(http.StatusInternalServerError, err.Error())
 	}
 
 	req.Header.Add("X-Cluster-Origin", origin)
@@ -253,7 +252,7 @@ func (c *APIClient) stream(method, path, contentType string, data io.Reader, ori
 
 	status, body, err := c.request(req)
 	if err != nil {
-		return nil, err
+		return nil, newError(http.StatusInternalServerError, err.Error())
 	}
 
 	if status < 200 || status >= 300 {
@@ -309,6 +308,15 @@ type Error struct {
 	Code    int      `json:"code" jsonschema:"required" format:"int"`
 	Message string   `json:"message" jsonschema:""`
 	Details []string `json:"details" jsonschema:""`
+}
+
+func newError(code int, details string) *Error {
+	return &Error{
+		Code: code,
+		Details: []string{
+			details,
+		},
+	}
 }
 
 func (e Error) Error() string {

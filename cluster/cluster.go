@@ -185,6 +185,7 @@ type cluster struct {
 
 var ErrDegraded = errors.New("cluster is currently degraded")
 var ErrUnknownNode = errors.New("unknown node id")
+var ErrUnknownProcess = errors.New("unknown process id")
 
 func New(config Config) (Cluster, error) {
 	c := &cluster{

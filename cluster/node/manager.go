@@ -155,7 +155,7 @@ func (p *Manager) NodeGet(id string) (*Node, error) {
 
 	node, ok := p.nodes[id]
 	if !ok {
-		return nil, fmt.Errorf("node not found: %s", id)
+		return nil, fmt.Errorf("%s: %w", id, ErrNodeNotFound)
 	}
 
 	return node, nil

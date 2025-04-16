@@ -211,7 +211,6 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	pid := app.NewProcessID(id, domain)
 
 	// Check the store for the process
-	// TODO: should check the leader because in larger cluster it needs time to get to all followers
 	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
 		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
@@ -414,7 +413,7 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 
 	if err := h.cluster.ProcessSetCommand("", pid, command.Command); err != nil {
 		if cerr, ok := err.(api.Error); ok {
-			return api.Err(cerr.Code, "", "comm failed: %s", cerr.Error())
+			return cerr
 		}
 		return api.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
 	}
