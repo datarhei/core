@@ -157,6 +157,7 @@ func CompleteConfig(config *Config) error {
 		"include":     {SkipRuntime: true},
 		"deprecated":  {SkipRuntime: true},
 		"specifiedBy": {SkipRuntime: true},
+		"oneOf":       {SkipRuntime: true},
 	}
 
 	for key, value := range defaultDirectives {
@@ -333,41 +334,53 @@ func (c *Config) injectTypesFromSchema() error {
 			schemaType.Kind == ast.Interface {
 			for _, field := range schemaType.Fields {
 				if fd := field.Directives.ForName("goField"); fd != nil {
-					forceResolver := c.Models[schemaType.Name].Fields[field.Name].Resolver
+					// First, copy map entry for type and field to do modifications
+					typeMapEntry := c.Models[schemaType.Name]
+					typeMapFieldEntry := typeMapEntry.Fields[field.Name]
+
+					if ta := fd.Arguments.ForName("type"); ta != nil {
+						if c.Models.UserDefined(schemaType.Name) {
+							return fmt.Errorf(
+								"argument 'type' for directive @goField (src: %s, line: %d) not applicable for user-defined models",
+								fd.Position.Src.Name,
+								fd.Position.Line,
+							)
+						}
+
+						if ft, err := ta.Value.Value(nil); err == nil {
+							typeMapFieldEntry.Type = ft.(string)
+						}
+					}
+
 					if ra := fd.Arguments.ForName("forceResolver"); ra != nil {
 						if fr, err := ra.Value.Value(nil); err == nil {
-							forceResolver = fr.(bool)
+							typeMapFieldEntry.Resolver = fr.(bool)
 						}
 					}
 
-					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
 					if na := fd.Arguments.ForName("name"); na != nil {
 						if fr, err := na.Value.Value(nil); err == nil {
-							fieldName = fr.(string)
+							typeMapFieldEntry.FieldName = fr.(string)
 						}
 					}
 
-					omittable := c.Models[schemaType.Name].Fields[field.Name].Omittable
 					if arg := fd.Arguments.ForName("omittable"); arg != nil {
 						if k, err := arg.Value.Value(nil); err == nil {
 							val := k.(bool)
-							omittable = &val
+							typeMapFieldEntry.Omittable = &val
 						}
 					}
 
-					if c.Models[schemaType.Name].Fields == nil {
-						c.Models[schemaType.Name] = TypeMapEntry{
-							Model:       c.Models[schemaType.Name].Model,
-							ExtraFields: c.Models[schemaType.Name].ExtraFields,
-							Fields:      map[string]TypeMapField{},
-						}
+					// May be uninitialized, so do it now.
+					if typeMapEntry.Fields == nil {
+						typeMapEntry.Fields = make(map[string]TypeMapField)
 					}
 
-					c.Models[schemaType.Name].Fields[field.Name] = TypeMapField{
-						FieldName: fieldName,
-						Resolver:  forceResolver,
-						Omittable: omittable,
-					}
+					// First, copy back probably modificated field settings
+					typeMapEntry.Fields[field.Name] = typeMapFieldEntry
+
+					// And final copy back probably modificated all type map
+					c.Models[schemaType.Name] = typeMapEntry
 				}
 			}
 
@@ -407,21 +420,22 @@ func (c *Config) injectTypesFromSchema() error {
 							}
 						}
 
+						// First copy, then modify map entry.
+						typeMapEntry := c.Models[schemaType.Name]
+
 						if extraFieldName == "" {
 							// Embeddable fields
-							typeMapEntry := c.Models[schemaType.Name]
 							typeMapEntry.EmbedExtraFields = append(typeMapEntry.EmbedExtraFields, extraField)
-							c.Models[schemaType.Name] = typeMapEntry
 						} else {
 							// Regular fields
-							typeMapEntry := c.Models[schemaType.Name]
 							if typeMapEntry.ExtraFields == nil {
 								typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
 							}
-
-							c.Models[schemaType.Name] = typeMapEntry
-							c.Models[schemaType.Name].ExtraFields[extraFieldName] = extraField
+							typeMapEntry.ExtraFields[extraFieldName] = extraField
 						}
+
+						// Copy back modified map entry
+						c.Models[schemaType.Name] = typeMapEntry
 					}
 				}
 			}
@@ -465,6 +479,24 @@ type TypeMapEntry struct {
 }
 
 type TypeMapField struct {
+	// Type is the Go type of the field.
+	//
+	// It supports the builtin basic types (like string or int64), named types
+	// (qualified by the full package path), pointers to those types (prefixed
+	// with `*`), and slices of those types (prefixed with `[]`).
+	//
+	// For example, the following are valid types:
+	//  string
+	//  *github.com/author/package.Type
+	//  []string
+	//  []*github.com/author/package.Type
+	//
+	// Note that the type will be referenced from the generated/graphql, which
+	// means the package it lives in must not reference the generated/graphql
+	// package to avoid circular imports.
+	// restrictions.
+	Type string `yaml:"type"`
+
 	Resolver        bool   `yaml:"resolver"`
 	FieldName       string `yaml:"fieldName"`
 	Omittable       *bool  `yaml:"omittable"`

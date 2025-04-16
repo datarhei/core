@@ -92,6 +92,9 @@ type Client struct {
 	// default to Auto.
 	lookup BucketLookupType
 
+	// lookupFn is a custom function to return URL lookup type supported by the server.
+	lookupFn func(u url.URL, bucketName string) BucketLookupType
+
 	// Factory for MD5 hash functions.
 	md5Hasher    func() md5simd.Hasher
 	sha256Hasher func() md5simd.Hasher
@@ -117,6 +120,25 @@ type Options struct {
 	// function to perform region lookups appropriately.
 	CustomRegionViaURL func(u url.URL) string
 
+	// Provide a custom function that returns BucketLookupType based
+	// on the input URL, this is just like s3utils.IsVirtualHostSupported()
+	// function but allows users to provide their own implementation.
+	// Once this is set it overrides all settings for opts.BucketLookup
+	// if this function returns BucketLookupAuto then default detection
+	// via s3utils.IsVirtualHostSupported() is used, otherwise the
+	// function is expected to return appropriate value as expected for
+	// the URL the user wishes to honor.
+	//
+	// BucketName is passed additionally for the caller to ensure
+	// handle situations where `bucketNames` have multiple `.` separators
+	// in such case HTTPs certs will not work properly for *.<domain>
+	// wildcards, so you need to specifically handle these situations
+	// and not return bucket as part of DNS since those requests may fail.
+	//
+	// For better understanding look at s3utils.IsVirtualHostSupported()
+	// implementation.
+	BucketLookupViaURL func(u url.URL, bucketName string) BucketLookupType
+
 	// TrailingHeaders indicates server support of trailing headers.
 	// Only supported for v4 signatures.
 	TrailingHeaders bool
@@ -133,7 +155,7 @@ type Options struct {
 // Global constants.
 const (
 	libraryName    = "minio-go"
-	libraryVersion = "v7.0.84"
+	libraryVersion = "v7.0.90"
 )
 
 // User Agent should always following the below style.
@@ -279,6 +301,7 @@ func privateNew(endpoint string, opts *Options) (*Client, error) {
 	// Sets bucket lookup style, whether server accepts DNS or Path lookup. Default is Auto - determined
 	// by the SDK. When Auto is specified, DNS lookup is used for Amazon/Google cloud endpoints and Path for all other endpoints.
 	clnt.lookup = opts.BucketLookup
+	clnt.lookupFn = opts.BucketLookupViaURL
 
 	// healthcheck is not initialized
 	clnt.healthStatus = unknown
@@ -575,7 +598,7 @@ func (c *Client) do(req *http.Request) (resp *http.Response, err error) {
 
 	// If trace is enabled, dump http request and response,
 	// except when the traceErrorsOnly enabled and the response's status code is ok
-	if c.isTraceEnabled && !(c.traceErrorsOnly && resp.StatusCode == http.StatusOK) {
+	if c.isTraceEnabled && (!c.traceErrorsOnly || resp.StatusCode != http.StatusOK) {
 		err = c.dumpHTTP(req, resp)
 		if err != nil {
 			return nil, err
@@ -637,13 +660,7 @@ func (c *Client) executeMethod(ctx context.Context, method string, metadata requ
 		metadata.trailer.Set(metadata.addCrc.Key(), base64.StdEncoding.EncodeToString(crc.Sum(nil)))
 	}
 
-	// Create cancel context to control 'newRetryTimer' go routine.
-	retryCtx, cancel := context.WithCancel(ctx)
-
-	// Indicate to our routine to exit cleanly upon return.
-	defer cancel()
-
-	for range c.newRetryTimer(retryCtx, reqRetry, DefaultRetryUnit, DefaultRetryCap, MaxJitter) {
+	for range c.newRetryTimer(ctx, reqRetry, DefaultRetryUnit, DefaultRetryCap, MaxJitter) {
 		// Retry executes the following function body if request has an
 		// error until maxRetries have been exhausted, retry attempts are
 		// performed after waiting for a given period of time in a
@@ -756,7 +773,7 @@ func (c *Client) executeMethod(ctx context.Context, method string, metadata requ
 	}
 
 	// Return an error when retry is canceled or deadlined
-	if e := retryCtx.Err(); e != nil {
+	if e := ctx.Err(); e != nil {
 		return nil, e
 	}
 
@@ -886,6 +903,11 @@ func (c *Client) newRequest(ctx context.Context, method string, metadata request
 
 	// For anonymous requests just return.
 	if signerType.IsAnonymous() {
+		if len(metadata.trailer) > 0 {
+			req.Header.Set("X-Amz-Content-Sha256", unsignedPayloadTrailer)
+			return signer.UnsignedTrailer(*req, metadata.trailer), nil
+		}
+
 		return req, nil
 	}
 
@@ -1003,6 +1025,18 @@ func (c *Client) makeTargetURL(bucketName, objectName, bucketLocation string, is
 
 // returns true if virtual hosted style requests are to be used.
 func (c *Client) isVirtualHostStyleRequest(url url.URL, bucketName string) bool {
+	if c.lookupFn != nil {
+		lookup := c.lookupFn(url, bucketName)
+		switch lookup {
+		case BucketLookupDNS:
+			return true
+		case BucketLookupPath:
+			return false
+		}
+		// if its auto then we fallback to default detection.
+		return s3utils.IsVirtualHostSupported(url, bucketName)
+	}
+
 	if bucketName == "" {
 		return false
 	}
@@ -1010,11 +1044,12 @@ func (c *Client) isVirtualHostStyleRequest(url url.URL, bucketName string) bool 
 	if c.lookup == BucketLookupDNS {
 		return true
 	}
+
 	if c.lookup == BucketLookupPath {
 		return false
 	}
 
-	// default to virtual only for Amazon/Google  storage. In all other cases use
+	// default to virtual only for Amazon/Google storage. In all other cases use
 	// path style requests
 	return s3utils.IsVirtualHostSupported(url, bucketName)
 }
@@ -1029,4 +1064,12 @@ func (c *Client) CredContext() *credentials.CredContext {
 		Client:   httpClient,
 		Endpoint: c.endpointURL.String(),
 	}
+}
+
+// GetCreds returns the access creds for the client
+func (c *Client) GetCreds() (credentials.Value, error) {
+	if c.credsProvider == nil {
+		return credentials.Value{}, errors.New("no credentials provider")
+	}
+	return c.credsProvider.GetWithContext(c.CredContext())
 }

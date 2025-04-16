@@ -18,7 +18,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/Masterminds/semver/v3"
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 )
