@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -630,8 +629,6 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
-
-	fmt.Printf("entering SetReport handler\n")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
