@@ -231,6 +231,10 @@ func (s *store) ProcessGet(id app.ProcessID) (Process, string, error) {
 
 	nodeid := s.data.ProcessNodeMap[id.String()]
 
+	if len(process.Error) != 0 {
+		nodeid = ""
+	}
+
 	return Process{
 		CreatedAt: process.CreatedAt,
 		UpdatedAt: process.UpdatedAt,

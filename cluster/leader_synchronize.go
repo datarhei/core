@@ -190,18 +190,24 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 		// The process is on the wantMap. Update the process if the configuration and/or metadata differ.
 		hasConfigChanges := !wantP.Config.Equal(haveP.Config)
 		hasMetadataChanges, metadata := isMetadataUpdateRequired(wantP.Metadata, haveP.Metadata)
-		if (hasConfigChanges || hasMetadataChanges) && opBudget > 0 {
-			// TODO: When the required resources increase, should we move this process to a node
-			// that has them available? Otherwise, this node might start throttling. However, this
-			// will result in rebalancing.
-			opStackUpdate = append(opStackUpdate, processOpUpdate{
-				nodeid:    haveP.NodeID,
-				processid: haveP.Config.ProcessID(),
-				config:    wantP.Config,
-				metadata:  metadata,
-			})
+		if opBudget > 0 {
+			if hasConfigChanges || hasMetadataChanges {
+				// TODO: When the required resources increase, should we move this process to a node
+				// that has them available? Otherwise, this node might start throttling. However, this
+				// will result in rebalancing.
+				opStackUpdate = append(opStackUpdate, processOpUpdate{
+					nodeid:    haveP.NodeID,
+					processid: haveP.Config.ProcessID(),
+					config:    wantP.Config,
+					metadata:  metadata,
+				})
 
-			opBudget -= 3
+				opBudget -= 3
+			} else {
+				opStack = append(opStack, processOpNull{
+					processid: haveP.Config.ProcessID(),
+				})
+			}
 		}
 
 		delete(wantMap, pid)

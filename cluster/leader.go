@@ -497,6 +497,10 @@ type processOpError struct {
 	err       error
 }
 
+type processOpNull struct {
+	processid app.ProcessID
+}
+
 func (c *cluster) applyOpStack(stack []interface{}, term uint64, runners int) []processOpError {
 	errors := []processOpError{}
 
@@ -527,10 +531,7 @@ func (c *cluster) applyOpStack(stack []interface{}, term uint64, runners int) []
 			defer wg.Done()
 
 			for op := range opChan {
-				opErr := c.applyOp(op, logger)
-				if opErr.err != nil {
-					errChan <- opErr
-				}
+				errChan <- c.applyOp(op, logger)
 			}
 		}(errChan, opChan, logger)
 	}
@@ -783,6 +784,11 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}).Log("Process skipped")
 	case processOpError:
 		opErr = v
+	case processOpNull:
+		opErr = processOpError{
+			processid: v.processid,
+			err:       nil,
+		}
 	default:
 		logger.Warn().Log("Unknown operation on stack: %+v", v)
 	}

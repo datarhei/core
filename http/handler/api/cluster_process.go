@@ -57,16 +57,14 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 		DomainPattern: domainpattern,
 	})
 
-	processes := []api.Process{}
-	pmap := map[app.ProcessID]struct{}{}
+	pmap := map[app.ProcessID]api.Process{}
 
 	for _, p := range procs {
 		if !h.iam.Enforce(ctxuser, domain, "process", p.ID, "read") {
 			continue
 		}
 
-		processes = append(processes, p)
-		pmap[app.NewProcessID(p.ID, p.Domain)] = struct{}{}
+		pmap[app.NewProcessID(p.ID, p.Domain)] = p
 	}
 
 	missing := []api.Process{}
@@ -82,8 +80,12 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 			}
 
 			// Check if the process has been deployed
-			if _, ok := pmap[p.Config.ProcessID()]; ok {
-				continue
+			if len(p.Error) == 0 {
+				if _, ok := pmap[p.Config.ProcessID()]; ok {
+					continue
+				}
+			} else {
+				delete(pmap, p.Config.ProcessID())
 			}
 
 			process := api.Process{}
@@ -91,6 +93,11 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 
 			missing = append(missing, process)
 		}
+	}
+
+	processes := []api.Process{}
+	for _, p := range pmap {
+		processes = append(processes, p)
 	}
 
 	processes = append(processes, missing...)
