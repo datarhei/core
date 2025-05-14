@@ -238,6 +238,9 @@ func TestSynchronizeOrderStop(t *testing.T) {
 	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar"},
+		},
 		processOpStop{
 			nodeid:    "node1",
 			processid: app.ProcessID{ID: "foobar"},
@@ -332,6 +335,9 @@ func TestSynchronizeOrderStart(t *testing.T) {
 	stack, resources, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar"},
+		},
 		processOpStart{
 			nodeid:    "node1",
 			processid: app.ProcessID{ID: "foobar"},
@@ -438,6 +444,9 @@ func TestSynchronizeAddReferenceAffinity(t *testing.T) {
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar"},
+		},
 		processOpAdd{
 			nodeid: "node2",
 			config: &app.Config{
@@ -542,6 +551,9 @@ func TestSynchronizeAddReferenceAffinityMultiple(t *testing.T) {
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar1"},
+		},
 		processOpAdd{
 			nodeid: "node2",
 			config: &app.Config{
@@ -1120,7 +1132,11 @@ func TestSynchronizeNoUpdate(t *testing.T) {
 
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
-	require.Empty(t, stack)
+	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar"},
+		},
+	}, stack)
 
 	require.Equal(t, map[string]string{
 		"foobar@": "node1",
@@ -1377,7 +1393,11 @@ func TestSynchronizeWaitDisconnectedNode(t *testing.T) {
 
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
-	require.Empty(t, stack)
+	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar1"},
+		},
+	}, stack)
 
 	require.Equal(t, map[string]string{
 		"foobar1@": "node1",
@@ -1464,6 +1484,9 @@ func TestSynchronizeWaitDisconnectedNodeNoWish(t *testing.T) {
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar1"},
+		},
 		processOpAdd{
 			nodeid: "node1",
 			config: &app.Config{
@@ -1562,6 +1585,9 @@ func TestSynchronizeWaitDisconnectedNodeUnrealisticWish(t *testing.T) {
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar1"},
+		},
 		processOpAdd{
 			nodeid: "node1",
 			config: &app.Config{
@@ -1660,6 +1686,9 @@ func TestSynchronizeTimeoutDisconnectedNode(t *testing.T) {
 	stack, _, reality := synchronize(wish, want, have, nodes, 2*time.Minute)
 
 	require.Equal(t, []interface{}{
+		processOpNull{
+			processid: app.ProcessID{ID: "foobar1"},
+		},
 		processOpAdd{
 			nodeid: "node1",
 			config: &app.Config{
