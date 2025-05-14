@@ -31,9 +31,7 @@ func (m *Storage) Range(onlyValid bool, f func(key app.ProcessID, value *task, t
 func (m *Storage) Store(id app.ProcessID, t *task) {
 	t, ok := m.tasks.LoadAndStore(id, t)
 	if ok {
-		t.Lock()
 		t.Destroy()
-		t.Unlock()
 	}
 }
 
@@ -67,7 +65,7 @@ func (m *Storage) LoadAndLock(id app.ProcessID) (*task, bool) {
 		return nil, false
 	}
 
-	task.lock.Lock()
+	task.Lock()
 	if !task.IsValid() {
 		task.Unlock()
 		return nil, false
