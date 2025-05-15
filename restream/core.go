@@ -58,6 +58,7 @@ type Restreamer interface {
 	GetProcessMetadata(id app.ProcessID, key string) (interface{}, error)                                             // Get previously set metadata from a process
 
 	Probe(config *app.Config, timeout time.Duration) app.Probe // Probe a process with specific timeout
+	Validate(config *app.Config) error                         // Validate a process config
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -1919,4 +1920,28 @@ func hasPlaceholder(config *app.Config, r replace.Replacer, placeholder string) 
 	}
 
 	return false
+}
+
+func (r *restream) Validate(config *app.Config) error {
+	cfg := config.Clone()
+
+	resolveStaticPlaceholders(cfg, r.replace)
+
+	err := r.resolveAddresses(r.tasks, cfg)
+	if err != nil {
+		return err
+	}
+
+	resolveDynamicPlaceholder(cfg, r.replace, map[string]string{
+		"hwdevice": "0",
+	}, map[string]string{
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+
+	_, err = validateConfig(cfg, r.fs.list, r.ffmpeg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

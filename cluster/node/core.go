@@ -411,6 +411,18 @@ func (n *Core) ProcessProbeConfig(config *app.Config) (api.Probe, error) {
 	return probe, err
 }
 
+func (n *Core) ProcessValidateConfig(config *app.Config) error {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		return ErrNoPeer
+	}
+
+	return client.ProcessValidateConfig(config)
+}
+
 func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, error) {
 	n.lock.RLock()
 	client := n.client

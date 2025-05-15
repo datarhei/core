@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/url"
 	"sort"
 	"sync"
@@ -493,6 +494,18 @@ func (p *Manager) FindNodeForResources(nodeid string, cpu float64, memory uint64
 	return ""
 }
 
+func (p *Manager) GetRandomNode() string {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	nodes := []string{}
+	for nodeid := range p.nodes {
+		nodes = append(nodes, nodeid)
+	}
+
+	return nodes[rand.IntN(len(p.nodes))]
+}
+
 func (p *Manager) ProcessList(options client.ProcessListOptions) []api.Process {
 	processChan := make(chan []api.Process, 64)
 	processList := []api.Process{}
@@ -625,6 +638,15 @@ func (p *Manager) ProcessProbeConfig(nodeid string, config *app.Config) (api.Pro
 	}
 
 	return node.Core().ProcessProbeConfig(config)
+}
+
+func (p *Manager) ProcessValidateConfig(nodeid string, config *app.Config) error {
+	node, err := p.NodeGet(nodeid)
+	if err != nil {
+		return err
+	}
+
+	return node.Core().ProcessValidateConfig(config)
 }
 
 func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {

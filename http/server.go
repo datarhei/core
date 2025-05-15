@@ -641,6 +641,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		if !s.readOnly {
 			v3.POST("/process/probe", s.v3handler.process.ProbeConfig)
+			v3.POST("/process/validate", s.v3handler.process.ValidateConfig)
 			v3.GET("/process/:id/probe", s.v3handler.process.Probe)
 			v3.POST("/process", s.v3handler.process.Add)
 			v3.PUT("/process/:id", s.v3handler.process.Update)

@@ -12,6 +12,12 @@ func (c *cluster) ProcessAdd(origin string, config *app.Config) error {
 		return c.forwarder.ProcessAdd(origin, config)
 	}
 
+	nodeid := c.manager.GetRandomNode()
+	err := c.manager.ProcessValidateConfig(nodeid, config)
+	if err != nil {
+		return err
+	}
+
 	cmd := &store.Command{
 		Operation: store.OpAddProcess,
 		Data: &store.CommandAddProcess{
@@ -55,6 +61,12 @@ func (c *cluster) ProcessRemove(origin string, id app.ProcessID) error {
 func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error {
 	if !c.IsRaftLeader() {
 		return c.forwarder.ProcessUpdate(origin, id, config)
+	}
+
+	nodeid := c.manager.GetRandomNode()
+	err := c.manager.ProcessValidateConfig(nodeid, config)
+	if err != nil {
+		return err
 	}
 
 	cmd := &store.Command{

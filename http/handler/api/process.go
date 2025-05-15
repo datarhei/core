@@ -751,7 +751,7 @@ func (h *ProcessHandler) Probe(c echo.Context) error {
 }
 
 // ProbeConfig probes a process
-// @Summary Add a new process
+// @Summary Probe a process config
 // @Description Probe a process to get a detailed stream information on the inputs.
 // @Tags v16.?.?
 // @ID process-3-probe-config
@@ -795,6 +795,49 @@ func (h *ProcessHandler) ProbeConfig(c echo.Context) error {
 	apiprobe.Unmarshal(&probe)
 
 	return c.JSON(http.StatusOK, apiprobe)
+}
+
+// ValaidateConfig validates a config
+// @Summary Validate a process config
+// @Description Probe a process to get a detailed stream information on the inputs.
+// @Tags v16.?.?
+// @ID process-3-validate-config
+// @Accept json
+// @Produce json
+// @Param config body api.ProcessConfig true "Process config"
+// @Success 200 {object} api.Probe
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/process/validate [post]
+func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+
+	process := api.ProcessConfig{
+		Owner: ctxuser,
+		Type:  "ffmpeg",
+	}
+
+	if err := util.ShouldBindJSON(c, &process); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
+		return api.Err(http.StatusForbidden, "", "You are not allowed to validate this process, check the domain and process ID")
+	}
+
+	if process.Type != "ffmpeg" {
+		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
+	}
+
+	config, _ := process.Marshal()
+
+	err := h.restream.Validate(config)
+	if err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid config: %s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, process)
 }
 
 // Skills returns the detected FFmpeg capabilities

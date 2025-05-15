@@ -67,6 +67,7 @@ type RestClient interface {
 	ProcessCommand(id app.ProcessID, command string) error                                // PUT /v3/process/{id}/command
 	ProcessProbe(id app.ProcessID) (api.Probe, error)                                     // GET /v3/process/{id}/probe
 	ProcessProbeConfig(config *app.Config) (api.Probe, error)                             // POST /v3/process/probe
+	ProcessValidateConfig(p *app.Config) error                                            // POST /v3/process/validate
 	ProcessConfig(id app.ProcessID) (api.ProcessConfig, error)                            // GET /v3/process/{id}/config
 	ProcessReport(id app.ProcessID) (api.ProcessReport, error)                            // GET /v3/process/{id}/report
 	ProcessReportSet(id app.ProcessID, report *app.Report) error                          // PUT /v3/process/{id}/report

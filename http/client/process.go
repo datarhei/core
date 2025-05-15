@@ -226,6 +226,24 @@ func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 	return probe, err
 }
 
+func (r *restclient) ProcessValidateConfig(p *app.Config) error {
+	buf := mem.Get()
+	defer mem.Put(buf)
+
+	config := api.ProcessConfig{}
+	config.Unmarshal(p, nil)
+
+	e := json.NewEncoder(buf)
+	e.Encode(config)
+
+	_, err := r.call("POST", "/v3/process/validate", nil, nil, "application/json", buf.Reader())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *restclient) ProcessConfig(id app.ProcessID) (api.ProcessConfig, error) {
 	var p api.ProcessConfig
 

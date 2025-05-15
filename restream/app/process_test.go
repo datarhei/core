@@ -66,6 +66,34 @@ func TestConfigHash(t *testing.T) {
 	require.False(t, bytes.Equal(hash1, hash2))
 }
 
+func TestConfigIOHash(t *testing.T) {
+	io1 := ConfigIO{
+		ID:      "0",
+		Address: "-",
+		Options: []string{
+			"-codec",
+			"copy",
+			"-f",
+			"null",
+		},
+		Cleanup: []ConfigIOCleanup{},
+	}
+
+	io2 := ConfigIO{
+		ID:      "0",
+		Address: "-",
+		Options: []string{
+			"-codec",
+			"copy",
+			"-f",
+			"null",
+		},
+		Cleanup: nil,
+	}
+
+	require.Equal(t, io1.HashString(), io2.HashString())
+}
+
 func TestProcessUsageCPU(t *testing.T) {
 	original := parse.UsageCPU{
 		NCPU:    1.5,
