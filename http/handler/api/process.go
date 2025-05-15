@@ -354,7 +354,9 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 		h.restream.SetProcessMetadata(tid, key, data)
 	}
 
-	return c.JSON(http.StatusOK, process)
+	p, _ := h.getProcess(tid, newFilter("config"))
+
+	return c.JSON(http.StatusOK, p.Config)
 }
 
 // Command issues a command to a process

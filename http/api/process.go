@@ -309,6 +309,7 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 		io := ProcessConfigIO{
 			ID:      x.ID,
 			Address: x.Address,
+			Cleanup: []ProcessConfigIOCleanup{},
 		}
 
 		io.Options = make([]string, len(x.Options))
@@ -321,6 +322,7 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 		io := ProcessConfigIO{
 			ID:      x.ID,
 			Address: x.Address,
+			Cleanup: []ProcessConfigIOCleanup{},
 		}
 
 		io.Options = make([]string, len(x.Options))
