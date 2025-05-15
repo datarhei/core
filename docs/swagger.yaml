@@ -5964,7 +5964,40 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Add a new process
+      summary: Probe a process config
+      tags:
+      - v16.?.?
+  /api/v3/process/validate:
+    post:
+      consumes:
+      - application/json
+      description: Probe a process to get a detailed stream information on the inputs.
+      operationId: process-3-validate-config
+      parameters:
+      - description: Process config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.ProcessConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Probe'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Validate a process config
       tags:
       - v16.?.?
   /api/v3/report/process:

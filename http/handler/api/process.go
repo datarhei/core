@@ -303,6 +303,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	process := api.ProcessConfig{
 		ID:        id,
 		Owner:     ctxuser,
+		Domain:    domain,
 		Type:      "ffmpeg",
 		Autostart: true,
 	}
