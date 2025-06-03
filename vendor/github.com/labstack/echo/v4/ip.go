@@ -24,7 +24,7 @@ To retrieve IP address reliably/securely, you must let your application be aware
 In Echo, this can be done by configuring `Echo#IPExtractor` appropriately.
 This guides show you why and how.
 
-> Note: if you dont' set `Echo#IPExtractor` explicitly, Echo fallback to legacy behavior, which is not a good choice.
+> Note: if you don't set `Echo#IPExtractor` explicitly, Echo fallback to legacy behavior, which is not a good choice.
 
 Let's start from two questions to know the right direction:
 
@@ -134,10 +134,10 @@ Private IPv6 address ranges:
 */
 
 type ipChecker struct {
+	trustExtraRanges []*net.IPNet
 	trustLoopback    bool
 	trustLinkLocal   bool
 	trustPrivateNet  bool
-	trustExtraRanges []*net.IPNet
 }
 
 // TrustOption is config for which IP address to trust

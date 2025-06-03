@@ -1,14 +1,15 @@
-package validator
+package rules
 
 import (
 	"github.com/vektah/gqlparser/v2/ast"
 
-	//nolint:revive // Validator rules each use dot imports for convenience.
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
 	. "github.com/vektah/gqlparser/v2/validator"
 )
 
-func init() {
-	AddRule("KnownDirectives", func(observers *Events, addError AddErrFunc) {
+var KnownDirectivesRule = Rule{
+	Name: "KnownDirectives",
+	RuleFunc: func(observers *Events, addError AddErrFunc) {
 		type mayNotBeUsedDirective struct {
 			Name   string
 			Line   int
@@ -45,5 +46,9 @@ func init() {
 				seen[tmp] = true
 			}
 		})
-	})
+	},
+}
+
+func init() {
+	AddRule(KnownDirectivesRule.Name, KnownDirectivesRule.RuleFunc)
 }

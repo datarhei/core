@@ -20,6 +20,13 @@ type parser struct {
 
 	comment          *ast.CommentGroup
 	commentConsuming bool
+
+	tokenCount    int
+	maxTokenLimit int
+}
+
+func (p *parser) SetMaxTokenLimit(maxToken int) {
+	p.maxTokenLimit = maxToken
 }
 
 func (p *parser) consumeComment() (*ast.Comment, bool) {
@@ -93,6 +100,12 @@ func (p *parser) error(tok lexer.Token, format string, args ...interface{}) {
 
 func (p *parser) next() lexer.Token {
 	if p.err != nil {
+		return p.prev
+	}
+	// Increment the token count before reading the next token
+	p.tokenCount++
+	if p.maxTokenLimit != 0 && p.tokenCount > p.maxTokenLimit {
+		p.err = gqlerror.Errorf("exceeded token limit of %d", p.maxTokenLimit)
 		return p.prev
 	}
 	if p.peeked {

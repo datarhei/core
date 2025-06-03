@@ -36,15 +36,15 @@ jobs:
                 include:
                     - core: ${{ needs.versions.outputs.coreversion }}
                       os: alpine
-                      os_version: "3.20"
-                      golang: golang:1.23-alpine3.20
+                      os_version: "3.22"
+                      golang: golang:1.24.3-alpine3.22@sha256:b4f875e650466fa0fe62c6fd3f02517a392123eea85f1d7e69d85f780e4db1c1
                       platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
                       branch: main
                       latest: yes
                     - core: ${{ needs.versions.outputs.coreversion }}
                       os: ubuntu
                       os_version: "22.04"
-                      golang: golang:1.23-alpine3.20
+                      golang: golang:1.24.3-alpine3.22@sha256:b4f875e650466fa0fe62c6fd3f02517a392123eea85f1d7e69d85f780e4db1c1
                       platforms: linux/amd64
                       branch: main
                       latest: yes
