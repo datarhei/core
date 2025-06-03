@@ -3,7 +3,7 @@ package ast
 type QueryDocument struct {
 	Operations OperationList
 	Fragments  FragmentDefinitionList
-	Position   *Position `dump:"-"`
+	Position   *Position `dump:"-" json:"-"`
 	Comment    *CommentGroup
 }
 
@@ -13,7 +13,7 @@ type SchemaDocument struct {
 	Directives      DirectiveDefinitionList
 	Definitions     DefinitionList
 	Extensions      DefinitionList
-	Position        *Position `dump:"-"`
+	Position        *Position `dump:"-" json:"-"`
 	Comment         *CommentGroup
 }
 
@@ -26,9 +26,10 @@ func (d *SchemaDocument) Merge(other *SchemaDocument) {
 }
 
 type Schema struct {
-	Query        *Definition
-	Mutation     *Definition
-	Subscription *Definition
+	Query            *Definition
+	Mutation         *Definition
+	Subscription     *Definition
+	SchemaDirectives DirectiveList
 
 	Types      map[string]*Definition
 	Directives map[string]*DirectiveDefinition
@@ -73,7 +74,7 @@ type SchemaDefinition struct {
 	Description    string
 	Directives     DirectiveList
 	OperationTypes OperationTypeDefinitionList
-	Position       *Position `dump:"-"`
+	Position       *Position `dump:"-" json:"-"`
 
 	BeforeDescriptionComment *CommentGroup
 	AfterDescriptionComment  *CommentGroup
@@ -83,6 +84,6 @@ type SchemaDefinition struct {
 type OperationTypeDefinition struct {
 	Operation Operation
 	Type      string
-	Position  *Position `dump:"-"`
+	Position  *Position `dump:"-" json:"-"`
 	Comment   *CommentGroup
 }

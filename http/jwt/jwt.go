@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 // The Config type holds information that is required to create a new JWT provider
@@ -87,7 +86,7 @@ func New(config Config) (JWT, error) {
 
 	j.accessConfig = echojwt.Config{
 		Skipper:        skipperFunc,
-		SigningMethod:  middleware.AlgorithmHS256,
+		SigningMethod:  echojwt.AlgorithmHS256,
 		ContextKey:     "user",
 		TokenLookup:    "header:Authorization:Bearer ",
 		ErrorHandler:   j.ErrorHandler,
@@ -96,7 +95,7 @@ func New(config Config) (JWT, error) {
 
 	j.refreshConfig = echojwt.Config{
 		Skipper:        skipperFunc,
-		SigningMethod:  middleware.AlgorithmHS256,
+		SigningMethod:  echojwt.AlgorithmHS256,
 		ContextKey:     "user",
 		TokenLookup:    "header:Authorization:Bearer ",
 		ErrorHandler:   j.ErrorHandler,
