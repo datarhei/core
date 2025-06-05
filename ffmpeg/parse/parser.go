@@ -917,10 +917,6 @@ func (p *parser) storeReportHistory(state string, usage Usage) {
 
 	p.ResetLog()
 
-	if len(report.Prelude) == 0 {
-		return
-	}
-
 	p.lock.logHistory.Lock()
 	defer p.lock.logHistory.Unlock()
 
