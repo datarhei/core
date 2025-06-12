@@ -95,7 +95,7 @@ func (p *process) tickCPU(ctx context.Context, interval time.Duration) {
 }
 
 func (p *process) collectCPU() cpuTimesStat {
-	stat, err := p.cpuTimes()
+	stat, err := cpuTimes(p.pid)
 	if err != nil {
 		return cpuTimesStat{
 			total: float64(time.Now().Unix()),
@@ -103,7 +103,47 @@ func (p *process) collectCPU() cpuTimesStat {
 		}
 	}
 
+	cstat := p.collectCPUFromChildren(p.proc)
+
+	stat.total += cstat.total
+	stat.system += cstat.system
+	stat.user += cstat.user
+	stat.idle += cstat.idle
+	stat.other += cstat.other
+
 	return *stat
+}
+
+func (p *process) collectCPUFromChildren(proc *psprocess.Process) *cpuTimesStat {
+	stat := cpuTimesStat{}
+
+	children, err := proc.Children()
+	if err != nil {
+		return &stat
+	}
+
+	for _, child := range children {
+		cstat, err := cpuTimes(child.Pid)
+		if err != nil {
+			continue
+		}
+
+		stat.total += cstat.total
+		stat.system += cstat.system
+		stat.user += cstat.user
+		stat.idle += cstat.idle
+		stat.other += cstat.other
+
+		cstat = p.collectCPUFromChildren(child)
+
+		stat.total += cstat.total
+		stat.system += cstat.system
+		stat.user += cstat.user
+		stat.idle += cstat.idle
+		stat.other += cstat.other
+	}
+
+	return &stat
 }
 
 func (p *process) tickMemory(ctx context.Context, interval time.Duration) {
@@ -130,7 +170,33 @@ func (p *process) collectMemory() uint64 {
 		return 0
 	}
 
-	return info.RSS
+	rss := info.RSS
+
+	rss += p.collectMemoryFromChildren(p.proc)
+
+	return rss
+}
+
+func (p *process) collectMemoryFromChildren(proc *psprocess.Process) uint64 {
+	children, err := proc.Children()
+	if err != nil {
+		return 0
+	}
+
+	rss := uint64(0)
+
+	for _, child := range children {
+		info, err := child.MemoryInfo()
+		if err != nil {
+			continue
+		}
+
+		rss += info.RSS
+
+		rss += p.collectMemoryFromChildren(child)
+	}
+
+	return rss
 }
 
 func (p *process) Cancel() {

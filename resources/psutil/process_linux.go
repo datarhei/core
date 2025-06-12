@@ -27,13 +27,13 @@ func init() {
 	}
 }
 
-func (p *process) cpuTimes() (*cpuTimesStat, error) {
+func cpuTimes(pid int32) (*cpuTimesStat, error) {
 	value := os.Getenv("HOST_PROC")
 	if value == "" {
 		value = "/proc"
 	}
 
-	path := filepath.Join(value, strconv.FormatInt(int64(p.pid), 10), "stat")
+	path := filepath.Join(value, strconv.FormatInt(int64(pid), 10), "stat")
 
 	contents, err := os.ReadFile(path)
 	if err != nil {

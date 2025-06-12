@@ -3,8 +3,15 @@
 
 package psutil
 
-func (p *process) cpuTimes() (*cpuTimesStat, error) {
-	times, err := p.proc.Times()
+import psprocess "github.com/shirou/gopsutil/v3/process"
+
+func cpuTimes(pid int32) (*cpuTimesStat, error) {
+	proc, err := psprocess.NewProcess(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	times, err := proc.Times()
 	if err != nil {
 		return nil, err
 	}
