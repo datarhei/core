@@ -86,6 +86,8 @@ func (c *client) ticker(ctx context.Context) {
 
 func (c *client) Close() {
 	c.cancel()
+
+	c.conn.Close()
 }
 
 // channel represents a stream that is sent to the server
