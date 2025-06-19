@@ -31,6 +31,7 @@ type Config struct {
 	Models                               TypeMap                    `yaml:"models,omitempty"`
 	StructTag                            string                     `yaml:"struct_tag,omitempty"`
 	Directives                           map[string]DirectiveConfig `yaml:"directives,omitempty"`
+	LocalPrefix                          string                     `yaml:"local_prefix,omitempty"`
 	GoBuildTags                          StringList                 `yaml:"go_build_tags,omitempty"`
 	GoInitialisms                        GoInitialismsConfig        `yaml:"go_initialisms,omitempty"`
 	OmitSliceElementPointers             bool                       `yaml:"omit_slice_element_pointers,omitempty"`
@@ -54,6 +55,7 @@ type Config struct {
 	ResolversAlwaysReturnPointers  bool           `yaml:"resolvers_always_return_pointers,omitempty"`
 	NullableInputOmittable         bool           `yaml:"nullable_input_omittable,omitempty"`
 	EnableModelJsonOmitemptyTag    *bool          `yaml:"enable_model_json_omitempty_tag,omitempty"`
+	EnableModelJsonOmitzeroTag     *bool          `yaml:"enable_model_json_omitzero_tag,omitempty"`
 	SkipValidation                 bool           `yaml:"skip_validation,omitempty"`
 	SkipModTidy                    bool           `yaml:"skip_mod_tidy,omitempty"`
 	Sources                        []*ast.Source  `yaml:"-"`
@@ -68,6 +70,7 @@ var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 
 // DefaultConfig creates a copy of the default config
 func DefaultConfig() *Config {
+	falseValue := false
 	return &Config{
 		SchemaFilename:                 StringList{"schema.graphql"},
 		Model:                          PackageConfig{Filename: "models_gen.go"},
@@ -78,6 +81,7 @@ func DefaultConfig() *Config {
 		ReturnPointersInUnmarshalInput: false,
 		ResolversAlwaysReturnPointers:  true,
 		NullableInputOmittable:         false,
+		EnableModelJsonOmitzeroTag:     &falseValue,
 	}
 }
 
@@ -282,24 +286,8 @@ func (c *Config) IsRoot(def *ast.Definition) bool {
 }
 
 func (c *Config) injectTypesFromSchema() error {
-	c.Directives["goModel"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goExtraField"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goField"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goTag"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goEnum"] = DirectiveConfig{
-		SkipRuntime: true,
+	for _, d := range []string{"goModel", "goExtraField", "goField", "goTag", "goEnum"} {
+		c.Directives[d] = DirectiveConfig{SkipRuntime: true}
 	}
 
 	for _, schemaType := range c.Schema.Types {

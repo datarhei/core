@@ -174,11 +174,49 @@ func IsValid(expr string) bool {
 		return false
 	}
 
+	// First check syntax without time dependency
+	if !isSyntaxValid(segs) {
+		return false
+	}
+
+	// Then check with time dependency
 	for pos, seg := range segs {
 		if _, err := checker.CheckDue(seg, pos); err != nil {
 			return false
 		}
 	}
 
+	return true
+}
+
+// isSyntaxValid checks if the cron segments are syntactically valid without time dependency.
+// It returns bool.
+func isSyntaxValid(segs []string) bool {
+	for _, seg := range segs {
+		// Check for empty segments
+		if seg == "" {
+			return false
+		}
+
+		// Split by comma to check each part
+		parts := strings.Split(seg, ",")
+		for _, part := range parts {
+			// Check for empty parts
+			if part == "" {
+				return false
+			}
+
+			// Check for invalid characters
+			if strings.ContainsAny(part, "*/") {
+				// If contains /, must have a number after it
+				if strings.Contains(part, "/") {
+					parts := strings.Split(part, "/")
+					if len(parts) != 2 || parts[1] == "" {
+						return false
+					}
+				}
+			}
+		}
+	}
 	return true
 }

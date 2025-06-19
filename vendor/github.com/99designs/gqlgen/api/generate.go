@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"syscall"
 
+	"golang.org/x/tools/imports"
+
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/plugin"
@@ -14,8 +16,8 @@ import (
 )
 
 var (
-	urlRegex     = regexp.MustCompile(`(?s)@link.*\(.*url:.*?"(.*?)"[^)]+\)`) // regex to grab the url of a link directive, should it exist
-	versionRegex = regexp.MustCompile(`v(\d+).(\d+)$`)                        // regex to grab the version number from a url
+	urlRegex     = regexp.MustCompile(`(?s)@link.*\(.*url:\s*?"(.*?)"[^)]+\)`) // regex to grab the url of a link directive, should it exist
+	versionRegex = regexp.MustCompile(`v(\d+).(\d+)$`)                         // regex to grab the version number from a url
 )
 
 func Generate(cfg *config.Config, option ...Option) error {
@@ -54,6 +56,10 @@ func Generate(cfg *config.Config, option ...Option) error {
 
 	for _, o := range option {
 		o(cfg, &plugins)
+	}
+
+	if cfg.LocalPrefix != "" {
+		imports.LocalPrefix = cfg.LocalPrefix
 	}
 
 	for _, p := range plugins {
