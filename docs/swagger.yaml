@@ -1752,6 +1752,11 @@ definitions:
       stream:
         format: uint64
         type: integer
+      tee:
+        description: Format specific
+        items:
+          $ref: '#/definitions/api.ProgressIOTee'
+        type: array
       type:
         type: string
       width:
@@ -1766,6 +1771,23 @@ definitions:
         type: number
       min:
         type: number
+    type: object
+  api.ProgressIOTee:
+    properties:
+      address:
+        type: string
+      fifo_enabled:
+        type: boolean
+      fifo_revocery_attempts_total:
+        type: number
+      fifo_state:
+        type: string
+      format:
+        type: string
+      id:
+        type: string
+      state:
+        type: string
     type: object
   api.RTMPChannel:
     properties:

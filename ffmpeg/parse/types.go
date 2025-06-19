@@ -167,6 +167,12 @@ func (av *ffmpegAVstream) export(trackType string) *AVstream {
 	return avs
 }
 
+type ffmpegProgressIOTee struct {
+	State                string `json:"state"`
+	FifoRecoveryAttempts uint64 `json:"fifo_recovery_attempts_total"`
+	FifoState            string `json:"fifo_state"`
+}
+
 type ffmpegProgressIO struct {
 	// common
 	Index     uint64  `json:"index"`
@@ -188,6 +194,9 @@ type ffmpegProgressIO struct {
 
 	// video
 	Quantizer float64 `json:"q"`
+
+	// format specific
+	Tee []ffmpegProgressIOTee `json:"tee"`
 }
 
 func (io *ffmpegProgressIO) exportTo(progress *ProgressIO) {
@@ -207,6 +216,16 @@ func (io *ffmpegProgressIO) exportTo(progress *ProgressIO) {
 		progress.Size = io.SizeKB * 1024
 	} else {
 		progress.Size = io.Size
+	}
+
+	if len(progress.Tee) == len(io.Tee) {
+		for i, t := range io.Tee {
+			tee := progress.Tee[i]
+			tee.State = t.State
+			tee.FifoRecoveryAttempts = t.FifoRecoveryAttempts
+			tee.FifoState = t.FifoState
+			progress.Tee[i] = tee
+		}
 	}
 }
 
@@ -262,6 +281,13 @@ func (p *ffmpegProgress) exportTo(progress *Progress) {
 	}
 }
 
+type ffmpegTee struct {
+	ID      string `json:"id"`
+	Address string `json:"address"`
+	Format  string `json:"format"`
+	Fifo    bool   `json:"fifo_enabled"`
+}
+
 type ffmpegProcessIO struct {
 	// common
 	Address string `json:"url"`
@@ -285,10 +311,13 @@ type ffmpegProcessIO struct {
 	Sampling  uint64 `json:"sampling_hz"`
 	Layout    string `json:"layout"`
 	Channels  uint64 `json:"channels"`
+
+	// format specific
+	Tee []ffmpegTee `json:"tee"`
 }
 
 func (io *ffmpegProcessIO) export() ProgressIO {
-	return ProgressIO{
+	pio := ProgressIO{
 		URL:       io.Address,
 		Address:   io.Address,
 		Format:    io.Format,
@@ -307,6 +336,17 @@ func (io *ffmpegProcessIO) export() ProgressIO {
 		Layout:    io.Layout,
 		Channels:  io.Channels,
 	}
+
+	for _, t := range io.Tee {
+		pio.Tee = append(pio.Tee, ProgressIOTee{
+			ID:      t.ID,
+			Address: t.Address,
+			Format:  t.Format,
+			Fifo:    t.Fifo,
+		})
+	}
+
+	return pio
 }
 
 type ffmpegGraphElement struct {
@@ -521,6 +561,16 @@ type ffmpegHLSVariant struct {
 	Streams []int  `json:"streams"`
 }
 
+type ProgressIOTee struct {
+	ID                   string
+	Address              string
+	Format               string
+	State                string
+	Fifo                 bool
+	FifoRecoveryAttempts uint64
+	FifoState            string
+}
+
 type ProgressIO struct {
 	URL     string
 	Address string
@@ -562,6 +612,9 @@ type ProgressIO struct {
 
 	// avstream
 	AVstream *AVstream
+
+	// Format specific
+	Tee []ProgressIOTee
 }
 
 type Progress struct {

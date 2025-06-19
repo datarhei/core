@@ -11,6 +11,16 @@ type ProgressIOFramerate struct {
 	Average json.Number `json:"avg" swaggertype:"number" jsonschema:"type=number"`
 }
 
+type ProgressIOTee struct {
+	ID                   string      `json:"id"`
+	Address              string      `json:"address"`
+	Format               string      `json:"format"`
+	State                string      `json:"state"`
+	Fifo                 bool        `json:"fifo_enabled"`
+	FifoRecoveryAttempts json.Number `json:"fifo_revocery_attempts_total" swaggertype:"number" jsonschema:"type=number"`
+	FifoState            string      `json:"fifo_state"`
+}
+
 // ProgressIO represents the progress of an ffmpeg input or output
 type ProgressIO struct {
 	ID      string `json:"id" jsonschema:"minLength=1"`
@@ -49,6 +59,9 @@ type ProgressIO struct {
 
 	// avstream
 	AVstream *AVstream `json:"avstream" jsonschema:"anyof_type=null;object"`
+
+	// Format specific
+	Tee []ProgressIOTee `json:"tee"`
 }
 
 // Unmarshal converts a core ProgressIO to a ProgressIO in API representation
@@ -90,6 +103,18 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 	if io.AVstream != nil {
 		i.AVstream = &AVstream{}
 		i.AVstream.Unmarshal(io.AVstream)
+	}
+
+	for _, t := range io.Tee {
+		i.Tee = append(i.Tee, ProgressIOTee{
+			ID:                   t.ID,
+			Address:              t.Address,
+			Format:               t.Format,
+			State:                t.State,
+			Fifo:                 t.Fifo,
+			FifoRecoveryAttempts: json.ToNumber(float64(t.FifoRecoveryAttempts)),
+			FifoState:            t.FifoState,
+		})
 	}
 }
 
@@ -149,6 +174,23 @@ func (i *ProgressIO) Marshal() app.ProgressIO {
 
 	if i.AVstream != nil {
 		p.AVstream = i.AVstream.Marshal()
+	}
+
+	for _, t := range i.Tee {
+		tee := app.ProgressIOTee{
+			ID:        t.ID,
+			Address:   t.Address,
+			Format:    t.Format,
+			State:     t.State,
+			Fifo:      t.Fifo,
+			FifoState: t.FifoState,
+		}
+
+		if x, err := t.FifoRecoveryAttempts.Int64(); err == nil {
+			tee.FifoRecoveryAttempts = uint64(x)
+		}
+
+		p.Tee = append(p.Tee, tee)
 	}
 
 	return p

@@ -8,6 +8,16 @@ type ProgressIOFramerate struct {
 	Average float64
 }
 
+type ProgressIOTee struct {
+	ID                   string
+	Address              string
+	Format               string
+	State                string
+	Fifo                 bool
+	FifoRecoveryAttempts uint64
+	FifoState            string
+}
+
 type ProgressIO struct {
 	ID      string
 	URL     string // The original URL as reported by ffmpeg
@@ -46,6 +56,9 @@ type ProgressIO struct {
 
 	// avstream
 	AVstream *AVstream
+
+	// Format specific
+	Tee []ProgressIOTee
 }
 
 func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
@@ -82,6 +95,10 @@ func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 		p.AVstream.UnmarshalParser(pp.AVstream)
 	} else {
 		p.AVstream = nil
+	}
+
+	for _, t := range pp.Tee {
+		p.Tee = append(p.Tee, ProgressIOTee(t))
 	}
 }
 

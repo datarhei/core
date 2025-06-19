@@ -7817,6 +7817,13 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "uint64"
                 },
+                "tee": {
+                    "description": "Format specific",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProgressIOTee"
+                    }
+                },
                 "type": {
                     "type": "string"
                 },
@@ -7837,6 +7844,32 @@ const docTemplate = `{
                 },
                 "min": {
                     "type": "number"
+                }
+            }
+        },
+        "api.ProgressIOTee": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "fifo_enabled": {
+                    "type": "boolean"
+                },
+                "fifo_revocery_attempts_total": {
+                    "type": "number"
+                },
+                "fifo_state": {
+                    "type": "string"
+                },
+                "format": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
                 }
             }
         },

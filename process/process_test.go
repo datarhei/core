@@ -365,7 +365,11 @@ func TestProcessDuration(t *testing.T) {
 
 	px := p.(*process)
 
-	require.Nil(t, px.stopTimer)
+	px.stopTimerLock.Lock()
+	stopTimer := px.stopTimer
+	px.stopTimerLock.Unlock()
+
+	require.Nil(t, stopTimer)
 }
 
 func TestProcessSchedulePointInTime(t *testing.T) {
