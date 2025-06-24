@@ -65,7 +65,8 @@ type Config struct {
 	ValidatorOutput         Validator
 	Portrange               net.Portranger
 	Collector               session.Collector
-	Resource                resources.Resources
+	Resource                resources.Resources // Resource observer
+	Throttling              bool                // Whether to allow CPU throttling
 }
 
 type ffmpeg struct {
@@ -84,7 +85,8 @@ type ffmpeg struct {
 	states     process.States
 	statesLock sync.RWMutex
 
-	resources resources.Resources
+	resources  resources.Resources
+	throttling bool
 }
 
 func New(config Config) (FFmpeg, error) {
@@ -95,6 +97,7 @@ func New(config Config) (FFmpeg, error) {
 	}
 
 	f.resources = config.Resource
+	f.throttling = config.Throttling
 
 	binary, err := exec.LookPath(config.Binary)
 	if err != nil {
@@ -164,6 +167,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		StaleTimeout:    config.StaleTimeout,
 		Timeout:         config.Timeout,
 		LimitCPU:        config.LimitCPU,
+		Throttling:      f.throttling,
 		LimitMemory:     config.LimitMemory,
 		LimitGPUUsage:   config.LimitGPUUsage,
 		LimitGPUEncoder: config.LimitGPUEncoder,

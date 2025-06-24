@@ -513,6 +513,7 @@ func (a *api) start(ctx context.Context) error {
 		Portrange:               portrange,
 		Collector:               a.sessions.Collector("ffmpeg"),
 		Resource:                a.resources,
+		Throttling:              !cfg.FFmpeg.DisableThrottling,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create ffmpeg: %w", err)

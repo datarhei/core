@@ -6070,6 +6070,9 @@
                         "binary": {
                             "type": "string"
                         },
+                        "disable_throttling": {
+                            "type": "boolean"
+                        },
                         "log": {
                             "type": "object",
                             "properties": {
@@ -8620,6 +8623,9 @@
                         },
                         "binary": {
                             "type": "string"
+                        },
+                        "disable_throttling": {
+                            "type": "boolean"
                         },
                         "log": {
                             "type": "object",

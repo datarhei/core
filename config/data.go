@@ -127,9 +127,10 @@ type Data struct {
 		} `json:"log"`
 	} `json:"srt"`
 	FFmpeg struct {
-		Binary       string `json:"binary"`
-		MaxProcesses int64  `json:"max_processes" format:"int64"`
-		Access       struct {
+		Binary            string `json:"binary"`
+		MaxProcesses      int64  `json:"max_processes" format:"int64"`
+		DisableThrottling bool   `json:"disable_throttling"`
+		Access            struct {
 			Input struct {
 				Allow []string `json:"allow"`
 				Block []string `json:"block"`

@@ -1922,6 +1922,9 @@ const docTemplateClusterAPI = `{
                         "binary": {
                             "type": "string"
                         },
+                        "disable_throttling": {
+                            "type": "boolean"
+                        },
                         "log": {
                             "type": "object",
                             "properties": {

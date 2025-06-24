@@ -6077,6 +6077,9 @@ const docTemplate = `{
                         "binary": {
                             "type": "string"
                         },
+                        "disable_throttling": {
+                            "type": "boolean"
+                        },
                         "log": {
                             "type": "object",
                             "properties": {
@@ -8627,6 +8630,9 @@ const docTemplate = `{
                         },
                         "binary": {
                             "type": "string"
+                        },
+                        "disable_throttling": {
+                            "type": "boolean"
                         },
                         "log": {
                             "type": "object",

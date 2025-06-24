@@ -86,6 +86,7 @@ type LimiterConfig struct {
 	OnLimit    LimitFunc     // Function to be triggered if limits are exceeded.
 	Mode       LimitMode     // How to limit CPU usage.
 	NCPU       float64       // Number of available CPU
+	Throttling bool          // Whether to allow CPU throttling
 	Logger     log.Logger
 }
 
@@ -236,8 +237,9 @@ type limiter struct {
 	lastUsage     Usage
 	lastUsageLock sync.RWMutex
 
-	cpu           metric[float64] // CPU limit
-	cpuThrottling bool            // Whether CPU throttling is currently active (soft limiter mode)
+	cpu                 metric[float64] // CPU limit
+	cpuThrottling       bool            // Whether CPU throttling is currently active (soft limiter mode)
+	cpuEnableThrottling bool            // Whether to enable CPU throttling
 
 	memory metric[uint64] // Memory limit (bytes)
 
@@ -269,7 +271,10 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 	}
 
 	l.cpu.SetLimit(config.CPU / 100)
+	l.cpuEnableThrottling = config.Throttling
+
 	l.memory.SetLimit(config.Memory)
+
 	l.gpu.memory.SetLimit(config.GPUMemory)
 	l.gpu.usage.SetLimit(config.GPUUsage / 100)
 	l.gpu.encoder.SetLimit(config.GPUEncoder / 100)
@@ -342,7 +347,7 @@ func (l *limiter) Start(process resources.Process) error {
 
 	go l.ticker(ctx, time.Second)
 
-	if l.mode == LimitModeSoft {
+	if l.mode == LimitModeSoft && l.cpuEnableThrottling {
 		go l.limitCPU(ctx, l.cpu.Limit(), time.Second)
 	}
 
@@ -407,7 +412,7 @@ func (l *limiter) collect() {
 
 	isLimitExceeded := false
 
-	if l.mode == LimitModeHard {
+	if l.mode == LimitModeHard || !l.cpuEnableThrottling {
 		if l.cpu.IsExceeded(l.waitFor, l.mode) {
 			l.logger.Warn().Log("CPU limit exceeded")
 			isLimitExceeded = true

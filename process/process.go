@@ -58,6 +58,7 @@ type Config struct {
 	StaleTimeout    time.Duration                         // Kill the process after this duration if it doesn't produce any output.
 	Timeout         time.Duration                         // Kill the process after this duration.
 	LimitCPU        float64                               // Kill the process if the CPU usage in percent is above this value, in percent 0-100 in hard mode, 0-100*ncpu in soft mode.
+	Throttling      bool                                  // Whether to allow CPU throttling
 	LimitMemory     uint64                                // Kill the process if the memory consumption in bytes is above this value.
 	LimitGPUUsage   float64                               // Kill the process if the GPU usage in percent is above this value, in percent 0-100.
 	LimitGPUEncoder float64                               // Kill the process if the GPU encoder usage in percent is above this value, in percent 0-100.
@@ -312,6 +313,7 @@ func New(config Config) (Process, error) {
 
 	limits, err := NewLimiter(LimiterConfig{
 		CPU:        config.LimitCPU,
+		Throttling: config.Throttling,
 		NCPU:       ncpu,
 		Memory:     config.LimitMemory,
 		GPUUsage:   config.LimitGPUUsage,

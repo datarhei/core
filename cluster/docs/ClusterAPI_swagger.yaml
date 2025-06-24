@@ -429,6 +429,8 @@ definitions:
             type: object
           binary:
             type: string
+          disable_throttling:
+            type: boolean
           log:
             properties:
               max_history:
