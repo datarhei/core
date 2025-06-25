@@ -238,7 +238,7 @@ func New(config Config) (Resources, error) {
 		"max_gpu_memory": r.maxGPUMemory,
 	})
 
-	r.self, err = r.psutil.Process(int32(os.Getpid()))
+	r.self, err = r.psutil.Process(int32(os.Getpid()), false)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create process observer for self: %w", err)
 	}
@@ -639,7 +639,7 @@ func (r *resources) Network() ([]NetworkInfo, error) {
 }
 
 func (r *resources) Process(pid int32) (Process, error) {
-	proc, err := r.psutil.Process(pid)
+	proc, err := r.psutil.Process(pid, true)
 	if err != nil {
 		return nil, err
 	}

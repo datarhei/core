@@ -89,7 +89,7 @@ func (u *MockPSUtil) GPU() ([]psutil.GPUInfo, error) {
 	return gpu, nil
 }
 
-func (u *MockPSUtil) Process(pid int32) (psutil.Process, error) {
+func (u *MockPSUtil) Process(pid int32, children bool) (psutil.Process, error) {
 	return &mockPSUtilProcess{}, nil
 }
 

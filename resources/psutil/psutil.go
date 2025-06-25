@@ -113,7 +113,7 @@ type Util interface {
 	GPU() ([]GPUInfo, error)
 
 	// Process returns a process observer for a process with the given pid.
-	Process(pid int32) (Process, error)
+	Process(pid int32, children bool) (Process, error)
 }
 
 type util struct {

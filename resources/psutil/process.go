@@ -36,6 +36,7 @@ type process struct {
 	cpuLimit  uint64
 	ncpu      float64
 	proc      *psprocess.Process
+	children  bool
 	procfs    Procfs
 
 	stopTicker context.CancelFunc
@@ -51,13 +52,14 @@ type process struct {
 	gpu gpu.GPU
 }
 
-func (u *util) Process(pid int32) (Process, error) {
+func (u *util) Process(pid int32, children bool) (Process, error) {
 	p := &process{
 		pid:       pid,
 		hasCgroup: u.hasCgroup,
 		cpuLimit:  u.cpuLimit,
 		ncpu:      u.ncpu,
 		gpu:       u.gpu,
+		children:  children,
 		procfs:    u.procfs,
 	}
 
@@ -105,13 +107,15 @@ func (p *process) collectCPU() cpuTimesStat {
 		}
 	}
 
-	cstat := p.collectCPUFromChildren(p.proc)
+	if p.children {
+		cstat := p.collectCPUFromChildren(p.proc)
 
-	stat.total += cstat.total
-	stat.system += cstat.system
-	stat.user += cstat.user
-	stat.idle += cstat.idle
-	stat.other += cstat.other
+		stat.total += cstat.total
+		stat.system += cstat.system
+		stat.user += cstat.user
+		stat.idle += cstat.idle
+		stat.other += cstat.other
+	}
 
 	return *stat
 }
@@ -163,7 +167,9 @@ func (p *process) collectMemory() uint64 {
 
 	rss := info.RSS
 
-	rss += p.collectMemoryFromChildren(p.proc)
+	if p.children {
+		rss += p.collectMemoryFromChildren(p.proc)
+	}
 
 	return rss
 }
