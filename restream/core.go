@@ -324,7 +324,7 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 				defer t.Release(token)
 				limitGPU := false
 				gpuindex := t.GetHWDevice()
-				if gpuindex >= 0 {
+				if gpuindex >= 0 && len(limitGPUs) >= gpuindex+1 {
 					limitGPU = limitGPUs[gpuindex]
 				}
 				if t.Limit(limitCPU, limitMemory, limitGPU) {
