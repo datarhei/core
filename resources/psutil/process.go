@@ -36,6 +36,7 @@ type process struct {
 	cpuLimit  uint64
 	ncpu      float64
 	proc      *psprocess.Process
+	procfs    Procfs
 
 	stopTicker context.CancelFunc
 
@@ -57,6 +58,7 @@ func (u *util) Process(pid int32) (Process, error) {
 		cpuLimit:  u.cpuLimit,
 		ncpu:      u.ncpu,
 		gpu:       u.gpu,
+		procfs:    u.procfs,
 	}
 
 	proc, err := psprocess.NewProcess(pid)
@@ -117,24 +119,13 @@ func (p *process) collectCPU() cpuTimesStat {
 func (p *process) collectCPUFromChildren(proc *psprocess.Process) *cpuTimesStat {
 	stat := cpuTimesStat{}
 
-	children, err := proc.Children()
-	if err != nil {
-		return &stat
-	}
+	children := p.procfs.AllChildren(proc.Pid)
 
-	for _, child := range children {
-		cstat, err := cpuTimes(child.Pid)
+	for _, pid := range children {
+		cstat, err := cpuTimes(pid)
 		if err != nil {
 			continue
 		}
-
-		stat.total += cstat.total
-		stat.system += cstat.system
-		stat.user += cstat.user
-		stat.idle += cstat.idle
-		stat.other += cstat.other
-
-		cstat = p.collectCPUFromChildren(child)
 
 		stat.total += cstat.total
 		stat.system += cstat.system
@@ -178,22 +169,22 @@ func (p *process) collectMemory() uint64 {
 }
 
 func (p *process) collectMemoryFromChildren(proc *psprocess.Process) uint64 {
-	children, err := proc.Children()
-	if err != nil {
-		return 0
-	}
+	children := p.procfs.AllChildren(proc.Pid)
 
 	rss := uint64(0)
 
-	for _, child := range children {
+	for _, pid := range children {
+		child, err := psprocess.NewProcess(pid)
+		if err != nil {
+			continue
+		}
+
 		info, err := child.MemoryInfo()
 		if err != nil {
 			continue
 		}
 
 		rss += info.RSS
-
-		rss += p.collectMemoryFromChildren(child)
 	}
 
 	return rss

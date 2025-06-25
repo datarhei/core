@@ -137,6 +137,8 @@ type util struct {
 	mem              MemoryInfo
 
 	gpu psutilgpu.GPU
+
+	procfs Procfs
 }
 
 // New returns a new util, it will be started automatically
@@ -184,6 +186,9 @@ func New(root string, gpu psutilgpu.GPU) (Util, error) {
 	go u.tickCPU(ctx, time.Second)
 	go u.tickMemory(ctx, time.Second)
 
+	procfs, _ := NewProcfs(ctx, 5*time.Second)
+	u.procfs = procfs
+
 	u.stopOnce = sync.Once{}
 
 	return u, nil
@@ -224,7 +229,8 @@ func (u *util) detectCgroupVersion() int {
 }
 
 func (u *util) cgroupCPULimit(version int) (uint64, float64) {
-	if version == 1 {
+	switch version {
+	case 1:
 		lines, err := u.readFile("cpu/cpu.cfs_quota_us")
 		if err != nil {
 			return 0, 0
@@ -248,7 +254,7 @@ func (u *util) cgroupCPULimit(version int) (uint64, float64) {
 
 			return uint64(1e6/period*quota) * 1e3, quota / period // nanoseconds
 		}
-	} else if version == 2 {
+	case 2:
 		lines, err := u.readFile("cpu.max")
 		if err != nil {
 			return 0, 0
@@ -437,7 +443,8 @@ func (u *util) CPU() (*CPUInfo, error) {
 func (u *util) cgroupCPUTimes(version int) (*cpuTimesStat, error) {
 	info := &cpuTimesStat{}
 
-	if version == 1 {
+	switch version {
+	case 1:
 		lines, err := u.readFile("cpuacct/cpuacct.usage")
 		if err != nil {
 			return nil, err
@@ -449,7 +456,7 @@ func (u *util) cgroupCPUTimes(version int) (*cpuTimesStat, error) {
 		}
 
 		info.system = usage
-	} else if version == 2 {
+	case 2:
 		lines, err := u.readFile("cpu.stat")
 		if err != nil {
 			return nil, err
@@ -523,7 +530,8 @@ func (u *util) Memory() (*MemoryInfo, error) {
 func (u *util) cgroupVirtualMemory(version int) (*MemoryInfo, error) {
 	info := &MemoryInfo{}
 
-	if version == 1 {
+	switch version {
+	case 1:
 		lines, err := u.readFile("memory/memory.limit_in_bytes")
 		if err != nil {
 			return nil, err
@@ -547,7 +555,7 @@ func (u *util) cgroupVirtualMemory(version int) (*MemoryInfo, error) {
 		info.Total = total
 		info.Available = total - used
 		info.Used = used
-	} else if version == 2 {
+	case 2:
 		lines, err := u.readFile("memory.max")
 		if err != nil {
 			return nil, err
