@@ -184,7 +184,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					username = config.IAM.GetDefaultVerifier().Name()
 				}
 
-				domain = c.QueryParam("domain")
+				domain = c.QueryParam("apidomain")
 				rtype = "api"
 			} else {
 				identity, err = mw.findIdentityFromSession(c)
@@ -203,12 +203,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 								time.Sleep(5 * time.Second)
 							}
 
-							if err == ErrBadRequest {
+							switch err {
+							case ErrBadRequest:
 								return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
-							} else if err == ErrUnauthorized {
+							case ErrUnauthorized:
 								c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
 								return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
-							} else {
+							default:
 								return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
 							}
 						}
@@ -530,8 +531,8 @@ func (m *iammiddleware) findDomainFromFilesystem(path string) string {
 			prefix += "/"
 		}
 
-		if strings.HasPrefix(path, prefix) {
-			elements := strings.Split(strings.TrimPrefix(path, prefix), "/")
+		if after, ok := strings.CutPrefix(path, prefix); ok {
+			elements := strings.Split(after, "/")
 			if m.iam.HasDomain(elements[0]) {
 				return elements[0]
 			}
