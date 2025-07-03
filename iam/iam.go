@@ -112,6 +112,9 @@ func (i *iam) Enforce(name, domain, rtype, resource, action string) bool {
 		if identity.IsSuperuser() {
 			superuser = true
 		}
+
+		// Use the name (not the alias) from now on. policies are only associated with the name.
+		name = identity.Name()
 	}
 
 	l := i.logger.Debug().WithFields(log.Fields{
