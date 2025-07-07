@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -204,7 +205,7 @@ type process struct {
 	args    []string
 	cmdArgs []string
 	cmd     *exec.Cmd
-	pid     int32
+	pid     atomic.Int32
 	stdout  io.ReadCloser
 	state   struct {
 		state  stateType
@@ -264,6 +265,8 @@ func New(config Config) (Process, error) {
 		scheduler: config.Scheduler,
 		resources: config.Resources,
 	}
+
+	p.pid.Store(-1)
 
 	if p.resources == nil {
 		return nil, fmt.Errorf("resources are required")
@@ -516,7 +519,7 @@ func (p *process) Status() Status {
 	order := p.getOrder()
 
 	s := Status{
-		PID:       p.pid,
+		PID:       p.pid.Load(),
 		State:     state.String(),
 		States:    states,
 		Order:     order,
@@ -707,6 +710,8 @@ func (p *process) start() error {
 		return err
 	}
 
+	p.pid.Store(int32(p.cmd.Process.Pid))
+
 	// Start the stop timeout if enabled
 	if p.timeout > time.Duration(0) {
 		p.stopTimerLock.Lock()
@@ -724,9 +729,7 @@ func (p *process) start() error {
 		p.stopTimerLock.Unlock()
 	}
 
-	p.pid = int32(p.cmd.Process.Pid)
-
-	if proc, err := p.resources.Process(p.pid); err == nil {
+	if proc, err := p.resources.Process(p.pid.Load()); err == nil {
 		p.limits.Start(proc)
 	}
 
@@ -1057,6 +1060,7 @@ func (p *process) waiter() {
 	}
 
 	p.setState(state)
+	p.pid.Store(-1)
 
 	p.logger.Info().Log("Stopped")
 	p.debuglogger.WithField("log", p.parser.Log()).Debug().Log("Stopped")

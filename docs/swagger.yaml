@@ -1522,6 +1522,8 @@ definitions:
       created_at:
         format: int64
         type: integer
+      domain:
+        type: string
       exit_state:
         type: string
       exited_at:
@@ -1553,6 +1555,9 @@ definitions:
         type: integer
       order:
         type: string
+      pid:
+        format: int32
+        type: integer
       progress:
         $ref: '#/definitions/api.Progress'
       reconnect_seconds:
@@ -3895,10 +3900,6 @@ paths:
       description: List of processes in the cluster
       operationId: cluster-3-get-all-processes
       parameters:
-      - description: Domain to act on
-        in: query
-        name: domain
-        type: string
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
           output.
@@ -5109,10 +5110,6 @@ paths:
         listed processes.
       operationId: process-3-get-all
       parameters:
-      - description: Domain to act on
-        in: query
-        name: domain
-        type: string
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
           output.

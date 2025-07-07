@@ -112,6 +112,7 @@ func (r *Report) MarshalParser() (parse.Report, []parse.ReportHistoryEntry) {
 
 type ReportHistorySearchResult struct {
 	ProcessID string
+	Domain    string
 	Reference string
 	ExitState string
 	ExitedAt  time.Time

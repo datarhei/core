@@ -312,6 +312,7 @@ type State struct {
 	LimitMode string        // How the process is limited (hard or soft)
 	Resources ProcessUsage  // Current resource usage, include CPU, memory and GPU consumption
 	Command   []string      // ffmpeg command line parameters
+	PID       int32         // System process ID
 }
 
 type ProcessUsageCPU struct {

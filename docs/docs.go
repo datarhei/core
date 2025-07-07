@@ -1610,12 +1610,6 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Domain to act on",
-                        "name": "domain",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
                         "name": "filter",
                         "in": "query"
@@ -3456,12 +3450,6 @@ const docTemplate = `{
                 "summary": "List all known processes",
                 "operationId": "process-3-get-all",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Domain to act on",
-                        "name": "domain",
-                        "in": "query"
-                    },
                     {
                         "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
@@ -7483,6 +7471,9 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
+                "domain": {
+                    "type": "string"
+                },
                 "exit_state": {
                     "type": "string"
                 },
@@ -7527,6 +7518,10 @@ const docTemplate = `{
                 },
                 "order": {
                     "type": "string"
+                },
+                "pid": {
+                    "type": "integer",
+                    "format": "int32"
                 },
                 "progress": {
                     "$ref": "#/definitions/api.Progress"

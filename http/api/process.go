@@ -366,6 +366,7 @@ type ProcessState struct {
 	LimitMode string       `json:"limit_mode"`
 	Resources ProcessUsage `json:"resources"`
 	Command   []string     `json:"command"`
+	PID       int32        `json:"pid" format:"int32"`
 }
 
 // Unmarshal converts a core ffmpeg process state to a state in API representation
@@ -385,6 +386,7 @@ func (s *ProcessState) Unmarshal(state *app.State) {
 	s.LimitMode = state.LimitMode
 	s.Resources.Unmarshal(&state.Resources)
 	s.Command = state.Command
+	s.PID = state.PID
 
 	s.Progress.Unmarshal(&state.Progress)
 }

@@ -243,6 +243,8 @@ func (t *task) State() (*app.State, error) {
 	state.Progress.Input = assignConfigID(state.Progress.Input, t.config.Input)
 	state.Progress.Output = assignConfigID(state.Progress.Output, t.config.Output)
 
+	state.PID = status.PID
+
 	return state, nil
 }
 
@@ -312,6 +314,7 @@ func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.Repo
 	for _, f := range presult {
 		result = append(result, app.ReportHistorySearchResult{
 			ProcessID: t.id,
+			Domain:    t.domain,
 			Reference: t.reference,
 			ExitState: f.ExitState,
 			CreatedAt: f.CreatedAt,
