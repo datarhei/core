@@ -22,7 +22,6 @@ import (
 // @Tags v16.?.?
 // @ID cluster-3-get-all-processes
 // @Produce json
-// @Param domain query string false "Domain to act on"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
 // @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
 // @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
@@ -40,16 +39,15 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
 	})
-	domain := util.DefaultQuery(c, "domain", "")
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
 	procs := h.proxy.ProcessList(node.ProcessListOptions{
-		ID:            wantids,
-		Filter:        filter.Slice(),
-		Domain:        domain,
+		ID:     wantids,
+		Filter: filter.Slice(),
+		//Domain:        domain,
 		Reference:     reference,
 		IDPattern:     idpattern,
 		RefPattern:    refpattern,
@@ -60,7 +58,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	pmap := map[app.ProcessID]api.Process{}
 
 	for _, p := range procs {
-		if !h.iam.Enforce(ctxuser, domain, "process", p.ID, "read") {
+		if !h.iam.Enforce(ctxuser, p.Domain, "process", p.ID, "read") {
 			continue
 		}
 
@@ -72,10 +70,10 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	// Here we have to add those processes that are in the cluster DB and couldn't be deployed
 	{
 		processes := h.cluster.Store().ProcessList()
-		filtered := h.getFilteredStoreProcesses(processes, wantids, domain, reference, idpattern, refpattern, ownerpattern, domainpattern)
+		filtered := h.getFilteredStoreProcesses(processes, wantids, reference, idpattern, refpattern, ownerpattern, domainpattern)
 
 		for _, p := range filtered {
-			if !h.iam.Enforce(ctxuser, domain, "process", p.Config.ID, "read") {
+			if !h.iam.Enforce(ctxuser, p.Config.Domain, "process", p.Config.ID, "read") {
 				continue
 			}
 
@@ -105,7 +103,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	return c.JSON(http.StatusOK, processes)
 }
 
-func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, _, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
+func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
 	filtered := []store.Process{}
 
 	count := 0
@@ -252,7 +250,6 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 // @Router /api/v3/cluster/process [post]
 func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
@@ -267,12 +264,6 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
-	}
-
-	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
-			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process in domain %s", process.Owner, process.Domain)
-		}
 	}
 
 	if process.Type != "ffmpeg" {
@@ -314,7 +305,6 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 // @Router /api/v3/cluster/process/{id} [put]
 func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
 
@@ -346,12 +336,6 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
-	}
-
-	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
-			return api.Err(http.StatusForbidden, "", "user %s is not allowed to write this process", process.Owner)
-		}
 	}
 
 	config, metadata := process.Marshal()

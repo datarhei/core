@@ -50,7 +50,6 @@ func NewProcess(restream restream.Restreamer, iam iam.IAM) *ProcessHandler {
 // @Router /api/v3/process [post]
 func (h *ProcessHandler) Add(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 
 	process := api.ProcessConfig{
 		ID:        shortuuid.New(),
@@ -65,12 +64,6 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process, check the domain and process ID")
-	}
-
-	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
-			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process", process.Owner)
-		}
 	}
 
 	if process.Type != "ffmpeg" {
@@ -107,7 +100,6 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 // @Tags v16.7.2
 // @ID process-3-get-all
 // @Produce json
-// @Param domain query string false "Domain to act on"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output."
 // @Param reference query string false "Return only these process that have this reference value. If empty, the reference will be ignored."
 // @Param id query string false "Comma separated list of process ids to list. Overrides the reference. If empty all IDs will be returned."
@@ -125,7 +117,6 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 	wantids := strings.FieldsFunc(util.DefaultQuery(c, "id", ""), func(r rune) bool {
 		return r == rune(',')
 	})
-	domain := util.DefaultQuery(c, "domain", "")
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
@@ -157,19 +148,19 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < 8; /*runtime.NumCPU()*/ i++ {
+	for range 8 {
 		wg.Add(1)
 
 		go func(idChan <-chan app.ProcessID) {
 			defer wg.Done()
 
 			for id := range idChan {
-				if !h.iam.Enforce(ctxuser, domain, "process", id.ID, "read") {
+				process, err := h.getProcess(id, filter)
+				if err != nil {
 					continue
 				}
 
-				process, err := h.getProcess(id, filter)
-				if err != nil {
+				if !h.iam.Enforce(ctxuser, process.Domain, "process", id.ID, "read") {
 					continue
 				}
 
@@ -218,7 +209,7 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -251,7 +242,6 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 // @Router /api/v3/process/{id} [delete]
 func (h *ProcessHandler) Delete(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
@@ -260,10 +250,8 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 		Domain: domain,
 	}
 
-	if !superuser {
-		if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-			return api.Err(http.StatusForbidden, "")
-		}
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
+		return api.Err(http.StatusForbidden, "")
 	}
 
 	if err := h.restream.StopProcess(tid); err != nil {
@@ -296,7 +284,6 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 // @Router /api/v3/process/{id} [put]
 func (h *ProcessHandler) Update(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	superuser := util.DefaultContext(c, "superuser", false)
 	domain := util.DefaultQuery(c, "domain", "")
 	id := util.PathParam(c, "id")
 
@@ -331,12 +318,6 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
 		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", process.ID)
-	}
-
-	if !superuser {
-		if !h.iam.Enforce(process.Owner, process.Domain, "process", process.ID, "write") {
-			return api.Err(http.StatusForbidden, "", "The owner '%s' is not allowed to write this process: %s", process.Owner, process.ID)
-		}
 	}
 
 	config, metadata := process.Marshal()
@@ -397,15 +378,16 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 	}
 
 	var err error
-	if command.Command == "start" {
+	switch command.Command {
+	case "start":
 		err = h.restream.StartProcess(tid)
-	} else if command.Command == "stop" {
+	case "stop":
 		err = h.restream.StopProcess(tid)
-	} else if command.Command == "restart" {
+	case "restart":
 		err = h.restream.RestartProcess(tid)
-	} else if command.Command == "reload" {
+	case "reload":
 		err = h.restream.ReloadProcess(tid)
-	} else {
+	default:
 		return api.Err(http.StatusBadRequest, "", "unknown command provided: known commands are: start, stop, reload, restart")
 	}
 
@@ -673,6 +655,7 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/report/process [get]
 func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
 	idpattern := util.DefaultQuery(c, "idpattern", "")
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	state := util.DefaultQuery(c, "state", "")
@@ -701,13 +684,20 @@ func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 
 	result := h.restream.SearchProcessLogHistory(idpattern, refpattern, state, from, to)
 
-	response := make([]api.ProcessReportSearchResult, len(result))
-	for i, b := range result {
-		response[i].ProcessID = b.ProcessID
-		response[i].Reference = b.Reference
-		response[i].ExitState = b.ExitState
-		response[i].CreatedAt = b.CreatedAt.Unix()
-		response[i].ExitedAt = b.ExitedAt.Unix()
+	response := []api.ProcessReportSearchResult{}
+	for _, b := range result {
+		if !h.iam.Enforce(ctxuser, b.Domain, "process", b.ProcessID, "read") {
+			continue
+		}
+
+		response = append(response, api.ProcessReportSearchResult{
+			ProcessID: b.ProcessID,
+			Domain:    b.Domain,
+			Reference: b.Reference,
+			ExitState: b.ExitState,
+			CreatedAt: b.CreatedAt.Unix(),
+			ExitedAt:  b.ExitedAt.Unix(),
+		})
 	}
 
 	return c.JSON(http.StatusOK, response)
@@ -841,43 +831,6 @@ func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, process)
-}
-
-// Skills returns the detected FFmpeg capabilities
-// @Summary FFmpeg capabilities
-// @Description List all detected FFmpeg capabilities.
-// @Tags v16.7.2
-// @ID skills-3
-// @Produce json
-// @Success 200 {object} api.Skills
-// @Security ApiKeyAuth
-// @Router /api/v3/skills [get]
-func (h *ProcessHandler) Skills(c echo.Context) error {
-	skills := h.restream.Skills()
-
-	apiskills := api.Skills{}
-	apiskills.Unmarshal(skills)
-
-	return c.JSON(http.StatusOK, apiskills)
-}
-
-// ReloadSkills will refresh the FFmpeg capabilities
-// @Summary Refresh FFmpeg capabilities
-// @Description Refresh the available FFmpeg capabilities.
-// @Tags v16.7.2
-// @ID skills-3-reload
-// @Produce json
-// @Success 200 {object} api.Skills
-// @Security ApiKeyAuth
-// @Router /api/v3/skills/reload [get]
-func (h *ProcessHandler) ReloadSkills(c echo.Context) error {
-	h.restream.ReloadSkills()
-	skills := h.restream.Skills()
-
-	apiskills := api.Skills{}
-	apiskills.Unmarshal(skills)
-
-	return c.JSON(http.StatusOK, apiskills)
 }
 
 // GetProcessMetadata returns the metadata stored with a process
@@ -1026,6 +979,43 @@ func (h *ProcessHandler) SetMetadata(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, data)
+}
+
+// Skills returns the detected FFmpeg capabilities
+// @Summary FFmpeg capabilities
+// @Description List all detected FFmpeg capabilities.
+// @Tags v16.7.2
+// @ID skills-3
+// @Produce json
+// @Success 200 {object} api.Skills
+// @Security ApiKeyAuth
+// @Router /api/v3/skills [get]
+func (h *ProcessHandler) Skills(c echo.Context) error {
+	skills := h.restream.Skills()
+
+	apiskills := api.Skills{}
+	apiskills.Unmarshal(skills)
+
+	return c.JSON(http.StatusOK, apiskills)
+}
+
+// ReloadSkills will refresh the FFmpeg capabilities
+// @Summary Refresh FFmpeg capabilities
+// @Description Refresh the available FFmpeg capabilities.
+// @Tags v16.7.2
+// @ID skills-3-reload
+// @Produce json
+// @Success 200 {object} api.Skills
+// @Security ApiKeyAuth
+// @Router /api/v3/skills/reload [get]
+func (h *ProcessHandler) ReloadSkills(c echo.Context) error {
+	h.restream.ReloadSkills()
+	skills := h.restream.Skills()
+
+	apiskills := api.Skills{}
+	apiskills.Unmarshal(skills)
+
+	return c.JSON(http.StatusOK, apiskills)
 }
 
 type filter struct {

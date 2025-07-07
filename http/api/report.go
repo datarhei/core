@@ -122,6 +122,7 @@ func (r *ProcessReport) Marshal() app.Report {
 
 type ProcessReportSearchResult struct {
 	ProcessID string `json:"id"`
+	Domain    string `json:"domain"`
 	Reference string `json:"reference"`
 	ExitState string `json:"exit_state"`
 	CreatedAt int64  `json:"created_at" format:"int64"`

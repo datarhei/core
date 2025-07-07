@@ -292,13 +292,13 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 // @Router /api/v3/iam/user [get]
 func (h *IAMHandler) ListIdentities(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
-	domain := util.DefaultQuery(c, "domain", "$none")
+	domain := util.DefaultQuery(c, "domain", "")
 
 	identities := h.iam.ListIdentities()
 
-	users := make([]api.IAMUser, len(identities)+1)
+	users := []api.IAMUser{}
 
-	for i, iamuser := range identities {
+	for _, iamuser := range identities {
 		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "read") {
 			continue
 		}
@@ -311,7 +311,9 @@ func (h *IAMHandler) ListIdentities(c echo.Context) error {
 
 		policies := h.iam.ListPolicies(iamuser.Name, "", nil, "", nil)
 
-		users[i].Marshal(iamuser, policies)
+		user := api.IAMUser{}
+		user.Marshal(iamuser, policies)
+		users = append(users, user)
 	}
 
 	anon := identity.User{
@@ -320,7 +322,9 @@ func (h *IAMHandler) ListIdentities(c echo.Context) error {
 
 	policies := h.iam.ListPolicies("$anon", "", nil, "", nil)
 
-	users[len(users)-1].Marshal(anon, policies)
+	user := api.IAMUser{}
+	user.Marshal(anon, policies)
+	users = append(users, user)
 
 	return c.JSON(http.StatusOK, users)
 }
