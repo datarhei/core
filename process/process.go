@@ -813,6 +813,11 @@ func (p *process) stop(wait bool, reason string) error {
 
 	// If the process is already in the finishing state, don't do anything
 	if state, _ := p.setState(stateFinishing); state == stateFinishing {
+		p.state.lock.RLock()
+		if time.Since(p.state.time) > 10*time.Second {
+			p.stdout.Close()
+		}
+		p.state.lock.RUnlock()
 		return nil
 	}
 
