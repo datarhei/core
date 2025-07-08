@@ -372,6 +372,10 @@ func (p *process) setState(state stateType) (stateType, error) {
 	prevState := p.state.state
 	failed := false
 
+	if prevState == state {
+		return prevState, nil
+	}
+
 	if p.state.state == stateFinished {
 		switch state {
 		case stateStarting:
@@ -813,11 +817,6 @@ func (p *process) stop(wait bool, reason string) error {
 
 	// If the process is already in the finishing state, don't do anything
 	if state, _ := p.setState(stateFinishing); state == stateFinishing {
-		p.state.lock.RLock()
-		if time.Since(p.state.time) > 10*time.Second {
-			p.stdout.Close()
-		}
-		p.state.lock.RUnlock()
 		return nil
 	}
 
@@ -858,39 +857,24 @@ func (p *process) stop(wait bool, reason string) error {
 	var err error
 	if runtime.GOOS == "windows" {
 		// Windows doesn't know the SIGINT
-		err = p.cmd.Process.Kill()
+		p.cmd.Process.Kill()
 	} else {
 		// First try to kill the process gracefully. On a SIGINT ffmpeg will exit
 		// normally as if "q" has been pressed.
-		err = p.cmd.Process.Signal(os.Interrupt)
-		if err != nil {
-			// If sending the signal fails, try it the hard way, however this will highly
-			// likely also fail because it is simply a shortcut for Signal(Kill).
-			err = p.cmd.Process.Kill()
-		} else {
-			// Set up a timer to kill the process with SIGKILL in case SIGINT didn't have
-			// an effect.
-			p.killTimerLock.Lock()
-			p.killTimer = time.AfterFunc(5*time.Second, func() {
-				p.cmd.Process.Kill()
-			})
-			p.killTimerLock.Unlock()
-		}
+		p.cmd.Process.Signal(os.Interrupt)
 	}
 
-	if err == nil && wait {
+	// Set up a timer to kill the process with SIGKILL in case SIGINT didn't have
+	// an effect.
+	p.killTimerLock.Lock()
+	p.killTimer = time.AfterFunc(5*time.Second, func() {
+		p.cmd.Process.Kill()
+		p.stdout.Close()
+	})
+	p.killTimerLock.Unlock()
+
+	if wait {
 		wg.Wait()
-	}
-
-	if err != nil {
-		p.parser.Parse([]byte(err.Error()))
-		p.debuglogger.WithFields(log.Fields{
-			"state": p.getStateString(),
-			"order": p.getOrder(),
-			"error": err,
-		}).Debug().Log("Stopping failed")
-
-		p.setState(stateFailed)
 	}
 
 	return err
