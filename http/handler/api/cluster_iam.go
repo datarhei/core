@@ -20,6 +20,7 @@ import (
 // @Accept json
 // @Produce json
 // @Param config body api.IAMUser true "Identity"
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -259,6 +260,7 @@ func (h *ClusterHandler) IAMReload(c echo.Context) error {
 // @Tags v16.?.?
 // @ID cluster-3-iam-list-identities
 // @Produce json
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {array} api.IAMUser
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user [get]
@@ -268,9 +270,9 @@ func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 
 	identities := h.iam.ListIdentities()
 
-	users := make([]api.IAMUser, len(identities)+1)
+	users := []api.IAMUser{}
 
-	for i, iamuser := range identities {
+	for _, iamuser := range identities {
 		if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "read") {
 			continue
 		}
@@ -283,7 +285,9 @@ func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 
 		policies := h.iam.ListPolicies(iamuser.Name, "", nil, "", nil)
 
-		users[i].Marshal(iamuser, policies)
+		user := api.IAMUser{}
+		user.Marshal(iamuser, policies)
+		users = append(users, user)
 	}
 
 	anon := identity.User{
@@ -292,7 +296,9 @@ func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 
 	policies := h.iam.ListPolicies("$anon", "", nil, "", nil)
 
-	users[len(users)-1].Marshal(anon, policies)
+	user := api.IAMUser{}
+	user.Marshal(anon, policies)
+	users = append(users, user)
 
 	return c.JSON(http.StatusOK, users)
 }
@@ -303,6 +309,7 @@ func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 // @Tags v16.?.?
 // @ID cluster-3-iam-list-identity
 // @Produce json
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
@@ -353,15 +360,23 @@ func (h *ClusterHandler) IAMIdentityGet(c echo.Context) error {
 // @Tags v16.?.?
 // @ID cluster-3-iam-list-policies
 // @Produce json
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {array} api.IAMPolicy
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/policies [get]
 func (h *ClusterHandler) IAMPolicyList(c echo.Context) error {
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
 	iampolicies := h.iam.ListPolicies("", "", nil, "", nil)
 
 	policies := []api.IAMPolicy{}
 
 	for _, pol := range iampolicies {
+		if !h.iam.Enforce(ctxuser, domain, "iam", pol.Name, "read") {
+			continue
+		}
+
 		policies = append(policies, api.IAMPolicy{
 			Name:     pol.Name,
 			Domain:   pol.Domain,
@@ -381,6 +396,7 @@ func (h *ClusterHandler) IAMPolicyList(c echo.Context) error {
 // @ID cluster-3-delete-identity
 // @Produce json
 // @Param name path string true "Identity name"
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {string} string
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
