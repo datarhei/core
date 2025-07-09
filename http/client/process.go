@@ -13,7 +13,6 @@ import (
 type ProcessListOptions struct {
 	ID            []string
 	Filter        []string
-	Domain        string
 	Reference     string
 	IDPattern     string
 	RefPattern    string
@@ -25,7 +24,6 @@ func (p *ProcessListOptions) Query() *url.Values {
 	values := &url.Values{}
 	values.Set("id", strings.Join(p.ID, ","))
 	values.Set("filter", strings.Join(p.Filter, ","))
-	values.Set("domain", p.Domain)
 	values.Set("reference", p.Reference)
 	values.Set("idpattern", p.IDPattern)
 	values.Set("refpattern", p.RefPattern)
