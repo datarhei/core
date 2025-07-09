@@ -423,6 +423,18 @@ func (n *Core) ProcessValidateConfig(config *app.Config) error {
 	return client.ProcessValidateConfig(config)
 }
 
+func (n *Core) ProcessGet(id app.ProcessID, filter []string) (api.Process, error) {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		return api.Process{}, ErrNoPeer
+	}
+
+	return client.Process(id, filter)
+}
+
 func (n *Core) ProcessList(options client.ProcessListOptions) ([]api.Process, error) {
 	n.lock.RLock()
 	client := n.client

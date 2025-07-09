@@ -555,20 +555,12 @@ func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (
 		return api.Process{}, err
 	}
 
-	list, err := node.Core().ProcessList(client.ProcessListOptions{
-		ID:     []string{id.ID},
-		Filter: filter,
-		Domain: id.Domain,
-	})
+	process, err := node.Core().ProcessGet(id, filter)
 	if err != nil {
 		return api.Process{}, err
 	}
 
-	if len(list) == 0 {
-		return api.Process{}, fmt.Errorf("process not found")
-	}
-
-	return list[0], nil
+	return process, nil
 }
 
 func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
