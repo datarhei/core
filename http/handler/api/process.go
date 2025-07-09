@@ -193,7 +193,7 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 // @ID process-3-get
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
 // @Failure 400 {object} api.Error
@@ -232,7 +232,7 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 // @ID process-3-delete
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -273,7 +273,7 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
@@ -348,7 +348,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param command body api.Command true "Process command"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
@@ -405,7 +405,7 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 // @ID process-3-get-config
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -445,7 +445,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 // @ID process-3-get-state
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessState
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -487,7 +487,7 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param created_at query int64 false "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports."
 // @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports."
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessReport
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -601,7 +601,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param report body api.ProcessReport true "Process report"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
@@ -710,7 +710,7 @@ func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 // @ID process-3-probe
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.Probe
 // @Failure 403 {object} api.Error
 // @Failure 404 {object} api.Error
@@ -841,7 +841,7 @@ func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.Metadata
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -880,7 +880,7 @@ func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
 // @Success 200 {object} api.Metadata
 // @Failure 400 {object} api.Error

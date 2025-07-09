@@ -287,6 +287,7 @@ func (h *IAMHandler) UpdateIdentityPolicies(c echo.Context) error {
 // @Tags v16.?.?
 // @ID iam-3-list-identities
 // @Produce json
+// @Param domain query string false "Domain of the acting user"
 // @Success 200 {array} api.IAMUser
 // @Security ApiKeyAuth
 // @Router /api/v3/iam/user [get]
