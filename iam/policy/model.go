@@ -91,7 +91,7 @@ func (m *model) addPolicy(policy Policy) error {
 		policies = []Policy{}
 	}
 
-	policies = append(policies, policy)
+	policies = append(policies, policy.Clone())
 	m.policies[key] = policies
 
 	return nil
@@ -152,7 +152,9 @@ func (m *model) GetFilteredPolicy(name, domain string) []Policy {
 
 	if len(name) == 0 && len(domain) == 0 {
 		for _, policies := range m.policies {
-			filteredPolicies = append(filteredPolicies, policies...)
+			for _, p := range policies {
+				filteredPolicies = append(filteredPolicies, p.Clone())
+			}
 		}
 	} else if len(name) != 0 && len(domain) == 0 {
 		for key, policies := range m.policies {
@@ -160,7 +162,9 @@ func (m *model) GetFilteredPolicy(name, domain string) []Policy {
 				continue
 			}
 
-			filteredPolicies = append(filteredPolicies, policies...)
+			for _, p := range policies {
+				filteredPolicies = append(filteredPolicies, p.Clone())
+			}
 		}
 	} else if len(name) == 0 && len(domain) != 0 {
 		for key, policies := range m.policies {
@@ -168,7 +172,9 @@ func (m *model) GetFilteredPolicy(name, domain string) []Policy {
 				continue
 			}
 
-			filteredPolicies = append(filteredPolicies, policies...)
+			for _, p := range policies {
+				filteredPolicies = append(filteredPolicies, p.Clone())
+			}
 		}
 	} else {
 		for key, policies := range m.policies {
@@ -178,7 +184,9 @@ func (m *model) GetFilteredPolicy(name, domain string) []Policy {
 				continue
 			}
 
-			filteredPolicies = append(filteredPolicies, policies...)
+			for _, p := range policies {
+				filteredPolicies = append(filteredPolicies, p.Clone())
+			}
 		}
 	}
 

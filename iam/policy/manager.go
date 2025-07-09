@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/datarhei/core/v16/log"
 )
@@ -51,9 +52,9 @@ func (am *policyaccess) HasPolicy(name, domain string, types []string, resource 
 	return am.enforcer.HasPolicy(Policy{
 		Name:     name,
 		Domain:   domain,
-		Types:    types,
+		Types:    slices.Clone(types),
 		Resource: resource,
-		Actions:  actions,
+		Actions:  slices.Clone(actions),
 	})
 }
 
@@ -61,9 +62,9 @@ func (am *policyaccess) AddPolicy(name, domain string, types []string, resource 
 	policy := Policy{
 		Name:     name,
 		Domain:   domain,
-		Types:    types,
+		Types:    slices.Clone(types),
 		Resource: resource,
-		Actions:  actions,
+		Actions:  slices.Clone(actions),
 	}
 
 	return am.enforcer.AddPolicy(policy)

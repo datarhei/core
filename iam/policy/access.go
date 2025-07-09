@@ -2,6 +2,7 @@ package policy
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -15,6 +16,16 @@ type Policy struct {
 
 func (p Policy) String() string {
 	return fmt.Sprintf("%s@%s (%s):%s %s", p.Name, p.Domain, strings.Join(p.Types, "|"), p.Resource, strings.Join(p.Actions, "|"))
+}
+
+func (p Policy) Clone() Policy {
+	return Policy{
+		Name:     p.Name,
+		Domain:   p.Domain,
+		Types:    slices.Clone(p.Types),
+		Resource: p.Resource,
+		Actions:  slices.Clone(p.Actions),
+	}
 }
 
 type Enforcer interface {
