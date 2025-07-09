@@ -29,23 +29,17 @@ func (a *policyAdapter) LoadPolicy(model policy.Model) error {
 	domains := map[string]struct{}{}
 
 	for _, p := range storePolicies.Policies {
-		if len(p.Domain) == 0 {
-			p.Domain = "$none"
+		policy := p.Clone()
+
+		if len(policy.Domain) == 0 {
+			policy.Domain = "$none"
 		}
 
-		if len(p.Types) == 0 {
-			p.Types = []string{"$none"}
+		if len(policy.Types) == 0 {
+			policy.Types = []string{"$none"}
 		}
 
-		policy := policy.Policy{
-			Name:     p.Name,
-			Domain:   p.Domain,
-			Types:    p.Types,
-			Resource: p.Resource,
-			Actions:  p.Actions,
-		}
-
-		domains[p.Domain] = struct{}{}
+		domains[policy.Domain] = struct{}{}
 
 		policies = append(policies, policy)
 	}

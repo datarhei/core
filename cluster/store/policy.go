@@ -54,7 +54,9 @@ func (s *store) IAMPolicyList() Policies {
 	}
 
 	for _, policies := range s.data.Policies.Policies {
-		p.Policies = append(p.Policies, policies...)
+		for _, pol := range policies {
+			p.Policies = append(p.Policies, pol.Clone())
+		}
 	}
 
 	return p
@@ -74,7 +76,10 @@ func (s *store) IAMIdentityPolicyList(name string) Policies {
 	}
 
 	p.UpdatedAt = user.UpdatedAt
-	p.Policies = append(p.Policies, s.data.Policies.Policies[user.Name]...)
+
+	for _, pol := range s.data.Policies.Policies[user.Name] {
+		p.Policies = append(p.Policies, pol.Clone())
+	}
 
 	return p
 }
