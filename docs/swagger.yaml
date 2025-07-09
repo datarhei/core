@@ -3207,6 +3207,11 @@ paths:
     get:
       description: List of policies IAM
       operationId: cluster-3-iam-list-policies
+      parameters:
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3245,6 +3250,11 @@ paths:
     get:
       description: List of identities in IAM
       operationId: cluster-3-iam-list-identities
+      parameters:
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3271,6 +3281,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/api.IAMUser'
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3301,6 +3315,10 @@ paths:
         name: name
         required: true
         type: string
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3324,6 +3342,11 @@ paths:
     get:
       description: Identity in IAM
       operationId: cluster-3-iam-list-identity
+      parameters:
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -3742,10 +3765,6 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
-        in: query
-        name: domain
-        type: string
       - description: Comma separated list of fields (config, state, report, metadata)
           that will be part of the output. If empty, all fields will be part of the
           output.
@@ -3992,6 +4011,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: Process domain
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -4022,7 +4045,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4062,7 +4085,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4108,7 +4131,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4158,7 +4181,7 @@ paths:
         name: key
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4201,7 +4224,7 @@ paths:
         name: key
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4245,7 +4268,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -4722,6 +4745,11 @@ paths:
     get:
       description: List of identities in IAM
       operationId: iam-3-list-identities
+      parameters:
+      - description: Domain of the acting user
+        in: query
+        name: domain
+        type: string
       produces:
       - application/json
       responses:
@@ -5210,7 +5238,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5252,7 +5280,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5300,7 +5328,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5350,7 +5378,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5399,7 +5427,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5447,7 +5475,7 @@ paths:
         name: key
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5494,7 +5522,7 @@ paths:
         name: key
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5788,7 +5816,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5834,7 +5862,7 @@ paths:
         in: query
         name: exited_at
         type: integer
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5877,7 +5905,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string
@@ -5925,7 +5953,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Domain to act on
+      - description: Process domain
         in: query
         name: domain
         type: string

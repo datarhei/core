@@ -547,6 +547,14 @@ const docTemplate = `{
                 ],
                 "summary": "List of policies in IAM",
                 "operationId": "cluster-3-iam-list-policies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -608,6 +616,14 @@ const docTemplate = `{
                 ],
                 "summary": "List of identities in IAM",
                 "operationId": "cluster-3-iam-list-identities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -647,6 +663,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.IAMUser"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -687,6 +709,14 @@ const docTemplate = `{
                 ],
                 "summary": "Identity in IAM",
                 "operationId": "cluster-3-iam-list-identity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -805,6 +835,12 @@ const docTemplate = `{
                         "name": "name",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1377,12 +1413,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
-                        "name": "domain",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "Comma separated list of fields (config, state, report, metadata) that will be part of the output. If empty, all fields will be part of the output.",
                         "name": "filter",
                         "in": "query"
@@ -1804,7 +1834,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -1864,7 +1894,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -1927,6 +1957,12 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Process domain",
+                        "name": "domain",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1980,7 +2016,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -2055,7 +2091,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -2117,7 +2153,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -2181,7 +2217,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -2855,6 +2891,14 @@ const docTemplate = `{
                 ],
                 "summary": "List of identities in IAM",
                 "operationId": "iam-3-list-identities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Domain of the acting user",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -3698,7 +3742,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -3770,7 +3814,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -3842,7 +3886,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -3910,7 +3954,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -3984,7 +4028,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -4056,7 +4100,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -4124,7 +4168,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -4564,7 +4608,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -4629,7 +4673,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
@@ -4695,7 +4739,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     },
@@ -4769,7 +4813,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Domain to act on",
+                        "description": "Process domain",
                         "name": "domain",
                         "in": "query"
                     }
