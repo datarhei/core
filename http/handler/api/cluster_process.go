@@ -45,9 +45,8 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
 
 	procs := h.proxy.ProcessList(node.ProcessListOptions{
-		ID:     wantids,
-		Filter: filter.Slice(),
-		//Domain:        domain,
+		ID:            wantids,
+		Filter:        filter.Slice(),
 		Reference:     reference,
 		IDPattern:     idpattern,
 		RefPattern:    refpattern,
@@ -196,7 +195,7 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 // @ID cluster-3-get-process
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
 // @Failure 403 {object} api.Error
@@ -295,7 +294,7 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
 // @Failure 400 {object} api.Error
@@ -365,7 +364,7 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param command body api.Command true "Process command"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
@@ -420,7 +419,7 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
 // @Success 200 {object} api.Metadata
 // @Failure 400 {object} api.Error
@@ -468,7 +467,7 @@ func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param key path string true "Key for data store"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.Metadata
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -505,7 +504,7 @@ func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
 // @ID cluster-3-process-probe
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param domain query string false "Domain to act on"
+// @Param domain query string false "Process domain"
 // @Success 200 {object} api.Probe
 // @Failure 403 {object} api.Error
 // @Security ApiKeyAuth
@@ -601,6 +600,7 @@ func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
 // @ID cluster-3-delete-process
 // @Produce json
 // @Param id path string true "Process ID"
+// @Param domain query string false "Process domain"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
