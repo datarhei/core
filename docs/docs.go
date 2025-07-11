@@ -5992,7 +5992,7 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
-                        "revocer_timeout_sec": {
+                        "recover_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"
@@ -7898,7 +7898,7 @@ const docTemplate = `{
                 "fifo_enabled": {
                     "type": "boolean"
                 },
-                "fifo_revocery_attempts_total": {
+                "fifo_recovery_attempts_total": {
                     "type": "number"
                 },
                 "fifo_state": {
@@ -8553,7 +8553,7 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         },
-                        "revocer_timeout_sec": {
+                        "recover_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"

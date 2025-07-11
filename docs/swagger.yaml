@@ -493,7 +493,7 @@ definitions:
             items:
               type: string
             type: array
-          revocer_timeout_sec:
+          recover_timeout_sec:
             description: seconds
             format: int64
             type: integer
@@ -1785,7 +1785,7 @@ definitions:
         type: string
       fifo_enabled:
         type: boolean
-      fifo_revocery_attempts_total:
+      fifo_recovery_attempts_total:
         type: number
       fifo_state:
         type: string
@@ -2291,7 +2291,7 @@ definitions:
             items:
               type: string
             type: array
-          revocer_timeout_sec:
+          recover_timeout_sec:
             description: seconds
             format: int64
             type: integer

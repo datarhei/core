@@ -1805,7 +1805,7 @@ const docTemplateClusterAPI = `{
                                 "type": "string"
                             }
                         },
-                        "revocer_timeout_sec": {
+                        "recover_timeout_sec": {
                             "description": "seconds",
                             "type": "integer",
                             "format": "int64"

@@ -17,7 +17,7 @@ type ProgressIOTee struct {
 	Format               string      `json:"format"`
 	State                string      `json:"state"`
 	Fifo                 bool        `json:"fifo_enabled"`
-	FifoRecoveryAttempts json.Number `json:"fifo_revocery_attempts_total" swaggertype:"number" jsonschema:"type=number"`
+	FifoRecoveryAttempts json.Number `json:"fifo_recovery_attempts_total" swaggertype:"number" jsonschema:"type=number"`
 	FifoState            string      `json:"fifo_state"`
 }
 

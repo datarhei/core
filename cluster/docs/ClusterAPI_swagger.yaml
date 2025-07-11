@@ -350,7 +350,7 @@ definitions:
             items:
               type: string
             type: array
-          revocer_timeout_sec:
+          recover_timeout_sec:
             description: seconds
             format: int64
             type: integer
