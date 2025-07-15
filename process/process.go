@@ -1002,6 +1002,7 @@ func (p *process) reader() {
 func (p *process) waiter() {
 	// The process exited normally, i.e. the return code is zero and no signal has been raised
 	state := stateFinished
+	enableReconnect := true
 
 	if err := p.cmd.Wait(); err != nil {
 		// The process exited abnormally, i.e. the return code is non-zero or a signal
@@ -1018,6 +1019,10 @@ func (p *process) waiter() {
 				"exit_string": exiterr.String(),
 				"signal":      status.Signal().String(),
 			}).Debug().Log("Exited")
+
+			if int(status.Signal()) == 6 { // If ffmpeg has been killed with SIGABRT, it will disable a reconnect.
+				enableReconnect = false
+			}
 
 			if status.Exited() {
 				if status.ExitStatus() == 255 {
@@ -1096,7 +1101,7 @@ func (p *process) waiter() {
 	}).Debug().Log("Waiting")
 
 	// Restart the process
-	if p.getOrder() == "start" {
+	if p.getOrder() == "start" && enableReconnect {
 		p.reconnect(p.delay(state))
 	}
 
