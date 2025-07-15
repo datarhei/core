@@ -1236,6 +1236,9 @@ func (r *restream) updateProcess(task *task, config *app.Config) error {
 		return fmt.Errorf("delete process: %w", err)
 	}
 
+	t.Lock()
+	defer t.Unlock()
+
 	r.tasks.Store(tid, t)
 
 	// set filesystem cleanup rules
