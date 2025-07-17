@@ -482,6 +482,11 @@ func ParseProcessID(pid string) ProcessID {
 }
 
 func (p ProcessID) String() string {
+	// TODO: causes problems in the cluster with processes without a domain
+	//if len(p.Domain) == 0 {
+	//	return p.ID
+	//}
+
 	return p.ID + "@" + p.Domain
 }
 
@@ -498,6 +503,8 @@ func (p *ProcessID) Parse(pid string) {
 	if i == -1 {
 		p.ID = pid
 		p.Domain = ""
+
+		return
 	}
 
 	p.ID = pid[:i]

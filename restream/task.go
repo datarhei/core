@@ -2,7 +2,6 @@ package restream
 
 import (
 	"maps"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 )
 
 type task struct {
-	valid     *atomic.Bool           // Whether the task is valid an can be used
 	readers   *atomic.Int64          // Number of concurrent readers
 	id        string                 // ID of the task/process
 	owner     string                 // Owner of the process
@@ -30,13 +28,10 @@ type task struct {
 	usesDisk  bool                   // Whether this task uses the disk
 	hwdevice  *atomic.Int32          // Index of the GPU this task uses
 	metadata  map[string]interface{} // Metadata of the process
-
-	lock sync.RWMutex
 }
 
 func NewTask(process *app.Process, logger log.Logger) *task {
 	t := &task{
-		valid:     &atomic.Bool{},
 		readers:   &atomic.Int64{},
 		id:        process.ID,
 		owner:     process.Owner,
@@ -51,31 +46,6 @@ func NewTask(process *app.Process, logger log.Logger) *task {
 	}
 
 	return t
-}
-
-func (t *task) Lock() {
-	t.lock.Lock()
-}
-
-func (t *task) Unlock() {
-	t.lock.Unlock()
-}
-
-func (t *task) RLock() string {
-	t.readers.Add(1)
-	return ""
-}
-
-func (t *task) Release(token string) {
-	t.readers.Add(-1)
-}
-
-func (t *task) IsValid() bool {
-	return t.valid.Load()
-}
-
-func (t *task) SetValid(valid bool) {
-	t.valid.Store(valid)
 }
 
 func (t *task) UsesDisk() bool {
@@ -95,10 +65,6 @@ func (t *task) String() string {
 
 // Restore restores the task's order
 func (t *task) Restore() error {
-	if !t.valid.Load() {
-		return ErrInvalidProcessConfig
-	}
-
 	if t.process.Order.String() == "start" {
 		err := t.ffmpeg.Start()
 		if err != nil {
@@ -110,16 +76,6 @@ func (t *task) Restore() error {
 }
 
 func (t *task) Start() error {
-	if !t.valid.Load() {
-		return ErrInvalidProcessConfig
-	}
-
-	status := t.ffmpeg.Status()
-
-	if t.process.Order.String() == "start" && status.Order == "start" {
-		return nil
-	}
-
 	t.process.Order.Set("start")
 
 	t.ffmpeg.Start()
@@ -128,16 +84,6 @@ func (t *task) Start() error {
 }
 
 func (t *task) Stop() error {
-	if !t.valid.Load() {
-		return ErrInvalidProcessConfig
-	}
-
-	status := t.ffmpeg.Status()
-
-	if t.process.Order.String() == "stop" && status.Order == "stop" {
-		return nil
-	}
-
 	t.process.Order.Set("stop")
 
 	t.ffmpeg.Stop(true)
@@ -147,18 +93,10 @@ func (t *task) Stop() error {
 
 // Kill stops a process without changing the tasks order
 func (t *task) Kill() {
-	if !t.valid.Load() {
-		return
-	}
-
 	t.ffmpeg.Stop(true)
 }
 
 func (t *task) Restart() error {
-	if !t.valid.Load() {
-		return ErrInvalidProcessConfig
-	}
-
 	if t.process.Order.String() == "stop" {
 		return nil
 	}
@@ -173,10 +111,6 @@ func (t *task) Restart() error {
 
 func (t *task) State() (*app.State, error) {
 	state := &app.State{}
-
-	if !t.valid.Load() {
-		return state, nil
-	}
 
 	status := t.ffmpeg.Status()
 
@@ -267,10 +201,6 @@ func assignConfigID(progress []app.ProgressIO, config []app.ConfigIO) []app.Prog
 func (t *task) Report() (*app.Report, error) {
 	report := &app.Report{}
 
-	if !t.valid.Load() {
-		return report, nil
-	}
-
 	current := t.parser.Report()
 
 	report.UnmarshalParser(&current)
@@ -291,10 +221,6 @@ func (t *task) Report() (*app.Report, error) {
 }
 
 func (t *task) SetReport(report *app.Report) error {
-	if !t.valid.Load() {
-		return nil
-	}
-
 	_, history := report.MarshalParser()
 
 	t.parser.ImportReportHistory(history)
@@ -304,10 +230,6 @@ func (t *task) SetReport(report *app.Report) error {
 
 func (t *task) SearchReportHistory(state string, from, to *time.Time) []app.ReportHistorySearchResult {
 	result := []app.ReportHistorySearchResult{}
-
-	if !t.valid.Load() {
-		return result
-	}
 
 	presult := t.parser.SearchReportHistory(state, from, to)
 
@@ -377,10 +299,6 @@ func (t *task) ExportMetadata() map[string]interface{} {
 }
 
 func (t *task) Limit(cpu, memory, gpu bool) bool {
-	if !t.valid.Load() {
-		return false
-	}
-
 	t.ffmpeg.Limit(cpu, memory, gpu)
 
 	return true
@@ -395,41 +313,19 @@ func (t *task) GetHWDevice() int {
 }
 
 func (t *task) Equal(config *app.Config) bool {
-	if !t.valid.Load() {
-		return false
-	}
-
 	return t.process.Config.Equal(config)
 }
 
 func (t *task) ResolvedConfig() *app.Config {
-	if !t.valid.Load() {
-		return nil
-	}
-
 	return t.config.Clone()
 }
 
 func (t *task) Config() *app.Config {
-	if !t.valid.Load() {
-		return nil
-	}
-
 	return t.process.Config.Clone()
 }
 
 func (t *task) Destroy() {
 	t.Stop()
-
-	t.valid.Store(false)
-	/*
-	   t.process = nil
-	   t.config = nil
-	   t.command = nil
-	   t.ffmpeg = nil
-	   t.parser = nil
-	   t.metadata = map[string]interface{}{}
-	*/
 }
 
 func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
@@ -468,33 +364,17 @@ func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
 }
 
 func (t *task) Process() *app.Process {
-	if !t.valid.Load() {
-		return nil
-	}
-
 	return t.process.Clone()
 }
 
 func (t *task) Order() string {
-	if !t.valid.Load() {
-		return ""
-	}
-
 	return t.process.Order.String()
 }
 
 func (t *task) ExportParserReportHistory() []parse.ReportHistoryEntry {
-	if !t.valid.Load() {
-		return nil
-	}
-
 	return t.parser.ReportHistory()
 }
 
 func (t *task) ImportParserReportHistory(report []parse.ReportHistoryEntry) {
-	if !t.valid.Load() {
-		return
-	}
-
 	t.parser.ImportReportHistory(report)
 }

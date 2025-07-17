@@ -183,9 +183,7 @@ func (r *restream) Start() {
 			go r.resourceObserver(ctx, r.resources, time.Second)
 		}
 
-		r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-			defer t.Release(token)
-
+		r.tasks.Range(func(id app.ProcessID, t *task) bool {
 			t.Restore()
 
 			// The filesystem cleanup rules can be set
@@ -216,10 +214,9 @@ func (r *restream) Stop() {
 		// Stop the currently running processes without altering their order such that on a subsequent
 		// Start() they will get restarted.
 
-		r.tasks.Range(true, func(_ app.ProcessID, t *task, token string) bool {
+		r.tasks.Range(func(_ app.ProcessID, t *task) bool {
 			wg.Add(1)
 			go func(t *task) {
-				defer t.Release(token)
 				defer wg.Done()
 				t.Kill()
 			}(t)
@@ -229,8 +226,7 @@ func (r *restream) Stop() {
 
 		wg.Wait()
 
-		r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-			defer t.Release(token)
+		r.tasks.Range(func(id app.ProcessID, t *task) bool {
 			r.unsetCleanup(id)
 			return true
 		})
@@ -263,8 +259,7 @@ func (r *restream) filesystemObserver(ctx context.Context, fs fs.Filesystem, int
 
 			if isFull {
 				// Stop all tasks that write to this filesystem
-				r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-					defer t.Release(token)
+				r.tasks.Range(func(id app.ProcessID, t *task) bool {
 					if !t.UsesDisk() {
 						return true
 					}
@@ -320,8 +315,7 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 				break
 			}
 
-			r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-				defer t.Release(token)
+			r.tasks.Range(func(id app.ProcessID, t *task) bool {
 				limitGPU := false
 				gpuindex := t.GetHWDevice()
 				if gpuindex >= 0 && len(limitGPUs) >= gpuindex+1 {
@@ -381,7 +375,7 @@ func (r *restream) load() error {
 			// Replace all placeholders in the config
 			resolveStaticPlaceholders(t.config, r.replace)
 
-			tasks.Store(t.ID(), t)
+			tasks.LoadAndStore(t.ID(), t)
 		}
 	}
 
@@ -389,9 +383,7 @@ func (r *restream) load() error {
 	// replaced, we can resolve references and validate the
 	// inputs and outputs.
 
-	tasks.Range(false, func(_ app.ProcessID, t *task, token string) bool {
-		defer t.Release(token)
-
+	tasks.Range(func(_ app.ProcessID, t *task) bool {
 		// Just warn if the ffmpeg version constraint doesn't match the available ffmpeg version
 		if c, err := semver.NewConstraint(t.config.FFVersion); err == nil {
 			if v, err := semver.NewVersion(skills.FFmpeg.Version); err == nil {
@@ -468,12 +460,14 @@ func (r *restream) load() error {
 		}
 
 		t.ffmpeg = ffmpeg
-		t.SetValid(true)
 
 		return true
 	})
 
-	r.tasks.Clear()
+	r.tasks.Clear(func(_ app.ProcessID, t *task) bool {
+		t.Destroy()
+		return true
+	})
 	r.tasks = tasks
 
 	r.metadata = data.Metadata
@@ -488,13 +482,7 @@ func (r *restream) save() {
 
 	data := store.NewData()
 
-	r.tasks.Range(true, func(tid app.ProcessID, t *task, token string) bool {
-		defer t.Release(token)
-
-		if !t.IsValid() {
-			return true
-		}
-
+	r.tasks.Range(func(tid app.ProcessID, t *task) bool {
 		domain := data.Process[tid.Domain]
 		if domain == nil {
 			domain = map[string]store.Process{}
@@ -528,12 +516,19 @@ func (r *restream) CreatedAt() time.Time {
 }
 
 func (r *restream) AddProcess(config *app.Config) error {
+	tid := app.ProcessID{
+		ID:     config.ID,
+		Domain: config.Domain,
+	}
+
+	if r.tasks.Has(tid) {
+		return ErrProcessExists
+	}
+
 	t, err := r.createTask(config)
 	if err != nil {
 		return err
 	}
-
-	tid := t.ID()
 
 	_, ok := r.tasks.LoadOrStore(tid, t)
 	if ok {
@@ -546,7 +541,7 @@ func (r *restream) AddProcess(config *app.Config) error {
 
 	err = t.Restore()
 	if err != nil {
-		r.tasks.Delete(tid)
+		r.tasks.LoadAndDelete(tid)
 		t.Destroy()
 		return err
 	}
@@ -655,8 +650,6 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	t.ffmpeg = ffmpeg
 
-	t.SetValid(true)
-
 	return t, nil
 }
 
@@ -683,9 +676,8 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 			selectedGPU = 0
 		}
 
-		if t, token, hasTask := r.tasks.Load(cfg.ProcessID()); hasTask {
+		if t, hasTask := r.tasks.LoadUnsafe(cfg.ProcessID()); hasTask {
 			t.SetHWDevice(selectedGPU)
-			t.Release(token)
 		} else {
 			return []string{}, fmt.Errorf("process with the ID '%s' not found", cfg.ProcessID())
 		}
@@ -1046,24 +1038,18 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 	}
 
 	var t *task = nil
-	var ttoken string = ""
 
-	tasks.Range(true, func(_ app.ProcessID, task *task, token string) bool {
+	tasks.Range(func(_ app.ProcessID, task *task) bool {
 		if task.id == matches["id"] && task.domain == matches["domain"] {
 			t = task
-			ttoken = token
 			return false
 		}
-
-		task.Release(token)
 		return true
 	})
 
 	if t == nil {
 		return address, fmt.Errorf("unknown process '%s' in domain '%s' (%s): %w", matches["id"], matches["domain"], address, ErrInvalidProcessConfig)
 	}
-
-	defer t.Release(ttoken)
 
 	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
 
@@ -1176,9 +1162,9 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 		return ErrUnknownProcess
 	}
 
-	err := r.updateProcess(task, config)
+	defer r.tasks.Unlock(id)
 
-	task.Unlock()
+	err := r.updateProcess(task, config)
 
 	if err != nil {
 		return err
@@ -1217,7 +1203,7 @@ func (r *restream) updateProcess(task *task, config *app.Config) error {
 
 	t.process.Order.Set(order)
 
-	if err := r.stopProcess(task); err != nil {
+	if err := task.Stop(); err != nil {
 		t.Destroy()
 		return fmt.Errorf("stop process: %w", err)
 	}
@@ -1231,20 +1217,21 @@ func (r *restream) updateProcess(task *task, config *app.Config) error {
 	// Transfer the metadata to the new process
 	t.ImportMetadata(task.ExportMetadata())
 
-	if err := r.deleteProcess(task); err != nil {
-		t.Destroy()
-		return fmt.Errorf("delete process: %w", err)
-	}
+	r.unsetPlayoutPorts(task)
+	r.unsetCleanup(task.ID())
 
-	t.Lock()
-	defer t.Unlock()
-
-	r.tasks.Store(tid, t)
+	r.tasks.LoadAndStore(tid, t)
 
 	// set filesystem cleanup rules
 	r.setCleanup(tid, t.config)
 
 	t.Restore()
+
+	if !tid.Equal(task.ID()) {
+		r.tasks.LoadAndDelete(task.ID())
+	}
+
+	task.Destroy()
 
 	return nil
 }
@@ -1276,9 +1263,7 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 	if idglob == nil && refglob == nil && ownerglob == nil && domainglob == nil {
 		ids = make([]app.ProcessID, 0, r.tasks.Size())
 
-		r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-			defer t.Release(token)
-
+		r.tasks.Range(func(id app.ProcessID, t *task) bool {
 			ids = append(ids, id)
 
 			return true
@@ -1286,9 +1271,7 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 	} else {
 		ids = []app.ProcessID{}
 
-		r.tasks.Range(true, func(id app.ProcessID, t *task, token string) bool {
-			defer t.Release(token)
-
+		r.tasks.Range(func(id app.ProcessID, t *task) bool {
 			if !t.Match(idglob, refglob, ownerglob, domainglob) {
 				return true
 			}
@@ -1303,11 +1286,10 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 }
 
 func (r *restream) GetProcess(id app.ProcessID) (*app.Process, error) {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadUnsafe(id)
 	if !ok {
 		return &app.Process{}, ErrUnknownProcess
 	}
-	defer task.Release(token)
 
 	return task.Process(), nil
 }
@@ -1320,7 +1302,7 @@ func (r *restream) DeleteProcess(id app.ProcessID) error {
 
 	err := r.deleteProcess(task)
 
-	task.Unlock()
+	r.tasks.Unlock(id)
 
 	if err != nil {
 		return err
@@ -1339,7 +1321,7 @@ func (r *restream) deleteProcess(task *task) error {
 	r.unsetPlayoutPorts(task)
 	r.unsetCleanup(task.ID())
 
-	r.tasks.Delete(task.ID())
+	r.tasks.LoadAndDelete(task.ID())
 
 	task.Destroy()
 
@@ -1347,14 +1329,13 @@ func (r *restream) deleteProcess(task *task) error {
 }
 
 func (r *restream) StartProcess(id app.ProcessID) error {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
+	defer r.tasks.Unlock(id)
 
 	err := r.startProcess(task)
-
-	task.Release(token)
 
 	if err != nil {
 		return err
@@ -1377,14 +1358,13 @@ func (r *restream) startProcess(task *task) error {
 }
 
 func (r *restream) StopProcess(id app.ProcessID) error {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
+	defer r.tasks.Unlock(id)
 
 	err := r.stopProcess(task)
-
-	task.Release(token)
 
 	if err != nil {
 		return err
@@ -1408,11 +1388,11 @@ func (r *restream) stopProcess(task *task) error {
 }
 
 func (r *restream) RestartProcess(id app.ProcessID) error {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
-	defer task.Release(token)
+	defer r.tasks.Unlock(id)
 
 	return r.restartProcess(task)
 }
@@ -1431,7 +1411,7 @@ func (r *restream) ReloadProcess(id app.ProcessID) error {
 
 	err := r.reloadProcess(task)
 
-	task.Unlock()
+	r.tasks.Unlock(id)
 
 	if err != nil {
 		return err
@@ -1464,22 +1444,22 @@ func (r *restream) reloadProcess(task *task) error {
 	}
 
 	// Transfer the report history to the new process
-	t.parser.ImportReportHistory(task.parser.ReportHistory())
+	t.ImportParserReportHistory(task.ExportParserReportHistory())
 
 	// Transfer the metadata to the new process
-	t.metadata = task.metadata
+	t.ImportMetadata(task.ExportMetadata())
 
-	if err := r.deleteProcess(task); err != nil {
-		t.Destroy()
-		return fmt.Errorf("delete process: %w", err)
-	}
+	r.unsetPlayoutPorts(task)
+	r.unsetCleanup(task.ID())
 
-	r.tasks.Store(tid, t)
+	r.tasks.LoadAndStore(tid, t)
 
 	// set filesystem cleanup rules
 	r.setCleanup(tid, t.config)
 
 	t.Restore()
+
+	task.Destroy()
 
 	return nil
 }
@@ -1487,11 +1467,10 @@ func (r *restream) reloadProcess(task *task) error {
 func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 	state := &app.State{}
 
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadUnsafe(id)
 	if !ok {
 		return state, ErrUnknownProcess
 	}
-	defer task.Release(token)
 
 	return task.State()
 }
@@ -1499,11 +1478,10 @@ func (r *restream) GetProcessState(id app.ProcessID) (*app.State, error) {
 func (r *restream) GetProcessReport(id app.ProcessID) (*app.Report, error) {
 	report := &app.Report{}
 
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadUnsafe(id)
 	if !ok {
 		return report, ErrUnknownProcess
 	}
-	defer task.Release(token)
 
 	return task.Report()
 }
@@ -1513,7 +1491,7 @@ func (r *restream) SetProcessReport(id app.ProcessID, report *app.Report) error 
 	if !ok {
 		return ErrUnknownProcess
 	}
-	defer task.Unlock()
+	defer r.tasks.Unlock(id)
 
 	return task.SetReport(report)
 }
@@ -1524,15 +1502,13 @@ func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, 
 	ids := r.GetProcessIDs(idpattern, refpattern, "", "")
 
 	for _, id := range ids {
-		task, token, ok := r.tasks.Load(id)
+		task, ok := r.tasks.LoadUnsafe(id)
 		if !ok {
 			continue
 		}
 
 		presult := task.SearchReportHistory(state, from, to)
 		result = append(result, presult...)
-
-		task.Release(token)
 	}
 
 	return result
@@ -1626,15 +1602,11 @@ func (r *restream) ReloadSkills() error {
 }
 
 func (r *restream) GetPlayout(id app.ProcessID, inputid string) (string, error) {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadAndRLock(id)
 	if !ok {
 		return "", ErrUnknownProcess
 	}
-	defer task.Release(token)
-
-	if !task.IsValid() {
-		return "", ErrInvalidProcessConfig
-	}
+	defer r.tasks.RUnlock(id)
 
 	port, ok := task.playout[inputid]
 	if !ok {
@@ -1652,7 +1624,7 @@ func (r *restream) SetProcessMetadata(id app.ProcessID, key string, data interfa
 
 	err := task.SetMetadata(key, data)
 
-	task.Unlock()
+	r.tasks.Unlock(id)
 
 	if err != nil {
 		return err
@@ -1664,11 +1636,10 @@ func (r *restream) SetProcessMetadata(id app.ProcessID, key string, data interfa
 }
 
 func (r *restream) GetProcessMetadata(id app.ProcessID, key string) (interface{}, error) {
-	task, token, ok := r.tasks.Load(id)
+	task, ok := r.tasks.LoadUnsafe(id)
 	if !ok {
 		return nil, ErrUnknownProcess
 	}
-	defer task.Release(token)
 
 	return task.GetMetadata(key)
 }
