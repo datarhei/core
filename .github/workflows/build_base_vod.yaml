@@ -17,18 +17,20 @@ jobs:
                       os_version: "3.21"
                       golang: golang:1.24-alpine3.21
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
-                      branch: 5d91db915fec9c14dfa4b5bb3b31cc3530bc3430
+                      branch: vod
+                      commit: 5d91db915fec9c14dfa4b5bb3b31cc3530bc3430
                     - os: ubuntu
                       os_version: "24.04"
                       golang: golang:1.24-alpine3.21
                       platforms: linux/amd64
-                      branch: 5d91db915fec9c14dfa4b5bb3b31cc3530bc3430
+                      branch: vod
+                      commit: 5d91db915fec9c14dfa4b5bb3b31cc3530bc3430
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
               with:
-                  ref: ${{ matrix.branch }}
+                  ref: ${{ matrix.commit }}
 
             - name: Docker meta
               id: meta
