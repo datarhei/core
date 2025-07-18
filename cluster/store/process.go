@@ -74,12 +74,9 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	}
 
 	if srcid == dstid {
-		if p.Config.Equal(cmd.Config) {
-			return nil
-		}
-
 		p.UpdatedAt = time.Now()
 		p.Config = cmd.Config
+		p.Force = cmd.Force
 
 		s.data.Process[srcid] = p
 
@@ -214,6 +211,7 @@ func (s *store) ProcessList() []Process {
 			Order:     p.Order,
 			Metadata:  p.Metadata,
 			Error:     p.Error,
+			Force:     p.Force,
 		})
 	}
 

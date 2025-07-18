@@ -36,13 +36,14 @@ func (f *Forwarder) ProcessGet(origin string, id app.ProcessID) (store.Process, 
 	return process, nodeid, reconstructError(err)
 }
 
-func (f *Forwarder) ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error {
+func (f *Forwarder) ProcessUpdate(origin string, id app.ProcessID, config *app.Config, force bool) error {
 	if origin == "" {
 		origin = f.ID
 	}
 
 	r := apiclient.UpdateProcessRequest{
 		Config: *config,
+		Force:  force,
 	}
 
 	f.lock.RLock()

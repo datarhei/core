@@ -81,7 +81,7 @@ func (r *restclient) ProcessAdd(p *app.Config, metadata map[string]interface{}) 
 	return nil
 }
 
-func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]interface{}) error {
+func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]any, force bool) error {
 	buf := mem.Get()
 	defer mem.Put(buf)
 
@@ -93,6 +93,10 @@ func (r *restclient) ProcessUpdate(id app.ProcessID, p *app.Config, metadata map
 
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
+
+	if force {
+		query.Set("force", "restart")
+	}
 
 	_, err := r.call("PUT", "/v3/process/"+url.PathEscape(id.ID), query, nil, "application/json", buf.Reader())
 	if err != nil {

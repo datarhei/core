@@ -563,7 +563,7 @@ func (p *Manager) ProcessGet(nodeid string, id app.ProcessID, filter []string) (
 	return process, nil
 }
 
-func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]interface{}) error {
+func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[string]any) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return err
@@ -581,13 +581,13 @@ func (p *Manager) ProcessDelete(nodeid string, id app.ProcessID) error {
 	return node.Core().ProcessDelete(id)
 }
 
-func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]interface{}) error {
+func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]any, force bool) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return err
 	}
 
-	return node.Core().ProcessUpdate(id, config, metadata)
+	return node.Core().ProcessUpdate(id, config, metadata, force)
 }
 
 func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.Report) error {

@@ -470,7 +470,7 @@ type processOpStop struct {
 type processOpAdd struct {
 	nodeid   string
 	config   *app.Config
-	metadata map[string]interface{}
+	metadata map[string]any
 	order    string
 }
 
@@ -478,7 +478,8 @@ type processOpUpdate struct {
 	nodeid    string
 	processid app.ProcessID
 	config    *app.Config
-	metadata  map[string]interface{}
+	metadata  map[string]any
+	force     bool
 }
 
 type processOpReject struct {
@@ -594,7 +595,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Adding process")
 	case processOpUpdate:
-		err := c.manager.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata)
+		err := c.manager.ProcessUpdate(v.nodeid, v.processid, v.config, v.metadata, v.force)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,

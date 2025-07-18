@@ -298,12 +298,12 @@ func TestUpdateProcess(t *testing.T) {
 	process3.ID = "process2"
 	tid3 := app.ProcessID{ID: process3.ID}
 
-	err = rs.UpdateProcess(tid1, process3)
+	err = rs.UpdateProcess(tid1, process3, false)
 	require.Error(t, err)
 
 	process3.ID = "process3"
 	tid3.ID = process3.ID
-	err = rs.UpdateProcess(tid1, process3)
+	err = rs.UpdateProcess(tid1, process3, false)
 	require.NoError(t, err)
 
 	_, err = rs.GetProcess(tid1)
@@ -335,7 +335,7 @@ func TestUpdateSameHashProcess(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	err = rs.UpdateProcess(tid, config)
+	err = rs.UpdateProcess(tid, config, false)
 	require.NoError(t, err)
 
 	process, err = rs.GetProcess(tid)
@@ -374,7 +374,7 @@ func TestUpdateProcessLogHistoryTransfer(t *testing.T) {
 	require.NotNil(t, p)
 
 	p.ID = "process2"
-	err = rs.UpdateProcess(tid1, p)
+	err = rs.UpdateProcess(tid1, p, false)
 	require.NoError(t, err)
 
 	tid2 := app.ProcessID{ID: p.ID}
@@ -419,7 +419,7 @@ func TestUpdateProcessMetadataTransfer(t *testing.T) {
 	require.NotNil(t, p)
 
 	p.ID = "process2"
-	err = rs.UpdateProcess(tid1, p)
+	err = rs.UpdateProcess(tid1, p, false)
 	require.NoError(t, err)
 
 	tid2 := app.ProcessID{ID: p.ID}
@@ -836,7 +836,7 @@ func TestLogTransfer(t *testing.T) {
 
 	require.Equal(t, 1, len(log.History))
 
-	err = rs.UpdateProcess(tid, process)
+	err = rs.UpdateProcess(tid, process, false)
 	require.NoError(t, err)
 
 	log, _ = rs.GetProcessReport(tid)
@@ -1858,7 +1858,7 @@ func TestProcessCleanup(t *testing.T) {
 	require.Equal(t, 10, len(files))
 
 	process.Reference = "foobar"
-	rsi.UpdateProcess(app.ProcessID{ID: process.ID}, process)
+	rsi.UpdateProcess(app.ProcessID{ID: process.ID}, process, false)
 
 	rsi.Start()
 

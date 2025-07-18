@@ -59,21 +59,21 @@ type RestClient interface {
 
 	Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) // POST /v3/events
 
-	ProcessList(opts ProcessListOptions) ([]api.Process, error)                           // GET /v3/process
-	ProcessAdd(p *app.Config, metadata map[string]interface{}) error                      // POST /v3/process
-	Process(id app.ProcessID, filter []string) (api.Process, error)                       // GET /v3/process/{id}
-	ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]interface{}) error // PUT /v3/process/{id}
-	ProcessDelete(id app.ProcessID) error                                                 // DELETE /v3/process/{id}
-	ProcessCommand(id app.ProcessID, command string) error                                // PUT /v3/process/{id}/command
-	ProcessProbe(id app.ProcessID) (api.Probe, error)                                     // GET /v3/process/{id}/probe
-	ProcessProbeConfig(config *app.Config) (api.Probe, error)                             // POST /v3/process/probe
-	ProcessValidateConfig(p *app.Config) error                                            // POST /v3/process/validate
-	ProcessConfig(id app.ProcessID) (api.ProcessConfig, error)                            // GET /v3/process/{id}/config
-	ProcessReport(id app.ProcessID) (api.ProcessReport, error)                            // GET /v3/process/{id}/report
-	ProcessReportSet(id app.ProcessID, report *app.Report) error                          // PUT /v3/process/{id}/report
-	ProcessState(id app.ProcessID) (api.ProcessState, error)                              // GET /v3/process/{id}/state
-	ProcessMetadata(id app.ProcessID, key string) (api.Metadata, error)                   // GET /v3/process/{id}/metadata/{key}
-	ProcessMetadataSet(id app.ProcessID, key string, metadata api.Metadata) error         // PUT /v3/process/{id}/metadata/{key}
+	ProcessList(opts ProcessListOptions) ([]api.Process, error)                               // GET /v3/process
+	ProcessAdd(p *app.Config, metadata map[string]any) error                                  // POST /v3/process
+	Process(id app.ProcessID, filter []string) (api.Process, error)                           // GET /v3/process/{id}
+	ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]any, force bool) error // PUT /v3/process/{id}
+	ProcessDelete(id app.ProcessID) error                                                     // DELETE /v3/process/{id}
+	ProcessCommand(id app.ProcessID, command string) error                                    // PUT /v3/process/{id}/command
+	ProcessProbe(id app.ProcessID) (api.Probe, error)                                         // GET /v3/process/{id}/probe
+	ProcessProbeConfig(config *app.Config) (api.Probe, error)                                 // POST /v3/process/probe
+	ProcessValidateConfig(p *app.Config) error                                                // POST /v3/process/validate
+	ProcessConfig(id app.ProcessID) (api.ProcessConfig, error)                                // GET /v3/process/{id}/config
+	ProcessReport(id app.ProcessID) (api.ProcessReport, error)                                // GET /v3/process/{id}/report
+	ProcessReportSet(id app.ProcessID, report *app.Report) error                              // PUT /v3/process/{id}/report
+	ProcessState(id app.ProcessID) (api.ProcessState, error)                                  // GET /v3/process/{id}/state
+	ProcessMetadata(id app.ProcessID, key string) (api.Metadata, error)                       // GET /v3/process/{id}/metadata/{key}
+	ProcessMetadataSet(id app.ProcessID, key string, metadata api.Metadata) error             // PUT /v3/process/{id}/metadata/{key}
 
 	RTMPChannels() ([]api.RTMPChannel, error) // GET /v3/rtmp
 	SRTChannels() ([]api.SRTChannel, error)   // GET /v3/srt

@@ -43,7 +43,7 @@ type Restreamer interface {
 	AddProcess(config *app.Config) error                                                                              // Add a new process
 	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID                          // Get a list of process IDs based on patterns for ID and reference
 	DeleteProcess(id app.ProcessID) error                                                                             // Delete a process
-	UpdateProcess(id app.ProcessID, config *app.Config) error                                                         // Update a process
+	UpdateProcess(id app.ProcessID, config *app.Config, force bool) error                                             // Update a process
 	StartProcess(id app.ProcessID) error                                                                              // Start a process
 	StopProcess(id app.ProcessID) error                                                                               // Stop a process
 	RestartProcess(id app.ProcessID) error                                                                            // Restart a process
@@ -1091,15 +1091,16 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 				continue
 			}
 
-			if matches["source"] == "hls" {
+			switch matches["source"] {
+			case "hls":
 				if (u.Scheme == "http" || u.Scheme == "https") && strings.HasSuffix(u.RawPath, ".m3u8") {
 					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
-			} else if matches["source"] == "rtmp" {
+			case "rtmp":
 				if u.Scheme == "rtmp" {
 					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
-			} else if matches["source"] == "srt" {
+			case "srt":
 				if u.Scheme == "srt" {
 					return r.rewrite.RewriteAddress(a, t.config.Owner, rewrite.READ), nil
 				}
@@ -1161,7 +1162,7 @@ func parseAddressReference(address string) (map[string]string, error) {
 	return results, nil
 }
 
-func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
+func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config, force bool) error {
 	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
@@ -1169,7 +1170,7 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 
 	defer r.tasks.Unlock(id)
 
-	err := r.updateProcess(task, config)
+	err := r.updateProcess(task, config, force)
 
 	if err != nil {
 		return err
@@ -1180,9 +1181,9 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config) error {
 	return nil
 }
 
-func (r *restream) updateProcess(task *task, config *app.Config) error {
+func (r *restream) updateProcess(task *task, config *app.Config, force bool) error {
 	// If the new config has the same hash as the current config, do nothing.
-	if task.Equal(config) {
+	if !force && task.Equal(config) {
 		return nil
 	}
 

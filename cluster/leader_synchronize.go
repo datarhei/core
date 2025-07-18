@@ -189,6 +189,9 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 
 		// The process is on the wantMap. Update the process if the configuration and/or metadata differ.
 		hasConfigChanges := !wantP.Config.Equal(haveP.Config)
+		if !hasConfigChanges && wantP.Force {
+			hasConfigChanges = wantP.UpdatedAt.After(haveP.UpdatedAt)
+		}
 		hasMetadataChanges, metadata := isMetadataUpdateRequired(wantP.Metadata, haveP.Metadata)
 		if opBudget > 0 {
 			if hasConfigChanges || hasMetadataChanges {
@@ -200,6 +203,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 					processid: haveP.Config.ProcessID(),
 					config:    wantP.Config,
 					metadata:  metadata,
+					force:     wantP.Force,
 				})
 
 				opBudget -= 3

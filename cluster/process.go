@@ -58,9 +58,9 @@ func (c *cluster) ProcessRemove(origin string, id app.ProcessID) error {
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Config) error {
+func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Config, force bool) error {
 	if !c.IsRaftLeader() {
-		return c.forwarder.ProcessUpdate(origin, id, config)
+		return c.forwarder.ProcessUpdate(origin, id, config, force)
 	}
 
 	nodeid := c.manager.GetRandomNode()
@@ -74,6 +74,7 @@ func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Con
 		Data: &store.CommandUpdateProcess{
 			ID:     id,
 			Config: config,
+			Force:  force,
 		},
 	}
 

@@ -45,8 +45,9 @@ type Process struct {
 	UpdatedAt time.Time
 	Config    *app.Config
 	Order     string
-	Metadata  map[string]interface{}
+	Metadata  map[string]any
 	Error     string
+	Force     bool
 }
 
 type Users struct {
@@ -109,6 +110,7 @@ type CommandRemoveProcess struct {
 type CommandUpdateProcess struct {
 	ID     app.ProcessID
 	Config *app.Config
+	Force  bool
 }
 
 type CommandSetRelocateProcess struct {

@@ -33,6 +33,7 @@ type GetProcessResponse struct {
 
 type UpdateProcessRequest struct {
 	Config app.Config `json:"config"`
+	Force  bool       `json:"force"`
 }
 
 type SetProcessCommandRequest struct {

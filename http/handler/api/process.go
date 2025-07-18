@@ -285,6 +285,7 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 func (h *ProcessHandler) Update(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
+	force := util.DefaultQuery(c, "force", "")
 	id := util.PathParam(c, "id")
 
 	process := api.ProcessConfig{
@@ -322,7 +323,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	if err := h.restream.UpdateProcess(tid, config); err != nil {
+	if err := h.restream.UpdateProcess(tid, config, force == "restart"); err != nil {
 		return h.apiErrorFromError(err)
 	}
 

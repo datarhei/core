@@ -516,7 +516,7 @@ func (a *api) ProcessUpdate(c echo.Context) error {
 		"new_id": r.Config.ProcessID(),
 	}).Log("Update process request")
 
-	err := a.cluster.ProcessUpdate(origin, pid, &r.Config)
+	err := a.cluster.ProcessUpdate(origin, pid, &r.Config, r.Force)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to update process")
 		return ErrFromClusterError(err)

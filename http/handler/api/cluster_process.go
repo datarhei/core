@@ -305,6 +305,7 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	domain := util.DefaultQuery(c, "domain", "")
+	force := util.DefaultQuery(c, "force", "")
 	id := util.PathParam(c, "id")
 
 	process := api.ProcessConfig{
@@ -339,7 +340,7 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 
 	config, metadata := process.Marshal()
 
-	if err := h.cluster.ProcessUpdate("", pid, config); err != nil {
+	if err := h.cluster.ProcessUpdate("", pid, config, force == "restart"); err != nil {
 		if err == restream.ErrUnknownProcess {
 			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
