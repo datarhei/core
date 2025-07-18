@@ -129,8 +129,6 @@ func (rfs *filesystem) compilePatterns(patterns []Pattern) []Pattern {
 }
 
 func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern) {
-	rfs.logger.Debug().WithField("id", id).Log("Update pattern group")
-
 	newPatterns = rfs.compilePatterns(newPatterns)
 
 	rfs.cleanupLock.Lock()
@@ -141,39 +139,32 @@ func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern) {
 
 	onlyCurrent, onlyNew := slices.DiffEqualer(currentPatterns, newPatterns)
 
-	patterns := []Pattern{}
-
-	for _, p := range currentPatterns {
+	for _, p := range newPatterns {
 		found := false
-		for _, x := range onlyCurrent {
+		for _, x := range onlyNew {
 			if p.Equal(x) == nil {
 				found = true
 				break
 			}
 		}
 		if !found {
-			patterns = append(patterns, p)
 			rfs.logger.Debug().WithFields(log.Fields{
 				"id":           id,
 				"pattern":      p.Pattern,
 				"max_files":    p.MaxFiles,
 				"max_file_age": p.MaxFileAge.Seconds(),
 			}).Log("Keep pattern")
+		} else {
+			rfs.logger.Debug().WithFields(log.Fields{
+				"id":           id,
+				"pattern":      p.Pattern,
+				"max_files":    p.MaxFiles,
+				"max_file_age": p.MaxFileAge.Seconds(),
+			}).Log("Add pattern")
 		}
 	}
 
-	for _, p := range onlyNew {
-		rfs.logger.Debug().WithFields(log.Fields{
-			"id":           id,
-			"pattern":      p.Pattern,
-			"max_files":    p.MaxFiles,
-			"max_file_age": p.MaxFileAge.Seconds(),
-		}).Log("Add pattern")
-	}
-
-	patterns = append(patterns, onlyNew...)
-
-	rfs.cleanupPatterns[id] = patterns
+	rfs.cleanupPatterns[id] = newPatterns
 
 	for _, p := range onlyCurrent {
 		rfs.logger.Debug().WithFields(log.Fields{
@@ -258,9 +249,13 @@ func (rfs *filesystem) purge(patterns []Pattern) int64 {
 			continue
 		}
 
-		_, nfiles := rfs.Filesystem.RemoveList("/", fs.ListOptions{
+		files, nfiles := rfs.Filesystem.RemoveList("/", fs.ListOptions{
 			Pattern: pattern.Pattern,
 		})
+
+		for _, file := range files {
+			rfs.logger.Debug().WithField("path", file).Log("Purged file")
+		}
 
 		nfilesTotal += nfiles
 	}

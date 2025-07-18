@@ -48,6 +48,12 @@ func TestUpdateCleanup(t *testing.T) {
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
 
+	patterns[0].MaxFiles = 42
+
+	cleanfs.UpdateCleanup("foobar", patterns)
+
+	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
+
 	cleanfs.UpdateCleanup("foobar", patterns[1:])
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns[1:])
