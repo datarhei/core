@@ -704,6 +704,8 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 }
 
 func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
+	patterns := map[string][]rfs.Pattern{}
+
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {
 			name, path, found := strings.Cut(c.Pattern, ":")
@@ -717,37 +719,40 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 			}
 
 			// Support legacy names
-			if name == "diskfs" {
+			switch name {
+			case "diskfs":
 				name = "disk"
-			} else if name == "memfs" {
+			case "memfs":
 				name = "mem"
 			}
 
-			for _, fs := range r.fs.list {
-				if fs.Name() != name {
-					continue
-				}
+			p := patterns[name]
+			p = append(p, rfs.Pattern{
+				Pattern:       path,
+				MaxFiles:      c.MaxFiles,
+				MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
+				PurgeOnDelete: c.PurgeOnDelete,
+			})
+			patterns[name] = p
+		}
+	}
 
-				pattern := rfs.Pattern{
-					Pattern:       path,
-					MaxFiles:      c.MaxFiles,
-					MaxFileAge:    time.Duration(c.MaxFileAge) * time.Second,
-					PurgeOnDelete: c.PurgeOnDelete,
-				}
-
-				fs.SetCleanup(id.String(), []rfs.Pattern{
-					pattern,
-				})
-
-				break
+	for name, p := range patterns {
+		for _, fs := range r.fs.list {
+			if fs.Name() != name {
+				continue
 			}
+
+			fs.UpdateCleanup(id.String(), p)
+
+			break
 		}
 	}
 }
 
 func (r *restream) unsetCleanup(id app.ProcessID) {
 	for _, fs := range r.fs.list {
-		fs.UnsetCleanup(id.String())
+		fs.UpdateCleanup(id.String(), nil)
 	}
 }
 
@@ -1218,16 +1223,16 @@ func (r *restream) updateProcess(task *task, config *app.Config) error {
 	t.ImportMetadata(task.ExportMetadata())
 
 	r.unsetPlayoutPorts(task)
-	r.unsetCleanup(task.ID())
 
 	r.tasks.LoadAndStore(tid, t)
 
-	// set filesystem cleanup rules
+	// Set the filesystem cleanup rules
 	r.setCleanup(tid, t.config)
 
 	t.Restore()
 
 	if !tid.Equal(task.ID()) {
+		r.unsetCleanup(task.ID())
 		r.tasks.LoadAndDelete(task.ID())
 	}
 
@@ -1450,11 +1455,10 @@ func (r *restream) reloadProcess(task *task) error {
 	t.ImportMetadata(task.ExportMetadata())
 
 	r.unsetPlayoutPorts(task)
-	r.unsetCleanup(task.ID())
 
 	r.tasks.LoadAndStore(tid, t)
 
-	// set filesystem cleanup rules
+	// Set the filesystem cleanup rules
 	r.setCleanup(tid, t.config)
 
 	t.Restore()

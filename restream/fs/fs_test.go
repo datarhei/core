@@ -12,6 +12,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpdateCleanup(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	clean, err := New(Config{
+		FS:       memfs,
+		Interval: time.Second,
+	})
+	require.NoError(t, err)
+
+	cleanfs := clean.(*filesystem)
+
+	cleanfs.Start()
+
+	patterns := []Pattern{
+		{
+			Pattern:    "/*.ts",
+			MaxFiles:   3,
+			MaxFileAge: 0,
+		},
+	}
+
+	cleanfs.UpdateCleanup("foobar", patterns)
+
+	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
+
+	patterns = append(patterns, Pattern{
+		Pattern:    "/*.m3u8",
+		MaxFiles:   5,
+		MaxFileAge: 0,
+	})
+
+	cleanfs.UpdateCleanup("foobar", patterns)
+
+	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
+
+	cleanfs.UpdateCleanup("foobar", patterns[1:])
+
+	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns[1:])
+
+	cleanfs.UpdateCleanup("foobar", nil)
+
+	require.Empty(t, cleanfs.cleanupPatterns["foobar"])
+}
+
 func TestMaxFiles(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
@@ -24,7 +69,7 @@ func TestMaxFiles(t *testing.T) {
 
 	cleanfs.Start()
 
-	cleanfs.SetCleanup("foobar", []Pattern{
+	cleanfs.UpdateCleanup("foobar", []Pattern{
 		{
 			Pattern:    "/*.ts",
 			MaxFiles:   3,
@@ -73,7 +118,7 @@ func TestMaxAge(t *testing.T) {
 
 	cleanfs.Start()
 
-	cleanfs.SetCleanup("foobar", []Pattern{
+	cleanfs.UpdateCleanup("foobar", []Pattern{
 		{
 			Pattern:    "/*.ts",
 			MaxFiles:   0,
@@ -122,7 +167,7 @@ func TestUnsetCleanup(t *testing.T) {
 
 	cleanfs.Start()
 
-	cleanfs.SetCleanup("foobar", []Pattern{
+	cleanfs.UpdateCleanup("foobar", []Pattern{
 		{
 			Pattern:    "/*.ts",
 			MaxFiles:   3,
@@ -156,7 +201,7 @@ func TestUnsetCleanup(t *testing.T) {
 		return true
 	}, 3*time.Second, time.Second)
 
-	cleanfs.UnsetCleanup("foobar")
+	cleanfs.UpdateCleanup("foobar", nil)
 
 	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"), -1)
 
@@ -172,6 +217,76 @@ func TestUnsetCleanup(t *testing.T) {
 		}
 
 		require.ElementsMatch(t, []string{"/chunk_1.ts", "/chunk_2.ts", "/chunk_3.ts", "/chunk_4.ts"}, names)
+
+		return true
+	}, 3*time.Second, time.Second)
+
+	cleanfs.Stop()
+}
+
+func TestPurge(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	cleanfs, err := New(Config{
+		FS:       memfs,
+		Interval: time.Second,
+	})
+	require.NoError(t, err)
+
+	cleanfs.Start()
+
+	cleanfs.UpdateCleanup("foobar", []Pattern{
+		{
+			Pattern:       "/*.ts",
+			MaxFiles:      3,
+			MaxFileAge:    0,
+			PurgeOnDelete: true,
+		},
+	})
+
+	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
+	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
+	cleanfs.WriteFileReader("/chunk_2.ts", strings.NewReader("chunk_2"), -1)
+
+	require.Eventually(t, func() bool {
+		return cleanfs.Files() == 3
+	}, 3*time.Second, time.Second)
+
+	cleanfs.WriteFileReader("/chunk_3.ts", strings.NewReader("chunk_3"), -1)
+
+	require.Eventually(t, func() bool {
+		if cleanfs.Files() != 3 {
+			return false
+		}
+
+		names := []string{}
+
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
+			names = append(names, f.Name())
+		}
+
+		require.ElementsMatch(t, []string{"/chunk_1.ts", "/chunk_2.ts", "/chunk_3.ts"}, names)
+
+		return true
+	}, 3*time.Second, time.Second)
+
+	cleanfs.UpdateCleanup("foobar", nil)
+
+	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"), -1)
+
+	require.Eventually(t, func() bool {
+		if cleanfs.Files() != 1 {
+			return false
+		}
+
+		names := []string{}
+
+		for _, f := range cleanfs.List("/", fs.ListOptions{Pattern: "/*.ts"}) {
+			names = append(names, f.Name())
+		}
+
+		require.ElementsMatch(t, []string{"/chunk_4.ts"}, names)
 
 		return true
 	}, 3*time.Second, time.Second)
@@ -229,7 +344,7 @@ func BenchmarkCleanup(b *testing.B) {
 			},
 		}
 
-		cleanfs.SetCleanup(id, patterns)
+		cleanfs.UpdateCleanup(id, patterns)
 
 		ids[i] = id
 	}
@@ -308,7 +423,7 @@ func BenchmarkPurge(b *testing.B) {
 			},
 		}
 
-		cleanfs.SetCleanup(id, patterns)
+		cleanfs.UpdateCleanup(id, patterns)
 
 		ids[i] = id
 	}

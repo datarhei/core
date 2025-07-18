@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/slices"
 )
 
 type Config struct {
@@ -27,14 +28,19 @@ type Pattern struct {
 	PurgeOnDelete   bool
 }
 
+func (p Pattern) Equal(other Pattern) error {
+	if p.Pattern == other.Pattern {
+		return nil
+	}
+
+	return fmt.Errorf("not euqal")
+}
+
 type Filesystem interface {
 	fs.Filesystem
 
-	// SetCleanup
-	SetCleanup(id string, patterns []Pattern)
-
-	// UnsetCleanup
-	UnsetCleanup(id string)
+	// UpdateCleanup
+	UpdateCleanup(id string, patterns []Pattern)
 
 	// Start
 	Start()
@@ -108,11 +114,7 @@ func (rfs *filesystem) Stop() {
 	})
 }
 
-func (rfs *filesystem) SetCleanup(id string, patterns []Pattern) {
-	if len(patterns) == 0 {
-		return
-	}
-
+func (rfs *filesystem) compilePatterns(patterns []Pattern) []Pattern {
 	for i, p := range patterns {
 		g, err := glob.Compile(p.Pattern, '/')
 		if err != nil {
@@ -121,7 +123,46 @@ func (rfs *filesystem) SetCleanup(id string, patterns []Pattern) {
 
 		p.compiledPattern = g
 		patterns[i] = p
+	}
 
+	return patterns
+}
+
+func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern) {
+	rfs.logger.Debug().WithField("id", id).Log("Update pattern group")
+
+	newPatterns = rfs.compilePatterns(newPatterns)
+
+	rfs.cleanupLock.Lock()
+	defer rfs.cleanupLock.Unlock()
+
+	currentPatterns := rfs.cleanupPatterns[id]
+	delete(rfs.cleanupPatterns, id)
+
+	onlyCurrent, onlyNew := slices.DiffEqualer(currentPatterns, newPatterns)
+
+	patterns := []Pattern{}
+
+	for _, p := range currentPatterns {
+		found := false
+		for _, x := range onlyCurrent {
+			if p.Equal(x) == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			patterns = append(patterns, p)
+			rfs.logger.Debug().WithFields(log.Fields{
+				"id":           id,
+				"pattern":      p.Pattern,
+				"max_files":    p.MaxFiles,
+				"max_file_age": p.MaxFileAge.Seconds(),
+			}).Log("Keep pattern")
+		}
+	}
+
+	for _, p := range onlyNew {
 		rfs.logger.Debug().WithFields(log.Fields{
 			"id":           id,
 			"pattern":      p.Pattern,
@@ -130,22 +171,20 @@ func (rfs *filesystem) SetCleanup(id string, patterns []Pattern) {
 		}).Log("Add pattern")
 	}
 
-	rfs.cleanupLock.Lock()
-	defer rfs.cleanupLock.Unlock()
+	patterns = append(patterns, onlyNew...)
 
-	rfs.cleanupPatterns[id] = append(rfs.cleanupPatterns[id], patterns...)
-}
+	rfs.cleanupPatterns[id] = patterns
 
-func (rfs *filesystem) UnsetCleanup(id string) {
-	rfs.logger.Debug().WithField("id", id).Log("Remove pattern group")
+	for _, p := range onlyCurrent {
+		rfs.logger.Debug().WithFields(log.Fields{
+			"id":           id,
+			"pattern":      p.Pattern,
+			"max_files":    p.MaxFiles,
+			"max_file_age": p.MaxFileAge.Seconds(),
+		}).Log("Remove pattern")
+	}
 
-	rfs.cleanupLock.Lock()
-	defer rfs.cleanupLock.Unlock()
-
-	patterns := rfs.cleanupPatterns[id]
-	delete(rfs.cleanupPatterns, id)
-
-	rfs.purge(patterns)
+	rfs.purge(onlyCurrent)
 }
 
 func (rfs *filesystem) cleanup() {
