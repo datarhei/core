@@ -34,7 +34,7 @@ func TestUpdateCleanup(t *testing.T) {
 		},
 	}
 
-	cleanfs.UpdateCleanup("foobar", patterns, false)
+	cleanfs.UpdateCleanup("foobar", patterns, true)
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
 
@@ -44,21 +44,21 @@ func TestUpdateCleanup(t *testing.T) {
 		MaxFileAge: 0,
 	})
 
-	cleanfs.UpdateCleanup("foobar", patterns, false)
+	cleanfs.UpdateCleanup("foobar", patterns, true)
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
 
 	patterns[0].MaxFiles = 42
 
-	cleanfs.UpdateCleanup("foobar", patterns, false)
+	cleanfs.UpdateCleanup("foobar", patterns, true)
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns)
 
-	cleanfs.UpdateCleanup("foobar", patterns[1:], false)
+	cleanfs.UpdateCleanup("foobar", patterns[1:], true)
 
 	require.Equal(t, cleanfs.cleanupPatterns["foobar"], patterns[1:])
 
-	cleanfs.UpdateCleanup("foobar", nil, false)
+	cleanfs.UpdateCleanup("foobar", nil, true)
 
 	require.Empty(t, cleanfs.cleanupPatterns["foobar"])
 }
@@ -81,7 +81,7 @@ func TestMaxFiles(t *testing.T) {
 			MaxFiles:   3,
 			MaxFileAge: 0,
 		},
-	}, false)
+	}, true)
 
 	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
 	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
@@ -130,7 +130,7 @@ func TestMaxAge(t *testing.T) {
 			MaxFiles:   0,
 			MaxFileAge: 3 * time.Second,
 		},
-	}, false)
+	}, true)
 
 	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
 	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
@@ -179,7 +179,7 @@ func TestUnsetCleanup(t *testing.T) {
 			MaxFiles:   3,
 			MaxFileAge: 0,
 		},
-	}, false)
+	}, true)
 
 	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
 	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
@@ -207,7 +207,7 @@ func TestUnsetCleanup(t *testing.T) {
 		return true
 	}, 3*time.Second, time.Second)
 
-	cleanfs.UpdateCleanup("foobar", nil, false)
+	cleanfs.UpdateCleanup("foobar", nil, true)
 
 	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"), -1)
 
@@ -249,7 +249,7 @@ func TestPurge(t *testing.T) {
 			MaxFileAge:    0,
 			PurgeOnDelete: true,
 		},
-	}, false)
+	}, true)
 
 	cleanfs.WriteFileReader("/chunk_0.ts", strings.NewReader("chunk_0"), -1)
 	cleanfs.WriteFileReader("/chunk_1.ts", strings.NewReader("chunk_1"), -1)
@@ -277,7 +277,7 @@ func TestPurge(t *testing.T) {
 		return true
 	}, 3*time.Second, time.Second)
 
-	cleanfs.UpdateCleanup("foobar", nil, false)
+	cleanfs.UpdateCleanup("foobar", nil, true)
 
 	cleanfs.WriteFileReader("/chunk_4.ts", strings.NewReader("chunk_4"), -1)
 
@@ -350,7 +350,7 @@ func BenchmarkCleanup(b *testing.B) {
 			},
 		}
 
-		cleanfs.UpdateCleanup(id, patterns, false)
+		cleanfs.UpdateCleanup(id, patterns, true)
 
 		ids[i] = id
 	}

@@ -42,7 +42,7 @@ func TestNew(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, Skills{
 		FFmpeg: ffmpeg{
-			Version:       "4.4.1",
+			Version:       "7.1.1",
 			Compiler:      "gcc 10.3.1 (Alpine 10.3.1_git20211027) 20211027",
 			Configuration: "--extra-version=datarhei --prefix=/usr --extra-libs='-lpthread -lm -lz -lsupc++ -lstdc++ -lssl -lcrypto -lz -lc -ldl' --enable-nonfree --enable-gpl --enable-version3 --enable-postproc --enable-static --enable-openssl --enable-omx --enable-omx-rpi --enable-mmal --enable-v4l2_m2m --enable-libfreetype --enable-libsrt --enable-libx264 --enable-libx265 --enable-libvpx --enable-libmp3lame --enable-libopus --enable-libvorbis --disable-ffplay --disable-debug --disable-doc --disable-shared",
 			Libraries: []Library{

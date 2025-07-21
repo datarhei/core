@@ -1534,7 +1534,7 @@ func TestProcessReplacer(t *testing.T) {
 	process = &app.Config{
 		ID:        "314159265359",
 		Reference: "refref",
-		FFVersion: "^4.4.1",
+		FFVersion: "^7.1.1",
 		Input: []app.ConfigIO{
 			{
 				ID:      "in_314159265359_refref",

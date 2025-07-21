@@ -37,9 +37,9 @@ func NewClusterFS(name string, fs fs.Filesystem, proxy *node.Manager) Filesystem
 
 func (fs *filesystem) Open(path string) fs.File {
 	// Check if the file is locally available
-	if file := fs.Filesystem.Open(path); file != nil {
-		return file
-	}
+	//if file := fs.Filesystem.Open(path); file != nil {
+	//	return file
+	//}
 
 	// Check if the file is available in the cluster
 	size, lastModified, err := fs.proxy.FilesystemGetFileInfo(fs.name, path)
@@ -51,9 +51,9 @@ func (fs *filesystem) Open(path string) fs.File {
 		getFile: func(offset int64) (io.ReadCloser, error) {
 			return fs.proxy.FilesystemGetFile(fs.name, path, offset)
 		},
-		name:          path,
-		size:          size,
-		lastModiefied: lastModified,
+		name:         path,
+		size:         size,
+		lastModified: lastModified,
 	}
 
 	return file
@@ -62,10 +62,10 @@ func (fs *filesystem) Open(path string) fs.File {
 type file struct {
 	io.ReadCloser
 
-	getFile       func(offset int64) (io.ReadCloser, error)
-	name          string
-	size          int64
-	lastModiefied time.Time
+	getFile      func(offset int64) (io.ReadCloser, error)
+	name         string
+	size         int64
+	lastModified time.Time
 }
 
 func (f *file) Read(p []byte) (int, error) {
@@ -128,7 +128,7 @@ func (f *file) Size() int64 {
 }
 
 func (f *file) ModTime() time.Time {
-	return f.lastModiefied
+	return f.lastModified
 }
 
 func (f *file) IsLink() (string, bool) {

@@ -297,10 +297,16 @@ func (p *Manager) FilesystemGetFileInfo(prefix, path string) (int64, time.Time, 
 	return size, lastModified, nil
 }
 
+type mediaInfo struct {
+	nodeid       string
+	lastModified time.Time
+}
+
 func (p *Manager) getNodeIDForMedia(prefix, path string) (string, error) {
 	// this is only for mem and disk prefixes
-	nodesChan := make(chan string, 16)
-	nodeids := []string{}
+	mediaChan := make(chan mediaInfo, 16)
+	nodeid := ""
+	lastModified := time.Time{}
 
 	wgList := sync.WaitGroup{}
 	wgList.Add(1)
@@ -308,12 +314,17 @@ func (p *Manager) getNodeIDForMedia(prefix, path string) (string, error) {
 	go func() {
 		defer wgList.Done()
 
-		for nodeid := range nodesChan {
-			if len(nodeid) == 0 {
+		for media := range mediaChan {
+			if len(media.nodeid) == 0 {
 				continue
 			}
 
-			nodeids = append(nodeids, nodeid)
+			if !media.lastModified.After(lastModified) {
+				continue
+			}
+
+			nodeid = media.nodeid
+			lastModified = media.lastModified
 		}
 	}()
 
@@ -323,30 +334,33 @@ func (p *Manager) getNodeIDForMedia(prefix, path string) (string, error) {
 	for id, n := range p.nodes {
 		wg.Add(1)
 
-		go func(nodeid string, node *Node, p chan<- string) {
+		go func(nodeid string, node *Node, p chan<- mediaInfo) {
 			defer wg.Done()
 
-			_, _, err := node.Core().MediaGetInfo(prefix, path)
+			_, lastModified, err := node.Core().MediaGetInfo(prefix, path)
 			if err != nil {
 				nodeid = ""
 			}
 
-			p <- nodeid
-		}(id, n, nodesChan)
+			p <- mediaInfo{
+				nodeid:       nodeid,
+				lastModified: lastModified,
+			}
+		}(id, n, mediaChan)
 	}
 	p.lock.RUnlock()
 
 	wg.Wait()
 
-	close(nodesChan)
+	close(mediaChan)
 
 	wgList.Wait()
 
-	if len(nodeids) == 0 {
+	if len(nodeid) == 0 {
 		return "", fmt.Errorf("file not found")
 	}
 
-	return nodeids[0], nil
+	return nodeid, nil
 }
 
 func (p *Manager) getNodeForMedia(prefix, path string) (*Node, error) {
@@ -363,7 +377,7 @@ func (p *Manager) getNodeForMedia(prefix, path string) (*Node, error) {
 		return nil, err
 	}
 
-	p.cache.Put(prefix+":"+path, id, 5*time.Second)
+	p.cache.Put(prefix+":"+path, id, 2*time.Second)
 
 	return p.NodeGet(id)
 }
