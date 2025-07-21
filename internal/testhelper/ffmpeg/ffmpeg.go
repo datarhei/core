@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/datarhei/core/v16/slices"
 )
 
 func main() {
-	header := `ffmpeg version 4.4.1-datarhei Copyright (c) 2000-2021 the FFmpeg developers
+	header := `ffmpeg version 7.1.1-datarhei Copyright (c) 2000-2021 the FFmpeg developers
 	built with gcc 10.3.1 (Alpine 10.3.1_git20211027) 20211027
 	configuration: --extra-version=datarhei --prefix=/usr --extra-libs='-lpthread -lm -lz -lsupc++ -lstdc++ -lssl -lcrypto -lz -lc -ldl' --enable-nonfree --enable-gpl --enable-version3 --enable-postproc --enable-static --enable-openssl --enable-omx --enable-omx-rpi --enable-mmal --enable-v4l2_m2m --enable-libfreetype --enable-libsrt --enable-libx264 --enable-libx265 --enable-libvpx --enable-libmp3lame --enable-libopus --enable-libvorbis --disable-ffplay --disable-debug --disable-doc --disable-shared
 	libavutil      56. 70.100 / 56. 70.100
@@ -150,6 +152,10 @@ Output #0, hls, to './data/testsrc.m3u8':
 		os.Exit(0)
 	}
 
+	if lastArg == "-buildconf" {
+		os.Exit(0)
+	}
+
 	switch lastArg {
 	case "-codecs":
 		fmt.Fprintf(os.Stderr, "%s\n", codecs)
@@ -175,6 +181,33 @@ Output #0, hls, to './data/testsrc.m3u8':
 		os.Exit(2)
 	}
 
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	for i, arg := range os.Args {
+		if arg != "-startdelay" {
+			continue
+		}
+
+		if x, err := strconv.ParseUint(os.Args[i+1], 10, 32); err == nil {
+			time.Sleep(time.Duration(x) * time.Second)
+			break
+		}
+	}
+
+	stopDelay := time.Duration(0)
+
+	for i, arg := range os.Args {
+		if arg != "-stopdelay" {
+			continue
+		}
+
+		if x, err := strconv.ParseUint(os.Args[i+1], 10, 32); err == nil {
+			stopDelay = time.Duration(x) * time.Second
+			break
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "%s\n", prelude)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,11 +230,13 @@ Output #0, hls, to './data/testsrc.m3u8':
 	}(ctx)
 
 	// Wait for interrupt signal to gracefully shutdown the app
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
 	<-quit
 
 	cancel()
+
+	if stopDelay > 0 {
+		time.Sleep(stopDelay)
+	}
 
 	fmt.Fprintf(os.Stderr, "\nExiting normally, received signal 2.\n")
 
