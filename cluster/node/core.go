@@ -166,7 +166,7 @@ func (n *Core) connect() error {
 			Transport: tr,
 			Timeout:   0,
 		},
-		Timeout: 5 * time.Second,
+		Timeout: 10 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("creating client failed (%s): %w", address, err)
