@@ -1,0 +1,21 @@
+ARG GOLANG_IMAGE=golang:1.24-alpine3.21
+ARG BUILD_IMAGE=alpine:3.21
+
+# Cross-Compilation
+# https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
+FROM --platform=$BUILDPLATFORM $GOLANG_IMAGE AS builder
+
+ARG TARGETOS TARGETARCH TARGETVARIANT
+ENV GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$TARGETVARIANT
+
+COPY . /dist/core
+
+RUN cd /dist/core/internal/testhelper/ffmpeg && \
+	go build
+
+FROM $BUILD_IMAGE
+
+COPY --from=builder /dist/core/internal/testhelper/ffmpeg/ffmpeg /usr/bin/ffmpeg
+
+ENTRYPOINT ["/usr/local/bin/ffmpeg"]
+WORKDIR /usr/local/bin
