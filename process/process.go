@@ -808,7 +808,7 @@ func (p *process) stop(wait bool, reason string) error {
 	// If the process in starting state, wait until the process has been started
 	for {
 		if p.getState() == stateStarting {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
