@@ -84,6 +84,8 @@ func (m *Storage) Has(id app.ProcessID) bool {
 	return hasTask
 }
 
+// LoadUnsafe returns the value stored in the map for a key, or zero value of type V if no value is present.
+// The ok result indicates whether value was found in the map.
 func (m *Storage) LoadUnsafe(id app.ProcessID) (*task, bool) {
 	mt, ok := m.tasks.Load(id)
 	if !ok {
@@ -91,28 +93,6 @@ func (m *Storage) LoadUnsafe(id app.ProcessID) (*task, bool) {
 	}
 
 	return mt.task, true
-}
-
-// LoadAndRLock returns the value stored in the map for a key, or zero value of type V if no value is present.
-// The ok result indicates whether value was found in the map.
-func (m *Storage) LoadAndRLock(id app.ProcessID) (*task, bool) {
-	mt, ok := m.tasks.Load(id)
-	if !ok {
-		return nil, false
-	}
-
-	mt.lock.RLock()
-
-	return mt.task, true
-}
-
-func (m *Storage) RUnlock(id app.ProcessID) {
-	mt, ok := m.tasks.Load(id)
-	if !ok {
-		return
-	}
-
-	mt.lock.RUnlock()
 }
 
 func (m *Storage) LoadAndLock(id app.ProcessID) (*task, bool) {

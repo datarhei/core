@@ -1167,7 +1167,6 @@ func (r *restream) UpdateProcess(id app.ProcessID, config *app.Config, force boo
 	if !ok {
 		return ErrUnknownProcess
 	}
-
 	defer r.tasks.Unlock(id)
 
 	err := r.updateProcess(task, config, force)
@@ -1305,10 +1304,9 @@ func (r *restream) DeleteProcess(id app.ProcessID) error {
 	if !ok {
 		return ErrUnknownProcess
 	}
+	defer r.tasks.Unlock(id)
 
 	err := r.deleteProcess(task)
-
-	r.tasks.Unlock(id)
 
 	if err != nil {
 		return err
@@ -1414,10 +1412,9 @@ func (r *restream) ReloadProcess(id app.ProcessID) error {
 	if !ok {
 		return ErrUnknownProcess
 	}
+	defer r.tasks.Unlock(id)
 
 	err := r.reloadProcess(task)
-
-	r.tasks.Unlock(id)
 
 	if err != nil {
 		return err
@@ -1607,11 +1604,10 @@ func (r *restream) ReloadSkills() error {
 }
 
 func (r *restream) GetPlayout(id app.ProcessID, inputid string) (string, error) {
-	task, ok := r.tasks.LoadAndRLock(id)
+	task, ok := r.tasks.LoadUnsafe(id)
 	if !ok {
 		return "", ErrUnknownProcess
 	}
-	defer r.tasks.RUnlock(id)
 
 	port, ok := task.playout[inputid]
 	if !ok {
