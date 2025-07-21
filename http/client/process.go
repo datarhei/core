@@ -2,6 +2,7 @@ package client
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/datarhei/core/v16/encoding/json"
@@ -127,9 +128,10 @@ func (r *restclient) ProcessReportSet(id app.ProcessID, report *app.Report) erro
 	return nil
 }
 
-func (r *restclient) ProcessDelete(id app.ProcessID) error {
+func (r *restclient) ProcessDelete(id app.ProcessID, purge bool) error {
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
+	query.Set("purge", strconv.FormatBool(purge))
 
 	_, err := r.call("DELETE", "/v3/process/"+url.PathEscape(id.ID), query, nil, "", nil)
 

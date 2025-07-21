@@ -618,7 +618,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Updating process")
 	case processOpDelete:
-		err := c.manager.ProcessDelete(v.nodeid, v.processid)
+		err := c.manager.ProcessDelete(v.nodeid, v.processid, true)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -701,7 +701,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			}
 		}
 
-		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID())
+		err = c.manager.ProcessDelete(v.fromNodeid, v.config.ProcessID(), false)
 		if err != nil {
 			//opErr = processOpError{
 			//	processid: v.config.ProcessID(),

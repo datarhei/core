@@ -258,7 +258,7 @@ func TestRemoveProcess(t *testing.T) {
 	err = rs.AddProcess(process)
 	require.Equal(t, nil, err, "Failed to add process (%s)", err)
 
-	err = rs.DeleteProcess(tid)
+	err = rs.DeleteProcess(tid, true)
 	require.Equal(t, nil, err, "Set process not found (%s)", process.ID)
 
 	_, err = rs.GetProcess(tid)
@@ -1777,7 +1777,7 @@ func BenchmarkGetProcessState(b *testing.B) {
 	}
 
 	for i := 0; i < n; i++ {
-		rs.DeleteProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""))
+		rs.DeleteProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""), true)
 	}
 }
 

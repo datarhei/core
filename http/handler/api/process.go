@@ -233,6 +233,7 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
+// @Param purge query string false "Whether to purge files"
 // @Success 200 {string} string
 // @Failure 400 {object} api.Error
 // @Failure 403 {object} api.Error
@@ -244,6 +245,12 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
+	purgeq := util.DefaultQuery(c, "purge", "true")
+
+	purge := false
+	if x, err := strconv.ParseBool(purgeq); err == nil {
+		purge = x
+	}
 
 	tid := app.ProcessID{
 		ID:     id,
@@ -258,7 +265,7 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 		return h.apiErrorFromError(err)
 	}
 
-	if err := h.restream.DeleteProcess(tid); err != nil {
+	if err := h.restream.DeleteProcess(tid, purge); err != nil {
 		return h.apiErrorFromError(err)
 	}
 

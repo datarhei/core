@@ -572,13 +572,13 @@ func (p *Manager) ProcessAdd(nodeid string, config *app.Config, metadata map[str
 	return node.Core().ProcessAdd(config, metadata)
 }
 
-func (p *Manager) ProcessDelete(nodeid string, id app.ProcessID) error {
+func (p *Manager) ProcessDelete(nodeid string, id app.ProcessID, purge bool) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return err
 	}
 
-	return node.Core().ProcessDelete(id)
+	return node.Core().ProcessDelete(id, purge)
 }
 
 func (p *Manager) ProcessUpdate(nodeid string, id app.ProcessID, config *app.Config, metadata map[string]any, force bool) error {

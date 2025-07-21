@@ -42,7 +42,7 @@ type Restreamer interface {
 
 	AddProcess(config *app.Config) error                                                                              // Add a new process
 	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID                          // Get a list of process IDs based on patterns for ID and reference
-	DeleteProcess(id app.ProcessID) error                                                                             // Delete a process
+	DeleteProcess(id app.ProcessID, purge bool) error                                                                 // Delete a process
 	UpdateProcess(id app.ProcessID, config *app.Config, force bool) error                                             // Update a process
 	StartProcess(id app.ProcessID) error                                                                              // Start a process
 	StopProcess(id app.ProcessID) error                                                                               // Stop a process
@@ -227,7 +227,7 @@ func (r *restream) Stop() {
 		wg.Wait()
 
 		r.tasks.Range(func(id app.ProcessID, t *task) bool {
-			r.unsetCleanup(id)
+			r.unsetCleanup(id, false)
 			return true
 		})
 
@@ -743,16 +743,16 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 				continue
 			}
 
-			fs.UpdateCleanup(id.String(), p)
+			fs.UpdateCleanup(id.String(), p, true)
 
 			break
 		}
 	}
 }
 
-func (r *restream) unsetCleanup(id app.ProcessID) {
+func (r *restream) unsetCleanup(id app.ProcessID, purge bool) {
 	for _, fs := range r.fs.list {
-		fs.UpdateCleanup(id.String(), nil)
+		fs.UpdateCleanup(id.String(), nil, purge)
 	}
 }
 
@@ -1232,7 +1232,7 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 	t.Restore()
 
 	if !tid.Equal(task.ID()) {
-		r.unsetCleanup(task.ID())
+		r.unsetCleanup(task.ID(), true)
 		r.tasks.LoadAndDelete(task.ID())
 	}
 
@@ -1299,14 +1299,14 @@ func (r *restream) GetProcess(id app.ProcessID) (*app.Process, error) {
 	return task.Process(), nil
 }
 
-func (r *restream) DeleteProcess(id app.ProcessID) error {
+func (r *restream) DeleteProcess(id app.ProcessID, purge bool) error {
 	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
 	defer r.tasks.Unlock(id)
 
-	err := r.deleteProcess(task)
+	err := r.deleteProcess(task, purge)
 
 	if err != nil {
 		return err
@@ -1317,13 +1317,13 @@ func (r *restream) DeleteProcess(id app.ProcessID) error {
 	return nil
 }
 
-func (r *restream) deleteProcess(task *task) error {
+func (r *restream) deleteProcess(task *task, purge bool) error {
 	if task.Order() != "stop" {
 		return fmt.Errorf("the process with the ID '%s' is still running", task.String())
 	}
 
 	r.unsetPlayoutPorts(task)
-	r.unsetCleanup(task.ID())
+	r.unsetCleanup(task.ID(), purge)
 
 	r.tasks.LoadAndDelete(task.ID())
 

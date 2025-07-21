@@ -40,7 +40,7 @@ type Filesystem interface {
 	fs.Filesystem
 
 	// UpdateCleanup
-	UpdateCleanup(id string, patterns []Pattern)
+	UpdateCleanup(id string, patterns []Pattern, purge bool)
 
 	// Start
 	Start()
@@ -128,7 +128,7 @@ func (rfs *filesystem) compilePatterns(patterns []Pattern) []Pattern {
 	return patterns
 }
 
-func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern) {
+func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern, purge bool) {
 	newPatterns = rfs.compilePatterns(newPatterns)
 
 	rfs.cleanupLock.Lock()
@@ -175,7 +175,9 @@ func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern) {
 		}).Log("Remove pattern")
 	}
 
-	rfs.purge(onlyCurrent)
+	if purge {
+		rfs.purge(onlyCurrent)
+	}
 }
 
 func (rfs *filesystem) cleanup() {
