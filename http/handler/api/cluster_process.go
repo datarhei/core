@@ -61,7 +61,17 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 			continue
 		}
 
-		pmap[app.NewProcessID(p.ID, p.Domain)] = p
+		pid := app.NewProcessID(p.ID, p.Domain)
+		proc, ok := pmap[pid]
+		if ok {
+			// While moving a process from one node to another, they exist on both nodes.
+			// This will select the latest incarnation of this process.
+			if p.CreatedAt < proc.CreatedAt {
+				continue
+			}
+		}
+
+		pmap[pid] = p
 	}
 
 	missing := []api.Process{}
@@ -76,15 +86,23 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 				continue
 			}
 
-			// Check if the process has been deployed
-			if len(p.Error) == 0 {
-				if _, ok := pmap[p.Config.ProcessID()]; ok {
-					continue
-				}
-			} else {
-				delete(pmap, p.Config.ProcessID())
+			// Prevent overshadowing existing processes with undeployed changes.
+			// TODO: should undeployed changes be visible in a process config/state? They
+			// are visible in the store process list, however.
+			if _, ok := pmap[p.Config.ProcessID()]; ok {
+				continue
 			}
 
+			/*
+				// Check if the process has been deployed
+				if len(p.Error) == 0 {
+					if _, ok := pmap[p.Config.ProcessID()]; ok {
+						continue
+					}
+				} else {
+					delete(pmap, p.Config.ProcessID())
+				}
+			*/
 			process := api.Process{}
 			process.UnmarshalStore(p, filter.config, filter.state, filter.report, filter.metadata)
 
