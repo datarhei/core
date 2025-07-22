@@ -372,10 +372,6 @@ func (p *process) setState(state stateType) (stateType, error) {
 	prevState := p.state.state
 	failed := false
 
-	if prevState == state {
-		return prevState, nil
-	}
-
 	if p.state.state == stateFinished {
 		switch state {
 		case stateStarting:
@@ -816,9 +812,11 @@ func (p *process) stop(wait bool, reason string) error {
 	}
 
 	// If the process is already in the finishing state, don't do anything
-	if state, _ := p.setState(stateFinishing); state == stateFinishing {
+	if p.getState() == stateFinishing {
 		return nil
 	}
+
+	p.setState(stateFinishing)
 
 	p.stopReasonLock.Lock()
 	p.stopReason = reason
@@ -857,24 +855,35 @@ func (p *process) stop(wait bool, reason string) error {
 	var err error
 	if runtime.GOOS == "windows" {
 		// Windows doesn't know the SIGINT
-		p.cmd.Process.Kill()
+		err = p.cmd.Process.Kill()
 	} else {
 		// First try to kill the process gracefully. On a SIGINT ffmpeg will exit
 		// normally as if "q" has been pressed.
-		p.cmd.Process.Signal(os.Interrupt)
+		err = p.cmd.Process.Signal(os.Interrupt)
 	}
 
 	// Set up a timer to kill the process with SIGKILL in case SIGINT didn't have
 	// an effect.
-	p.killTimerLock.Lock()
-	p.killTimer = time.AfterFunc(5*time.Second, func() {
-		p.cmd.Process.Kill()
-		p.stdout.Close()
-	})
-	p.killTimerLock.Unlock()
+	if err == nil {
+		p.killTimerLock.Lock()
+		p.killTimer = time.AfterFunc(5*time.Second, func() {
+			p.cmd.Process.Kill()
+			p.stdout.Close()
+		})
+		p.killTimerLock.Unlock()
+	}
 
-	if wait {
+	if err == nil && wait {
 		wg.Wait()
+	}
+
+	if err != nil {
+		p.parser.Parse([]byte(err.Error()))
+		p.debuglogger.WithFields(log.Fields{
+			"state": p.getStateString(),
+			"order": p.getOrder(),
+			"error": err,
+		}).Debug().Log("Stopping failed")
 	}
 
 	return err
