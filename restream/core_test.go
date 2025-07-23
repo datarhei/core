@@ -1503,7 +1503,7 @@ func TestProcessReplacer(t *testing.T) {
 				},
 				Cleanup: []app.ConfigIOCleanup{
 					{
-						Pattern:       "foo:pattern_{outputid}_{processid}_{reference}_{rtmp,name=$outputid}",
+						Pattern:       "mem:pattern_{outputid}_{processid}_{reference}_{rtmp,name=$outputid}",
 						MaxFiles:      0,
 						MaxFileAge:    0,
 						PurgeOnDelete: false,
@@ -1574,7 +1574,7 @@ func TestProcessReplacer(t *testing.T) {
 				},
 				Cleanup: []app.ConfigIOCleanup{
 					{
-						Pattern:       "foo:pattern_out_314159265359_refref_314159265359_refref_{rtmp,name=$outputid}",
+						Pattern:       "mem:pattern_out_314159265359_refref_314159265359_refref_{rtmp,name=$outputid}",
 						MaxFiles:      0,
 						MaxFileAge:    0,
 						PurgeOnDelete: false,
