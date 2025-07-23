@@ -133,7 +133,6 @@ func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern, purge boo
 	newPatterns = rfs.compilePatterns(newPatterns)
 
 	rfs.cleanupLock.Lock()
-	defer rfs.cleanupLock.Unlock()
 
 	currentPatterns := rfs.cleanupPatterns[id]
 	delete(rfs.cleanupPatterns, id)
@@ -175,6 +174,8 @@ func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern, purge boo
 			"max_file_age": p.MaxFileAge.Seconds(),
 		}).Log("Remove pattern")
 	}
+
+	rfs.cleanupLock.Unlock()
 
 	if purge {
 		rfs.purge(onlyCurrent)
