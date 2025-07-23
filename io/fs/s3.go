@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/mem"
 	"github.com/minio/minio-go/v7"
@@ -139,47 +138,11 @@ func (fs *s3Filesystem) SetMetadata(key, data string) {
 }
 
 func (fs *s3Filesystem) Size() (int64, int64) {
-	size := int64(0)
-
-	files := fs.List("/", ListOptions{})
-
-	for _, file := range files {
-		size += file.Size()
-	}
-
-	return size, -1
+	return 0, -1
 }
 
 func (fs *s3Filesystem) Files() int64 {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-		WithVersions: false,
-		WithMetadata: false,
-		Prefix:       "",
-		Recursive:    true,
-		MaxKeys:      0,
-		StartAfter:   "",
-		UseV1:        false,
-	})
-
-	nfiles := int64(0)
-
-	for object := range ch {
-		if object.Err != nil {
-			fs.logger.WithError(object.Err).Log("Listing object failed")
-		}
-
-		if strings.HasSuffix("/"+object.Key, "/"+fakeDirEntry) {
-			// Skip fake entries (see MkdirAll)
-			continue
-		}
-
-		nfiles++
-	}
-
-	return nfiles
+	return 0
 }
 
 func (fs *s3Filesystem) Symlink(oldname, newname string) error {
@@ -403,8 +366,7 @@ func (fs *s3Filesystem) Copy(src, dst string) error {
 	src = fs.cleanPath(src)
 	dst = fs.cleanPath(dst)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 
 	_, err := fs.client.CopyObject(ctx, minio.CopyDestOptions{
 		Bucket: fs.bucket,
@@ -444,8 +406,7 @@ func (fs *s3Filesystem) MkdirAll(path string, perm os.FileMode) error {
 func (fs *s3Filesystem) Remove(path string) int64 {
 	path = fs.cleanPath(path)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 
 	stat, err := fs.client.StatObject(ctx, fs.bucket, path, minio.StatObjectOptions{})
 	if err != nil {
@@ -467,191 +428,203 @@ func (fs *s3Filesystem) Remove(path string) int64 {
 }
 
 func (fs *s3Filesystem) RemoveList(path string, options ListOptions) ([]string, int64) {
-	path = fs.cleanPath(path)
+	fs.logger.Warn().Log("Removing files with pattern is not supported")
+	return nil, 0
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	/*
+	   path = fs.cleanPath(path)
 
-	var totalSize int64 = 0
-	files := []string{}
-	recursive := false
+	   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	   defer cancel()
 
-	var compiledPattern glob.Glob
-	var err error
+	   var totalSize int64 = 0
+	   files := []string{}
+	   recursive := false
 
-	if len(options.Pattern) != 0 {
-		compiledPattern, err = glob.Compile(options.Pattern, '/')
-		if err != nil {
-			return nil, 0
-		}
+	   var compiledPattern glob.Glob
+	   var err error
 
-		if strings.Contains(options.Pattern, "**") {
-			recursive = true
-		}
-	}
+	   	if len(options.Pattern) != 0 {
+	   		compiledPattern, err = glob.Compile(options.Pattern, '/')
+	   		if err != nil {
+	   			return nil, 0
+	   		}
 
-	recursive = true
+	   		if strings.Contains(options.Pattern, "**") {
+	   			recursive = true
+	   		}
+	   	}
 
-	objectsCh := make(chan minio.ObjectInfo)
+	   recursive = true
 
-	// Send object names that are needed to be removed to objectsCh
-	go func() {
-		defer close(objectsCh)
+	   objectsCh := make(chan minio.ObjectInfo)
 
-		for object := range fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-			WithVersions: false,
-			WithMetadata: false,
-			Prefix:       path,
-			Recursive:    recursive,
-			MaxKeys:      0,
-			StartAfter:   "",
-			UseV1:        false,
-		}) {
-			if object.Err != nil {
-				fs.logger.WithError(object.Err).Log("Listing object failed")
-				continue
-			}
-			key := "/" + object.Key
-			if strings.HasSuffix(key, "/"+fakeDirEntry) {
-				// filter out fake directory entries (see MkdirAll)
-				continue
-			}
+	   // Send object names that are needed to be removed to objectsCh
 
-			if compiledPattern != nil {
-				if !compiledPattern.Match(key) {
-					continue
-				}
-			}
+	   	go func() {
+	   		defer close(objectsCh)
 
-			if options.ModifiedStart != nil {
-				if object.LastModified.Before(*options.ModifiedStart) {
-					continue
-				}
-			}
+	   		for object := range fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
+	   			WithVersions: false,
+	   			WithMetadata: false,
+	   			Prefix:       path,
+	   			Recursive:    recursive,
+	   			MaxKeys:      0,
+	   			StartAfter:   "",
+	   			UseV1:        false,
+	   		}) {
+	   			if object.Err != nil {
+	   				fs.logger.WithError(object.Err).Log("Listing object failed")
+	   				continue
+	   			}
+	   			key := "/" + object.Key
+	   			if strings.HasSuffix(key, "/"+fakeDirEntry) {
+	   				// filter out fake directory entries (see MkdirAll)
+	   				continue
+	   			}
 
-			if options.ModifiedEnd != nil {
-				if object.LastModified.After(*options.ModifiedEnd) {
-					continue
-				}
-			}
+	   			if compiledPattern != nil {
+	   				if !compiledPattern.Match(key) {
+	   					continue
+	   				}
+	   			}
 
-			if options.SizeMin > 0 {
-				if object.Size < options.SizeMin {
-					continue
-				}
-			}
+	   			if options.ModifiedStart != nil {
+	   				if object.LastModified.Before(*options.ModifiedStart) {
+	   					continue
+	   				}
+	   			}
 
-			if options.SizeMax > 0 {
-				if object.Size > options.SizeMax {
-					continue
-				}
-			}
+	   			if options.ModifiedEnd != nil {
+	   				if object.LastModified.After(*options.ModifiedEnd) {
+	   					continue
+	   				}
+	   			}
 
-			totalSize += object.Size
-			objectsCh <- object
+	   			if options.SizeMin > 0 {
+	   				if object.Size < options.SizeMin {
+	   					continue
+	   				}
+	   			}
 
-			files = append(files, key)
-		}
-	}()
+	   			if options.SizeMax > 0 {
+	   				if object.Size > options.SizeMax {
+	   					continue
+	   				}
+	   			}
 
-	for err := range fs.client.RemoveObjects(context.Background(), fs.bucket, objectsCh, minio.RemoveObjectsOptions{
-		GovernanceBypass: true,
-	}) {
-		fs.logger.WithError(err.Err).WithField("key", err.ObjectName).Log("Deleting object failed")
-	}
+	   			totalSize += object.Size
+	   			objectsCh <- object
 
-	fs.logger.Debug().Log("Deleted all files")
+	   			files = append(files, key)
+	   		}
+	   	}()
 
-	return files, totalSize
+	   	for err := range fs.client.RemoveObjects(context.Background(), fs.bucket, objectsCh, minio.RemoveObjectsOptions{
+	   		GovernanceBypass: true,
+	   	}) {
+
+	   		fs.logger.WithError(err.Err).WithField("key", err.ObjectName).Log("Deleting object failed")
+	   	}
+
+	   fs.logger.Debug().Log("Deleted all files")
+
+	   return files, totalSize
+	*/
 }
 
 func (fs *s3Filesystem) List(path string, options ListOptions) []FileInfo {
-	path = fs.cleanPath(path)
+	fs.logger.Warn().Log("Listing files is not supported")
+	return nil
 
-	var compiledPattern glob.Glob
-	var err error
-	recursive := false
+	/*
+	   path = fs.cleanPath(path)
 
-	if len(options.Pattern) != 0 {
-		compiledPattern, err = glob.Compile(options.Pattern, '/')
-		if err != nil {
-			return nil
-		}
+	   var compiledPattern glob.Glob
+	   var err error
+	   recursive := false
 
-		if strings.Contains(options.Pattern, "**") {
-			recursive = true
-		}
-	}
+	   	if len(options.Pattern) != 0 {
+	   		compiledPattern, err = glob.Compile(options.Pattern, '/')
+	   		if err != nil {
+	   			return nil
+	   		}
 
-	recursive = true
+	   		if strings.Contains(options.Pattern, "**") {
+	   			recursive = true
+	   		}
+	   	}
 
-	files := []FileInfo{}
+	   recursive = true
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	   files := []FileInfo{}
 
-	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-		WithVersions: false,
-		WithMetadata: false,
-		Prefix:       path,
-		Recursive:    recursive,
-		MaxKeys:      0,
-		StartAfter:   "",
-		UseV1:        false,
-	})
+	   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	   defer cancel()
 
-	for object := range ch {
-		if object.Err != nil {
-			fs.logger.WithError(object.Err).Log("Listing object failed")
-			continue
-		}
+	   	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
+	   		WithVersions: false,
+	   		WithMetadata: false,
+	   		Prefix:       path,
+	   		Recursive:    recursive,
+	   		MaxKeys:      0,
+	   		StartAfter:   "",
+	   		UseV1:        false,
+	   	})
 
-		key := "/" + object.Key
-		if strings.HasSuffix(key, "/"+fakeDirEntry) {
-			// filter out fake directory entries (see MkdirAll)
-			continue
-		}
+	   	for object := range ch {
+	   		if object.Err != nil {
+	   			fs.logger.WithError(object.Err).Log("Listing object failed")
+	   			continue
+	   		}
 
-		if compiledPattern != nil {
-			if !compiledPattern.Match(key) {
-				continue
-			}
-		}
+	   		key := "/" + object.Key
+	   		if strings.HasSuffix(key, "/"+fakeDirEntry) {
+	   			// filter out fake directory entries (see MkdirAll)
+	   			continue
+	   		}
 
-		if options.ModifiedStart != nil {
-			if object.LastModified.Before(*options.ModifiedStart) {
-				continue
-			}
-		}
+	   		if compiledPattern != nil {
+	   			if !compiledPattern.Match(key) {
+	   				continue
+	   			}
+	   		}
 
-		if options.ModifiedEnd != nil {
-			if object.LastModified.After(*options.ModifiedEnd) {
-				continue
-			}
-		}
+	   		if options.ModifiedStart != nil {
+	   			if object.LastModified.Before(*options.ModifiedStart) {
+	   				continue
+	   			}
+	   		}
 
-		if options.SizeMin > 0 {
-			if object.Size < options.SizeMin {
-				continue
-			}
-		}
+	   		if options.ModifiedEnd != nil {
+	   			if object.LastModified.After(*options.ModifiedEnd) {
+	   				continue
+	   			}
+	   		}
 
-		if options.SizeMax > 0 {
-			if object.Size > options.SizeMax {
-				continue
-			}
-		}
+	   		if options.SizeMin > 0 {
+	   			if object.Size < options.SizeMin {
+	   				continue
+	   			}
+	   		}
 
-		f := &s3FileInfo{
-			name:         key,
-			size:         object.Size,
-			lastModified: object.LastModified,
-		}
+	   		if options.SizeMax > 0 {
+	   			if object.Size > options.SizeMax {
+	   				continue
+	   			}
+	   		}
 
-		files = append(files, f)
-	}
+	   		f := &s3FileInfo{
+	   			name:         key,
+	   			size:         object.Size,
+	   			lastModified: object.LastModified,
+	   		}
 
-	return files
+	   		files = append(files, f)
+	   	}
+
+	   return files
+	*/
 }
 
 func (fs *s3Filesystem) LookPath(file string) (string, error) {
@@ -689,38 +662,18 @@ func (fs *s3Filesystem) LookPath(file string) (string, error) {
 
 func (fs *s3Filesystem) isDir(path string) bool {
 	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+		path = path + "/" + fakeDirEntry
 	}
 
-	if path == "/" {
+	if path == "/"+fakeDirEntry {
 		return true
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch := fs.client.ListObjects(ctx, fs.bucket, minio.ListObjectsOptions{
-		WithVersions: false,
-		WithMetadata: false,
-		Prefix:       path,
-		Recursive:    true,
-		MaxKeys:      1,
-		StartAfter:   "",
-		UseV1:        false,
-	})
-
-	files := uint64(0)
-
-	for object := range ch {
-		if object.Err != nil {
-			fs.logger.WithError(object.Err).Log("Listing object failed")
-			continue
-		}
-
-		files++
-	}
-
-	return files > 0
+	_, err := fs.client.StatObject(ctx, fs.bucket, path, minio.StatObjectOptions{})
+	return err == nil
 }
 
 func (fs *s3Filesystem) cleanPath(path string) string {

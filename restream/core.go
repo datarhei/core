@@ -187,7 +187,8 @@ func (r *restream) Start() {
 			t.Restore()
 
 			// The filesystem cleanup rules can be set
-			r.setCleanup(id, t.config)
+			patterns, _ := r.compileCleanup(t.ResolvedConfig())
+			r.setCleanup(id, patterns)
 
 			return true
 		})
@@ -537,7 +538,12 @@ func (r *restream) AddProcess(config *app.Config) error {
 	}
 
 	// set filesystem cleanup rules
-	r.setCleanup(tid, t.config)
+	patterns, err := r.compileCleanup(t.ResolvedConfig())
+	if err != nil {
+		t.Destroy()
+		return err
+	}
+	r.setCleanup(tid, patterns)
 
 	err = t.Restore()
 	if err != nil {
@@ -703,14 +709,21 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 	}
 }
 
-func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
+func (r *restream) compileCleanup(config *app.Config) (map[string][]rfs.Pattern, error) {
 	patterns := map[string][]rfs.Pattern{}
+	var err error = nil
+
+	logger := r.logger.WithFields(log.Fields{
+		"id":     config.ID,
+		"domain": config.Domain,
+	})
 
 	for _, output := range config.Output {
 		for _, c := range output.Cleanup {
 			name, path, found := strings.Cut(c.Pattern, ":")
 			if !found {
-				r.logger.Warn().WithField("pattern", c.Pattern).Log("invalid pattern, no prefix")
+				logger.Warn().WithField("pattern", c.Pattern).Log("invalid pattern, no prefix")
+				err = fmt.Errorf("invalid pattern, no prefix: %s", c.Pattern)
 				continue
 			}
 
@@ -726,6 +739,38 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 				name = "mem"
 			}
 
+			fstype := ""
+
+			for _, fs := range r.fs.list {
+				if fs.Name() != name {
+					continue
+				}
+
+				fstype = fs.Type()
+
+				break
+			}
+
+			if len(fstype) == 0 {
+				logger.Warn().WithField("pattern", c.Pattern).Log("no filesystem with the name '%s' found", name)
+				err = fmt.Errorf("no filesystem with the name '%s' found: %s", name, c.Pattern)
+				continue
+			}
+
+			if fstype == "s3" {
+				if glob.IsPattern(path) {
+					logger.Warn().WithField("pattern", c.Pattern).Log("wildcards are not allowed for s3 filesystems")
+					err = fmt.Errorf("wildcards are not allowed for s3 filesystems: %s", c.Pattern)
+					continue
+				}
+
+				if c.MaxFiles != 0 || c.MaxFileAge != 0 {
+					logger.Warn().WithField("pattern", c.Pattern).Log("cleanup filter rule are not allowed for s3 filesystems")
+					err = fmt.Errorf("cleanup filter rules are not allowed for s3 filesystems: %s", c.Pattern)
+					continue
+				}
+			}
+
 			p := patterns[name]
 			p = append(p, rfs.Pattern{
 				Pattern:       path,
@@ -737,6 +782,10 @@ func (r *restream) setCleanup(id app.ProcessID, config *app.Config) {
 		}
 	}
 
+	return patterns, err
+}
+
+func (r *restream) setCleanup(id app.ProcessID, patterns map[string][]rfs.Pattern) {
 	for name, p := range patterns {
 		for _, fs := range r.fs.list {
 			if fs.Name() != name {
@@ -1191,6 +1240,11 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 		return err
 	}
 
+	cleanupPatterns, err := r.compileCleanup(t.ResolvedConfig())
+	if err != nil {
+		return err
+	}
+
 	tid := t.ID()
 
 	if !tid.Equal(task.ID()) {
@@ -1227,7 +1281,7 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 	r.tasks.LoadAndStore(tid, t)
 
 	// Set the filesystem cleanup rules
-	r.setCleanup(tid, t.config)
+	r.setCleanup(tid, cleanupPatterns)
 
 	t.Restore()
 
@@ -1426,6 +1480,11 @@ func (r *restream) ReloadProcess(id app.ProcessID) error {
 }
 
 func (r *restream) reloadProcess(task *task) error {
+	cleanupPatterns, err := r.compileCleanup(task.ResolvedConfig())
+	if err != nil {
+		return err
+	}
+
 	t, err := r.createTask(task.Config())
 	if err != nil {
 		return err
@@ -1457,7 +1516,7 @@ func (r *restream) reloadProcess(task *task) error {
 	r.tasks.LoadAndStore(tid, t)
 
 	// Set the filesystem cleanup rules
-	r.setCleanup(tid, t.config)
+	r.setCleanup(tid, cleanupPatterns)
 
 	t.Restore()
 

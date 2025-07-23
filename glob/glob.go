@@ -48,6 +48,11 @@ func Prefix(pattern string) string {
 	return strings.Clone(pattern[:index])
 }
 
+func IsPattern(pattern string) bool {
+	index := strings.IndexAny(pattern, "*[{")
+	return index != -1
+}
+
 // Match returns whether the name matches the glob pattern, also considering
 // one or several optionnal separator. An error is only returned if the pattern
 // is invalid.

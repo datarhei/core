@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -181,6 +182,10 @@ func (rfs *filesystem) UpdateCleanup(id string, newPatterns []Pattern, purge boo
 }
 
 func (rfs *filesystem) cleanup() {
+	if rfs.Filesystem.Type() == "s3" {
+		return
+	}
+
 	rfs.cleanupLock.RLock()
 	nPatterns := len(rfs.cleanupPatterns)
 	rfs.cleanupLock.RUnlock()
@@ -251,15 +256,28 @@ func (rfs *filesystem) purge(patterns []Pattern) int64 {
 			continue
 		}
 
-		files, nfiles := rfs.Filesystem.RemoveList("/", fs.ListOptions{
-			Pattern: pattern.Pattern,
-		})
-
-		for _, file := range files {
-			rfs.logger.Debug().WithField("path", file).Log("Purged file")
+		if len(pattern.Pattern) == 0 {
+			continue
 		}
 
-		nfilesTotal += nfiles
+		if rfs.Filesystem.Type() == "s3" {
+			rfs.Filesystem.Remove(pattern.Pattern)
+			nfilesTotal++
+		} else {
+			prefix := glob.Prefix(pattern.Pattern)
+			index := strings.LastIndex(prefix, "/")
+			path := prefix[:index+1]
+
+			files, nfiles := rfs.Filesystem.RemoveList(path, fs.ListOptions{
+				Pattern: pattern.Pattern,
+			})
+
+			for _, file := range files {
+				rfs.logger.Debug().WithField("path", file).Log("Purged file")
+			}
+
+			nfilesTotal += nfiles
+		}
 	}
 
 	return nfilesTotal
