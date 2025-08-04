@@ -1031,10 +1031,10 @@ func (p *process) waiter() {
 				"status":      status.ExitStatus(),
 				"exit_code":   exiterr.ExitCode(),
 				"exit_string": exiterr.String(),
-				"signal":      status.Signal().String(),
+				"signal":      int(status.Signal()),
 			}).Debug().Log("Exited")
 
-			if int(status.Signal()) == 6 { // If ffmpeg has been killed with SIGABRT, it will disable a reconnect.
+			if int(status.Signal()) == 1 { // If ffmpeg has been killed with SIGHUP, it will disable a reconnect.
 				enableReconnect = false
 			}
 
