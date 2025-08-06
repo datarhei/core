@@ -3,11 +3,12 @@ package aac
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/datarhei/joy4/av"
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/codec/aacparser"
-	"io"
-	"time"
 )
 
 type Muxer struct {

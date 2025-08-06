@@ -46,7 +46,6 @@ func (self *Queue) SetMaxGopCount(n int) {
 	self.lock.Lock()
 	self.maxgopcount = n
 	self.lock.Unlock()
-	return
 }
 
 func (self *Queue) WriteHeader(streams []av.CodecData) error {
@@ -85,17 +84,34 @@ func (self *Queue) WritePacket(pkt av.Packet) (err error) {
 	self.lock.Lock()
 
 	self.buf.Push(pkt)
-	if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
-		self.curgopcount++
-	}
 
-	for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
-		pkt := self.buf.Pop()
-		if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
-			self.curgopcount--
+	if self.videoidx == -1 { // audio only stream
+		if pkt.IsKeyFrame {
+			self.curgopcount++
 		}
-		if self.curgopcount < self.maxgopcount {
-			break
+
+		for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
+			pkt := self.buf.Pop()
+			if pkt.IsKeyFrame {
+				self.curgopcount--
+			}
+			if self.curgopcount < self.maxgopcount {
+				break
+			}
+		}
+	} else { // video only or video+audio stream
+		if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
+			self.curgopcount++
+		}
+
+		for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
+			pkt := self.buf.Pop()
+			if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
+				self.curgopcount--
+			}
+			if self.curgopcount < self.maxgopcount {
+				break
+			}
 		}
 	}
 
