@@ -72,7 +72,7 @@ func (c *client) Close() {
 // channel represents a stream that is sent to the server
 type channel struct {
 	// The packet queue for the stream
-	queue *pubsub.Queue
+	queue *pubsub.DurationQueue
 
 	// The metadata of the stream
 	streams []av.CodecData
@@ -102,7 +102,7 @@ func newChannel(conn connection, playPath, reference string, remote net.Addr, st
 		subscriber: make(map[string]*client),
 		collector:  collector,
 		streams:    streams,
-		queue:      pubsub.NewQueue(),
+		queue:      pubsub.NewDurationQueue(),
 		isProxy:    isProxy,
 	}
 

@@ -12,7 +12,7 @@ require (
 	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/caddyserver/certmagic v0.23.0
 	github.com/datarhei/gosrt v0.9.0
-	github.com/datarhei/joy4 v0.0.0-20250806135534-393d6bb11439
+	github.com/datarhei/joy4 v0.0.0-20250818192923-6dc77ee81363
 	github.com/dolthub/swiss v0.2.1
 	github.com/fujiwara/shapeio v1.0.0
 	github.com/go-playground/validator/v10 v10.27.0

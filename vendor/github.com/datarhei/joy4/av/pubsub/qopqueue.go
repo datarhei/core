@@ -23,7 +23,6 @@ import (
 // One publisher and multiple subscribers thread-safe packet buffer queue.
 type Queue struct {
 	buf                      *pktque.Buf
-	head, tail               int
 	lock                     *sync.RWMutex
 	cond                     *sync.Cond
 	curgopcount, maxgopcount int
@@ -42,82 +41,82 @@ func NewQueue() *Queue {
 	return q
 }
 
-func (self *Queue) SetMaxGopCount(n int) {
-	self.lock.Lock()
-	self.maxgopcount = n
-	self.lock.Unlock()
+func (q *Queue) SetMaxGopCount(n int) {
+	q.lock.Lock()
+	q.maxgopcount = n
+	q.lock.Unlock()
 }
 
-func (self *Queue) WriteHeader(streams []av.CodecData) error {
-	self.lock.Lock()
+func (q *Queue) WriteHeader(streams []av.CodecData) error {
+	q.lock.Lock()
 
-	self.streams = streams
+	q.streams = streams
 	for i, stream := range streams {
 		if stream.Type().IsVideo() {
-			self.videoidx = i
+			q.videoidx = i
 		}
 	}
-	self.cond.Broadcast()
+	q.cond.Broadcast()
 
-	self.lock.Unlock()
+	q.lock.Unlock()
 
 	return nil
 }
 
-func (self *Queue) WriteTrailer() error {
+func (q *Queue) WriteTrailer() error {
 	return nil
 }
 
 // After Close() called, all QueueCursor's ReadPacket will return io.EOF.
-func (self *Queue) Close() (err error) {
-	self.lock.Lock()
+func (q *Queue) Close() (err error) {
+	q.lock.Lock()
 
-	self.closed = true
-	self.cond.Broadcast()
+	q.closed = true
+	q.cond.Broadcast()
 
-	self.lock.Unlock()
+	q.lock.Unlock()
 	return
 }
 
 // Put packet into buffer, old packets will be discared.
-func (self *Queue) WritePacket(pkt av.Packet) (err error) {
-	self.lock.Lock()
+func (q *Queue) WritePacket(pkt av.Packet) (err error) {
+	q.lock.Lock()
 
-	self.buf.Push(pkt)
+	q.buf.Push(pkt)
 
-	if self.videoidx == -1 { // audio only stream
+	if q.videoidx == -1 { // audio only stream
 		if pkt.IsKeyFrame {
-			self.curgopcount++
+			q.curgopcount++
 		}
 
-		for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
-			pkt := self.buf.Pop()
+		for q.curgopcount >= q.maxgopcount && q.buf.Count > 1 {
+			pkt := q.buf.Pop()
 			if pkt.IsKeyFrame {
-				self.curgopcount--
+				q.curgopcount--
 			}
-			if self.curgopcount < self.maxgopcount {
+			if q.curgopcount < q.maxgopcount {
 				break
 			}
 		}
 	} else { // video only or video+audio stream
-		if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
-			self.curgopcount++
+		if pkt.Idx == int8(q.videoidx) && pkt.IsKeyFrame {
+			q.curgopcount++
 		}
 
-		for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
-			pkt := self.buf.Pop()
-			if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
-				self.curgopcount--
+		for q.curgopcount >= q.maxgopcount && q.buf.Count > 1 {
+			pkt := q.buf.Pop()
+			if pkt.Idx == int8(q.videoidx) && pkt.IsKeyFrame {
+				q.curgopcount--
 			}
-			if self.curgopcount < self.maxgopcount {
+			if q.curgopcount < q.maxgopcount {
 				break
 			}
 		}
 	}
 
-	self.cond.Broadcast()
+	q.cond.Broadcast()
 
-	self.lock.Unlock()
+	q.lock.Unlock()
 	return
 }
 
@@ -128,15 +127,15 @@ type QueueCursor struct {
 	init   func(buf *pktque.Buf, videoidx int) pktque.BufPos
 }
 
-func (self *Queue) newCursor() *QueueCursor {
+func (q *Queue) newCursor() *QueueCursor {
 	return &QueueCursor{
-		que: self,
+		que: q,
 	}
 }
 
 // Create cursor position at latest packet.
-func (self *Queue) Latest() *QueueCursor {
-	cursor := self.newCursor()
+func (q *Queue) Latest() *QueueCursor {
+	cursor := q.newCursor()
 	cursor.init = func(buf *pktque.Buf, videoidx int) pktque.BufPos {
 		return buf.Tail
 	}
@@ -144,8 +143,8 @@ func (self *Queue) Latest() *QueueCursor {
 }
 
 // Create cursor position at oldest buffered packet.
-func (self *Queue) Oldest() *QueueCursor {
-	cursor := self.newCursor()
+func (q *Queue) Oldest() *QueueCursor {
+	cursor := q.newCursor()
 	cursor.init = func(buf *pktque.Buf, videoidx int) pktque.BufPos {
 		return buf.Head
 	}
@@ -153,8 +152,8 @@ func (self *Queue) Oldest() *QueueCursor {
 }
 
 // Create cursor position at specific time in buffered packets.
-func (self *Queue) DelayedTime(dur time.Duration) *QueueCursor {
-	cursor := self.newCursor()
+func (q *Queue) DelayedTime(dur time.Duration) *QueueCursor {
+	cursor := q.newCursor()
 	cursor.init = func(buf *pktque.Buf, videoidx int) pktque.BufPos {
 		i := buf.Tail - 1
 		if buf.IsValidPos(i) {
@@ -172,14 +171,14 @@ func (self *Queue) DelayedTime(dur time.Duration) *QueueCursor {
 }
 
 // Create cursor position at specific delayed GOP count in buffered packets.
-func (self *Queue) DelayedGopCount(n int) *QueueCursor {
-	cursor := self.newCursor()
+func (q *Queue) DelayedGopCount(n int) *QueueCursor {
+	cursor := q.newCursor()
 	cursor.init = func(buf *pktque.Buf, videoidx int) pktque.BufPos {
 		i := buf.Tail - 1
 		if videoidx != -1 {
 			for gop := 0; buf.IsValidPos(i) && gop < n; i-- {
 				pkt := buf.Get(i)
-				if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
+				if pkt.Idx == int8(q.videoidx) && pkt.IsKeyFrame {
 					gop++
 				}
 			}
@@ -189,45 +188,45 @@ func (self *Queue) DelayedGopCount(n int) *QueueCursor {
 	return cursor
 }
 
-func (self *QueueCursor) Streams() (streams []av.CodecData, err error) {
-	self.que.cond.L.Lock()
-	for self.que.streams == nil && !self.que.closed {
-		self.que.cond.Wait()
+func (qc *QueueCursor) Streams() (streams []av.CodecData, err error) {
+	qc.que.cond.L.Lock()
+	for qc.que.streams == nil && !qc.que.closed {
+		qc.que.cond.Wait()
 	}
-	if self.que.streams != nil {
-		streams = self.que.streams
+	if qc.que.streams != nil {
+		streams = qc.que.streams
 	} else {
 		err = io.EOF
 	}
-	self.que.cond.L.Unlock()
+	qc.que.cond.L.Unlock()
 	return
 }
 
 // ReadPacket will not consume packets in Queue, it's just a cursor.
-func (self *QueueCursor) ReadPacket() (pkt av.Packet, err error) {
-	self.que.cond.L.Lock()
-	buf := self.que.buf
-	if !self.gotpos {
-		self.pos = self.init(buf, self.que.videoidx)
-		self.gotpos = true
+func (qc *QueueCursor) ReadPacket() (pkt av.Packet, err error) {
+	qc.que.cond.L.Lock()
+	buf := qc.que.buf
+	if !qc.gotpos {
+		qc.pos = qc.init(buf, qc.que.videoidx)
+		qc.gotpos = true
 	}
 	for {
-		if self.pos.LT(buf.Head) {
-			self.pos = buf.Head
-		} else if self.pos.GT(buf.Tail) {
-			self.pos = buf.Tail
+		if qc.pos.LT(buf.Head) {
+			qc.pos = buf.Head
+		} else if qc.pos.GT(buf.Tail) {
+			qc.pos = buf.Tail
 		}
-		if buf.IsValidPos(self.pos) {
-			pkt = buf.Get(self.pos)
-			self.pos++
+		if buf.IsValidPos(qc.pos) {
+			pkt = buf.Get(qc.pos)
+			qc.pos++
 			break
 		}
-		if self.que.closed {
+		if qc.que.closed {
 			err = io.EOF
 			break
 		}
-		self.que.cond.Wait()
+		qc.que.cond.Wait()
 	}
-	self.que.cond.L.Unlock()
+	qc.que.cond.L.Unlock()
 	return
 }
