@@ -247,8 +247,8 @@ func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 }
 
 // Reallocation issues reallocation requests of processes
-// @Summary Retrieve snapshot of the cluster DB
-// @Description Retrieve snapshot of the cluster DB
+// @Summary Issue reallocation requests of processes
+// @Description Issue reallocation requests of processes
 // @Tags v16.?.?
 // @ID cluster-3-reallocation
 // @Produce json

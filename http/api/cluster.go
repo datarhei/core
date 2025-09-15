@@ -108,6 +108,8 @@ type ClusterKVS map[string]ClusterKVSValue
 
 type ClusterProcessMap map[string]string
 
+type ClusterProcessRelocateMap map[string]string
+
 type ClusterProcessReallocate struct {
 	TargetNodeID string      `json:"target_node_id"`
 	Processes    []ProcessID `json:"process_ids"`

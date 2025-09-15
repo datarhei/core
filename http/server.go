@@ -742,6 +742,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/db/locks", s.v3handler.cluster.StoreListLocks)
 		v3.GET("/cluster/db/kv", s.v3handler.cluster.StoreListKV)
 		v3.GET("/cluster/db/map/process", s.v3handler.cluster.StoreGetProcessNodeMap)
+		v3.GET("/cluster/db/map/reallocate", s.v3handler.cluster.StoreGetProcessRelocateMap)
 		v3.GET("/cluster/db/node", s.v3handler.cluster.StoreListNodes)
 
 		v3.GET("/cluster/iam/user", s.v3handler.cluster.IAMIdentityList)

@@ -86,9 +86,24 @@ func (h *ClusterHandler) StoreGetProcess(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} api.ClusterProcessMap
 // @Security ApiKeyAuth
-// @Router /api/v3/cluster/map/process [get]
+// @Router /api/v3/cluster/db/map/process [get]
 func (h *ClusterHandler) StoreGetProcessNodeMap(c echo.Context) error {
 	m := h.cluster.Store().ProcessGetNodeMap()
+
+	return c.JSON(http.StatusOK, m)
+}
+
+// StoreGetProcessRelocateMap returns a map of which processes should be relocated
+// @Summary Retrieve a map of which processes should be relocated
+// @Description Retrieve a map of which processes should be relocated
+// @Tags v16.?.?
+// @ID cluster-3-db-process-relocate-map
+// @Produce json
+// @Success 200 {object} api.ClusterProcessRelocateMap
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/db/map/reallocate [get]
+func (h *ClusterHandler) StoreGetProcessRelocateMap(c echo.Context) error {
+	m := h.cluster.Store().ProcessGetRelocateMap()
 
 	return c.JSON(http.StatusOK, m)
 }
