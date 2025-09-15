@@ -1432,7 +1432,7 @@ func (a *api) start(ctx context.Context) error {
 		{
 			Name:               a.diskfs.Name(),
 			Mountpoint:         "",
-			AllowWrite:         false,
+			AllowWrite:         true,
 			EnableAuth:         false,
 			Username:           "",
 			Password:           "",
