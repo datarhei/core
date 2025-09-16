@@ -204,6 +204,49 @@ definitions:
       id:
         type: string
     type: object
+  api.ClusterDeployments:
+    properties:
+      process:
+        $ref: '#/definitions/api.ClusterDeploymentsProcesses'
+    type: object
+  api.ClusterDeploymentsProcess:
+    properties:
+      domain:
+        type: string
+      error:
+        type: string
+      id:
+        type: string
+      node_id:
+        type: string
+      order:
+        type: string
+      updated_at:
+        type: integer
+    type: object
+  api.ClusterDeploymentsProcesses:
+    properties:
+      add:
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
+      delete:
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
+      order:
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
+      relocate:
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
+      update:
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
+    type: object
   api.ClusterKVS:
     additionalProperties:
       $ref: '#/definitions/api.ClusterKVSValue'
@@ -370,6 +413,10 @@ definitions:
         type: array
       target_node_id:
         type: string
+    type: object
+  api.ClusterProcessRelocateMap:
+    additionalProperties:
+      type: string
     type: object
   api.ClusterRaft:
     properties:
@@ -2999,6 +3046,38 @@ paths:
       summary: List locks in the cluster DB
       tags:
       - v16.?.?
+  /api/v3/cluster/db/map/process:
+    get:
+      description: Retrieve a map of which process is running on which node
+      operationId: cluster-3-db-process-node-map
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterProcessMap'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve a map of which process is running on which node
+      tags:
+      - v16.?.?
+  /api/v3/cluster/db/map/reallocate:
+    get:
+      description: Retrieve a map of which processes should be relocated
+      operationId: cluster-3-db-process-relocate-map
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterProcessRelocateMap'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve a map of which processes should be relocated
+      tags:
+      - v16.?.?
   /api/v3/cluster/db/node:
     get:
       description: List of nodes in the cluster DB
@@ -3119,6 +3198,22 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: List of identities in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/deployments:
+    get:
+      description: Retrieve snapshot of pending deployments
+      operationId: cluster-3-deployments
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ClusterDeployments'
+      security:
+      - ApiKeyAuth: []
+      summary: Retrieve snapshot of pending deployments
       tags:
       - v16.?.?
   /api/v3/cluster/events:
@@ -3495,22 +3590,6 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Leave the cluster gracefully
-      tags:
-      - v16.?.?
-  /api/v3/cluster/map/process:
-    get:
-      description: Retrieve a map of which process is running on which node
-      operationId: cluster-3-db-process-node-map
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.ClusterProcessMap'
-      security:
-      - ApiKeyAuth: []
-      summary: Retrieve a map of which process is running on which node
       tags:
       - v16.?.?
   /api/v3/cluster/node:
@@ -4332,7 +4411,7 @@ paths:
       - v16.?.?
   /api/v3/cluster/reallocation:
     put:
-      description: Retrieve snapshot of the cluster DB
+      description: Issue reallocation requests of processes
       operationId: cluster-3-reallocation
       parameters:
       - description: Process reallocations
@@ -4354,7 +4433,7 @@ paths:
             $ref: '#/definitions/api.Error'
       security:
       - ApiKeyAuth: []
-      summary: Retrieve snapshot of the cluster DB
+      summary: Issue reallocation requests of processes
       tags:
       - v16.?.?
   /api/v3/cluster/snapshot:
@@ -5241,6 +5320,10 @@ paths:
       - description: Process domain
         in: query
         name: domain
+        type: string
+      - description: Whether to purge files
+        in: query
+        name: purge
         type: string
       produces:
       - application/json

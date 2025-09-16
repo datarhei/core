@@ -733,6 +733,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/healthy", s.v3handler.cluster.Healthy)
 
 		v3.GET("/cluster/snapshot", s.v3handler.cluster.GetSnapshot)
+		v3.GET("/cluster/deployments", s.v3handler.cluster.Deployments)
 
 		v3.GET("/cluster/db/process", s.v3handler.cluster.StoreListProcesses)
 		v3.GET("/cluster/db/process/:id", s.v3handler.cluster.StoreGetProcess)

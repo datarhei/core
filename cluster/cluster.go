@@ -87,6 +87,7 @@ type Cluster interface {
 	Store() store.Store
 
 	Resources() (resources.Info, error)
+	Deployments() (Deployments, error)
 }
 
 type Peer struct {
@@ -1146,4 +1147,157 @@ func (c *cluster) Store() store.Store {
 	}
 
 	return c.store
+}
+
+type Deployments struct {
+	Process struct {
+		Delete   []DeploymentsProcess
+		Update   []DeploymentsProcess
+		Order    []DeploymentsProcess
+		Add      []DeploymentsProcess
+		Relocate []DeploymentsProcess
+	}
+}
+
+type DeploymentsProcess struct {
+	ID        string
+	Domain    string
+	NodeID    string
+	Order     string
+	Error     string
+	UpdatedAt time.Time
+}
+
+func (c *cluster) Deployments() (Deployments, error) {
+	processDelete := []DeploymentsProcess{}
+	processUpdate := []DeploymentsProcess{}
+	processOrder := []DeploymentsProcess{}
+	processAdd := []DeploymentsProcess{}
+	processRelocate := []DeploymentsProcess{}
+
+	want := c.store.ProcessList()
+	have, err := c.manager.ClusterProcessList()
+	if err != nil {
+		return Deployments{}, err
+	}
+
+	// A map from the process ID to the process config of the processes
+	// we want to be running on the nodes.
+	wantMap := map[string]store.Process{}
+	for _, wantP := range want {
+		pid := wantP.Config.ProcessID().String()
+		wantMap[pid] = wantP
+	}
+
+	// Now we iterate through the processes we actually have running on the nodes
+	// and remove them from the wantMap.
+	for _, haveP := range have {
+		pid := haveP.Config.ProcessID().String()
+		wantP, ok := wantMap[pid]
+		if !ok {
+			processDelete = append(processDelete, DeploymentsProcess{
+				ID:     haveP.Config.ID,
+				Domain: haveP.Config.Domain,
+				NodeID: haveP.NodeID,
+				Order:  haveP.Order,
+				Error:  "",
+			})
+			continue
+		}
+
+		hasConfigChanges := !wantP.Config.Equal(haveP.Config)
+		if !hasConfigChanges && wantP.Force {
+			hasConfigChanges = wantP.UpdatedAt.After(haveP.UpdatedAt)
+		}
+		hasMetadataChanges, _ := isMetadataUpdateRequired(wantP.Metadata, haveP.Metadata)
+		if hasConfigChanges || hasMetadataChanges {
+			processUpdate = append(processUpdate, DeploymentsProcess{
+				ID:        wantP.Config.ID,
+				Domain:    wantP.Config.Domain,
+				NodeID:    haveP.NodeID,
+				Order:     wantP.Order,
+				Error:     wantP.Error,
+				UpdatedAt: wantP.UpdatedAt,
+			})
+		}
+
+		delete(wantMap, pid)
+
+		if haveP.Order != wantP.Order {
+			processOrder = append(processOrder, DeploymentsProcess{
+				ID:        wantP.Config.ID,
+				Domain:    wantP.Config.Domain,
+				NodeID:    haveP.NodeID,
+				Order:     wantP.Order,
+				Error:     wantP.Error,
+				UpdatedAt: wantP.UpdatedAt,
+			})
+		}
+	}
+
+	// The wantMap now contains only those processes that need to be installed on a node.
+	for _, wantP := range wantMap {
+		processAdd = append(processAdd, DeploymentsProcess{
+			ID:        wantP.Config.ID,
+			Domain:    wantP.Config.Domain,
+			NodeID:    "",
+			Order:     wantP.Order,
+			Error:     wantP.Error,
+			UpdatedAt: wantP.UpdatedAt,
+		})
+	}
+
+	// Rebuild want map
+	wantMap = map[string]store.Process{}
+	for _, wantP := range want {
+		pid := wantP.Config.ProcessID().String()
+		wantMap[pid] = wantP
+	}
+
+	relocateMap := c.store.ProcessGetRelocateMap()
+
+	for pid, targetNodeid := range relocateMap {
+		wantP, ok := wantMap[pid]
+		if !ok {
+			continue
+		}
+		haveP := clusternode.Process{}
+
+		found := false
+		for _, p := range have {
+			if pid == p.Config.ProcessID().String() {
+				haveP = p
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			continue
+		}
+
+		sourceNodeid := haveP.NodeID
+
+		if sourceNodeid == targetNodeid {
+			continue
+		}
+
+		processRelocate = append(processRelocate, DeploymentsProcess{
+			ID:     wantP.Config.ID,
+			Domain: wantP.Config.Domain,
+			NodeID: targetNodeid,
+			Order:  wantP.Order,
+			Error:  wantP.Error,
+		})
+	}
+
+	deployments := Deployments{}
+
+	deployments.Process.Delete = processDelete
+	deployments.Process.Update = processUpdate
+	deployments.Process.Order = processOrder
+	deployments.Process.Add = processAdd
+	deployments.Process.Relocate = processRelocate
+
+	return deployments, nil
 }

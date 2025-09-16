@@ -289,3 +289,44 @@ func (h *ClusterHandler) Reallocation(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, "OK")
 }
+
+// Deployments returns a current snapshot of pending deployments
+// @Summary Retrieve snapshot of pending deployments
+// @Description Retrieve snapshot of pending deployments
+// @Tags v16.?.?
+// @ID cluster-3-deployments
+// @Produce application/json
+// @Success 200 {object} api.ClusterDeployments
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/deployments [get]
+func (h *ClusterHandler) Deployments(c echo.Context) error {
+	deployments, err := h.cluster.Deployments()
+	if err != nil {
+		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+	}
+
+	marshal := func(processes []cluster.DeploymentsProcess) []api.ClusterDeploymentsProcess {
+		apiProcesses := []api.ClusterDeploymentsProcess{}
+		for _, p := range processes {
+			apiProcesses = append(apiProcesses, api.ClusterDeploymentsProcess{
+				ID:       p.ID,
+				Domain:   p.Domain,
+				NodeID:   p.NodeID,
+				Order:    p.Order,
+				Error:    p.Error,
+				UpdateAt: p.UpdatedAt.Unix(),
+			})
+		}
+		return apiProcesses
+	}
+
+	return c.JSON(http.StatusOK, api.ClusterDeployments{
+		Process: api.ClusterDeploymentsProcesses{
+			Delete:   marshal(deployments.Process.Delete),
+			Update:   marshal(deployments.Process.Update),
+			Order:    marshal(deployments.Process.Order),
+			Add:      marshal(deployments.Process.Add),
+			Relocate: marshal(deployments.Process.Relocate),
+		},
+	})
+}

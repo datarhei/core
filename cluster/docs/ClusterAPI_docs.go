@@ -1655,6 +1655,9 @@ const docTemplateClusterAPI = `{
             "properties": {
                 "config": {
                     "$ref": "#/definitions/app.Config"
+                },
+                "force": {
+                    "type": "boolean"
                 }
             }
         },
@@ -2355,9 +2358,12 @@ const docTemplateClusterAPI = `{
                 "error": {
                     "type": "string"
                 },
+                "force": {
+                    "type": "boolean"
+                },
                 "metadata": {
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 },
                 "order": {
                     "type": "string"

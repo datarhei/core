@@ -120,3 +120,24 @@ type ClusterStoreNode struct {
 	State     string    `json:"state"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type ClusterDeployments struct {
+	Process ClusterDeploymentsProcesses `json:"process"`
+}
+
+type ClusterDeploymentsProcesses struct {
+	Delete   []ClusterDeploymentsProcess `json:"delete"`
+	Update   []ClusterDeploymentsProcess `json:"update"`
+	Order    []ClusterDeploymentsProcess `json:"order"`
+	Add      []ClusterDeploymentsProcess `json:"add"`
+	Relocate []ClusterDeploymentsProcess `json:"relocate"`
+}
+
+type ClusterDeploymentsProcess struct {
+	ID       string `json:"id"`
+	Domain   string `json:"domain"`
+	NodeID   string `json:"node_id"`
+	Order    string `json:"order"`
+	Error    string `json:"error"`
+	UpdateAt int64  `json:"updated_at"`
+}

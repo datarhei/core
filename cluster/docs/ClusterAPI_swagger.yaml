@@ -252,6 +252,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/app.Config'
+      force:
+        type: boolean
     type: object
   cluster.Error:
     properties:
@@ -722,8 +724,10 @@ definitions:
         type: string
       error:
         type: string
+      force:
+        type: boolean
       metadata:
-        additionalProperties: true
+        additionalProperties: {}
         type: object
       order:
         type: string

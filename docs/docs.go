@@ -208,6 +208,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/cluster/db/map/process": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a map of which process is running on which node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve a map of which process is running on which node",
+                "operationId": "cluster-3-db-process-node-map",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterProcessMap"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/db/map/reallocate": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a map of which processes should be relocated",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve a map of which processes should be relocated",
+                "operationId": "cluster-3-db-process-relocate-map",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterProcessRelocateMap"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/db/node": {
             "get": {
                 "security": [
@@ -398,6 +450,32 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/deployments": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve snapshot of pending deployments",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Retrieve snapshot of pending deployments",
+                "operationId": "cluster-3-deployments",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ClusterDeployments"
                         }
                     }
                 }
@@ -986,32 +1064,6 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v3/cluster/map/process": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Retrieve a map of which process is running on which node",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "v16.?.?"
-                ],
-                "summary": "Retrieve a map of which process is running on which node",
-                "operationId": "cluster-3-db-process-node-map",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.ClusterProcessMap"
                         }
                     }
                 }
@@ -2245,14 +2297,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Retrieve snapshot of the cluster DB",
+                "description": "Issue reallocation requests of processes",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Retrieve snapshot of the cluster DB",
+                "summary": "Issue reallocation requests of processes",
                 "operationId": "cluster-3-reallocation",
                 "parameters": [
                     {
@@ -3888,6 +3940,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Process domain",
                         "name": "domain",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whether to purge files",
+                        "name": "purge",
                         "in": "query"
                     }
                 ],
@@ -5563,6 +5621,72 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ClusterDeployments": {
+            "type": "object",
+            "properties": {
+                "process": {
+                    "$ref": "#/definitions/api.ClusterDeploymentsProcesses"
+                }
+            }
+        },
+        "api.ClusterDeploymentsProcess": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ClusterDeploymentsProcesses": {
+            "type": "object",
+            "properties": {
+                "add": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
+                },
+                "delete": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
+                },
+                "order": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
+                },
+                "relocate": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
+                },
+                "update": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
+                }
+            }
+        },
         "api.ClusterKVS": {
             "type": "object",
             "additionalProperties": {
@@ -5806,6 +5930,12 @@ const docTemplate = `{
                 "target_node_id": {
                     "type": "string"
                 }
+            }
+        },
+        "api.ClusterProcessRelocateMap": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
             }
         },
         "api.ClusterRaft": {
