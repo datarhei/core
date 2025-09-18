@@ -135,6 +135,8 @@ type memFilesystem struct {
 	// Storage backend
 	storage memStorage
 	dirs    *dirStorage
+
+	events *EventWriter
 }
 
 type dirStorage struct {
@@ -221,6 +223,8 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 	}
 
 	fs.logger.Debug().Log("Created")
+
+	fs.events = NewEventWriter()
 
 	return fs, nil
 }
@@ -462,8 +466,10 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 	})
 
 	if replace {
+		fs.events.Publish(Event{Action: "update", Name: newFile.name})
 		logger.Debug().Log("Replaced file")
 	} else {
+		fs.events.Publish(Event{Action: "create", Name: newFile.name})
 		logger.Debug().Log("Added file")
 	}
 
@@ -520,6 +526,8 @@ func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int
 		"size_bytes":     fs.currentSize,
 	}).Log("Appended to file")
 
+	fs.events.Publish(Event{Action: "update", Name: file.name})
+
 	return size, nil
 }
 
@@ -555,6 +563,8 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 			"filesize_bytes": f.size,
 			"size_bytes":     fs.currentSize,
 		}).Debug().Log("Purged file")
+
+		fs.events.Publish(Event{Action: "remove", Name: f.name})
 
 		if size <= 0 {
 			break
@@ -599,15 +609,21 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 	dstFile, replace := fs.storage.Store(dst, srcFile)
 	fs.storage.Delete(src)
 
+	fs.events.Publish(Event{Action: "remove", Name: src})
+
 	fs.dirs.Remove(src)
 	if !replace {
 		fs.dirs.Add(dst)
+
+		fs.events.Publish(Event{Action: "create", Name: dst})
 	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
 	if replace {
+		fs.events.Publish(Event{Action: "update", Name: dst})
+
 		dstFile.Close()
 
 		fs.currentSize -= dstFile.size
@@ -643,12 +659,15 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 
 	if !replace {
 		fs.dirs.Add(dst)
+
+		fs.events.Publish(Event{Action: "create", Name: dst})
 	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
 	if replace {
+		fs.events.Publish(Event{Action: "update", Name: dst})
 		replacedFile.Close()
 		fs.currentSize -= replacedFile.size
 	}
@@ -735,6 +754,8 @@ func (fs *memFilesystem) remove(path string) int64 {
 		"size_bytes":     fs.currentSize,
 	}).Debug().Log("Removed file")
 
+	fs.events.Publish(Event{Action: "remove", Name: file.name})
+
 	return file.size
 }
 
@@ -808,6 +829,8 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 		fs.dirs.Remove(file.name)
 
 		file.Close()
+
+		fs.events.Publish(Event{Action: "remove", Name: file.name})
 	}
 
 	fs.sizeLock.Lock()
@@ -923,4 +946,8 @@ func (fs *memFilesystem) cleanPath(path string) string {
 	}
 
 	return filepath.Join("/", filepath.Clean(path))
+}
+
+func (fs *memFilesystem) Events() (<-chan Event, EventsCancelFunc) {
+	return fs.events.Subscribe()
 }
