@@ -1150,16 +1150,11 @@ func (c *cluster) Store() store.Store {
 }
 
 type Deployments struct {
-	Process struct {
-		Delete   []DeploymentsProcess
-		Update   []DeploymentsProcess
-		Order    []DeploymentsProcess
-		Add      []DeploymentsProcess
-		Relocate []DeploymentsProcess
-	}
+	Process []DeploymentsProcess
 }
 
 type DeploymentsProcess struct {
+	Action    string
 	ID        string
 	Domain    string
 	NodeID    string
@@ -1169,11 +1164,7 @@ type DeploymentsProcess struct {
 }
 
 func (c *cluster) Deployments() (Deployments, error) {
-	processDelete := []DeploymentsProcess{}
-	processUpdate := []DeploymentsProcess{}
-	processOrder := []DeploymentsProcess{}
-	processAdd := []DeploymentsProcess{}
-	processRelocate := []DeploymentsProcess{}
+	processes := []DeploymentsProcess{}
 
 	want := c.store.ProcessList()
 	have, err := c.manager.ClusterProcessList()
@@ -1195,7 +1186,8 @@ func (c *cluster) Deployments() (Deployments, error) {
 		pid := haveP.Config.ProcessID().String()
 		wantP, ok := wantMap[pid]
 		if !ok {
-			processDelete = append(processDelete, DeploymentsProcess{
+			processes = append(processes, DeploymentsProcess{
+				Action: "delete",
 				ID:     haveP.Config.ID,
 				Domain: haveP.Config.Domain,
 				NodeID: haveP.NodeID,
@@ -1211,7 +1203,8 @@ func (c *cluster) Deployments() (Deployments, error) {
 		}
 		hasMetadataChanges, _ := isMetadataUpdateRequired(wantP.Metadata, haveP.Metadata)
 		if hasConfigChanges || hasMetadataChanges {
-			processUpdate = append(processUpdate, DeploymentsProcess{
+			processes = append(processes, DeploymentsProcess{
+				Action:    "update",
 				ID:        wantP.Config.ID,
 				Domain:    wantP.Config.Domain,
 				NodeID:    haveP.NodeID,
@@ -1224,7 +1217,8 @@ func (c *cluster) Deployments() (Deployments, error) {
 		delete(wantMap, pid)
 
 		if haveP.Order != wantP.Order {
-			processOrder = append(processOrder, DeploymentsProcess{
+			processes = append(processes, DeploymentsProcess{
+				Action:    "order",
 				ID:        wantP.Config.ID,
 				Domain:    wantP.Config.Domain,
 				NodeID:    haveP.NodeID,
@@ -1237,7 +1231,8 @@ func (c *cluster) Deployments() (Deployments, error) {
 
 	// The wantMap now contains only those processes that need to be installed on a node.
 	for _, wantP := range wantMap {
-		processAdd = append(processAdd, DeploymentsProcess{
+		processes = append(processes, DeploymentsProcess{
+			Action:    "add",
 			ID:        wantP.Config.ID,
 			Domain:    wantP.Config.Domain,
 			NodeID:    "",
@@ -1282,7 +1277,8 @@ func (c *cluster) Deployments() (Deployments, error) {
 			continue
 		}
 
-		processRelocate = append(processRelocate, DeploymentsProcess{
+		processes = append(processes, DeploymentsProcess{
+			Action: "relocate",
 			ID:     wantP.Config.ID,
 			Domain: wantP.Config.Domain,
 			NodeID: targetNodeid,
@@ -1291,13 +1287,9 @@ func (c *cluster) Deployments() (Deployments, error) {
 		})
 	}
 
-	deployments := Deployments{}
-
-	deployments.Process.Delete = processDelete
-	deployments.Process.Update = processUpdate
-	deployments.Process.Order = processOrder
-	deployments.Process.Add = processAdd
-	deployments.Process.Relocate = processRelocate
+	deployments := Deployments{
+		Process: processes,
+	}
 
 	return deployments, nil
 }

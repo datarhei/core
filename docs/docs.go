@@ -5625,13 +5625,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "process": {
-                    "$ref": "#/definitions/api.ClusterDeploymentsProcesses"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
+                    }
                 }
             }
         },
         "api.ClusterDeploymentsProcess": {
             "type": "object",
+            "required": [
+                "action"
+            ],
             "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "delete",
+                        "update",
+                        "add",
+                        "order",
+                        "relocate"
+                    ]
+                },
                 "domain": {
                     "type": "string"
                 },
@@ -5649,41 +5665,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "integer"
-                }
-            }
-        },
-        "api.ClusterDeploymentsProcesses": {
-            "type": "object",
-            "properties": {
-                "add": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
-                    }
-                },
-                "delete": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
-                    }
-                },
-                "order": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
-                    }
-                },
-                "relocate": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
-                    }
-                },
-                "update": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ClusterDeploymentsProcess"
-                    }
                 }
             }
         },

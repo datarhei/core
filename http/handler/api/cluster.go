@@ -309,6 +309,7 @@ func (h *ClusterHandler) Deployments(c echo.Context) error {
 		apiProcesses := []api.ClusterDeploymentsProcess{}
 		for _, p := range processes {
 			apiProcesses = append(apiProcesses, api.ClusterDeploymentsProcess{
+				Action:   p.Action,
 				ID:       p.ID,
 				Domain:   p.Domain,
 				NodeID:   p.NodeID,
@@ -321,12 +322,6 @@ func (h *ClusterHandler) Deployments(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, api.ClusterDeployments{
-		Process: api.ClusterDeploymentsProcesses{
-			Delete:   marshal(deployments.Process.Delete),
-			Update:   marshal(deployments.Process.Update),
-			Order:    marshal(deployments.Process.Order),
-			Add:      marshal(deployments.Process.Add),
-			Relocate: marshal(deployments.Process.Relocate),
-		},
+		Process: marshal(deployments.Process),
 	})
 }

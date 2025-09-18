@@ -207,10 +207,20 @@ definitions:
   api.ClusterDeployments:
     properties:
       process:
-        $ref: '#/definitions/api.ClusterDeploymentsProcesses'
+        items:
+          $ref: '#/definitions/api.ClusterDeploymentsProcess'
+        type: array
     type: object
   api.ClusterDeploymentsProcess:
     properties:
+      action:
+        enum:
+        - delete
+        - update
+        - add
+        - order
+        - relocate
+        type: string
       domain:
         type: string
       error:
@@ -223,29 +233,8 @@ definitions:
         type: string
       updated_at:
         type: integer
-    type: object
-  api.ClusterDeploymentsProcesses:
-    properties:
-      add:
-        items:
-          $ref: '#/definitions/api.ClusterDeploymentsProcess'
-        type: array
-      delete:
-        items:
-          $ref: '#/definitions/api.ClusterDeploymentsProcess'
-        type: array
-      order:
-        items:
-          $ref: '#/definitions/api.ClusterDeploymentsProcess'
-        type: array
-      relocate:
-        items:
-          $ref: '#/definitions/api.ClusterDeploymentsProcess'
-        type: array
-      update:
-        items:
-          $ref: '#/definitions/api.ClusterDeploymentsProcess'
-        type: array
+    required:
+    - action
     type: object
   api.ClusterKVS:
     additionalProperties:

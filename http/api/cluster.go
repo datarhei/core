@@ -122,18 +122,11 @@ type ClusterStoreNode struct {
 }
 
 type ClusterDeployments struct {
-	Process ClusterDeploymentsProcesses `json:"process"`
-}
-
-type ClusterDeploymentsProcesses struct {
-	Delete   []ClusterDeploymentsProcess `json:"delete"`
-	Update   []ClusterDeploymentsProcess `json:"update"`
-	Order    []ClusterDeploymentsProcess `json:"order"`
-	Add      []ClusterDeploymentsProcess `json:"add"`
-	Relocate []ClusterDeploymentsProcess `json:"relocate"`
+	Process []ClusterDeploymentsProcess `json:"process"`
 }
 
 type ClusterDeploymentsProcess struct {
+	Action   string `json:"action" validate:"required" enums:"delete,update,add,order,relocate" jsonschema:"enum=delete,enum=update,enum=add,enum=order,enum=relocate"`
 	ID       string `json:"id"`
 	Domain   string `json:"domain"`
 	NodeID   string `json:"node_id"`
