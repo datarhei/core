@@ -139,6 +139,8 @@ type diskFilesystem struct {
 
 	// Logger from the config
 	logger log.Logger
+
+	events *EventWriter
 }
 
 // NewDiskFilesystem returns a new filesystem that is backed by the disk filesystem.
@@ -171,6 +173,8 @@ func NewDiskFilesystem(config DiskConfig) (Filesystem, error) {
 	if fs.logger == nil {
 		fs.logger = log.New("")
 	}
+
+	fs.events = NewEventWriter()
 
 	return fs, nil
 }
@@ -213,6 +217,8 @@ func NewRootedDiskFilesystem(config RootedDiskConfig) (Filesystem, error) {
 	if fs.logger == nil {
 		fs.logger = log.New("")
 	}
+
+	fs.events = NewEventWriter()
 
 	return fs, nil
 }
@@ -362,6 +368,12 @@ func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int
 
 	fs.lastSizeCheck = time.Time{}
 
+	if replace {
+		fs.events.Publish(Event{Action: "update", Name: path})
+	} else {
+		fs.events.Publish(Event{Action: "create", Name: path})
+	}
+
 	return size, !replace, nil
 }
 
@@ -425,6 +437,8 @@ func (fs *diskFilesystem) AppendFileReader(path string, r io.Reader, sizeHint in
 
 	fs.lastSizeCheck = time.Time{}
 
+	fs.events.Publish(Event{Action: "update", Name: path})
+
 	return size, nil
 }
 
@@ -447,6 +461,8 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 
 	// First try to rename the file
 	if err := os.Rename(src, dst); err == nil {
+		fs.events.Publish(Event{Action: "remove", Name: src})
+		fs.events.Publish(Event{Action: "create", Name: dst})
 		return nil
 	}
 
@@ -456,10 +472,14 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
+	fs.events.Publish(Event{Action: "create", Name: dst})
+
 	if err := os.Remove(src); err != nil {
 		os.Remove(dst)
 		return fmt.Errorf("failed to remove source file: %w", err)
 	}
+
+	fs.events.Publish(Event{Action: "remove", Name: src})
 
 	return nil
 }
@@ -499,6 +519,8 @@ func (fs *diskFilesystem) copy(src, dst string) error {
 	source.Close()
 
 	fs.lastSizeCheck = time.Time{}
+
+	fs.events.Publish(Event{Action: "create", Name: dst})
 
 	return nil
 }
@@ -551,6 +573,8 @@ func (fs *diskFilesystem) Remove(path string) int64 {
 	}
 
 	fs.lastSizeCheck = time.Time{}
+
+	fs.events.Publish(Event{Action: "remove", Name: path})
 
 	return size
 }
@@ -618,6 +642,7 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string
 		if err := os.Remove(path); err == nil {
 			files = append(files, name)
 			size += info.Size()
+			fs.events.Publish(Event{Action: "remove", Name: path})
 		}
 	})
 
@@ -768,5 +793,7 @@ func (fs *diskFilesystem) cleanPath(path string) string {
 }
 
 func (fs *diskFilesystem) Events() (<-chan Event, EventsCancelFunc, error) {
-	return nil, func() {}, fmt.Errorf("events are not implemented for this filesystem")
+	ch, cancel := fs.events.Subscribe()
+
+	return ch, cancel, nil
 }
