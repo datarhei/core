@@ -686,6 +686,10 @@ func (fs *s3Filesystem) cleanPath(path string) string {
 	return filepath.Join("/", filepath.Clean(path))[1:]
 }
 
+func (fs *s3Filesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+	return nil, func() {}, fmt.Errorf("events are not implemented for this filesystem")
+}
+
 type s3FileInfo struct {
 	name         string
 	size         int64

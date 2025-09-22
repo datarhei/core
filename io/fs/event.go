@@ -22,10 +22,6 @@ func (e Event) clone() Event {
 
 type EventsCancelFunc func()
 
-type EventFilesystem interface {
-	Events() (<-chan Event, EventsCancelFunc)
-}
-
 type EventWriter struct {
 	publisher       chan Event
 	publisherClosed bool

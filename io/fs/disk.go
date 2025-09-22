@@ -766,3 +766,7 @@ func (fs *diskFilesystem) cleanPath(path string) string {
 
 	return filepath.Join(fs.root, filepath.Clean(path))
 }
+
+func (fs *diskFilesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+	return nil, func() {}, fmt.Errorf("events are not implemented for this filesystem")
+}

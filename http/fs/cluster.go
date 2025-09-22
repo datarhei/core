@@ -35,21 +35,21 @@ func NewClusterFS(name string, fs fs.Filesystem, proxy *node.Manager) Filesystem
 	return f
 }
 
-func (fs *filesystem) Open(path string) fs.File {
+func (cfs *filesystem) Open(path string) fs.File {
 	// Check if the file is locally available
 	//if file := fs.Filesystem.Open(path); file != nil {
 	//	return file
 	//}
 
 	// Check if the file is available in the cluster
-	size, lastModified, err := fs.proxy.FilesystemGetFileInfo(fs.name, path)
+	size, lastModified, err := cfs.proxy.FilesystemGetFileInfo(cfs.name, path)
 	if err != nil {
 		return nil
 	}
 
 	file := &file{
 		getFile: func(offset int64) (io.ReadCloser, error) {
-			return fs.proxy.FilesystemGetFile(fs.name, path, offset)
+			return cfs.proxy.FilesystemGetFile(cfs.name, path, offset)
 		},
 		name:         path,
 		size:         size,

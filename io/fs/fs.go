@@ -84,6 +84,8 @@ type ReadFilesystem interface {
 	// on success, the result is an absolute path. On non-disk filesystems. Only the mere existence
 	// of that file is verfied. In case the file is not found, the error ErrNotExist will be returned.
 	LookPath(file string) (string, error)
+
+	Events() (<-chan Event, EventsCancelFunc, error)
 }
 
 type WriteFilesystem interface {

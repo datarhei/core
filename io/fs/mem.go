@@ -948,6 +948,8 @@ func (fs *memFilesystem) cleanPath(path string) string {
 	return filepath.Join("/", filepath.Clean(path))
 }
 
-func (fs *memFilesystem) Events() (<-chan Event, EventsCancelFunc) {
-	return fs.events.Subscribe()
+func (fs *memFilesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+	ch, cancel := fs.events.Subscribe()
+
+	return ch, cancel, nil
 }

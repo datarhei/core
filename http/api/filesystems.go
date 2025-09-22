@@ -22,3 +22,8 @@ type FilesystemOperation struct {
 	Target    string `json:"target"`
 	RateLimit uint64 `json:"bandwidth_limit_kbit"` // kbit/s
 }
+
+type FilesystemEvent struct {
+	Action string `json:"action"`
+	Name   string `json:"name"`
+}

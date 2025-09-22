@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -265,6 +266,11 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
 
+	accept := c.Request().Header.Get(echo.HeaderAccept)
+	if strings.Contains(accept, "application/x-json-stream") || strings.Contains(accept, "text/event-stream") {
+		return h.ListFilesEvent(c)
+	}
+
 	path := "/"
 
 	if len(pattern) != 0 {
@@ -300,7 +306,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 
 	if len(modifiedEnd) != 0 {
 		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "lastmode_end: %s", err.Error())
+			return api.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
 		} else {
 			t := time.Unix(x+1, 0)
 			options.ModifiedEnd = &t
@@ -345,6 +351,85 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fileinfos)
+}
+
+func (h *FSHandler) ListFilesEvent(c echo.Context) error {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	req := c.Request()
+	reqctx := req.Context()
+
+	contentType := "text/event-stream"
+	accept := req.Header.Get(echo.HeaderAccept)
+	if strings.Contains(accept, "application/x-json-stream") {
+		contentType = "application/x-json-stream"
+	}
+
+	evts, cancel, err := h.FS.Filesystem.Events()
+	if err != nil {
+		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this filesystem")
+	}
+	defer cancel()
+
+	res := c.Response()
+
+	res.Header().Set(echo.HeaderContentType, contentType+"; charset=UTF-8")
+	res.Header().Set(echo.HeaderCacheControl, "no-store")
+	res.Header().Set(echo.HeaderConnection, "close")
+	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	enc.SetIndent("", "")
+
+	done := make(chan error, 1)
+
+	if contentType == "text/event-stream" {
+		res.Write([]byte(":keepalive\n\n"))
+		res.Flush()
+
+		for {
+			select {
+			case err := <-done:
+				return err
+			case <-reqctx.Done():
+				done <- nil
+			case <-ticker.C:
+				res.Write([]byte(":keepalive\n\n"))
+				res.Flush()
+			case e := <-evts:
+				res.Write([]byte("event: " + e.Action + "\ndata: "))
+				if err := enc.Encode(e); err != nil {
+					done <- err
+				}
+				res.Write([]byte("\n"))
+				res.Flush()
+			}
+		}
+	} else {
+		res.Write([]byte("{\"action\": \"keepalive\"}\n"))
+		res.Flush()
+
+		for {
+			select {
+			case err := <-done:
+				return err
+			case <-reqctx.Done():
+				done <- nil
+			case <-ticker.C:
+				res.Write([]byte("{\"action\": \"keepalive\"}\n"))
+				res.Flush()
+			case e := <-evts:
+				if err := enc.Encode(api.FilesystemEvent{
+					Action: e.Action,
+					Name:   e.Name,
+				}); err != nil {
+					done <- err
+				}
+				res.Flush()
+			}
+		}
+	}
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb
