@@ -354,8 +354,11 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 }
 
 func (h *FSHandler) ListFilesEvent(c echo.Context) error {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	keepaliveTicker := time.NewTicker(5 * time.Second)
+	defer keepaliveTicker.Stop()
+
+	listTicker := time.NewTicker(30 * time.Second)
+	defer listTicker.Stop()
 
 	req := c.Request()
 	reqctx := req.Context()
@@ -384,50 +387,46 @@ func (h *FSHandler) ListFilesEvent(c echo.Context) error {
 
 	done := make(chan error, 1)
 
-	if contentType == "text/event-stream" {
-		res.Write([]byte(":keepalive\n\n"))
-		res.Flush()
-
-		for {
-			select {
-			case err := <-done:
-				return err
-			case <-reqctx.Done():
-				done <- nil
-			case <-ticker.C:
-				res.Write([]byte(":keepalive\n\n"))
-				res.Flush()
-			case e := <-evts:
-				res.Write([]byte("event: " + e.Action + "\ndata: "))
-				if err := enc.Encode(e); err != nil {
-					done <- err
-				}
-				res.Write([]byte("\n"))
-				res.Flush()
-			}
+	createList := func() api.FilesystemEvent {
+		files := h.FS.Filesystem.List("/", fs.ListOptions{})
+		event := api.FilesystemEvent{
+			Action: "list",
+			Names:  make([]string, 0, len(files)),
 		}
-	} else {
-		res.Write([]byte("{\"action\": \"keepalive\"}\n"))
-		res.Flush()
+		for _, file := range files {
+			event.Names = append(event.Names, file.Name())
+		}
 
-		for {
-			select {
-			case err := <-done:
-				return err
-			case <-reqctx.Done():
-				done <- nil
-			case <-ticker.C:
-				res.Write([]byte("{\"action\": \"keepalive\"}\n"))
-				res.Flush()
-			case e := <-evts:
-				if err := enc.Encode(api.FilesystemEvent{
-					Action: e.Action,
-					Name:   e.Name,
-				}); err != nil {
-					done <- err
-				}
-				res.Flush()
+		return event
+	}
+
+	if err := enc.Encode(createList()); err != nil {
+		done <- err
+	}
+	res.Flush()
+
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-reqctx.Done():
+			done <- nil
+		case <-keepaliveTicker.C:
+			res.Write([]byte("{\"action\": \"keepalive\"}\n"))
+			res.Flush()
+		case <-listTicker.C:
+			if err := enc.Encode(createList()); err != nil {
+				done <- err
 			}
+			res.Flush()
+		case e := <-evts:
+			if err := enc.Encode(api.FilesystemEvent{
+				Action: e.Action,
+				Name:   e.Name,
+			}); err != nil {
+				done <- err
+			}
+			res.Flush()
 		}
 	}
 }
