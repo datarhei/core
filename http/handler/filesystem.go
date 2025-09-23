@@ -258,6 +258,11 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 }
 
 func (h *FSHandler) ListFiles(c echo.Context) error {
+	accept := c.Request().Header.Get(echo.HeaderAccept)
+	if strings.Contains(accept, "application/x-json-stream") || strings.Contains(accept, "text/event-stream") {
+		return h.ListFilesEvent(c)
+	}
+
 	pattern := util.DefaultQuery(c, "glob", "")
 	sizeMin := util.DefaultQuery(c, "size_min", "0")
 	sizeMax := util.DefaultQuery(c, "size_max", "0")
@@ -265,11 +270,6 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
 	sortby := util.DefaultQuery(c, "sort", "none")
 	order := util.DefaultQuery(c, "order", "asc")
-
-	accept := c.Request().Header.Get(echo.HeaderAccept)
-	if strings.Contains(accept, "application/x-json-stream") || strings.Contains(accept, "text/event-stream") {
-		return h.ListFilesEvent(c)
-	}
 
 	path := "/"
 
@@ -354,6 +354,30 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 }
 
 func (h *FSHandler) ListFilesEvent(c echo.Context) error {
+	pattern := util.DefaultQuery(c, "glob", "")
+
+	path := "/"
+
+	if len(pattern) != 0 {
+		prefix := glob.Prefix(pattern)
+		index := strings.LastIndex(prefix, "/")
+		path = prefix[:index+1]
+	}
+
+	var compiledPattern glob.Glob = nil
+
+	if len(pattern) != 0 {
+		var err error
+		compiledPattern, err = glob.Compile(pattern, '/')
+		if err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid pattern: %w", err)
+		}
+	}
+
+	options := fs.ListOptions{
+		Pattern: pattern,
+	}
+
 	keepaliveTicker := time.NewTicker(5 * time.Second)
 	defer keepaliveTicker.Stop()
 
@@ -388,10 +412,11 @@ func (h *FSHandler) ListFilesEvent(c echo.Context) error {
 	done := make(chan error, 1)
 
 	createList := func() api.FilesystemEvent {
-		files := h.FS.Filesystem.List("/", fs.ListOptions{})
+		files := h.FS.Filesystem.List(path, options)
 		event := api.FilesystemEvent{
-			Action: "list",
-			Names:  make([]string, 0, len(files)),
+			Action:    "list",
+			Names:     make([]string, 0, len(files)),
+			Timestamp: time.Now().UnixMilli(),
 		}
 		for _, file := range files {
 			event.Names = append(event.Names, file.Name())
@@ -420,9 +445,15 @@ func (h *FSHandler) ListFilesEvent(c echo.Context) error {
 			}
 			res.Flush()
 		case e := <-evts:
+			if compiledPattern != nil {
+				if !compiledPattern.Match(e.Name) {
+					continue
+				}
+			}
 			if err := enc.Encode(api.FilesystemEvent{
-				Action: e.Action,
-				Name:   e.Name,
+				Action:    e.Action,
+				Name:      e.Name,
+				Timestamp: e.Timestamp.UnixMilli(),
 			}); err != nil {
 				done <- err
 			}

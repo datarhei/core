@@ -24,7 +24,8 @@ type FilesystemOperation struct {
 }
 
 type FilesystemEvent struct {
-	Action string   `json:"action"`
-	Name   string   `json:"name,omitempty"`
-	Names  []string `json:"names,omitempty"`
+	Action    string   `json:"action"`
+	Name      string   `json:"name,omitempty"`
+	Names     []string `json:"names,omitempty"`
+	Timestamp int64    `json:"ts"`
 }

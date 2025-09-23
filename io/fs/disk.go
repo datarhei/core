@@ -369,9 +369,9 @@ func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int
 	fs.lastSizeCheck = time.Time{}
 
 	if replace {
-		fs.events.Publish(Event{Action: "update", Name: path})
+		fs.events.Publish(NewEvent("update", path))
 	} else {
-		fs.events.Publish(Event{Action: "create", Name: path})
+		fs.events.Publish(NewEvent("create", path))
 	}
 
 	return size, !replace, nil
@@ -437,7 +437,7 @@ func (fs *diskFilesystem) AppendFileReader(path string, r io.Reader, sizeHint in
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(Event{Action: "update", Name: path})
+	fs.events.Publish(NewEvent("update", path))
 
 	return size, nil
 }
@@ -461,8 +461,8 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 
 	// First try to rename the file
 	if err := os.Rename(src, dst); err == nil {
-		fs.events.Publish(Event{Action: "remove", Name: src})
-		fs.events.Publish(Event{Action: "create", Name: dst})
+		fs.events.Publish(NewEvent("remove", src))
+		fs.events.Publish(NewEvent("create", dst))
 		return nil
 	}
 
@@ -472,14 +472,14 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
-	fs.events.Publish(Event{Action: "create", Name: dst})
+	fs.events.Publish(NewEvent("create", dst))
 
 	if err := os.Remove(src); err != nil {
 		os.Remove(dst)
 		return fmt.Errorf("failed to remove source file: %w", err)
 	}
 
-	fs.events.Publish(Event{Action: "remove", Name: src})
+	fs.events.Publish(NewEvent("remove", src))
 
 	return nil
 }
@@ -520,7 +520,7 @@ func (fs *diskFilesystem) copy(src, dst string) error {
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(Event{Action: "create", Name: dst})
+	fs.events.Publish(NewEvent("create", dst))
 
 	return nil
 }
@@ -574,7 +574,7 @@ func (fs *diskFilesystem) Remove(path string) int64 {
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(Event{Action: "remove", Name: path})
+	fs.events.Publish(NewEvent("remove", path))
 
 	return size
 }
@@ -642,7 +642,7 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string
 		if err := os.Remove(path); err == nil {
 			files = append(files, name)
 			size += info.Size()
-			fs.events.Publish(Event{Action: "remove", Name: path})
+			fs.events.Publish(NewEvent("remove", path))
 		}
 	})
 

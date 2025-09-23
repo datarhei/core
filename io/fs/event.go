@@ -4,19 +4,30 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/lithammer/shortuuid/v4"
 )
 
 type Event struct {
-	Action string
-	Name   string
+	Action    string
+	Name      string
+	Timestamp time.Time
+}
+
+func NewEvent(action, name string) Event {
+	return Event{
+		Action:    action,
+		Name:      name,
+		Timestamp: time.Now(),
+	}
 }
 
 func (e Event) clone() Event {
 	return Event{
-		Action: e.Action,
-		Name:   e.Name,
+		Action:    e.Action,
+		Name:      e.Name,
+		Timestamp: e.Timestamp,
 	}
 }
 
