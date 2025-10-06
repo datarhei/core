@@ -57,7 +57,8 @@ type RestClient interface {
 	FilesystemDeleteFile(storage, path string) error                                   // DELETE /v3/fs/{storage}/{path}
 	FilesystemAddFile(storage, path string, data io.Reader) error                      // PUT /v3/fs/{storage}/{path}
 
-	Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) // POST /v3/events
+	Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error)       // POST /v3/events
+	MediaEvents(ctx context.Context, storage, pattern string) (<-chan api.MediaEvent, error) // GET /v3/fs/{storage}, GET /v3/(rtmp|srt)
 
 	ProcessList(opts ProcessListOptions) ([]api.Process, error)                               // GET /v3/process
 	ProcessAdd(p *app.Config, metadata map[string]any) error                                  // POST /v3/process

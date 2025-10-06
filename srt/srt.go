@@ -13,6 +13,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/node"
 	enctoken "github.com/datarhei/core/v16/encoding/token"
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
@@ -60,6 +61,8 @@ type Server interface {
 
 	// Channels return a list of currently publishing streams
 	Channels() []Channel
+
+	event.MediaSource
 }
 
 // server implements the Server interface
@@ -87,6 +90,8 @@ type server struct {
 	proxy *node.Manager
 
 	iam iam.IAM
+
+	events *event.PubSub
 }
 
 func New(config Config) (Server, error) {
@@ -98,6 +103,7 @@ func New(config Config) (Server, error) {
 		iam:        config.IAM,
 		logger:     config.Logger,
 		proxy:      config.Proxy,
+		events:     event.NewPubSub(),
 	}
 
 	if s.collector == nil {
@@ -369,6 +375,16 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	si, _ := url.ParseStreamId(streamId)
 	identity, _ := s.findIdentityFromToken(si.Token)
 
+	// Check if this stream is already published on the cluster
+	if s.proxy != nil {
+		_, err := s.proxy.MediaGetURL("rtmp", si.Resource)
+		if err == nil {
+			s.log(identity, "PUBLISH", "CONFLICT", si.Resource, "already publishing", client)
+			conn.Close()
+			return fmt.Errorf("already publishing this resource")
+		}
+	}
+
 	// Look for the stream
 	s.lock.Lock()
 	ch := s.channels[si.Resource]
@@ -388,6 +404,10 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 
 	s.log(identity, "PUBLISH", "START", si.Resource, "", client)
 
+	if !isProxy {
+		s.events.Publish(event.NewMediaEvent("create", si.Resource))
+	}
+
 	// Blocks until connection closes
 	err := ch.pubsub.Publish(conn)
 
@@ -396,6 +416,10 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	s.lock.Unlock()
 
 	ch.Close()
+
+	if !isProxy {
+		s.events.Publish(event.NewMediaEvent("remove", si.Resource))
+	}
 
 	s.log(identity, "PUBLISH", "STOP", si.Resource, err.Error(), client)
 
@@ -560,4 +584,21 @@ func (s *server) findDomainFromPlaypath(path string) string {
 	}
 
 	return "$none"
+}
+
+func (s *server) Events() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := s.events.Subscribe()
+
+	return ch, cancel, nil
+}
+
+func (s *server) MediaList() []string {
+	channels := s.Channels()
+	list := make([]string, 0, len(channels))
+
+	for _, channel := range channels {
+		list = append(list, channel.Name)
+	}
+
+	return list
 }

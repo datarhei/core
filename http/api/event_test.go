@@ -7,7 +7,7 @@ import (
 )
 
 func TestEventFilter(t *testing.T) {
-	event := Event{
+	event := LogEvent{
 		Timestamp: 1234,
 		Level:     3,
 		Component: "foobar",
@@ -17,7 +17,7 @@ func TestEventFilter(t *testing.T) {
 		},
 	}
 
-	filter := EventFilter{
+	filter := LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Message:   "none",
@@ -29,7 +29,7 @@ func TestEventFilter(t *testing.T) {
 	res := event.Filter(&filter)
 	require.True(t, res)
 
-	filter = EventFilter{
+	filter = LogEventFilter{
 		Component: "foobar",
 		Level:     "warn",
 		Message:   "none",
@@ -41,7 +41,7 @@ func TestEventFilter(t *testing.T) {
 	res = event.Filter(&filter)
 	require.False(t, res)
 
-	filter = EventFilter{
+	filter = LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Message:   "done",
@@ -53,7 +53,7 @@ func TestEventFilter(t *testing.T) {
 	res = event.Filter(&filter)
 	require.False(t, res)
 
-	foobarfilter := EventFilter{
+	foobarfilter := LogEventFilter{
 		Component: "foobar",
 		Data: map[string]string{
 			"foo": "^b.*$",
@@ -66,7 +66,7 @@ func TestEventFilter(t *testing.T) {
 	res = event.Filter(&foobarfilter)
 	require.True(t, res)
 
-	foobazfilter := EventFilter{
+	foobazfilter := LogEventFilter{
 		Component: "foobaz",
 		Data: map[string]string{
 			"foo": "baz",
@@ -81,7 +81,7 @@ func TestEventFilter(t *testing.T) {
 }
 
 func TestEventFilterDataKey(t *testing.T) {
-	event := Event{
+	event := LogEvent{
 		Timestamp: 1234,
 		Level:     3,
 		Component: "foobar",
@@ -91,7 +91,7 @@ func TestEventFilterDataKey(t *testing.T) {
 		},
 	}
 
-	filter := EventFilter{
+	filter := LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Message:   "none",
@@ -103,7 +103,7 @@ func TestEventFilterDataKey(t *testing.T) {
 	res := event.Filter(&filter)
 	require.True(t, res)
 
-	filter = EventFilter{
+	filter = LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Message:   "none",
@@ -118,7 +118,7 @@ func TestEventFilterDataKey(t *testing.T) {
 	res = event.Filter(&filter)
 	require.False(t, res)
 
-	filter = EventFilter{
+	filter = LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Message:   "none",
@@ -135,7 +135,7 @@ func TestEventFilterDataKey(t *testing.T) {
 }
 
 func BenchmarkEventFilters(b *testing.B) {
-	event := Event{
+	event := LogEvent{
 		Timestamp: 1234,
 		Level:     3,
 		Component: "foobar",
@@ -145,7 +145,7 @@ func BenchmarkEventFilters(b *testing.B) {
 		},
 	}
 
-	levelfilter := EventFilter{
+	levelfilter := LogEventFilter{
 		Component: "foobar",
 		Level:     "info",
 		Data: map[string]string{

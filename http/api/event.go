@@ -9,7 +9,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 )
 
-type Event struct {
+type LogEvent struct {
 	Timestamp int64  `json:"ts" format:"int64"`
 	Level     int    `json:"level"`
 	Component string `json:"event"`
@@ -20,7 +20,7 @@ type Event struct {
 	Data map[string]string `json:"data"`
 }
 
-func (e *Event) Unmarshal(le *log.Event) {
+func (e *LogEvent) Unmarshal(le *log.Event) {
 	e.Timestamp = le.Time.Unix()
 	e.Level = int(le.Level)
 	e.Component = strings.ToLower(le.Component)
@@ -53,7 +53,7 @@ func (e *Event) Unmarshal(le *log.Event) {
 	}
 }
 
-func (e *Event) Filter(ef *EventFilter) bool {
+func (e *LogEvent) Filter(ef *LogEventFilter) bool {
 	if ef.reMessage != nil {
 		if !ef.reMessage.MatchString(e.Message) {
 			return false
@@ -93,7 +93,7 @@ func (e *Event) Filter(ef *EventFilter) bool {
 	return true
 }
 
-type EventFilter struct {
+type LogEventFilter struct {
 	Component string            `json:"event"`
 	Message   string            `json:"message"`
 	Level     string            `json:"level"`
@@ -109,10 +109,10 @@ type EventFilter struct {
 }
 
 type EventFilters struct {
-	Filters []EventFilter `json:"filters"`
+	Filters []LogEventFilter `json:"filters"`
 }
 
-func (ef *EventFilter) Compile() error {
+func (ef *LogEventFilter) Compile() error {
 	if len(ef.Message) != 0 {
 		r, err := regexp.Compile("(?i)" + ef.Message)
 		if err != nil {
@@ -161,4 +161,11 @@ func (ef *EventFilter) Compile() error {
 	}
 
 	return nil
+}
+
+type MediaEvent struct {
+	Action    string   `json:"action"`
+	Name      string   `json:"name,omitempty"`
+	Names     []string `json:"names,omitempty"`
+	Timestamp int64    `json:"ts"`
 }

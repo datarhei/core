@@ -12,6 +12,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/node"
 	enctoken "github.com/datarhei/core/v16/encoding/token"
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/log"
@@ -79,6 +80,8 @@ type Server interface {
 
 	// Channels return a list of currently publishing streams
 	Channels() []string
+
+	event.MediaSource
 }
 
 // server is an implementation of the Server interface
@@ -101,6 +104,8 @@ type server struct {
 	proxy *node.Manager
 
 	iam iam.IAM
+
+	events *event.PubSub
 }
 
 // New creates a new RTMP server according to the given config
@@ -120,6 +125,7 @@ func New(config Config) (Server, error) {
 		collector: config.Collector,
 		proxy:     config.Proxy,
 		iam:       config.IAM,
+		events:    event.NewPubSub(),
 	}
 
 	if s.collector == nil {
@@ -178,15 +184,18 @@ func (s *server) Close() {
 	}
 }
 
-// Channels returns the list of streams that are
-// publishing currently
+// Channels returns the list of streams that are publishing currently, excluding proxied channels
 func (s *server) Channels() []string {
 	channels := []string{}
 
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	for key := range s.channels {
+	for key, channel := range s.channels {
+		if channel.isProxy {
+			continue
+		}
+
 		channels = append(channels, key)
 	}
 
@@ -366,6 +375,15 @@ func (s *server) handlePublish(conn *rtmp.Conn) {
 		return
 	}
 
+	// Check if this stream is already published on the cluster
+	if s.proxy != nil {
+		_, err = s.proxy.MediaGetURL("rtmp", playpath)
+		if err == nil {
+			s.log(identity, "PUBLISH", "CONFLICT", playpath, "already publishing", remote)
+			return
+		}
+	}
+
 	err = s.publish(conn, playpath, remote, identity, false)
 	if err != nil {
 		s.logger.WithField("path", conn.URL.Path).WithError(err).Log("")
@@ -419,6 +437,10 @@ func (s *server) publish(src connection, playpath string, remote net.Addr, ident
 		s.log(identity, "PUBLISH", "STREAM", playpath, stream.Type().String(), remote)
 	}
 
+	if !isProxy {
+		s.events.Publish(event.NewMediaEvent("create", playpath))
+	}
+
 	// Ingest the data, blocks until done
 	avutil.CopyPackets(ch.queue, src)
 
@@ -427,6 +449,10 @@ func (s *server) publish(src connection, playpath string, remote net.Addr, ident
 	s.lock.Unlock()
 
 	ch.Close()
+
+	if !isProxy {
+		s.events.Publish(event.NewMediaEvent("remove", playpath))
+	}
 
 	s.log(identity, "PUBLISH", "STOP", playpath, "", remote)
 
@@ -492,4 +518,14 @@ func (s *server) findDomainFromPlaypath(path string) string {
 	}
 
 	return "$none"
+}
+
+func (s *server) Events() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := s.events.Subscribe()
+
+	return ch, cancel, nil
+}
+
+func (s *server) MediaList() []string {
+	return s.Channels()
 }

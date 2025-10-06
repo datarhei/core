@@ -19,11 +19,68 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 )
 
+type Media struct {
+	available bool             // Whether filesystem events are available
+	media     map[string]int64 // List of files and timestamp of when they have been last seen
+	lock      sync.RWMutex     // Lock for the map
+}
+
+func (m *Media) update(name string, timestamp int64) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.media[name] = timestamp
+}
+
+func (m *Media) remove(name string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	delete(m.media, name)
+}
+
+func (m *Media) set(name []string, timestamp int64) {
+	media := map[string]int64{}
+
+	for _, n := range name {
+		media[n] = timestamp
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.media = media
+}
+
+func (m *Media) get(name string) (int64, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	ts, ok := m.media[name]
+
+	return ts, ok
+}
+
+func (m *Media) list() []string {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	names := make([]string, 0, len(m.media))
+
+	for name := range m.media {
+		names = append(names, name)
+	}
+
+	return names
+}
+
 type Core struct {
 	id string
 
-	client    client.RestClient
-	clientErr error
+	client       client.RestClient
+	clientErr    error
+	clientCtx    context.Context
+	clientCancel context.CancelFunc
 
 	lock sync.RWMutex
 
@@ -39,6 +96,9 @@ type Core struct {
 	hasSRT      bool
 	srtAddress  *url.URL
 
+	media     map[string]*Media // map[storage]map[path]lastchange
+	mediaLock sync.RWMutex
+
 	logger log.Logger
 }
 
@@ -48,6 +108,7 @@ func NewCore(id string, logger log.Logger) *Core {
 	core := &Core{
 		id:     id,
 		logger: logger,
+		media:  map[string]*Media{},
 	}
 
 	if core.logger == nil {
@@ -68,18 +129,18 @@ func (n *Core) SetEssentials(address string, config *config.Config) {
 
 	if n.address != address {
 		n.address = address
-		n.client = nil // force reconnet
+		n.disconnect() // force reconnet
 	}
 
 	if config != nil {
 		if n.config == nil {
 			n.config = config
-			n.client = nil // force reconnect
+			n.disconnect() // force reconnect
 		}
 
 		if n.config != nil && n.config.UpdatedAt != config.UpdatedAt {
 			n.config = config
-			n.client = nil // force reconnect
+			n.disconnect() // force reconnect
 		}
 	}
 }
@@ -112,11 +173,22 @@ func (n *Core) Stop() {
 
 	n.cancel()
 	n.cancel = nil
+
+	n.disconnect()
 }
 
 func (n *Core) Reconnect() {
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
+	n.disconnect()
+}
+
+func (n *Core) disconnect() {
+	if n.clientCancel != nil {
+		n.clientCancel()
+		n.clientCancel = nil
+	}
 
 	n.client = nil
 }
@@ -240,9 +312,69 @@ func (n *Core) connect() error {
 	n.srtAddress = srtAddress
 	n.client = client
 
+	ctx, cancel := context.WithCancel(context.Background())
+	n.clientCtx = ctx
+	n.clientCancel = cancel
+
+	go n.mediaEvents(ctx, "mem")
+	go n.mediaEvents(ctx, "disk")
+	go n.mediaEvents(ctx, "rtmp")
+	go n.mediaEvents(ctx, "srt")
+
 	n.lock.Unlock()
 
 	return nil
+}
+
+func (n *Core) mediaEvents(ctx context.Context, storage string) {
+	m := &Media{}
+
+	for {
+		ch, err := n.client.MediaEvents(ctx, storage, "/**")
+		if err != nil {
+			m.available = false
+			m.media = nil
+
+			n.mediaLock.Lock()
+			n.media[storage] = m
+			n.mediaLock.Unlock()
+
+			n.logger.Error().WithField("storage", storage).WithError(err).Log("Failed to connect to event source")
+
+			return
+		}
+
+		n.logger.Info().WithField("storage", storage).Log("Connected to event source")
+
+		m.available = true
+		m.media = map[string]int64{}
+		n.mediaLock.Lock()
+		n.media[storage] = m
+		n.mediaLock.Unlock()
+
+	innerloop:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e, ok := <-ch:
+				if !ok {
+					break innerloop
+				}
+				switch e.Action {
+				case "update", "create":
+					m.update(e.Name, e.Timestamp)
+				case "remove":
+					m.remove(e.Name)
+				case "list":
+					m.set(e.Names, e.Timestamp)
+				}
+			}
+		}
+
+		n.logger.Info().WithField("storage", storage).Log("Reconnecting to event source")
+		time.Sleep(5 * time.Second)
+	}
 }
 
 type CoreAbout struct {
@@ -538,134 +670,28 @@ func (n *Core) MediaList() NodeFiles {
 		LastUpdate: time.Now(),
 	}
 
-	errorsChan := make(chan error, 8)
-	filesChan := make(chan string, 1024)
-	errorList := []error{}
+	prefixes := []string{}
 
-	wgList := sync.WaitGroup{}
-	wgList.Add(1)
-
-	go func() {
-		defer wgList.Done()
-
-		for file := range filesChan {
-			files.Files = append(files.Files, file)
-		}
-
-		for err := range errorsChan {
-			errorList = append(errorList, err)
-		}
-	}()
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	go func(f chan<- string, e chan<- error) {
-		defer wg.Done()
-
-		n.lock.RLock()
-		client := n.client
-		n.lock.RUnlock()
-
-		if client == nil {
-			e <- ErrNoPeer
-			return
-		}
-
-		files, err := client.FilesystemList("mem", "/*", "name", "asc")
-		if err != nil {
-			e <- err
-			return
-		}
-
-		for _, file := range files {
-			f <- "mem:" + file.Name
-		}
-	}(filesChan, errorsChan)
-
-	go func(f chan<- string, e chan<- error) {
-		defer wg.Done()
-
-		n.lock.RLock()
-		client := n.client
-		n.lock.RUnlock()
-
-		if client == nil {
-			e <- ErrNoPeer
-			return
-		}
-
-		files, err := client.FilesystemList("disk", "/*", "name", "asc")
-		if err != nil {
-			e <- err
-			return
-		}
-
-		for _, file := range files {
-			f <- "disk:" + file.Name
-		}
-	}(filesChan, errorsChan)
-
-	if n.hasRTMP {
-		wg.Add(1)
-
-		go func(f chan<- string, e chan<- error) {
-			defer wg.Done()
-
-			n.lock.RLock()
-			client := n.client
-			n.lock.RUnlock()
-
-			if client == nil {
-				e <- ErrNoPeer
-				return
-			}
-
-			files, err := client.RTMPChannels()
-			if err != nil {
-				e <- err
-				return
-			}
-
-			for _, file := range files {
-				f <- "rtmp:" + file.Name
-			}
-		}(filesChan, errorsChan)
+	n.mediaLock.RLock()
+	for prefix := range n.media {
+		prefixes = append(prefixes, prefix)
 	}
+	n.mediaLock.RUnlock()
 
-	if n.hasSRT {
-		wg.Add(1)
+	for _, prefix := range prefixes {
+		n.mediaLock.RLock()
+		m, ok := n.media[prefix]
+		n.mediaLock.RUnlock()
 
-		go func(f chan<- string, e chan<- error) {
-			defer wg.Done()
+		if !ok {
+			continue
+		}
 
-			n.lock.RLock()
-			client := n.client
-			n.lock.RUnlock()
-
-			if client == nil {
-				e <- ErrNoPeer
-				return
-			}
-
-			files, err := client.SRTChannels()
-			if err != nil {
-				e <- err
-				return
-			}
-
-			for _, file := range files {
-				f <- "srt:" + file.Name
-			}
-		}(filesChan, errorsChan)
+		list := m.list()
+		for _, name := range list {
+			files.Files = append(files.Files, prefix+":"+name)
+		}
 	}
-
-	wg.Wait()
-
-	close(filesChan)
-	close(errorsChan)
-
-	wgList.Wait()
 
 	return files
 }
@@ -702,18 +728,19 @@ func cloneURL(src *url.URL) *url.URL {
 func (n *Core) MediaGetURL(prefix, path string) (*url.URL, error) {
 	var u *url.URL
 
-	if prefix == "mem" {
+	switch prefix {
+	case "mem":
 		u = cloneURL(n.httpAddress)
 		u = u.JoinPath("memfs", path)
-	} else if prefix == "disk" {
+	case "disk":
 		u = cloneURL(n.httpAddress)
 		u = u.JoinPath(path)
-	} else if prefix == "rtmp" {
+	case "rtmp":
 		u = cloneURL(n.rtmpAddress)
 		u = u.JoinPath(path)
-	} else if prefix == "srt" {
+	case "srt":
 		u = cloneURL(n.srtAddress)
-	} else {
+	default:
 		return nil, fmt.Errorf("unknown prefix")
 	}
 
@@ -721,6 +748,19 @@ func (n *Core) MediaGetURL(prefix, path string) (*url.URL, error) {
 }
 
 func (n *Core) MediaGetInfo(prefix, path string) (int64, time.Time, error) {
+	n.mediaLock.RLock()
+	m, ok := n.media[prefix]
+	n.mediaLock.RUnlock()
+
+	if ok && m.available {
+		lastmod, ok := m.get(path)
+		if !ok {
+			return 0, time.Time{}, fmt.Errorf("media not found")
+		}
+
+		return 0, time.UnixMilli(lastmod), nil
+	}
+
 	if prefix == "disk" || prefix == "mem" {
 		return n.FilesystemGetFileInfo(prefix, path)
 	}
@@ -873,7 +913,7 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 	return processes, nil
 }
 
-func (n *Core) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
+func (n *Core) Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error) {
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()

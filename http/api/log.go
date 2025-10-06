@@ -1,4 +1,4 @@
 package api
 
-// LogEvent represents a log event from the app
-type LogEvent map[string]interface{}
+// LogEntries represents a log event from the app
+type LogEntries map[string]interface{}

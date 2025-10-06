@@ -6177,6 +6177,7 @@ paths:
       operationId: rtmp-3-list-channels
       produces:
       - application/json
+      - application/x-json-stream
       responses:
         "200":
           description: OK
@@ -6317,6 +6318,7 @@ paths:
       operationId: srt-3-list-channels
       produces:
       - application/json
+      - application/x-json-stream
       responses:
         "200":
           description: OK

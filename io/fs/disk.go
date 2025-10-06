@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
 )
@@ -140,7 +141,7 @@ type diskFilesystem struct {
 	// Logger from the config
 	logger log.Logger
 
-	events *EventWriter
+	events *event.PubSub
 }
 
 // NewDiskFilesystem returns a new filesystem that is backed by the disk filesystem.
@@ -174,7 +175,7 @@ func NewDiskFilesystem(config DiskConfig) (Filesystem, error) {
 		fs.logger = log.New("")
 	}
 
-	fs.events = NewEventWriter()
+	fs.events = event.NewPubSub()
 
 	return fs, nil
 }
@@ -218,7 +219,7 @@ func NewRootedDiskFilesystem(config RootedDiskConfig) (Filesystem, error) {
 		fs.logger = log.New("")
 	}
 
-	fs.events = NewEventWriter()
+	fs.events = event.NewPubSub()
 
 	return fs, nil
 }
@@ -369,9 +370,9 @@ func (fs *diskFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int
 	fs.lastSizeCheck = time.Time{}
 
 	if replace {
-		fs.events.Publish(NewEvent("update", path))
+		fs.events.Publish(event.NewMediaEvent("update", path))
 	} else {
-		fs.events.Publish(NewEvent("create", path))
+		fs.events.Publish(event.NewMediaEvent("create", path))
 	}
 
 	return size, !replace, nil
@@ -437,7 +438,7 @@ func (fs *diskFilesystem) AppendFileReader(path string, r io.Reader, sizeHint in
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(NewEvent("update", path))
+	fs.events.Publish(event.NewMediaEvent("update", path))
 
 	return size, nil
 }
@@ -461,8 +462,8 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 
 	// First try to rename the file
 	if err := os.Rename(src, dst); err == nil {
-		fs.events.Publish(NewEvent("remove", src))
-		fs.events.Publish(NewEvent("create", dst))
+		fs.events.Publish(event.NewMediaEvent("create", dst))
+		fs.events.Publish(event.NewMediaEvent("remove", src))
 		return nil
 	}
 
@@ -472,14 +473,14 @@ func (fs *diskFilesystem) rename(src, dst string) error {
 		return fmt.Errorf("failed to copy files: %w", err)
 	}
 
-	fs.events.Publish(NewEvent("create", dst))
+	fs.events.Publish(event.NewMediaEvent("create", dst))
 
 	if err := os.Remove(src); err != nil {
 		os.Remove(dst)
 		return fmt.Errorf("failed to remove source file: %w", err)
 	}
 
-	fs.events.Publish(NewEvent("remove", src))
+	fs.events.Publish(event.NewMediaEvent("remove", src))
 
 	return nil
 }
@@ -520,7 +521,7 @@ func (fs *diskFilesystem) copy(src, dst string) error {
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(NewEvent("create", dst))
+	fs.events.Publish(event.NewMediaEvent("create", dst))
 
 	return nil
 }
@@ -574,7 +575,7 @@ func (fs *diskFilesystem) Remove(path string) int64 {
 
 	fs.lastSizeCheck = time.Time{}
 
-	fs.events.Publish(NewEvent("remove", path))
+	fs.events.Publish(event.NewMediaEvent("remove", path))
 
 	return size
 }
@@ -642,7 +643,7 @@ func (fs *diskFilesystem) RemoveList(path string, options ListOptions) ([]string
 		if err := os.Remove(path); err == nil {
 			files = append(files, name)
 			size += info.Size()
-			fs.events.Publish(NewEvent("remove", path))
+			fs.events.Publish(event.NewMediaEvent("remove", path))
 		}
 	})
 
@@ -792,8 +793,19 @@ func (fs *diskFilesystem) cleanPath(path string) string {
 	return filepath.Join(fs.root, filepath.Clean(path))
 }
 
-func (fs *diskFilesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+func (fs *diskFilesystem) Events() (<-chan event.Event, event.CancelFunc, error) {
 	ch, cancel := fs.events.Subscribe()
 
 	return ch, cancel, nil
+}
+
+func (fs *diskFilesystem) MediaList() []string {
+	files := fs.List("/", ListOptions{})
+	list := make([]string, 0, len(files))
+
+	for _, file := range files {
+		list = append(list, file.Name())
+	}
+
+	return list
 }

@@ -35,7 +35,7 @@ func NewLog(buffer log.BufferWriter) *LogHandler {
 // @ID log-3
 // @Param format query string false "Format of the list of log events (*console, raw)"
 // @Produce json
-// @Success 200 {array} api.LogEvent "application log"
+// @Success 200 {array} api.LogEntries "application log"
 // @Success 200 {array} string "application log"
 // @Security ApiKeyAuth
 // @Router /api/v3/log [get]

@@ -356,8 +356,8 @@ func (e *Event) Error() Logger {
 	return clone
 }
 
-func (l *Event) Write(p []byte) (int, error) {
-	l.Log("%s", strings.TrimSpace(string(p)))
+func (e *Event) Write(p []byte) (int, error) {
+	e.Log("%s", strings.TrimSpace(string(p)))
 
 	return len(p), nil
 }

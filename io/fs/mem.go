@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/mem"
@@ -136,7 +137,7 @@ type memFilesystem struct {
 	storage memStorage
 	dirs    *dirStorage
 
-	events *EventWriter
+	events *event.PubSub
 }
 
 type dirStorage struct {
@@ -224,7 +225,7 @@ func NewMemFilesystem(config MemConfig) (Filesystem, error) {
 
 	fs.logger.Debug().Log("Created")
 
-	fs.events = NewEventWriter()
+	fs.events = event.NewPubSub()
 
 	return fs, nil
 }
@@ -466,10 +467,10 @@ func (fs *memFilesystem) WriteFileReader(path string, r io.Reader, sizeHint int)
 	})
 
 	if replace {
-		fs.events.Publish(NewEvent("update", newFile.name))
+		fs.events.Publish(event.NewMediaEvent("update", newFile.name))
 		logger.Debug().Log("Replaced file")
 	} else {
-		fs.events.Publish(NewEvent("create", newFile.name))
+		fs.events.Publish(event.NewMediaEvent("create", newFile.name))
 		logger.Debug().Log("Added file")
 	}
 
@@ -526,7 +527,7 @@ func (fs *memFilesystem) AppendFileReader(path string, r io.Reader, sizeHint int
 		"size_bytes":     fs.currentSize,
 	}).Log("Appended to file")
 
-	fs.events.Publish(NewEvent("update", file.name))
+	fs.events.Publish(event.NewMediaEvent("update", file.name))
 
 	return size, nil
 }
@@ -564,7 +565,7 @@ func (fs *memFilesystem) Purge(size int64) int64 {
 			"size_bytes":     fs.currentSize,
 		}).Debug().Log("Purged file")
 
-		fs.events.Publish(NewEvent("remove", f.name))
+		fs.events.Publish(event.NewMediaEvent("remove", f.name))
 
 		if size <= 0 {
 			break
@@ -607,23 +608,24 @@ func (fs *memFilesystem) Rename(src, dst string) error {
 	}
 
 	dstFile, replace := fs.storage.Store(dst, srcFile)
+	if replace {
+		fs.events.Publish(event.NewMediaEvent("update", dst))
+	} else {
+		fs.events.Publish(event.NewMediaEvent("create", dst))
+	}
 	fs.storage.Delete(src)
 
-	fs.events.Publish(NewEvent("remove", src))
+	fs.events.Publish(event.NewMediaEvent("remove", src))
 
 	fs.dirs.Remove(src)
 	if !replace {
 		fs.dirs.Add(dst)
-
-		fs.events.Publish(NewEvent("create", dst))
 	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		fs.events.Publish(NewEvent("update", dst))
-
 		dstFile.Close()
 
 		fs.currentSize -= dstFile.size
@@ -660,14 +662,14 @@ func (fs *memFilesystem) Copy(src, dst string) error {
 	if !replace {
 		fs.dirs.Add(dst)
 
-		fs.events.Publish(NewEvent("create", dst))
+		fs.events.Publish(event.NewMediaEvent("create", dst))
 	}
 
 	fs.sizeLock.Lock()
 	defer fs.sizeLock.Unlock()
 
 	if replace {
-		fs.events.Publish(NewEvent("update", dst))
+		fs.events.Publish(event.NewMediaEvent("update", dst))
 		replacedFile.Close()
 		fs.currentSize -= replacedFile.size
 	}
@@ -754,7 +756,7 @@ func (fs *memFilesystem) remove(path string) int64 {
 		"size_bytes":     fs.currentSize,
 	}).Debug().Log("Removed file")
 
-	fs.events.Publish(NewEvent("remove", file.name))
+	fs.events.Publish(event.NewMediaEvent("remove", file.name))
 
 	return file.size
 }
@@ -830,7 +832,7 @@ func (fs *memFilesystem) RemoveList(path string, options ListOptions) ([]string,
 
 		file.Close()
 
-		fs.events.Publish(NewEvent("remove", file.name))
+		fs.events.Publish(event.NewMediaEvent("remove", file.name))
 	}
 
 	fs.sizeLock.Lock()
@@ -948,8 +950,19 @@ func (fs *memFilesystem) cleanPath(path string) string {
 	return filepath.Join("/", filepath.Clean(path))
 }
 
-func (fs *memFilesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+func (fs *memFilesystem) Events() (<-chan event.Event, event.CancelFunc, error) {
 	ch, cancel := fs.events.Subscribe()
 
 	return ch, cancel, nil
+}
+
+func (fs *memFilesystem) MediaList() []string {
+	files := fs.List("/", ListOptions{})
+	list := make([]string, 0, len(files))
+
+	for _, file := range files {
+		list = append(list, file.Name())
+	}
+
+	return list
 }

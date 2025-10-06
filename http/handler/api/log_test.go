@@ -24,5 +24,5 @@ func TestLog(t *testing.T) {
 
 	response := mock.Request(t, http.StatusOK, router, "GET", "/", nil)
 
-	mock.Validate(t, []api.LogEvent{}, response.Data)
+	mock.Validate(t, []api.LogEntries{}, response.Data)
 }

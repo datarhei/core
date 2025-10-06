@@ -4986,7 +4986,8 @@ const docTemplate = `{
                 ],
                 "description": "List all currently publishing RTMP streams.",
                 "produces": [
-                    "application/json"
+                    "application/json",
+                    "application/x-json-stream"
                 ],
                 "tags": [
                     "v16.7.2"
@@ -5206,7 +5207,8 @@ const docTemplate = `{
                 ],
                 "description": "List all currently publishing SRT streams. This endpoint is EXPERIMENTAL and may change in future.",
                 "produces": [
-                    "application/json"
+                    "application/json",
+                    "application/x-json-stream"
                 ],
                 "tags": [
                     "v16.9.0"

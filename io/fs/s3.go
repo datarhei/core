@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/mem"
 	"github.com/minio/minio-go/v7"
@@ -686,8 +687,12 @@ func (fs *s3Filesystem) cleanPath(path string) string {
 	return filepath.Join("/", filepath.Clean(path))[1:]
 }
 
-func (fs *s3Filesystem) Events() (<-chan Event, EventsCancelFunc, error) {
+func (fs *s3Filesystem) Events() (<-chan event.Event, event.CancelFunc, error) {
 	return nil, func() {}, fmt.Errorf("events are not implemented for this filesystem")
+}
+
+func (fs *s3Filesystem) MediaList() []string {
+	return nil
 }
 
 type s3FileInfo struct {

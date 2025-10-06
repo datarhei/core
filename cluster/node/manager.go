@@ -655,12 +655,12 @@ func (p *Manager) ProcessValidateConfig(nodeid string, config *app.Config) error
 	return node.Core().ProcessValidateConfig(config)
 }
 
-func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.Event, error) {
-	eventChan := make(chan api.Event, 128)
+func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error) {
+	eventChan := make(chan api.LogEvent, 128)
 
 	p.lock.RLock()
 	for _, n := range p.nodes {
-		go func(node *Node, e chan<- api.Event) {
+		go func(node *Node, e chan<- api.LogEvent) {
 			eventChan, err := node.Core().Events(ctx, filters)
 			if err != nil {
 				return

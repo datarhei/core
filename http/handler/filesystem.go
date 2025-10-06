@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -258,11 +257,6 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 }
 
 func (h *FSHandler) ListFiles(c echo.Context) error {
-	accept := c.Request().Header.Get(echo.HeaderAccept)
-	if strings.Contains(accept, "application/x-json-stream") || strings.Contains(accept, "text/event-stream") {
-		return h.ListFilesEvent(c)
-	}
-
 	pattern := util.DefaultQuery(c, "glob", "")
 	sizeMin := util.DefaultQuery(c, "size_min", "0")
 	sizeMax := util.DefaultQuery(c, "size_max", "0")
@@ -351,115 +345,6 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fileinfos)
-}
-
-func (h *FSHandler) ListFilesEvent(c echo.Context) error {
-	pattern := util.DefaultQuery(c, "glob", "")
-
-	path := "/"
-
-	if len(pattern) != 0 {
-		prefix := glob.Prefix(pattern)
-		index := strings.LastIndex(prefix, "/")
-		path = prefix[:index+1]
-	}
-
-	var compiledPattern glob.Glob = nil
-
-	if len(pattern) != 0 {
-		var err error
-		compiledPattern, err = glob.Compile(pattern, '/')
-		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid pattern: %w", err)
-		}
-	}
-
-	options := fs.ListOptions{
-		Pattern: pattern,
-	}
-
-	keepaliveTicker := time.NewTicker(5 * time.Second)
-	defer keepaliveTicker.Stop()
-
-	listTicker := time.NewTicker(30 * time.Second)
-	defer listTicker.Stop()
-
-	req := c.Request()
-	reqctx := req.Context()
-
-	contentType := "text/event-stream"
-	accept := req.Header.Get(echo.HeaderAccept)
-	if strings.Contains(accept, "application/x-json-stream") {
-		contentType = "application/x-json-stream"
-	}
-
-	evts, cancel, err := h.FS.Filesystem.Events()
-	if err != nil {
-		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this filesystem")
-	}
-	defer cancel()
-
-	res := c.Response()
-
-	res.Header().Set(echo.HeaderContentType, contentType+"; charset=UTF-8")
-	res.Header().Set(echo.HeaderCacheControl, "no-store")
-	res.Header().Set(echo.HeaderConnection, "close")
-	res.WriteHeader(http.StatusOK)
-
-	enc := json.NewEncoder(res)
-	enc.SetIndent("", "")
-
-	done := make(chan error, 1)
-
-	createList := func() api.FilesystemEvent {
-		files := h.FS.Filesystem.List(path, options)
-		event := api.FilesystemEvent{
-			Action:    "list",
-			Names:     make([]string, 0, len(files)),
-			Timestamp: time.Now().UnixMilli(),
-		}
-		for _, file := range files {
-			event.Names = append(event.Names, file.Name())
-		}
-
-		return event
-	}
-
-	if err := enc.Encode(createList()); err != nil {
-		done <- err
-	}
-	res.Flush()
-
-	for {
-		select {
-		case err := <-done:
-			return err
-		case <-reqctx.Done():
-			done <- nil
-		case <-keepaliveTicker.C:
-			res.Write([]byte("{\"action\": \"keepalive\"}\n"))
-			res.Flush()
-		case <-listTicker.C:
-			if err := enc.Encode(createList()); err != nil {
-				done <- err
-			}
-			res.Flush()
-		case e := <-evts:
-			if compiledPattern != nil {
-				if !compiledPattern.Match(e.Name) {
-					continue
-				}
-			}
-			if err := enc.Encode(api.FilesystemEvent{
-				Action:    e.Action,
-				Name:      e.Name,
-				Timestamp: e.Timestamp.UnixMilli(),
-			}); err != nil {
-				done <- err
-			}
-			res.Flush()
-		}
-	}
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb

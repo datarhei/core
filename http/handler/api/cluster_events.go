@@ -32,7 +32,7 @@ func (h *ClusterHandler) Events(c echo.Context) error {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
-	filter := map[string]*api.EventFilter{}
+	filter := map[string]*api.LogEventFilter{}
 
 	for _, f := range filters.Filters {
 		f := f
@@ -77,7 +77,7 @@ func (h *ClusterHandler) Events(c echo.Context) error {
 
 	done := make(chan error, 1)
 
-	filterEvent := func(event *api.Event) bool {
+	filterEvent := func(event *api.LogEvent) bool {
 		if len(filter) == 0 {
 			return true
 		}

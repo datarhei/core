@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"time"
+
+	"github.com/datarhei/core/v16/event"
 )
 
 var ErrExist = errors.New("file or directory already exists")
@@ -85,7 +87,7 @@ type ReadFilesystem interface {
 	// of that file is verfied. In case the file is not found, the error ErrNotExist will be returned.
 	LookPath(file string) (string, error)
 
-	Events() (<-chan Event, EventsCancelFunc, error)
+	event.MediaSource
 }
 
 type WriteFilesystem interface {
