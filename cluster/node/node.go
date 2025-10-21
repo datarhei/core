@@ -96,7 +96,7 @@ func New(config Config) *Node {
 	n.config = coreConfig
 	n.skills = coreSkills
 
-	n.core = NewCore(n.id, n.logger.WithComponent("ClusterCore").WithField("address", address))
+	n.core = NewCore(n.id, n.logger.WithComponent("ClusterCore"))
 	n.core.SetEssentials(address, coreConfig)
 
 	n.coreLastErr = err
