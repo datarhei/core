@@ -96,7 +96,7 @@ type Core struct {
 	hasSRT      bool
 	srtAddress  *url.URL
 
-	media     map[string]*Media // map[storage]map[path]lastchange
+	media     map[string]*Media
 	mediaLock sync.RWMutex
 
 	logger log.Logger
@@ -333,15 +333,15 @@ func (n *Core) mediaEvents(ctx context.Context, storage string) {
 		ch, err := n.client.MediaEvents(ctx, storage, "/**")
 		if err != nil {
 			m.available = false
-			m.media = nil
+			m.media = map[string]int64{}
 
 			n.mediaLock.Lock()
 			n.media[storage] = m
 			n.mediaLock.Unlock()
 
 			n.logger.Error().WithField("storage", storage).WithError(err).Log("Failed to connect to event source")
-
-			return
+			time.Sleep(5 * time.Second)
+			continue
 		}
 
 		n.logger.Info().WithField("storage", storage).Log("Connected to event source")
