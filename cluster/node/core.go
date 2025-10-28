@@ -327,10 +327,30 @@ func (n *Core) connect() error {
 }
 
 func (n *Core) mediaEvents(ctx context.Context, storage string) {
+	defer func() {
+		n.logger.Warn().WithField("storage", storage).Log("Disconnected from event source")
+	}()
+
 	m := &Media{}
 
 	for {
-		ch, err := n.client.MediaEvents(ctx, storage, "/**")
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		n.lock.RLock()
+		client := n.client
+		n.lock.RUnlock()
+
+		if client == nil {
+			n.logger.Error().WithField("storage", storage).Log("Failed to connect to event source, client not connected")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		ch, err := client.MediaEvents(ctx, storage, "/**")
 		if err != nil {
 			m.available = false
 			m.media = map[string]int64{}
