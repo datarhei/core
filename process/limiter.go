@@ -297,7 +297,8 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 	mode := "hard"
 	if l.mode == LimitModeSoft {
 		mode = "soft"
-		l.cpu.SetLimit(l.cpu.Limit() / l.ncpu)
+		l.cpu.SetLimit(config.CPU / 100 / l.ncpu)
+		l.lastUsage.CPU.Limit = config.CPU
 		l.ncpuFactor = l.ncpu
 	}
 
