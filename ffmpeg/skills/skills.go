@@ -112,12 +112,8 @@ func New(binary string) (Skills, error) {
 	c := Skills{}
 
 	ffmpeg, err := version(binary)
-	if len(ffmpeg.Version) == 0 || err != nil {
-		if err != nil {
-			return Skills{}, fmt.Errorf("can't parse ffmpeg version info: %w", err)
-		}
-
-		return Skills{}, fmt.Errorf("can't parse ffmpeg version info")
+	if err != nil {
+		return Skills{}, fmt.Errorf("can't parse ffmpeg version info: %w", err)
 	}
 
 	c.FFmpeg = ffmpeg
