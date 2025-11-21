@@ -1,4 +1,4 @@
-# Core `add compatiblity`
+# Core
 
 ![dsdsds](https://github.com/datarhei/misc/blob/main/img/media-core.png?raw=true)
 
