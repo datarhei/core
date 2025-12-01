@@ -19,6 +19,16 @@ func NewJWT(iam iam.IAM) *JWTHandler {
 	}
 }
 
+// Login Creates a JWT from username/password
+// @Summary Create a JWT
+// @Description Create a JWT from username/password
+// @ID login
+// @Accept json
+// @Produce json
+// @Param user body api.Login true "User definition"
+// @Success 200 {object} api.JWT
+// @Failure 403 {object} api.Error
+// @Router /api/login [post]
 func (j *JWTHandler) Login(c echo.Context) error {
 	subject, ok := c.Get("user").(string)
 	if !ok {
@@ -36,6 +46,16 @@ func (j *JWTHandler) Login(c echo.Context) error {
 	})
 }
 
+// Refresh Refreshes a JWT from refresh JWT
+// @Summary Refresh a JWT
+// @Description Refresh a JWT
+// @ID refresh
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.JWTRefresh
+// @Failure 403 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/login/refresh [get]
 func (j *JWTHandler) Refresh(c echo.Context) error {
 	subject, ok := c.Get("user").(string)
 	if !ok {

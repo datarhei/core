@@ -13,16 +13,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Events returns a stream of event
-// @Summary Stream of events
-// @Description Stream of events of whats happening on each node in the cluster
+// Events returns a stream of log event
+// @Summary Stream of log events
+// @Description Stream of log events of whats happening on each node in the cluster
 // @ID cluster-3-events
 // @Tags v16.?.?
 // @Accept json
 // @Produce text/event-stream
 // @Produce json-stream
 // @Param filters body api.EventFilters false "Event filters"
-// @Success 200 {object} api.Event
+// @Success 200 {object} api.LogEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/events [post]
 func (h *ClusterHandler) Events(c echo.Context) error {

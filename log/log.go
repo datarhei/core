@@ -6,7 +6,9 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
@@ -14,6 +16,31 @@ import (
 
 // LogLevel represents a log level
 type Level uint
+
+var components = []string{}
+var lock = sync.Mutex{}
+
+func registerComponent(component string) {
+	if len(component) == 0 {
+		return
+	}
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	if slices.Contains(components, component) {
+		return
+	}
+
+	components = append(components, component)
+}
+
+func ListComponents() []string {
+	lock.Lock()
+	defer lock.Unlock()
+
+	return slices.Clone(components)
+}
 
 const (
 	Lsilent Level = 0
@@ -108,6 +135,8 @@ type logger struct {
 
 // New returns an implementation of the Logger interface.
 func New(component string) Logger {
+	registerComponent(component)
+
 	l := &logger{
 		component: component,
 	}
@@ -155,6 +184,8 @@ func (l *logger) WithError(err error) Logger {
 func (l *logger) WithComponent(component string) Logger {
 	clone := l.clone()
 	clone.component = component
+
+	registerComponent(component)
 
 	return clone
 }
@@ -219,8 +250,9 @@ func (e *Event) WithOutput(w Writer) Logger {
 
 func (e *Event) WithComponent(component string) Logger {
 	clone := e.clone()
-
 	clone.Component = component
+
+	registerComponent(component)
 
 	return clone
 }

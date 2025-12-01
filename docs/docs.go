@@ -109,6 +109,76 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/login": {
+            "post": {
+                "description": "Create a JWT from username/password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Create a JWT",
+                "operationId": "login",
+                "parameters": [
+                    {
+                        "description": "User definition",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.Login"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.JWT"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/login/refresh": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Refresh a JWT",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Refresh a JWT",
+                "operationId": "refresh",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.JWTRefresh"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/swagger": {
             "get": {
                 "description": "Swagger UI for this API",
@@ -488,7 +558,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Stream of events of whats happening on each node in the cluster",
+                "description": "Stream of log events of whats happening on each node in the cluster",
                 "consumes": [
                     "application/json"
                 ],
@@ -499,7 +569,7 @@ const docTemplate = `{
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Stream of events",
+                "summary": "Stream of log events",
                 "operationId": "cluster-3-events",
                 "parameters": [
                     {
@@ -515,7 +585,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.Event"
+                            "$ref": "#/definitions/api.LogEvent"
                         }
                     }
                 }
@@ -2500,7 +2570,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Stream of event of whats happening in the core",
+                "description": "Stream of log event of whats happening in the core",
                 "consumes": [
                     "application/json"
                 ],
@@ -2511,8 +2581,8 @@ const docTemplate = `{
                 "tags": [
                     "v16.?.?"
                 ],
-                "summary": "Stream of events",
-                "operationId": "events",
+                "summary": "Stream of log events",
+                "operationId": "events-3-media",
                 "parameters": [
                     {
                         "description": "Event filters",
@@ -2527,7 +2597,44 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.Event"
+                            "$ref": "#/definitions/api.MediaEvent"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/events/media/{type}": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stream of media event of whats happening in the core",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/x-json-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Stream of media events",
+                "operationId": "events-3-log",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "glob pattern for media names",
+                        "name": "glob",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.LogEvent"
                         }
                     }
                 }
@@ -4986,8 +5093,7 @@ const docTemplate = `{
                 ],
                 "description": "List all currently publishing RTMP streams.",
                 "produces": [
-                    "application/json",
-                    "application/x-json-stream"
+                    "application/json"
                 ],
                 "tags": [
                     "v16.7.2"
@@ -5207,8 +5313,7 @@ const docTemplate = `{
                 ],
                 "description": "List all currently publishing SRT streams. This endpoint is EXPERIMENTAL and may change in future.",
                 "produces": [
-                    "application/json",
-                    "application/x-json-stream"
+                    "application/json"
                 ],
                 "tags": [
                     "v16.9.0"
@@ -6670,69 +6775,13 @@ const docTemplate = `{
                 }
             }
         },
-        "api.Event": {
-            "type": "object",
-            "properties": {
-                "caller": {
-                    "type": "string"
-                },
-                "core_id": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "event": {
-                    "type": "string"
-                },
-                "level": {
-                    "type": "integer"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "ts": {
-                    "type": "integer",
-                    "format": "int64"
-                }
-            }
-        },
-        "api.EventFilter": {
-            "type": "object",
-            "properties": {
-                "caller": {
-                    "type": "string"
-                },
-                "core_id": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "event": {
-                    "type": "string"
-                },
-                "level": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
         "api.EventFilters": {
             "type": "object",
             "properties": {
                 "filters": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.EventFilter"
+                        "$ref": "#/definitions/api.LogEventFilter"
                     }
                 }
             }
@@ -7042,9 +7091,119 @@ const docTemplate = `{
                 }
             }
         },
-        "api.LogEvent": {
+        "api.JWT": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.JWTRefresh": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.LogEntries": {
             "type": "object",
             "additionalProperties": true
+        },
+        "api.LogEvent": {
+            "type": "object",
+            "properties": {
+                "caller": {
+                    "type": "string"
+                },
+                "core_id": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "ts": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "api.LogEventFilter": {
+            "type": "object",
+            "properties": {
+                "caller": {
+                    "type": "string"
+                },
+                "core_id": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.Login": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.MediaEvent": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ts": {
+                    "type": "integer"
+                }
+            }
         },
         "api.MetricsDescription": {
             "type": "object",

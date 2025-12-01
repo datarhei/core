@@ -46,13 +46,13 @@ func (h *EventsHandler) AddMediaSource(name string, source event.MediaSource) {
 // LogEvents returns a stream of event
 // @Summary Stream of log events
 // @Description Stream of log event of whats happening in the core
-// @ID events
+// @ID events-3-media
 // @Tags v16.?.?
 // @Accept json
 // @Produce text/event-stream
 // @Produce json-stream
 // @Param filters body api.EventFilters false "Event filters"
-// @Success 200 {object} api.Event
+// @Success 200 {object} api.MediaEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/events [post]
 func (h *EventsHandler) LogEvents(c echo.Context) error {
@@ -177,12 +177,12 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 // LogEvents returns a stream of media event
 // @Summary Stream of media events
 // @Description Stream of media event of whats happening in the core
-// @ID events
+// @ID events-3-log
 // @Tags v16.?.?
 // @Accept json
 // @Param glob query string false "glob pattern for media names"
 // @Produce json-stream
-// @Success 200 {object} api.Event
+// @Success 200 {object} api.LogEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/events/media/{type} [post]
 func (h *EventsHandler) MediaEvents(c echo.Context) error {

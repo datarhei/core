@@ -911,48 +911,11 @@ definitions:
       message:
         type: string
     type: object
-  api.Event:
-    properties:
-      caller:
-        type: string
-      core_id:
-        type: string
-      data:
-        additionalProperties:
-          type: string
-        type: object
-      event:
-        type: string
-      level:
-        type: integer
-      message:
-        type: string
-      ts:
-        format: int64
-        type: integer
-    type: object
-  api.EventFilter:
-    properties:
-      caller:
-        type: string
-      core_id:
-        type: string
-      data:
-        additionalProperties:
-          type: string
-        type: object
-      event:
-        type: string
-      level:
-        type: string
-      message:
-        type: string
-    type: object
   api.EventFilters:
     properties:
       filters:
         items:
-          $ref: '#/definitions/api.EventFilter'
+          $ref: '#/definitions/api.LogEventFilter'
         type: array
     type: object
   api.FileInfo:
@@ -1157,8 +1120,80 @@ definitions:
           type: string
         type: array
     type: object
-  api.LogEvent:
+  api.JWT:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  api.JWTRefresh:
+    properties:
+      access_token:
+        type: string
+    type: object
+  api.LogEntries:
     additionalProperties: true
+    type: object
+  api.LogEvent:
+    properties:
+      caller:
+        type: string
+      core_id:
+        type: string
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      event:
+        type: string
+      level:
+        type: integer
+      message:
+        type: string
+      ts:
+        format: int64
+        type: integer
+    type: object
+  api.LogEventFilter:
+    properties:
+      caller:
+        type: string
+      core_id:
+        type: string
+      data:
+        additionalProperties:
+          type: string
+        type: object
+      event:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+    type: object
+  api.Login:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  api.MediaEvent:
+    properties:
+      action:
+        type: string
+      name:
+        type: string
+      names:
+        items:
+          type: string
+        type: array
+      ts:
+        type: integer
     type: object
   api.MetricsDescription:
     properties:
@@ -2973,6 +3008,51 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Query the GraphAPI
+  /api/login:
+    post:
+      consumes:
+      - application/json
+      description: Create a JWT from username/password
+      operationId: login
+      parameters:
+      - description: User definition
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/api.Login'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.JWT'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      summary: Create a JWT
+  /api/login/refresh:
+    get:
+      consumes:
+      - application/json
+      description: Refresh a JWT
+      operationId: refresh
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.JWTRefresh'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Refresh a JWT
   /api/swagger:
     get:
       description: Swagger UI for this API
@@ -3209,7 +3289,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Stream of events of whats happening on each node in the cluster
+      description: Stream of log events of whats happening on each node in the cluster
       operationId: cluster-3-events
       parameters:
       - description: Event filters
@@ -3224,10 +3304,10 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.Event'
+            $ref: '#/definitions/api.LogEvent'
       security:
       - ApiKeyAuth: []
-      summary: Stream of events
+      summary: Stream of log events
       tags:
       - v16.?.?
   /api/v3/cluster/fs/{storage}:
@@ -4531,8 +4611,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Stream of event of whats happening in the core
-      operationId: events
+      description: Stream of log event of whats happening in the core
+      operationId: events-3-media
       parameters:
       - description: Event filters
         in: body
@@ -4546,10 +4626,33 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.Event'
+            $ref: '#/definitions/api.MediaEvent'
       security:
       - ApiKeyAuth: []
-      summary: Stream of events
+      summary: Stream of log events
+      tags:
+      - v16.?.?
+  /api/v3/events/media/{type}:
+    post:
+      consumes:
+      - application/json
+      description: Stream of media event of whats happening in the core
+      operationId: events-3-log
+      parameters:
+      - description: glob pattern for media names
+        in: query
+        name: glob
+        type: string
+      produces:
+      - application/x-json-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogEvent'
+      security:
+      - ApiKeyAuth: []
+      summary: Stream of media events
       tags:
       - v16.?.?
   /api/v3/fs:
@@ -6177,7 +6280,6 @@ paths:
       operationId: rtmp-3-list-channels
       produces:
       - application/json
-      - application/x-json-stream
       responses:
         "200":
           description: OK
@@ -6318,7 +6420,6 @@ paths:
       operationId: srt-3-list-channels
       produces:
       - application/json
-      - application/x-json-stream
       responses:
         "200":
           description: OK
