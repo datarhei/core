@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	goslices "slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,9 +20,10 @@ import (
 
 // The EventsHandler type provides handler functions for retrieving event.
 type EventsHandler struct {
-	logs  log.ChannelWriter
-	media map[string]event.MediaSource
-	lock  sync.Mutex
+	logs    log.ChannelWriter
+	media   map[string]event.MediaSource
+	process event.EventSource
+	lock    sync.Mutex
 }
 
 // NewEvents returns a new EventsHandler type
@@ -43,20 +45,31 @@ func (h *EventsHandler) AddMediaSource(name string, source event.MediaSource) {
 	h.media[name] = source
 }
 
+func (h *EventsHandler) SetProcessSource(source event.EventSource) {
+	if source == nil {
+		return
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.process = source
+}
+
 // LogEvents returns a stream of event
 // @Summary Stream of log events
 // @Description Stream of log event of whats happening in the core
-// @ID events-3-media
+// @ID events-3-log
 // @Tags v16.?.?
 // @Accept json
 // @Produce text/event-stream
 // @Produce json-stream
-// @Param filters body api.EventFilters false "Event filters"
-// @Success 200 {object} api.MediaEvent
+// @Param filters body api.LogEventFilters false "Event filters"
+// @Success 200 {object} api.LogEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/events [post]
 func (h *EventsHandler) LogEvents(c echo.Context) error {
-	filters := api.EventFilters{}
+	filters := api.LogEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -174,15 +187,15 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 	}
 }
 
-// LogEvents returns a stream of media event
+// MediaEvents returns a stream of media event
 // @Summary Stream of media events
-// @Description Stream of media event of whats happening in the core
-// @ID events-3-log
+// @Description Stream of media event of whats happening in the filesystems
+// @ID events-3-media
 // @Tags v16.?.?
 // @Accept json
 // @Param glob query string false "glob pattern for media names"
 // @Produce json-stream
-// @Success 200 {object} api.LogEvent
+// @Success 200 {object} api.MediaEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/events/media/{type} [post]
 func (h *EventsHandler) MediaEvents(c echo.Context) error {
@@ -268,6 +281,8 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 	}
 	res.Flush()
 
+	event := api.MediaEvent{}
+
 	for {
 		select {
 		case err := <-done:
@@ -282,18 +297,110 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 				done <- err
 			}
 			res.Flush()
-		case evt := <-evts:
-			e := evt.(*event.MediaEvent)
+		case e := <-evts:
+			if !event.Unmarshal(e) {
+				continue
+			}
+
 			if compiledPattern != nil {
-				if !compiledPattern.Match(e.Name) {
+				if !compiledPattern.Match(event.Name) {
 					continue
 				}
 			}
-			if err := enc.Encode(api.MediaEvent{
-				Action:    e.Action,
-				Name:      e.Name,
-				Timestamp: e.Timestamp.UnixMilli(),
-			}); err != nil {
+
+			if err := enc.Encode(event); err != nil {
+				done <- err
+			}
+			res.Flush()
+		}
+	}
+}
+
+// ProcessEvents returns a stream of process event
+// @Summary Stream of process events
+// @Description Stream of process event of whats happening in the processes
+// @ID events-3-process
+// @Tags v16.?.?
+// @Accept json
+// @Produce json-stream
+// @Param filters body api.ProcessEventFilters false "Event filters"
+// @Success 200 {object} api.ProcessEvent
+// @Security ApiKeyAuth
+// @Router /api/v3/events/process [post]
+func (h *EventsHandler) ProcessEvents(c echo.Context) error {
+	filters := api.ProcessEventFilters{}
+
+	if err := util.ShouldBindJSON(c, &filters); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	filter := []*api.ProcessEventFilter{}
+
+	for _, f := range filters.Filters {
+		f := f
+
+		if err := f.Compile(); err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid filter: %s", err.Error())
+		}
+
+		filter = append(filter, &f)
+	}
+
+	keepaliveTicker := time.NewTicker(5 * time.Second)
+	defer keepaliveTicker.Stop()
+
+	req := c.Request()
+	reqctx := req.Context()
+
+	contentType := "application/x-json-stream"
+
+	evts, cancel, err := h.process.Events()
+	if err != nil {
+		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+	}
+	defer cancel()
+
+	res := c.Response()
+
+	res.Header().Set(echo.HeaderContentType, contentType+"; charset=UTF-8")
+	res.Header().Set(echo.HeaderCacheControl, "no-store")
+	res.Header().Set(echo.HeaderConnection, "close")
+	res.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(res)
+	enc.SetIndent("", "")
+
+	done := make(chan error, 1)
+
+	filterEvent := func(event *api.ProcessEvent) bool {
+		if len(filter) == 0 {
+			return true
+		}
+
+		return goslices.ContainsFunc(filter, event.Filter)
+	}
+
+	event := api.ProcessEvent{}
+
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-reqctx.Done():
+			done <- nil
+		case <-keepaliveTicker.C:
+			res.Write([]byte("{\"type\":\"keepalive\"}\n"))
+			res.Flush()
+		case e := <-evts:
+			if !event.Unmarshal(e) {
+				continue
+			}
+
+			if !filterEvent(&event) {
+				continue
+			}
+
+			if err := enc.Encode(event); err != nil {
 				done <- err
 			}
 			res.Flush()

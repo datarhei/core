@@ -911,13 +911,6 @@ definitions:
       message:
         type: string
     type: object
-  api.EventFilters:
-    properties:
-      filters:
-        items:
-          $ref: '#/definitions/api.LogEventFilter'
-        type: array
-    type: object
   api.FileInfo:
     properties:
       core_id:
@@ -1171,6 +1164,13 @@ definitions:
         type: string
       message:
         type: string
+    type: object
+  api.LogEventFilters:
+    properties:
+      filters:
+        items:
+          $ref: '#/definitions/api.LogEventFilter'
+        type: array
     type: object
   api.Login:
     properties:
@@ -1528,12 +1528,78 @@ definitions:
         format: uint64
         type: integer
     type: object
+  api.ProcessEvent:
+    properties:
+      domain:
+        type: string
+      line:
+        type: string
+      pid:
+        type: string
+      progress:
+        $ref: '#/definitions/api.ProcessProgress'
+      ts:
+        type: integer
+      type:
+        type: string
+    type: object
+  api.ProcessEventFilter:
+    properties:
+      domain:
+        type: string
+      pid:
+        type: string
+      type:
+        type: string
+    type: object
+  api.ProcessEventFilters:
+    properties:
+      filters:
+        items:
+          $ref: '#/definitions/api.ProcessEventFilter'
+        type: array
+    type: object
   api.ProcessID:
     properties:
       domain:
         type: string
       id:
         type: string
+    type: object
+  api.ProcessProgress:
+    properties:
+      input:
+        items:
+          $ref: '#/definitions/api.ProcessProgressInput'
+        type: array
+      output:
+        items:
+          $ref: '#/definitions/api.ProcessProgressOutput'
+        type: array
+      time:
+        type: number
+    type: object
+  api.ProcessProgressInput:
+    properties:
+      bitrate:
+        type: number
+      drop:
+        type: integer
+      dup:
+        type: integer
+      enc:
+        type: integer
+      fps:
+        type: number
+      looping:
+        type: boolean
+    type: object
+  api.ProcessProgressOutput:
+    properties:
+      bitrate:
+        type: number
+      fps:
+        type: number
     type: object
   api.ProcessReport:
     properties:
@@ -3296,7 +3362,7 @@ paths:
         in: body
         name: filters
         schema:
-          $ref: '#/definitions/api.EventFilters'
+          $ref: '#/definitions/api.LogEventFilters'
       produces:
       - text/event-stream
       - application/x-json-stream
@@ -4612,13 +4678,13 @@ paths:
       consumes:
       - application/json
       description: Stream of log event of whats happening in the core
-      operationId: events-3-media
+      operationId: events-3-log
       parameters:
       - description: Event filters
         in: body
         name: filters
         schema:
-          $ref: '#/definitions/api.EventFilters'
+          $ref: '#/definitions/api.LogEventFilters'
       produces:
       - text/event-stream
       - application/x-json-stream
@@ -4626,7 +4692,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.MediaEvent'
+            $ref: '#/definitions/api.LogEvent'
       security:
       - ApiKeyAuth: []
       summary: Stream of log events
@@ -4636,8 +4702,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Stream of media event of whats happening in the core
-      operationId: events-3-log
+      description: Stream of media event of whats happening in the filesystems
+      operationId: events-3-media
       parameters:
       - description: glob pattern for media names
         in: query
@@ -4649,10 +4715,34 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.LogEvent'
+            $ref: '#/definitions/api.MediaEvent'
       security:
       - ApiKeyAuth: []
       summary: Stream of media events
+      tags:
+      - v16.?.?
+  /api/v3/events/process:
+    post:
+      consumes:
+      - application/json
+      description: Stream of process event of whats happening in the processes
+      operationId: events-3-process
+      parameters:
+      - description: Event filters
+        in: body
+        name: filters
+        schema:
+          $ref: '#/definitions/api.ProcessEventFilters'
+      produces:
+      - application/x-json-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessEvent'
+      security:
+      - ApiKeyAuth: []
+      summary: Stream of process events
       tags:
       - v16.?.?
   /api/v3/fs:

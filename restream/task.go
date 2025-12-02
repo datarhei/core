@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
@@ -326,6 +327,8 @@ func (t *task) Config() *app.Config {
 
 func (t *task) Destroy() {
 	t.Stop()
+
+	t.parser.Destroy()
 }
 
 func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
@@ -377,4 +380,8 @@ func (t *task) ExportParserReportHistory() []parse.ReportHistoryEntry {
 
 func (t *task) ImportParserReportHistory(report []parse.ReportHistoryEntry) {
 	t.parser.ImportReportHistory(report)
+}
+
+func (t *task) Events() (<-chan event.Event, event.CancelFunc, error) {
+	return t.parser.Events()
 }

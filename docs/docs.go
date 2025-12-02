@@ -577,7 +577,7 @@ const docTemplate = `{
                         "name": "filters",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/api.EventFilters"
+                            "$ref": "#/definitions/api.LogEventFilters"
                         }
                     }
                 ],
@@ -2582,14 +2582,14 @@ const docTemplate = `{
                     "v16.?.?"
                 ],
                 "summary": "Stream of log events",
-                "operationId": "events-3-media",
+                "operationId": "events-3-log",
                 "parameters": [
                     {
                         "description": "Event filters",
                         "name": "filters",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/api.EventFilters"
+                            "$ref": "#/definitions/api.LogEventFilters"
                         }
                     }
                 ],
@@ -2597,7 +2597,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.MediaEvent"
+                            "$ref": "#/definitions/api.LogEvent"
                         }
                     }
                 }
@@ -2610,7 +2610,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Stream of media event of whats happening in the core",
+                "description": "Stream of media event of whats happening in the filesystems",
                 "consumes": [
                     "application/json"
                 ],
@@ -2621,7 +2621,7 @@ const docTemplate = `{
                     "v16.?.?"
                 ],
                 "summary": "Stream of media events",
-                "operationId": "events-3-log",
+                "operationId": "events-3-media",
                 "parameters": [
                     {
                         "type": "string",
@@ -2634,7 +2634,46 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.LogEvent"
+                            "$ref": "#/definitions/api.MediaEvent"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/events/process": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stream of process event of whats happening in the processes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/x-json-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Stream of process events",
+                "operationId": "events-3-process",
+                "parameters": [
+                    {
+                        "description": "Event filters",
+                        "name": "filters",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessEventFilters"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessEvent"
                         }
                     }
                 }
@@ -6775,17 +6814,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.EventFilters": {
-            "type": "object",
-            "properties": {
-                "filters": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.LogEventFilter"
-                    }
-                }
-            }
-        },
         "api.FileInfo": {
             "type": "object",
             "properties": {
@@ -7167,6 +7195,17 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "api.LogEventFilters": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.LogEventFilter"
+                    }
                 }
             }
         },
@@ -7690,6 +7729,54 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ProcessEvent": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "line": {
+                    "type": "string"
+                },
+                "pid": {
+                    "type": "string"
+                },
+                "progress": {
+                    "$ref": "#/definitions/api.ProcessProgress"
+                },
+                "ts": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ProcessEventFilter": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "pid": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ProcessEventFilters": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessEventFilter"
+                    }
+                }
+            }
+        },
         "api.ProcessID": {
             "type": "object",
             "properties": {
@@ -7698,6 +7785,60 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                }
+            }
+        },
+        "api.ProcessProgress": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessProgressInput"
+                    }
+                },
+                "output": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ProcessProgressOutput"
+                    }
+                },
+                "time": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.ProcessProgressInput": {
+            "type": "object",
+            "properties": {
+                "bitrate": {
+                    "type": "number"
+                },
+                "drop": {
+                    "type": "integer"
+                },
+                "dup": {
+                    "type": "integer"
+                },
+                "enc": {
+                    "type": "integer"
+                },
+                "fps": {
+                    "type": "number"
+                },
+                "looping": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.ProcessProgressOutput": {
+            "type": "object",
+            "properties": {
+                "bitrate": {
+                    "type": "number"
+                },
+                "fps": {
+                    "type": "number"
                 }
             }
         },

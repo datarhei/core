@@ -288,6 +288,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	}
 	s.v3handler.events.AddMediaSource("srt", config.SRT)
 	s.v3handler.events.AddMediaSource("rtmp", config.RTMP)
+	s.v3handler.events.SetProcessSource(config.Restream)
 
 	if config.Restream != nil {
 		s.v3handler.process = api.NewProcess(
@@ -816,5 +817,6 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.POST("/events", s.v3handler.events.LogEvents)
 		v3.POST("/events/log", s.v3handler.events.LogEvents)
 		v3.POST("/events/media/:type", s.v3handler.events.MediaEvents)
+		v3.POST("/events/process", s.v3handler.events.ProcessEvents)
 	}
 }

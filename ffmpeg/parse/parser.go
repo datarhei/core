@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/ffmpeg/prelude"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/net/url"
@@ -42,6 +43,10 @@ type Parser interface {
 
 	// ImportReportHistory imports a report history from another parser
 	ImportReportHistory([]ReportHistoryEntry)
+
+	Events() (<-chan event.Event, event.CancelFunc, error)
+
+	Destroy()
 }
 
 // Config is the config for the Parser implementation
@@ -125,6 +130,8 @@ type parser struct {
 		log        sync.RWMutex
 		logHistory sync.RWMutex
 	}
+
+	events *event.PubSub
 }
 
 // New returns a Parser that satisfies the Parser interface
@@ -135,6 +142,7 @@ func New(config Config) Parser {
 		logMinimalHistoryLength: config.LogMinimalHistory,
 		logger:                  config.Logger,
 		collector:               config.Collector,
+		events:                  event.NewPubSub(),
 	}
 
 	if p.logger == nil {
@@ -319,6 +327,8 @@ func (p *parser) Parse(line []byte) uint64 {
 		// Write the current non-progress line to the log
 		p.addLog(stringLine)
 
+		p.events.Publish(event.NewProcessLogEvent(stringLine))
+
 		p.lock.prelude.Lock()
 		if !p.prelude.done {
 			if len(p.prelude.data) < p.prelude.headLines {
@@ -457,6 +467,36 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 	}
 
+	progress := p.assembleProgress()
+	evt := &event.ProcessProgress{
+		Time: progress.Time,
+	}
+
+	for _, io := range progress.Input {
+		input := event.ProcessProgressInput{
+			Bitrate: io.Bitrate,
+			FPS:     io.FPS,
+		}
+
+		if io.AVstream != nil {
+			input.Looping = io.AVstream.Looping
+			input.Enc = io.AVstream.Enc
+			input.Drop = io.AVstream.Drop
+			input.Dup = io.AVstream.Dup
+		}
+
+		evt.Input = append(evt.Input, input)
+	}
+
+	for _, io := range progress.Output {
+		evt.Output = append(evt.Output, event.ProcessProgressOutput{
+			Bitrate: io.Bitrate,
+			FPS:     io.FPS,
+		})
+	}
+
+	p.events.Publish(event.NewProcessProgressEvent(evt))
+
 	// Calculate if any of the processed frames staled.
 	// If one number of frames in an output is the same as before, then pFrames becomes 0.
 	pFrames := p.stats.main.diff.frame
@@ -539,9 +579,10 @@ func (p *parser) parseFFmpegIO(kind string, line []byte) error {
 		}
 	}
 
-	if kind == "input" {
+	switch kind {
+	case "input":
 		p.process.input = processIO
-	} else if kind == "output" {
+	case "output":
 		p.process.output = processIO
 	}
 
@@ -644,10 +685,7 @@ func (p *parser) Stop(state string, pusage process.Usage) {
 	p.storeReportHistory(state, usage)
 }
 
-func (p *parser) Progress() Progress {
-	p.lock.progress.RLock()
-	defer p.lock.progress.RUnlock()
-
+func (p *parser) assembleProgress() Progress {
 	progress := p.process.export()
 
 	p.progress.ffmpeg.exportTo(&progress)
@@ -664,6 +702,13 @@ func (p *parser) Progress() Progress {
 	progress.Started = p.stats.initialized
 
 	return progress
+}
+
+func (p *parser) Progress() Progress {
+	p.lock.progress.RLock()
+	defer p.lock.progress.RUnlock()
+
+	return p.assembleProgress()
 }
 
 func (p *parser) IsRunning() bool {
@@ -999,4 +1044,14 @@ func (p *parser) ImportReportHistory(history []ReportHistoryEntry) {
 		p.logHistory.Value = r
 		p.logHistory = p.logHistory.Next()
 	}
+}
+
+func (p *parser) Events() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := p.events.Subscribe()
+
+	return ch, cancel, nil
+}
+
+func (p *parser) Destroy() {
+	p.events.Close()
 }

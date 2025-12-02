@@ -655,7 +655,7 @@ func (p *Manager) ProcessValidateConfig(nodeid string, config *app.Config) error
 	return node.Core().ProcessValidateConfig(config)
 }
 
-func (p *Manager) Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error) {
+func (p *Manager) LogEvents(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
 	eventChan := make(chan api.LogEvent, 128)
 
 	p.lock.RLock()

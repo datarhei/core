@@ -21,12 +21,12 @@ import (
 // @Accept json
 // @Produce text/event-stream
 // @Produce json-stream
-// @Param filters body api.EventFilters false "Event filters"
+// @Param filters body api.LogEventFilters false "Event filters"
 // @Success 200 {object} api.LogEvent
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/events [post]
 func (h *ClusterHandler) Events(c echo.Context) error {
-	filters := api.EventFilters{}
+	filters := api.LogEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
 		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
@@ -67,7 +67,7 @@ func (h *ClusterHandler) Events(c echo.Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	evts, err := h.proxy.Events(ctx, filters)
+	evts, err := h.proxy.LogEvents(ctx, filters)
 	if err != nil {
 		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}

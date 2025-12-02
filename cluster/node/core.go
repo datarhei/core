@@ -933,7 +933,7 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 	return processes, nil
 }
 
-func (n *Core) Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error) {
+func (n *Core) Events(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()

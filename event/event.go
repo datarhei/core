@@ -44,6 +44,32 @@ func NewPubSub() *PubSub {
 	return w
 }
 
+func (w *PubSub) Consume(s EventSource, rewrite func(e Event) Event) {
+	ch, cancel, err := s.Events()
+	if err != nil {
+		return
+	}
+
+	if rewrite == nil {
+		rewrite = func(e Event) Event { return e }
+	}
+
+	go func(ch <-chan Event, cancel CancelFunc) {
+		for {
+			select {
+			case <-w.ctx.Done():
+				cancel()
+				return
+			case e, ok := <-ch:
+				if !ok {
+					return
+				}
+				w.Publish(rewrite(e))
+			}
+		}
+	}(ch, cancel)
+}
+
 func (w *PubSub) Publish(e Event) error {
 	event := e.Clone()
 
@@ -64,9 +90,14 @@ func (w *PubSub) Publish(e Event) error {
 }
 
 func (w *PubSub) Close() {
+	w.publisherLock.Lock()
+	if w.publisherClosed {
+		w.publisherLock.Unlock()
+		return
+	}
+
 	w.cancel()
 
-	w.publisherLock.Lock()
 	close(w.publisher)
 	w.publisherClosed = true
 	w.publisherLock.Unlock()
@@ -98,6 +129,8 @@ func (w *PubSub) Subscribe() (<-chan Event, CancelFunc) {
 		w.subscriberLock.Lock()
 		delete(w.subscriber, id)
 		w.subscriberLock.Unlock()
+
+		close(l)
 	}
 
 	return l, unsubscribe

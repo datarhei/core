@@ -11,7 +11,7 @@ import (
 	"github.com/datarhei/core/v16/mem"
 )
 
-func (r *restclient) Events(ctx context.Context, filters api.EventFilters) (<-chan api.LogEvent, error) {
+func (r *restclient) Events(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
 	buf := mem.Get()
 	defer mem.Put(buf)
 

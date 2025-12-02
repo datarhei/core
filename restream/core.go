@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/ffmpeg"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/glob"
@@ -59,6 +60,8 @@ type Restreamer interface {
 
 	Probe(config *app.Config, timeout time.Duration) app.Probe // Probe a process with specific timeout
 	Validate(config *app.Config) error                         // Validate a process config
+
+	Events() (<-chan event.Event, event.CancelFunc, error)
 }
 
 // Config is the required configuration for a new restreamer instance.
@@ -101,6 +104,8 @@ type restream struct {
 
 	startOnce sync.Once
 	stopOnce  sync.Once
+
+	events *event.PubSub
 }
 
 // New returns a new instance that implements the Restreamer interface
@@ -115,6 +120,7 @@ func New(config Config) (Restreamer, error) {
 		logger:    config.Logger,
 		tasks:     NewStorage(),
 		metadata:  map[string]interface{}{},
+		events:    event.NewPubSub(),
 	}
 
 	if r.logger == nil {
@@ -462,6 +468,18 @@ func (r *restream) load() error {
 
 		t.ffmpeg = ffmpeg
 
+		r.events.Consume(t.parser, func(e event.Event) event.Event {
+			pe, ok := e.(*event.ProcessEvent)
+			if !ok {
+				return e
+			}
+
+			pe.ProcessID = t.process.ID
+			pe.Domain = t.process.Domain
+
+			return pe
+		})
+
 		return true
 	})
 
@@ -655,6 +673,18 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 	}
 
 	t.ffmpeg = ffmpeg
+
+	r.events.Consume(t.parser, func(e event.Event) event.Event {
+		pe, ok := e.(*event.ProcessEvent)
+		if !ok {
+			return e
+		}
+
+		pe.ProcessID = t.process.ID
+		pe.Domain = t.process.Domain
+
+		return pe
+	})
 
 	return t, nil
 }
@@ -1978,4 +2008,10 @@ func (r *restream) Validate(config *app.Config) error {
 	}
 
 	return nil
+}
+
+func (r *restream) Events() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := r.events.Subscribe()
+
+	return ch, cancel, nil
 }
