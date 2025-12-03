@@ -252,6 +252,8 @@ func TestFFmpegWaitStop(t *testing.T) {
 	err = p.Start()
 	require.NoError(t, err)
 
+	time.Sleep(time.Second)
+
 	require.Eventually(t, func() bool {
 		return p.Status().State == "running"
 	}, 10*time.Second, 500*time.Millisecond)
@@ -280,6 +282,8 @@ func TestFFmpegKill(t *testing.T) {
 	err = p.Start()
 	require.NoError(t, err)
 
+	time.Sleep(time.Second)
+
 	require.Eventually(t, func() bool {
 		return p.Status().State == "running"
 	}, 10*time.Second, 500*time.Millisecond)
@@ -305,6 +309,8 @@ func TestProcessForceKill(t *testing.T) {
 
 	err = p.Start()
 	require.NoError(t, err)
+
+	time.Sleep(time.Second)
 
 	require.Eventually(t, func() bool {
 		return p.Status().State == "running"
