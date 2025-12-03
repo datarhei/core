@@ -195,12 +195,17 @@ type ProcessEvent struct {
 }
 
 type ProcessProgressInput struct {
-	Bitrate json.Number `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
-	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
-	Looping bool        `json:"looping"`
-	Enc     uint64      `json:"enc"`
-	Drop    uint64      `json:"drop"`
-	Dup     uint64      `json:"dup"`
+	Bitrate  json.Number                  `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
+	FPS      json.Number                  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	AVstream ProcessProgressInputAVstream `json:"avstream"`
+}
+
+type ProcessProgressInputAVstream struct {
+	Looping bool   `json:"looping"`
+	Enc     uint64 `json:"enc"`
+	Drop    uint64 `json:"drop"`
+	Dup     uint64 `json:"dup"`
+	Time    uint64 `json:"time"`
 }
 
 type ProcessProgressOutput struct {
@@ -219,10 +224,13 @@ func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 		p.Input = append(p.Input, ProcessProgressInput{
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),
-			Looping: io.Looping,
-			Enc:     io.Enc,
-			Drop:    io.Drop,
-			Dup:     io.Dup,
+			AVstream: ProcessProgressInputAVstream{
+				Looping: io.AVstream.Looping,
+				Enc:     io.AVstream.Enc,
+				Drop:    io.AVstream.Drop,
+				Dup:     io.AVstream.Dup,
+				Time:    io.AVstream.Time,
+			},
 		})
 	}
 

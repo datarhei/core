@@ -479,10 +479,13 @@ func (p *parser) Parse(line []byte) uint64 {
 		}
 
 		if io.AVstream != nil {
-			input.Looping = io.AVstream.Looping
-			input.Enc = io.AVstream.Enc
-			input.Drop = io.AVstream.Drop
-			input.Dup = io.AVstream.Dup
+			input.AVstream = event.ProcessProgressInputAVstream{
+				Looping: io.AVstream.Looping,
+				Enc:     io.AVstream.Enc,
+				Drop:    io.AVstream.Drop,
+				Dup:     io.AVstream.Dup,
+				Time:    io.AVstream.Input.Time,
+			}
 		}
 
 		evt.Input = append(evt.Input, input)

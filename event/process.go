@@ -46,22 +46,36 @@ func NewProcessProgressEvent(progress *ProcessProgress) *ProcessEvent {
 }
 
 type ProcessProgressInput struct {
-	Bitrate float64
-	FPS     float64
-	Looping bool
-	Enc     uint64
-	Drop    uint64
-	Dup     uint64
+	Bitrate  float64
+	FPS      float64
+	AVstream ProcessProgressInputAVstream
 }
 
 func (p *ProcessProgressInput) Clone() ProcessProgressInput {
 	c := ProcessProgressInput{
-		Bitrate: p.Bitrate,
-		FPS:     p.FPS,
+		Bitrate:  p.Bitrate,
+		FPS:      p.FPS,
+		AVstream: p.AVstream.Clone(),
+	}
+
+	return c
+}
+
+type ProcessProgressInputAVstream struct {
+	Looping bool
+	Enc     uint64
+	Drop    uint64
+	Dup     uint64
+	Time    uint64
+}
+
+func (p *ProcessProgressInputAVstream) Clone() ProcessProgressInputAVstream {
+	c := ProcessProgressInputAVstream{
 		Looping: p.Looping,
 		Enc:     p.Enc,
 		Drop:    p.Drop,
 		Dup:     p.Dup,
+		Time:    p.Time,
 	}
 
 	return c
