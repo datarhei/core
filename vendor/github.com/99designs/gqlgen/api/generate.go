@@ -16,8 +16,12 @@ import (
 )
 
 var (
-	urlRegex     = regexp.MustCompile(`(?s)@link.*\(.*url:\s*?"(.*?)"[^)]+\)`) // regex to grab the url of a link directive, should it exist
-	versionRegex = regexp.MustCompile(`v(\d+).(\d+)$`)                         // regex to grab the version number from a url
+	urlRegex = regexp.MustCompile(
+		`(?s)@link.*\(.*url:\s*?"(.*?)"[^)]+\)`,
+	) // regex to grab the url of a link directive, should it exist
+	versionRegex = regexp.MustCompile(
+		`v(\d+).(\d+)$`,
+	) // regex to grab the version number from a url
 )
 
 func Generate(cfg *config.Config, option ...Option) error {
@@ -33,7 +37,8 @@ func Generate(cfg *config.Config, option ...Option) error {
 	plugins = append(plugins, resolvergen.New())
 	if cfg.Federation.IsDefined() {
 		if cfg.Federation.Version == 0 { // default to using the user's choice of version, but if unset, try to sort out which federation version to use
-			// check the sources, and if one is marked as federation v2, we mark the entirety to be generated using that format
+			// check the sources, and if one is marked as federation v2, we mark the entirety to be
+			// generated using that format
 			for _, v := range cfg.Sources {
 				cfg.Federation.Version = 1
 				urlString := urlRegex.FindStringSubmatch(v.Input)
@@ -63,6 +68,7 @@ func Generate(cfg *config.Config, option ...Option) error {
 	}
 
 	for _, p := range plugins {
+		//nolint:staticcheck // for backwards compatibility only
 		if inj, ok := p.(plugin.EarlySourceInjector); ok {
 			if s := inj.InjectSourceEarly(); s != nil {
 				cfg.Sources = append(cfg.Sources, s)
@@ -101,6 +107,11 @@ func Generate(cfg *config.Config, option ...Option) error {
 		return fmt.Errorf("failed to load schema: %w", err)
 	}
 
+	codegen.ClearInlineArgsMetadata()
+	if err := codegen.ExpandInlineArguments(cfg.Schema); err != nil {
+		return fmt.Errorf("failed to expand inline arguments: %w", err)
+	}
+
 	if err := cfg.Init(); err != nil {
 		return fmt.Errorf("generating core failed: %w", err)
 	}
@@ -122,6 +133,7 @@ func Generate(cfg *config.Config, option ...Option) error {
 			}
 		}
 	}
+
 	// Merge again now that the generated models have been injected into the typemap
 	dataPlugins := make([]any, len(plugins))
 	for index := range plugins {

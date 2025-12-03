@@ -77,6 +77,8 @@ var defaultSpecifications = map[byte]Appender{
 	'D': mdy,
 	'd': dayOfMonthZeroPad,
 	'e': dayOfMonthSpacePad,
+	'G': weekyear,
+	'g': weekyearNoCentury,
 	'F': ymd,
 	'H': twentyFourHourClockZeroPad,
 	'h': abbrvMonthName,

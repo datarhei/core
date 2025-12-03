@@ -42,6 +42,10 @@ type PackageOptions struct {
 	// ComputedRequires generates resolver functions to compute values for
 	// fields using the @required directive.
 	ComputedRequires bool
+	// EntityResolverMulti is default engine for entityResolver generation.
+	// This can be overriding by @entityResolver(multi: Boolean) directive.
+	// false by default.
+	EntityResolverMulti bool
 }
 
 // New returns a federation plugin that injects
@@ -64,30 +68,63 @@ func New(version int, cfg *config.Config) (*Federation, error) {
 func buildPackageOptions(cfg *config.Config) (PackageOptions, error) {
 	packageOptions := cfg.Federation.Options
 
-	explicitRequires := packageOptions["explicit_requires"]
-	computedRequires := packageOptions["computed_requires"]
+	const (
+		optionExplicitRequires    = "explicit_requires"
+		optionComputedRequires    = "computed_requires"
+		optionEntityResolverMulti = "entity_resolver_multi"
+	)
+
+	var explicitRequires,
+		computedRequires,
+		entityResolverMulti bool
+
+	for k, v := range packageOptions {
+		switch k {
+		case optionExplicitRequires:
+			explicitRequires = v
+		case optionComputedRequires:
+			computedRequires = v
+		case optionEntityResolverMulti:
+			entityResolverMulti = v
+		default:
+			return PackageOptions{}, fmt.Errorf("unknown package option: %s", k)
+		}
+	}
+
 	if explicitRequires && computedRequires {
-		return PackageOptions{}, errors.New("only one of explicit_requires or computed_requires can be set to true")
+		return PackageOptions{}, fmt.Errorf(
+			"only one of %s or %s can be set to true",
+			optionExplicitRequires,
+			optionComputedRequires,
+		)
 	}
 
 	if computedRequires {
 		if cfg.Federation.Version != 2 {
-			return PackageOptions{}, errors.New("when using federation.options.computed_requires you must be using Federation 2")
+			return PackageOptions{}, fmt.Errorf(
+				"when using federation.options.%s you must be using Federation 2",
+				optionComputedRequires,
+			)
 		}
 
-		// We rely on injecting a null argument with a directives for fields with @requires, so we need to ensure
+		// We rely on injecting a null argument with a directives for fields with @requires, so we
+		// need to ensure
 		// our directive is always called.
 		if !cfg.CallArgumentDirectivesWithNull {
-			return PackageOptions{}, errors.New("when using federation.options.computed_requires, call_argument_directives_with_null must be set to true")
+			return PackageOptions{}, fmt.Errorf(
+				"when using federation.options.%s, call_argument_directives_with_null must be set to true",
+				optionComputedRequires,
+			)
 		}
 	}
 
-	// We rely on injecting a null argument with a directives for fields with @requires, so we need to ensure
+	// We rely on injecting a null argument with a directives for fields with @requires, so we need
+	// to ensure
 	// our directive is always called.
-
 	return PackageOptions{
-		ExplicitRequires: explicitRequires,
-		ComputedRequires: computedRequires,
+		ExplicitRequires:    explicitRequires,
+		ComputedRequires:    computedRequires,
+		EntityResolverMulti: entityResolverMulti,
 	}, nil
 }
 
@@ -100,7 +137,10 @@ func (f *Federation) Name() string {
 func (f *Federation) MutateConfig(cfg *config.Config) error {
 	for typeName, entry := range builtins {
 		if cfg.Models.Exists(typeName) {
-			return fmt.Errorf("%v already exists which must be reserved when Federation is enabled", typeName)
+			return fmt.Errorf(
+				"%v already exists which must be reserved when Federation is enabled",
+				typeName,
+			)
 		}
 		cfg.Models[typeName] = entry
 	}
@@ -127,7 +167,9 @@ func (f *Federation) MutateConfig(cfg *config.Config) error {
 
 	if f.usesRequires && f.PackageOptions.ComputedRequires {
 		cfg.Schema.Directives[dirPopulateFromRepresentations.Name] = dirPopulateFromRepresentations
-		cfg.Directives[dirPopulateFromRepresentations.Name] = config.DirectiveConfig{Implementation: &populateFromRepresentationsImplementation}
+		cfg.Directives[dirPopulateFromRepresentations.Name] = config.DirectiveConfig{
+			Implementation: &populateFromRepresentationsImplementation,
+		}
 
 		cfg.Schema.Directives[dirEntityReference.Name] = dirEntityReference
 		cfg.Directives[dirEntityReference.Name] = config.DirectiveConfig{SkipRuntime: true}
@@ -142,7 +184,8 @@ func (f *Federation) MutateConfig(cfg *config.Config) error {
 func (f *Federation) InjectSourcesEarly() ([]*ast.Source, error) {
 	input := ``
 
-	// add version-specific changes on key directive, as well as adding the new directives for federation 2
+	// add version-specific changes on key directive, as well as adding the new directives for
+	// federation 2
 	switch f.version {
 	case 1:
 		input += federationVersion1Schema
@@ -157,7 +200,7 @@ func (f *Federation) InjectSourcesEarly() ([]*ast.Source, error) {
 	}}, nil
 }
 
-// InjectSourceLate creates a GraphQL Entity type with all
+// InjectSourcesLate creates a GraphQL Entity type with all
 // the fields that had the @key directive
 func (f *Federation) InjectSourcesLate(schema *ast.Schema) ([]*ast.Source, error) {
 	f.Entities = f.buildEntities(schema, f.version)
@@ -178,7 +221,10 @@ func (f *Federation) InjectSourcesLate(schema *ast.Schema) ([]*ast.Source, error
 			resolverSDL, entityResolverInputSDL := buildResolverSDL(r, e.Multi)
 			resolvers = append(resolvers, resolverSDL)
 			if entityResolverInputSDL != "" {
-				entityResolverInputDefinitions = append(entityResolverInputDefinitions, entityResolverInputSDL)
+				entityResolverInputDefinitions = append(
+					entityResolverInputDefinitions,
+					entityResolverInputSDL,
+				)
 			}
 		}
 	}
@@ -393,7 +439,10 @@ func (f *Federation) buildEntity(
 	}
 
 	if (schemaType.Kind == ast.Interface) && (len(schema.GetPossibleTypes(schemaType)) == 0) {
-		fmt.Printf("@key directive found on unused \"interface %s\". Will be ignored.\n", schemaType.Name)
+		fmt.Printf(
+			"@key directive found on unused \"interface %s\". Will be ignored.\n",
+			schemaType.Name,
+		)
 		return nil
 	}
 
@@ -402,7 +451,7 @@ func (f *Federation) buildEntity(
 		Def:       schemaType,
 		Resolvers: nil,
 		Requires:  nil,
-		Multi:     isMultiEntity(schemaType),
+		Multi:     f.isMultiEntity(schemaType),
 	}
 
 	// If our schema has a field with a type defined in
@@ -436,10 +485,12 @@ func (f *Federation) buildEntity(
 	return entity
 }
 
-func isMultiEntity(schemaType *ast.Definition) bool {
+// isMultiEntity returns @entityResolver(multi) value, if directive is not defined,
+// then global configuration parameter will be used.
+func (f *Federation) isMultiEntity(schemaType *ast.Definition) bool {
 	dir := schemaType.Directives.ForName(dirNameEntityResolver)
 	if dir == nil {
-		return false
+		return f.PackageOptions.EntityResolverMulti
 	}
 
 	if dirArg := dir.Arguments.ForName("multi"); dirArg != nil {
@@ -448,7 +499,7 @@ func isMultiEntity(schemaType *ast.Definition) bool {
 		}
 	}
 
-	return false
+	return f.PackageOptions.EntityResolverMulti
 }
 
 func buildResolvers(
@@ -493,7 +544,8 @@ func extractFields(
 ) (string, error) {
 	var arg *ast.Argument
 
-	// since directives are able to now have multiple arguments, we need to check both possible for a possible @key(fields="" fields="")
+	// since directives are able to now have multiple arguments, we need to check both possible for
+	// a possible @key(fields="" fields="")
 	for _, a := range dir.Arguments {
 		if a.Name == DirArgFields {
 			if arg != nil {
@@ -611,12 +663,22 @@ func (f *Federation) generateExplicitRequires(
 			Entity:   entity,
 		}
 
-		populator.Comment = strings.TrimSpace(strings.TrimLeft(rewriter.GetMethodComment("executionContext", populator.FuncName), `\`))
-		populator.Implementation = strings.TrimSpace(rewriter.GetMethodBody("executionContext", populator.FuncName))
+		populator.Comment = strings.TrimSpace(
+			strings.TrimLeft(
+				rewriter.GetMethodComment("executionContext", populator.FuncName),
+				`\`,
+			),
+		)
+		populator.Implementation = strings.TrimSpace(
+			rewriter.GetMethodBody("executionContext", populator.FuncName),
+		)
 
 		if populator.Implementation == "" {
 			populator.Exists = false
-			populator.Implementation = fmt.Sprintf("panic(fmt.Errorf(\"not implemented: %v\"))", populator.FuncName)
+			populator.Implementation = fmt.Sprintf(
+				"panic(fmt.Errorf(\"not implemented: %v\"))",
+				populator.FuncName,
+			)
 		}
 		populators = append(populators, populator)
 	}
@@ -660,27 +722,43 @@ func buildResolverSDL(
 ) (resolverSDL, entityResolverInputSDL string) {
 	if multi {
 		entityResolverInputSDL = buildEntityResolverInputDefinitionSDL(resolver)
-		resolverSDL := fmt.Sprintf("\t%s(reps: [%s]!): [%s]", resolver.ResolverName, resolver.InputTypeName, resolver.ReturnTypeName)
+		resolverSDL := fmt.Sprintf(
+			"\t%s(reps: [%s]!): [%s]",
+			resolver.ResolverName,
+			resolver.InputTypeName,
+			resolver.ReturnTypeName,
+		)
 		return resolverSDL, entityResolverInputSDL
 	}
 
 	resolverArgs := ""
+	var resolverArgsSb705 strings.Builder
 	for _, keyField := range resolver.KeyFields {
-		resolverArgs += fmt.Sprintf("%s: %s,", keyField.Field.ToGoPrivate(), keyField.Definition.Type.String())
+		resolverArgsSb705.WriteString(
+			fmt.Sprintf("%s: %s,", keyField.Field.ToGoPrivate(), keyField.Definition.Type.String()),
+		)
 	}
-	resolverSDL = fmt.Sprintf("\t%s(%s): %s!", resolver.ResolverName, resolverArgs, resolver.ReturnTypeName)
+	resolverArgs += resolverArgsSb705.String()
+	resolverSDL = fmt.Sprintf(
+		"\t%s(%s): %s!",
+		resolver.ResolverName,
+		resolverArgs,
+		resolver.ReturnTypeName,
+	)
 	return resolverSDL, ""
 }
 
 func buildEntityResolverInputDefinitionSDL(resolver *EntityResolver) string {
 	entityResolverInputDefinition := "input " + resolver.InputTypeName + " {\n"
+	var entityResolverInputDefinitionSb714 strings.Builder
 	for _, keyField := range resolver.KeyFields {
-		entityResolverInputDefinition += fmt.Sprintf(
+		entityResolverInputDefinitionSb714.WriteString(fmt.Sprintf(
 			"\t%s: %s\n",
 			keyField.Field.ToGo(),
 			keyField.Definition.Type.String(),
-		)
+		))
 	}
+	entityResolverInputDefinition += entityResolverInputDefinitionSb714.String()
 	return entityResolverInputDefinition + "}"
 }
 

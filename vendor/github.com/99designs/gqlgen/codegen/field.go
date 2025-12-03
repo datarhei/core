@@ -76,7 +76,8 @@ func (b *builder) buildField(obj *Object, field *ast.FieldDefinition) (*Field, e
 		log.Println(err.Error())
 	}
 
-	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() && f.TypeReference.IsStruct() {
+	if f.IsResolver && b.Config.ResolversAlwaysReturnPointers && !f.TypeReference.IsPtr() &&
+		f.TypeReference.IsStruct() {
 		f.TypeReference = b.Binder.PointerTo(f.TypeReference)
 	}
 
@@ -317,9 +318,13 @@ func (b *builder) findBindMethodTarget(in types.Type, name string) (types.Object
 	return nil, nil
 }
 
-func (b *builder) findBindMethoderTarget(methodFunc func(i int) *types.Func, methodCount int, name string) (types.Object, error) {
+func (b *builder) findBindMethoderTarget(
+	methodFunc func(i int) *types.Func,
+	methodCount int,
+	name string,
+) (types.Object, error) {
 	var found types.Object
-	for i := 0; i < methodCount; i++ {
+	for i := range methodCount {
 		method := methodFunc(i)
 		if !method.Exported() || !strings.EqualFold(method.Name(), name) {
 			continue
@@ -373,7 +378,10 @@ func (b *builder) findBindEmbedsTarget(in types.Type, name string) (types.Object
 	return nil, nil
 }
 
-func (b *builder) findBindStructEmbedsTarget(strukt *types.Struct, name string) (types.Object, error) {
+func (b *builder) findBindStructEmbedsTarget(
+	strukt *types.Struct,
+	name string,
+) (types.Object, error) {
 	var found types.Object
 	for i := 0; i < strukt.NumFields(); i++ {
 		field := strukt.Field(i)
@@ -403,7 +411,10 @@ func (b *builder) findBindStructEmbedsTarget(strukt *types.Struct, name string) 
 	return found, nil
 }
 
-func (b *builder) findBindInterfaceEmbedsTarget(iface *types.Interface, name string) (types.Object, error) {
+func (b *builder) findBindInterfaceEmbedsTarget(
+	iface *types.Interface,
+	name string,
+) (types.Object, error) {
 	var found types.Object
 	for i := 0; i < iface.NumEmbeddeds(); i++ {
 		embeddedType := iface.EmbeddedType(i)
@@ -518,6 +529,36 @@ func (f *Field) IsRoot() bool {
 	return f.Object.Root
 }
 
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+func formatGoType(goType string) string {
+	if strings.Contains(goType, "/") {
+		lastDot := strings.LastIndex(goType, ".")
+		if lastDot == -1 {
+			return goType
+		}
+
+		packagePath := goType[:lastDot]
+		typeName := goType[lastDot+1:]
+
+		alias := templates.CurrentImports.Lookup(packagePath)
+		if alias == "" {
+			return typeName
+		}
+
+		return alias + "." + typeName
+	}
+
+	return goType
+}
+
 func (f *Field) ShortResolverDeclaration() string {
 	return f.ShortResolverSignature(nil)
 }
@@ -537,9 +578,33 @@ func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 	if !f.Object.Root {
 		res += fmt.Sprintf(", obj %s", templates.CurrentImports.LookupType(f.Object.Reference()))
 	}
-	for _, arg := range f.Args {
-		res += fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO))
+	var resSb540 strings.Builder
+
+	var inlineInfo *InlineArgsInfo
+	if f.Object != nil && f.Object.Definition != nil {
+		inlineInfo = GetInlineArgsMetadata(f.Object.Name, f.Name)
 	}
+	if inlineInfo != nil {
+		goType := formatGoType(inlineInfo.GoType)
+		resSb540.WriteString(fmt.Sprintf(", %s %s", inlineInfo.OriginalArgName, goType))
+
+		for _, arg := range f.Args {
+			if !contains(inlineInfo.ExpandedArgs, arg.Name) {
+				resSb540.WriteString(
+					fmt.Sprintf(
+						", %s %s",
+						arg.VarName,
+						templates.CurrentImports.LookupType(arg.TypeReference.GO),
+					),
+				)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			resSb540.WriteString(fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO)))
+		}
+	}
+	res += resSb540.String()
 
 	result := templates.CurrentImports.LookupType(f.TypeReference.GO)
 	if f.Object.Stream {
@@ -555,7 +620,11 @@ func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 			namedE = ft.Results.List[1].Names[0].Name
 		}
 	}
-	res += fmt.Sprintf(") (%s %s, %s error)", namedV, result, namedE)
+	if namedV != "" || namedE != "" {
+		res += fmt.Sprintf(") (%s %s, %s error)", namedV, result, namedE)
+	} else {
+		res += fmt.Sprintf(") (%s, error)", result)
+	}
 	return res
 }
 
@@ -568,9 +637,17 @@ func (f *Field) GoResultName() (string, bool) {
 
 func (f *Field) ComplexitySignature() string {
 	res := "func(childComplexity int"
+	var resSb571 strings.Builder
 	for _, arg := range f.Args {
-		res += fmt.Sprintf(", %s %s", arg.VarName, templates.CurrentImports.LookupType(arg.TypeReference.GO))
+		resSb571.WriteString(
+			fmt.Sprintf(
+				", %s %s",
+				arg.VarName,
+				templates.CurrentImports.LookupType(arg.TypeReference.GO),
+			),
+		)
 	}
+	res += resSb571.String()
 	res += ") int"
 	return res
 }
@@ -578,7 +655,11 @@ func (f *Field) ComplexitySignature() string {
 func (f *Field) ComplexityArgs() string {
 	args := make([]string, len(f.Args))
 	for i, arg := range f.Args {
-		args[i] = "args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+		args[i] = "args[" + strconv.Quote(
+			arg.Name,
+		) + "].(" + templates.CurrentImports.LookupType(
+			arg.TypeReference.GO,
+		) + ")"
 	}
 
 	return strings.Join(args, ", ")
@@ -588,7 +669,7 @@ func (f *Field) CallArgs() string {
 	args := make([]string, 0, len(f.Args)+2)
 
 	if f.IsResolver {
-		args = append(args, "rctx")
+		args = append(args, "ctx")
 
 		if !f.Object.Root {
 			args = append(args, "obj")
@@ -597,21 +678,100 @@ func (f *Field) CallArgs() string {
 		args = append(args, "ctx")
 	}
 
-	for _, arg := range f.Args {
-		tmp := "fc.Args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+	var inlineInfo *InlineArgsInfo
+	if f.Object != nil && f.Object.Definition != nil {
+		inlineInfo = GetInlineArgsMetadata(f.Object.Name, f.Name)
+	}
+	if inlineInfo != nil {
+		isMap := strings.Contains(inlineInfo.GoType, "map[")
 
-		if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
-			tmp = fmt.Sprintf(`
+		var entries []string
+		for _, argName := range inlineInfo.ExpandedArgs {
+			var argRef *FieldArgument
+			for _, arg := range f.Args {
+				if arg.Name == argName {
+					argRef = arg
+					break
+				}
+			}
+			if argRef != nil {
+				goType := templates.CurrentImports.LookupType(argRef.TypeReference.GO)
+				var entry string
+				if isMap {
+					entry = fmt.Sprintf("%q: fc.Args[%q].(%s)", argName, argName, goType)
+				} else {
+					fieldName := templates.ToGo(argName)
+					entry = fmt.Sprintf("%s: fc.Args[%q].(%s)", fieldName, argName, goType)
+				}
+				entries = append(entries, entry)
+			}
+		}
+
+		goType := formatGoType(inlineInfo.GoType)
+		bundled := fmt.Sprintf("%s{\n\t\t%s,\n\t}", goType, strings.Join(entries, ",\n\t\t"))
+		args = append(args, bundled)
+
+		for _, arg := range f.Args {
+			if !contains(inlineInfo.ExpandedArgs, arg.Name) {
+				tmp := "fc.Args[" + strconv.Quote(
+					arg.Name,
+				) + "].(" + templates.CurrentImports.LookupType(
+					arg.TypeReference.GO,
+				) + ")"
+
+				if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
+					tmp = fmt.Sprintf(`
 				func () any {
 					if fc.Args["%s"] == nil {
 						return nil
 					}
 					return fc.Args["%s"].(any)
 				}()`, arg.Name, arg.Name,
-			)
-		}
+					)
+				}
 
-		args = append(args, tmp)
+				args = append(args, tmp)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			tmp := "fc.Args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
+
+			if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
+				tmp = fmt.Sprintf(`
+				func () any {
+					if fc.Args["%s"] == nil {
+						return nil
+					}
+					return fc.Args["%s"].(any)
+				}()`, arg.Name, arg.Name,
+				)
+			}
+
+			args = append(args, tmp)
+		}
+	}
+
+	return strings.Join(args, ", ")
+}
+
+// StubCallArgs returns a comma-separated list of argument variable names for stub code.
+func (f *Field) StubCallArgs() string {
+	args := make([]string, 0, len(f.Args)+2)
+
+	inlineInfo := GetInlineArgsMetadata(f.Object.Name, f.Name)
+	if inlineInfo != nil {
+		args = append(args, inlineInfo.OriginalArgName)
+
+		for _, arg := range f.Args {
+			if !contains(inlineInfo.ExpandedArgs, arg.Name) {
+				args = append(args, arg.VarName)
+			}
+		}
+	} else {
+		for _, arg := range f.Args {
+			args = append(args, arg.VarName)
+		}
 	}
 
 	return strings.Join(args, ", ")

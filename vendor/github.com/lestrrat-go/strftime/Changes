@@ -1,6 +1,9 @@
 Changes
 =======
 
+v1.1.1 - 29 Jul 2025
+  * Implement %G and %g (#67)
+
 v1.1.0 - 28 Aug 2024
 [Miscellaneous]
   * github.com/pkg/errors has been removed (it has been two years :)

@@ -41,6 +41,8 @@ var (
 	// monday as the first day, and 01 as the first value
 	weekNumberMondayOriginOneOrigin = AppendFunc(appendWeekNumber)
 	eby                             = StdlibFormat("_2-Jan-2006")
+	weekyear                        = AppendFunc(appendWeekYear)          // week year, with century
+	weekyearNoCentury               = AppendFunc(appendWeekYearNoCentury) // week year, without century
 	// monday as the first day, and 00 as the first value
 	weekNumberMondayOrigin = weeknumberOffset(false) // week number of the year, Monday first
 	weekdaySundayOrigin    = weekday(0)
@@ -257,6 +259,40 @@ func (v weeknumberOffset) Append(b []byte, t time.Time) []byte {
 		b = append(b, '0')
 	}
 	return append(b, strconv.Itoa(n)...)
+}
+
+func appendWeekYear(b []byte, t time.Time) []byte {
+	year, _ := t.ISOWeek()
+
+	// Handle negative years (BCE)
+	if year < 0 {
+		b = append(b, '-')
+		year = -year
+	}
+	// Ensure 4-digit formatting
+	if year < 1000 {
+		if year < 10 {
+			b = append(b, '0', '0', '0')
+		} else if year < 100 {
+			b = append(b, '0', '0')
+		} else {
+			b = append(b, '0')
+		}
+	}
+	return append(b, strconv.Itoa(year)...)
+}
+
+func appendWeekYearNoCentury(b []byte, t time.Time) []byte {
+	year, _ := t.ISOWeek()
+	if year < 0 {
+		b = append(b, '-')
+		year = -year
+	}
+	yearNoCentury := year % 100
+	if yearNoCentury < 10 {
+		b = append(b, '0')
+	}
+	return append(b, strconv.Itoa(yearNoCentury)...)
 }
 
 func appendWeekNumber(b []byte, t time.Time) []byte {
