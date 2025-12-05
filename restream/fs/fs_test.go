@@ -373,8 +373,7 @@ func BenchmarkCleanup(b *testing.B) {
 
 	rfs := cleanfs.(*filesystem)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rfs.cleanup()
 	}
 }
@@ -393,7 +392,7 @@ func BenchmarkPurge(b *testing.B) {
 
 	ids := make([]string, nProcs)
 
-	for i := 0; i < nProcs; i++ {
+	for i := range nProcs {
 		id := rand.StringAlphanumeric(8)
 
 		patterns := []Pattern{
@@ -435,7 +434,7 @@ func BenchmarkPurge(b *testing.B) {
 	}
 
 	// Fill the filesystem with files
-	for j := 0; j < nProcs; j++ {
+	for j := range nProcs {
 		path := fmt.Sprintf("/%d/%s.m3u8", j, ids[j])
 		memfs.WriteFile(path, []byte("foobar"))
 		path = fmt.Sprintf("/%d/%s_0.m3u8", j, ids[j])
@@ -452,8 +451,7 @@ func BenchmarkPurge(b *testing.B) {
 
 	rfs := cleanfs.(*filesystem)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rfs.purge(rfs.cleanupPatterns[ids[42]])
 	}
 }

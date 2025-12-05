@@ -39,7 +39,7 @@ func BenchmarkRewrite(b *testing.B) {
 	buffer := &mem.Buffer{}
 	prefix := []byte("/path/to/foobar/")
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.buffer.Reset()
 		r.Write(data)
 

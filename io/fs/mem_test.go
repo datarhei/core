@@ -109,9 +109,7 @@ func benchmarkMemList(b *testing.B, fs Filesystem) {
 		fs.WriteFile(path, []byte("foobar"))
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		fs.List("/", ListOptions{
 			Pattern: "/5/**",
 		})
@@ -119,15 +117,13 @@ func benchmarkMemList(b *testing.B, fs Filesystem) {
 }
 
 func benchmarkMemRemoveList(b *testing.B, fs Filesystem) {
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		id := rand.StringAlphanumeric(8)
 		path := fmt.Sprintf("/%d/%s.dat", i, id)
 		fs.WriteFile(path, []byte("foobar"))
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		fs.RemoveList("/", ListOptions{
 			Pattern: "/5/**",
 		})
@@ -137,16 +133,14 @@ func benchmarkMemRemoveList(b *testing.B, fs Filesystem) {
 func benchmarkMemReadFile(b *testing.B, fs Filesystem) {
 	nFiles := 1000
 
-	for i := 0; i < nFiles; i++ {
+	for i := range nFiles {
 		path := fmt.Sprintf("/%d.dat", i)
 		fs.WriteFile(path, []byte(rand.StringAlphanumeric(2*1024)))
 	}
 
 	r := gorand.New(gorand.NewSource(42))
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		num := r.Intn(nFiles)
 		f := fs.Open("/" + strconv.Itoa(num) + ".dat")
 		f.Close()
@@ -156,14 +150,12 @@ func benchmarkMemReadFile(b *testing.B, fs Filesystem) {
 func benchmarkMemWriteFile(b *testing.B, fs Filesystem) {
 	nFiles := 50000
 
-	for i := 0; i < nFiles; i++ {
+	for i := range nFiles {
 		path := fmt.Sprintf("/%d.dat", i)
 		fs.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		path := fmt.Sprintf("/%d.dat", i%nFiles)
 		fs.WriteFile(path, []byte(rand.StringAlphanumeric(1)))
 	}
@@ -181,11 +173,11 @@ func benchmarkMemReadFileWhileWriting(b *testing.B, fs Filesystem) {
 
 	data := []byte(rand.StringAlphanumeric(2 * 1024))
 
-	for i := 0; i < nWriters; i++ {
+	for i := range nWriters {
 		writerWg.Add(1)
 
 		go func(ctx context.Context, from int) {
-			for i := 0; i < nFiles; i++ {
+			for i := range nFiles {
 				path := fmt.Sprintf("/%d.dat", from+i)
 				fs.WriteFile(path, data)
 			}
@@ -215,12 +207,12 @@ func benchmarkMemReadFileWhileWriting(b *testing.B, fs Filesystem) {
 
 	readerWg := sync.WaitGroup{}
 
-	for i := 0; i < nReaders; i++ {
+	for range nReaders {
 		readerWg.Add(1)
 		go func() {
 			defer readerWg.Done()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				num := gorand.Intn(nWriters * nFiles)
 				f := fs.Open("/" + strconv.Itoa(num) + ".dat")
 				f.Close()

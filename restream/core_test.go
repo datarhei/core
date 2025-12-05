@@ -1707,7 +1707,7 @@ func BenchmarkGetProcessIDs(b *testing.B) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(b, err)
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		process := getDummyProcess()
 		process.ID = "test_" + strconv.Itoa(i)
 
@@ -1715,9 +1715,7 @@ func BenchmarkGetProcessIDs(b *testing.B) {
 		require.Equal(b, nil, err, "Failed to add process (%s)", err)
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ids := rs.GetProcessIDs("", "", "", "")
 		require.NotEmpty(b, ids)
 		require.Equal(b, 1000, len(ids))
@@ -1728,7 +1726,7 @@ func BenchmarkGetProcess(b *testing.B) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(b, err)
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		process := getDummyProcess()
 		process.ID = "test_" + strconv.Itoa(i)
 
@@ -1738,9 +1736,7 @@ func BenchmarkGetProcess(b *testing.B) {
 
 	rand := rand.New(rand.NewSource(42))
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		n := rand.Intn(1000)
 		p, err := rs.GetProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""))
 		require.NotNil(b, p)
@@ -1754,7 +1750,7 @@ func BenchmarkGetProcessState(b *testing.B) {
 
 	n := 10
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		process := getDummyProcess()
 		process.ID = "test_" + strconv.Itoa(i)
 		process.Autostart = true
@@ -1767,16 +1763,14 @@ func BenchmarkGetProcessState(b *testing.B) {
 
 	time.Sleep(10 * time.Second)
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		n := rand.Intn(n)
 		s, err := rs.GetProcessState(app.NewProcessID("test_"+strconv.Itoa(n), ""))
 		require.NotNil(b, s)
 		require.Nil(b, err)
 	}
 
-	for i := 0; i < n; i++ {
+	for range n {
 		rs.DeleteProcess(app.NewProcessID("test_"+strconv.Itoa(n), ""), true)
 	}
 }

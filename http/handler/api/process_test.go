@@ -754,7 +754,7 @@ func BenchmarkAllProcesses(b *testing.B) {
 	err = json.Unmarshal(data.Bytes(), &process)
 	require.NoError(b, err)
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		process.ID = "test_" + strconv.Itoa(i)
 
 		encoded, err := json.Marshal(&process)
@@ -767,9 +767,7 @@ func BenchmarkAllProcesses(b *testing.B) {
 		mock.Request(b, http.StatusOK, router, "POST", "/", &data)
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		response := mock.RequestEx(b, http.StatusOK, router, "GET", "/", nil, false)
 		require.Equal(b, response.Code, 200)
 	}

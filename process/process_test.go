@@ -751,11 +751,9 @@ func BenchmarkScannerText(b *testing.B) {
 		data = append(data, []byte(line)...)
 	}
 
-	b.ResetTimer()
-
 	lastline := ""
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r := bytes.NewReader(data)
 		scanner := bufio.NewScanner(r)
 		scanner.Split(bufio.ScanLines)
@@ -781,11 +779,9 @@ func BenchmarkScannerBytes(b *testing.B) {
 		data = append(data, []byte(line)...)
 	}
 
-	b.ResetTimer()
-
 	lastline := []byte{}
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r := bytes.NewReader(data)
 		scanner := bufio.NewScanner(r)
 		scanner.Split(bufio.ScanLines)

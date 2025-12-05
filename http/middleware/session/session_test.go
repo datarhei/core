@@ -158,7 +158,7 @@ func BenchmarkHeaderSize(b *testing.B) {
 
 	buffer := &mem.Buffer{}
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		headerSize(header, buffer)
 	}
 }

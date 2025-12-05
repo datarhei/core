@@ -1776,9 +1776,7 @@ func BenchmarkParserString(b *testing.B) {
 		[]byte(`[https @ 0x557c840d1080] [info] Opening 'https://ch-fra-n16.livespotting.com/vpu/e9slfpe3/z60wzayk_720_100794.ts' for reading`),
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		parser.Parse(data[0])
 		parser.Parse(data[1])
 	}

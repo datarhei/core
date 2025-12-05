@@ -70,7 +70,7 @@ func BenchmarkHLSSegmentReader(b *testing.B) {
 	rd := bytes.NewReader(data)
 	r := io.NopCloser(rd)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		rd.Reset(data)
 		br := &segmentReader{
 			reader: io.NopCloser(r),
@@ -139,7 +139,7 @@ func BenchmarkHLSRewrite(b *testing.B) {
 	u, err := url.Parse("http://example.com/test.m3u8")
 	require.NoError(b, err)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		br := &sessionRewriter{
 			buffer: mem.Get(),
 		}

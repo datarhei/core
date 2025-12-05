@@ -392,7 +392,7 @@ func BenchmarkCompress(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 
-				for i := 0; i < b.N; i++ {
+				for b.Loop() {
 					rec := httptest.NewRecorder()
 					c := e.NewContext(req, rec)
 					h(c)
@@ -423,7 +423,7 @@ func BenchmarkCompressJSON(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				rec := httptest.NewRecorder()
 				c := e.NewContext(req, rec)
 				h(c)

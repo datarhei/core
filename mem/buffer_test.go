@@ -27,7 +27,7 @@ func BenchmarkBufferReadFrom(b *testing.B) {
 
 	r := bytes.NewReader(data)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.Seek(0, io.SeekStart)
 		buf := &Buffer{}
 		buf.ReadFrom(r)
@@ -39,7 +39,7 @@ func BenchmarkBytesBufferReadFrom(b *testing.B) {
 
 	r := bytes.NewReader(data)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		r.Seek(0, io.SeekStart)
 		buf := &bytes.Buffer{}
 		buf.ReadFrom(r)

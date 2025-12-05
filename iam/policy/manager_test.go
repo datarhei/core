@@ -118,15 +118,13 @@ func BenchmarkEnforce(b *testing.B) {
 
 	names := []string{}
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		name := fmt.Sprintf("user%d", i)
 		names = append(names, name)
 		am.AddPolicy(name, "$none", []string{"foobar"}, "**", []string{"ANY"})
 	}
 
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		name := names[rand.IntN(1000)]
 		ok, _ := am.Enforce(name, "$none", "foobar", "baz", "read")
 		require.True(b, ok)
@@ -145,7 +143,7 @@ func BenchmarkConcurrentEnforce(b *testing.B) {
 
 	names := []string{}
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		name := fmt.Sprintf("user%d", i)
 		names = append(names, name)
 		am.AddPolicy(name, "$none", []string{"foobar"}, "**", []string{"ANY"})
@@ -160,7 +158,7 @@ func BenchmarkConcurrentEnforce(b *testing.B) {
 		go func() {
 			defer readerWg.Done()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				name := names[rand.IntN(1000)]
 				ok, _ := am.Enforce(name, "$none", "foobar", "baz", "read")
 				require.True(b, ok)
