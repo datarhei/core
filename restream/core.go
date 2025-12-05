@@ -226,6 +226,7 @@ func (r *restream) Stop() {
 			go func(t *task) {
 				defer wg.Done()
 				t.Kill()
+				t.parser.Destroy()
 			}(t)
 
 			return true

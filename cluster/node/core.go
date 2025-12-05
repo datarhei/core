@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/config"
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/client"
 	"github.com/datarhei/core/v16/log"
@@ -99,6 +100,11 @@ type Core struct {
 	media     map[string]*Media
 	mediaLock sync.RWMutex
 
+	events struct {
+		log     *event.PubSub
+		process *event.PubSub
+	}
+
 	logger log.Logger
 }
 
@@ -110,6 +116,9 @@ func NewCore(id string, logger log.Logger) *Core {
 		logger: logger,
 		media:  map[string]*Media{},
 	}
+
+	core.events.log = event.NewPubSub()
+	core.events.process = event.NewPubSub()
 
 	if core.logger == nil {
 		core.logger = log.New("")
@@ -173,6 +182,9 @@ func (n *Core) Stop() {
 
 	n.cancel()
 	n.cancel = nil
+
+	n.events.process.Close()
+	n.events.log.Close()
 
 	n.disconnect()
 }
@@ -320,6 +332,9 @@ func (n *Core) connect() error {
 	go n.mediaEvents(ctx, "disk")
 	go n.mediaEvents(ctx, "rtmp")
 	go n.mediaEvents(ctx, "srt")
+
+	go n.logEvents(ctx)
+	go n.processEvents(ctx)
 
 	n.lock.Unlock()
 
@@ -933,14 +948,114 @@ func (n *Core) ClusterProcessList() ([]Process, error) {
 	return processes, nil
 }
 
-func (n *Core) Events(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
-	n.lock.RLock()
-	client := n.client
-	n.lock.RUnlock()
+func (n *Core) logEvents(ctx context.Context) {
+	defer func() {
+		n.logger.Warn().WithField("source", "log").Log("Disconnected from event source")
+	}()
 
-	if client == nil {
-		return nil, ErrNoPeer
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		n.lock.RLock()
+		client := n.client
+		n.lock.RUnlock()
+
+		if client == nil {
+			n.logger.Error().WithField("source", "log").Log("Failed to connect to event source, client not connected")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		ch, err := client.LogEvents(ctx, api.LogEventFilters{})
+		if err != nil {
+			n.logger.Error().WithField("source", "log").WithError(err).Log("Failed to connect to event source")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		n.logger.Info().WithField("source", "log").Log("Connected to event source")
+
+	innerloop:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e, ok := <-ch:
+				if !ok {
+					break innerloop
+				}
+
+				e.CoreID = n.id
+
+				n.events.log.Publish(e.Marshal())
+			}
+		}
+
+		n.logger.Info().WithField("source", "process").Log("Reconnecting to event source")
+		time.Sleep(5 * time.Second)
 	}
+}
 
-	return client.Events(ctx, filters)
+func (n *Core) LogEventsSource() event.EventSource {
+	return n.events.log.EventSource()
+}
+
+func (n *Core) processEvents(ctx context.Context) {
+	defer func() {
+		n.logger.Warn().WithField("source", "process").Log("Disconnected from event source")
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		n.lock.RLock()
+		client := n.client
+		n.lock.RUnlock()
+
+		if client == nil {
+			n.logger.Error().WithField("source", "process").Log("Failed to connect to event source, client not connected")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		ch, err := client.ProcessEvents(ctx, api.ProcessEventFilters{})
+		if err != nil {
+			n.logger.Error().WithField("source", "process").WithError(err).Log("Failed to connect to event source")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		n.logger.Info().WithField("source", "process").Log("Connected to event source")
+
+	innerloop:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e, ok := <-ch:
+				if !ok {
+					break innerloop
+				}
+
+				e.CoreID = n.id
+
+				n.events.process.Publish(e.Marshal())
+			}
+		}
+
+		n.logger.Info().WithField("source", "process").Log("Reconnecting to event source")
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func (n *Core) ProcessEventsSource() event.EventSource {
+	return n.events.process.EventSource()
 }

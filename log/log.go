@@ -3,6 +3,7 @@ package log
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -285,11 +286,6 @@ func (e *Event) Log(format string, args ...interface{}) {
 }
 
 func (e *Event) clone() *Event {
-	data := make(Fields, len(e.Data))
-	for k, v := range e.Data {
-		data[k] = v
-	}
-
 	return &Event{
 		Time:      e.Time,
 		Caller:    e.Caller,
@@ -298,7 +294,7 @@ func (e *Event) clone() *Event {
 		Component: e.Component,
 		Message:   e.Message,
 		err:       e.err,
-		Data:      data,
+		Data:      maps.Clone(e.Data),
 	}
 }
 

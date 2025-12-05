@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	goslices "slices"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/slices"
 
 	"github.com/labstack/echo/v4"
@@ -20,16 +20,15 @@ import (
 
 // The EventsHandler type provides handler functions for retrieving event.
 type EventsHandler struct {
-	logs    log.ChannelWriter
+	logs    event.EventSource
 	media   map[string]event.MediaSource
 	process event.EventSource
 	lock    sync.Mutex
 }
 
 // NewEvents returns a new EventsHandler type
-func NewEvents(logs log.ChannelWriter) *EventsHandler {
+func NewEvents() *EventsHandler {
 	return &EventsHandler{
-		logs:  logs,
 		media: map[string]event.MediaSource{},
 	}
 }
@@ -54,6 +53,17 @@ func (h *EventsHandler) SetProcessSource(source event.EventSource) {
 	defer h.lock.Unlock()
 
 	h.process = source
+}
+
+func (h *EventsHandler) SetLogSource(source event.EventSource) {
+	if source == nil {
+		return
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	h.logs = source
 }
 
 // LogEvents returns a stream of event
@@ -107,13 +117,14 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 	res.Header().Set(echo.HeaderConnection, "close")
 	res.WriteHeader(http.StatusOK)
 
-	evts, cancel := h.logs.Subscribe()
+	evts, cancel, err := h.logs.Events()
+	if err != nil {
+		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+	}
 	defer cancel()
 
 	enc := json.NewEncoder(res)
 	enc.SetIndent("", "")
-
-	done := make(chan error, 1)
 
 	filterEvent := func(event *api.LogEvent) bool {
 		if len(filter) == 0 {
@@ -136,15 +147,17 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 
 		for {
 			select {
-			case err := <-done:
-				return err
 			case <-reqctx.Done():
-				done <- nil
+				return nil
 			case <-ticker.C:
 				res.Write([]byte(":keepalive\n\n"))
 				res.Flush()
-			case e := <-evts:
-				event.Unmarshal(&e)
+			case e, ok := <-evts:
+				if !ok {
+					return fmt.Errorf("channel closed")
+				}
+
+				event.Unmarshal(e)
 
 				if !filterEvent(&event) {
 					continue
@@ -152,7 +165,7 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 
 				res.Write([]byte("event: " + event.Component + "\ndata: "))
 				if err := enc.Encode(event); err != nil {
-					done <- err
+					return err
 				}
 				res.Write([]byte("\n"))
 				res.Flush()
@@ -164,22 +177,24 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 
 		for {
 			select {
-			case err := <-done:
-				return err
 			case <-reqctx.Done():
-				done <- nil
+				return nil
 			case <-ticker.C:
 				res.Write([]byte("{\"event\": \"keepalive\"}\n"))
 				res.Flush()
-			case e := <-evts:
-				event.Unmarshal(&e)
+			case e, ok := <-evts:
+				if !ok {
+					return fmt.Errorf("channel closed")
+				}
+
+				event.Unmarshal(e)
 
 				if !filterEvent(&event) {
 					continue
 				}
 
 				if err := enc.Encode(event); err != nil {
-					done <- err
+					return err
 				}
 				res.Flush()
 			}
@@ -248,8 +263,6 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 	enc := json.NewEncoder(res)
 	enc.SetIndent("", "")
 
-	done := make(chan error, 1)
-
 	createList := func() api.MediaEvent {
 		list := mediaSource.MediaList()
 
@@ -277,7 +290,7 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 	}
 
 	if err := enc.Encode(createList()); err != nil {
-		done <- err
+		return err
 	}
 	res.Flush()
 
@@ -285,19 +298,21 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 
 	for {
 		select {
-		case err := <-done:
-			return err
 		case <-reqctx.Done():
-			done <- nil
+			return nil
 		case <-keepaliveTicker.C:
 			res.Write([]byte("{\"action\":\"keepalive\"}\n"))
 			res.Flush()
 		case <-listTicker.C:
 			if err := enc.Encode(createList()); err != nil {
-				done <- err
+				return err
 			}
 			res.Flush()
-		case e := <-evts:
+		case e, ok := <-evts:
+			if !ok {
+				return fmt.Errorf("channel closed")
+			}
+
 			if !event.Unmarshal(e) {
 				continue
 			}
@@ -309,7 +324,7 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 			}
 
 			if err := enc.Encode(event); err != nil {
-				done <- err
+				return err
 			}
 			res.Flush()
 		}
@@ -370,8 +385,6 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 	enc := json.NewEncoder(res)
 	enc.SetIndent("", "")
 
-	done := make(chan error, 1)
-
 	filterEvent := func(event *api.ProcessEvent) bool {
 		if len(filter) == 0 {
 			return true
@@ -384,14 +397,19 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 
 	for {
 		select {
-		case err := <-done:
-			return err
 		case <-reqctx.Done():
-			done <- nil
+			return nil
 		case <-keepaliveTicker.C:
-			res.Write([]byte("{\"type\":\"keepalive\"}\n"))
+			_, err := res.Write([]byte("{\"type\":\"keepalive\"}\n"))
+			if err != nil {
+				return err
+			}
 			res.Flush()
-		case e := <-evts:
+		case e, ok := <-evts:
+			if !ok {
+				return fmt.Errorf("channel closed")
+			}
+
 			if !event.Unmarshal(e) {
 				continue
 			}
@@ -401,7 +419,7 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 			}
 
 			if err := enc.Encode(event); err != nil {
-				done <- err
+				return err
 			}
 			res.Flush()
 		}

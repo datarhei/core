@@ -38,6 +38,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/fs"
@@ -84,7 +85,7 @@ var ListenAndServe = http.ListenAndServe
 type Config struct {
 	Logger        log.Logger
 	LogBuffer     log.BufferWriter
-	LogEvents     log.ChannelWriter
+	LogEvents     event.EventSource
 	Restream      restream.Restreamer
 	Metrics       monitor.HistoryReader
 	Prometheus    prometheus.Reader
@@ -279,10 +280,9 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		config.LogBuffer,
 	)
 
-	s.v3handler.events = api.NewEvents(
-		config.LogEvents,
-	)
+	s.v3handler.events = api.NewEvents()
 
+	s.v3handler.events.SetLogSource(config.LogEvents)
 	for name, fs := range s.filesystems {
 		s.v3handler.events.AddMediaSource(name, fs.Filesystem)
 	}
@@ -773,7 +773,9 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 		v3.GET("/cluster/fs/:storage", s.v3handler.cluster.FilesystemListFiles)
 
-		v3.POST("/cluster/events", s.v3handler.cluster.Events)
+		v3.POST("/cluster/events", s.v3handler.cluster.LogEvents)
+		v3.POST("/cluster/events/log", s.v3handler.cluster.LogEvents)
+		v3.POST("/cluster/events/process", s.v3handler.cluster.ProcessEvents)
 
 		if !s.readOnly {
 			v3.PUT("/cluster/transfer/:id", s.v3handler.cluster.TransferLeadership)

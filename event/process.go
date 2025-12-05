@@ -11,6 +11,7 @@ type ProcessEvent struct {
 	Line      string
 	Progress  *ProcessProgress
 	Timestamp time.Time
+	CoreID    string
 }
 
 func (e *ProcessEvent) Clone() Event {
@@ -20,6 +21,7 @@ func (e *ProcessEvent) Clone() Event {
 		Type:      e.Type,
 		Line:      e.Line,
 		Timestamp: e.Timestamp,
+		CoreID:    e.CoreID,
 	}
 
 	if e.Progress != nil {

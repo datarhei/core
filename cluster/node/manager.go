@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/client"
 	"github.com/datarhei/core/v16/log"
@@ -34,6 +34,11 @@ type Manager struct {
 	cache *Cache[string]
 
 	logger log.Logger
+
+	events struct {
+		log     *event.PubSub
+		process *event.PubSub
+	}
 }
 
 var ErrNodeNotFound = errors.New("node not found")
@@ -50,6 +55,9 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		p.logger = log.New("")
 	}
 
+	p.events.log = event.NewPubSub()
+	p.events.process = event.NewPubSub()
+
 	return p, nil
 }
 
@@ -65,6 +73,9 @@ func (p *Manager) NodeAdd(id string, node *Node) (string, error) {
 	}
 
 	p.nodes[id] = node
+
+	p.events.log.Consume(node.Core().LogEventsSource(), nil)
+	p.events.process.Consume(node.Core().ProcessEventsSource(), nil)
 
 	p.logger.Info().WithFields(log.Fields{
 		"address": about.Address,
@@ -655,24 +666,14 @@ func (p *Manager) ProcessValidateConfig(nodeid string, config *app.Config) error
 	return node.Core().ProcessValidateConfig(config)
 }
 
-func (p *Manager) LogEvents(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
-	eventChan := make(chan api.LogEvent, 128)
+func (p *Manager) LogEvents() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := p.events.log.Subscribe()
 
-	p.lock.RLock()
-	for _, n := range p.nodes {
-		go func(node *Node, e chan<- api.LogEvent) {
-			eventChan, err := node.Core().Events(ctx, filters)
-			if err != nil {
-				return
-			}
+	return ch, cancel, nil
+}
 
-			for event := range eventChan {
-				event.CoreID = node.id
-				e <- event
-			}
-		}(n, eventChan)
-	}
-	p.lock.RUnlock()
+func (p *Manager) ProcessEvents() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := p.events.process.Subscribe()
 
-	return eventChan, nil
+	return ch, cancel, nil
 }

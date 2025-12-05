@@ -106,7 +106,7 @@ type api struct {
 	log struct {
 		writer io.Writer
 		buffer log.BufferWriter
-		events log.ChannelWriter
+		events *log.ChannelWriter
 		logger struct {
 			core    log.Logger
 			main    log.Logger

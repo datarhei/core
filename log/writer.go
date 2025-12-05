@@ -2,15 +2,13 @@ package log
 
 import (
 	"container/ring"
-	"context"
-	"fmt"
 	"io"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/datarhei/core/v16/event"
 	"github.com/mattn/go-isatty"
 )
 
@@ -318,114 +316,28 @@ func (w *bufferWriter) Events() []*Event {
 	return lines
 }
 
-type ChannelWriter interface {
-	Writer
-
-	Subscribe() (<-chan Event, func())
+type ChannelWriter struct {
+	pubsub *event.PubSub
 }
 
-type channelWriter struct {
-	publisher       chan Event
-	publisherClosed bool
-	publisherLock   sync.Mutex
-
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	subscriber     map[string]chan Event
-	subscriberLock sync.Mutex
-}
-
-func NewChannelWriter() ChannelWriter {
-	w := &channelWriter{
-		publisher:       make(chan Event, 1024),
-		publisherClosed: false,
-		subscriber:      make(map[string]chan Event),
+func NewChannelWriter() *ChannelWriter {
+	w := &ChannelWriter{
+		pubsub: event.NewPubSub(),
 	}
-
-	w.ctx, w.cancel = context.WithCancel(context.Background())
-
-	go w.broadcast()
 
 	return w
 }
 
-func (w *channelWriter) Write(e *Event) error {
-	event := e.clone()
-	event.logger = nil
-
-	w.publisherLock.Lock()
-	defer w.publisherLock.Unlock()
-
-	if w.publisherClosed {
-		return fmt.Errorf("writer is closed")
-	}
-
-	select {
-	case w.publisher <- *e:
-	default:
-		return fmt.Errorf("publisher queue full")
-	}
-
-	return nil
+func (w *ChannelWriter) Write(e *Event) error {
+	return w.pubsub.Publish(event.NewLogEvent(e.Time, e.Level.String(), e.Component, e.Caller, e.Message, e.Data))
 }
 
-func (w *channelWriter) Close() {
-	w.cancel()
-
-	w.publisherLock.Lock()
-	close(w.publisher)
-	w.publisherClosed = true
-	w.publisherLock.Unlock()
-
-	w.subscriberLock.Lock()
-	for _, c := range w.subscriber {
-		close(c)
-	}
-	w.subscriber = make(map[string]chan Event)
-	w.subscriberLock.Unlock()
+func (w *ChannelWriter) Close() {
+	w.pubsub.Close()
 }
 
-func (w *channelWriter) Subscribe() (<-chan Event, func()) {
-	l := make(chan Event, 1024)
+func (w *ChannelWriter) Events() (<-chan event.Event, event.CancelFunc, error) {
+	ch, cancel := w.pubsub.Subscribe()
 
-	var id string = ""
-
-	w.subscriberLock.Lock()
-	for {
-		id = shortuuid.New()
-		if _, ok := w.subscriber[id]; !ok {
-			w.subscriber[id] = l
-			break
-		}
-	}
-	w.subscriberLock.Unlock()
-
-	unsubscribe := func() {
-		w.subscriberLock.Lock()
-		delete(w.subscriber, id)
-		w.subscriberLock.Unlock()
-	}
-
-	return l, unsubscribe
-}
-
-func (w *channelWriter) broadcast() {
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case e := <-w.publisher:
-			w.subscriberLock.Lock()
-			for _, c := range w.subscriber {
-				pp := e.clone()
-
-				select {
-				case c <- *pp:
-				default:
-				}
-			}
-			w.subscriberLock.Unlock()
-		}
-	}
+	return ch, cancel, nil
 }

@@ -9,7 +9,7 @@ import (
 func TestEventFilter(t *testing.T) {
 	event := LogEvent{
 		Timestamp: 1234,
-		Level:     3,
+		Level:     "info",
 		Component: "foobar",
 		Message:   "none",
 		Data: map[string]string{
@@ -83,7 +83,7 @@ func TestEventFilter(t *testing.T) {
 func TestEventFilterDataKey(t *testing.T) {
 	event := LogEvent{
 		Timestamp: 1234,
-		Level:     3,
+		Level:     "info",
 		Component: "foobar",
 		Message:   "none",
 		Data: map[string]string{
@@ -137,7 +137,7 @@ func TestEventFilterDataKey(t *testing.T) {
 func BenchmarkEventFilters(b *testing.B) {
 	event := LogEvent{
 		Timestamp: 1234,
-		Level:     3,
+		Level:     "info",
 		Component: "foobar",
 		Message:   "none",
 		Data: map[string]string{
@@ -159,7 +159,7 @@ func BenchmarkEventFilters(b *testing.B) {
 	res := event.Filter(&levelfilter)
 	require.True(b, res)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		event.Filter(&levelfilter)
 	}
 }

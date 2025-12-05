@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/event"
-	"github.com/datarhei/core/v16/log"
 )
 
 type LogEvent struct {
 	Timestamp int64  `json:"ts" format:"int64"`
-	Level     int    `json:"level"`
+	Level     string `json:"level"`
 	Component string `json:"event"`
 	Message   string `json:"message"`
 	Caller    string `json:"caller"`
@@ -21,16 +21,22 @@ type LogEvent struct {
 	Data map[string]string `json:"data"`
 }
 
-func (e *LogEvent) Unmarshal(le *log.Event) {
-	e.Timestamp = le.Time.Unix()
-	e.Level = int(le.Level)
-	e.Component = strings.ToLower(le.Component)
-	e.Message = le.Message
-	e.Caller = le.Caller
+func (e *LogEvent) Unmarshal(le event.Event) bool {
+	evt, ok := le.(*event.LogEvent)
+	if !ok {
+		return false
+	}
+
+	e.Timestamp = evt.Time.Unix()
+	e.Level = evt.Level
+	e.Component = strings.ToLower(evt.Component)
+	e.Message = evt.Message
+	e.Caller = evt.Caller
+	e.CoreID = evt.CoreID
 
 	e.Data = make(map[string]string)
 
-	for k, v := range le.Data {
+	for k, v := range evt.Data {
 		var value string
 
 		switch val := v.(type) {
@@ -52,6 +58,26 @@ func (e *LogEvent) Unmarshal(le *log.Event) {
 
 		e.Data[k] = value
 	}
+
+	return true
+}
+
+func (e *LogEvent) Marshal() event.Event {
+	evt := &event.LogEvent{
+		Time:      time.UnixMilli(e.Timestamp),
+		Level:     e.Level,
+		Component: e.Component,
+		Caller:    e.Caller,
+		Message:   e.Message,
+		CoreID:    e.CoreID,
+		Data:      map[string]any{},
+	}
+
+	for k, v := range e.Data {
+		evt.Data[k] = v
+	}
+
+	return evt
 }
 
 func (e *LogEvent) Filter(ef *LogEventFilter) bool {
@@ -62,8 +88,7 @@ func (e *LogEvent) Filter(ef *LogEventFilter) bool {
 	}
 
 	if ef.reLevel != nil {
-		level := log.Level(e.Level).String()
-		if !ef.reLevel.MatchString(level) {
+		if !ef.reLevel.MatchString(e.Level) {
 			return false
 		}
 	}
@@ -191,6 +216,7 @@ type ProcessEvent struct {
 	Type      string           `json:"type"`
 	Line      string           `json:"line,omitempty"`
 	Progress  *ProcessProgress `json:"progress,omitempty"`
+	CoreID    string           `json:"core_id,omitempty"`
 	Timestamp int64            `json:"ts"`
 }
 
@@ -198,6 +224,22 @@ type ProcessProgressInput struct {
 	Bitrate  json.Number                  `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS      json.Number                  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 	AVstream ProcessProgressInputAVstream `json:"avstream"`
+}
+
+func (p *ProcessProgressInput) Marshal() event.ProcessProgressInput {
+	o := event.ProcessProgressInput{}
+
+	if x, err := p.Bitrate.Float64(); err == nil {
+		o.Bitrate = x
+	}
+
+	if x, err := p.FPS.Float64(); err == nil {
+		o.FPS = x
+	}
+
+	o.AVstream = p.AVstream.Marshal()
+
+	return o
 }
 
 type ProcessProgressInputAVstream struct {
@@ -208,9 +250,35 @@ type ProcessProgressInputAVstream struct {
 	Time    uint64 `json:"time"`
 }
 
+func (p *ProcessProgressInputAVstream) Marshal() event.ProcessProgressInputAVstream {
+	o := event.ProcessProgressInputAVstream{
+		Looping: p.Looping,
+		Enc:     p.Enc,
+		Drop:    p.Drop,
+		Dup:     p.Dup,
+		Time:    p.Time,
+	}
+
+	return o
+}
+
 type ProcessProgressOutput struct {
 	Bitrate json.Number `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+}
+
+func (p *ProcessProgressOutput) Marshal() event.ProcessProgressOutput {
+	o := event.ProcessProgressOutput{}
+
+	if x, err := p.Bitrate.Float64(); err == nil {
+		o.Bitrate = x
+	}
+
+	if x, err := p.FPS.Float64(); err == nil {
+		o.FPS = x
+	}
+
+	return o
 }
 
 type ProcessProgress struct {
@@ -244,6 +312,24 @@ func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 	p.Time = json.ToNumber(e.Time)
 }
 
+func (p *ProcessProgress) Marshal() *event.ProcessProgress {
+	e := &event.ProcessProgress{}
+
+	if x, err := p.Time.Float64(); err == nil {
+		e.Time = x
+	}
+
+	for _, input := range p.Input {
+		e.Input = append(e.Input, input.Marshal())
+	}
+
+	for _, output := range p.Output {
+		e.Output = append(e.Output, output.Marshal())
+	}
+
+	return e
+}
+
 func (p *ProcessEvent) Unmarshal(e event.Event) bool {
 	evt, ok := e.(*event.ProcessEvent)
 	if !ok {
@@ -261,8 +347,27 @@ func (p *ProcessEvent) Unmarshal(e event.Event) bool {
 		p.Progress.Unmarshal(evt.Progress)
 	}
 	p.Timestamp = evt.Timestamp.UnixMilli()
+	p.CoreID = evt.CoreID
 
 	return true
+}
+
+func (p *ProcessEvent) Marshal() event.Event {
+	evt := &event.ProcessEvent{
+		ProcessID: p.ProcessID,
+		Domain:    p.Domain,
+		Type:      p.Type,
+		Line:      p.Line,
+		Progress:  nil,
+		Timestamp: time.UnixMilli(p.Timestamp),
+		CoreID:    p.CoreID,
+	}
+
+	if p.Progress != nil {
+		evt.Progress = p.Progress.Marshal()
+	}
+
+	return evt
 }
 
 func (e *ProcessEvent) Filter(ef *ProcessEventFilter) bool {
@@ -284,6 +389,12 @@ func (e *ProcessEvent) Filter(ef *ProcessEventFilter) bool {
 		}
 	}
 
+	if ef.reCoreID != nil {
+		if !ef.reCoreID.MatchString(e.CoreID) {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -291,10 +402,12 @@ type ProcessEventFilter struct {
 	ProcessID string `json:"pid"`
 	Domain    string `json:"domain"`
 	Type      string `json:"type"`
+	CoreID    string `json:"core_id"`
 
 	reProcessID *regexp.Regexp
 	reDomain    *regexp.Regexp
 	reType      *regexp.Regexp
+	reCoreID    *regexp.Regexp
 }
 
 type ProcessEventFilters struct {
@@ -327,6 +440,15 @@ func (ef *ProcessEventFilter) Compile() error {
 		}
 
 		ef.reType = r
+	}
+
+	if len(ef.CoreID) != 0 {
+		r, err := regexp.Compile("(?i)" + ef.CoreID)
+		if err != nil {
+			return err
+		}
+
+		ef.reCoreID = r
 	}
 
 	return nil

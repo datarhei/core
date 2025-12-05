@@ -18,6 +18,16 @@ type EventSource interface {
 	Events() (<-chan Event, CancelFunc, error)
 }
 
+type eventSource struct {
+	pubsub *PubSub
+}
+
+func (s *eventSource) Events() (<-chan Event, CancelFunc, error) {
+	ch, cancel := s.pubsub.Subscribe()
+
+	return ch, cancel, nil
+}
+
 type PubSub struct {
 	publisher       chan Event
 	publisherClosed bool
@@ -42,6 +52,10 @@ func NewPubSub() *PubSub {
 	go w.broadcast()
 
 	return w
+}
+
+func (w *PubSub) EventSource() EventSource {
+	return &eventSource{pubsub: w}
 }
 
 func (w *PubSub) Consume(s EventSource, rewrite func(e Event) Event) {
@@ -111,7 +125,7 @@ func (w *PubSub) Close() {
 }
 
 func (w *PubSub) Subscribe() (<-chan Event, CancelFunc) {
-	l := make(chan Event, 1024)
+	l := make(chan Event, 128)
 
 	var id string = ""
 
