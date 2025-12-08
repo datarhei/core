@@ -193,19 +193,19 @@ func (r *restclient) ProcessMetadataSet(id app.ProcessID, key string, metadata a
 }
 
 func (r *restclient) ProcessProbe(id app.ProcessID) (api.Probe, error) {
-	var p api.Probe
+	var probe api.Probe
 
 	query := &url.Values{}
 	query.Set("domain", id.Domain)
 
 	data, err := r.call("GET", "/v3/process/"+url.PathEscape(id.ID)+"/probe", query, nil, "", nil)
 	if err != nil {
-		return p, err
+		return probe, err
 	}
 
-	err = json.Unmarshal(data, &p)
+	err = json.Unmarshal(data, &probe)
 
-	return p, err
+	return probe, err
 }
 
 func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
@@ -225,7 +225,7 @@ func (r *restclient) ProcessProbeConfig(p *app.Config) (api.Probe, error) {
 		return probe, err
 	}
 
-	err = json.Unmarshal(data, &p)
+	err = json.Unmarshal(data, &probe)
 
 	return probe, err
 }
