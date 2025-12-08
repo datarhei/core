@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -11,7 +13,7 @@ import (
 	"github.com/datarhei/core/v16/mem"
 )
 
-func (r *restclient) LogEvents(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEvent, error) {
+func (r *restclient) LogEvents(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEventRaw, error) {
 	buf := mem.Get()
 	defer mem.Put(buf)
 
@@ -26,34 +28,32 @@ func (r *restclient) LogEvents(ctx context.Context, filters api.LogEventFilters)
 		return nil, err
 	}
 
-	channel := make(chan api.LogEvent, 128)
+	channel := make(chan api.LogEventRaw, 128)
 
-	go func(stream io.ReadCloser, ch chan<- api.LogEvent) {
+	go func(stream io.ReadCloser, ch chan<- api.LogEventRaw) {
 		defer stream.Close()
 		defer close(channel)
 
-		decoder := json.NewDecoder(stream)
+		scanner := bufio.NewScanner(stream)
+		scanner.Split(bufio.ScanLines)
 
-		for decoder.More() {
-			var event api.LogEvent
-			if err := decoder.Decode(&event); err == io.EOF {
-				return
-			} else if err != nil {
-				event.Component = "error"
-				event.Message = err.Error()
-			}
+		for scanner.Scan() {
+			data := bytes.Clone(scanner.Bytes())
 
-			// Don't emit keepalives
-			if event.Component == "keepalive" {
-				continue
-			}
-
-			ch <- event
-
-			if event.Component == "" || event.Component == "error" {
-				return
-			}
+			ch <- data
 		}
+		/*
+			decoder := json.NewDecoder(stream)
+
+			for decoder.More() {
+				var event api.LogEventRaw
+				if err := decoder.Decode(&event); err != nil {
+					return
+				}
+
+				ch <- event
+			}
+		*/
 	}(stream, channel)
 
 	return channel, nil
@@ -105,7 +105,7 @@ func (r *restclient) MediaEvents(ctx context.Context, storage, pattern string) (
 	return channel, nil
 }
 
-func (r *restclient) ProcessEvents(ctx context.Context, filters api.ProcessEventFilters) (<-chan api.ProcessEvent, error) {
+func (r *restclient) ProcessEvents(ctx context.Context, filters api.ProcessEventFilters) (<-chan api.ProcessEventRaw, error) {
 	buf := mem.Get()
 	defer mem.Put(buf)
 
@@ -120,34 +120,33 @@ func (r *restclient) ProcessEvents(ctx context.Context, filters api.ProcessEvent
 		return nil, err
 	}
 
-	channel := make(chan api.ProcessEvent, 128)
+	channel := make(chan api.ProcessEventRaw, 128)
 
-	go func(stream io.ReadCloser, ch chan<- api.ProcessEvent) {
+	go func(stream io.ReadCloser, ch chan<- api.ProcessEventRaw) {
 		defer stream.Close()
 		defer close(channel)
 
-		decoder := json.NewDecoder(stream)
+		scanner := bufio.NewScanner(stream)
+		scanner.Split(bufio.ScanLines)
 
-		for decoder.More() {
-			var event api.ProcessEvent
-			if err := decoder.Decode(&event); err == io.EOF {
-				return
-			} else if err != nil {
-				event.Type = "error"
-				event.Line = err.Error()
-			}
+		for scanner.Scan() {
+			data := bytes.Clone(scanner.Bytes())
 
-			// Don't emit keepalives
-			if event.Type == "keepalive" {
-				continue
-			}
-
-			ch <- event
-
-			if event.Type == "" || event.Type == "error" {
-				return
-			}
+			ch <- data
 		}
+
+		/*
+			decoder := json.NewDecoder(io.TeeReader(stream, os.Stdout))
+
+			for decoder.More() {
+				var event api.ProcessEventRaw
+				if err := decoder.Decode(&event); err != nil {
+					return
+				}
+
+				ch <- event
+			}
+		*/
 	}(stream, channel)
 
 	return channel, nil

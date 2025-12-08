@@ -23,6 +23,7 @@ import (
 	configstore "github.com/datarhei/core/v16/config/store"
 	configvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/ffmpeg"
+	"github.com/datarhei/core/v16/global"
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
@@ -291,6 +292,8 @@ func (a *api) Reload() error {
 	a.log.logger.core = logger
 	a.log.buffer = buffer
 	a.log.events = events
+
+	global.SetCoreID(cfg.ID)
 
 	return nil
 }

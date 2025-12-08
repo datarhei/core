@@ -989,13 +989,11 @@ func (n *Core) logEvents(ctx context.Context) {
 					break innerloop
 				}
 
-				e.CoreID = n.id
-
-				n.events.log.Publish(e.Marshal())
+				n.events.log.Publish(&e)
 			}
 		}
 
-		n.logger.Info().WithField("source", "process").Log("Reconnecting to event source")
+		n.logger.Info().WithField("source", "log").Log("Reconnecting to event source")
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -1045,9 +1043,7 @@ func (n *Core) processEvents(ctx context.Context) {
 					break innerloop
 				}
 
-				e.CoreID = n.id
-
-				n.events.process.Publish(e.Marshal())
+				n.events.process.Publish(&e)
 			}
 		}
 

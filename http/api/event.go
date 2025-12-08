@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -119,6 +120,16 @@ func (e *LogEvent) Filter(ef *LogEventFilter) bool {
 	return true
 }
 
+type LogEventRaw json.RawMessage
+
+func (e *LogEventRaw) Clone() event.Event {
+	p := bytes.Clone([]byte(*e))
+
+	x := LogEventRaw(p)
+
+	return &x
+}
+
 type LogEventFilter struct {
 	Component string            `json:"event"`
 	Message   string            `json:"message"`
@@ -218,6 +229,16 @@ type ProcessEvent struct {
 	Progress  *ProcessProgress `json:"progress,omitempty"`
 	CoreID    string           `json:"core_id,omitempty"`
 	Timestamp int64            `json:"ts"`
+}
+
+type ProcessEventRaw json.RawMessage
+
+func (e *ProcessEventRaw) Clone() event.Event {
+	p := bytes.Clone([]byte(*e))
+
+	x := ProcessEventRaw(p)
+
+	return &x
 }
 
 type ProcessProgressInput struct {

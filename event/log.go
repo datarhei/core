@@ -3,6 +3,8 @@ package event
 import (
 	"maps"
 	"time"
+
+	"github.com/datarhei/core/v16/global"
 )
 
 type LogEvent struct {
@@ -38,5 +40,6 @@ func NewLogEvent(ts time.Time, level, component, caller, message string, data ma
 		Caller:    caller,
 		Message:   message,
 		Data:      maps.Clone(data),
+		CoreID:    global.GetCoreID(),
 	}
 }

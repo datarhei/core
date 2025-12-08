@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	goslices "slices"
 	"strings"
@@ -123,7 +124,7 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 	}
 	defer cancel()
 
-	enc := json.NewEncoder(res)
+	enc := json.NewEncoder(io.MultiWriter(res))
 	enc.SetIndent("", "")
 
 	filterEvent := func(event *api.LogEvent) bool {

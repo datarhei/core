@@ -10,6 +10,7 @@ import (
 type UnmarshalTypeError = json.UnmarshalTypeError
 type SyntaxError = json.SyntaxError
 type Number = json.Number
+type RawMessage = json.RawMessage
 
 // Unmarshal is a wrapper for json.Unmarshal
 func Unmarshal(data []byte, v interface{}) error {

@@ -135,7 +135,25 @@ func (h *ClusterHandler) LogEvents(c echo.Context) error {
 					return fmt.Errorf("channel closed")
 				}
 
-				event.Unmarshal(e)
+				ev, ok := e.(*api.LogEventRaw)
+				if !ok {
+					continue
+				}
+
+				var event api.LogEvent
+
+				err := json.Unmarshal([]byte(*ev), &event)
+				if err != nil {
+					continue
+				}
+
+				//if !event.Unmarshal(e) {
+				//	continue
+				//}
+
+				if event.Component == "keepalive" {
+					continue
+				}
 
 				if !filterEvent(&event) {
 					continue
@@ -212,7 +230,7 @@ func (h *ClusterHandler) ProcessEvents(c echo.Context) error {
 		return goslices.ContainsFunc(filter, event.Filter)
 	}
 
-	event := api.ProcessEvent{}
+	//event := api.ProcessEvent{}
 
 	for {
 		select {
@@ -229,7 +247,24 @@ func (h *ClusterHandler) ProcessEvents(c echo.Context) error {
 				return fmt.Errorf("channel closed")
 			}
 
-			if !event.Unmarshal(e) {
+			ev, ok := e.(*api.ProcessEventRaw)
+			if !ok {
+				continue
+			}
+
+			var event api.ProcessEvent
+
+			err := json.Unmarshal([]byte(*ev), &event)
+			if err != nil {
+				continue
+			}
+			//json.RawMessage(ev)
+
+			//if !event.Unmarshal(e) {
+			//	continue
+			//}
+
+			if event.Type == "keepalive" {
 				continue
 			}
 

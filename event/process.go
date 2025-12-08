@@ -2,6 +2,8 @@ package event
 
 import (
 	"time"
+
+	"github.com/datarhei/core/v16/global"
 )
 
 type ProcessEvent struct {
@@ -36,6 +38,7 @@ func NewProcessLogEvent(logline string) *ProcessEvent {
 		Type:      "line",
 		Line:      logline,
 		Timestamp: time.Now(),
+		CoreID:    global.GetCoreID(),
 	}
 }
 
@@ -44,6 +47,7 @@ func NewProcessProgressEvent(progress *ProcessProgress) *ProcessEvent {
 		Type:      "progress",
 		Progress:  progress,
 		Timestamp: time.Now(),
+		CoreID:    global.GetCoreID(),
 	}
 }
 
