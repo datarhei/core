@@ -242,6 +242,8 @@ func (e *ProcessEventRaw) Clone() event.Event {
 }
 
 type ProcessProgressInput struct {
+	ID       string                       `json:"id"`
+	Type     string                       `json:"type"`
 	Bitrate  json.Number                  `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS      json.Number                  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 	AVstream ProcessProgressInputAVstream `json:"avstream"`
@@ -264,6 +266,7 @@ func (p *ProcessProgressInput) Marshal() event.ProcessProgressInput {
 }
 
 type ProcessProgressInputAVstream struct {
+	Enabled bool   `json:"enabled"`
 	Looping bool   `json:"looping"`
 	Enc     uint64 `json:"enc"`
 	Drop    uint64 `json:"drop"`
@@ -273,6 +276,7 @@ type ProcessProgressInputAVstream struct {
 
 func (p *ProcessProgressInputAVstream) Marshal() event.ProcessProgressInputAVstream {
 	o := event.ProcessProgressInputAVstream{
+		Enabled: p.Enabled,
 		Looping: p.Looping,
 		Enc:     p.Enc,
 		Drop:    p.Drop,
@@ -283,13 +287,27 @@ func (p *ProcessProgressInputAVstream) Marshal() event.ProcessProgressInputAVstr
 	return o
 }
 
+func (p *ProcessProgressInputAVstream) Unmarshal(e event.ProcessProgressInputAVstream) {
+	p.Enabled = e.Enabled
+	p.Looping = e.Looping
+	p.Enc = e.Enc
+	p.Drop = e.Drop
+	p.Dup = e.Dup
+	p.Time = e.Time
+}
+
 type ProcessProgressOutput struct {
+	ID      string      `json:"id"`
+	Type    string      `json:"type"`
 	Bitrate json.Number `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
 }
 
 func (p *ProcessProgressOutput) Marshal() event.ProcessProgressOutput {
-	o := event.ProcessProgressOutput{}
+	o := event.ProcessProgressOutput{
+		ID:   p.ID,
+		Type: p.Type,
+	}
 
 	if x, err := p.Bitrate.Float64(); err == nil {
 		o.Bitrate = x
@@ -310,21 +328,21 @@ type ProcessProgress struct {
 
 func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 	for _, io := range e.Input {
-		p.Input = append(p.Input, ProcessProgressInput{
+		x := ProcessProgressInput{
+			ID:      io.ID,
+			Type:    io.Type,
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),
-			AVstream: ProcessProgressInputAVstream{
-				Looping: io.AVstream.Looping,
-				Enc:     io.AVstream.Enc,
-				Drop:    io.AVstream.Drop,
-				Dup:     io.AVstream.Dup,
-				Time:    io.AVstream.Time,
-			},
-		})
+		}
+		x.AVstream.Unmarshal(io.AVstream)
+
+		p.Input = append(p.Input, x)
 	}
 
 	for _, io := range e.Output {
 		p.Output = append(p.Output, ProcessProgressOutput{
+			ID:      io.ID,
+			Type:    io.Type,
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),
 		})

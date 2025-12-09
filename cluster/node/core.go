@@ -343,7 +343,7 @@ func (n *Core) connect() error {
 
 func (n *Core) mediaEvents(ctx context.Context, storage string) {
 	defer func() {
-		n.logger.Warn().WithField("storage", storage).Log("Disconnected from event source")
+		n.logger.Warn().WithField("source", storage).Log("Disconnected from event source")
 	}()
 
 	m := &Media{}
@@ -360,7 +360,7 @@ func (n *Core) mediaEvents(ctx context.Context, storage string) {
 		n.lock.RUnlock()
 
 		if client == nil {
-			n.logger.Error().WithField("storage", storage).Log("Failed to connect to event source, client not connected")
+			n.logger.Error().WithField("source", storage).Log("Failed to connect to event source, client not connected")
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -374,12 +374,12 @@ func (n *Core) mediaEvents(ctx context.Context, storage string) {
 			n.media[storage] = m
 			n.mediaLock.Unlock()
 
-			n.logger.Error().WithField("storage", storage).WithError(err).Log("Failed to connect to event source")
+			n.logger.Error().WithField("source", storage).WithError(err).Log("Failed to connect to event source")
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		n.logger.Info().WithField("storage", storage).Log("Connected to event source")
+		n.logger.Info().WithField("source", storage).Log("Connected to event source")
 
 		m.available = true
 		m.media = map[string]int64{}
@@ -407,7 +407,7 @@ func (n *Core) mediaEvents(ctx context.Context, storage string) {
 			}
 		}
 
-		n.logger.Info().WithField("storage", storage).Log("Reconnecting to event source")
+		n.logger.Info().WithField("source", storage).Log("Reconnecting to event source")
 		time.Sleep(5 * time.Second)
 	}
 }

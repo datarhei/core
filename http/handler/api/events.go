@@ -151,7 +151,10 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 			case <-reqctx.Done():
 				return nil
 			case <-ticker.C:
-				res.Write([]byte(":keepalive\n\n"))
+				_, err := res.Write([]byte(":keepalive\n\n"))
+				if err != nil {
+					return err
+				}
 				res.Flush()
 			case e, ok := <-evts:
 				if !ok {
@@ -181,7 +184,10 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 			case <-reqctx.Done():
 				return nil
 			case <-ticker.C:
-				res.Write([]byte("{\"event\": \"keepalive\"}\n"))
+				_, err := res.Write([]byte("{\"event\": \"keepalive\"}\n"))
+				if err != nil {
+					return err
+				}
 				res.Flush()
 			case e, ok := <-evts:
 				if !ok {
@@ -297,12 +303,21 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 
 	event := api.MediaEvent{}
 
+	_, err = res.Write([]byte("{\"action\":\"keepalive\"}\n"))
+	if err != nil {
+		return err
+	}
+	res.Flush()
+
 	for {
 		select {
 		case <-reqctx.Done():
 			return nil
 		case <-keepaliveTicker.C:
-			res.Write([]byte("{\"action\":\"keepalive\"}\n"))
+			_, err := res.Write([]byte("{\"action\":\"keepalive\"}\n"))
+			if err != nil {
+				return err
+			}
 			res.Flush()
 		case <-listTicker.C:
 			if err := enc.Encode(createList()); err != nil {
@@ -395,6 +410,12 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 	}
 
 	event := api.ProcessEvent{}
+
+	_, err = res.Write([]byte("{\"type\":\"keepalive\"}\n"))
+	if err != nil {
+		return err
+	}
+	res.Flush()
 
 	for {
 		select {

@@ -14,21 +14,21 @@ import (
 )
 
 type task struct {
-	readers   *atomic.Int64          // Number of concurrent readers
-	id        string                 // ID of the task/process
-	owner     string                 // Owner of the process
-	domain    string                 // Domain of the process
-	reference string                 // reference of the process
-	process   *app.Process           // The process definition
-	config    *app.Config            // Process config with replaced static placeholders
-	command   []string               // The actual command parameter for ffmpeg
-	ffmpeg    process.Process        // The OS process
-	parser    parse.Parser           // Parser for the OS process' output
-	playout   map[string]int         // Port mapping to access playout API
-	logger    log.Logger             // Logger
-	usesDisk  bool                   // Whether this task uses the disk
-	hwdevice  *atomic.Int32          // Index of the GPU this task uses
-	metadata  map[string]interface{} // Metadata of the process
+	readers   *atomic.Int64   // Number of concurrent readers
+	id        string          // ID of the task/process
+	owner     string          // Owner of the process
+	domain    string          // Domain of the process
+	reference string          // reference of the process
+	process   *app.Process    // The process definition
+	config    *app.Config     // Process config with replaced static placeholders
+	command   []string        // The actual command parameter for ffmpeg
+	ffmpeg    process.Process // The OS process
+	parser    parse.Parser    // Parser for the OS process' output
+	playout   map[string]int  // Port mapping to access playout API
+	logger    log.Logger      // Logger
+	usesDisk  bool            // Whether this task uses the disk
+	hwdevice  *atomic.Int32   // Index of the GPU this task uses
+	metadata  map[string]any  // Metadata of the process
 }
 
 func NewTask(process *app.Process, logger log.Logger) *task {
@@ -175,8 +175,13 @@ func (t *task) State() (*app.State, error) {
 	progress := t.parser.Progress()
 	state.Progress.UnmarshalParser(&progress)
 
-	state.Progress.Input = assignConfigID(state.Progress.Input, t.config.Input)
-	state.Progress.Output = assignConfigID(state.Progress.Output, t.config.Output)
+	for i, io := range state.Progress.Input {
+		state.Progress.Input[i].ID = t.config.InputIDFromAddress(io.URL)
+	}
+
+	for i, io := range state.Progress.Output {
+		state.Progress.Output[i].ID = t.config.OutputIDFromAddress(io.URL)
+	}
 
 	state.PID = status.PID
 
@@ -214,8 +219,13 @@ func (t *task) Report() (*app.Report, error) {
 		report.History[i].UnmarshalParser(&h)
 		e := &report.History[i]
 
-		e.Progress.Input = assignConfigID(e.Progress.Input, t.config.Input)
-		e.Progress.Output = assignConfigID(e.Progress.Output, t.config.Input)
+		for i, io := range e.Progress.Input {
+			e.Progress.Input[i].ID = t.config.InputIDFromAddress(io.URL)
+		}
+
+		for i, io := range e.Progress.Output {
+			e.Progress.Output[i].ID = t.config.OutputIDFromAddress(io.URL)
+		}
 	}
 
 	return report, nil
@@ -384,4 +394,28 @@ func (t *task) ImportParserReportHistory(report []parse.ReportHistoryEntry) {
 
 func (t *task) Events() (<-chan event.Event, event.CancelFunc, error) {
 	return t.parser.Events()
+}
+
+func (t *task) RewriteEvent(e event.Event) event.Event {
+	pe, ok := e.(*event.ProcessEvent)
+	if !ok {
+		return e
+	}
+
+	pe.ProcessID = t.process.ID
+	pe.Domain = t.process.Domain
+
+	if pe.Progress != nil {
+		for i, io := range pe.Progress.Input {
+			pe.Progress.Input[i].ID = t.config.InputIDFromAddress(io.URL)
+			pe.Progress.Input[i].URL = ""
+		}
+
+		for i, io := range pe.Progress.Output {
+			pe.Progress.Output[i].ID = t.config.OutputIDFromAddress(io.URL)
+			pe.Progress.Output[i].URL = ""
+		}
+	}
+
+	return pe
 }

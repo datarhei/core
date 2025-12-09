@@ -216,6 +216,26 @@ func (c *Config) ProcessID() ProcessID {
 	}
 }
 
+func (c *Config) InputIDFromAddress(address string) string {
+	for _, input := range c.Input {
+		if input.Address == address {
+			return input.ID
+		}
+	}
+
+	return ""
+}
+
+func (c *Config) OutputIDFromAddress(address string) string {
+	for _, output := range c.Output {
+		if output.Address == address {
+			return output.ID
+		}
+	}
+
+	return ""
+}
+
 type order struct {
 	order string
 	lock  sync.RWMutex

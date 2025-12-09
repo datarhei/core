@@ -675,17 +675,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	t.ffmpeg = ffmpeg
 
-	r.events.Consume(t.parser, func(e event.Event) event.Event {
-		pe, ok := e.(*event.ProcessEvent)
-		if !ok {
-			return e
-		}
-
-		pe.ProcessID = t.process.ID
-		pe.Domain = t.process.Domain
-
-		return pe
-	})
+	r.events.Consume(t.parser, t.RewriteEvent)
 
 	return t, nil
 }

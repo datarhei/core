@@ -42,18 +42,6 @@ func (r *restclient) LogEvents(ctx context.Context, filters api.LogEventFilters)
 
 			ch <- data
 		}
-		/*
-			decoder := json.NewDecoder(stream)
-
-			for decoder.More() {
-				var event api.LogEventRaw
-				if err := decoder.Decode(&event); err != nil {
-					return
-				}
-
-				ch <- event
-			}
-		*/
 	}(stream, channel)
 
 	return channel, nil
@@ -134,19 +122,6 @@ func (r *restclient) ProcessEvents(ctx context.Context, filters api.ProcessEvent
 
 			ch <- data
 		}
-
-		/*
-			decoder := json.NewDecoder(io.TeeReader(stream, os.Stdout))
-
-			for decoder.More() {
-				var event api.ProcessEventRaw
-				if err := decoder.Decode(&event); err != nil {
-					return
-				}
-
-				ch <- event
-			}
-		*/
 	}(stream, channel)
 
 	return channel, nil

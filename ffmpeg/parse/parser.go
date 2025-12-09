@@ -474,18 +474,24 @@ func (p *parser) Parse(line []byte) uint64 {
 
 	for _, io := range progress.Input {
 		input := event.ProcessProgressInput{
+			ID:      "",
+			URL:     io.URL,
+			Type:    io.Type,
 			Bitrate: io.Bitrate,
 			FPS:     io.FPS,
 		}
 
 		if io.AVstream != nil {
 			input.AVstream = event.ProcessProgressInputAVstream{
+				Enabled: true,
 				Looping: io.AVstream.Looping,
 				Enc:     io.AVstream.Enc,
 				Drop:    io.AVstream.Drop,
 				Dup:     io.AVstream.Dup,
 				Time:    io.AVstream.Input.Time,
 			}
+		} else {
+			input.AVstream = event.ProcessProgressInputAVstream{}
 		}
 
 		evt.Input = append(evt.Input, input)
@@ -493,6 +499,9 @@ func (p *parser) Parse(line []byte) uint64 {
 
 	for _, io := range progress.Output {
 		evt.Output = append(evt.Output, event.ProcessProgressOutput{
+			ID:      "",
+			URL:     io.URL,
+			Type:    io.Type,
 			Bitrate: io.Bitrate,
 			FPS:     io.FPS,
 		})

@@ -52,6 +52,9 @@ func NewProcessProgressEvent(progress *ProcessProgress) *ProcessEvent {
 }
 
 type ProcessProgressInput struct {
+	ID       string
+	URL      string
+	Type     string
 	Bitrate  float64
 	FPS      float64
 	AVstream ProcessProgressInputAVstream
@@ -59,6 +62,9 @@ type ProcessProgressInput struct {
 
 func (p *ProcessProgressInput) Clone() ProcessProgressInput {
 	c := ProcessProgressInput{
+		ID:       p.ID,
+		URL:      p.URL,
+		Type:     p.Type,
 		Bitrate:  p.Bitrate,
 		FPS:      p.FPS,
 		AVstream: p.AVstream.Clone(),
@@ -68,6 +74,7 @@ func (p *ProcessProgressInput) Clone() ProcessProgressInput {
 }
 
 type ProcessProgressInputAVstream struct {
+	Enabled bool
 	Looping bool
 	Enc     uint64
 	Drop    uint64
@@ -77,6 +84,7 @@ type ProcessProgressInputAVstream struct {
 
 func (p *ProcessProgressInputAVstream) Clone() ProcessProgressInputAVstream {
 	c := ProcessProgressInputAVstream{
+		Enabled: p.Enabled,
 		Looping: p.Looping,
 		Enc:     p.Enc,
 		Drop:    p.Drop,
@@ -88,12 +96,18 @@ func (p *ProcessProgressInputAVstream) Clone() ProcessProgressInputAVstream {
 }
 
 type ProcessProgressOutput struct {
+	ID      string
+	URL     string
+	Type    string
 	Bitrate float64
 	FPS     float64
 }
 
 func (p *ProcessProgressOutput) Clone() ProcessProgressOutput {
 	c := ProcessProgressOutput{
+		ID:      p.ID,
+		URL:     p.URL,
+		Type:    p.Type,
 		Bitrate: p.Bitrate,
 		FPS:     p.FPS,
 	}

@@ -158,10 +158,8 @@ func (w *PubSub) broadcast() {
 		case e := <-w.publisher:
 			w.subscriberLock.Lock()
 			for _, c := range w.subscriber {
-				pp := e.Clone()
-
 				select {
-				case c <- pp:
+				case c <- e.Clone():
 				default:
 				}
 			}
