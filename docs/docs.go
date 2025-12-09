@@ -570,7 +570,7 @@ const docTemplate = `{
                     "v16.?.?"
                 ],
                 "summary": "Stream of log events",
-                "operationId": "cluster-3-events",
+                "operationId": "cluster-3-events-log",
                 "parameters": [
                     {
                         "description": "Event filters",
@@ -586,6 +586,45 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.LogEvent"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/events/process": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stream of process events of whats happening on each node in the cluster",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/x-json-stream"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Stream of process events",
+                "operationId": "cluster-3-events-process",
+                "parameters": [
+                    {
+                        "description": "Event filters",
+                        "name": "filters",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessEventFilters"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessEvent"
                         }
                     }
                 }
@@ -7161,7 +7200,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "level": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "message": {
                     "type": "string"
@@ -7732,6 +7771,9 @@ const docTemplate = `{
         "api.ProcessEvent": {
             "type": "object",
             "properties": {
+                "core_id": {
+                    "type": "string"
+                },
                 "domain": {
                     "type": "string"
                 },
@@ -7755,6 +7797,9 @@ const docTemplate = `{
         "api.ProcessEventFilter": {
             "type": "object",
             "properties": {
+                "core_id": {
+                    "type": "string"
+                },
                 "domain": {
                     "type": "string"
                 },
@@ -7811,23 +7856,43 @@ const docTemplate = `{
         "api.ProcessProgressInput": {
             "type": "object",
             "properties": {
+                "avstream": {
+                    "$ref": "#/definitions/api.ProcessProgressInputAVstream"
+                },
                 "bitrate": {
                     "type": "number"
                 },
+                "fps": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ProcessProgressInputAVstream": {
+            "type": "object",
+            "properties": {
                 "drop": {
                     "type": "integer"
                 },
                 "dup": {
                     "type": "integer"
                 },
+                "enabled": {
+                    "type": "boolean"
+                },
                 "enc": {
                     "type": "integer"
                 },
-                "fps": {
-                    "type": "number"
-                },
                 "looping": {
                     "type": "boolean"
+                },
+                "time": {
+                    "type": "integer"
                 }
             }
         },
@@ -7839,6 +7904,12 @@ const docTemplate = `{
                 },
                 "fps": {
                     "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
