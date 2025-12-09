@@ -15,12 +15,12 @@ jobs:
                 include:
                     - os: alpine
                       os_version: "3.21"
-                      golang: golang:1.24-alpine3.21
+                      golang: golang:1.25-alpine3.21
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                     - os: ubuntu
                       os_version: "24.04"
-                      golang: golang:1.24-alpine3.21
+                      golang: golang:1.25-alpine3.21
                       platforms: linux/amd64
                       branch: vod
 
