@@ -271,6 +271,8 @@ func (d *Config) init() {
 	d.vars.Register(value.NewMustAddress(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
 	d.vars.Register(value.NewAbsolutePath(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.vars.Register(value.NewString(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
+	d.vars.Register(value.NewBool(&d.RTMP.HTTPFLV.Enable, false), "rtmp.httpflv_enable", "CORE_RTMP_HTTPFLV_ENABLE", nil, "Enable FLV over HTTP for RTMP streams", false, false)
+	d.vars.Register(value.NewAbsolutePath(&d.RTMP.HTTPFLV.Mount, "/rtmp"), "rtmp.httpflv_mount", "CORE_RTMP_HTTPFLV_MOUNT", nil, "Mountpoint for FLV over HTTP", false, true)
 
 	// SRT
 	d.vars.Register(value.NewBool(&d.SRT.Enable, false), "srt.enable", "CORE_SRT_ENABLE", nil, "Enable SRT server", false, false)
@@ -446,6 +448,14 @@ func (d *Config) Validate(resetLogs bool) {
 
 		if d.RTMP.Enable && d.RTMP.Address == d.RTMP.AddressTLS {
 			d.vars.Log("error", "rtmp.address", "The RTMP and RTMPS server can't listen on the same address")
+		}
+	}
+
+	if d.RTMP.Enable {
+		if d.RTMP.HTTPFLV.Enable {
+			if d.RTMP.HTTPFLV.Mount == "/" {
+				d.vars.Log("error", "rtmp.httpflv.mount", "The FLV over HTTP mount point cannot be root")
+			}
 		}
 	}
 

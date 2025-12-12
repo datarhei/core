@@ -3,8 +3,11 @@ package rtmp
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -22,6 +25,7 @@ import (
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/av/pktque"
 	"github.com/datarhei/joy4/format"
+	"github.com/datarhei/joy4/format/flv"
 	"github.com/datarhei/joy4/format/rtmp"
 )
 
@@ -80,6 +84,8 @@ type Server interface {
 
 	// Channels return a list of currently publishing streams
 	Channels() []string
+
+	PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error)
 
 	event.MediaSource
 }
@@ -212,20 +218,27 @@ func (s *server) log(who, handler, action, resource, message string, client net.
 	}).Log(message)
 }
 
-// handlePlay is called when a RTMP client wants to play a stream
-func (s *server) handlePlay(conn *rtmp.Conn) {
-	defer conn.Close()
+type PlayError struct {
+	Message  string
+	Identity string
+	Playpath string
+	Details  string
+	Err      error
+}
 
-	remote := conn.NetConn().RemoteAddr()
-	playpath, token, isStreamkey := rtmpurl.GetToken(conn.URL)
+func (e PlayError) Error() string {
+	return fmt.Sprintf("%s %s %s %s", e.Identity, e.Message, e.Playpath, e.Details)
+}
+
+func (s *server) play(remote net.Addr, u *url.URL) (*channel, string, string, error) {
+	playpath, token, isStreamkey := rtmpurl.GetToken(u)
 
 	playpath, _ = rtmpurl.RemovePathPrefix(playpath, s.app)
 
 	identity, err := s.findIdentityFromStreamKey(token)
 	if err != nil {
 		s.logger.Debug().WithError(err).Log("invalid streamkey")
-		s.log("", "PLAY", "FORBIDDEN", playpath, "invalid streamkey ("+token+")", remote)
-		return
+		return nil, "", playpath, &PlayError{"FORBIDDEN", "", playpath, "invalid streamkey (" + token + ")", err}
 	}
 
 	if identity == "$anon" && isStreamkey {
@@ -237,8 +250,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 	resource := playpath
 
 	if !s.iam.Enforce(identity, domain, "rtmp", resource, "PLAY") {
-		s.log(identity, "PLAY", "FORBIDDEN", playpath, "access denied", remote)
-		return
+		return nil, identity, playpath, &PlayError{"FORBIDDEN", "", playpath, "access denies", nil}
 	}
 
 	// Look for the stream
@@ -250,8 +262,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		// Check in the cluster for that stream
 		url, err := s.proxy.MediaGetURL("rtmp", playpath)
 		if err != nil {
-			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
-			return
+			return nil, identity, playpath, &PlayError{"NOTFOUND", identity, playpath, "", err}
 		}
 
 		url = url.JoinPath(token)
@@ -260,11 +271,10 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		src, err := avutil.Open(peerurl)
 		if err != nil {
 			s.logger.Error().WithField("address", url).WithError(err).Log("Proxying address failed")
-			s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
-			return
+			return nil, identity, playpath, &PlayError{"NOTFOUND", identity, playpath, "", err}
 		}
 
-		c := newConnectionFromDemuxer(src)
+		c := newConnectionFromDemuxCloser(src)
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -303,41 +313,56 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		ticker.Stop()
 	}
 
-	if ch != nil {
-		// Send the metadata to the client
-		conn.WriteHeader(ch.streams)
-
-		s.log(identity, "PLAY", "START", playpath, "", remote)
-
-		// Get a cursor and apply filters
-		cursor := ch.queue.Oldest()
-
-		filters := pktque.Filters{}
-
-		if ch.hasVideo {
-			// The first packet has to be a key frame
-			filters = append(filters, &pktque.WaitKeyFrame{})
-		}
-
-		// Adjust the timestamp such that the stream starts from 0
-		filters = append(filters, &pktque.FixTime{StartFromZero: true, MakeIncrement: false})
-
-		demuxer := &pktque.FilterDemuxer{
-			Filter:  filters,
-			Demuxer: cursor,
-		}
-
-		id := ch.AddSubscriber(conn, playpath, identity)
-
-		// Transfer the data, blocks until done
-		avutil.CopyFile(conn, demuxer)
-
-		ch.RemoveSubscriber(id)
-
-		s.log(identity, "PLAY", "STOP", playpath, "", remote)
-	} else {
+	if ch == nil {
 		s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
 	}
+
+	return ch, identity, playpath, nil
+}
+
+// handlePlay is called when a RTMP client wants to play a stream
+func (s *server) handlePlay(conn *rtmp.Conn) {
+	defer conn.Close()
+
+	remote := conn.NetConn().RemoteAddr()
+
+	ch, identity, playpath, err := s.play(remote, conn.URL)
+	if err != nil {
+		var rtmperr PlayError
+		if errors.As(err, &rtmperr) {
+			s.log(rtmperr.Identity, "PLAY", rtmperr.Message, rtmperr.Playpath, rtmperr.Details, remote)
+		}
+		return
+	}
+
+	s.log(identity, "PLAY", "START", playpath, "", remote)
+
+	// Get a cursor and apply filters
+	cursor := ch.queue.Oldest()
+
+	filters := pktque.Filters{}
+
+	if ch.hasVideo {
+		// The first packet has to be a key frame
+		filters = append(filters, &pktque.WaitKeyFrame{})
+	}
+
+	// Adjust the timestamp such that the stream starts from 0
+	filters = append(filters, &pktque.FixTime{StartFromZero: true, MakeIncrement: false})
+
+	demuxer := &pktque.FilterDemuxer{
+		Filter:  filters,
+		Demuxer: cursor,
+	}
+
+	id := ch.AddSubscriber(conn, remote.String(), playpath, identity)
+
+	// Transfer the data, blocks until done
+	avutil.CopyFile(conn, demuxer)
+
+	ch.RemoveSubscriber(id)
+
+	s.log(identity, "PLAY", "STOP", playpath, "", remote)
 }
 
 // handlePublish is called when a RTMP client wants to publish a stream
@@ -528,4 +553,52 @@ func (s *server) Events() (<-chan event.Event, event.CancelFunc, error) {
 
 func (s *server) MediaList() []string {
 	return s.Channels()
+}
+
+func (s *server) PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error) {
+	ch, identity, playpath, err := s.play(remote, u)
+	if err != nil {
+		return nil, err
+	}
+
+	s.log(identity, "FLVPLAY", "START", playpath, "", remote)
+
+	// Get a cursor and apply filters
+	cursor := ch.queue.Oldest()
+
+	filters := pktque.Filters{}
+
+	if ch.hasVideo {
+		// The first packet has to be a key frame
+		filters = append(filters, &pktque.WaitKeyFrame{})
+	}
+
+	// Adjust the timestamp such that the stream starts from 0
+	filters = append(filters, &pktque.FixTime{StartFromZero: true, MakeIncrement: false})
+
+	demuxer := &pktque.FilterDemuxer{
+		Filter:  filters,
+		Demuxer: cursor,
+	}
+
+	r, w := io.Pipe()
+
+	muxer := flv.NewMuxer(w)
+
+	conn := newConnectionFromMuxer(muxer)
+
+	id := ch.AddSubscriber(conn, remote.String(), playpath, identity)
+
+	go func() {
+		defer w.Close()
+
+		// Transfer the data, blocks until done
+		avutil.CopyFile(muxer, demuxer)
+
+		ch.RemoveSubscriber(id)
+
+		s.log(identity, "FLVPLAY", "STOP", playpath, "", remote)
+	}()
+
+	return r, err
 }

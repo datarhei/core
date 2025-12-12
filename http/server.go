@@ -83,30 +83,31 @@ import (
 var ListenAndServe = http.ListenAndServe
 
 type Config struct {
-	Logger        log.Logger
-	LogBuffer     log.BufferWriter
-	LogEvents     event.EventSource
-	Restream      restream.Restreamer
-	Metrics       monitor.HistoryReader
-	Prometheus    prometheus.Reader
-	MimeTypesFile string
-	MimeTypes     map[string]string
-	Filesystems   []fs.FS
-	IPLimiter     net.IPLimitValidator
-	Profiling     bool
-	Cors          CorsConfig
-	RTMP          rtmp.Server
-	SRT           srt.Server
-	Config        cfgstore.Store
-	Cache         cache.Cacher
-	Sessions      session.RegistryReader
-	Router        router.Router
-	ReadOnly      bool
-	Cluster       cluster.Cluster
-	IAM           iam.IAM
-	IAMSkipper    func(ip string) bool
-	Resources     resources.Resources
-	Compress      CompressConfig
+	Logger           log.Logger
+	LogBuffer        log.BufferWriter
+	LogEvents        event.EventSource
+	Restream         restream.Restreamer
+	Metrics          monitor.HistoryReader
+	Prometheus       prometheus.Reader
+	MimeTypesFile    string
+	MimeTypes        map[string]string
+	Filesystems      []fs.FS
+	IPLimiter        net.IPLimitValidator
+	Profiling        bool
+	Cors             CorsConfig
+	RTMP             rtmp.Server
+	RTMPHTTPFLVMount string
+	SRT              srt.Server
+	Config           cfgstore.Store
+	Cache            cache.Cacher
+	Sessions         session.RegistryReader
+	Router           router.Router
+	ReadOnly         bool
+	Cluster          cluster.Cluster
+	IAM              iam.IAM
+	IAMSkipper       func(ip string) bool
+	Resources        resources.Resources
+	Compress         CompressConfig
 }
 
 type CorsConfig struct {
@@ -166,6 +167,7 @@ type server struct {
 	mimeTypesFile string
 	mimeTypes     map[string]string
 	profiling     bool
+	httpFLVMount  string
 
 	readOnly bool
 
@@ -319,6 +321,10 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		s.v3handler.rtmp = api.NewRTMP(
 			config.RTMP,
 		)
+
+		if len(config.RTMPHTTPFLVMount) != 0 {
+			s.httpFLVMount = config.RTMPHTTPFLVMount
+		}
 	}
 
 	if config.SRT != nil {
@@ -592,6 +598,11 @@ func (s *server) setRoutes() {
 		}
 
 		s.handler.profiling.Register(prof)
+	}
+
+	// RTMP over HTTP
+	if s.v3handler.rtmp != nil && len(s.httpFLVMount) != 0 {
+		s.router.GET(s.httpFLVMount+"/*", s.v3handler.rtmp.Play)
 	}
 
 	// GraphQL

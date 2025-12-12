@@ -9,7 +9,6 @@ import (
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/joy4/av"
 	"github.com/datarhei/joy4/av/pubsub"
-	"github.com/datarhei/joy4/format/rtmp"
 )
 
 type client struct {
@@ -134,8 +133,7 @@ func (ch *channel) Close() {
 	ch.queue.Close()
 }
 
-func (ch *channel) AddSubscriber(conn *rtmp.Conn, playPath, identity string) string {
-	addr := conn.NetConn().RemoteAddr().String()
+func (ch *channel) AddSubscriber(conn connection, addr string, playPath, identity string) string {
 	ip, _, _ := net.SplitHostPort(addr)
 
 	client := newClient(conn, addr, ch.collector)

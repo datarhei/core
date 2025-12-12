@@ -1,9 +1,12 @@
 package api
 
 import (
+	"errors"
+	"net"
 	"net/http"
 
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/rtmp"
 
 	"github.com/labstack/echo/v4"
@@ -42,4 +45,52 @@ func (rtmph *RTMPHandler) ListChannels(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, list)
+}
+
+// Play plays a RTMP stream over HTTP
+// @Summary Plays a RTMP stream over HTTP
+// @Description Plays a RTMP stream over HTTP
+// @Tags v16.?.?
+// @ID rtmp-3-play
+// @Produce video/x-flv
+// @Produce json
+// @Success 200 {file} byte
+// @Success 403 {object} api.Error
+// @Success 404 {object} api.Error
+// @Success 500 {object} api.Error
+// @Router /rtmp/{path} [get]
+func (rtmph *RTMPHandler) Play(c echo.Context) error {
+	path := util.PathWildcardParam(c)
+	addr, err := net.ResolveIPAddr("ip", c.RealIP())
+	if err != nil {
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	}
+
+	u := c.Request().URL
+	u.Path = path
+
+	r, err := rtmph.rtmp.PlayFLV(addr, u)
+	if err != nil {
+		var rtmperr rtmp.PlayError
+		if errors.As(err, &rtmperr) {
+			status := http.StatusInternalServerError
+			switch rtmperr.Message {
+			case "FORBIDDEN":
+				status = http.StatusForbidden
+			case "NOTFOUND":
+				status = http.StatusNotFound
+			}
+
+			return api.Err(status, "", "%s", err.Error())
+		} else {
+			return err
+		}
+	}
+
+	defer r.Close()
+
+	c.Response().Header().Set("Transfer-Encoding", "chunked")
+	c.Response().Header().Set("Access-Control-Allow-Origin", "*") // important for browser player
+
+	return c.Stream(200, "video/x-flv", r)
 }

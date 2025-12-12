@@ -25,12 +25,36 @@ type conn struct {
 // Make sure that conn implements the connection interface
 var _ connection = &conn{}
 
-func newConnectionFromDemuxer(m av.DemuxCloser) connection {
+func newConnectionFromDemuxCloser(m av.DemuxCloser) connection {
 	c := &conn{
 		demuxer: m,
 	}
 
 	return c
+}
+
+func newConnectionFromMuxCloser(m av.MuxCloser) connection {
+	c := &conn{
+		muxer: m,
+	}
+
+	return c
+}
+
+func newConnectionFromMuxer(m av.Muxer) connection {
+	c := &conn{
+		muxer: &fakeMuxCloser{m},
+	}
+
+	return c
+}
+
+type fakeMuxCloser struct {
+	av.Muxer
+}
+
+func (f *fakeMuxCloser) Close() error {
+	return nil
 }
 
 func (c *conn) TxBytes() uint64 {

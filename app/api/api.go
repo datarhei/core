@@ -1488,14 +1488,15 @@ func (a *api) start(ctx context.Context) error {
 		Cors: http.CorsConfig{
 			Origins: cfg.Storage.CORS.Origins,
 		},
-		RTMP:     a.rtmpserver,
-		SRT:      a.srtserver,
-		Config:   a.config.store,
-		Sessions: a.sessions,
-		Router:   router,
-		ReadOnly: cfg.API.ReadOnly,
-		Cluster:  a.cluster,
-		IAM:      a.iam,
+		RTMP:             a.rtmpserver,
+		RTMPHTTPFLVMount: "",
+		SRT:              a.srtserver,
+		Config:           a.config.store,
+		Sessions:         a.sessions,
+		Router:           router,
+		ReadOnly:         cfg.API.ReadOnly,
+		Cluster:          a.cluster,
+		IAM:              a.iam,
 		IAMSkipper: func(ip string) bool {
 			if !cfg.API.Auth.Enable {
 				return true
@@ -1518,6 +1519,10 @@ func (a *api) start(ctx context.Context) error {
 			MimeTypes: cfg.Compress.MimeTypes,
 			MinLength: cfg.Compress.MinLength,
 		},
+	}
+
+	if cfg.RTMP.HTTPFLV.Enable {
+		serverConfig.RTMPHTTPFLVMount = cfg.RTMP.HTTPFLV.Mount
 	}
 
 	mainserverhandler, err := http.NewServer(serverConfig)

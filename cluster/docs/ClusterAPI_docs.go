@@ -2092,6 +2092,17 @@ const docTemplateClusterAPI = `{
                         "enable_tls": {
                             "type": "boolean"
                         },
+                        "httpflv": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "mount": {
+                                    "type": "string"
+                                }
+                            }
+                        },
                         "token": {
                             "description": "Deprecated, use IAM",
                             "type": "string"

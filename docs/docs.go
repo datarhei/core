@@ -5509,6 +5509,46 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/rtmp/{path}": {
+            "get": {
+                "description": "Plays a RTMP stream over HTTP",
+                "produces": [
+                    "video/x-flv",
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Plays a RTMP stream over HTTP",
+                "operationId": "rtmp-3-play",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -6571,6 +6611,17 @@ const docTemplate = `{
                         },
                         "enable_tls": {
                             "type": "boolean"
+                        },
+                        "httpflv": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "mount": {
+                                    "type": "string"
+                                }
+                            }
                         },
                         "token": {
                             "description": "Deprecated, use IAM",
@@ -9320,6 +9371,17 @@ const docTemplate = `{
                         },
                         "enable_tls": {
                             "type": "boolean"
+                        },
+                        "httpflv": {
+                            "type": "object",
+                            "properties": {
+                                "enable": {
+                                    "type": "boolean"
+                                },
+                                "mount": {
+                                    "type": "string"
+                                }
+                            }
                         },
                         "token": {
                             "description": "Deprecated, use IAM",

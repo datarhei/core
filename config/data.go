@@ -115,6 +115,10 @@ type Data struct {
 		AddressTLS string `json:"address_tls"`
 		App        string `json:"app"`
 		Token      string `json:"token"` // Deprecated, use IAM
+		HTTPFLV    struct {
+			Enable bool   `json:"enable"`
+			Mount  string `json:"mount"`
+		} `json:"httpflv"`
 	} `json:"rtmp"`
 	SRT struct {
 		Enable     bool   `json:"enable"`
@@ -227,7 +231,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.DB = d.DB
 	data.Host = d.Host
 	data.API = d.API
-	data.RTMP = d.RTMP
 	data.SRT = d.SRT
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
@@ -263,6 +266,15 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Sessions.PersistInterval = d.Sessions.PersistInterval
 	data.Sessions.MaxBitrate = d.Sessions.MaxBitrate
 	data.Sessions.MaxSessions = d.Sessions.MaxSessions
+
+	data.RTMP.Enable = d.RTMP.Enable
+	data.RTMP.EnableTLS = d.RTMP.EnableTLS
+	data.RTMP.Address = d.RTMP.Address
+	data.RTMP.AddressTLS = d.RTMP.AddressTLS
+	data.RTMP.App = d.RTMP.App
+	data.RTMP.Token = d.RTMP.Token
+	data.RTMP.HTTPFLV.Enable = false
+	data.RTMP.HTTPFLV.Mount = "/rtmp"
 
 	data.SRT.Log.Topics = slices.Copy(d.SRT.Log.Topics)
 
@@ -325,7 +337,6 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.DB = d.DB
 	data.Host = d.Host
 	data.API = d.API
-	data.RTMP = d.RTMP
 	data.SRT = d.SRT
 	data.Playout = d.Playout
 	data.Metrics = d.Metrics
@@ -361,6 +372,13 @@ func DowngradeV3toV2(d *Data) (*v2.Data, error) {
 	data.Sessions.PersistInterval = d.Sessions.PersistInterval
 	data.Sessions.MaxBitrate = d.Sessions.MaxBitrate
 	data.Sessions.MaxSessions = d.Sessions.MaxSessions
+
+	data.RTMP.Enable = d.RTMP.Enable
+	data.RTMP.EnableTLS = d.RTMP.EnableTLS
+	data.RTMP.Address = d.RTMP.Address
+	data.RTMP.AddressTLS = d.RTMP.AddressTLS
+	data.RTMP.App = d.RTMP.App
+	data.RTMP.Token = d.RTMP.Token
 
 	data.SRT.Log.Topics = slices.Copy(d.SRT.Log.Topics)
 

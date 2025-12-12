@@ -723,6 +723,13 @@ definitions:
             type: boolean
           enable_tls:
             type: boolean
+          httpflv:
+            properties:
+              enable:
+                type: boolean
+              mount:
+                type: string
+            type: object
           token:
             description: Deprecated, use IAM
             type: string
@@ -2643,6 +2650,13 @@ definitions:
             type: boolean
           enable_tls:
             type: boolean
+          httpflv:
+            properties:
+              enable:
+                type: boolean
+              mount:
+                type: string
+            type: object
           token:
             description: Deprecated, use IAM
             type: string
@@ -6635,6 +6649,33 @@ paths:
           schema:
             type: string
       summary: Retrieve profiling data from the application
+  /rtmp/{path}:
+    get:
+      description: Plays a RTMP stream over HTTP
+      operationId: rtmp-3-play
+      produces:
+      - video/x-flv
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Error'
+      summary: Plays a RTMP stream over HTTP
+      tags:
+      - v16.?.?
 securityDefinitions:
   ApiKeyAuth:
     in: header
