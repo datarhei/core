@@ -7899,6 +7899,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/api.ProcessProgressOutput"
                     }
                 },
+                "speed": {
+                    "type": "number"
+                },
                 "time": {
                     "type": "number"
                 }
@@ -7958,6 +7961,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "q": {
+                    "type": "number"
                 },
                 "type": {
                     "type": "string"

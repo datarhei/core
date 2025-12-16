@@ -469,7 +469,8 @@ func (p *parser) Parse(line []byte) uint64 {
 
 	progress := p.assembleProgress()
 	evt := &event.ProcessProgress{
-		Time: progress.Time,
+		Time:  progress.Time,
+		Speed: progress.Speed,
 	}
 
 	for _, io := range progress.Input {
@@ -504,6 +505,7 @@ func (p *parser) Parse(line []byte) uint64 {
 			Type:    io.Type,
 			Bitrate: io.Bitrate,
 			FPS:     io.FPS,
+			Quality: io.Quantizer,
 		})
 	}
 

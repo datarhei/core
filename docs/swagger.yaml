@@ -1587,6 +1587,8 @@ definitions:
         items:
           $ref: '#/definitions/api.ProcessProgressOutput'
         type: array
+      speed:
+        type: number
       time:
         type: number
     type: object
@@ -1626,6 +1628,8 @@ definitions:
         type: number
       id:
         type: string
+      q:
+        type: number
       type:
         type: string
     type: object

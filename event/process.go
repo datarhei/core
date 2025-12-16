@@ -101,6 +101,7 @@ type ProcessProgressOutput struct {
 	Type    string
 	Bitrate float64
 	FPS     float64
+	Quality float64
 }
 
 func (p *ProcessProgressOutput) Clone() ProcessProgressOutput {
@@ -110,6 +111,7 @@ func (p *ProcessProgressOutput) Clone() ProcessProgressOutput {
 		Type:    p.Type,
 		Bitrate: p.Bitrate,
 		FPS:     p.FPS,
+		Quality: p.Quality,
 	}
 
 	return c
@@ -119,6 +121,7 @@ type ProcessProgress struct {
 	Input  []ProcessProgressInput
 	Output []ProcessProgressOutput
 	Time   float64
+	Speed  float64
 }
 
 func (p *ProcessProgress) Clone() *ProcessProgress {
@@ -133,6 +136,7 @@ func (p *ProcessProgress) Clone() *ProcessProgress {
 	}
 
 	c.Time = p.Time
+	c.Speed = p.Speed
 
 	return &c
 }

@@ -301,6 +301,7 @@ type ProcessProgressOutput struct {
 	Type    string      `json:"type"`
 	Bitrate json.Number `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
+	Quality json.Number `json:"q" swaggertype:"number" jsonschema:"type=number"`
 }
 
 func (p *ProcessProgressOutput) Marshal() event.ProcessProgressOutput {
@@ -317,6 +318,10 @@ func (p *ProcessProgressOutput) Marshal() event.ProcessProgressOutput {
 		o.FPS = x
 	}
 
+	if x, err := p.Quality.Float64(); err == nil {
+		o.Quality = x
+	}
+
 	return o
 }
 
@@ -324,6 +329,7 @@ type ProcessProgress struct {
 	Input  []ProcessProgressInput  `json:"input"`
 	Output []ProcessProgressOutput `json:"output"`
 	Time   json.Number             `json:"time" swaggertype:"number" jsonschema:"type=number"`
+	Speed  json.Number             `json:"speed" swaggertype:"number" jsonschema:"type=number"`
 }
 
 func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
@@ -345,10 +351,12 @@ func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 			Type:    io.Type,
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),
+			Quality: json.ToNumber(io.Quality),
 		})
 	}
 
 	p.Time = json.ToNumber(e.Time)
+	p.Speed = json.ToNumber(e.Speed)
 }
 
 func (p *ProcessProgress) Marshal() *event.ProcessProgress {
@@ -356,6 +364,10 @@ func (p *ProcessProgress) Marshal() *event.ProcessProgress {
 
 	if x, err := p.Time.Float64(); err == nil {
 		e.Time = x
+	}
+
+	if x, err := p.Speed.Float64(); err == nil {
+		e.Speed = x
 	}
 
 	for _, input := range p.Input {

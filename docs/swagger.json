@@ -7892,6 +7892,9 @@
                         "$ref": "#/definitions/api.ProcessProgressOutput"
                     }
                 },
+                "speed": {
+                    "type": "number"
+                },
                 "time": {
                     "type": "number"
                 }
@@ -7951,6 +7954,9 @@
                 },
                 "id": {
                     "type": "string"
+                },
+                "q": {
+                    "type": "number"
                 },
                 "type": {
                     "type": "string"
