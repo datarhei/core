@@ -314,7 +314,7 @@ func (s *server) play(remote net.Addr, u *url.URL) (*channel, string, string, er
 	}
 
 	if ch == nil {
-		s.log(identity, "PLAY", "NOTFOUND", playpath, "", remote)
+		return nil, identity, playpath, &PlayError{"NOTFOUND", identity, playpath, "", err}
 	}
 
 	return ch, identity, playpath, nil
