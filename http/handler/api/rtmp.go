@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net"
 	"net/http"
 
@@ -71,8 +70,8 @@ func (rtmph *RTMPHandler) Play(c echo.Context) error {
 
 	r, err := rtmph.rtmp.PlayFLV(addr, u)
 	if err != nil {
-		var rtmperr rtmp.PlayError
-		if errors.As(err, &rtmperr) {
+		rtmperr, ok := err.(*rtmp.PlayError)
+		if ok {
 			status := http.StatusInternalServerError
 			switch rtmperr.Message {
 			case "FORBIDDEN":

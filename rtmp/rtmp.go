@@ -250,7 +250,7 @@ func (s *server) play(remote net.Addr, u *url.URL) (*channel, string, string, er
 	resource := playpath
 
 	if !s.iam.Enforce(identity, domain, "rtmp", resource, "PLAY") {
-		return nil, identity, playpath, &PlayError{"FORBIDDEN", "", playpath, "access denies", nil}
+		return nil, identity, playpath, &PlayError{"FORBIDDEN", "", playpath, "access denied", nil}
 	}
 
 	// Look for the stream
@@ -512,6 +512,8 @@ func (s *server) findIdentityFromStreamKey(key string) (string, error) {
 	if ok, err := identity.VerifyServiceToken(token); !ok {
 		if err != nil {
 			err = fmt.Errorf("invalid token: %w", err)
+		} else {
+			err = fmt.Errorf("invlid token")
 		}
 
 		if isDefaultIdentity {
