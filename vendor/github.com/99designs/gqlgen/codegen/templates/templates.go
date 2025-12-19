@@ -22,8 +22,9 @@ import (
 	"github.com/99designs/gqlgen/internal/imports"
 )
 
-// CurrentImports keeps track of all the import declarations that are needed during the execution of a plugin.
-// this is done with a global because subtemplates currently get called in functions. Lets aim to remove this eventually.
+// CurrentImports keeps track of all the import declarations that are needed during the execution of
+// a plugin. this is done with a global because subtemplates currently get called in functions. Lets
+// aim to remove this eventually.
 var CurrentImports *Imports
 
 // Options specify various parameters to rendering a template.
@@ -88,26 +89,31 @@ func Render(cfg Options) error {
 	}
 
 	roots := make([]string, 0, len(t.Templates()))
-	for _, template := range t.Templates() {
+	for _, templ := range t.Templates() {
 		// templates that end with _.gotpl are special files we don't want to include
-		if strings.HasSuffix(template.Name(), "_.gotpl") ||
+		if strings.HasSuffix(templ.Name(), "_.gotpl") ||
 			// filter out templates added with {{ template xxx }} syntax inside the template file
-			!strings.HasSuffix(template.Name(), ".gotpl") {
+			!strings.HasSuffix(templ.Name(), ".gotpl") {
 			continue
 		}
 
-		roots = append(roots, template.Name())
+		roots = append(roots, templ.Name())
 	}
 
 	// then execute all the important looking ones in order, adding them to the same file
-	sort.Slice(roots, func(i, j int) bool {
+	sort.SliceStable(roots, func(i, j int) bool {
 		// important files go first
-		if strings.HasSuffix(roots[i], "!.gotpl") {
+		if strings.HasSuffix(roots[i], "!.gotpl") &&
+			!strings.HasSuffix(roots[j], "!.gotpl") {
 			return true
 		}
-		if strings.HasSuffix(roots[j], "!.gotpl") {
+		if strings.HasSuffix(roots[j], "!.gotpl") &&
+			!strings.HasSuffix(roots[i], "!.gotpl") {
 			return false
 		}
+		// files that have identical names are sorted dependent on input order
+		// so we rely on SliceStable here to ensure deterministic results
+		// to avoid test failures
 		return roots[i] < roots[j]
 	})
 
@@ -205,6 +211,7 @@ func Funcs() template.FuncMap {
 		"obj":                obj,
 		"ts":                 TypeIdentifier,
 		"call":               Call,
+		"dict":               dict,
 		"prefixLines":        prefixLines,
 		"notNil":             notNil,
 		"strSplit":           StrSplit,
@@ -247,7 +254,22 @@ func isDelimiter(c rune) bool {
 }
 
 func ref(p types.Type) string {
-	return CurrentImports.LookupType(p)
+	typeString := CurrentImports.LookupType(p)
+	// TODO(steve): figure out why this is needed
+	// otherwise inconsistent sometimes
+	// see https://github.com/99designs/gqlgen/issues/3414#issuecomment-2822856422
+	if typeString == "interface{}" {
+		return "any"
+	}
+	if typeString == "map[string]interface{}" {
+		return "map[string]any"
+	}
+	// assuming that some other container interface{} type
+	// like []interface{} or something needs coercion to any
+	if strings.Contains(typeString, "interface{}") {
+		return strings.ReplaceAll(typeString, "interface{}", "any")
+	}
+	return typeString
 }
 
 func obj(obj types.Object) string {
@@ -272,6 +294,21 @@ func Call(p *types.Func) string {
 	}
 
 	return pkg + p.Name()
+}
+
+func dict(values ...any) (map[string]any, error) {
+	if len(values)%2 != 0 {
+		return nil, errors.New("invalid dict call: arguments must be key-value pairs")
+	}
+	m := make(map[string]any, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return nil, errors.New("dict keys must be strings")
+		}
+		m[key] = values[i+1]
+	}
+	return m, nil
 }
 
 func resetModelNames() {
@@ -506,7 +543,9 @@ func wordWalker(str string, f func(*wordInfo)) {
 			// do NOT count this as an initialism.
 			switch upperWord {
 			case "ID", "IP":
-				if remainingRunes := runes[w:]; word == string(remainingRunes[:2]) && !eow && len(remainingRunes) > 3 && unicode.IsUpper(remainingRunes[3]) {
+				if remainingRunes := runes[w:]; word == string(remainingRunes[:2]) && !eow &&
+					len(remainingRunes) > 3 &&
+					unicode.IsUpper(remainingRunes[3]) {
 					continue
 				}
 			}
@@ -606,10 +645,10 @@ func Dump(val any) string {
 		for _, part := range val {
 			parts = append(parts, Dump(part))
 		}
-		return "[]interface{}{" + strings.Join(parts, ",") + "}"
+		return "[]any{" + strings.Join(parts, ",") + "}"
 	case map[string]any:
 		buf := bytes.Buffer{}
-		buf.WriteString("map[string]interface{}{")
+		buf.WriteString("map[string]any{")
 		var keys []string
 		for key := range val {
 			keys = append(keys, key)
@@ -775,7 +814,8 @@ var CommonInitialisms = map[string]bool{
 	"GCP":   true,
 }
 
-// GetInitialisms returns the initialisms to capitalize in Go names. If unchanged, default initialisms will be returned
+// GetInitialisms returns the initialisms to capitalize in Go names. If unchanged, default
+// initialisms will be returned
 var GetInitialisms = func() map[string]bool {
 	return CommonInitialisms
 }

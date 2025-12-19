@@ -8,6 +8,8 @@
 {{ $options := .PackageOptions }}
 {{ $usePointers := .UsePointers }}
 
+{{ $useFunctionSyntaxForExecutionContext := .UseFunctionSyntaxForExecutionContext }}
+
 var (
 	ErrUnknownType = errors.New("unknown type")
 	ErrTypeNotFound = errors.New("type not found")
@@ -33,7 +35,7 @@ func (ec *executionContext) __resolve__service(ctx context.Context) (fedruntime.
 }
 
 {{if .Entities}}
-func (ec *executionContext) __resolve_entities(ctx context.Context, representations []map[string]interface{}) []fedruntime.Entity {
+func (ec *executionContext) __resolve_entities(ctx context.Context, representations []map[string]any) []fedruntime.Entity {
 	list := make([]fedruntime.Entity, len(representations))
 
 	repsMap := ec.buildRepresentationGroups(ctx, representations)
@@ -169,7 +171,11 @@ func (ec *executionContext) resolveEntity(
 					{{ range $i, $resolver := .Resolvers }}
 					case "{{.ResolverName}}":
 						{{- range $j, $keyField := .KeyFields }}
-						id{{$j}}, err := ec.{{.Type.UnmarshalFunc}}(ctx, rep["{{.Field.Join `"].(map[string]interface{})["`}}"])
+						{{ if $useFunctionSyntaxForExecutionContext -}}
+						id{{$j}}, err := {{.Type.UnmarshalFunc}}(ctx, ec, rep["{{.Field.Join `"].(map[string]any)["`}}"])
+						{{- else -}}
+						id{{$j}}, err := ec.{{.Type.UnmarshalFunc}}(ctx, rep["{{.Field.Join `"].(map[string]any)["`}}"])
+						{{- end }}
 							if err != nil {
 							return nil, fmt.Errorf(`unmarshalling param {{$j}} for {{$resolver.ResolverName}}(): %w`, err)
 							}
@@ -187,7 +193,11 @@ func (ec *executionContext) resolveEntity(
 							}
 						{{- else }}
 							{{ range $entity.Requires }}
-								entity.{{.Field.JoinGo `.`}}, err = ec.{{.Type.UnmarshalFunc}}(ctx, rep["{{.Field.Join `"].(map[string]interface{})["`}}"])
+								{{ if $useFunctionSyntaxForExecutionContext -}}
+								entity.{{.Field.JoinGo `.`}}, err = {{.Type.UnmarshalFunc}}(ctx, ec, rep["{{.Field.Join `"].(map[string]any)["`}}"])
+								{{- else -}}
+								entity.{{.Field.JoinGo `.`}}, err = ec.{{.Type.UnmarshalFunc}}(ctx, rep["{{.Field.Join `"].(map[string]any)["`}}"])
+								{{- end }}
 								if err != nil {
 									return nil, err
 								}
@@ -231,7 +241,11 @@ func (ec *executionContext) resolveManyEntities(
 
 						for i, rep := range reps {
 							{{ range $i, $keyField := .KeyFields -}}
-							id{{$i}}, err := ec.{{.Type.UnmarshalFunc}}(ctx, rep.entity["{{.Field.Join `"].(map[string]interface{})["`}}"])
+							{{ if $useFunctionSyntaxForExecutionContext -}}
+							id{{$i}}, err := {{.Type.UnmarshalFunc}}(ctx, ec, rep.entity["{{.Field.Join `"].(map[string]any)["`}}"])
+							{{- else -}}
+							id{{$i}}, err := ec.{{.Type.UnmarshalFunc}}(ctx, rep.entity["{{.Field.Join `"].(map[string]any)["`}}"])
+							{{- end }}
 								if err != nil {
 									return errors.New(fmt.Sprintf("Field %s undefined in schema.", "{{.Definition.Name}}"))
 								}
@@ -250,11 +264,27 @@ func (ec *executionContext) resolveManyEntities(
 						}
 
 						for i, entity := range entities {
+							{{- if and $.PackageOptions.ExplicitRequires (index $.RequiresEntities $entity.Def.Name) }}
+								err = ec.Populate{{$entity.Def.Name}}Requires(ctx, {{- if not $usePointers -}}&{{- end -}}entity, reps[i].entity)
+								if err != nil {
+									return fmt.Errorf(`populating requires for Entity "{{$entity.Def.Name}}": %w`, err)
+								}
+							{{- end }}
 							{{- range $entity.Requires }}
-								entity.{{.Field.JoinGo `.`}}, err = ec.{{.Type.UnmarshalFunc}}(ctx, reps[i].entity["{{.Field.Join `"].(map[string]interface{})["`}}"])
+								{{- if $options.ComputedRequires }}
+									{{/* We don't do anything in this case, computed requires are handled by standard resolvers */}}
+								{{- else if $.PackageOptions.ExplicitRequires }}
+									{{/* already handled above */}}
+								{{- else }}
+									{{ if $useFunctionSyntaxForExecutionContext -}}
+										entity.{{.Field.JoinGo `.`}}, err = {{.Type.UnmarshalFunc}}(ctx, ec, reps[i].entity["{{.Field.Join `"].(map[string]any)["`}}"])
+										{{- else -}}
+										entity.{{.Field.JoinGo `.`}}, err = ec.{{.Type.UnmarshalFunc}}(ctx, reps[i].entity["{{.Field.Join `"].(map[string]any)["`}}"])
+									{{- end }}
 									if err != nil {
 										return err
 									}
+								{{- end}}
 							{{- end}}
 						list[reps[i].index] = entity
 						}
@@ -276,11 +306,14 @@ func (ec *executionContext) resolveManyEntities(
 	{{- if .Resolvers }}
 
 		func entityResolverNameFor{{$entity.Name}}(ctx context.Context, rep EntityRepresentation) (string, error) {
+			// we collect errors because a later entity resolver may work fine
+			// when an entity has multiple keys
+			entityResolverErrs := []error{}
 			{{- range .Resolvers }}
 				for {
 					var (
 						m   EntityRepresentation
-						val interface{}
+						val any
 						ok  bool
 					)
 					_ = val
@@ -292,10 +325,15 @@ func (ec *executionContext) resolveManyEntities(
 						{{- range $i, $field := .Field }}
 							val, ok = m["{{.}}"]
 							if !ok {
+								entityResolverErrs = append(entityResolverErrs,
+									fmt.Errorf("%w due to missing Key Field \"{{.}}\" for {{$entity.Name}}", ErrTypeNotFound))
 								break
 							}
 							{{- if (ne $i $keyField.Field.LastIndex ) }}
-								if m, ok = val.(map[string]interface{}); !ok {
+								if m, ok = val.(map[string]any); !ok {
+									// nested field value is not a map[string]interface so don't use it
+									entityResolverErrs = append(entityResolverErrs,
+										fmt.Errorf("%w due to nested Key Field \"{{.}}\" value not matching map[string]any for {{$entity.Name}}", ErrTypeNotFound))
 									break
 								}
 							{{- else}}
@@ -306,12 +344,15 @@ func (ec *executionContext) resolveManyEntities(
 						{{- end}}
 					{{- end }}
 					if allNull {
+						entityResolverErrs = append(entityResolverErrs,
+							fmt.Errorf("%w due to all null value KeyFields for {{$entity.Name}}", ErrTypeNotFound))
 						break
 					}
 					return "{{.ResolverName}}", nil
 				}
 			{{- end }}
-			return "", fmt.Errorf("%w for {{$entity.Name}}", ErrTypeNotFound)
+			return "", fmt.Errorf("%w for {{$entity.Name}} due to %v", ErrTypeNotFound,
+				errors.Join(entityResolverErrs...).Error())
 		}
 	{{- end }}
 {{- end }}

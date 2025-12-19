@@ -29,7 +29,11 @@ func getResponseContext(ctx context.Context) *responseContext {
 	return val
 }
 
-func WithResponseContext(ctx context.Context, presenterFunc ErrorPresenterFunc, recoverFunc RecoverFunc) context.Context {
+func WithResponseContext(
+	ctx context.Context,
+	presenterFunc ErrorPresenterFunc,
+	recoverFunc RecoverFunc,
+) context.Context {
 	return context.WithValue(ctx, resultCtx, &responseContext{
 		errorPresenter: presenterFunc,
 		recover:        recoverFunc,
@@ -51,9 +55,15 @@ func AddErrorf(ctx context.Context, format string, args ...any) {
 
 // AddError sends an error to the client, first passing it through the error presenter.
 func AddError(ctx context.Context, err error) {
+	if err == nil {
+		return
+	}
 	c := getResponseContext(ctx)
 
 	presentedError := c.errorPresenter(ctx, ErrorOnPath(ctx, err))
+	if presentedError == nil {
+		return
+	}
 
 	c.errorsMu.Lock()
 	defer c.errorsMu.Unlock()

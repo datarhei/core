@@ -13,6 +13,13 @@ type Plugin interface {
 	Name() string
 }
 
+// SchemaMutator is used to modify the schema before it is used to generate code
+// Similarly to [ConfigMutator] that is also triggered before code generation, SchemaMutator
+// can be used to modify the schema even before the models are generated.
+type SchemaMutator interface {
+	MutateSchema(schema *ast.Schema) error
+}
+
 type ConfigMutator interface {
 	MutateConfig(cfg *config.Config) error
 }
@@ -22,6 +29,7 @@ type CodeGenerator interface {
 }
 
 // EarlySourceInjector is used to inject things that are required for user schema files to compile.
+//
 // Deprecated: Use EarlySourcesInjector instead
 type EarlySourceInjector interface {
 	InjectSourceEarly() *ast.Source
@@ -33,7 +41,7 @@ type EarlySourcesInjector interface {
 }
 
 // LateSourceInjector is used to inject more sources, after we have loaded the users schema.
-// Deprecated: Use LateSourcesInjector instead
+// // Deprecated: Use LateSourcesInjector instead
 type LateSourceInjector interface {
 	InjectSourceLate(schema *ast.Schema) *ast.Source
 }

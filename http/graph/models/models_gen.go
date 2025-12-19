@@ -3,6 +3,7 @@
 package models
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -58,13 +59,13 @@ type AboutVersion struct {
 
 type Metric struct {
 	Name   string                          `json:"name"`
-	Labels map[string]interface{}          `json:"labels,omitempty"`
+	Labels map[string]any                  `json:"labels,omitempty"`
 	Values []*scalars.MetricsResponseValue `json:"values"`
 }
 
 type MetricInput struct {
-	Name   string                 `json:"name"`
-	Labels map[string]interface{} `json:"labels,omitempty"`
+	Name   string         `json:"name"`
+	Labels map[string]any `json:"labels,omitempty"`
 }
 
 type Metrics struct {
@@ -77,6 +78,9 @@ type MetricsInput struct {
 	TimerangeSeconds *int           `json:"timerange_seconds,omitempty"`
 	IntervalSeconds  *int           `json:"interval_seconds,omitempty"`
 	Metrics          []*MetricInput `json:"metrics"`
+}
+
+type Mutation struct {
 }
 
 type Probe struct {
@@ -104,14 +108,14 @@ type ProbeIo struct {
 }
 
 type Process struct {
-	ID        string                 `json:"id"`
-	Type      string                 `json:"type"`
-	Reference string                 `json:"reference"`
-	CreatedAt time.Time              `json:"created_at"`
-	Config    *ProcessConfig         `json:"config"`
-	State     *ProcessState          `json:"state"`
-	Report    *ProcessReport         `json:"report"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Reference string         `json:"reference"`
+	CreatedAt time.Time      `json:"created_at"`
+	Config    *ProcessConfig `json:"config"`
+	State     *ProcessState  `json:"state"`
+	Report    *ProcessReport `json:"report"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
 type ProcessConfig struct {
@@ -256,6 +260,9 @@ type ProgressIo struct {
 	Avstream    *AVStream      `json:"avstream,omitempty"`
 }
 
+type Query struct {
+}
+
 type RawAVstream struct {
 	ID          string           `json:"id"`
 	URL         string           `json:"url"`
@@ -268,7 +275,7 @@ type RawAVstream struct {
 	Looping     bool             `json:"looping"`
 	Duplicating bool             `json:"duplicating"`
 	Gop         string           `json:"gop"`
-	Debug       interface{}      `json:"debug,omitempty"`
+	Debug       any              `json:"debug,omitempty"`
 	Input       *RawAVstreamIo   `json:"input"`
 	Output      *RawAVstreamIo   `json:"output"`
 	Swap        *RawAVstreamSwap `json:"swap"`
@@ -316,7 +323,7 @@ func (e Command) String() string {
 	return string(e)
 }
 
-func (e *Command) UnmarshalGQL(v interface{}) error {
+func (e *Command) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
@@ -331,6 +338,20 @@ func (e *Command) UnmarshalGQL(v interface{}) error {
 
 func (e Command) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *Command) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e Command) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type State string
@@ -357,7 +378,7 @@ func (e State) String() string {
 	return string(e)
 }
 
-func (e *State) UnmarshalGQL(v interface{}) error {
+func (e *State) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
@@ -372,4 +393,18 @@ func (e *State) UnmarshalGQL(v interface{}) error {
 
 func (e State) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *State) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e State) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

@@ -18,8 +18,12 @@ import (
 // defined in https://github.com/APIs-guru/graphql-over-http#get
 type GET struct {
 	// Map of all headers that are added to graphql response. If not
-	// set, only one header: Content-Type: application/json will be set.
+	// set, only one header: Content-Type: application/graphql-response+json will be set.
 	ResponseHeaders map[string][]string
+	// UseGrapQLResponseJsonByDefault determines whether to use 'application/graphql-response+json'
+	// as the response content type
+	// when the Accept header is empty or 'application/*' or '*/*'.
+	UseGrapQLResponseJsonByDefault bool
 }
 
 var _ graphql.Transport = GET{}
@@ -29,7 +33,7 @@ func (h GET) Supports(r *http.Request) bool {
 		return false
 	}
 
-	return r.Method == "GET"
+	return r.Method == http.MethodGet
 }
 
 func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
@@ -39,7 +43,18 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		writeJsonError(w, err.Error())
 		return
 	}
-	writeHeaders(w, h.ResponseHeaders)
+	contentType := determineResponseContentType(
+		h.ResponseHeaders,
+		r,
+		h.UseGrapQLResponseJsonByDefault,
+	)
+	responseHeaders := mergeHeaders(
+		map[string][]string{
+			"Content-Type": {contentType},
+		},
+		h.ResponseHeaders,
+	)
+	writeHeaders(w, responseHeaders)
 
 	raw := &graphql.RawParams{
 		Query:         query.Get("query"),
@@ -68,7 +83,11 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	opCtx, gqlError := exec.CreateOperationContext(r.Context(), raw)
 	if gqlError != nil {
-		w.WriteHeader(statusFor(gqlError))
+		if contentType == acceptApplicationGraphqlResponseJson {
+			w.WriteHeader(statusForGraphQLResponse(gqlError))
+		} else {
+			w.WriteHeader(statusFor(gqlError))
+		}
 		resp := exec.DispatchError(graphql.WithOperationContext(r.Context(), opCtx), gqlError)
 		writeJson(w, resp)
 		return
@@ -94,6 +113,16 @@ func statusFor(errs gqlerror.List) int {
 	switch errcode.GetErrorKind(errs) {
 	case errcode.KindProtocol:
 		return http.StatusUnprocessableEntity
+	default:
+		return http.StatusOK
+	}
+}
+
+func statusForGraphQLResponse(errs gqlerror.List) int {
+	// https://graphql.github.io/graphql-over-http/draft/#sec-application-graphql-response-json
+	switch errcode.GetErrorKind(errs) {
+	case errcode.KindProtocol:
+		return http.StatusBadRequest
 	default:
 		return http.StatusOK
 	}

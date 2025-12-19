@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"github.com/99designs/gqlgen/api"
 	"github.com/99designs/gqlgen/codegen/config"
@@ -31,7 +32,8 @@ var configFileTemplate string
 
 func getConfigFileContent(pkgName string) string {
 	var buf bytes.Buffer
-	if err := template.Must(template.New("gqlgen.yml").Parse(configFileTemplate)).Execute(&buf, pkgName); err != nil {
+	if err := template.Must(template.New("gqlgen.yml").Parse(configFileTemplate)).
+		Execute(&buf, pkgName); err != nil {
 		panic(err)
 	}
 	return buf.String()
@@ -66,10 +68,10 @@ func findModuleRoot(dir string) (roots string) {
 
 func initFile(filename, contents string) error {
 	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
-		return fmt.Errorf("unable to create directory for file '%s': %w\n", filename, err)
+		return fmt.Errorf("unable to create directory for file '%s': %w", filename, err)
 	}
 	if err := os.WriteFile(filename, []byte(contents), 0o644); err != nil {
-		return fmt.Errorf("unable to write file '%s': %w\n", filename, err)
+		return fmt.Errorf("unable to write file '%s': %w", filename, err)
 	}
 
 	return nil
@@ -92,14 +94,13 @@ var initCmd = &cli.Command{
 			Value: "graph/schema.graphqls",
 		},
 	},
-	Action: func(ctx *cli.Context) error {
-		configFilename := ctx.String("config")
-		serverFilename := ctx.String("server")
-		schemaFilename := ctx.String("schema")
+	Action: func(ctx context.Context, c *cli.Command) error {
+		configFilename := c.String("config")
+		serverFilename := c.String("server")
+		schemaFilename := c.String("schema")
 
 		cwd, err := os.Getwd()
 		if err != nil {
-			log.Println(err)
 			return fmt.Errorf("unable to determine current directory: %w", err)
 		}
 		pkgName := code.ImportPathForDir(cwd)
@@ -110,7 +111,7 @@ var initCmd = &cli.Command{
 		}
 		modRoot := findModuleRoot(cwd)
 		if modRoot == "" {
-			return errors.New("go.mod is missing. Please, do 'go mod init' first\n")
+			return cli.Exit("go.mod is missing. Please, do 'go mod init' first\n", 1)
 		}
 
 		// check schema and config don't already exist
@@ -121,27 +122,27 @@ var initCmd = &cli.Command{
 		}
 		_, err = config.LoadConfigFromDefaultLocations()
 		if err == nil {
-			return errors.New("gqlgen.yml already exists in a parent directory\n")
+			return cli.Exit("gqlgen.yml already exists in a parent directory\n", 1)
 		}
 
 		// create config
 		fmt.Println("Creating", configFilename)
 		if err := initFile(configFilename, getConfigFileContent(pkgName)); err != nil {
-			return err
+			return cli.Exit(err.Error()+"\n", 1)
 		}
 
 		// create schema
 		fmt.Println("Creating", schemaFilename)
 
 		if err := initFile(schemaFilename, schemaFileContent); err != nil {
-			return err
+			return cli.Exit(err.Error()+"\n", 1)
 		}
 
 		// create the package directory with a temporary file so that go recognises it as a package
 		// and autobinding doesn't error out
 		tmpPackageNameFile := "graph/model/_tmp_gqlgen_init.go"
 		if err := initFile(tmpPackageNameFile, "package model"); err != nil {
-			return err
+			return cli.Exit(err.Error()+"\n", 1)
 		}
 		defer os.Remove(tmpPackageNameFile)
 
@@ -168,10 +169,10 @@ var generateCmd = &cli.Command{
 		&cli.BoolFlag{Name: "verbose, v", Usage: "show logs"},
 		&cli.StringFlag{Name: "config, c", Usage: "the config filename"},
 	},
-	Action: func(ctx *cli.Context) error {
+	Action: func(ctx context.Context, c *cli.Command) error {
 		var cfg *config.Config
 		var err error
-		if configFilename := ctx.String("config"); configFilename != "" {
+		if configFilename := c.String("config"); configFilename != "" {
 			cfg, err = config.LoadConfig(configFilename)
 			if err != nil {
 				return err
@@ -194,27 +195,27 @@ var generateCmd = &cli.Command{
 var versionCmd = &cli.Command{
 	Name:  "version",
 	Usage: "print the version string",
-	Action: func(ctx *cli.Context) error {
+	Action: func(ctx context.Context, c *cli.Command) error {
 		fmt.Println(graphql.Version)
 		return nil
 	},
 }
 
 func main() {
-	app := cli.NewApp()
+	app := &cli.Command{}
 	app.Name = "gqlgen"
 	app.Usage = generateCmd.Usage
 	app.Description = "This is a library for quickly creating strictly typed graphql servers in golang. See https://gqlgen.com/ for a getting started guide."
 	app.HideVersion = true
 	app.Flags = generateCmd.Flags
 	app.Version = graphql.Version
-	app.Before = func(context *cli.Context) error {
-		if context.Bool("verbose") {
+	app.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if c.Bool("verbose") {
 			log.SetFlags(0)
 		} else {
 			log.SetOutput(io.Discard)
 		}
-		return nil
+		return ctx, nil
 	}
 
 	app.Action = generateCmd.Action
@@ -224,7 +225,7 @@ func main() {
 		versionCmd,
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprint(os.Stderr, err.Error()+"\n")
 		os.Exit(1)
 	}

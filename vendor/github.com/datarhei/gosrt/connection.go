@@ -546,7 +546,9 @@ func (c *srtConn) pop(p packet.Packet) {
 		c.cryptoLock.Lock()
 		if c.crypto != nil {
 			p.Header().KeyBaseEncryptionFlag = c.keyBaseEncryption
-			c.crypto.EncryptOrDecryptPayload(p.Data(), p.Header().KeyBaseEncryptionFlag, p.Header().PacketSequenceNumber.Val())
+			if !p.Header().RetransmittedPacketFlag {
+				c.crypto.EncryptOrDecryptPayload(p.Data(), p.Header().KeyBaseEncryptionFlag, p.Header().PacketSequenceNumber.Val())
+			}
 
 			c.kmPreAnnounceCountdown--
 			c.kmRefreshCountdown--

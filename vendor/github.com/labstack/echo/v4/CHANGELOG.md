@@ -1,5 +1,111 @@
 # Changelog
 
+## v4.14.0 - 2025-12-11
+
+`middleware.Logger` has been deprecated. For request logging, use `middleware.RequestLogger` or
+`middleware.RequestLoggerWithConfig`.
+
+`middleware.RequestLogger` replaces `middleware.Logger`, offering comparable configuration while relying on the
+Go standard library’s new `slog` logger.
+
+The previous default output format was JSON. The new default follows the standard `slog` logger settings.
+To continue emitting request logs in JSON, configure `slog` accordingly:
+```go
+slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+e.Use(middleware.RequestLogger())
+```
+
+
+**Security**
+
+* Logger middleware json string escaping and deprecation by @aldas in https://github.com/labstack/echo/pull/2849
+
+
+
+**Enhancements**
+
+* Update deps  by @aldas in https://github.com/labstack/echo/pull/2807
+* refactor to use reflect.TypeFor by @cuiweixie in https://github.com/labstack/echo/pull/2812
+* Use Go 1.25 in CI by @aldas in https://github.com/labstack/echo/pull/2810
+* Modernize context.go by replacing interface{} with any by @vishr in https://github.com/labstack/echo/pull/2822
+* Fix typo in SetParamValues comment by @vishr in https://github.com/labstack/echo/pull/2828
+* Fix typo in ContextTimeout middleware comment by @vishr in https://github.com/labstack/echo/pull/2827
+* Improve BasicAuth middleware: use strings.Cut and RFC compliance by @vishr in https://github.com/labstack/echo/pull/2825
+* Fix duplicate plus operator in router backtracking logic by @yuya-morimoto in https://github.com/labstack/echo/pull/2832
+* Replace custom private IP range check with built-in net.IP.IsPrivate by @kumapower17 in https://github.com/labstack/echo/pull/2835
+* Ensure proxy connection is closed in proxyRaw function(#2837) by @kumapower17 in https://github.com/labstack/echo/pull/2838
+* Update deps by @aldas in https://github.com/labstack/echo/pull/2843
+* Update golang.org/x/* deps by @aldas in https://github.com/labstack/echo/pull/2850
+
+
+
+## v4.13.4 - 2025-05-22
+
+**Enhancements**
+
+* chore: fix some typos in comment by @zhuhaicity in https://github.com/labstack/echo/pull/2735
+* CI: test with Go 1.24 by @aldas in https://github.com/labstack/echo/pull/2748
+* Add support for TLS WebSocket proxy by @t-ibayashi-safie in https://github.com/labstack/echo/pull/2762
+
+**Security**
+
+* Update dependencies for [GO-2025-3487](https://pkg.go.dev/vuln/GO-2025-3487), [GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503) and [GO-2025-3595](https://pkg.go.dev/vuln/GO-2025-3595) in https://github.com/labstack/echo/pull/2780
+
+
+## v4.13.3 - 2024-12-19
+
+**Security**
+
+* Update golang.org/x/net dependency [GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333) in https://github.com/labstack/echo/pull/2722
+
+
+## v4.13.2 - 2024-12-12
+
+**Security**
+
+* Update dependencies (dependabot reports [GO-2024-3321](https://pkg.go.dev/vuln/GO-2024-3321)) in https://github.com/labstack/echo/pull/2721
+
+
+## v4.13.1 - 2024-12-11
+
+**Fixes**
+
+* Fix BindBody ignoring `Transfer-Encoding: chunked` requests by @178inaba in https://github.com/labstack/echo/pull/2717
+
+
+
+## v4.13.0 - 2024-12-04
+
+**BREAKING CHANGE** JWT Middleware Removed from Core use [labstack/echo-jwt](https://github.com/labstack/echo-jwt) instead
+
+The JWT middleware has been **removed from Echo core** due to another security vulnerability, [CVE-2024-51744](https://nvd.nist.gov/vuln/detail/CVE-2024-51744). For more details, refer to issue [#2699](https://github.com/labstack/echo/issues/2699). A drop-in replacement is available in the [labstack/echo-jwt](https://github.com/labstack/echo-jwt) repository.
+
+**Important**: Direct assignments like `token := c.Get("user").(*jwt.Token)` will now cause a panic due to an invalid cast. Update your code accordingly. Replace the current imports from `"github.com/golang-jwt/jwt"` in your handlers to the new middleware version using `"github.com/golang-jwt/jwt/v5"`.
+
+
+Background: 
+
+The version of `golang-jwt/jwt` (v3.2.2) previously used in Echo core has been in an unmaintained state for some time. This is not the first vulnerability affecting this library; earlier issues were addressed in [PR #1946](https://github.com/labstack/echo/pull/1946).
+JWT middleware was marked as deprecated in Echo core as of [v4.10.0](https://github.com/labstack/echo/releases/tag/v4.10.0) on 2022-12-27. If you did not notice that, consider leveraging tools like [Staticcheck](https://staticcheck.dev/) to catch such deprecations earlier in you dev/CI flow.  For bonus points - check out [gosec](https://github.com/securego/gosec).
+
+We sincerely apologize for any inconvenience caused by this change. While we strive to maintain backward compatibility within Echo core, recurring security issues with third-party dependencies have forced this decision.
+
+**Enhancements**
+
+* remove jwt middleware by @stevenwhitehead in https://github.com/labstack/echo/pull/2701
+* optimization: struct alignment by @behnambm in https://github.com/labstack/echo/pull/2636
+* bind: Maintain backwards compatibility for map[string]interface{} binding by @thesaltree in https://github.com/labstack/echo/pull/2656
+* Add Go 1.23 to CI by @aldas in https://github.com/labstack/echo/pull/2675
+* improve `MultipartForm` test by @martinyonatann in https://github.com/labstack/echo/pull/2682
+* `bind` : add support of multipart multi files by @martinyonatann in https://github.com/labstack/echo/pull/2684
+* Add TemplateRenderer struct to ease creating renderers for `html/template` and `text/template` packages. by @aldas in https://github.com/labstack/echo/pull/2690
+* Refactor TestBasicAuth to utilize table-driven test format by @ErikOlson in https://github.com/labstack/echo/pull/2688
+* Remove broken header by @aldas in https://github.com/labstack/echo/pull/2705
+* fix(bind body): content-length can be -1 by @phamvinhdat in https://github.com/labstack/echo/pull/2710
+* CORS middleware should compile allowOrigin regexp at creation by @aldas in https://github.com/labstack/echo/pull/2709
+* Shorten Github issue template and add test example by @aldas in https://github.com/labstack/echo/pull/2711
+
+
 ## v4.12.0 - 2024-04-15
 
 **Security**

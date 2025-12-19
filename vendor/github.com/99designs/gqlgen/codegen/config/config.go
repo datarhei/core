@@ -12,40 +12,44 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 	"golang.org/x/tools/go/packages"
-	"gopkg.in/yaml.v3"
 
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/internal/code"
 )
 
 type Config struct {
-	SchemaFilename                StringList                 `yaml:"schema,omitempty"`
-	Exec                          ExecConfig                 `yaml:"exec"`
-	Model                         PackageConfig              `yaml:"model,omitempty"`
-	Federation                    PackageConfig              `yaml:"federation,omitempty"`
-	Resolver                      ResolverConfig             `yaml:"resolver,omitempty"`
-	AutoBind                      []string                   `yaml:"autobind"`
-	Models                        TypeMap                    `yaml:"models,omitempty"`
-	StructTag                     string                     `yaml:"struct_tag,omitempty"`
-	Directives                    map[string]DirectiveConfig `yaml:"directives,omitempty"`
-	GoBuildTags                   StringList                 `yaml:"go_build_tags,omitempty"`
-	GoInitialisms                 GoInitialismsConfig        `yaml:"go_initialisms,omitempty"`
-	OmitSliceElementPointers      bool                       `yaml:"omit_slice_element_pointers,omitempty"`
-	OmitGetters                   bool                       `yaml:"omit_getters,omitempty"`
-	OmitInterfaceChecks           bool                       `yaml:"omit_interface_checks,omitempty"`
-	OmitComplexity                bool                       `yaml:"omit_complexity,omitempty"`
-	OmitGQLGenFileNotice          bool                       `yaml:"omit_gqlgen_file_notice,omitempty"`
-	OmitGQLGenVersionInFileNotice bool                       `yaml:"omit_gqlgen_version_in_file_notice,omitempty"`
-	OmitRootModels                bool                       `yaml:"omit_root_models,omitempty"`
-	OmitResolverFields            bool                       `yaml:"omit_resolver_fields,omitempty"`
-	OmitPanicHandler              bool                       `yaml:"omit_panic_handler,omitempty"`
+	SchemaFilename                       StringList                 `yaml:"schema,omitempty"`
+	Exec                                 ExecConfig                 `yaml:"exec"`
+	Model                                PackageConfig              `yaml:"model,omitempty"`
+	Federation                           PackageConfig              `yaml:"federation,omitempty"`
+	Resolver                             ResolverConfig             `yaml:"resolver,omitempty"`
+	AutoBind                             []string                   `yaml:"autobind"`
+	Models                               TypeMap                    `yaml:"models,omitempty"`
+	StructTag                            string                     `yaml:"struct_tag,omitempty"`
+	EmbeddedStructsPrefix                string                     `yaml:"embedded_structs_prefix,omitempty"`
+	Directives                           map[string]DirectiveConfig `yaml:"directives,omitempty"`
+	LocalPrefix                          string                     `yaml:"local_prefix,omitempty"`
+	GoBuildTags                          StringList                 `yaml:"go_build_tags,omitempty"`
+	GoInitialisms                        GoInitialismsConfig        `yaml:"go_initialisms,omitempty"`
+	OmitSliceElementPointers             bool                       `yaml:"omit_slice_element_pointers,omitempty"`
+	OmitGetters                          bool                       `yaml:"omit_getters,omitempty"`
+	OmitInterfaceChecks                  bool                       `yaml:"omit_interface_checks,omitempty"`
+	OmitComplexity                       bool                       `yaml:"omit_complexity,omitempty"`
+	OmitGQLGenFileNotice                 bool                       `yaml:"omit_gqlgen_file_notice,omitempty"`
+	OmitGQLGenVersionInFileNotice        bool                       `yaml:"omit_gqlgen_version_in_file_notice,omitempty"`
+	OmitRootModels                       bool                       `yaml:"omit_root_models,omitempty"`
+	OmitResolverFields                   bool                       `yaml:"omit_resolver_fields,omitempty"`
+	OmitPanicHandler                     bool                       `yaml:"omit_panic_handler,omitempty"`
+	OmitEnumJSONMarshalers               bool                       `yaml:"omit_enum_json_marshalers,omitempty"`
+	UseFunctionSyntaxForExecutionContext bool                       `yaml:"use_function_syntax_for_execution_context,omitempty"`
 	// If this is set to true, argument directives that
 	// decorate a field with a null value will still be called.
 	//
-	// This enables argumment directives to not just mutate
+	// This enables argument directives to not just mutate
 	// argument values but to set them even if they're null.
 	CallArgumentDirectivesWithNull bool           `yaml:"call_argument_directives_with_null,omitempty"`
 	StructFieldsAlwaysPointers     bool           `yaml:"struct_fields_always_pointers,omitempty"`
@@ -53,6 +57,7 @@ type Config struct {
 	ResolversAlwaysReturnPointers  bool           `yaml:"resolvers_always_return_pointers,omitempty"`
 	NullableInputOmittable         bool           `yaml:"nullable_input_omittable,omitempty"`
 	EnableModelJsonOmitemptyTag    *bool          `yaml:"enable_model_json_omitempty_tag,omitempty"`
+	EnableModelJsonOmitzeroTag     *bool          `yaml:"enable_model_json_omitzero_tag,omitempty"`
 	SkipValidation                 bool           `yaml:"skip_validation,omitempty"`
 	SkipModTidy                    bool           `yaml:"skip_mod_tidy,omitempty"`
 	Sources                        []*ast.Source  `yaml:"-"`
@@ -65,8 +70,18 @@ type Config struct {
 
 var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 
+// templatePackageNames is a list of packages names that the default templates use, in order to
+// preload those for performance considerations any additional package added to the base templates
+// should be added here to improve performance and load all packages in bulk
+var templatePackageNames = []string{
+	"context", "fmt", "io", "strconv", "time", "sync", "strings", "sync/atomic", "embed", "golang.org/x/sync/semaphore",
+	"errors", "bytes", "github.com/vektah/gqlparser/v2", "github.com/vektah/gqlparser/v2/ast",
+	"github.com/99designs/gqlgen/graphql", "github.com/99designs/gqlgen/graphql/introspection",
+}
+
 // DefaultConfig creates a copy of the default config
 func DefaultConfig() *Config {
+	falseValue := false
 	return &Config{
 		SchemaFilename:                 StringList{"schema.graphql"},
 		Model:                          PackageConfig{Filename: "models_gen.go"},
@@ -77,6 +92,8 @@ func DefaultConfig() *Config {
 		ReturnPointersInUnmarshalInput: false,
 		ResolversAlwaysReturnPointers:  true,
 		NullableInputOmittable:         false,
+		EnableModelJsonOmitzeroTag:     &falseValue,
+		EmbeddedStructsPrefix:          "Base",
 	}
 }
 
@@ -93,13 +110,17 @@ func LoadDefaultConfig() (*Config, error) {
 			return nil, fmt.Errorf("unable to open schema: %w", err)
 		}
 
-		config.Sources = append(config.Sources, &ast.Source{Name: filename, Input: string(schemaRaw)})
+		config.Sources = append(
+			config.Sources,
+			&ast.Source{Name: filename, Input: string(schemaRaw)},
+		)
 	}
 
 	return config, nil
 }
 
-// LoadConfigFromDefaultLocations looks for a config file in the current directory, and all parent directories
+// LoadConfigFromDefaultLocations looks for a config file in the current directory, and all parent
+// directories
 // walking up the tree. The closest config file will be returned.
 func LoadConfigFromDefaultLocations() (*Config, error) {
 	cfgFile, err := findCfg()
@@ -131,11 +152,17 @@ func LoadConfig(filename string) (*Config, error) {
 	return ReadConfig(bytes.NewReader(b))
 }
 
-func ReadConfig(cfgFile io.Reader) (*Config, error) {
+func ReadConfig(cfgFile io.Reader) (cfg *Config, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			cfg = nil
+			err = fmt.Errorf("unable to parse config: panic during decode: %v", r)
+		}
+	}()
+
 	config := DefaultConfig()
 
-	dec := yaml.NewDecoder(cfgFile)
-	dec.KnownFields(true)
+	dec := yaml.NewDecoder(cfgFile, yaml.DisallowUnknownField())
 
 	if err := dec.Decode(config); err != nil {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
@@ -156,6 +183,7 @@ func CompleteConfig(config *Config) error {
 		"include":     {SkipRuntime: true},
 		"deprecated":  {SkipRuntime: true},
 		"specifiedBy": {SkipRuntime: true},
+		"oneOf":       {SkipRuntime: true},
 	}
 
 	for key, value := range defaultDirectives {
@@ -175,20 +203,24 @@ func CompleteConfig(config *Config) error {
 			pathParts := strings.SplitN(f, "**", 2)
 			rest := strings.TrimPrefix(strings.TrimPrefix(pathParts[1], `\`), `/`)
 			// turn the rest of the glob into a regex, anchored only at the end because ** allows
-			// for any number of dirs in between and walk will let us match against the full path name
+			// for any number of dirs in between and walk will let us match against the full path
+			// name
 			globRe := regexp.MustCompile(path2regex.Replace(rest) + `$`)
 
-			if err := filepath.Walk(pathParts[0], func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
+			if err := filepath.Walk(
+				pathParts[0],
+				func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
 
-				if globRe.MatchString(strings.TrimPrefix(path, pathParts[0])) {
-					matches = append(matches, path)
-				}
+					if globRe.MatchString(strings.TrimPrefix(path, pathParts[0])) {
+						matches = append(matches, path)
+					}
 
-				return nil
-			}); err != nil {
+					return nil
+				},
+			); err != nil {
 				return fmt.Errorf("failed to walk schema at root %s: %w", pathParts[0], err)
 			}
 		} else {
@@ -216,7 +248,10 @@ func CompleteConfig(config *Config) error {
 			return fmt.Errorf("unable to open schema: %w", err)
 		}
 
-		config.Sources = append(config.Sources, &ast.Source{Name: filename, Input: string(schemaRaw)})
+		config.Sources = append(
+			config.Sources,
+			&ast.Source{Name: filename, Input: string(schemaRaw)},
+		)
 	}
 
 	config.GoInitialisms.setInitialisms()
@@ -228,6 +263,8 @@ func (c *Config) Init() error {
 	if c.Packages == nil {
 		c.Packages = code.NewPackages(
 			code.WithBuildTags(c.GoBuildTags...),
+			code.PackagePrefixToCache("github.com/99designs/gqlgen/graphql"),
+			code.WithPreloadNames(templatePackageNames...),
 		)
 	}
 
@@ -242,14 +279,15 @@ func (c *Config) Init() error {
 		return err
 	}
 
+	// prefetch all packages in one big packages.Load call
+	c.Packages.LoadAll(c.packageList()...)
+
 	err = c.autobind()
 	if err != nil {
 		return err
 	}
 
 	c.injectBuiltins()
-	// prefetch all packages in one big packages.Load call
-	c.Packages.LoadAll(c.packageList()...)
 
 	//  check everything is valid on the way out
 	err = c.check()
@@ -279,24 +317,8 @@ func (c *Config) IsRoot(def *ast.Definition) bool {
 }
 
 func (c *Config) injectTypesFromSchema() error {
-	c.Directives["goModel"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goExtraField"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goField"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goTag"] = DirectiveConfig{
-		SkipRuntime: true,
-	}
-
-	c.Directives["goEnum"] = DirectiveConfig{
-		SkipRuntime: true,
+	for _, d := range []string{"goModel", "goExtraField", "goField", "goTag", "goEnum", "inlineArguments"} {
+		c.Directives[d] = DirectiveConfig{SkipRuntime: true}
 	}
 
 	for _, schemaType := range c.Schema.Types {
@@ -331,41 +353,53 @@ func (c *Config) injectTypesFromSchema() error {
 			schemaType.Kind == ast.Interface {
 			for _, field := range schemaType.Fields {
 				if fd := field.Directives.ForName("goField"); fd != nil {
-					forceResolver := c.Models[schemaType.Name].Fields[field.Name].Resolver
+					// First, copy map entry for type and field to do modifications
+					typeMapEntry := c.Models[schemaType.Name]
+					typeMapFieldEntry := typeMapEntry.Fields[field.Name]
+
+					if ta := fd.Arguments.ForName("type"); ta != nil {
+						if c.Models.UserDefined(schemaType.Name) {
+							return fmt.Errorf(
+								"argument 'type' for directive @goField (src: %s, line: %d) not applicable for user-defined models",
+								fd.Position.Src.Name,
+								fd.Position.Line,
+							)
+						}
+
+						if ft, err := ta.Value.Value(nil); err == nil {
+							typeMapFieldEntry.Type = ft.(string)
+						}
+					}
+
 					if ra := fd.Arguments.ForName("forceResolver"); ra != nil {
 						if fr, err := ra.Value.Value(nil); err == nil {
-							forceResolver = fr.(bool)
+							typeMapFieldEntry.Resolver = fr.(bool)
 						}
 					}
 
-					fieldName := c.Models[schemaType.Name].Fields[field.Name].FieldName
 					if na := fd.Arguments.ForName("name"); na != nil {
 						if fr, err := na.Value.Value(nil); err == nil {
-							fieldName = fr.(string)
+							typeMapFieldEntry.FieldName = fr.(string)
 						}
 					}
 
-					omittable := c.Models[schemaType.Name].Fields[field.Name].Omittable
 					if arg := fd.Arguments.ForName("omittable"); arg != nil {
 						if k, err := arg.Value.Value(nil); err == nil {
 							val := k.(bool)
-							omittable = &val
+							typeMapFieldEntry.Omittable = &val
 						}
 					}
 
-					if c.Models[schemaType.Name].Fields == nil {
-						c.Models[schemaType.Name] = TypeMapEntry{
-							Model:       c.Models[schemaType.Name].Model,
-							ExtraFields: c.Models[schemaType.Name].ExtraFields,
-							Fields:      map[string]TypeMapField{},
-						}
+					// May be uninitialized, so do it now.
+					if typeMapEntry.Fields == nil {
+						typeMapEntry.Fields = make(map[string]TypeMapField)
 					}
 
-					c.Models[schemaType.Name].Fields[field.Name] = TypeMapField{
-						FieldName: fieldName,
-						Resolver:  forceResolver,
-						Omittable: omittable,
-					}
+					// First, copy back probably modificated field settings
+					typeMapEntry.Fields[field.Name] = typeMapFieldEntry
+
+					// And final copy back probably modificated all type map
+					c.Models[schemaType.Name] = typeMapEntry
 				}
 			}
 
@@ -405,21 +439,25 @@ func (c *Config) injectTypesFromSchema() error {
 							}
 						}
 
+						// First copy, then modify map entry.
+						typeMapEntry := c.Models[schemaType.Name]
+
 						if extraFieldName == "" {
 							// Embeddable fields
-							typeMapEntry := c.Models[schemaType.Name]
-							typeMapEntry.EmbedExtraFields = append(typeMapEntry.EmbedExtraFields, extraField)
-							c.Models[schemaType.Name] = typeMapEntry
+							typeMapEntry.EmbedExtraFields = append(
+								typeMapEntry.EmbedExtraFields,
+								extraField,
+							)
 						} else {
 							// Regular fields
-							typeMapEntry := c.Models[schemaType.Name]
 							if typeMapEntry.ExtraFields == nil {
 								typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
 							}
-
-							c.Models[schemaType.Name] = typeMapEntry
-							c.Models[schemaType.Name].ExtraFields[extraFieldName] = extraField
+							typeMapEntry.ExtraFields[extraFieldName] = extraField
 						}
+
+						// Copy back modified map entry
+						c.Models[schemaType.Name] = typeMapEntry
 					}
 				}
 			}
@@ -463,6 +501,24 @@ type TypeMapEntry struct {
 }
 
 type TypeMapField struct {
+	// Type is the Go type of the field.
+	//
+	// It supports the builtin basic types (like string or int64), named types
+	// (qualified by the full package path), pointers to those types (prefixed
+	// with `*`), and slices of those types (prefixed with `[]`).
+	//
+	// For example, the following are valid types:
+	//  string
+	//  *github.com/author/package.Type
+	//  []string
+	//  []*github.com/author/package.Type
+	//
+	// Note that the type will be referenced from the generated/graphql, which
+	// means the package it lives in must not reference the generated/graphql
+	// package to avoid circular imports.
+	// restrictions.
+	Type string `yaml:"type"`
+
 	Resolver        bool   `yaml:"resolver"`
 	FieldName       string `yaml:"fieldName"`
 	Omittable       *bool  `yaml:"omittable"`
@@ -567,34 +623,43 @@ func (c *Config) check() error {
 		if err := c.Resolver.Check(); err != nil {
 			return fmt.Errorf("config.resolver: %w", err)
 		}
-		fileList[c.Resolver.ImportPath()] = append(fileList[c.Resolver.ImportPath()], FilenamePackage{
-			Filename: c.Resolver.Filename,
-			Package:  c.Resolver.Package,
-			Declaree: "resolver",
-		})
+		fileList[c.Resolver.ImportPath()] = append(
+			fileList[c.Resolver.ImportPath()],
+			FilenamePackage{
+				Filename: c.Resolver.Filename,
+				Package:  c.Resolver.Package,
+				Declaree: "resolver",
+			},
+		)
 	}
 	if c.Federation.IsDefined() {
 		if err := c.Federation.Check(); err != nil {
 			return fmt.Errorf("config.federation: %w", err)
 		}
-		fileList[c.Federation.ImportPath()] = append(fileList[c.Federation.ImportPath()], FilenamePackage{
-			Filename: c.Federation.Filename,
-			Package:  c.Federation.Package,
-			Declaree: "federation",
-		})
+		fileList[c.Federation.ImportPath()] = append(
+			fileList[c.Federation.ImportPath()],
+			FilenamePackage{
+				Filename: c.Federation.Filename,
+				Package:  c.Federation.Package,
+				Declaree: "federation",
+			},
+		)
 		if c.Federation.ImportPath() != c.Exec.ImportPath() {
 			return errors.New("federation and exec must be in the same package")
 		}
 	}
 	if c.Federated {
-		return errors.New("federated has been removed, instead use\nfederation:\n    filename: path/to/federated.go")
+		return errors.New(
+			"federated has been removed, instead use\nfederation:\n    filename: path/to/federated.go",
+		)
 	}
 
 	for importPath, pkg := range fileList {
 		for _, file1 := range pkg {
 			for _, file2 := range pkg {
 				if file1.Package != file2.Package {
-					return fmt.Errorf("%s and %s define the same import path (%s) with different package names (%s vs %s)",
+					return fmt.Errorf(
+						"%s and %s define the same import path (%s) with different package names (%s vs %s)",
 						file1.Declaree,
 						file2.Declaree,
 						importPath,
@@ -625,14 +690,22 @@ func (tm TypeMap) Check() error {
 	for typeName, entry := range tm {
 		for _, model := range entry.Model {
 			if strings.LastIndex(model, ".") < strings.LastIndex(model, "/") {
-				return fmt.Errorf("model %s: invalid type specifier \"%s\" - you need to specify a struct to map to", typeName, entry.Model)
+				return fmt.Errorf(
+					"model %s: invalid type specifier \"%s\" - you need to specify a struct to map to",
+					typeName,
+					entry.Model,
+				)
 			}
 		}
 
 		if len(entry.Model) == 0 {
 			for enum, v := range entry.EnumValues {
 				if v.Value != "" {
-					return fmt.Errorf("model is empty for: %v, but enum value is specified for %v", typeName, enum)
+					return fmt.Errorf(
+						"model is empty for: %v, but enum value is specified for %v",
+						typeName,
+						enum,
+					)
 				}
 			}
 		}
@@ -645,7 +718,10 @@ func (tm TypeMap) ReferencedPackages() []string {
 
 	for _, typ := range tm {
 		for _, model := range typ.Model {
-			if model == "map[string]interface{}" || model == "interface{}" {
+			if model == "map[string]any" ||
+				model == "map[string]interface{}" ||
+				model == "any" ||
+				model == "interface{}" {
 				continue
 			}
 			pkg, _ := code.PkgAndType(model)
@@ -684,7 +760,8 @@ type DirectiveConfig struct {
 	// The function implemmentation should be provided here as a string.
 	//
 	// The function should have the following signature:
-	// func(ctx context.Context, obj any, next graphql.Resolver[, directive arguments if any]) (res any, err error)
+	// func(ctx context.Context, obj any, next graphql.Resolver[, directive arguments if any]) (res
+	// any, err error)
 	Implementation *string
 }
 
@@ -744,7 +821,10 @@ func (c *Config) autobind() error {
 
 		for i, p := range ps {
 			if p == nil || p.Module == nil {
-				return fmt.Errorf("unable to load %s - make sure you're using an import path to a package that exists", c.AutoBind[i])
+				return fmt.Errorf(
+					"unable to load %s - make sure you're using an import path to a package that exists",
+					c.AutoBind[i],
+				)
 			}
 
 			autobindType := c.lookupAutobindType(p, t)
@@ -796,22 +876,40 @@ func (c *Config) lookupAutobindType(p *packages.Package, schemaType *ast.Definit
 
 func (c *Config) injectBuiltins() {
 	builtins := TypeMap{
-		"__Directive":         {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Directive"}},
+		"__Directive": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Directive"},
+		},
 		"__DirectiveLocation": {Model: StringList{"github.com/99designs/gqlgen/graphql.String"}},
-		"__Type":              {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Type"}},
-		"__TypeKind":          {Model: StringList{"github.com/99designs/gqlgen/graphql.String"}},
-		"__Field":             {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Field"}},
-		"__EnumValue":         {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.EnumValue"}},
-		"__InputValue":        {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.InputValue"}},
-		"__Schema":            {Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Schema"}},
-		"Float":               {Model: StringList{"github.com/99designs/gqlgen/graphql.FloatContext"}},
-		"String":              {Model: StringList{"github.com/99designs/gqlgen/graphql.String"}},
-		"Boolean":             {Model: StringList{"github.com/99designs/gqlgen/graphql.Boolean"}},
-		"Int": {Model: StringList{
-			"github.com/99designs/gqlgen/graphql.Int",
-			"github.com/99designs/gqlgen/graphql.Int32",
-			"github.com/99designs/gqlgen/graphql.Int64",
-		}},
+		"__Type": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Type"},
+		},
+		"__TypeKind": {Model: StringList{"github.com/99designs/gqlgen/graphql.String"}},
+		"__Field": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Field"},
+		},
+		"__EnumValue": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.EnumValue"},
+		},
+		"__InputValue": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.InputValue"},
+		},
+		"__Schema": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql/introspection.Schema"},
+		},
+		"Float": {
+			Model: StringList{"github.com/99designs/gqlgen/graphql.FloatContext"},
+		},
+		"String":  {Model: StringList{"github.com/99designs/gqlgen/graphql.String"}},
+		"Boolean": {Model: StringList{"github.com/99designs/gqlgen/graphql.Boolean"}},
+		"Int": {
+			// FIXME: using int / int64 for Int is not spec compliant and introduces
+			// security risks. We should default to int32.
+			Model: StringList{
+				"github.com/99designs/gqlgen/graphql.Int",
+				"github.com/99designs/gqlgen/graphql.Int32",
+				"github.com/99designs/gqlgen/graphql.Int64",
+			},
+		},
 		"ID": {
 			Model: StringList{
 				"github.com/99designs/gqlgen/graphql.ID",
@@ -828,6 +926,12 @@ func (c *Config) injectBuiltins() {
 
 	// These are additional types that are injected if defined in the schema as scalars.
 	extraBuiltins := TypeMap{
+		"Int64": {
+			Model: StringList{
+				"github.com/99designs/gqlgen/graphql.Int",
+				"github.com/99designs/gqlgen/graphql.Int64",
+			},
+		},
 		"Time":   {Model: StringList{"github.com/99designs/gqlgen/graphql.Time"}},
 		"Map":    {Model: StringList{"github.com/99designs/gqlgen/graphql.Map"}},
 		"Upload": {Model: StringList{"github.com/99designs/gqlgen/graphql.Upload"}},
@@ -835,7 +939,8 @@ func (c *Config) injectBuiltins() {
 	}
 
 	for typeName, entry := range extraBuiltins {
-		if t, ok := c.Schema.Types[typeName]; !c.Models.Exists(typeName) && ok && t.Kind == ast.Scalar {
+		if t, ok := c.Schema.Types[typeName]; !c.Models.Exists(typeName) && ok &&
+			t.Kind == ast.Scalar {
 			c.Models[typeName] = entry
 		}
 	}
@@ -845,6 +950,8 @@ func (c *Config) LoadSchema() error {
 	if c.Packages != nil {
 		c.Packages = code.NewPackages(
 			code.WithBuildTags(c.GoBuildTags...),
+			code.PackagePrefixToCache("github.com/99designs/gqlgen/graphql"),
+			code.WithPreloadNames(templatePackageNames...),
 		)
 	}
 

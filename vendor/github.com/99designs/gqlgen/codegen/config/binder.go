@@ -63,11 +63,11 @@ func (b *Binder) FindTypeFromName(name string) (types.Type, error) {
 
 func (b *Binder) FindType(pkgName, typeName string) (types.Type, error) {
 	if pkgName == "" {
-		if typeName == "map[string]interface{}" {
+		if typeName == "map[string]any" || typeName == "map[string]interface{}" {
 			return MapType, nil
 		}
 
-		if typeName == "interface{}" {
+		if typeName == "any" || typeName == "interface{}" {
 			return InterfaceType, nil
 		}
 	}
@@ -93,8 +93,8 @@ func (b *Binder) InstantiateType(orig types.Type, targs []types.Type) (types.Typ
 }
 
 var (
-	MapType       = types.NewMap(types.Typ[types.String], types.NewInterfaceType(nil, nil).Complete())
-	InterfaceType = types.NewInterfaceType(nil, nil)
+	MapType       = types.NewMap(types.Typ[types.String], types.Universe.Lookup("any").Type())
+	InterfaceType = types.Universe.Lookup("any").Type()
 )
 
 func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
@@ -103,11 +103,11 @@ func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
 		return nil, fmt.Errorf("%s not found in typemap", name)
 	}
 
-	if models[0] == "map[string]interface{}" {
+	if models[0] == "map[string]any" || models[0] == "map[string]interface{}" {
 		return MapType, nil
 	}
 
-	if models[0] == "interface{}" {
+	if models[0] == "any" || models[0] == "interface{}" {
 		return InterfaceType, nil
 	}
 
@@ -126,7 +126,7 @@ func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
 
 func (b *Binder) FindObject(pkgName, typeName string) (types.Object, error) {
 	if pkgName == "" {
-		return nil, errors.New("package cannot be nil")
+		return nil, fmt.Errorf("package cannot be nil in FindObject for type: %s", typeName)
 	}
 
 	pkg := b.pkgs.LoadWithTypes(pkgName)
@@ -175,9 +175,10 @@ func indexDefs(pkg *packages.Package) map[string]types.Object {
 		}
 
 		if _, ok := res[astNode.Name]; !ok {
-			// The above check may not be really needed, it is only here to have a consistent behavior with
-			// previous implementation of FindObject() function which only honored the first inclusion of a def.
-			// If this is still needed, we can consider something like sync.Map.LoadOrStore() to avoid two lookups.
+			// The above check may not be really needed, it is only here to have a consistent
+			// behavior with previous implementation of FindObject() function which only honored the
+			// first inclusion of a def. If this is still needed, we can consider something like
+			// sync.Map.LoadOrStore() to avoid two lookups.
 			res[astNode.Name] = def
 		}
 	}
@@ -192,7 +193,8 @@ func (b *Binder) PointerTo(ref *TypeReference) *TypeReference {
 	return &newRef
 }
 
-// TypeReference is used by args and field types. The Definition can refer to both input and output types.
+// TypeReference is used by args and field types. The Definition can refer to both input and output
+// types.
 type TypeReference struct {
 	Definition               *ast.Definition
 	GQL                      *ast.Type
@@ -230,7 +232,8 @@ func (ref *TypeReference) IsPtr() bool {
 	return isPtr
 }
 
-// fix for https://github.com/golang/go/issues/31103 may make it possible to remove this (may still be useful)
+// fix for https://github.com/golang/go/issues/31103 may make it possible to remove this (may still
+// be useful)
 func (ref *TypeReference) IsPtrToPtr() bool {
 	if p, isPtr := ref.GO.(*types.Pointer); isPtr {
 		_, isPtr := p.Elem().(*types.Pointer)
@@ -258,7 +261,7 @@ func (ref *TypeReference) IsPtrToSlice() bool {
 
 func (ref *TypeReference) IsPtrToIntf() bool {
 	if ref.IsPtr() {
-		_, isPointerToInterface := ref.GO.(*types.Pointer).Elem().(*types.Interface)
+		_, isPointerToInterface := types.Unalias(ref.GO.(*types.Pointer).Elem()).(*types.Interface)
 		return isPointerToInterface
 	}
 	return false
@@ -293,7 +296,9 @@ func (ref *TypeReference) UniquenessKey() string {
 		// Fix for #896
 		elemNullability = "ᚄ"
 	}
-	return nullability + ref.Definition.Name + "2" + templates.TypeIdentifier(ref.GO) + elemNullability
+	return nullability + ref.Definition.Name + "2" + templates.TypeIdentifier(
+		ref.GO,
+	) + elemNullability
 }
 
 func (ref *TypeReference) MarshalFunc() string {
@@ -308,6 +313,10 @@ func (ref *TypeReference) MarshalFunc() string {
 	return "marshal" + ref.UniquenessKey()
 }
 
+func (ref *TypeReference) MarshalFuncFunctionSyntax() string {
+	return ref.MarshalFunc() + "F"
+}
+
 func (ref *TypeReference) UnmarshalFunc() string {
 	if ref.Definition == nil {
 		panic(errors.New("Definition missing for " + ref.GQL.Name()))
@@ -318,6 +327,10 @@ func (ref *TypeReference) UnmarshalFunc() string {
 	}
 
 	return "unmarshal" + ref.UniquenessKey()
+}
+
+func (ref *TypeReference) UnmarshalFuncFunctionSyntax() string {
+	return ref.UnmarshalFunc() + "F"
 }
 
 func (ref *TypeReference) IsTargetNilable() bool {
@@ -344,7 +357,7 @@ func isIntf(t types.Type) bool {
 	if t == nil {
 		return true
 	}
-	_, ok := t.(*types.Interface)
+	_, ok := types.Unalias(t).(*types.Interface)
 	return ok
 }
 
@@ -362,7 +375,10 @@ func unwrapOmittable(t types.Type) (types.Type, bool) {
 	return named.TypeArgs().At(0), true
 }
 
-func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret *TypeReference, err error) {
+func (b *Binder) TypeReference(
+	schemaType *ast.Type,
+	bindTarget types.Type,
+) (ret *TypeReference, err error) {
 	if bindTarget != nil {
 		bindTarget = code.Unalias(bindTarget)
 	}
@@ -398,26 +414,26 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 	}
 
 	for _, model := range b.cfg.Models[schemaType.Name()].Model {
-		if model == "map[string]interface{}" {
+		if model == "map[string]any" || model == "map[string]interface{}" {
 			if !isMap(bindTarget) {
 				continue
 			}
 			return &TypeReference{
 				Definition: def,
 				GQL:        schemaType,
-				GO:         MapType,
+				GO:         b.CopyModifiersFromAst(schemaType, MapType),
 				IsRoot:     b.cfg.IsRoot(def),
 			}, nil
 		}
 
-		if model == "interface{}" {
+		if model == "any" || model == "interface{}" {
 			if !isIntf(bindTarget) {
 				continue
 			}
 			return &TypeReference{
 				Definition: def,
 				GQL:        schemaType,
-				GO:         InterfaceType,
+				GO:         b.CopyModifiersFromAst(schemaType, InterfaceType),
 				IsRoot:     b.cfg.IsRoot(def),
 			}, nil
 		}
@@ -456,7 +472,8 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 			ref.GO = t
 			ref.IsMarshaler = true
 		} else if underlying := basicUnderlying(t); def.IsLeafType() && underlying != nil && underlying.Kind() == types.String {
-			// TODO delete before v1. Backwards compatibility case for named types wrapping strings (see #595)
+			// TODO delete before v1. Backwards compatibility case for named types wrapping strings
+			// (see #595)
 
 			ref.GO = t
 			ref.CastType = underlying
@@ -477,7 +494,23 @@ func (b *Binder) TypeReference(schemaType *ast.Type, bindTarget types.Type) (ret
 
 		if bindTarget != nil {
 			if err = code.CompatibleTypes(ref.GO, bindTarget); err != nil {
-				continue
+				// if the bind type implements the
+				// graphql.ContextMarshaler/graphql.ContextUnmarshaler/graphql.Marshaler/graphql.Unmarshaler
+				// interface, we can use it
+				if hasMethod(bindTarget, "MarshalGQLContext") &&
+					hasMethod(bindTarget, "UnmarshalGQLContext") {
+					ref.IsContext = true
+					ref.IsMarshaler = true
+					ref.Marshaler = nil
+					ref.Unmarshaler = nil
+				} else if hasMethod(bindTarget, "MarshalGQL") && hasMethod(bindTarget, "UnmarshalGQL") {
+					ref.IsContext = false
+					ref.IsMarshaler = true
+					ref.Marshaler = nil
+					ref.Unmarshaler = nil
+				} else {
+					continue
+				}
 			}
 			ref.GO = bindTarget
 		}
@@ -499,9 +532,11 @@ func isValid(t types.Type) bool {
 }
 
 func (b *Binder) CopyModifiersFromAst(t *ast.Type, base types.Type) types.Type {
+	base = types.Unalias(base)
 	if t.Elem != nil {
 		child := b.CopyModifiersFromAst(t.Elem, base)
-		if _, isStruct := child.Underlying().(*types.Struct); isStruct && !b.cfg.OmitSliceElementPointers {
+		if _, isStruct := child.Underlying().(*types.Struct); isStruct &&
+			!b.cfg.OmitSliceElementPointers {
 			child = types.NewPointer(child)
 		}
 		return types.NewSlice(child)
@@ -528,11 +563,11 @@ func IsNilable(t types.Type) bool {
 		return IsNilable(namedType.Underlying())
 	}
 	_, isPtr := t.(*types.Pointer)
-	_, isMap := t.(*types.Map)
+	_, isNilableMap := t.(*types.Map)
 	_, isInterface := t.(*types.Interface)
 	_, isSlice := t.(*types.Slice)
 	_, isChan := t.(*types.Chan)
-	return isPtr || isMap || isInterface || isSlice || isChan
+	return isPtr || isNilableMap || isInterface || isSlice || isChan
 }
 
 func hasMethod(it types.Type, name string) bool {
@@ -553,8 +588,9 @@ func hasMethod(it types.Type, name string) bool {
 }
 
 func basicUnderlying(it types.Type) *types.Basic {
+	it = types.Unalias(it)
 	if ptr, isPtr := it.(*types.Pointer); isPtr {
-		it = ptr.Elem()
+		it = types.Unalias(ptr.Elem())
 	}
 	namedType, ok := it.(*types.Named)
 	if !ok {
@@ -590,7 +626,11 @@ func (b *Binder) enumValues(def *ast.Definition) map[string]EnumValue {
 	return model.EnumValues
 }
 
-func (b *Binder) enumReference(ref *TypeReference, obj types.Object, values map[string]EnumValue) error {
+func (b *Binder) enumReference(
+	ref *TypeReference,
+	obj types.Object,
+	values map[string]EnumValue,
+) error {
 	if len(ref.Definition.EnumValues) != len(values) {
 		return fmt.Errorf("not all enum values are binded for %v", ref.Definition.Name)
 	}
@@ -614,7 +654,11 @@ func (b *Binder) enumReference(ref *TypeReference, obj types.Object, values map[
 	for _, value := range ref.Definition.EnumValues {
 		v, ok := values[value.Name]
 		if !ok {
-			return fmt.Errorf("enum value not found for: %v, of enum: %v", value.Name, ref.Definition.Name)
+			return fmt.Errorf(
+				"enum value not found for: %v, of enum: %v",
+				value.Name,
+				ref.Definition.Name,
+			)
 		}
 
 		pkgName, typeName := code.PkgAndType(v.Value)

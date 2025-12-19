@@ -40,7 +40,8 @@ func (m *FieldSet) Dispatch(ctx context.Context) {
 		d := m.delayed[0]
 		m.Values[d.i] = d.f(ctx)
 	} else if len(m.delayed) > 1 {
-		// more than one concurrent task, use the main goroutine to do one, only spawn goroutines for the others
+		// more than one concurrent task, use the main goroutine to do one, only spawn goroutines
+		// for the others
 
 		var wg sync.WaitGroup
 		for _, d := range m.delayed[1:] {
@@ -58,13 +59,18 @@ func (m *FieldSet) Dispatch(ctx context.Context) {
 
 func (m *FieldSet) MarshalGQL(writer io.Writer) {
 	writer.Write(openBrace)
+	writtenFields := make(map[string]bool, len(m.fields))
 	for i, field := range m.fields {
+		if writtenFields[field.Alias] {
+			continue
+		}
 		if i != 0 {
 			writer.Write(comma)
 		}
 		writeQuotedString(writer, field.Alias)
 		writer.Write(colon)
 		m.Values[i].MarshalGQL(writer)
+		writtenFields[field.Alias] = true
 	}
 	writer.Write(closeBrace)
 }

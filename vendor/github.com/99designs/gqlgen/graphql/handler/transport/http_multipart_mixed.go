@@ -40,16 +40,20 @@ func (t MultipartMixed) Supports(r *http.Request) bool {
 // Do implements the multipart/mixed spec as a multipart/mixed response
 func (t MultipartMixed) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
 	// Implements the multipart/mixed spec as a multipart/mixed response:
-	// * https://github.com/graphql/graphql-wg/blob/e4ef5f9d5997815d9de6681655c152b6b7838b4c/rfcs/DeferStream.md
+	// *
+	// https://github.com/graphql/graphql-wg/blob/e4ef5f9d5997815d9de6681655c152b6b7838b4c/rfcs/DeferStream.md
 	//   2022/08/23 as implemented by gqlgen.
-	// * https://github.com/graphql/graphql-wg/blob/f22ea7748c6ebdf88fdbf770a8d9e41984ebd429/rfcs/DeferStream.md June 2023 Spec for the
+	// *
+	// https://github.com/graphql/graphql-wg/blob/f22ea7748c6ebdf88fdbf770a8d9e41984ebd429/rfcs/DeferStream.md
+	// June 2023 Spec for the
 	//   `incremental` field
 	// * https://github.com/graphql/graphql-over-http/blob/main/rfcs/IncrementalDelivery.md
 	//   multipart specification
 	// Follows the format that is used in the Apollo Client tests:
 	// https://github.com/apollographql/apollo-client/blob/v3.11.8/src/link/http/__tests__/responseIterator.ts#L68
-	// Apollo Client, despite mentioning in its requests that they require the 2022 spec, it wants the
-	// `incremental` field to be an array of responses, not a single response. Theoretically we could
+	// Apollo Client, despite mentioning in its requests that they require the 2022 spec, it wants
+	// the `incremental` field to be an array of responses, not a single response. Theoretically we
+	// could
 	// batch responses in the `incremental` field, if we wanted to optimize this code.
 	ctx := r.Context()
 	flusher, ok := w.(http.Flusher)
@@ -178,7 +182,8 @@ func writeContentTypeHeader(w io.Writer) {
 	fmt.Fprintf(w, "Content-Type: application/json\r\n\r\n")
 }
 
-// multipartResponseAggregator helps us reduce the number of responses sent to the frontend by batching all the
+// multipartResponseAggregator helps us reduce the number of responses sent to the frontend by
+// batching all the
 // incremental responses together.
 type multipartResponseAggregator struct {
 	mu              sync.Mutex
@@ -269,9 +274,21 @@ func (a *multipartResponseAggregator) flush(w http.ResponseWriter) {
 
 	if len(a.deferResponses) > 0 {
 		writeContentTypeHeader(w)
+
+		// Note: while the 2023 spec that includes "incremental" does not
+		// explicitly list the fields that should be included as part of the
+		// incremental object, it shows hasNext only on the response payload
+		// (marking the status of the operation as a whole), and instead the
+		// response payload implements pending and complete fields to mark the
+		// status of the incrementally delivered data.
+		//
+		// TODO: use the "HasNext" status of deferResponses items to determine
+		// the operation status and pending / complete fields, but remove from
+		// the incremental (deferResponses) object.
 		hasNext = a.deferResponses[len(a.deferResponses)-1].HasNext != nil &&
 			*a.deferResponses[len(a.deferResponses)-1].HasNext
 		writeIncrementalJson(w, a.deferResponses, hasNext)
+
 		// Reset the deferResponses so we don't send them again
 		a.deferResponses = nil
 	}

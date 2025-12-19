@@ -7,6 +7,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"github.com/vektah/gqlparser/v2/parser"
 	"github.com/vektah/gqlparser/v2/validator"
+	"github.com/vektah/gqlparser/v2/validator/rules"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/errcode"
@@ -24,7 +25,9 @@ type Executor struct {
 	recoverFunc    graphql.RecoverFunc
 	queryCache     graphql.Cache[*ast.QueryDocument]
 
-	parserTokenLimit int
+	parserTokenLimit  int
+	disableSuggestion bool
+	defaultRulesFn    func() *rules.Rules
 }
 
 var _ graphql.GraphExecutor = &Executor{}
@@ -41,6 +44,11 @@ func New(es graphql.ExecutableSchema) *Executor {
 		parserTokenLimit: parserTokenNoLimit,
 	}
 	return e
+}
+
+// SetDefaultRulesFn is to customize the Default GraphQL Validation Rules
+func (e *Executor) SetDefaultRulesFn(f func() *rules.Rules) {
+	e.defaultRulesFn = f
 }
 
 func (e *Executor) CreateOperationContext(
@@ -67,6 +75,7 @@ func (e *Executor) CreateOperationContext(
 
 	opCtx.RawQuery = params.Query
 	opCtx.OperationName = params.OperationName
+	opCtx.Extensions = params.Extensions
 	opCtx.Headers = params.Headers
 
 	var listErr gqlerror.List
@@ -83,7 +92,11 @@ func (e *Executor) CreateOperationContext(
 	}
 
 	var err error
-	opCtx.Variables, err = validator.VariableValues(e.es.Schema(), opCtx.Operation, params.Variables)
+	opCtx.Variables, err = validator.VariableValues(
+		e.es.Schema(),
+		opCtx.Operation,
+		params.Variables,
+	)
 	if err != nil {
 		gqlErr, ok := err.(*gqlerror.Error)
 		if ok {
@@ -106,10 +119,9 @@ func (e *Executor) DispatchOperation(
 	ctx context.Context,
 	opCtx *graphql.OperationContext,
 ) (graphql.ResponseHandler, context.Context) {
-	ctx = graphql.WithOperationContext(ctx, opCtx)
+	innerCtx := graphql.WithOperationContext(ctx, opCtx)
 
-	var innerCtx context.Context
-	res := e.ext.operationMiddleware(ctx, func(ctx context.Context) graphql.ResponseHandler {
+	res := e.ext.operationMiddleware(innerCtx, func(ctx context.Context) graphql.ResponseHandler {
 		innerCtx = ctx
 
 		tmpResponseContext := graphql.WithResponseContext(ctx, e.errorPresenter, e.recoverFunc)
@@ -177,6 +189,10 @@ func (e *Executor) SetParserTokenLimit(limit int) {
 	e.parserTokenLimit = limit
 }
 
+func (e *Executor) SetDisableSuggestion(value bool) {
+	e.disableSuggestion = value
+}
+
 // parseQuery decodes the incoming query and validates it, pulling from cache if present.
 //
 // NOTE: This should NOT look at variables, they will change per request. It should only parse and
@@ -209,14 +225,34 @@ func (e *Executor) parseQuery(
 
 	stats.Validation.Start = graphql.Now()
 
-	if len(doc.Operations) == 0 {
+	if doc == nil || len(doc.Operations) == 0 {
 		err = gqlerror.Errorf("no operation provided")
 		gqlErr, _ := err.(*gqlerror.Error)
 		errcode.Set(err, errcode.ValidationFailed)
 		return nil, gqlerror.List{gqlErr}
 	}
 
-	listErr := validator.Validate(e.es.Schema(), doc)
+	var currentRules *rules.Rules
+	if e.defaultRulesFn == nil {
+		currentRules = rules.NewDefaultRules()
+	} else {
+		currentRules = e.defaultRulesFn()
+	}
+	// Customise rules as required
+	// TODO(steve): consider currentRules.RemoveRule(rules.MaxIntrospectionDepth.Name)
+
+	// swap out the FieldsOnCorrectType rule with one that doesn't provide suggestions
+	if e.disableSuggestion {
+		currentRules.RemoveRule("FieldsOnCorrectType")
+		rule := rules.FieldsOnCorrectTypeRuleWithoutSuggestions
+		currentRules.AddRule(rule.Name, rule.RuleFunc)
+	} else { // or vice versa
+		currentRules.RemoveRule("FieldsOnCorrectTypeWithoutSuggestions")
+		rule := rules.FieldsOnCorrectTypeRule
+		currentRules.AddRule(rule.Name, rule.RuleFunc)
+	}
+
+	listErr := validator.ValidateWithRules(e.es.Schema(), doc, currentRules)
 	if len(listErr) != 0 {
 		for _, e := range listErr {
 			errcode.Set(e, errcode.ValidationFailed)

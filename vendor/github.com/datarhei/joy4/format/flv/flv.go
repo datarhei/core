@@ -279,15 +279,18 @@ func (prober *Prober) TagToPacket(tag flvio.Tag, timestamp int32) (pkt av.Packet
 			case flvio.AAC_RAW:
 				ok = true
 				pkt.Data = tag.Data
+				pkt.IsKeyFrame = true
 			}
 
 		case flvio.SOUND_SPEEX:
 			ok = true
 			pkt.Data = tag.Data
+			pkt.IsKeyFrame = true
 
 		case flvio.SOUND_NELLYMOSER:
 			ok = true
 			pkt.Data = tag.Data
+			pkt.IsKeyFrame = true
 		}
 	}
 

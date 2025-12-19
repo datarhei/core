@@ -18,7 +18,8 @@ type FieldContext struct {
 	Parent *FieldContext
 	// The name of the type this field belongs to
 	Object string
-	// These are the args after processing, they can be mutated in middleware to change what the resolver will get.
+	// These are the args after processing, they can be mutated in middleware to change what the
+	// resolver will get.
 	Args map[string]any
 	// The raw field
 	Field CollectedField
@@ -34,7 +35,7 @@ type FieldContext struct {
 	// Note that, the returned child FieldContext represents the context as it was
 	// before the execution of the field resolver. For example:
 	//
-	//	srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (interface{}, error) {
+	//	srv.AroundFields(func(ctx context.Context, next graphql.Resolver) (any, error) {
 	//		fc := graphql.GetFieldContext(ctx)
 	//		opCtx := graphql.GetOperationContext(ctx)
 	//		collected := graphql.CollectFields(opCtx, fc.Field.Selections, []string{"User"})

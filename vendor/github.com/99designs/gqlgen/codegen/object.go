@@ -97,9 +97,11 @@ type Objects []*Object
 
 func (o *Object) Implementors() string {
 	satisfiedBy := strconv.Quote(o.Name)
+	var satisfiedBySb100 strings.Builder
 	for _, s := range o.Implements {
-		satisfiedBy += ", " + strconv.Quote(s.Name)
+		satisfiedBySb100.WriteString(", " + strconv.Quote(s.Name))
 	}
+	satisfiedBy += satisfiedBySb100.String()
 	return "[]string{" + satisfiedBy + "}"
 }
 
@@ -147,7 +149,7 @@ func (o *Object) IsConcurrent() bool {
 }
 
 func (o *Object) IsReserved() bool {
-	return strings.HasPrefix(o.Definition.Name, "__")
+	return strings.HasPrefix(o.Name, "__")
 }
 
 func (o *Object) IsMap() bool {
@@ -170,7 +172,7 @@ func (o *Object) HasField(name string) bool {
 
 func (os Objects) ByName(name string) *Object {
 	for i, o := range os {
-		if strings.EqualFold(o.Definition.Name, name) {
+		if strings.EqualFold(o.Name, name) {
 			return os[i]
 		}
 	}

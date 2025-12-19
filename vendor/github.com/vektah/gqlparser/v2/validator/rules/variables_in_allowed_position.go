@@ -3,8 +3,8 @@ package rules
 import (
 	"github.com/vektah/gqlparser/v2/ast"
 
-	//nolint:revive // Validator rules each use dot imports for convenience.
-	. "github.com/vektah/gqlparser/v2/validator"
+	//nolint:staticcheck // Validator rules each use dot imports for convenience.
+	. "github.com/vektah/gqlparser/v2/validator/core"
 )
 
 var VariablesInAllowedPositionRule = Rule{
@@ -25,6 +25,11 @@ var VariablesInAllowedPositionRule = Rule{
 				}
 			}
 
+			// If the expected type has a default, the given variable can be null
+			if value.ExpectedTypeHasDefault {
+				tmp.NonNull = false
+			}
+
 			if !value.VariableDefinition.Type.IsCompatible(&tmp) {
 				addError(
 					Message(
@@ -38,8 +43,4 @@ var VariablesInAllowedPositionRule = Rule{
 			}
 		})
 	},
-}
-
-func init() {
-	AddRule(VariablesInAllowedPositionRule.Name, VariablesInAllowedPositionRule.RuleFunc)
 }

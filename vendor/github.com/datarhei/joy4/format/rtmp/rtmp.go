@@ -1102,7 +1102,7 @@ func (conn *Conn) WritePacket(pkt av.Packet) (err error) {
 		fmt.Println("rtmp: WritePacket", pkt.Idx, pkt.Time, pkt.CompositionTime)
 	}
 
-	if err = conn.writeAVTag(tag, int32(timestamp)); err != nil {
+	if err = conn.writeAVTag(tag, timestamp); err != nil {
 		return
 	}
 

@@ -13,7 +13,8 @@ import (
 	"github.com/99designs/gqlgen/codegen/config"
 )
 
-// Data is a unified model of the code to be generated. Plugins may modify this structure to do things like implement
+// Data is a unified model of the code to be generated. Plugins may modify this structure to do
+// things like implement
 // resolvers or directives automatically (eg grpc, validation)
 type Data struct {
 	Config *config.Config
@@ -48,7 +49,8 @@ func (d *Data) HasEmbeddableSources() bool {
 	return hasEmbeddableSources
 }
 
-// AugmentedSource contains extra information about graphql schema files which is not known directly from the Config.Sources data
+// AugmentedSource contains extra information about graphql schema files which is not known directly
+// from the Config.Sources data
 type AugmentedSource struct {
 	// path relative to Config.Exec.Filename
 	RelativePath string
@@ -103,7 +105,6 @@ func (d *Data) Directives() DirectiveList {
 }
 
 func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
-	// We reload all packages to allow packages to be compared correctly.
 	cfg.ReloadAllPackages()
 
 	b := builder{
@@ -180,11 +181,11 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 	s.ReferencedTypes = b.buildTypes()
 
 	sort.Slice(s.Objects, func(i, j int) bool {
-		return s.Objects[i].Definition.Name < s.Objects[j].Definition.Name
+		return s.Objects[i].Name < s.Objects[j].Name
 	})
 
 	sort.Slice(s.Inputs, func(i, j int) bool {
-		return s.Inputs[i].Definition.Name < s.Inputs[j].Definition.Name
+		return s.Inputs[i].Name < s.Inputs[j].Name
 	})
 
 	if b.Binder.SawInvalid {
@@ -195,10 +196,18 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 		}
 
 		// otherwise show a generic error message
-		return nil, errors.New("invalid types were encountered while traversing the go source code, this probably means the invalid code generated isnt correct. add try adding -v to debug")
+		return nil, errors.New(
+			"invalid types were encountered while traversing the go source code, this probably means the invalid code generated isnt correct. add try adding -v to debug",
+		)
 	}
+	var sources []*ast.Source
+	sources, err = SerializeTransformedSchema(cfg.Schema, cfg.Sources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize transformed schema: %w", err)
+	}
+
 	aSources := []AugmentedSource{}
-	for _, s := range cfg.Sources {
+	for _, s := range sources {
 		wd, err := os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -207,7 +216,12 @@ func BuildData(cfg *config.Config, plugins ...any) (*Data, error) {
 		sourcePath := filepath.Join(wd, s.Name)
 		relative, err := filepath.Rel(outputDir, sourcePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute path of %s relative to %s: %w", sourcePath, outputDir, err)
+			return nil, fmt.Errorf(
+				"failed to compute path of %s relative to %s: %w",
+				sourcePath,
+				outputDir,
+				err,
+			)
 		}
 		relative = filepath.ToSlash(relative)
 		embeddable := true
