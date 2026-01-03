@@ -4,7 +4,6 @@ import (
 	gojson "encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/datarhei/core/v16/config"
 	v1 "github.com/datarhei/core/v16/config/v1"
@@ -30,11 +29,6 @@ func NewJSON(f fs.Filesystem, path string, reloadFn func()) (Store, error) {
 		fs:       f,
 		data:     make(map[string]*config.Config),
 		reloadFn: reloadFn,
-	}
-
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine absolute path of '%s': %w", path, err)
 	}
 
 	c.path = path

@@ -13,6 +13,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/log"
+	"runtime"
 )
 
 // DiskConfig is the config required to create a new disk filesystem.
@@ -554,7 +555,7 @@ func (fs *diskFilesystem) List(path, pattern string) []FileInfo {
 }
 
 func (fs *diskFilesystem) LookPath(file string) (string, error) {
-	if strings.Contains(file, "/") {
+	if filepath.IsAbs(file) {
 		file = fs.cleanPath(file)
 		err := fs.findExecutable(file)
 		if err == nil {
@@ -567,6 +568,9 @@ func (fs *diskFilesystem) LookPath(file string) (string, error) {
 		if dir == "" {
 			// Unix shell semantics: path element "" means "."
 			dir = "."
+		}
+		if runtime.GOOS == "windows" && !strings.HasSuffix(file, ".exe") {
+			file += ".exe"
 		}
 		path := filepath.Join(dir, file)
 		path = fs.cleanPath(path)
@@ -591,7 +595,7 @@ func (fs *diskFilesystem) findExecutable(file string) error {
 		return fmt.Errorf("is a directory")
 	}
 
-	if m&0111 != 0 {
+	if runtime.GOOS == "windows" || m&0111 != 0 {
 		return nil
 	}
 
