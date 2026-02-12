@@ -215,7 +215,7 @@ func (s *server) log(who, handler, action, resource, message string, client net.
 		"action":   action,
 		"resource": resource,
 		"client":   client.String(),
-	}).Log(message)
+	}).Log("%s", message)
 }
 
 type PlayError struct {

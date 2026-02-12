@@ -579,9 +579,9 @@ func TestProcessResources(t *testing.T) {
 	require.Equal(t, app.ProcessUsage{
 		CPU: app.ProcessUsageCPU{
 			NCPU:         2,
-			Current:      12,
-			Average:      12,
-			Max:          12,
+			Current:      6,
+			Average:      6,
+			Max:          6,
 			Limit:        0,
 			IsThrottling: false,
 		},

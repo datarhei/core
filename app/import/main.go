@@ -59,7 +59,7 @@ func doImport(logger log.Logger, filesystem fs.Filesystem, configstore cfgstore.
 					"value":       v.Value,
 					"env":         v.EnvName,
 					"description": v.Description,
-				}).Log(message)
+				}).Log("%s", message)
 
 				messages = append(messages, v.Name+": "+message)
 			}

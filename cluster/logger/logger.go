@@ -49,7 +49,7 @@ func (l *hclogger) Log(level hclog.Level, msg string, args ...interface{}) {
 		msg = strings.ToUpper(msg[:1]) + msg[1:]
 	}
 
-	logger.Log(msg)
+	logger.Log("%s", msg)
 }
 
 func (l *hclogger) argFields(args ...interface{}) log.Fields {

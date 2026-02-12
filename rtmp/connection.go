@@ -33,14 +33,6 @@ func newConnectionFromDemuxCloser(m av.DemuxCloser) connection {
 	return c
 }
 
-func newConnectionFromMuxCloser(m av.MuxCloser) connection {
-	c := &conn{
-		muxer: m,
-	}
-
-	return c
-}
-
 func newConnectionFromMuxer(m av.Muxer) connection {
 	c := &conn{
 		muxer: &fakeMuxCloser{m},
