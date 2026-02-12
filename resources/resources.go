@@ -358,6 +358,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 			if r.isCPULimiting != doCPULimit {
 				r.logger.Warn().WithFields(log.Fields{
 					"enabled": doCPULimit,
+					"current": cpuload,
 				}).Log("Limiting CPU")
 			}
 			r.isCPULimiting = doCPULimit
@@ -365,6 +366,7 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 			if r.isMemoryLimiting != doMemoryLimit {
 				r.logger.Warn().WithFields(log.Fields{
 					"enabled": doMemoryLimit,
+					"current": vmstat.Used,
 				}).Log("Limiting memory")
 			}
 			r.isMemoryLimiting = doMemoryLimit
