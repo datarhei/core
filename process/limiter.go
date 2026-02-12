@@ -307,12 +307,12 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 	}
 
 	l.logger = l.logger.WithFields(log.Fields{
-		"cpu":        l.cpu.Limit() * l.ncpuFactor,
+		"cpu":        l.cpu.Limit() * l.ncpuFactor * 100,
 		"memory":     l.memory.Limit(),
 		"gpumemory":  l.gpu.memory.Limit(),
-		"gpuusage":   l.gpu.usage.Limit(),
-		"gpuencoder": l.gpu.encoder.Limit(),
-		"gpudecoder": l.gpu.decoder.Limit(),
+		"gpuusage":   l.gpu.usage.Limit() * 100,
+		"gpuencoder": l.gpu.encoder.Limit() * 100,
+		"gpudecoder": l.gpu.decoder.Limit() * 100,
 		"mode":       mode,
 	})
 
@@ -415,39 +415,39 @@ func (l *limiter) collect() {
 
 	if l.mode == LimitModeHard || !l.cpuEnableThrottling {
 		if l.cpu.IsExceeded(l.waitFor, l.mode) {
-			l.logger.Warn().Log("CPU limit exceeded")
+			l.logger.Warn().WithField("current", l.cpu.Current()*l.ncpuFactor*100).Log("CPU limit exceeded")
 			isLimitExceeded = true
 		}
 	}
 
 	if l.memory.IsExceeded(l.waitFor, l.mode) {
-		l.logger.Warn().Log("Memory limit exceeded")
+		l.logger.Warn().WithField("current", l.memory.Current()).Log("Memory limit exceeded")
 		isLimitExceeded = true
 	}
 
 	if l.gpu.memory.IsExceeded(l.waitFor, l.mode) {
-		l.logger.Warn().Log("GPU memory limit exceeded")
+		l.logger.Warn().WithField("current", l.gpu.memory.Current()).Log("GPU memory limit exceeded")
 		isLimitExceeded = true
 	}
 
 	if l.gpu.usage.IsExceeded(l.waitFor, l.mode) {
-		l.logger.Warn().Log("GPU usage limit exceeded")
+		l.logger.Warn().WithField("current", l.gpu.usage.Current()*100).Log("GPU usage limit exceeded")
 		isLimitExceeded = true
 	}
 
 	if l.gpu.encoder.IsExceeded(l.waitFor, l.mode) {
-		l.logger.Warn().Log("GPU encoder limit exceeded")
+		l.logger.Warn().WithField("current", l.gpu.encoder.Current()*100).Log("GPU encoder limit exceeded")
 		isLimitExceeded = true
 	}
 
 	if l.gpu.decoder.IsExceeded(l.waitFor, l.mode) {
-		l.logger.Warn().Log("GPU decoder limit exceeded")
+		l.logger.Warn().WithField("current", l.gpu.decoder.Current()*100).Log("GPU decoder limit exceeded")
 		isLimitExceeded = true
 	}
 
 	l.logger.Debug().WithFields(log.Fields{
-		"cur_cpu":     l.cpu.Current() * l.ncpuFactor,
-		"top_cpu":     l.cpu.Top() * l.ncpuFactor,
+		"cur_cpu":     l.cpu.Current() * l.ncpuFactor * 100,
+		"top_cpu":     l.cpu.Top() * l.ncpuFactor * 100,
 		"cur_mem":     l.memory.Current(),
 		"top_mem":     l.memory.Top(),
 		"cur_gpu_mem": l.gpu.memory.Current(),
@@ -456,13 +456,13 @@ func (l *limiter) collect() {
 	}).Log("Observation")
 
 	if isLimitExceeded {
-		go l.onLimit(l.cpu.Current()*l.ncpuFactor*100, l.memory.Current(), l.gpu.usage.Current(), l.gpu.encoder.Current(), l.gpu.decoder.Current(), l.gpu.memory.Current())
+		go l.onLimit(l.cpu.Current()*l.ncpuFactor*100, l.memory.Current(), l.gpu.usage.Current()*100, l.gpu.encoder.Current()*100, l.gpu.decoder.Current()*100, l.gpu.memory.Current())
 	}
 
 	l.lastUsageLock.Lock()
-	l.lastUsage.CPU.Current = l.cpu.Current() * l.ncpu * 100
-	l.lastUsage.CPU.Average = l.cpu.Avg() * l.ncpu * 100
-	l.lastUsage.CPU.Max = l.cpu.Max() * l.ncpu * 100
+	l.lastUsage.CPU.Current = l.cpu.Current() * l.ncpuFactor * 100
+	l.lastUsage.CPU.Average = l.cpu.Avg() * l.ncpuFactor * 100
+	l.lastUsage.CPU.Max = l.cpu.Max() * l.ncpuFactor * 100
 	l.lastUsage.CPU.IsThrottling = l.cpuThrottling
 
 	l.lastUsage.Memory.Current = l.memory.Current()
