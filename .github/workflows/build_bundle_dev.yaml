@@ -37,7 +37,7 @@ jobs:
                     - core_os: ubuntu24.04
                       ffmpeg: "7.1.1-cuda"
                       ffmpeg_os: ubuntu24.04
-                      ffmpeg_tags: "-cuda12.8.1"
+                      ffmpeg_tags: "-cuda12.9.1"
                       platforms: linux/amd64
                       branch: dev
                       prefix: cuda-
