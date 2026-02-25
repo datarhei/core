@@ -13,16 +13,16 @@ jobs:
         strategy:
             matrix:
                 include:
-                    - core_os: alpine3.21
+                    - core_os: alpine3.23
                       ffmpeg: "7.1.1"
-                      ffmpeg_os: alpine3.21
+                      ffmpeg_os: alpine3.23
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: dev
                       prefix:
                       latest: yes
-                    - core_os: alpine3.21
+                    - core_os: alpine3.23
                       ffmpeg: "7.1.1-rpi"
-                      ffmpeg_os: alpine3.21
+                      ffmpeg_os: alpine3.23
                       platforms: linux/arm64,linux/arm/v7
                       branch: dev
                       prefix: rpi-
