@@ -382,6 +382,7 @@ func (a *api) start(ctx context.Context) error {
 		MaxMemory:    cfg.Resources.MaxMemoryUsage,
 		MaxGPU:       cfg.Resources.MaxGPUUsage,
 		MaxGPUMemory: cfg.Resources.MaxGPUMemoryUsage,
+		LimitWaitFor: time.Duration(cfg.Resources.LimitWaitFor) * time.Second,
 		Logger:       a.log.logger.core.WithComponent("Resources"),
 		PSUtil:       psutil,
 	})

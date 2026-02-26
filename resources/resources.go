@@ -111,6 +111,10 @@ type resources struct {
 	isMemoryLimiting bool
 	isGPULimiting    []bool
 
+	limitWaitFor time.Duration
+	limitLast    bool
+	limitSince   time.Time
+
 	self psutil.Process
 
 	cancelObserver context.CancelFunc
@@ -146,10 +150,11 @@ type Resources interface {
 }
 
 type Config struct {
-	MaxCPU       float64 // percent 0-100
-	MaxMemory    float64 // percent 0-100
-	MaxGPU       float64 // general,encoder,decoder usage, percent 0-100
-	MaxGPUMemory float64 // memory usage, percent 0-100
+	MaxCPU       float64       // percent 0-100
+	MaxMemory    float64       // percent 0-100
+	MaxGPU       float64       // general,encoder,decoder usage, percent 0-100
+	MaxGPUMemory float64       // memory usage, percent 0-100
+	LimitWaitFor time.Duration // seconds to wait before triggering limiter
 	PSUtil       psutil.Util
 	Logger       log.Logger
 }
@@ -203,6 +208,7 @@ func New(config Config) (Resources, error) {
 		maxCPU:        config.MaxCPU,
 		maxGPU:        config.MaxGPU,
 		maxGPUMemory:  config.MaxGPUMemory,
+		limitWaitFor:  config.LimitWaitFor,
 		psutil:        config.PSUtil,
 		isUnlimited:   isUnlimited,
 		ngpu:          len(gpu),
@@ -339,12 +345,14 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 			}
 
 			doGPULimit := make([]bool, r.ngpu)
+			doGPUAnyLimit := false
 
 			for i, limiting := range r.isGPULimiting {
 				maxMemory := uint64(r.maxGPUMemory * float64(gpustat[i].MemoryTotal) / 100)
 				if !limiting {
 					if gpustat[i].MemoryUsed >= maxMemory || (gpustat[i].Usage >= r.maxGPU && gpustat[i].Encoder >= r.maxGPU && gpustat[i].Decoder >= r.maxGPU) {
 						doGPULimit[i] = true
+						doGPUAnyLimit = true
 					}
 				} else {
 					doGPULimit[i] = true
@@ -355,31 +363,62 @@ func (r *resources) observe(ctx context.Context, interval time.Duration) {
 			}
 
 			r.lock.Lock()
-			if r.isCPULimiting != doCPULimit {
-				r.logger.Warn().WithFields(log.Fields{
-					"enabled": doCPULimit,
-					"current": cpuload,
-				}).Log("Limiting CPU")
-			}
-			r.isCPULimiting = doCPULimit
 
-			if r.isMemoryLimiting != doMemoryLimit {
-				r.logger.Warn().WithFields(log.Fields{
-					"enabled": doMemoryLimit,
-					"current": vmstat.Used,
-				}).Log("Limiting memory")
-			}
-			r.isMemoryLimiting = doMemoryLimit
+			updateLimiting := false
 
-			for i, limiting := range r.isGPULimiting {
-				if limiting != doGPULimit[i] {
-					r.logger.Warn().WithFields(log.Fields{
-						"enabled": doGPULimit,
-						"index":   i,
-					}).Log("Limiting GPU")
+			if doCPULimit || doMemoryLimit || doGPUAnyLimit {
+				if !r.limitLast {
+					r.limitSince = time.Now()
+					r.limitLast = true
 				}
+
+				waiting := time.Since(r.limitSince)
+
+				if waiting >= r.limitWaitFor {
+					updateLimiting = true
+				} else {
+					r.logger.Warn().WithFields(log.Fields{
+						"cur_cpu":  cpuload,
+						"cur_mem":  vmstat.Used,
+						"waiting":  waiting,
+						"wait_for": r.limitWaitFor,
+					}).Log("Waiting before limiting")
+				}
+			} else {
+				r.limitLast = false
+				updateLimiting = true
 			}
-			r.isGPULimiting = doGPULimit
+
+			if updateLimiting {
+				if r.isCPULimiting != doCPULimit {
+					r.logger.Warn().WithFields(log.Fields{
+						"enabled":  doCPULimit,
+						"current":  cpuload,
+						"wait_for": r.limitWaitFor,
+					}).Log("Limiting CPU")
+				}
+				r.isCPULimiting = doCPULimit
+
+				if r.isMemoryLimiting != doMemoryLimit {
+					r.logger.Warn().WithFields(log.Fields{
+						"enabled":  doMemoryLimit,
+						"current":  vmstat.Used,
+						"wait_for": r.limitWaitFor,
+					}).Log("Limiting memory")
+				}
+				r.isMemoryLimiting = doMemoryLimit
+
+				for i, limiting := range r.isGPULimiting {
+					if limiting != doGPULimit[i] {
+						r.logger.Warn().WithFields(log.Fields{
+							"enabled":  doGPULimit,
+							"index":    i,
+							"wait_for": r.limitWaitFor,
+						}).Log("Limiting GPU")
+					}
+				}
+				r.isGPULimiting = doGPULimit
+			}
 
 			r.lock.Unlock()
 		}

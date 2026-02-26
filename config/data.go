@@ -194,6 +194,7 @@ type Data struct {
 		MaxMemoryUsage    float64 `json:"max_memory_usage"`     // percent 0-100
 		MaxGPUUsage       float64 `json:"max_gpu_usage"`        // percent 0-100
 		MaxGPUMemoryUsage float64 `json:"max_gpu_memory_usage"` // percent 0-100
+		LimitWaitFor      int64   `json:"limit_wait_for_sec"`
 	} `json:"resources"`
 	Cluster struct {
 		Enable                 bool     `json:"enable"`

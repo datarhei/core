@@ -338,6 +338,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewFloatRange(&d.Resources.MaxMemoryUsage, 0, 0, 100), "resources.max_memory_usage", "CORE_RESOURCES_MAX_MEMORY_USAGE", nil, "Maximum system usage in percent, from 0 (no limit) to 100", false, false)
 	d.vars.Register(value.NewFloatRange(&d.Resources.MaxGPUUsage, 0, 0, 100), "resources.max_gpu_usage", "CORE_RESOURCES_MAX_GPU_USAGE", nil, "Maximum general, encoder, and decoder GPU usage in percent per GPU, from 0 (no limit) to 100", false, false)
 	d.vars.Register(value.NewFloatRange(&d.Resources.MaxGPUMemoryUsage, 0, 0, 100), "resources.max_gpu_memory_usage", "CORE_RESOURCES_MAX_GPU_MEMORY_USAGE", nil, "Maximum GPU memory usage in percent per GPU, from 0 (no limit) to 100", false, false)
+	d.vars.Register(value.NewInt64(&d.Resources.LimitWaitFor, 0), "resources.limit_wait_for_sec", "CORE_RESOURCES_LIMIT_WAIT_FOR_SEC", nil, "Time to wait before signalling to limit", false, false)
 
 	// Cluster
 	d.vars.Register(value.NewBool(&d.Cluster.Enable, false), "cluster.enable", "CORE_CLUSTER_ENABLE", nil, "Enable cluster mode", false, false)
