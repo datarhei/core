@@ -216,7 +216,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewBool(&d.RTMP.EnableTLS, false), "rtmp.enable_tls", "CORE_RTMP_ENABLE_TLS", nil, "Enable RTMPS server instead of RTMP", false, false)
 	d.vars.Register(value.NewAddress(&d.RTMP.Address, ":1935"), "rtmp.address", "CORE_RTMP_ADDRESS", nil, "RTMP server listen address", false, false)
 	d.vars.Register(value.NewAddress(&d.RTMP.AddressTLS, ":1936"), "rtmp.address_tls", "CORE_RTMP_ADDRESS_TLS", nil, "RTMPS server listen address", false, false)
-	d.vars.Register(value.NewAbsolutePath(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
+	d.vars.Register(value.NewString(&d.RTMP.App, "/"), "rtmp.app", "CORE_RTMP_APP", nil, "RTMP app for publishing", false, false)
 	d.vars.Register(value.NewString(&d.RTMP.Token, ""), "rtmp.token", "CORE_RTMP_TOKEN", nil, "RTMP token for publishing and playing", false, true)
 
 	// SRT
@@ -228,7 +228,7 @@ func (d *Config) init() {
 	d.vars.Register(value.NewStringList(&d.SRT.Log.Topics, []string{}, ","), "srt.log.topics", "CORE_SRT_LOG_TOPICS", nil, "List of topics to log", false, false)
 
 	// FFmpeg
-	d.vars.Register(value.NewExec(&d.FFmpeg.Binary, "ffmpeg", d.fs), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
+	d.vars.Register(value.NewString(&d.FFmpeg.Binary, "ffmpeg"), "ffmpeg.binary", "CORE_FFMPEG_BINARY", nil, "Path to ffmpeg binary", true, false)
 	d.vars.Register(value.NewInt64(&d.FFmpeg.MaxProcesses, 0), "ffmpeg.max_processes", "CORE_FFMPEG_MAXPROCESSES", nil, "Max. allowed simultaneously running ffmpeg instances, 0 for unlimited", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Allow, []string{}, " "), "ffmpeg.access.input.allow", "CORE_FFMPEG_ACCESS_INPUT_ALLOW", nil, "List of allowed expression to match against the input addresses", false, false)
 	d.vars.Register(value.NewStringList(&d.FFmpeg.Access.Input.Block, []string{}, " "), "ffmpeg.access.input.block", "CORE_FFMPEG_ACCESS_INPUT_BLOCK", nil, "List of blocked expression to match against the input addresses", false, false)
