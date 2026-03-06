@@ -491,6 +491,17 @@ func (s *store) Snapshot() (raft.FSMSnapshot, error) {
 func (s *store) Restore(snapshot io.ReadCloser) error {
 	s.logger.Debug().Log("Snapshot restore")
 
+	defer func() {
+		s.logger.Info().Log("Snapshot restored")
+
+		s.lock.RLock()
+		if s.callback != nil {
+			s.callback(OpAddIdentity)
+			s.callback(OpSetPolicies)
+		}
+		s.lock.RUnlock()
+	}()
+
 	defer snapshot.Close()
 
 	s.lock.Lock()

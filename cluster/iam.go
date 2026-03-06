@@ -35,6 +35,9 @@ func (c *cluster) IAM(superuser iamidentity.User, jwtRealm, jwtSecret string) (i
 		return nil, fmt.Errorf("cluster iam: %w", err)
 	}
 
+	iam.ReloadIndentities()
+	iam.ReloadPolicies()
+
 	return iam, nil
 }
 
