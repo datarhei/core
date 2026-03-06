@@ -480,7 +480,7 @@ func (r *raft) start(fsm hcraft.FSM, peers []Peer, inmem bool) error {
 			return fmt.Errorf("recovering cluster: %w", err)
 		}
 
-		r.logger.Info().Log("Raft node recoverd")
+		r.logger.Info().Log("Raft node recovered")
 	}
 
 	// Set up a channel for reliable leader notifications.
