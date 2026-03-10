@@ -292,7 +292,7 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 	l.lastUsage.GPU.Encoder.Limit = l.gpu.encoder.Limit() * 100
 	l.lastUsage.GPU.Decoder.Limit = l.gpu.decoder.Limit() * 100
 
-	l.ncpuFactor = 1
+	l.ncpuFactor = l.ncpu
 
 	mode := "hard"
 	if l.mode == LimitModeSoft {
@@ -307,6 +307,7 @@ func NewLimiter(config LimiterConfig) (Limiter, error) {
 	}
 
 	l.logger = l.logger.WithFields(log.Fields{
+		"ncpu":       l.ncpu,
 		"cpu":        l.cpu.Limit() * l.ncpuFactor * 100,
 		"memory":     l.memory.Limit(),
 		"gpumemory":  l.gpu.memory.Limit(),
