@@ -153,7 +153,7 @@ func (a *api) Reload() error {
 
 	logger := log.New("Core").WithOutput(log.NewConsoleWriter(a.log.writer, log.Lwarn, true))
 
-	rootfs, _ := fs.NewDiskFilesystem(fs.DiskConfig{})
+	rootfs, _ := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{Root: "."})
 	store, err := configstore.NewJSON(rootfs, a.config.path, func() {
 		a.errorChan <- ErrConfigReload
 	})
