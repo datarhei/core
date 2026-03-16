@@ -18,7 +18,7 @@ jobs:
                     - os: alpine
                       os_version: "3.23"
                       golang: golang:1.26-alpine3.23
-                      platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+                      platforms: linux/amd64,linux/arm64,linux/arm/v8,linux/arm/v7,linux/arm/v6
                       branch: dev
                     - os: ubuntu
                       os_version: "24.04"
