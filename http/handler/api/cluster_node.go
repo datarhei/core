@@ -245,6 +245,10 @@ func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 
 	defer file.Close()
 
+	if c.Request().Method == http.MethodHead {
+		return c.NoContent(http.StatusOK)
+	}
+
 	return c.Stream(http.StatusOK, "application/data", file)
 }
 

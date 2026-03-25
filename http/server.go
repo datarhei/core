@@ -778,6 +778,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/node/:id/files", s.v3handler.cluster.NodeGetMedia)
 		v3.GET("/cluster/node/:id/fs/:storage", s.v3handler.cluster.NodeFSListFiles)
 		v3.GET("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSGetFile)
+		v3.HEAD("/cluster/node/:id/fs/:storage/*", s.v3handler.cluster.NodeFSGetFile)
 		v3.GET("/cluster/node/:id/process", s.v3handler.cluster.NodeListProcesses)
 		v3.GET("/cluster/node/:id/version", s.v3handler.cluster.NodeGetVersion)
 		v3.GET("/cluster/node/:id/state", s.v3handler.cluster.NodeGetState)
