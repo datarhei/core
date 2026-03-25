@@ -1301,7 +1301,8 @@
                 },
                 "limitCPU": {
                     "description": "percent",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "limitGPU": {
                     "description": "GPU limits",
@@ -1313,11 +1314,13 @@
                 },
                 "limitMemory": {
                     "description": "bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "limitWaitFor": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "logPatterns": {
                     "description": "will be interpreted as regular expressions",
@@ -1346,7 +1349,8 @@
                 },
                 "reconnectDelay": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "reference": {
                     "type": "string"
@@ -1357,11 +1361,13 @@
                 },
                 "staleTimeout": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "timeout": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -1410,19 +1416,23 @@
             "properties": {
                 "decoder": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "encoder": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "memory": {
                     "description": "bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "usage": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 }
             }
         },
@@ -2029,6 +2039,9 @@
                 "resources": {
                     "type": "object",
                     "properties": {
+                        "limit_wait_for_sec": {
+                            "type": "integer"
+                        },
                         "max_cpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"

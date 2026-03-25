@@ -1546,6 +1546,66 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "head": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Fetch a file from a filesystem on a node",
+                "produces": [
+                    "application/data",
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Fetch a file from a filesystem on a node",
+                "operationId": "cluster-3-node-fs-get-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Path to file",
+                        "name": "filepath",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "301": {
+                        "description": "Moved Permanently",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
             }
         },
         "/api/v3/cluster/node/{id}/process": {
@@ -2829,24 +2889,28 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "minimal size of files",
                         "name": "size_min",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "maximal size of files",
                         "name": "size_max",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "minimal last modification time",
                         "name": "lastmod_start",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "maximal last modification time",
                         "name": "lastmod_end",
                         "in": "query"
@@ -2907,24 +2971,28 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "minimal size of files",
                         "name": "size_min",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "maximal size of files",
                         "name": "size_max",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "minimal last modification time",
                         "name": "lastmod_start",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "maximal last modification time",
                         "name": "lastmod_end",
                         "in": "query"
@@ -3099,6 +3167,59 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Fetch a file from a filesystem",
+                "produces": [
+                    "application/data",
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.7.2"
+                ],
+                "summary": "Fetch a file from a filesystem",
+                "operationId": "filesystem-3-get-file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name of the filesystem",
+                        "name": "storage",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Path to file",
+                        "name": "filepath",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "301": {
+                        "description": "Moved Permanently",
                         "schema": {
                             "type": "string"
                         }
@@ -4904,12 +5025,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports.",
                         "name": "created_at",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
                         "name": "exited_at",
                         "in": "query"
@@ -5132,12 +5255,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Search range of when the report has been exited, older than this value. Unix timestamp, leave empty for any",
                         "name": "from",
                         "in": "query"
                     },
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "Search range of when the report has been exited, younger than this value. Unix timestamp, leave empty for any",
                         "name": "to",
                         "in": "query"
@@ -5952,6 +6077,12 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "public_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "resources": {
                     "$ref": "#/definitions/api.ClusterNodeResources"
                 },
@@ -6556,6 +6687,9 @@ const docTemplate = `{
                 "resources": {
                     "type": "object",
                     "properties": {
+                        "limit_wait_for_sec": {
+                            "type": "integer"
+                        },
                         "max_cpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"
@@ -9322,6 +9456,9 @@ const docTemplate = `{
                 "resources": {
                     "type": "object",
                     "properties": {
+                        "limit_wait_for_sec": {
+                            "type": "integer"
+                        },
                         "max_cpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"

@@ -1308,7 +1308,8 @@ const docTemplateClusterAPI = `{
                 },
                 "limitCPU": {
                     "description": "percent",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "limitGPU": {
                     "description": "GPU limits",
@@ -1320,11 +1321,13 @@ const docTemplateClusterAPI = `{
                 },
                 "limitMemory": {
                     "description": "bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "limitWaitFor": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "logPatterns": {
                     "description": "will be interpreted as regular expressions",
@@ -1353,7 +1356,8 @@ const docTemplateClusterAPI = `{
                 },
                 "reconnectDelay": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "reference": {
                     "type": "string"
@@ -1364,11 +1368,13 @@ const docTemplateClusterAPI = `{
                 },
                 "staleTimeout": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "timeout": {
                     "description": "seconds",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },
@@ -1417,19 +1423,23 @@ const docTemplateClusterAPI = `{
             "properties": {
                 "decoder": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "encoder": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 },
                 "memory": {
                     "description": "bytes",
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "usage": {
                     "description": "percent 0-100",
-                    "type": "number"
+                    "type": "number",
+                    "format": "float64"
                 }
             }
         },
@@ -2036,6 +2046,9 @@ const docTemplateClusterAPI = `{
                 "resources": {
                     "type": "object",
                     "properties": {
+                        "limit_wait_for_sec": {
+                            "type": "integer"
+                        },
                         "max_cpu_usage": {
                             "description": "percent 0-100",
                             "type": "number"

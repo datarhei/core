@@ -228,6 +228,7 @@ func (h *ClusterHandler) NodeFSListFiles(c echo.Context) error {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [get]
+// @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [head]
 func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	storage := util.PathParam(c, "storage")

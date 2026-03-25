@@ -2,10 +2,10 @@ package cluster
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/datarhei/core/v16/cluster/raft"
-	"github.com/datarhei/core/v16/slices"
 )
 
 type ClusterRaft struct {
@@ -44,6 +44,7 @@ type ClusterNodeGPUResources struct {
 type ClusterNode struct {
 	ID          string
 	Name        string
+	Domains     []string
 	Version     string
 	State       string
 	Error       error
@@ -87,7 +88,7 @@ type ClusterAbout struct {
 func (c *cluster) About() (ClusterAbout, error) {
 	c.stateLock.RLock()
 	hasLeader := c.hasRaftLeader
-	domains := slices.Copy(c.hostnames)
+	domains := slices.Clone(c.hostnames)
 	c.stateLock.RUnlock()
 
 	about := ClusterAbout{
@@ -135,9 +136,19 @@ func (c *cluster) About() (ClusterAbout, error) {
 	for _, node := range nodes {
 		nodeAbout := node.About()
 
+		nodeDomains := []string{}
+		for _, d := range nodeAbout.HostNames {
+			if slices.Contains(domains, d) {
+				continue
+			}
+
+			nodeDomains = append(nodeDomains, d)
+		}
+
 		node := ClusterNode{
 			ID:          nodeAbout.ID,
 			Name:        nodeAbout.Name,
+			Domains:     nodeDomains,
 			Version:     nodeAbout.Version,
 			State:       nodeAbout.State,
 			Error:       nodeAbout.Error,

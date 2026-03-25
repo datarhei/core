@@ -97,6 +97,7 @@ func (h *ClusterHandler) marshalClusterNode(node cluster.ClusterNode) api.Cluste
 	n := api.ClusterNode{
 		ID:          node.ID,
 		Name:        node.Name,
+		Domains:     node.Domains,
 		Version:     node.Version,
 		Status:      node.State,
 		Voter:       node.Voter,

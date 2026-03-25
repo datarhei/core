@@ -275,6 +275,10 @@ definitions:
         type: boolean
       name:
         type: string
+      public_domains:
+        items:
+          type: string
+        type: array
       resources:
         $ref: '#/definitions/api.ClusterNodeResources'
       status:
@@ -685,6 +689,8 @@ definitions:
         type: object
       resources:
         properties:
+          limit_wait_for_sec:
+            type: integer
           max_cpu_usage:
             description: percent 0-100
             type: number
@@ -2616,6 +2622,8 @@ definitions:
         type: object
       resources:
         properties:
+          limit_wait_for_sec:
+            type: integer
           max_cpu_usage:
             description: percent 0-100
             type: number
@@ -3987,6 +3995,46 @@ paths:
       summary: Fetch a file from a filesystem on a node
       tags:
       - v16.?.?
+    head:
+      description: Fetch a file from a filesystem on a node
+      operationId: cluster-3-node-fs-get-file
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: Path to file
+        in: path
+        name: filepath
+        required: true
+        type: string
+      produces:
+      - application/data
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "301":
+          description: Moved Permanently
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Fetch a file from a filesystem on a node
+      tags:
+      - v16.?.?
     put:
       consumes:
       - application/data
@@ -4874,18 +4922,22 @@ paths:
         name: glob
         type: string
       - description: minimal size of files
+        format: int64
         in: query
         name: size_min
         type: integer
       - description: maximal size of files
+        format: int64
         in: query
         name: size_max
         type: integer
       - description: minimal last modification time
+        format: int64
         in: query
         name: lastmod_start
         type: integer
       - description: maximal last modification time
+        format: int64
         in: query
         name: lastmod_end
         type: integer
@@ -4918,18 +4970,22 @@ paths:
         name: glob
         type: string
       - description: minimal size of files
+        format: int64
         in: query
         name: size_min
         type: integer
       - description: maximal size of files
+        format: int64
         in: query
         name: size_max
         type: integer
       - description: minimal last modification time
+        format: int64
         in: query
         name: lastmod_start
         type: integer
       - description: maximal last modification time
+        format: int64
         in: query
         name: lastmod_end
         type: integer
@@ -4987,6 +5043,41 @@ paths:
       tags:
       - v16.7.2
     get:
+      description: Fetch a file from a filesystem
+      operationId: filesystem-3-get-file
+      parameters:
+      - description: Name of the filesystem
+        in: path
+        name: storage
+        required: true
+        type: string
+      - description: Path to file
+        in: path
+        name: filepath
+        required: true
+        type: string
+      produces:
+      - application/data
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "301":
+          description: Moved Permanently
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Fetch a file from a filesystem
+      tags:
+      - v16.7.2
+    head:
       description: Fetch a file from a filesystem
       operationId: filesystem-3-get-file
       parameters:
@@ -6182,12 +6273,14 @@ paths:
       - description: Select only the report with that created_at date. Unix timestamp,
           leave empty for any. In combination with exited_at it denotes a range or
           reports.
+        format: int64
         in: query
         name: created_at
         type: integer
       - description: Select only the report with that exited_at date. Unix timestamp,
           leave empty for any. In combination with created_at it denotes a range or
           reports.
+        format: int64
         in: query
         name: exited_at
         type: integer
@@ -6402,11 +6495,13 @@ paths:
         type: string
       - description: Search range of when the report has been exited, older than this
           value. Unix timestamp, leave empty for any
+        format: int64
         in: query
         name: from
         type: integer
       - description: Search range of when the report has been exited, younger than
           this value. Unix timestamp, leave empty for any
+        format: int64
         in: query
         name: to
         type: integer

@@ -18,6 +18,7 @@ definitions:
         type: array
       limitCPU:
         description: percent
+        format: float64
         type: number
       limitGPU:
         allOf:
@@ -25,9 +26,11 @@ definitions:
         description: GPU limits
       limitMemory:
         description: bytes
+        format: int64
         type: integer
       limitWaitFor:
         description: seconds
+        format: int64
         type: integer
       logPatterns:
         description: will be interpreted as regular expressions
@@ -48,6 +51,7 @@ definitions:
         type: boolean
       reconnectDelay:
         description: seconds
+        format: int64
         type: integer
       reference:
         type: string
@@ -56,9 +60,11 @@ definitions:
         type: string
       staleTimeout:
         description: seconds
+        format: int64
         type: integer
       timeout:
         description: seconds
+        format: int64
         type: integer
     type: object
   app.ConfigIO:
@@ -91,15 +97,19 @@ definitions:
     properties:
       decoder:
         description: percent 0-100
+        format: float64
         type: number
       encoder:
         description: percent 0-100
+        format: float64
         type: number
       memory:
         description: bytes
+        format: int64
         type: integer
       usage:
         description: percent 0-100
+        format: float64
         type: number
     type: object
   client.AboutResponse:
@@ -508,6 +518,8 @@ definitions:
         type: object
       resources:
         properties:
+          limit_wait_for_sec:
+            type: integer
           max_cpu_usage:
             description: percent 0-100
             type: number

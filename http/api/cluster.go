@@ -11,6 +11,7 @@ type ClusterNodeID struct {
 type ClusterNode struct {
 	ID          string               `json:"id"`
 	Name        string               `json:"name"`
+	Domains     []string             `json:"public_domains"`
 	Version     string               `json:"version"`
 	Status      string               `json:"status"`
 	Error       string               `json:"error"`

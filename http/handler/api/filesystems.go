@@ -46,6 +46,7 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 // @Failure 404 {object} api.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/fs/{storage}/{filepath} [get]
+// @Router /api/v3/fs/{storage}/{filepath} [head]
 func (h *FSHandler) GetFile(c echo.Context) error {
 	name := util.PathParam(c, "storage")
 

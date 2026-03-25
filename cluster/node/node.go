@@ -13,6 +13,7 @@ import (
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/ffmpeg/skills"
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/slices"
 )
 
 type Node struct {
@@ -129,6 +130,7 @@ var maxLastContact time.Duration = 5 * time.Second
 type About struct {
 	ID          string
 	Name        string
+	HostNames   []string
 	Version     string
 	Address     string
 	State       string
@@ -177,6 +179,7 @@ func (n *Node) About() About {
 	}
 
 	a.Name = n.coreAbout.Name
+	a.HostNames = slices.Copy(n.config.Host.Name)
 	a.Error = n.nodeLastErr
 	a.LastContact = n.nodeLastContact
 	if time.Since(a.LastContact) > maxLastContact {
