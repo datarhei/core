@@ -692,6 +692,18 @@ func (n *Core) FilesystemGetFile(storage, path string, offset int64) (io.ReadClo
 	return client.FilesystemGetFileOffset(storage, path, offset)
 }
 
+func (n *Core) FilesystemOperation(operation, dst, src string, ratelimit uint64) error {
+	n.lock.RLock()
+	client := n.client
+	n.lock.RUnlock()
+
+	if client == nil {
+		return ErrNoPeer
+	}
+
+	return client.FilesystemOperation(operation, dst, src, ratelimit)
+}
+
 type NodeFiles struct {
 	ID         string
 	Files      []string

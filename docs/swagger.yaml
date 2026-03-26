@@ -3873,6 +3873,39 @@ paths:
       summary: List the resources of a proxy node by its ID
       tags:
       - v16.?.?
+  /api/v3/cluster/node/{id}/fs:
+    put:
+      consumes:
+      - application/json
+      description: Execute file operations (copy or move) between registered filesystems
+      operationId: cluster-3-node-fs-operation
+      parameters:
+      - description: Filesystem operation
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/api.FilesystemOperation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: File operations between filesystems
+      tags:
+      - v16.?.?
   /api/v3/cluster/node/{id}/fs/{storage}:
     get:
       description: List all files on a filesystem on a node. The listing can be ordered

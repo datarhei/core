@@ -241,6 +241,10 @@ func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 
 	file, err := peer.Core().FilesystemGetFile(storage, path, 0)
 	if err != nil {
+		if apierr, ok := err.(api.Error); ok {
+			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		}
+
 		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
@@ -283,10 +287,52 @@ func (h *ClusterHandler) NodeFSPutFile(c echo.Context) error {
 
 	err = peer.Core().FilesystemPutFile(storage, path, req.Body)
 	if err != nil {
+		if apierr, ok := err.(api.Error); ok {
+			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		}
+
 		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusCreated, nil)
+}
+
+// FileOperation executes file operations between filesystems
+// @Summary File operations between filesystems
+// @Description Execute file operations (copy or move) between registered filesystems
+// @ID cluster-3-node-fs-operation
+// @Tags v16.?.?
+// @Accept json
+// @Produce json
+// @Param config body api.FilesystemOperation true "Filesystem operation"
+// @Success 200 {string} string
+// @Failure 400 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/node/{id}/fs [put]
+func (h *ClusterHandler) NodeFSFileOperation(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	operation := api.FilesystemOperation{}
+
+	if err := util.ShouldBindJSON(c, &operation); err != nil {
+		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	peer, err := h.proxy.NodeGet(id)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+	}
+
+	err = peer.Core().FilesystemOperation(operation.Operation, operation.Target, operation.Source, operation.RateLimit)
+	if err != nil {
+		if apierr, ok := err.(api.Error); ok {
+			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		}
+
+		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	}
+
+	return c.JSON(http.StatusOK, nil)
 }
 
 // NodeFSDeleteFile removes a file from a filesystem on a node
@@ -314,6 +360,10 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 
 	err = peer.Core().FilesystemDeleteFile(storage, path)
 	if err != nil {
+		if apierr, ok := err.(api.Error); ok {
+			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		}
+
 		return api.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 

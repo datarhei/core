@@ -10,6 +10,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/mem"
 )
 
 const (
@@ -103,6 +104,25 @@ func (r *restclient) FilesystemAddFile(storage, path string, data io.Reader) err
 	}
 
 	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(storage)+path, nil, nil, "application/data", data)
+
+	return err
+}
+
+func (r *restclient) FilesystemOperation(operation, dst, src string, ratelimit uint64) error {
+	buf := mem.Get()
+	defer mem.Put(buf)
+
+	p := api.FilesystemOperation{
+		Operation: operation,
+		Source:    src,
+		Target:    dst,
+		RateLimit: ratelimit,
+	}
+
+	e := json.NewEncoder(buf)
+	e.Encode(p)
+
+	_, err := r.call("PUT", "/v3/fs", nil, nil, "application/json", buf.Reader())
 
 	return err
 }

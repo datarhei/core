@@ -56,6 +56,7 @@ type RestClient interface {
 	FilesystemGetFileOffset(storage, path string, offset int64) (io.ReadCloser, error) // GET /v3/fs/{storage}/{path}
 	FilesystemDeleteFile(storage, path string) error                                   // DELETE /v3/fs/{storage}/{path}
 	FilesystemAddFile(storage, path string, data io.Reader) error                      // PUT /v3/fs/{storage}/{path}
+	FilesystemOperation(operation, dst, src string, ratelimit uint64) error            // PUT /v3/fs
 
 	LogEvents(ctx context.Context, filters api.LogEventFilters) (<-chan api.LogEventRaw, error)             // POST /v3/events
 	MediaEvents(ctx context.Context, storage, pattern string) (<-chan api.MediaEvent, error)                // GET /v3/events/media/{storage}
