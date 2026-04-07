@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/ring"
 	"fmt"
+	"maps"
 	"regexp"
 	"strconv"
 	"sync"
@@ -87,9 +88,10 @@ type parser struct {
 		patterns []*regexp.Regexp
 	}
 
-	log      *ring.Ring
-	logLines int
-	logStart time.Time
+	log       *ring.Ring
+	logLength int
+	logStart  time.Time
+	logLines  map[string]uint64
 
 	logHistory              *ring.Ring
 	logHistoryLength        int
@@ -137,7 +139,7 @@ type parser struct {
 // New returns a Parser that satisfies the Parser interface
 func New(config Config) Parser {
 	p := &parser{
-		logLines:                config.LogLines,
+		logLength:               config.LogLines,
 		logHistoryLength:        config.LogHistory,
 		logMinimalHistoryLength: config.LogMinimalHistory,
 		logger:                  config.Logger,
@@ -149,14 +151,14 @@ func New(config Config) Parser {
 		p.logger = log.New("")
 	}
 
-	if p.logLines <= 0 {
-		p.logLines = 1
+	if p.logLength <= 0 {
+		p.logLength = 1
 	}
 
 	p.averager.window = 30 * time.Second
 	p.averager.granularity = time.Second
 
-	p.re.logline = regexp.MustCompile(`^(?:\[.*? @ .*?\] )?(?:\[[a-z]+\] )?(.*)`)
+	p.re.logline = regexp.MustCompile(`^(?:\[.*? @ .*?\] )?(\[[a-z]+\] )?(.*)`)
 	p.re.frame = regexp.MustCompile(`frame=\s*([0-9]+)`)
 	p.re.quantizer = regexp.MustCompile(`q=\s*([0-9\.]+)`)
 	p.re.size = regexp.MustCompile(`size=\s*([0-9]+)kB`)
@@ -178,7 +180,8 @@ func New(config Config) Parser {
 	p.lock.prelude.Unlock()
 
 	p.lock.log.Lock()
-	p.log = ring.New(p.logLines)
+	p.log = ring.New(p.logLength)
+	p.logLines = map[string]uint64{}
 	p.lock.log.Unlock()
 
 	p.lock.logHistory.Lock()
@@ -212,7 +215,8 @@ func New(config Config) Parser {
 
 func (p *parser) Parse(line []byte) uint64 {
 	matches := p.re.logline.FindSubmatch(line)
-	msg := matches[1]
+	level := string(bytes.Trim(matches[1], "[] "))
+	msg := matches[2]
 
 	isDefaultProgress := bytes.HasPrefix(msg, []byte("frame="))
 	isFFmpegInputs := bytes.HasPrefix(msg, []byte("ffmpeg.inputs:"))
@@ -232,6 +236,10 @@ func (p *parser) Parse(line []byte) uint64 {
 			"timestamp":  p.logStart.Unix(),
 		}).Info().Log("Created")
 	}
+	if len(level) == 0 {
+		level = "info"
+	}
+	p.logLines[level]++
 	p.lock.log.Unlock()
 
 	p.lock.prelude.Lock()
@@ -921,9 +929,10 @@ func (p *parser) ResetLog() {
 	p.lock.prelude.Unlock()
 
 	p.lock.log.Lock()
-	p.log = ring.New(p.logLines)
+	p.log = ring.New(p.logLength)
 	p.logStart = time.Time{}
 	p.logpatterns.matches = []string{}
+	p.logLines = map[string]uint64{}
 	p.lock.log.Unlock()
 }
 
@@ -1020,6 +1029,7 @@ func (p *parser) Report() Report {
 
 	p.lock.log.RLock()
 	h.CreatedAt = p.logStart
+	h.LogLines = maps.Clone(p.logLines)
 	p.lock.log.RUnlock()
 
 	return h

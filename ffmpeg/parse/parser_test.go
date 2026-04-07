@@ -85,7 +85,7 @@ func TestParserLongPrelude(t *testing.T) {
 	require.Equal(t, 0, len(log))
 
 	for i := 0; i < 150; i++ {
-		parser.Parse([]byte(fmt.Sprintf("prelude %3d", i)))
+		parser.Parse(fmt.Appendf(nil, "prelude %3d", i))
 	}
 
 	log = parser.Prelude()
@@ -105,7 +105,7 @@ func TestParserVeryLongPrelude(t *testing.T) {
 	require.Equal(t, 0, len(log))
 
 	for i := 0; i < 300; i++ {
-		parser.Parse([]byte(fmt.Sprintf("prelude %3d", i)))
+		parser.Parse(fmt.Appendf(nil, "prelude %3d", i))
 	}
 
 	log = parser.Prelude()
@@ -127,6 +127,31 @@ func TestParserLog(t *testing.T) {
 	log = parser.Log()
 
 	require.Equal(t, 1, len(log))
+}
+
+func TestParserReport(t *testing.T) {
+	parser := New(Config{
+		LogLines: 20,
+	})
+
+	report := parser.Report()
+
+	require.Equal(t, 0, len(report.Log))
+	require.Equal(t, 0, len(report.Prelude))
+	require.Equal(t, 0, len(report.Matches))
+	require.Equal(t, 0, len(report.LogLines))
+
+	parser.Parse([]byte("bla"))
+	parser.Parse([]byte("[warning] bla"))
+
+	report = parser.Report()
+
+	require.Equal(t, 2, len(report.Log))
+	require.Equal(t, 2, len(report.Prelude))
+	require.Equal(t, 0, len(report.Matches))
+	require.Equal(t, 2, len(report.LogLines))
+	require.Equal(t, uint64(1), report.LogLines["info"])
+	require.Equal(t, uint64(1), report.LogLines["warning"])
 }
 
 func TestParserLastLogLine(t *testing.T) {

@@ -1,11 +1,12 @@
 package app
 
 import (
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/datarhei/core/v16/ffmpeg/parse"
 	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/slices"
 )
 
 type LogLine struct {
@@ -32,12 +33,14 @@ type ReportEntry struct {
 	Prelude   []string
 	Log       []LogLine
 	Matches   []string
+	LogLines  map[string]uint64
 }
 
 func (r *ReportEntry) UnmarshalParser(p *parse.Report) {
 	r.CreatedAt = p.CreatedAt
-	r.Prelude = slices.Copy(p.Prelude)
-	r.Matches = slices.Copy(p.Matches)
+	r.Prelude = slices.Clone(p.Prelude)
+	r.Matches = slices.Clone(p.Matches)
+	r.LogLines = maps.Clone(p.LogLines)
 
 	r.Log = make([]LogLine, len(p.Log))
 	for i, line := range p.Log {
@@ -48,8 +51,9 @@ func (r *ReportEntry) UnmarshalParser(p *parse.Report) {
 func (r *ReportEntry) MarshalParser() parse.Report {
 	p := parse.Report{
 		CreatedAt: r.CreatedAt,
-		Prelude:   slices.Copy(r.Prelude),
-		Matches:   slices.Copy(r.Matches),
+		Prelude:   slices.Clone(r.Prelude),
+		Matches:   slices.Clone(r.Matches),
+		LogLines:  maps.Clone(r.LogLines),
 	}
 
 	p.Log = make([]process.Line, len(r.Log))

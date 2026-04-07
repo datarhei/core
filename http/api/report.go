@@ -1,6 +1,7 @@
 package api
 
 import (
+	"maps"
 	"strconv"
 	"time"
 
@@ -9,10 +10,11 @@ import (
 
 // ProcessReportEntry represents the logs of a run of a core process
 type ProcessReportEntry struct {
-	CreatedAt int64       `json:"created_at" format:"int64"`
-	Prelude   []string    `json:"prelude,omitempty"`
-	Log       [][2]string `json:"log,omitempty"`
-	Matches   []string    `json:"matches,omitempty"`
+	CreatedAt int64             `json:"created_at" format:"int64"`
+	Prelude   []string          `json:"prelude,omitempty"`
+	Log       [][2]string       `json:"log,omitempty"`
+	Matches   []string          `json:"matches,omitempty"`
+	LogLines  map[string]uint64 `json:"lines,omitempty"`
 }
 
 func (r *ProcessReportEntry) Unmarshal(p *app.ReportEntry) {
@@ -24,6 +26,7 @@ func (r *ProcessReportEntry) Unmarshal(p *app.ReportEntry) {
 		r.Log[i][1] = line.Data
 	}
 	r.Matches = p.Matches
+	r.LogLines = maps.Clone(p.LogLines)
 }
 
 func (r *ProcessReportEntry) Marshal() app.ReportEntry {
@@ -32,6 +35,7 @@ func (r *ProcessReportEntry) Marshal() app.ReportEntry {
 		Prelude:   r.Prelude,
 		Log:       make([]app.LogLine, 0, len(r.Log)),
 		Matches:   r.Matches,
+		LogLines:  maps.Clone(r.LogLines),
 	}
 
 	for _, l := range r.Log {

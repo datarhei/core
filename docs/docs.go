@@ -8169,6 +8169,13 @@ const docTemplate = `{
                         "$ref": "#/definitions/api.ProcessReportHistoryEntry"
                     }
                 },
+                "lines": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
                 "log": {
                     "type": "array",
                     "items": {
@@ -8205,6 +8212,13 @@ const docTemplate = `{
                 "exited_at": {
                     "type": "integer",
                     "format": "int64"
+                },
+                "lines": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
                 },
                 "log": {
                     "type": "array",

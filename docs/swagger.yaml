@@ -1648,6 +1648,11 @@ definitions:
         items:
           $ref: '#/definitions/api.ProcessReportHistoryEntry'
         type: array
+      lines:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
       log:
         items:
           items:
@@ -1673,6 +1678,11 @@ definitions:
       exited_at:
         format: int64
         type: integer
+      lines:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
       log:
         items:
           items:

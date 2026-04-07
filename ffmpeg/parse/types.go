@@ -754,6 +754,7 @@ type Report struct {
 	Prelude   []string
 	Log       []process.Line
 	Matches   []string
+	LogLines  map[string]uint64
 }
 
 // ReportHistoryEntry represents an historical log report, including the exit status of the
