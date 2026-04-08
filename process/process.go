@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"math/rand/v2"
 	"os"
 	"os/exec"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/resources"
+
+	"golang.org/x/time/rate"
 )
 
 // Process represents a process and ways to control it
@@ -70,6 +73,7 @@ type Config struct {
 	LimitGPUDecoder float64                               // Kill the process if the GPU decoder usage in percent is above this value, in percent 0-100.
 	LimitGPUMemory  uint64                                // Kill the process if the GPU memory consumption in bytes is above this value.
 	LimitDuration   time.Duration                         // Kill the process if the limits are exceeded for this duration.
+	LimitLogRate    float64                               // Kill the process if the log lines per second exceed this limit.
 	LimitMode       LimitMode                             // Select limiting mode
 	Scheduler       Scheduler                             // A scheduler.
 	Parser          Parser                                // A parser for the output of the process.
@@ -252,9 +256,10 @@ type process struct {
 		onStateChange func(from, to string)
 		lock          sync.Mutex
 	}
-	limits    Limiter
-	scheduler Scheduler
-	resources resources.Resources
+	limits       Limiter
+	limitLogRate float64
+	scheduler    Scheduler
+	resources    resources.Resources
 }
 
 var _ Process = &process{}
@@ -262,13 +267,14 @@ var _ Process = &process{}
 // New creates a new process wrapper
 func New(config Config) (Process, error) {
 	p := &process{
-		binary:    config.Binary,
-		cmd:       nil,
-		timeout:   config.Timeout,
-		parser:    config.Parser,
-		logger:    config.Logger,
-		scheduler: config.Scheduler,
-		resources: config.Resources,
+		binary:       config.Binary,
+		cmd:          nil,
+		timeout:      config.Timeout,
+		parser:       config.Parser,
+		logger:       config.Logger,
+		scheduler:    config.Scheduler,
+		resources:    config.Resources,
+		limitLogRate: config.LimitLogRate,
 	}
 
 	p.pid.Store(-1)
@@ -986,10 +992,26 @@ func (p *process) reader() {
 	// Reset the parser logs
 	p.parser.ResetLog()
 
+	burst := 1000
+	if p.limitLogRate > float64(burst) {
+		burst = int(10 * p.limitLogRate)
+	}
+
+	rateLimit := rate.Limit(p.limitLogRate)
+	if p.limitLogRate <= 0 {
+		rateLimit = rate.Limit(math.MaxFloat64)
+	}
+	limiter := rate.NewLimiter(rateLimit, burst)
+
 	var n uint64 = 0
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
+
+		if !limiter.Allow() {
+			p.stop(false, fmt.Sprintf("Killed because too many log events > %.2f per second", p.limitLogRate), 10*time.Second)
+			continue
+		}
 
 		// Parse the output line from ffmpeg
 		n = p.parser.Parse(line)

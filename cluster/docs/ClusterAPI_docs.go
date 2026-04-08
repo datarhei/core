@@ -1319,6 +1319,11 @@ const docTemplateClusterAPI = `{
                         }
                     ]
                 },
+                "limitLogRate": {
+                    "description": "allow this number of log events per seconds, otherwise skip",
+                    "type": "number",
+                    "format": "float64"
+                },
                 "limitMemory": {
                     "description": "bytes",
                     "type": "integer",

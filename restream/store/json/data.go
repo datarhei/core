@@ -1,6 +1,8 @@
 package json
 
 import (
+	"slices"
+
 	"github.com/datarhei/core/v16/restream/app"
 )
 
@@ -89,9 +91,36 @@ type ProcessConfig struct {
 	Timeout        uint64            `json:"timeout"`               // seconds
 	Scheduler      string            `json:"scheduler"`             // crontab pattern or RFC3339 timestamp
 	LogPatterns    []string          `json:"log_patterns"`          // will we interpreted as regualr expressions
+	LimitLogRate   float64           `json:"limit_log_rate"`        // allow this number of log events per seconds, otherwise skip
 	LimitCPU       float64           `json:"limit_cpu_usage"`       // percent
 	LimitMemory    uint64            `json:"limit_memory_bytes"`    // bytes
+	LimitGPU       ConfigLimitGPU    `json:"limit_gpu_usage"`       // GPU limits
 	LimitWaitFor   uint64            `json:"limit_waitfor_seconds"` // seconds
+}
+
+type ConfigLimitGPU struct {
+	Usage   float64 `json:"usage"`   // percent 0-100
+	Encoder float64 `json:"encoder"` // percent 0-100
+	Decoder float64 `json:"decoder"` // percent 0-100
+	Memory  uint64  `json:"memory"`  // bytes
+}
+
+func (p *ConfigLimitGPU) Marshal(a app.ConfigLimitGPU) {
+	p.Usage = a.Usage
+	p.Encoder = a.Encoder
+	p.Decoder = a.Decoder
+	p.Memory = a.Memory
+}
+
+func (p *ConfigLimitGPU) Unmarshal() app.ConfigLimitGPU {
+	a := app.ConfigLimitGPU{
+		Usage:   p.Usage,
+		Encoder: p.Encoder,
+		Decoder: p.Decoder,
+		Memory:  p.Memory,
+	}
+
+	return a
 }
 
 func (p *ProcessConfig) Marshal(a *app.Config) {
@@ -101,21 +130,19 @@ func (p *ProcessConfig) Marshal(a *app.Config) {
 	p.Domain = a.Domain
 	p.Binary = a.Binary
 	p.FFVersion = a.FFVersion
+	p.Options = slices.Clone(a.Options)
 	p.Reconnect = a.Reconnect
 	p.ReconnectDelay = a.ReconnectDelay
 	p.Autostart = a.Autostart
 	p.StaleTimeout = a.StaleTimeout
 	p.Timeout = a.Timeout
 	p.Scheduler = a.Scheduler
+	p.LogPatterns = slices.Clone(a.LogPatterns)
+	p.LimitLogRate = a.LimitLogRate
 	p.LimitCPU = a.LimitCPU
 	p.LimitMemory = a.LimitMemory
+	p.LimitGPU.Marshal(a.LimitGPU)
 	p.LimitWaitFor = a.LimitWaitFor
-
-	p.Options = make([]string, len(a.Options))
-	copy(p.Options, a.Options)
-
-	p.LogPatterns = make([]string, len(a.LogPatterns))
-	copy(p.LogPatterns, a.LogPatterns)
 
 	p.Input = make([]ProcessConfigIO, len(a.Input))
 	for x, input := range a.Input {
@@ -125,6 +152,10 @@ func (p *ProcessConfig) Marshal(a *app.Config) {
 	p.Output = make([]ProcessConfigIO, len(a.Output))
 	for x, output := range a.Output {
 		p.Output[x].Marshal(&output)
+	}
+
+	if p.LogPatterns == nil {
+		p.LogPatterns = []string{}
 	}
 }
 
@@ -138,23 +169,20 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 		FFVersion:      p.FFVersion,
 		Input:          []app.ConfigIO{},
 		Output:         []app.ConfigIO{},
-		Options:        []string{},
+		Options:        slices.Clone(p.Options),
 		Reconnect:      p.Reconnect,
 		ReconnectDelay: p.ReconnectDelay,
 		Autostart:      p.Autostart,
 		StaleTimeout:   p.StaleTimeout,
 		Timeout:        p.Timeout,
 		Scheduler:      p.Scheduler,
+		LogPatterns:    slices.Clone(p.LogPatterns),
+		LimitLogRate:   p.LimitLogRate,
 		LimitCPU:       p.LimitCPU,
 		LimitMemory:    p.LimitMemory,
+		LimitGPU:       p.LimitGPU.Unmarshal(),
 		LimitWaitFor:   p.LimitWaitFor,
 	}
-
-	a.Options = make([]string, len(p.Options))
-	copy(a.Options, p.Options)
-
-	a.LogPatterns = make([]string, len(p.LogPatterns))
-	copy(a.LogPatterns, p.LogPatterns)
 
 	a.Input = make([]app.ConfigIO, len(p.Input))
 	for x, input := range p.Input {
@@ -164,6 +192,10 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 	a.Output = make([]app.ConfigIO, len(p.Output))
 	for x, output := range p.Output {
 		a.Output[x] = output.Unmarshal()
+	}
+
+	if a.LogPatterns == nil {
+		a.LogPatterns = []string{}
 	}
 
 	return a

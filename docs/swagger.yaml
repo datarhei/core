@@ -1532,6 +1532,10 @@ definitions:
       gpu_usage:
         description: percent 0-100
         type: number
+      log_event_rate:
+        description: rate limit for log events
+        format: float64
+        type: number
       memory_mbytes:
         description: megabytes
         format: uint64

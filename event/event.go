@@ -3,9 +3,12 @@ package event
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/lithammer/shortuuid/v4"
+	"golang.org/x/time/rate"
 )
 
 type Event interface {
@@ -38,13 +41,24 @@ type PubSub struct {
 
 	subscriber     map[string]chan Event
 	subscriberLock sync.Mutex
+
+	limiter *rate.Limiter
 }
 
 func NewPubSub() *PubSub {
+	return NewPubSubWithRateLimit(math.MaxFloat64)
+}
+
+func NewPubSubWithRateLimit(limit float64) *PubSub {
 	w := &PubSub{
 		publisher:       make(chan Event, 1024),
 		publisherClosed: false,
 		subscriber:      make(map[string]chan Event),
+	}
+
+	if limit != math.MaxFloat64 {
+		limiter := rate.NewLimiter(rate.Limit(limit), 10000)
+		limiter.AllowN(time.Now(), 10000)
 	}
 
 	w.ctx, w.cancel = context.WithCancel(context.Background())
@@ -85,6 +99,13 @@ func (w *PubSub) Consume(s EventSource, rewrite func(e Event) Event) {
 }
 
 func (w *PubSub) Publish(e Event) error {
+	if w.limiter != nil {
+		// Drop events that exceed the rate limit
+		if !w.limiter.Allow() {
+			return fmt.Errorf("publishing limit reached")
+		}
+	}
+
 	event := e.Clone()
 
 	w.publisherLock.Lock()

@@ -42,6 +42,7 @@ type ProcessConfig struct {
 	LimitGPUDecoder float64                          // Kill the process id the GPU usage (decoder) in percent is above this value.
 	LimitGPUMemory  uint64                           // Kill the process if the GPU memory consumption in bytes is above this value.
 	LimitDuration   time.Duration                    // Kill the process if the limits are exceeded for this duration.
+	LimitLogRate    float64                          // Kill the process if the log lines per second exceed this limit.
 	LimitMode       string                           // How to limit the process, "hard" or "soft"
 	Scheduler       string                           // A scheduler for starting the process, either a concrete date (RFC3339) or in crontab syntax
 	Args            []string                         // Arguments for the process
@@ -174,6 +175,7 @@ func (f *ffmpeg) New(config ProcessConfig) (process.Process, error) {
 		LimitGPUDecoder: config.LimitGPUDecoder,
 		LimitGPUMemory:  config.LimitGPUMemory,
 		LimitDuration:   config.LimitDuration,
+		LimitLogRate:    config.LimitLogRate,
 		LimitMode:       limitMode,
 		Scheduler:       scheduler,
 		Parser:          config.Parser,

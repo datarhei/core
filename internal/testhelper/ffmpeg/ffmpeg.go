@@ -208,6 +208,19 @@ Output #0, hls, to './data/testsrc.m3u8':
 		}
 	}
 
+	lograte := uint64(0)
+
+	for i, arg := range os.Args {
+		if arg != "-lograte" {
+			continue
+		}
+
+		if x, err := strconv.ParseUint(os.Args[i+1], 10, 32); err == nil {
+			lograte = x
+			break
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "%s\n", prelude)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,12 +229,30 @@ Output #0, hls, to './data/testsrc.m3u8':
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 
-		frame := uint64(0)
+		var logticker *time.Ticker
 
+		if lograte != 0 {
+			logticker = time.NewTicker(time.Second / time.Duration(lograte))
+		} else {
+			logticker = time.NewTicker(time.Second)
+		}
+
+		defer logticker.Stop()
+
+		frame := uint64(0)
+		logentry := uint64(0)
+
+	loop:
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-logticker.C:
+				if lograte == 0 {
+					continue loop
+				}
+				fmt.Fprintf(os.Stderr, "[log @ 0x7fa969803a00] writing log entry %d\n", logentry)
+				logentry++
 			case <-ticker.C:
 				frame += 25
 				fmt.Fprintf(os.Stderr, "frame=%5d fps= 25 q=-1.0 Lsize=N/A time=00:00:02.32 bitrate=N/A speed=1.0x    \r", frame)

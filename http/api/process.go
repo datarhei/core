@@ -1,6 +1,7 @@
 package api
 
 import (
+	"slices"
 	"strconv"
 
 	"github.com/datarhei/core/v16/cluster/store"
@@ -162,6 +163,7 @@ type ProcessConfigLimits struct {
 	GPUDecoder float64 `json:"gpu_decoder" jsonschema:"minimum=0"`                       // percent 0-100
 	GPUMemory  uint64  `json:"gpu_memory_mbytes" jsonschema:"minimum=0" format:"uint64"` // megabytes
 	WaitFor    uint64  `json:"waitfor_seconds" jsonschema:"minimum=0" format:"uint64"`   // seconds
+	LogEvents  float64 `json:"log_event_rate" jsonschema:"minimum=0" format:"float64"`   // rate limit for log events
 }
 
 // ProcessConfig represents the configuration of an ffmpeg process
@@ -194,13 +196,15 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 		Domain:         cfg.Domain,
 		Binary:         cfg.Binary,
 		Reference:      cfg.Reference,
-		Options:        cfg.Options,
+		Options:        slices.Clone(cfg.Options),
 		Reconnect:      cfg.Reconnect,
 		ReconnectDelay: cfg.ReconnectDelay,
 		Autostart:      cfg.Autostart,
 		StaleTimeout:   cfg.StaleTimeout,
 		Timeout:        cfg.Timeout,
 		Scheduler:      cfg.Scheduler,
+		LogPatterns:    slices.Clone(cfg.LogPatterns),
+		LimitLogRate:   cfg.Limits.LogEvents,
 		LimitCPU:       cfg.Limits.CPU,
 		LimitMemory:    cfg.Limits.Memory * 1024 * 1024,
 		LimitGPU: app.ConfigLimitGPU{
@@ -244,9 +248,6 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 
 	}
 
-	p.LogPatterns = make([]string, len(cfg.LogPatterns))
-	copy(p.LogPatterns, cfg.LogPatterns)
-
 	return p, cfg.Metadata
 }
 
@@ -288,12 +289,15 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 	cfg.Binary = c.Binary
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"
+	cfg.Options = slices.Clone(c.Options)
 	cfg.Reconnect = c.Reconnect
 	cfg.ReconnectDelay = c.ReconnectDelay
 	cfg.Autostart = c.Autostart
 	cfg.StaleTimeout = c.StaleTimeout
 	cfg.Timeout = c.Timeout
 	cfg.Scheduler = c.Scheduler
+	cfg.LogPatterns = slices.Clone(c.LogPatterns)
+	cfg.Limits.LogEvents = c.LimitLogRate
 	cfg.Limits.CPU = c.LimitCPU
 	cfg.Limits.Memory = c.LimitMemory / 1024 / 1024
 	cfg.Limits.GPUUsage = c.LimitGPU.Usage
@@ -301,9 +305,6 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 	cfg.Limits.GPUDecoder = c.LimitGPU.Decoder
 	cfg.Limits.GPUMemory = c.LimitGPU.Memory / 1024 / 1024
 	cfg.Limits.WaitFor = c.LimitWaitFor
-
-	cfg.Options = make([]string, len(c.Options))
-	copy(cfg.Options, c.Options)
 
 	for _, x := range c.Input {
 		io := ProcessConfigIO{
@@ -339,9 +340,6 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 
 		cfg.Output = append(cfg.Output, io)
 	}
-
-	cfg.LogPatterns = make([]string, len(c.LogPatterns))
-	copy(cfg.LogPatterns, c.LogPatterns)
 
 	cfg.Metadata = metadata
 }

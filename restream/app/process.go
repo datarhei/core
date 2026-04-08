@@ -84,6 +84,7 @@ type Config struct {
 	Timeout        uint64         // seconds
 	Scheduler      string         // crontab pattern or RFC3339 timestamp
 	LogPatterns    []string       // will be interpreted as regular expressions
+	LimitLogRate   float64        // allow this number of log events per seconds, otherwise skip
 	LimitCPU       float64        // percent
 	LimitMemory    uint64         // bytes
 	LimitGPU       ConfigLimitGPU // GPU limits
@@ -111,6 +112,7 @@ func (config *Config) Clone() *Config {
 		StaleTimeout:   config.StaleTimeout,
 		Timeout:        config.Timeout,
 		Scheduler:      config.Scheduler,
+		LimitLogRate:   config.LimitLogRate,
 		LimitCPU:       config.LimitCPU,
 		LimitMemory:    config.LimitMemory,
 		LimitGPU:       config.LimitGPU,
@@ -186,6 +188,7 @@ func (config *Config) Hash() []byte {
 	b.WriteString(strconv.FormatUint(config.Timeout, 10))
 	b.WriteString(strconv.FormatUint(config.LimitMemory, 10))
 	b.WriteString(strconv.FormatUint(config.LimitWaitFor, 10))
+	b.WriteString(strconv.FormatFloat(config.LimitLogRate, 'f', -1, 64))
 	b.WriteString(strconv.FormatFloat(config.LimitCPU, 'f', -1, 64))
 	b.WriteString(strconv.FormatFloat(config.LimitGPU.Usage, 'f', -1, 64))
 	b.WriteString(strconv.FormatFloat(config.LimitGPU.Encoder, 'f', -1, 64))

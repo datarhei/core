@@ -7993,6 +7993,11 @@ const docTemplate = `{
                     "description": "percent 0-100",
                     "type": "number"
                 },
+                "log_event_rate": {
+                    "description": "rate limit for log events",
+                    "type": "number",
+                    "format": "float64"
+                },
                 "memory_mbytes": {
                     "description": "megabytes",
                     "type": "integer",

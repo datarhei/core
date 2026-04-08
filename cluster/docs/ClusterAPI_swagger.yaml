@@ -24,6 +24,10 @@ definitions:
         allOf:
         - $ref: '#/definitions/app.ConfigLimitGPU'
         description: GPU limits
+      limitLogRate:
+        description: allow this number of log events per seconds, otherwise skip
+        format: float64
+        type: number
       limitMemory:
         description: bytes
         format: int64
