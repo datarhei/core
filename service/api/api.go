@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/log"
 )
 
 type API interface {

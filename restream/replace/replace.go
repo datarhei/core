@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/datarhei/core/v16/glob"
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/glob"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 type TemplateFn func(config *app.Config, section string) string

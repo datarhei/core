@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	cfgstore "github.com/datarhei/core/v16/config/store"
-	cfgvars "github.com/datarhei/core/v16/config/vars"
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/restream/store"
+	cfgstore "github.com/darkiris4/sfx-core/config/store"
+	cfgvars "github.com/darkiris4/sfx-core/config/vars"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/restream/store"
 
 	_ "github.com/joho/godotenv/autoload"
 )

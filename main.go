@@ -4,9 +4,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/datarhei/core/v16/app/api"
-	"github.com/datarhei/core/v16/config/store"
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/app/api"
+	"github.com/darkiris4/sfx-core/config/store"
+	"github.com/darkiris4/sfx-core/log"
 
 	_ "github.com/joho/godotenv/autoload"
 )

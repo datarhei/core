@@ -1,6 +1,6 @@
 package api
 
-import "github.com/datarhei/core/v16/playout"
+import "github.com/darkiris4/sfx-core/playout"
 
 type PlayoutStatusIO struct {
 	State  string `json:"state" enums:"running,idle" jsonschema:"enum=running,enum=idle"`

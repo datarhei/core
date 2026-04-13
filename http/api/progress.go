@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 type ProgressIOFramerate struct {

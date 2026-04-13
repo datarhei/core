@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/glob"
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/glob"
+	"github.com/darkiris4/sfx-core/log"
 )
 
 // DiskConfig is the config required to create a new disk filesystem.

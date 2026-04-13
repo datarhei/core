@@ -3,8 +3,8 @@ package config
 import (
 	"testing"
 
-	v2 "github.com/datarhei/core/v16/config/v2"
-	"github.com/datarhei/core/v16/io/fs"
+	v2 "github.com/darkiris4/sfx-core/config/v2"
+	"github.com/darkiris4/sfx-core/io/fs"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/monitor/metric"
 )
 
 type filesystemCollector struct {

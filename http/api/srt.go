@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/datarhei/core/v16/srt"
+	"github.com/darkiris4/sfx-core/srt"
 
 	gosrt "github.com/datarhei/gosrt"
 )

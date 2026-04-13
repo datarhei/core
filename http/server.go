@@ -7,7 +7,7 @@
 // @contact.email hello@datarhei.com
 
 // @license.name Apache 2.0
-// @license.url https://github.com/datarhei/core/v16/blob/main/LICENSE
+// @license.url https://github.com/darkiris4/sfx-core/blob/main/LICENSE
 
 // @BasePath /
 
@@ -33,34 +33,34 @@ import (
 	"net/http"
 	"strings"
 
-	cfgstore "github.com/datarhei/core/v16/config/store"
-	"github.com/datarhei/core/v16/http/cache"
-	"github.com/datarhei/core/v16/http/errorhandler"
-	"github.com/datarhei/core/v16/http/fs"
-	"github.com/datarhei/core/v16/http/graph/resolver"
-	"github.com/datarhei/core/v16/http/handler"
-	api "github.com/datarhei/core/v16/http/handler/api"
-	"github.com/datarhei/core/v16/http/jwt"
-	"github.com/datarhei/core/v16/http/router"
-	"github.com/datarhei/core/v16/http/validator"
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/monitor"
-	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/prometheus"
-	"github.com/datarhei/core/v16/restream"
-	"github.com/datarhei/core/v16/rtmp"
-	"github.com/datarhei/core/v16/session"
-	"github.com/datarhei/core/v16/srt"
+	cfgstore "github.com/darkiris4/sfx-core/config/store"
+	"github.com/darkiris4/sfx-core/http/cache"
+	"github.com/darkiris4/sfx-core/http/errorhandler"
+	"github.com/darkiris4/sfx-core/http/fs"
+	"github.com/darkiris4/sfx-core/http/graph/resolver"
+	"github.com/darkiris4/sfx-core/http/handler"
+	api "github.com/darkiris4/sfx-core/http/handler/api"
+	"github.com/darkiris4/sfx-core/http/jwt"
+	"github.com/darkiris4/sfx-core/http/router"
+	"github.com/darkiris4/sfx-core/http/validator"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/monitor"
+	"github.com/darkiris4/sfx-core/net"
+	"github.com/darkiris4/sfx-core/prometheus"
+	"github.com/darkiris4/sfx-core/restream"
+	"github.com/darkiris4/sfx-core/rtmp"
+	"github.com/darkiris4/sfx-core/session"
+	"github.com/darkiris4/sfx-core/srt"
 
-	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
-	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
-	mwgzip "github.com/datarhei/core/v16/http/middleware/gzip"
-	mwhlsrewrite "github.com/datarhei/core/v16/http/middleware/hlsrewrite"
-	mwiplimit "github.com/datarhei/core/v16/http/middleware/iplimit"
-	mwlog "github.com/datarhei/core/v16/http/middleware/log"
-	mwmime "github.com/datarhei/core/v16/http/middleware/mime"
-	mwredirect "github.com/datarhei/core/v16/http/middleware/redirect"
-	mwsession "github.com/datarhei/core/v16/http/middleware/session"
+	mwcache "github.com/darkiris4/sfx-core/http/middleware/cache"
+	mwcors "github.com/darkiris4/sfx-core/http/middleware/cors"
+	mwgzip "github.com/darkiris4/sfx-core/http/middleware/gzip"
+	mwhlsrewrite "github.com/darkiris4/sfx-core/http/middleware/hlsrewrite"
+	mwiplimit "github.com/darkiris4/sfx-core/http/middleware/iplimit"
+	mwlog "github.com/darkiris4/sfx-core/http/middleware/log"
+	mwmime "github.com/darkiris4/sfx-core/http/middleware/mime"
+	mwredirect "github.com/darkiris4/sfx-core/http/middleware/redirect"
+	mwsession "github.com/darkiris4/sfx-core/http/middleware/session"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -68,7 +68,7 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger" // echo-swagger middleware
 
 	// Expose the API docs
-	_ "github.com/datarhei/core/v16/docs"
+	_ "github.com/darkiris4/sfx-core/docs"
 )
 
 var ListenAndServe = http.ListenAndServe

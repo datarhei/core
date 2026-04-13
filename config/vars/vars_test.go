@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/datarhei/core/v16/config/value"
+	"github.com/darkiris4/sfx-core/config/value"
 
 	"github.com/stretchr/testify/require"
 )

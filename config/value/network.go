@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/cors"
+	"github.com/darkiris4/sfx-core/http/cors"
 )
 
 // address (host?:port)

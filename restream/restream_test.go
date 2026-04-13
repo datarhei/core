@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/ffmpeg"
-	"github.com/datarhei/core/v16/internal/testhelper"
-	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/restream/app"
-	"github.com/datarhei/core/v16/restream/replace"
+	"github.com/darkiris4/sfx-core/ffmpeg"
+	"github.com/darkiris4/sfx-core/internal/testhelper"
+	"github.com/darkiris4/sfx-core/net"
+	"github.com/darkiris4/sfx-core/restream/app"
+	"github.com/darkiris4/sfx-core/restream/replace"
 
 	"github.com/stretchr/testify/require"
 )

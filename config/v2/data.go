@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/v16/config/copy"
-	v1 "github.com/datarhei/core/v16/config/v1"
-	"github.com/datarhei/core/v16/config/value"
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/config/copy"
+	v1 "github.com/darkiris4/sfx-core/config/v1"
+	"github.com/darkiris4/sfx-core/config/value"
+	"github.com/darkiris4/sfx-core/io/fs"
 )
 
 type Data struct {

@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"github.com/datarhei/core/v16/ffmpeg"
-	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/darkiris4/sfx-core/ffmpeg"
+	"github.com/darkiris4/sfx-core/monitor/metric"
 )
 
 type ffmpegCollector struct {

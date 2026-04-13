@@ -17,8 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/psutil"
 )
 
 // Process represents a process and ways to control it

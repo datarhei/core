@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 // Duration represents a time.Duration

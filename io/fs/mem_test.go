@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/math/rand"
+	"github.com/darkiris4/sfx-core/math/rand"
 	"github.com/stretchr/testify/require"
 )
 

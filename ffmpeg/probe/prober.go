@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/v16/ffmpeg/prelude"
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/ffmpeg/prelude"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/process"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 type Parser interface {

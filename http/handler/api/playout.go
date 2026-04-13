@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/playout"
-	"github.com/datarhei/core/v16/restream"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/handler/util"
+	"github.com/darkiris4/sfx-core/playout"
+	"github.com/darkiris4/sfx-core/restream"
 
 	"github.com/labstack/echo/v4"
 )

@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/glob"
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/glob"
+	"github.com/darkiris4/sfx-core/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )

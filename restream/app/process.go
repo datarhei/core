@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/datarhei/core/v16/process"
+	"github.com/darkiris4/sfx-core/process"
 )
 
 type ConfigIOCleanup struct {

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/app"
-	"github.com/datarhei/core/v16/http/api"
+	"github.com/darkiris4/sfx-core/app"
+	"github.com/darkiris4/sfx-core/http/api"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

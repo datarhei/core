@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/session"
 )
 
 // SessionStats are the accumulated numbers for the session summary

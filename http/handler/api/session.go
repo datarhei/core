@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/handler/util"
+	"github.com/darkiris4/sfx-core/session"
 
 	"github.com/labstack/echo/v4"
 )

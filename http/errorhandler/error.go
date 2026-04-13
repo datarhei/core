@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/api"
+	"github.com/darkiris4/sfx-core/http/api"
 
 	"github.com/labstack/echo/v4"
 )

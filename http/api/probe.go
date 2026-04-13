@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 // ProbeIO represents a stream of a probed file

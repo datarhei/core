@@ -1,7 +1,7 @@
 package ffmpeg
 
 import (
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/session"
 )
 
 type wrappedCollector struct {

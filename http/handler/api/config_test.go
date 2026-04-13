@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/datarhei/core/v16/config"
-	"github.com/datarhei/core/v16/config/store"
-	v1 "github.com/datarhei/core/v16/config/v1"
-	"github.com/datarhei/core/v16/http/mock"
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/config"
+	"github.com/darkiris4/sfx-core/config/store"
+	v1 "github.com/darkiris4/sfx-core/config/v1"
+	"github.com/darkiris4/sfx-core/http/mock"
+	"github.com/darkiris4/sfx-core/io/fs"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )

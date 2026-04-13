@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/mock"
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/mock"
+	"github.com/darkiris4/sfx-core/session"
 
 	"github.com/labstack/echo/v4"
 )

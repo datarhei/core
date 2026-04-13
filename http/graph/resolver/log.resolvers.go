@@ -8,7 +8,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/log"
 )
 
 // Log is the resolver for the log field.

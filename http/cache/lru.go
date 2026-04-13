@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/log"
 )
 
 // LRUConfig is the configuration for a new LRU cache

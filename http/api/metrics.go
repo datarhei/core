@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/datarhei/core/v16/monitor"
+	"github.com/darkiris4/sfx-core/monitor"
 )
 
 type MetricsDescription struct {

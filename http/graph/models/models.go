@@ -3,9 +3,9 @@ package models
 import (
 	"time"
 
-	"github.com/datarhei/core/v16/http/graph/scalars"
-	"github.com/datarhei/core/v16/playout"
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/http/graph/scalars"
+	"github.com/darkiris4/sfx-core/playout"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 func (s *RawAVstream) UnmarshalPlayout(status playout.Status) {

@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/datarhei/core/v16/config"
-	v1 "github.com/datarhei/core/v16/config/v1"
-	v2 "github.com/datarhei/core/v16/config/v2"
-	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/config"
+	v1 "github.com/darkiris4/sfx-core/config/v1"
+	v2 "github.com/darkiris4/sfx-core/config/v2"
+	"github.com/darkiris4/sfx-core/encoding/json"
+	"github.com/darkiris4/sfx-core/io/fs"
 )
 
 type jsonStore struct {

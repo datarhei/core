@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/datarhei/core/v16/http/graph/models"
-	"github.com/datarhei/core/v16/playout"
+	"github.com/darkiris4/sfx-core/http/graph/models"
+	"github.com/darkiris4/sfx-core/playout"
 )
 
 // PlayoutStatus is the resolver for the playoutStatus field.

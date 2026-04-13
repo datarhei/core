@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/restream/app"
 	"github.com/stretchr/testify/require"
 )
 

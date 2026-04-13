@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/darkiris4/sfx-core/psutil"
 
 	"github.com/stretchr/testify/assert"
 )

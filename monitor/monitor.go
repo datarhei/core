@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/darkiris4/sfx-core/monitor/metric"
 )
 
 type Reader interface {

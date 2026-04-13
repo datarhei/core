@@ -7,7 +7,7 @@ package resolver
 import (
 	"context"
 
-	"github.com/datarhei/core/v16/http/graph/graph"
+	"github.com/darkiris4/sfx-core/http/graph/graph"
 )
 
 // Ping is the resolver for the ping field.

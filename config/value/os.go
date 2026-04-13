@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/io/fs"
 )
 
 // must directory

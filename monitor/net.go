@@ -1,8 +1,8 @@
 package monitor
 
 import (
-	"github.com/datarhei/core/v16/monitor/metric"
-	"github.com/datarhei/core/v16/psutil"
+	"github.com/darkiris4/sfx-core/monitor/metric"
+	"github.com/darkiris4/sfx-core/psutil"
 )
 
 type netCollector struct {

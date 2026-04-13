@@ -1,4 +1,4 @@
-module github.com/datarhei/core/v16
+module github.com/darkiris4/sfx-core
 
 go 1.21.0
 

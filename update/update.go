@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/monitor/metric"
 	"golang.org/x/mod/semver"
 )
 

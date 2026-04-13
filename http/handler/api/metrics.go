@@ -5,10 +5,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/monitor"
-	"github.com/datarhei/core/v16/monitor/metric"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/handler/util"
+	"github.com/darkiris4/sfx-core/monitor"
+	"github.com/darkiris4/sfx-core/monitor/metric"
 
 	"github.com/labstack/echo/v4"
 )

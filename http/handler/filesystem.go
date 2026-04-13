@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/fs"
-	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/fs"
+	"github.com/darkiris4/sfx-core/http/handler/util"
 
 	"github.com/labstack/echo/v4"
 )

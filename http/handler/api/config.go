@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	cfgstore "github.com/datarhei/core/v16/config/store"
-	cfgvars "github.com/datarhei/core/v16/config/vars"
-	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/http/api"
+	cfgstore "github.com/darkiris4/sfx-core/config/store"
+	cfgvars "github.com/darkiris4/sfx-core/config/vars"
+	"github.com/darkiris4/sfx-core/encoding/json"
+	"github.com/darkiris4/sfx-core/http/api"
 
 	"github.com/labstack/echo/v4"
 )

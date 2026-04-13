@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/internal/testhelper"
+	"github.com/darkiris4/sfx-core/internal/testhelper"
 	"github.com/stretchr/testify/require"
 )
 

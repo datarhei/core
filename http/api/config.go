@@ -3,9 +3,9 @@ package api
 import (
 	"time"
 
-	"github.com/datarhei/core/v16/config"
-	v1config "github.com/datarhei/core/v16/config/v1"
-	v2config "github.com/datarhei/core/v16/config/v2"
+	"github.com/darkiris4/sfx-core/config"
+	v1config "github.com/darkiris4/sfx-core/config/v1"
+	v2config "github.com/darkiris4/sfx-core/config/v2"
 )
 
 // ConfigVersion is used to only unmarshal the version field in order

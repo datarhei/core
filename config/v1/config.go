@@ -5,11 +5,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/datarhei/core/v16/config/copy"
-	"github.com/datarhei/core/v16/config/value"
-	"github.com/datarhei/core/v16/config/vars"
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/math/rand"
+	"github.com/darkiris4/sfx-core/config/copy"
+	"github.com/darkiris4/sfx-core/config/value"
+	"github.com/darkiris4/sfx-core/config/vars"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/math/rand"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/google/uuid"

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/http/cache"
+	"github.com/darkiris4/sfx-core/http/cache"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"

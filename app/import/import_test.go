@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/restream/store"
+	"github.com/darkiris4/sfx-core/encoding/json"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/restream/store"
 
 	"github.com/stretchr/testify/require"
 )

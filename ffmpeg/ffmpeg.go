@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/ffmpeg/parse"
-	"github.com/datarhei/core/v16/ffmpeg/probe"
-	"github.com/datarhei/core/v16/ffmpeg/skills"
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/process"
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/ffmpeg/parse"
+	"github.com/darkiris4/sfx-core/ffmpeg/probe"
+	"github.com/darkiris4/sfx-core/ffmpeg/skills"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/net"
+	"github.com/darkiris4/sfx-core/process"
+	"github.com/darkiris4/sfx-core/session"
 )
 
 type FFmpeg interface {

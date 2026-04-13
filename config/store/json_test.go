@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/datarhei/core/v16/config"
+	"github.com/darkiris4/sfx-core/config"
 
 	"github.com/stretchr/testify/require"
 )

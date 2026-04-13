@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/session"
 
 	"github.com/datarhei/joy4/av/avutil"
 	"github.com/datarhei/joy4/av/pktque"

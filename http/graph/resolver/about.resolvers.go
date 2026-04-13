@@ -8,9 +8,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/datarhei/core/v16/app"
-	"github.com/datarhei/core/v16/http/graph/models"
-	"github.com/datarhei/core/v16/http/graph/scalars"
+	"github.com/darkiris4/sfx-core/app"
+	"github.com/darkiris4/sfx-core/http/graph/models"
+	"github.com/darkiris4/sfx-core/http/graph/scalars"
 )
 
 // About is the resolver for the about field.

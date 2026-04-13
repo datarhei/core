@@ -3,7 +3,7 @@ package v1
 import (
 	"time"
 
-	"github.com/datarhei/core/v16/config/value"
+	"github.com/darkiris4/sfx-core/config/value"
 )
 
 type Data struct {

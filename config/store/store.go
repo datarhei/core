@@ -1,6 +1,6 @@
 package store
 
-import "github.com/datarhei/core/v16/config"
+import "github.com/darkiris4/sfx-core/config"
 
 // Store is a store for the configuration data.
 type Store interface {

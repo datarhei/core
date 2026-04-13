@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/http/handler/util"
-	"github.com/datarhei/core/v16/http/jwt/jwks"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/http/handler/util"
+	"github.com/darkiris4/sfx-core/http/jwt/jwks"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"

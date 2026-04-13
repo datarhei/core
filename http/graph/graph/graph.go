@@ -14,8 +14,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/datarhei/core/v16/http/graph/models"
-	"github.com/datarhei/core/v16/http/graph/scalars"
+	"github.com/darkiris4/sfx-core/http/graph/models"
+	"github.com/darkiris4/sfx-core/http/graph/scalars"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )

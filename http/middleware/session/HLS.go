@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/datarhei/core/v16/net"
-	"github.com/datarhei/core/v16/session"
+	"github.com/darkiris4/sfx-core/net"
+	"github.com/darkiris4/sfx-core/session"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

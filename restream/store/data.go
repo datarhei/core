@@ -1,7 +1,7 @@
 package store
 
 import (
-	"github.com/datarhei/core/v16/restream/app"
+	"github.com/darkiris4/sfx-core/restream/app"
 )
 
 type StoreData struct {

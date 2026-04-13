@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/datarhei/core/v16/http/graph/scalars"
+	"github.com/darkiris4/sfx-core/http/graph/scalars"
 )
 
 type IProcessReportHistoryEntry interface {

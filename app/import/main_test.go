@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/datarhei/core/v16/config/store"
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/config/store"
+	"github.com/darkiris4/sfx-core/io/fs"
 
 	"github.com/stretchr/testify/require"
 )

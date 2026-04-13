@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/log"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/log"
 )
 
 type Config struct {

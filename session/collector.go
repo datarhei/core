@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/datarhei/core/v16/io/fs"
-	"github.com/datarhei/core/v16/log"
-	"github.com/datarhei/core/v16/net"
+	"github.com/darkiris4/sfx-core/io/fs"
+	"github.com/darkiris4/sfx-core/log"
+	"github.com/darkiris4/sfx-core/net"
 
 	"github.com/prep/average"
 )

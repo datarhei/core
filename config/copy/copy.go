@@ -1,6 +1,6 @@
 package copy
 
-import "github.com/datarhei/core/v16/config/value"
+import "github.com/darkiris4/sfx-core/config/value"
 
 func StringMap(src map[string]string) map[string]string {
 	dst := make(map[string]string)

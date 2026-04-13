@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/datarhei/core/v16/http/api"
-	"github.com/datarhei/core/v16/srt"
+	"github.com/darkiris4/sfx-core/http/api"
+	"github.com/darkiris4/sfx-core/srt"
 
 	"github.com/labstack/echo/v4"
 )

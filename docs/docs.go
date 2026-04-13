@@ -16,7 +16,7 @@ const docTemplate = `{
         },
         "license": {
             "name": "Apache 2.0",
-            "url": "https://github.com/datarhei/core/v16/blob/main/LICENSE"
+            "url": "https://github.com/darkiris4/sfx-core/blob/main/LICENSE"
         },
         "version": "{{.Version}}"
     },

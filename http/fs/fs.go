@@ -1,8 +1,8 @@
 package fs
 
 import (
-	"github.com/datarhei/core/v16/http/cache"
-	"github.com/datarhei/core/v16/io/fs"
+	"github.com/darkiris4/sfx-core/http/cache"
+	"github.com/darkiris4/sfx-core/io/fs"
 )
 
 type FS struct {

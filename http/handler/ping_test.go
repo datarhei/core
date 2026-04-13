@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/datarhei/core/v16/http/mock"
+	"github.com/darkiris4/sfx-core/http/mock"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
