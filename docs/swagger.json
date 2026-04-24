@@ -2324,6 +2324,71 @@
                 }
             }
         },
+        "/api/v3/cluster/process/{id}/config": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get the configuration of a process. This is the configuration as provided by Add or Update.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Get the configuration of a process",
+                "operationId": "cluster-3-get-process-config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Process domain",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessConfig"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/cluster/process/{id}/metadata/{key}": {
             "get": {
                 "security": [
@@ -2497,6 +2562,150 @@
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process/{id}/report": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get the report of a process.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Get the report of a process",
+                "operationId": "cluster-3-get-process-report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports.",
+                        "name": "created_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
+                        "name": "exited_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Process domain",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessState"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/cluster/process/{id}/state": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get the state of a process.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Get the state of a process",
+                "operationId": "cluster-3-get-process-state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Process ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Process domain",
+                        "name": "domain",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ProcessState"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/api.Error"
                         }

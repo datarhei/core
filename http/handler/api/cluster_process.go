@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/datarhei/core/v16/cluster/node"
@@ -250,6 +252,221 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, process)
+}
+
+// ProcessGetConfig returns the configuration of a process
+// @Summary Get the configuration of a process
+// @Description Get the configuration of a process. This is the configuration as provided by Add or Update.
+// @Tags v16.?.?
+// @ID cluster-3-get-process-config
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Process domain"
+// @Success 200 {object} api.ProcessConfig
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/config [get]
+func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
+		return api.Err(http.StatusForbidden, "")
+	}
+
+	pid := app.NewProcessID(id, domain)
+
+	// Check the store for the process
+	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+	}
+
+	process := api.Process{}
+	process.UnmarshalStore(p, true, false, false, false)
+
+	// Get the actual process data
+	if len(nodeid) != 0 {
+		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"config"})
+		if err != nil {
+			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		}
+	}
+
+	return c.JSON(http.StatusOK, process.Config)
+}
+
+// ProcessGetState returns the state of a process
+// @Summary Get the state of a process
+// @Description Get the state of a process.
+// @Tags v16.?.?
+// @ID cluster-3-get-process-state
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param domain query string false "Process domain"
+// @Success 200 {object} api.ProcessState
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/state [get]
+func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
+		return api.Err(http.StatusForbidden, "")
+	}
+
+	pid := app.NewProcessID(id, domain)
+
+	// Check the store for the process
+	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+	}
+
+	process := api.Process{}
+	process.UnmarshalStore(p, false, true, false, false)
+
+	// Get the actual process data
+	if len(nodeid) != 0 {
+		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"state"})
+		if err != nil {
+			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		}
+	}
+
+	return c.JSON(http.StatusOK, process.State)
+}
+
+// ProcessGetReport returns the report of a process
+// @Summary Get the report of a process
+// @Description Get the report of a process.
+// @Tags v16.?.?
+// @ID cluster-3-get-process-report
+// @Produce json
+// @Param id path string true "Process ID"
+// @Param created_at query int64 false "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range of reports."
+// @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports."
+// @Param domain query string false "Process domain"
+// @Success 200 {object} api.ProcessState
+// @Failure 400 {object} api.Error
+// @Failure 403 {object} api.Error
+// @Failure 404 {object} api.Error
+// @Failure 409 {object} api.Error
+// @Security ApiKeyAuth
+// @Router /api/v3/cluster/process/{id}/report [get]
+func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
+	id := util.PathParam(c, "id")
+	ctxuser := util.DefaultContext(c, "user", "")
+	domain := util.DefaultQuery(c, "domain", "")
+	createdUnix := util.DefaultQuery(c, "created_at", "")
+	exitedUnix := util.DefaultQuery(c, "exited_at", "")
+
+	var createdAt *int64 = nil
+	var exitedAt *int64 = nil
+
+	if len(createdUnix) != 0 {
+		if x, err := strconv.ParseInt(createdUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
+		} else {
+			createdAt = &x
+		}
+	}
+
+	if len(exitedUnix) != 0 {
+		if x, err := strconv.ParseInt(exitedUnix, 10, 64); err != nil {
+			return api.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
+		} else {
+			exitedAt = &x
+		}
+	}
+
+	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
+		return api.Err(http.StatusForbidden, "")
+	}
+
+	pid := app.NewProcessID(id, domain)
+
+	// Check the store for the process
+	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
+	if err != nil {
+		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+	}
+
+	process := api.Process{}
+	process.UnmarshalStore(p, false, false, true, false)
+
+	// Get the actual process data
+	if len(nodeid) != 0 {
+		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"report"})
+		if err != nil {
+			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		}
+	}
+
+	if createdAt == nil && exitedAt == nil {
+		return c.JSON(http.StatusOK, process.Report)
+	}
+
+	report := process.Report
+
+	filteredReport := api.ProcessReport{}
+
+	// Add the current report as a fake history entry
+	report.History = append(report.History, api.ProcessReportHistoryEntry{
+		ProcessReportEntry: api.ProcessReportEntry{
+			CreatedAt: report.CreatedAt,
+			Prelude:   report.Prelude,
+			Log:       report.Log,
+		},
+	})
+
+	entries := []api.ProcessReportHistoryEntry{}
+
+	for _, r := range report.History {
+		if createdAt != nil && exitedAt == nil {
+			if r.CreatedAt == *createdAt {
+				entries = append(entries, r)
+			}
+		} else if createdAt == nil && exitedAt != nil {
+			if r.ExitedAt == *exitedAt {
+				entries = append(entries, r)
+			}
+		} else {
+			if r.CreatedAt >= *createdAt && r.ExitedAt <= *exitedAt {
+				entries = append(entries, r)
+			}
+		}
+	}
+
+	if len(entries) == 0 {
+		return api.Err(http.StatusNotFound, "", "No matching reports found")
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].CreatedAt > entries[j].CreatedAt
+	})
+
+	if entries[0].ExitState == "" {
+		// This is a running process
+		filteredReport.CreatedAt = entries[0].CreatedAt
+		filteredReport.Prelude = entries[0].Prelude
+		filteredReport.Log = entries[0].Log
+
+		filteredReport.History = entries[1:]
+	} else {
+		filteredReport.History = entries
+	}
+
+	return c.JSON(http.StatusOK, filteredReport)
 }
 
 // Add adds a new process to the cluster

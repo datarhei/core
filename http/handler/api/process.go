@@ -493,8 +493,8 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 // @ID process-3-get-report
 // @Produce json
 // @Param id path string true "Process ID"
-// @Param created_at query int64 false "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports."
-// @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports."
+// @Param created_at query int64 false "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range of reports."
+// @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports."
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessReport
 // @Failure 400 {object} api.Error

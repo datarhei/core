@@ -4538,6 +4538,49 @@ paths:
       summary: Issue a command to a process in the cluster
       tags:
       - v16.?.?
+  /api/v3/cluster/process/{id}/config:
+    get:
+      description: Get the configuration of a process. This is the configuration as
+        provided by Add or Update.
+      operationId: cluster-3-get-process-config
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Process domain
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessConfig'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the configuration of a process
+      tags:
+      - v16.?.?
   /api/v3/cluster/process/{id}/metadata/{key}:
     get:
       description: Retrieve the previously stored JSON metadata under the given key.
@@ -4659,6 +4702,104 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Probe a process in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process/{id}/report:
+    get:
+      description: Get the report of a process.
+      operationId: cluster-3-get-process-report
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Select only the report with that created_at date. Unix timestamp,
+          leave empty for any. In combination with exited_at it denotes a range or
+          reports.
+        format: int64
+        in: query
+        name: created_at
+        type: integer
+      - description: Select only the report with that exited_at date. Unix timestamp,
+          leave empty for any. In combination with created_at it denotes a range or
+          reports.
+        format: int64
+        in: query
+        name: exited_at
+        type: integer
+      - description: Process domain
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessState'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the report of a process
+      tags:
+      - v16.?.?
+  /api/v3/cluster/process/{id}/state:
+    get:
+      description: Get the state of a process.
+      operationId: cluster-3-get-process-state
+      parameters:
+      - description: Process ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Process domain
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ProcessState'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the state of a process
       tags:
       - v16.?.?
   /api/v3/cluster/process/probe:
