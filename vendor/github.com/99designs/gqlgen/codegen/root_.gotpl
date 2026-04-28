@@ -6,33 +6,21 @@
 {{ reserveImport "time"  }}
 {{ reserveImport "sync"  }}
 {{ reserveImport "sync/atomic" }}
-{{ reserveImport "errors"  }}
 {{ reserveImport "bytes"  }}
+{{ reserveImport "errors"  }}
 {{ reserveImport "embed"  }}
+{{ reserveImport "math"  }}
 
 {{ reserveImport "github.com/vektah/gqlparser/v2" "gqlparser" }}
 {{ reserveImport "github.com/vektah/gqlparser/v2/ast" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
-{{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
-
-{{ $useFunctionSyntaxForExecutionContext := .Config.UseFunctionSyntaxForExecutionContext }}
 
 // NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.
 func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
-	return &executableSchema{
-		schema: cfg.Schema,
-		resolvers: cfg.Resolvers,
-		directives: cfg.Directives,
-		complexity: cfg.Complexity,
-	}
+	return &executableSchema{SchemaData: cfg.Schema, Resolvers: cfg.Resolvers, Directives: cfg.Directives, ComplexityRoot: cfg.Complexity}
 }
 
-type Config struct {
-	Schema    *ast.Schema
-	Resolvers  ResolverRoot
-	Directives DirectiveRoot
-	Complexity ComplexityRoot
-}
+type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
 {{- range $object := .Objects -}}
@@ -76,22 +64,17 @@ type ComplexityRoot struct {
 	)
 {{ end }}
 
-type executableSchema struct {
-	schema    *ast.Schema
-	resolvers  ResolverRoot
-	directives DirectiveRoot
-	complexity ComplexityRoot
-}
+type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 func (e *executableSchema) Schema() *ast.Schema {
-	if e.schema != nil {
-			return e.schema
+	if e.SchemaData != nil {
+			return e.SchemaData
 	}
 	return parsedSchema
 }
 
 func (e *executableSchema) Complexity(ctx context.Context, typeName, field string, childComplexity int, rawArgs map[string]any) (int, bool) {
-	ec := executionContext{nil, e, 0, 0, nil}
+	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	{{- if not .Config.OmitComplexity }}
 	switch typeName + "." + field {
@@ -103,20 +86,16 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 					{{- $last := eq (add $i 1) $len }}
 					{{- if not $field.IsReserved }}
 						{{- if eq $i 0 }}case {{ end }}"{{$object.Name}}.{{$field.Name}}"{{ if not $last }},{{ else }}:
-						if e.complexity.{{ucFirst $object.Name }}.{{$field.GoFieldName}} == nil {
+						if e.ComplexityRoot.{{ucFirst $object.Name }}.{{$field.GoFieldName}} == nil {
 						break
 						}
 						{{ if $field.Args }}
-							{{ if $useFunctionSyntaxForExecutionContext -}}
-							args, err := {{ $field.ArgsFunc }}(ctx, &ec, rawArgs)
-							{{- else -}}
-							args, err := ec.{{ $field.ArgsFunc }}(ctx,rawArgs)
-							{{- end }}
+							args, err := {{$.ECDot}}{{ $field.ArgsFunc }}(ctx, {{$.ECArg}}rawArgs)
 							if err != nil {
 							return 0, false
 							}
 						{{ end }}
-						return e.complexity.{{ucFirst $object.Name}}.{{$field.GoFieldName}}(childComplexity{{if $field.Args}}, {{$field.ComplexityArgs}} {{ end }}), true
+						return e.ComplexityRoot.{{ucFirst $object.Name}}.{{$field.GoFieldName}}(childComplexity{{if $field.Args}}, {{$field.ComplexityArgs}} {{ end }}), true
 						{{ end }}
 					{{- end }}
 				{{- end }}
@@ -130,15 +109,11 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
-	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
+	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		{{- range $input := .Inputs -}}
 			{{ if not $input.HasUnmarshal }}
-				{{ if $useFunctionSyntaxForExecutionContext -}}
-				unmarshalInput{{ $input.Name }},
-				{{- else -}}
-				ec.unmarshalInput{{ $input.Name }},
-				{{- end }}
+				{{$.ECDot}}unmarshalInput{{ $input.Name }},
 			{{- end }}
 		{{- end }}
 	)
@@ -152,26 +127,17 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			if first {
 				first = false
 				ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
-				{{ if .Directives.LocationDirectives "QUERY" -}}
-					{{ if $useFunctionSyntaxForExecutionContext -}}
-					data = _queryMiddleware(ctx, ec, opCtx.Operation, func(ctx context.Context) (any, error){
-						return _{{.QueryRoot.Name}}(ctx, &ec, opCtx.Operation.SelectionSet), nil
-					{{- else -}}
-					data = ec._queryMiddleware(ctx, opCtx.Operation, func(ctx context.Context) (any, error){
-						return ec._{{.QueryRoot.Name}}(ctx, opCtx.Operation.SelectionSet), nil
-					{{- end }}
+				{{ if .AllDirectives.LocationDirectives "QUERY" -}}
+					data = {{$.ECDot}}_queryMiddleware(ctx, {{$.ECArg}}opCtx.Operation, func(ctx context.Context) (any, error){
+						return {{$.ECDot}}_{{.QueryRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet), nil
 					})
 				{{- else -}}
-					{{ if $useFunctionSyntaxForExecutionContext -}}
-					data = _{{.QueryRoot.Name}}(ctx, &ec, opCtx.Operation.SelectionSet)
-					{{- else -}}
-					data = ec._{{.QueryRoot.Name}}(ctx, opCtx.Operation.SelectionSet)
-					{{- end }}
+					data = {{$.ECDot}}_{{.QueryRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet)
 				{{- end }}
 			} else {
-				if atomic.LoadInt32(&ec.pendingDeferred) > 0 {
-					result := <-ec.deferredResults
-					atomic.AddInt32(&ec.pendingDeferred, -1)
+				if atomic.LoadInt32(&ec.PendingDeferred) > 0 {
+					result := <-ec.DeferredResults
+					atomic.AddInt32(&ec.PendingDeferred, -1)
 					data = result.Result
 					response.Path = result.Path
 					response.Label = result.Label
@@ -183,8 +149,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
 			response.Data = buf.Bytes()
-			if atomic.LoadInt32(&ec.deferred) > 0 {
-				hasNext := atomic.LoadInt32(&ec.pendingDeferred) > 0
+			if atomic.LoadInt32(&ec.Deferred) > 0 {
+				hasNext := atomic.LoadInt32(&ec.PendingDeferred) > 0
 				response.HasNext = &hasNext
 			}
 
@@ -197,21 +163,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			if !first { return nil }
 			first = false
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
-			{{ if .Directives.LocationDirectives "MUTATION" -}}
-				{{ if $useFunctionSyntaxForExecutionContext -}}
-				data := _mutationMiddleware(ctx, &ec, opCtx.Operation, func(ctx context.Context) (any, error){
-					return _{{.MutationRoot.Name}}(ctx, ec, opCtx.Operation.SelectionSet), nil
-				{{- else -}}
-				data := ec._mutationMiddleware(ctx, opCtx.Operation, func(ctx context.Context) (any, error){
-					return ec._{{.MutationRoot.Name}}(ctx, opCtx.Operation.SelectionSet), nil
-				{{- end }}
+			{{ if .AllDirectives.LocationDirectives "MUTATION" -}}
+				data := {{$.ECDot}}_mutationMiddleware(ctx, {{$.ECArg}}opCtx.Operation, func(ctx context.Context) (any, error){
+					return {{$.ECDot}}_{{.MutationRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet), nil
 				})
 			{{- else -}}
-				{{ if $useFunctionSyntaxForExecutionContext -}}
-				data := _{{.MutationRoot.Name}}(ctx, &ec, opCtx.Operation.SelectionSet)
-				{{- else -}}
-				data := ec._{{.MutationRoot.Name}}(ctx, opCtx.Operation.SelectionSet)
-				{{- end }}
+				data := {{$.ECDot}}_{{.MutationRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet)
 			{{- end }}
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
@@ -223,21 +180,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	{{ end }}
 
 	{{- if .SubscriptionRoot }} case ast.Subscription:
-		{{ if .Directives.LocationDirectives "SUBSCRIPTION" -}}
-			{{ if $useFunctionSyntaxForExecutionContext -}}
-			next := _subscriptionMiddleware(ctx, &ec, opCtx.Operation, func(ctx context.Context) (any, error){
-				return _{{.SubscriptionRoot.Name}}(ctx, ec, opCtx.Operation.SelectionSet),nil
-			{{- else -}}
-			next := ec._subscriptionMiddleware(ctx, opCtx.Operation, func(ctx context.Context) (any, error){
-				return ec._{{.SubscriptionRoot.Name}}(ctx, opCtx.Operation.SelectionSet),nil
-			{{- end }}
+		{{ if .AllDirectives.LocationDirectives "SUBSCRIPTION" -}}
+			next := {{$.ECDot}}_subscriptionMiddleware(ctx, {{$.ECArg}}opCtx.Operation, func(ctx context.Context) (any, error){
+				return {{$.ECDot}}_{{.SubscriptionRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet),nil
 			})
 		{{- else -}}
-			{{ if $useFunctionSyntaxForExecutionContext -}}
-			next := _{{.SubscriptionRoot.Name}}(ctx, &ec, opCtx.Operation.SelectionSet)
-			{{- else -}}
-			next := ec._{{.SubscriptionRoot.Name}}(ctx, opCtx.Operation.SelectionSet)
-			{{- end }}
+			next := {{$.ECDot}}_{{.SubscriptionRoot.Name}}(ctx, {{$.ECArg}}opCtx.Operation.SelectionSet)
 		{{- end }}
 
 		var buf bytes.Buffer
@@ -261,44 +209,22 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 }
 
 type executionContext struct {
-	*graphql.OperationContext
-	*executableSchema
-	deferred        int32
-	pendingDeferred int32
-	deferredResults chan graphql.DeferredResult
+	*graphql.ExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot]
 }
 
-func (ec *executionContext) processDeferredGroup(dg graphql.DeferredGroup) {
-	atomic.AddInt32(&ec.pendingDeferred, 1)
-	go func () {
-		ctx := graphql.WithFreshResponseContext(dg.Context)
-		dg.FieldSet.Dispatch(ctx)
-		ds := graphql.DeferredResult{
-			Path:   dg.Path,
-			Label:  dg.Label,
-			Result: dg.FieldSet,
-			Errors: graphql.GetErrors(ctx),
-		}
-		// null fields should bubble up
-		if dg.FieldSet.Invalids > 0 {
-			ds.Result = graphql.Null
-		}
-		ec.deferredResults <- ds
-	}()
-}
-
-func (ec *executionContext) introspectSchema() (*introspection.Schema, error) {
-	if ec.DisableIntrospection {
-		return nil, errors.New("introspection disabled")
+func newExecutionContext(
+	opCtx *graphql.OperationContext,
+	execSchema *executableSchema,
+	deferredResults chan graphql.DeferredResult,
+) *executionContext {
+	return &executionContext{
+		ExecutionContextState: graphql.NewExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot](
+			opCtx,
+			(*graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot])(execSchema),
+			parsedSchema,
+			deferredResults,
+		),
 	}
-	return introspection.WrapSchema(ec.Schema()), nil
-}
-
-func (ec *executionContext) introspectType(name string) (*introspection.Type, error) {
-	if ec.DisableIntrospection {
-		return nil, errors.New("introspection disabled")
-	}
-	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
 
@@ -321,3 +247,21 @@ var sources = []*ast.Source{
 {{- end }}
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
+
+// childFields_* functions provide shared child field context lookups.
+// Each function is generated once per unique object type, deduplicating the
+// switch statements that were previously inlined in every fieldContext_* function.
+{{- range $ct := .UniqueChildFieldTypes }}
+
+func {{$.FuncReceiver}}childFields_{{ $ct.TypeName }}(ctx context.Context, {{$.ECFuncParam}}field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	{{- range $f := $ct.Definition.Fields }}
+	case "{{ $f.Name }}":
+		return {{$.ECDot}}fieldContext_{{ $ct.TypeName }}_{{ $f.Name }}(ctx, {{$.ECArg}}field)
+	{{- end }}
+	}
+	return nil, fmt.Errorf("no field named %q was found under type {{ $ct.TypeName }}", field.Name)
+}
+{{- end }}
+
+{{ template "globalMiddleware" . }}

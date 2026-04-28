@@ -35,7 +35,7 @@ type fakeLiveReceive struct {
 	}
 
 	sendACK func(seq circular.Number, light bool)
-	sendNAK func(from, to circular.Number)
+	sendNAK func(list []circular.Number)
 	deliver func(p packet.Packet)
 
 	lock sync.RWMutex
@@ -62,7 +62,7 @@ func NewFakeLiveReceive(config ReceiveConfig) congestion.Receiver {
 	}
 
 	if r.sendNAK == nil {
-		r.sendNAK = func(from, to circular.Number) {}
+		r.sendNAK = func(list []circular.Number) {}
 	}
 
 	if r.deliver == nil {

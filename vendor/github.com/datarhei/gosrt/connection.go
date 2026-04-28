@@ -191,7 +191,7 @@ type srtConn struct {
 	readBuffer bytes.Buffer
 
 	onSend     func(p packet.Packet)
-	onShutdown func(socketId uint32)
+	onShutdown func(*srtConn)
 
 	tick time.Duration
 
@@ -234,7 +234,7 @@ type srtConnConfig struct {
 	crypto                      crypto.Crypto
 	keyBaseEncryption           packet.PacketEncryption
 	onSend                      func(p packet.Packet)
-	onShutdown                  func(socketId uint32)
+	onShutdown                  func(*srtConn)
 	logger                      Logger
 }
 
@@ -264,7 +264,7 @@ func newSRTConn(config srtConnConfig) *srtConn {
 	}
 
 	if c.onShutdown == nil {
-		c.onShutdown = func(socketId uint32) {}
+		c.onShutdown = func(*srtConn) {}
 	}
 
 	c.nextACKNumber = circular.New(1, packet.MAX_TIMESTAMP)
@@ -1201,7 +1201,7 @@ func (c *srtConn) sendShutdown() {
 }
 
 // sendNAK sends a NAK to the peer with the given range of sequence numbers.
-func (c *srtConn) sendNAK(from, to circular.Number) {
+func (c *srtConn) sendNAK(list []circular.Number) {
 	p := packet.NewPacket(c.remoteAddr)
 
 	p.Header().IsControlPacket = true
@@ -1211,8 +1211,7 @@ func (c *srtConn) sendNAK(from, to circular.Number) {
 
 	cif := packet.CIFNAK{}
 
-	cif.LostPacketSequenceNumber = append(cif.LostPacketSequenceNumber, from)
-	cif.LostPacketSequenceNumber = append(cif.LostPacketSequenceNumber, to)
+	cif.LostPacketSequenceNumber = append(cif.LostPacketSequenceNumber, list...)
 
 	p.MarshalCIF(&cif)
 
@@ -1416,7 +1415,7 @@ func (c *srtConn) close() {
 		c.log("connection:close", func() string { return "shutdown" })
 
 		go func() {
-			c.onShutdown(c.socketId)
+			c.onShutdown(c)
 		}()
 	})
 }

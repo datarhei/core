@@ -6,15 +6,42 @@ package middleware
 import (
 	"crypto/subtle"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
+// CSRFUsingSecFetchSite is a context key for CSRF middleware what is set when the client browser is using Sec-Fetch-Site
+// header and the request is deemed safe.
+// It is a dummy token value that can be used to render CSRF token for form by handlers.
+//
+// We know that the client is using a browser that supports Sec-Fetch-Site header, so when the form is submitted in
+// the future with this dummy token value it is OK. Although the request is safe, the template rendered by the
+// handler may need this value to render CSRF token for form.
+const CSRFUsingSecFetchSite = "_echo_csrf_using_sec_fetch_site_"
+
 // CSRFConfig defines the config for CSRF middleware.
 type CSRFConfig struct {
 	// Skipper defines a function to skip middleware.
 	Skipper Skipper
+
+	// TrustedOrigin permits any request with `Sec-Fetch-Site` header whose `Origin` header
+	// exactly matches the specified value.
+	// Values should be formated as Origin header "scheme://host[:port]".
+	//
+	// See [Origin]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin
+	// See [Sec-Fetch-Site]: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#fetch-metadata-headers
+	TrustedOrigins []string
+
+	// AllowSecFetchSameSite allows custom behaviour for `Sec-Fetch-Site` requests that are about to
+	// fail with CRSF error, to be allowed or replaced with custom error.
+	// This function applies to `Sec-Fetch-Site` values:
+	// - `same-site` 		same registrable domain (subdomain and/or different port)
+	// - `cross-site`		request originates from different site
+	// See [Sec-Fetch-Site]: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#fetch-metadata-headers
+	AllowSecFetchSiteFunc func(c echo.Context) (bool, error)
 
 	// TokenLength is the length of the generated token.
 	TokenLength uint8 `yaml:"token_length"`
@@ -65,6 +92,8 @@ type CSRFConfig struct {
 
 	// ErrorHandler defines a function which is executed for returning custom errors.
 	ErrorHandler CSRFErrorHandler
+
+	generator func(length uint8) string
 }
 
 // CSRFErrorHandler is a function which is executed for creating custom errors.
@@ -94,7 +123,11 @@ func CSRF() echo.MiddlewareFunc {
 // CSRFWithConfig returns a CSRF middleware with config.
 // See `CSRF()`.
 func CSRFWithConfig(config CSRFConfig) echo.MiddlewareFunc {
-	// Defaults
+	return toMiddlewareOrPanic(config)
+}
+
+// ToMiddleware converts CSRFConfig to middleware or returns an error for invalid configuration
+func (config CSRFConfig) ToMiddleware() (echo.MiddlewareFunc, error) {
 	if config.Skipper == nil {
 		config.Skipper = DefaultCSRFConfig.Skipper
 	}
@@ -117,10 +150,20 @@ func CSRFWithConfig(config CSRFConfig) echo.MiddlewareFunc {
 	if config.CookieSameSite == http.SameSiteNoneMode {
 		config.CookieSecure = true
 	}
+	if len(config.TrustedOrigins) > 0 {
+		if vErr := validateOrigins(config.TrustedOrigins, "trusted origin"); vErr != nil {
+			return nil, vErr
+		}
+		config.TrustedOrigins = append([]string(nil), config.TrustedOrigins...)
+	}
+	tokenGenerator := randomString
+	if config.generator != nil {
+		tokenGenerator = config.generator
+	}
 
 	extractors, cErr := CreateExtractors(config.TokenLookup)
 	if cErr != nil {
-		panic(cErr)
+		return nil, cErr
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -129,9 +172,20 @@ func CSRFWithConfig(config CSRFConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
+			// use the `Sec-Fetch-Site` header as part of a modern approach to CSRF protection
+			allow, err := config.checkSecFetchSiteRequest(c)
+			if err != nil {
+				return err
+			}
+			if allow {
+				return next(c)
+			}
+
+			// Fallback to legacy token based CSRF protection
+
 			token := ""
 			if k, err := c.Cookie(config.CookieName); err != nil {
-				token = randomString(config.TokenLength)
+				token = tokenGenerator(config.TokenLength)
 			} else {
 				token = k.Value // Reuse token
 			}
@@ -210,9 +264,60 @@ func CSRFWithConfig(config CSRFConfig) echo.MiddlewareFunc {
 
 			return next(c)
 		}
-	}
+	}, nil
 }
 
 func validateCSRFToken(token, clientToken string) bool {
 	return subtle.ConstantTimeCompare([]byte(token), []byte(clientToken)) == 1
+}
+
+var safeMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace}
+
+func (config CSRFConfig) checkSecFetchSiteRequest(c echo.Context) (bool, error) {
+	// https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#fetch-metadata-headers
+	// Sec-Fetch-Site values are:
+	// - `same-origin` 	exact origin match - allow always
+	// - `same-site` 		same registrable domain (subdomain and/or different port) - block, unless explicitly trusted
+	// - `cross-site`		request originates from different site - block, unless explicitly trusted
+	// - `none`					direct navigation (URL bar, bookmark) - allow always
+	secFetchSite := c.Request().Header.Get(echo.HeaderSecFetchSite)
+	if secFetchSite == "" {
+		return false, nil
+	}
+
+	if len(config.TrustedOrigins) > 0 {
+		// trusted sites ala OAuth callbacks etc. should be let through
+		origin := c.Request().Header.Get(echo.HeaderOrigin)
+		if origin != "" {
+			for _, trustedOrigin := range config.TrustedOrigins {
+				if strings.EqualFold(origin, trustedOrigin) {
+					return true, nil
+				}
+			}
+		}
+	}
+	isSafe := slices.Contains(safeMethods, c.Request().Method)
+	if !isSafe { // for state-changing request check SecFetchSite value
+		isSafe = secFetchSite == "same-origin" || secFetchSite == "none"
+	}
+
+	if isSafe {
+		// This helps handlers that support older token-based CSRF protection.
+		// We know that the client is using a browser that supports Sec-Fetch-Site header, so when the form is submitted in
+		// the future with this dummy token value it is OK. Although the request is safe, the template rendered by the
+		// handler may need this value to render CSRF token for form.
+		c.Set(config.ContextKey, CSRFUsingSecFetchSite)
+		return true, nil
+	}
+	// we are here when request is state-changing and `cross-site` or `same-site`
+
+	// Note: if you want to block `same-site` use config.TrustedOrigins or `config.AllowSecFetchSiteFunc`
+	if config.AllowSecFetchSiteFunc != nil {
+		return config.AllowSecFetchSiteFunc(c)
+	}
+
+	if secFetchSite == "same-site" {
+		return false, nil // fall back to legacy token
+	}
+	return false, echo.NewHTTPError(http.StatusForbidden, "cross-site request blocked by CSRF")
 }

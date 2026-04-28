@@ -125,11 +125,16 @@ directive @goField(
 	name: String
 	omittable: Boolean
 	type: String
+  autoBindGetterHaser: Boolean
+  forceGenerate: Boolean
+	batch: Boolean
 ) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
 
 type User @goModel(model: "github.com/you/pkg/model.User") {
 	id: ID! @goField(name: "todoId")
 	friends: [User!]! @goField(forceResolver: true)
+	# When omit_resolver_fields is enabled, this field will still be generated in the struct
+	data: String! @goField(forceResolver: true, forceGenerate: true)
 }
 ```
 

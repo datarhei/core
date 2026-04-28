@@ -161,7 +161,8 @@ func (b *Binder) FindObject(pkgName, typeName string) (types.Object, error) {
 }
 
 func indexDefs(pkg *packages.Package) map[string]types.Object {
-	res := make(map[string]types.Object)
+	// Pre-allocate with capacity to avoid map rehashing
+	res := make(map[string]types.Object, len(pkg.TypesInfo.Defs))
 
 	scope := pkg.Types.Scope()
 	for astNode, def := range pkg.TypesInfo.Defs {
@@ -333,6 +334,24 @@ func (ref *TypeReference) UnmarshalFuncFunctionSyntax() string {
 	return ref.UnmarshalFunc() + "F"
 }
 
+// EnumMarshalVar returns the generated enum marshal variable name for the
+// given generation mode.
+func (ref *TypeReference) EnumMarshalVar(functionSyntax bool) string {
+	if functionSyntax {
+		return ref.MarshalFuncFunctionSyntax()
+	}
+	return ref.MarshalFunc()
+}
+
+// EnumUnmarshalVar returns the generated enum unmarshal variable name for the
+// given generation mode.
+func (ref *TypeReference) EnumUnmarshalVar(functionSyntax bool) string {
+	if functionSyntax {
+		return ref.UnmarshalFuncFunctionSyntax()
+	}
+	return ref.UnmarshalFunc()
+}
+
 func (ref *TypeReference) IsTargetNilable() bool {
 	return IsNilable(ref.Target)
 }
@@ -421,7 +440,7 @@ func (b *Binder) TypeReference(
 			return &TypeReference{
 				Definition: def,
 				GQL:        schemaType,
-				GO:         MapType,
+				GO:         b.CopyModifiersFromAst(schemaType, MapType),
 				IsRoot:     b.cfg.IsRoot(def),
 			}, nil
 		}
@@ -433,7 +452,7 @@ func (b *Binder) TypeReference(
 			return &TypeReference{
 				Definition: def,
 				GQL:        schemaType,
-				GO:         InterfaceType,
+				GO:         b.CopyModifiersFromAst(schemaType, InterfaceType),
 				IsRoot:     b.cfg.IsRoot(def),
 			}, nil
 		}
@@ -461,7 +480,9 @@ func (b *Binder) TypeReference(
 			}
 		} else if fun, isFunc := obj.(*types.Func); isFunc {
 			ref.GO = code.Unalias(t.(*types.Signature).Params().At(0).Type())
-			ref.IsContext = code.Unalias(t.(*types.Signature).Results().At(0).Type()).String() == "github.com/99designs/gqlgen/graphql.ContextMarshaler"
+			ref.IsContext = code.Unalias(t.(*types.Signature).Results().At(0).Type()).
+				String() ==
+				"github.com/99designs/gqlgen/graphql.ContextMarshaler"
 			ref.Marshaler = fun
 			ref.Unmarshaler = types.NewFunc(0, fun.Pkg(), "Unmarshal"+typeName, nil)
 		} else if hasMethod(t, "MarshalGQLContext") && hasMethod(t, "UnmarshalGQLContext") {
@@ -579,8 +600,8 @@ func hasMethod(it types.Type, name string) bool {
 		return false
 	}
 
-	for i := 0; i < namedType.NumMethods(); i++ {
-		if namedType.Method(i).Name() == name {
+	for method := range namedType.Methods() {
+		if method.Name() == name {
 			return true
 		}
 	}
@@ -684,8 +705,11 @@ func (b *Binder) enumReference(
 				Object:     valueObj,
 			})
 		default:
-			return fmt.Errorf("unsupported enum value for: %v, of enum: %v, only const and var allowed",
-				value.Name, ref.Definition.Name)
+			return fmt.Errorf(
+				"unsupported enum value for: %v, of enum: %v, only const and var allowed",
+				value.Name,
+				ref.Definition.Name,
+			)
 		}
 	}
 

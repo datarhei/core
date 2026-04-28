@@ -15,7 +15,7 @@ It has the following **unique** features:
 -   Slice, Array and Map diving, which allows any or all levels of a multidimensional field to be validated.
 -   Ability to dive into both map keys and values for validation
 -   Handles type interface by determining it's underlying type prior to validation.
--   Handles custom field types such as sql driver Valuer see [Valuer](https://golang.org/src/database/sql/driver/types.go?s=1210:1293#L29)
+-   Handles custom field types such as sql driver [Valuer](https://golang.org/src/database/sql/driver/types.go?s=1210:1293#L29) and the [Valuer interface](https://github.com/go-playground/validator/blob/master/_examples/valuer/main.go)
 -   Alias validation tags, which allows for mapping of several validations to a single tag for easier defining of validations on structs
 -   Extraction of custom defined Field Name e.g. can specify to extract the JSON name while validating and have it available in the resulting FieldError
 -   Customizable i18n aware error messages.
@@ -24,7 +24,7 @@ It has the following **unique** features:
 A Call for Maintainers
 ----------------------
 
-Please read the discussiong started [here](https://github.com/go-playground/validator/discussions/1330) if you are interested in contributing/helping maintain this package.
+Please read the discussion started [here](https://github.com/go-playground/validator/discussions/1330) if you are interested in contributing/helping maintain this package.
 
 Installation
 ------------
@@ -123,6 +123,7 @@ validate := validator.New(validator.WithRequiredStructEnabled())
 | udp6_addr | User Datagram Protocol Address UDPv6 |
 | udp_addr | User Datagram Protocol Address UDP |
 | unix_addr | Unix domain socket end point Address |
+| uds_exists | Unix domain socket exists (checks filesystem sockets and Linux abstract sockets) |
 | uri | URI String |
 | url | URL String |
 | http_url | HTTP(s) URL String |
@@ -137,6 +138,7 @@ validate := validator.New(validator.WithRequiredStructEnabled())
 | alpha | Alpha Only |
 | alphaspace | Alpha Space |
 | alphanum | Alphanumeric |
+| alphanumspace | Alphanumeric Space |
 | alphanumunicode | Alphanumeric Unicode |
 | alphaunicode | Alpha Unicode |
 | ascii | ASCII |
@@ -164,7 +166,8 @@ validate := validator.New(validator.WithRequiredStructEnabled())
 | base64 | Base64 String |
 | base64url | Base64URL String |
 | base64rawurl | Base64RawURL String |
-| bic | Business Identifier Code (ISO 9362) |
+| bic_iso_9362_2014 | Business Identifier Code (ISO 9362:2014) |
+| bic | Business Identifier Code (ISO 9362:2022) |
 | bcp47_language_tag | Language tag (BCP 47) |
 | btc_addr | Bitcoin Address |
 | btc_addr_bech32 | Bitcoin Bech32 Address (segwit) |
@@ -175,13 +178,14 @@ validate := validator.New(validator.WithRequiredStructEnabled())
 | spicedb | SpiceDb ObjectID/Permission/Type |
 | datetime | Datetime |
 | e164 | e164 formatted phone number |
-| ein | U.S. Employeer Identification Number |
+| ein | U.S. Employer Identification Number |
 | email | E-mail String
 | eth_addr | Ethereum Address |
 | hexadecimal | Hexadecimal String |
 | hexcolor | Hexcolor String |
 | hsl | HSL String |
 | hsla | HSLA String |
+| cmyk | CMYK String |
 | html | HTML Tags |
 | html_encoded | HTML Encoded |
 | isbn | International Standard Book Number |
@@ -271,7 +275,7 @@ validate := validator.New(validator.WithRequiredStructEnabled())
 #### Aliases:
 | Tag | Description |
 | - | - |
-| iscolor | hexcolor\|rgb\|rgba\|hsl\|hsla |
+| iscolor | hexcolor\|rgb\|rgba\|hsl\|hsla\|cmyk |
 | country_code | iso3166_1_alpha2\|iso3166_1_alpha3\|iso3166_1_alpha_numeric |
 
 Benchmarks

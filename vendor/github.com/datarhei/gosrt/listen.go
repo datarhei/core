@@ -121,10 +121,10 @@ type listener struct {
 
 	config Config
 
-	backlog  chan packet.Packet
-	connReqs map[uint32]*connRequest
-	conns    map[uint32]*srtConn
-	lock     sync.RWMutex
+	backlog     chan packet.Packet
+	conns       map[uint32]*srtConn
+	connsByPeer map[uint32]*srtConn
+	lock        sync.RWMutex
 
 	start time.Time
 
@@ -190,8 +190,8 @@ func Listen(network, address string, config Config) (Listener, error) {
 		return nil, fmt.Errorf("listen: no local address")
 	}
 
-	ln.connReqs = make(map[uint32]*connRequest)
 	ln.conns = make(map[uint32]*srtConn)
+	ln.connsByPeer = make(map[uint32]*srtConn)
 
 	ln.backlog = make(chan packet.Packet, 128)
 
@@ -326,9 +326,10 @@ func (ln *listener) error() error {
 	return ln.doneErr
 }
 
-func (ln *listener) handleShutdown(socketId uint32) {
+func (ln *listener) handleShutdown(c *srtConn) {
 	ln.lock.Lock()
-	delete(ln.conns, socketId)
+	delete(ln.conns, c.socketId)
+	delete(ln.connsByPeer, c.peerSocketId)
 	ln.lock.Unlock()
 }
 
@@ -347,6 +348,9 @@ func (ln *listener) Close() {
 
 		ln.lock.RLock()
 		for _, conn := range ln.conns {
+			if conn == nil {
+				continue
+			}
 			conn.close()
 		}
 		ln.lock.RUnlock()
@@ -402,7 +406,7 @@ func (ln *listener) reader(ctx context.Context) {
 			conn, ok := ln.conns[p.Header().DestinationSocketId]
 			ln.lock.RUnlock()
 
-			if !ok {
+			if !ok || conn == nil {
 				// ignore the packet, we don't know the destination
 				break
 			}

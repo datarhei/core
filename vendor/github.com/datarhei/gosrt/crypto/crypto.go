@@ -4,6 +4,7 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/pbkdf2"
 	"crypto/sha1"
 	"encoding/binary"
 	"errors"
@@ -13,7 +14,6 @@ import (
 	"github.com/datarhei/gosrt/rand"
 
 	"github.com/benburkert/openpgp/aes/keywrap"
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // Crypto implements the SRT data encryption and decryption.
@@ -89,9 +89,10 @@ func (c *crypto) GenerateSEK(key packet.PacketEncryption) error {
 		return err
 	}
 
-	if key == packet.EvenKeyEncrypted {
+	switch key {
+	case packet.EvenKeyEncrypted:
 		c.evenSEK = sek
-	} else if key == packet.OddKeyEncrypted {
+	case packet.OddKeyEncrypted:
 		c.oddSEK = sek
 	}
 
@@ -135,7 +136,10 @@ func (c *crypto) UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase stri
 		copy(c.salt, km.Salt)
 	}
 
-	kek := c.calculateKEK(passphrase, c.salt, c.keyLength)
+	kek, err := c.calculateKEK(passphrase, c.salt, c.keyLength)
+	if err != nil {
+		return err
+	}
 
 	unwrap, err := keywrap.Unwrap(kek, km.Wrap)
 	if err != nil {
@@ -146,11 +150,12 @@ func (c *crypto) UnmarshalKM(km *packet.CIFKeyMaterialExtension, passphrase stri
 		return ErrInvalidWrap
 	}
 
-	if km.KeyBasedEncryption == packet.EvenKeyEncrypted {
+	switch km.KeyBasedEncryption {
+	case packet.EvenKeyEncrypted:
 		copy(c.evenSEK, unwrap)
-	} else if km.KeyBasedEncryption == packet.OddKeyEncrypted {
+	case packet.OddKeyEncrypted:
 		copy(c.oddSEK, unwrap)
-	} else {
+	default:
 		copy(c.evenSEK, unwrap[:c.keyLength])
 		copy(c.oddSEK, unwrap[c.keyLength:])
 	}
@@ -187,16 +192,20 @@ func (c *crypto) MarshalKM(km *packet.CIFKeyMaterialExtension, passphrase string
 
 	w := make([]byte, n*c.keyLength)
 
-	if key == packet.EvenKeyEncrypted {
+	switch key {
+	case packet.EvenKeyEncrypted:
 		copy(w, c.evenSEK)
-	} else if key == packet.OddKeyEncrypted {
+	case packet.OddKeyEncrypted:
 		copy(w, c.oddSEK)
-	} else {
+	default:
 		copy(w[:c.keyLength], c.evenSEK)
 		copy(w[c.keyLength:], c.oddSEK)
 	}
 
-	kek := c.calculateKEK(passphrase, c.salt, c.keyLength)
+	kek, err := c.calculateKEK(passphrase, c.salt, c.keyLength)
+	if err != nil {
+		return err
+	}
 
 	wrap, err := keywrap.Wrap(kek, w)
 	if err != nil {
@@ -242,11 +251,12 @@ func (c *crypto) EncryptOrDecryptPayload(data []byte, key packet.PacketEncryptio
 	}
 
 	var sek []byte
-	if key == packet.EvenKeyEncrypted {
+	switch key {
+	case packet.EvenKeyEncrypted:
 		sek = c.evenSEK
-	} else if key == packet.OddKeyEncrypted {
+	case packet.OddKeyEncrypted:
 		sek = c.oddSEK
-	} else {
+	default:
 		return fmt.Errorf("crypto: invalid SEK selected. Must be either even or odd")
 	}
 
@@ -264,9 +274,9 @@ func (c *crypto) EncryptOrDecryptPayload(data []byte, key packet.PacketEncryptio
 }
 
 // calculateKEK calculates a KEK based on the passphrase.
-func (c *crypto) calculateKEK(passphrase string, salt []byte, keyLength int) []byte {
+func (c *crypto) calculateKEK(passphrase string, salt []byte, keyLength int) ([]byte, error) {
 	// 6.1.4.  Key Encrypting Key (KEK)
-	return pbkdf2.Key([]byte(passphrase), salt[8:], 2048, keyLength, sha1.New)
+	return pbkdf2.Key(sha1.New, passphrase, salt[8:], 2048, keyLength)
 }
 
 // prng generates a random sequence of byte into the given slice p.

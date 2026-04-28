@@ -81,7 +81,7 @@ func (t *Type) Fields(includeDeprecated bool) []Field {
 				Name:         arg.Name,
 				description:  arg.Description,
 				DefaultValue: defaultValue(arg.DefaultValue),
-				deprecation:  f.Directives.ForName("deprecated"),
+				deprecation:  arg.Directives.ForName("deprecated"),
 			})
 		}
 
@@ -123,7 +123,7 @@ func defaultValue(value *ast.Value) *string {
 }
 
 func (t *Type) Interfaces() []Type {
-	if t.def == nil || t.def.Kind != ast.Object {
+	if t.def == nil || (t.def.Kind != ast.Object && t.def.Kind != ast.Interface) {
 		return []Type{}
 	}
 

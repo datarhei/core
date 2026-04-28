@@ -26,6 +26,12 @@ type ConnRequest interface {
 	// to decide what to do with the connection.
 	StreamId() string
 
+	// SocketId return the socketid of the connection.
+	SocketId() uint32
+
+	// PeerSocketId returns the socketid of the peer of the connection.
+	PeerSocketId() uint32
+
 	// IsEncrypted returns whether the connection is encrypted. If it is
 	// encrypted, use SetPassphrase to set the passphrase for decrypting.
 	IsEncrypted() bool
@@ -54,6 +60,7 @@ type connRequest struct {
 	addr            net.Addr
 	start           time.Time
 	socketId        uint32
+	peerSocketId    uint32
 	timestamp       uint32
 	config          Config
 	handshake       *packet.CIFHandshake
@@ -231,13 +238,13 @@ func newConnRequest(ln *listener, p packet.Packet) *connRequest {
 		}
 
 		req := &connRequest{
-			ln:        ln,
-			addr:      p.Header().Addr,
-			start:     time.Now(),
-			socketId:  cif.SRTSocketId,
-			timestamp: p.Header().Timestamp,
-			config:    config,
-			handshake: cif,
+			ln:           ln,
+			addr:         p.Header().Addr,
+			start:        time.Now(),
+			peerSocketId: cif.SRTSocketId,
+			timestamp:    p.Header().Timestamp,
+			config:       config,
+			handshake:    cif,
 		}
 
 		if cif.SRTKM != nil {
@@ -257,14 +264,28 @@ func newConnRequest(ln *listener, p packet.Packet) *connRequest {
 		}
 
 		ln.lock.Lock()
-		_, exists := ln.connReqs[cif.SRTSocketId]
-		if !exists {
-			ln.connReqs[cif.SRTSocketId] = req
+
+		// We received a duplicate request: reject silently
+		_, exists := ln.connsByPeer[cif.SRTSocketId]
+		if exists {
+			ln.lock.Unlock()
+			return nil
 		}
+
+		// Already fill connsByPeer for this connection
+		ln.connsByPeer[cif.SRTSocketId] = nil
+
+		// Already reserve a socketId for this connection
+		socketId, err := req.generateSocketId()
+		if err == nil {
+			ln.conns[socketId] = nil
+			req.socketId = socketId
+		}
+
 		ln.lock.Unlock()
 
-		// we received a duplicate request: reject silently
-		if exists {
+		// We couldn't create a socketId: reject silently
+		if err != nil {
 			return nil
 		}
 
@@ -291,6 +312,14 @@ func (req *connRequest) Version() uint32 {
 
 func (req *connRequest) StreamId() string {
 	return req.handshake.StreamId
+}
+
+func (req *connRequest) SocketId() uint32 {
+	return req.socketId
+}
+
+func (req *connRequest) PeerSocketId() uint32 {
+	return req.peerSocketId
 }
 
 func (req *connRequest) IsEncrypted() bool {
@@ -321,7 +350,7 @@ func (req *connRequest) Reject(reason RejectionReason) {
 	req.ln.lock.Lock()
 	defer req.ln.lock.Unlock()
 
-	if _, hasReq := req.ln.connReqs[req.socketId]; !hasReq {
+	if cr, hasReq := req.ln.connsByPeer[req.peerSocketId]; !hasReq || cr != nil {
 		return
 	}
 
@@ -331,14 +360,15 @@ func (req *connRequest) Reject(reason RejectionReason) {
 	p.Header().SubType = 0
 	p.Header().TypeSpecific = 0
 	p.Header().Timestamp = uint32(time.Since(req.ln.start).Microseconds())
-	p.Header().DestinationSocketId = req.socketId
+	p.Header().DestinationSocketId = req.peerSocketId
 	req.handshake.HandshakeType = packet.HandshakeType(reason)
 	p.MarshalCIF(req.handshake)
 	req.ln.log("handshake:send:dump", func() string { return p.Dump() })
 	req.ln.log("handshake:send:cif", func() string { return req.handshake.String() })
 	req.ln.send(p)
 
-	delete(req.ln.connReqs, req.socketId)
+	delete(req.ln.conns, req.socketId)
+	delete(req.ln.connsByPeer, req.peerSocketId)
 }
 
 // generateSocketId generates an SRT SocketID that can be used for this connection
@@ -367,14 +397,8 @@ func (req *connRequest) Accept() (Conn, error) {
 	req.ln.lock.Lock()
 	defer req.ln.lock.Unlock()
 
-	if _, hasReq := req.ln.connReqs[req.socketId]; !hasReq {
+	if cr, hasReq := req.ln.connsByPeer[req.peerSocketId]; !hasReq || cr != nil {
 		return nil, fmt.Errorf("connection already accepted")
-	}
-
-	// Create a new socket ID
-	socketId, err := req.generateSocketId()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate socket id: %w", err)
 	}
 
 	// Select the largest TSBPD delay advertised by the caller, but at least 120ms
@@ -402,8 +426,8 @@ func (req *connRequest) Accept() (Conn, error) {
 		remoteAddr:                  req.addr,
 		config:                      req.config,
 		start:                       req.start,
-		socketId:                    socketId,
-		peerSocketId:                req.handshake.SRTSocketId,
+		socketId:                    req.socketId,
+		peerSocketId:                req.peerSocketId,
 		tsbpdTimeBase:               uint64(req.timestamp),
 		tsbpdDelay:                  uint64(recvTsbpdDelay) * 1000,
 		peerTsbpdDelay:              uint64(sendTsbpdDelay) * 1000,
@@ -417,7 +441,7 @@ func (req *connRequest) Accept() (Conn, error) {
 
 	req.ln.log("connection:new", func() string { return fmt.Sprintf("%#08x (%s)", conn.SocketId(), conn.StreamId()) })
 
-	req.handshake.SRTSocketId = socketId
+	req.handshake.SRTSocketId = req.socketId
 	req.handshake.SynCookie = 0
 
 	if req.handshake.Version == 5 {
@@ -441,14 +465,14 @@ func (req *connRequest) Accept() (Conn, error) {
 	p.Header().SubType = 0
 	p.Header().TypeSpecific = 0
 	p.Header().Timestamp = uint32(time.Since(req.start).Microseconds())
-	p.Header().DestinationSocketId = req.socketId
+	p.Header().DestinationSocketId = req.peerSocketId
 	p.MarshalCIF(req.handshake)
 	req.ln.log("handshake:send:dump", func() string { return p.Dump() })
 	req.ln.log("handshake:send:cif", func() string { return req.handshake.String() })
 	req.ln.send(p)
 
-	req.ln.conns[socketId] = conn
-	delete(req.ln.connReqs, req.socketId)
+	req.ln.conns[req.socketId] = conn
+	req.ln.connsByPeer[req.peerSocketId] = conn
 
 	return conn, nil
 }

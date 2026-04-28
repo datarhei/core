@@ -107,7 +107,7 @@ func (o *Object) Implementors() string {
 
 func (o *Object) HasResolvers() bool {
 	for _, f := range o.Fields {
-		if f.IsResolver {
+		if f.IsResolver || f.IsBatch() {
 			return true
 		}
 	}
@@ -118,8 +118,8 @@ func (o *Object) HasUnmarshal() bool {
 	if o.IsMap() {
 		return false
 	}
-	for i := 0; i < o.Type.(*types.Named).NumMethods(); i++ {
-		if o.Type.(*types.Named).Method(i).Name() == "UnmarshalGQL" {
+	for method := range o.Type.(*types.Named).Methods() {
+		if method.Name() == "UnmarshalGQL" {
 			return true
 		}
 	}
@@ -139,6 +139,23 @@ func (o *Object) HasDirectives() bool {
 	return false
 }
 
+// InputObjectDirectives returns directives that should be executed at the INPUT_OBJECT level.
+// This is used for input types to execute @directives placed on the input object itself,
+// after all fields have been unmarshaled.
+// See: https://github.com/99designs/gqlgen/issues/2281
+func (o *Object) InputObjectDirectives() []*Directive {
+	if o.Kind != ast.InputObject {
+		return nil
+	}
+	var d []*Directive
+	for _, dir := range o.Directives {
+		if !dir.SkipRuntime && dir.IsLocation(ast.LocationInputObject) {
+			d = append(d, dir)
+		}
+	}
+	return d
+}
+
 func (o *Object) IsConcurrent() bool {
 	for _, f := range o.Fields {
 		if f.IsConcurrent() {
@@ -146,6 +163,16 @@ func (o *Object) IsConcurrent() bool {
 		}
 	}
 	return false
+}
+
+// InvalidsIncrement returns the Go statement that increments the invalids
+// counter for this object's field set. Concurrent objects require atomic
+// access; sequential objects use a plain increment.
+func (o *Object) InvalidsIncrement(fieldSetVar string) string {
+	if o.IsConcurrent() {
+		return fmt.Sprintf("atomic.AddUint32(&%s.Invalids, 1)", fieldSetVar)
+	}
+	return fieldSetVar + ".Invalids++"
 }
 
 func (o *Object) IsReserved() bool {

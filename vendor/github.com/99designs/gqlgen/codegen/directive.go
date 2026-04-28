@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -28,10 +29,8 @@ type Directive struct {
 // IsLocation check location directive
 func (d *Directive) IsLocation(location ...ast.DirectiveLocation) bool {
 	for _, l := range d.Locations {
-		for _, a := range location {
-			if l == a {
-				return true
-			}
+		if slices.Contains(location, l) {
+			return true
 		}
 	}
 
@@ -187,12 +186,11 @@ func (d *Directive) Declaration() string {
 
 	var resSb173 strings.Builder
 	for _, arg := range d.Args {
-		resSb173.WriteString(
-			fmt.Sprintf(
-				", %s %s",
-				templates.ToGoPrivate(arg.Name),
-				templates.CurrentImports.LookupType(arg.TypeReference.GO),
-			),
+		fmt.Fprintf(
+			&resSb173,
+			", %s %s",
+			templates.ToGoPrivate(arg.Name),
+			templates.CurrentImports.LookupType(arg.TypeReference.GO),
 		)
 	}
 	res += resSb173.String()
@@ -210,7 +208,7 @@ func (d *Directive) CallPath() string {
 		return "builtInDirective" + d.CallName()
 	}
 
-	return "ec.directives." + d.CallName()
+	return "ec.Directives." + d.CallName()
 }
 
 func (d *Directive) FunctionImpl() string {

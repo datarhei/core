@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"go/types"
 	"sort"
 	"strings"
 
@@ -356,6 +357,21 @@ func (f *Federation) GenerateCode(data *codegen.Data) error {
 		}
 	}
 
+	// fill in return types for all entity resolvers
+	// Entity resolvers always return pointers in Federation
+	for _, entity := range f.Entities {
+		for _, resolver := range entity.Resolvers {
+			// Ensure the return type is a pointer
+			if ptr, ok := entity.Type.(*types.Pointer); ok {
+				// Already a pointer
+				resolver.ReturnType = ptr
+			} else {
+				// Make it a pointer
+				resolver.ReturnType = types.NewPointer(entity.Type)
+			}
+		}
+	}
+
 	if f.PackageOptions.ExplicitRequires && len(requiresEntities) > 0 {
 		err := f.generateExplicitRequires(
 			data,
@@ -369,6 +385,28 @@ func (f *Federation) GenerateCode(data *codegen.Data) error {
 
 	f.RequiresEntities = requiresEntities
 
+	// Populate ImplDirectives on each entity by extracting the resolved
+	// OBJECT-level directives from the corresponding codegen.Object.
+	// These are the user-defined directives (e.g. @guard, @auth) that
+	// should wrap entity resolver calls — federation-internal directives
+	// are excluded.
+	for _, e := range f.Entities {
+		obj := data.Objects.ByName(e.Def.Name)
+		if obj == nil || len(obj.Fields) == 0 {
+			continue
+		}
+		// OBJECT-level directives are propagated to every field during
+		// codegen.  Pick them from the first field's directive list.
+		for _, d := range obj.Fields[0].Directives {
+			if d.SkipRuntime {
+				continue
+			}
+			if d.IsLocation(ast.LocationObject) && !federationDirectiveNames[d.Name] {
+				e.ImplDirectives = append(e.ImplDirectives, d)
+			}
+		}
+	}
+
 	return templates.Render(templates.Options{
 		PackageName: data.Config.Federation.Package,
 		Filename:    data.Config.Federation.Filename,
@@ -380,6 +418,7 @@ func (f *Federation) GenerateCode(data *codegen.Data) error {
 		GeneratedHeader: true,
 		Packages:        data.Config.Packages,
 		Template:        federationTemplate,
+		PruneOptions:    data.Config.GetPruneOptions(),
 	})
 }
 
@@ -713,6 +752,7 @@ func (f *Federation) generateExplicitRequires(
 		GeneratedHeader: false,
 		Packages:        data.Config.Packages,
 		Template:        explicitRequiresTemplate,
+		PruneOptions:    data.Config.GetPruneOptions(),
 	})
 }
 
@@ -734,8 +774,11 @@ func buildResolverSDL(
 	resolverArgs := ""
 	var resolverArgsSb705 strings.Builder
 	for _, keyField := range resolver.KeyFields {
-		resolverArgsSb705.WriteString(
-			fmt.Sprintf("%s: %s,", keyField.Field.ToGoPrivate(), keyField.Definition.Type.String()),
+		fmt.Fprintf(
+			&resolverArgsSb705,
+			"%s: %s,",
+			keyField.Field.ToGoPrivate(),
+			keyField.Definition.Type.String(),
 		)
 	}
 	resolverArgs += resolverArgsSb705.String()
@@ -752,11 +795,11 @@ func buildEntityResolverInputDefinitionSDL(resolver *EntityResolver) string {
 	entityResolverInputDefinition := "input " + resolver.InputTypeName + " {\n"
 	var entityResolverInputDefinitionSb714 strings.Builder
 	for _, keyField := range resolver.KeyFields {
-		entityResolverInputDefinitionSb714.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&entityResolverInputDefinitionSb714,
 			"\t%s: %s\n",
 			keyField.Field.ToGo(),
 			keyField.Definition.Type.String(),
-		))
+		)
 	}
 	entityResolverInputDefinition += entityResolverInputDefinitionSb714.String()
 	return entityResolverInputDefinition + "}"

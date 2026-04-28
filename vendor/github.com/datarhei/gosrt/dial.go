@@ -513,7 +513,7 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 			crypto:                      dl.crypto,
 			keyBaseEncryption:           packet.EvenKeyEncrypted,
 			onSend:                      dl.send,
-			onShutdown:                  func(socketId uint32) { dl.Close() },
+			onShutdown:                  func(*srtConn) { dl.Close() },
 			logger:                      dl.config.Logger,
 		})
 

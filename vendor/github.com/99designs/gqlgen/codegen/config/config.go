@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/internal/code"
+	"github.com/99designs/gqlgen/internal/imports"
 )
 
 type Config struct {
@@ -28,6 +30,7 @@ type Config struct {
 	Federation                           PackageConfig              `yaml:"federation,omitempty"`
 	Resolver                             ResolverConfig             `yaml:"resolver,omitempty"`
 	AutoBind                             []string                   `yaml:"autobind"`
+	AutobindGetterHaser                  bool                       `yaml:"autobind_getter_haser,omitempty"`
 	Models                               TypeMap                    `yaml:"models,omitempty"`
 	StructTag                            string                     `yaml:"struct_tag,omitempty"`
 	EmbeddedStructsPrefix                string                     `yaml:"embedded_structs_prefix,omitempty"`
@@ -44,28 +47,87 @@ type Config struct {
 	OmitRootModels                       bool                       `yaml:"omit_root_models,omitempty"`
 	OmitResolverFields                   bool                       `yaml:"omit_resolver_fields,omitempty"`
 	OmitPanicHandler                     bool                       `yaml:"omit_panic_handler,omitempty"`
+	OmitEnumJSONMarshalers               bool                       `yaml:"omit_enum_json_marshalers,omitempty"`
 	UseFunctionSyntaxForExecutionContext bool                       `yaml:"use_function_syntax_for_execution_context,omitempty"`
 	// If this is set to true, argument directives that
 	// decorate a field with a null value will still be called.
 	//
 	// This enables argument directives to not just mutate
 	// argument values but to set them even if they're null.
-	CallArgumentDirectivesWithNull bool           `yaml:"call_argument_directives_with_null,omitempty"`
-	StructFieldsAlwaysPointers     bool           `yaml:"struct_fields_always_pointers,omitempty"`
-	ReturnPointersInUnmarshalInput bool           `yaml:"return_pointers_in_unmarshalinput,omitempty"`
-	ResolversAlwaysReturnPointers  bool           `yaml:"resolvers_always_return_pointers,omitempty"`
-	NullableInputOmittable         bool           `yaml:"nullable_input_omittable,omitempty"`
-	EnableModelJsonOmitemptyTag    *bool          `yaml:"enable_model_json_omitempty_tag,omitempty"`
-	EnableModelJsonOmitzeroTag     *bool          `yaml:"enable_model_json_omitzero_tag,omitempty"`
-	SkipValidation                 bool           `yaml:"skip_validation,omitempty"`
-	SkipModTidy                    bool           `yaml:"skip_mod_tidy,omitempty"`
-	Sources                        []*ast.Source  `yaml:"-"`
-	Packages                       *code.Packages `yaml:"-"`
-	Schema                         *ast.Schema    `yaml:"-"`
-
-	// Deprecated: use Federation instead. Will be removed next release
-	Federated bool `yaml:"federated,omitempty"`
+	CallArgumentDirectivesWithNull bool  `yaml:"call_argument_directives_with_null,omitempty"`
+	StructFieldsAlwaysPointers     bool  `yaml:"struct_fields_always_pointers,omitempty"`
+	ReturnPointersInUnmarshalInput bool  `yaml:"return_pointers_in_unmarshalinput,omitempty"`
+	ResolversAlwaysReturnPointers  bool  `yaml:"resolvers_always_return_pointers,omitempty"`
+	NullableInputOmittable         bool  `yaml:"nullable_input_omittable,omitempty"`
+	EnableModelJsonOmitemptyTag    *bool `yaml:"enable_model_json_omitempty_tag,omitempty"`
+	EnableModelJsonOmitzeroTag     *bool `yaml:"enable_model_json_omitzero_tag,omitempty"`
+	SkipValidation                 bool  `yaml:"skip_validation,omitempty"`
+	SkipModTidy                    bool  `yaml:"skip_mod_tidy,omitempty"`
+	// FastValidation uses -gcflags="-N -l" to disable compiler optimizations
+	// during validation, making cold cache validation ~2x faster. The generated
+	// code is only used for error checking, not execution. Default: false
+	FastValidation *bool `yaml:"fast_validation,omitempty"`
+	// SkipImportGrouping uses go/format.Source instead of imports.Process for
+	// formatting generated code. This is faster but doesn't group imports
+	// (stdlib/external/internal). Default: false (uses imports.Process)
+	SkipImportGrouping *bool `yaml:"skip_import_grouping,omitempty"`
+	// UseBufferPooling reuses byte buffers via sync.Pool during code formatting
+	// to reduce GC pressure. Default: false
+	UseBufferPooling *bool          `yaml:"use_buffer_pooling,omitempty"`
+	Sources          []*ast.Source  `yaml:"-"`
+	Packages         *code.Packages `yaml:"-"`
+	Schema           *ast.Schema    `yaml:"-"`
 }
+
+// boolOrFalse returns the value of a *bool pointer, or false if nil.
+func boolOrFalse(ptr *bool) bool {
+	return ptr != nil && *ptr
+}
+
+// GetFastValidation returns the value of FastValidation with default false.
+func (c *Config) GetFastValidation() bool {
+	return boolOrFalse(c.FastValidation)
+}
+
+// GetSkipImportGrouping returns the value of SkipImportGrouping with default false.
+func (c *Config) GetSkipImportGrouping() bool {
+	return boolOrFalse(c.SkipImportGrouping)
+}
+
+// GetUseBufferPooling returns the value of UseBufferPooling with default false.
+func (c *Config) GetUseBufferPooling() bool {
+	return boolOrFalse(c.UseBufferPooling)
+}
+
+// GetPruneOptions returns the PruneOptions based on the config settings.
+func (c *Config) GetPruneOptions() imports.PruneOptions {
+	return imports.PruneOptions{
+		SkipImportGrouping: c.GetSkipImportGrouping(),
+		UseBufferPooling:   c.GetUseBufferPooling(),
+	}
+}
+
+const (
+	DirGoModel         = "goModel"
+	DirGoExtraField    = "goExtraField"
+	DirGoField         = "goField"
+	DirGoTag           = "goTag"
+	DirGoEnum          = "goEnum"
+	DirInlineArguments = "inlineArguments"
+
+	DirArgName                = "name"
+	DirArgModel               = "model"
+	DirArgModels              = "models"
+	DirArgType                = "type"
+	DirArgValue               = "value"
+	DirArgForceGenerate       = "forceGenerate"
+	DirArgForceResolver       = "forceResolver"
+	DirArgOverrideTags        = "overrideTags"
+	DirArgDescription         = "description"
+	DirArgOmittable           = "omittable"
+	DirArgAutoBindGetterHaser = "autoBindGetterHaser"
+	DirArgBatch               = "batch"
+)
 
 var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 
@@ -73,9 +135,22 @@ var cfgFilenames = []string{".gqlgen.yml", "gqlgen.yml", "gqlgen.yaml"}
 // preload those for performance considerations any additional package added to the base templates
 // should be added here to improve performance and load all packages in bulk
 var templatePackageNames = []string{
-	"context", "fmt", "io", "strconv", "time", "sync", "strings", "sync/atomic", "embed", "golang.org/x/sync/semaphore",
-	"errors", "bytes", "github.com/vektah/gqlparser/v2", "github.com/vektah/gqlparser/v2/ast",
-	"github.com/99designs/gqlgen/graphql", "github.com/99designs/gqlgen/graphql/introspection",
+	"context",
+	"fmt",
+	"io",
+	"strconv",
+	"time",
+	"sync",
+	"strings",
+	"sync/atomic",
+	"embed",
+	"golang.org/x/sync/semaphore",
+	"errors",
+	"bytes",
+	"github.com/vektah/gqlparser/v2",
+	"github.com/vektah/gqlparser/v2/ast",
+	"github.com/99designs/gqlgen/graphql",
+	"github.com/99designs/gqlgen/graphql/introspection",
 }
 
 // DefaultConfig creates a copy of the default config
@@ -278,7 +353,6 @@ func (c *Config) Init() error {
 		return err
 	}
 
-	// prefetch all packages in one big packages.Load call
 	c.Packages.LoadAll(c.packageList()...)
 
 	err = c.autobind()
@@ -316,7 +390,14 @@ func (c *Config) IsRoot(def *ast.Definition) bool {
 }
 
 func (c *Config) injectTypesFromSchema() error {
-	for _, d := range []string{"goModel", "goExtraField", "goField", "goTag", "goEnum", "inlineArguments"} {
+	for _, d := range []string{
+		DirGoModel,
+		DirGoExtraField,
+		DirGoField,
+		DirGoTag,
+		DirGoEnum,
+		DirInlineArguments,
+	} {
 		c.Directives[d] = DirectiveConfig{SkipRuntime: true}
 	}
 
@@ -325,167 +406,229 @@ func (c *Config) injectTypesFromSchema() error {
 			continue
 		}
 
-		if bd := schemaType.Directives.ForName("goModel"); bd != nil {
-			if ma := bd.Arguments.ForName("model"); ma != nil {
-				if mv, err := ma.Value.Value(nil); err == nil {
-					c.Models.Add(schemaType.Name, mv.(string))
-				}
-			}
-
-			if ma := bd.Arguments.ForName("models"); ma != nil {
-				if mvs, err := ma.Value.Value(nil); err == nil {
-					for _, mv := range mvs.([]any) {
-						c.Models.Add(schemaType.Name, mv.(string))
-					}
-				}
-			}
-
-			if fg := bd.Arguments.ForName("forceGenerate"); fg != nil {
-				if mv, err := fg.Value.Value(nil); err == nil {
-					c.Models.ForceGenerate(schemaType.Name, mv.(bool))
-				}
-			}
-		}
+		c.injectGoModelDirective(schemaType)
 
 		if schemaType.Kind == ast.Object ||
 			schemaType.Kind == ast.InputObject ||
 			schemaType.Kind == ast.Interface {
-			for _, field := range schemaType.Fields {
-				if fd := field.Directives.ForName("goField"); fd != nil {
-					// First, copy map entry for type and field to do modifications
-					typeMapEntry := c.Models[schemaType.Name]
-					typeMapFieldEntry := typeMapEntry.Fields[field.Name]
-
-					if ta := fd.Arguments.ForName("type"); ta != nil {
-						if c.Models.UserDefined(schemaType.Name) {
-							return fmt.Errorf(
-								"argument 'type' for directive @goField (src: %s, line: %d) not applicable for user-defined models",
-								fd.Position.Src.Name,
-								fd.Position.Line,
-							)
-						}
-
-						if ft, err := ta.Value.Value(nil); err == nil {
-							typeMapFieldEntry.Type = ft.(string)
-						}
-					}
-
-					if ra := fd.Arguments.ForName("forceResolver"); ra != nil {
-						if fr, err := ra.Value.Value(nil); err == nil {
-							typeMapFieldEntry.Resolver = fr.(bool)
-						}
-					}
-
-					if na := fd.Arguments.ForName("name"); na != nil {
-						if fr, err := na.Value.Value(nil); err == nil {
-							typeMapFieldEntry.FieldName = fr.(string)
-						}
-					}
-
-					if arg := fd.Arguments.ForName("omittable"); arg != nil {
-						if k, err := arg.Value.Value(nil); err == nil {
-							val := k.(bool)
-							typeMapFieldEntry.Omittable = &val
-						}
-					}
-
-					// May be uninitialized, so do it now.
-					if typeMapEntry.Fields == nil {
-						typeMapEntry.Fields = make(map[string]TypeMapField)
-					}
-
-					// First, copy back probably modificated field settings
-					typeMapEntry.Fields[field.Name] = typeMapFieldEntry
-
-					// And final copy back probably modificated all type map
-					c.Models[schemaType.Name] = typeMapEntry
-				}
+			if err := c.injectGoFieldDirectives(schemaType); err != nil {
+				return err
 			}
 
-			if efds := schemaType.Directives.ForNames("goExtraField"); len(efds) != 0 {
-				for _, efd := range efds {
-					if t := efd.Arguments.ForName("type"); t != nil {
-						extraField := ModelExtraField{}
-
-						if tv, err := t.Value.Value(nil); err == nil {
-							extraField.Type = tv.(string)
-						}
-
-						if extraField.Type == "" {
-							return fmt.Errorf(
-								"argument 'type' for directive @goExtraField (src: %s, line: %d) cannot by empty",
-								efd.Position.Src.Name,
-								efd.Position.Line,
-							)
-						}
-
-						if ot := efd.Arguments.ForName("overrideTags"); ot != nil {
-							if otv, err := ot.Value.Value(nil); err == nil {
-								extraField.OverrideTags = otv.(string)
-							}
-						}
-
-						if d := efd.Arguments.ForName("description"); d != nil {
-							if dv, err := d.Value.Value(nil); err == nil {
-								extraField.Description = dv.(string)
-							}
-						}
-
-						extraFieldName := ""
-						if fn := efd.Arguments.ForName("name"); fn != nil {
-							if fnv, err := fn.Value.Value(nil); err == nil {
-								extraFieldName = fnv.(string)
-							}
-						}
-
-						// First copy, then modify map entry.
-						typeMapEntry := c.Models[schemaType.Name]
-
-						if extraFieldName == "" {
-							// Embeddable fields
-							typeMapEntry.EmbedExtraFields = append(
-								typeMapEntry.EmbedExtraFields,
-								extraField,
-							)
-						} else {
-							// Regular fields
-							if typeMapEntry.ExtraFields == nil {
-								typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
-							}
-							typeMapEntry.ExtraFields[extraFieldName] = extraField
-						}
-
-						// Copy back modified map entry
-						c.Models[schemaType.Name] = typeMapEntry
-					}
-				}
+			if err := c.injectGoExtraFieldDirectives(schemaType); err != nil {
+				return err
 			}
 		}
 
-		if schemaType.Kind == ast.Enum && !strings.HasPrefix(schemaType.Name, "__") {
-			values := make(map[string]EnumValue)
+		c.injectGoEnumDirectives(schemaType)
+	}
 
-			for _, value := range schemaType.EnumValues {
-				if directive := value.Directives.ForName("goEnum"); directive != nil {
-					if arg := directive.Arguments.ForName("value"); arg != nil {
-						if v, err := arg.Value.Value(nil); err == nil {
-							values[value.Name] = EnumValue{
-								Value: v.(string),
-							}
-						}
-					}
-				}
-			}
+	return nil
+}
 
-			if len(values) > 0 {
-				model := c.Models[schemaType.Name]
-				model.EnumValues = values
-				c.Models[schemaType.Name] = model
+func (c *Config) injectGoModelDirective(schemaType *ast.Definition) {
+	bd := schemaType.Directives.ForName(DirGoModel)
+	if bd == nil {
+		return
+	}
+
+	if ma := bd.Arguments.ForName(DirArgModel); ma != nil {
+		if mv, err := ma.Value.Value(nil); err == nil {
+			c.Models.Add(schemaType.Name, mv.(string))
+		}
+	}
+
+	if ma := bd.Arguments.ForName(DirArgModels); ma != nil {
+		if mvs, err := ma.Value.Value(nil); err == nil {
+			for _, mv := range mvs.([]any) {
+				c.Models.Add(schemaType.Name, mv.(string))
 			}
 		}
 	}
 
+	if fg := bd.Arguments.ForName(DirArgForceGenerate); fg != nil {
+		if mv, err := fg.Value.Value(nil); err == nil {
+			c.Models.ForceGenerate(schemaType.Name, mv.(bool))
+		}
+	}
+}
+
+func (c *Config) injectGoFieldDirectives(schemaType *ast.Definition) error {
+	for _, field := range schemaType.Fields {
+		fd := field.Directives.ForName(DirGoField)
+		if fd == nil {
+			continue
+		}
+
+		// First, copy map entry for type and field to do modifications
+		typeMapEntry := c.Models[schemaType.Name]
+		typeMapFieldEntry := typeMapEntry.Fields[field.Name]
+
+		if ta := fd.Arguments.ForName(DirArgType); ta != nil {
+			if c.Models.UserDefined(schemaType.Name) {
+				return newNotApplicableError(DirGoField, DirArgType, *fd.Position)
+			}
+
+			if ft, err := ta.Value.Value(nil); err == nil {
+				typeMapFieldEntry.Type = ft.(string)
+			}
+		}
+
+		if ra := fd.Arguments.ForName(DirArgForceResolver); ra != nil {
+			if fr, err := ra.Value.Value(nil); err == nil {
+				typeMapFieldEntry.Resolver = fr.(bool)
+			}
+		}
+
+		if na := fd.Arguments.ForName(DirArgName); na != nil {
+			if fr, err := na.Value.Value(nil); err == nil {
+				typeMapFieldEntry.FieldName = fr.(string)
+			}
+		}
+
+		if arg := fd.Arguments.ForName(DirArgOmittable); arg != nil {
+			if k, err := arg.Value.Value(nil); err == nil {
+				val := k.(bool)
+				typeMapFieldEntry.Omittable = &val
+			}
+		}
+
+		if arg := fd.Arguments.ForName(DirArgAutoBindGetterHaser); arg != nil {
+			if k, err := arg.Value.Value(nil); err == nil {
+				val := k.(bool)
+				typeMapFieldEntry.AutoBindGetterHaser = &val
+			}
+		}
+
+		if arg := fd.Arguments.ForName(DirArgBatch); arg != nil {
+			if k, err := arg.Value.Value(nil); err == nil {
+				typeMapFieldEntry.Batch = k.(bool)
+			}
+		}
+
+		if arg := fd.Arguments.ForName(DirArgForceGenerate); arg != nil {
+			if c.Models.UserDefined(schemaType.Name) {
+				return newNotApplicableError(
+					DirGoField,
+					DirArgForceGenerate,
+					*fd.Position,
+				)
+			}
+
+			if k, err := arg.Value.Value(nil); err == nil {
+				val := k.(bool)
+				typeMapFieldEntry.ForceGenerate = val
+			}
+		}
+
+		// May be uninitialized, so do it now.
+		if typeMapEntry.Fields == nil {
+			typeMapEntry.Fields = make(map[string]TypeMapField)
+		}
+
+		// First, copy back probably modificated field settings
+		typeMapEntry.Fields[field.Name] = typeMapFieldEntry
+
+		// And final copy back probably modificated all type map
+		c.Models[schemaType.Name] = typeMapEntry
+	}
+
 	return nil
+}
+
+func (c *Config) injectGoExtraFieldDirectives(schemaType *ast.Definition) error {
+	efds := schemaType.Directives.ForNames(DirGoExtraField)
+	if len(efds) == 0 {
+		return nil
+	}
+
+	for _, efd := range efds {
+		t := efd.Arguments.ForName(DirArgType)
+		if t == nil {
+			continue
+		}
+
+		extraField := ModelExtraField{}
+
+		if tv, err := t.Value.Value(nil); err == nil {
+			extraField.Type = tv.(string)
+		}
+
+		if extraField.Type == "" {
+			return newCannotBeEmptyError(
+				DirGoExtraField,
+				DirArgType,
+				*efd.Position,
+			)
+		}
+
+		if ot := efd.Arguments.ForName(DirArgOverrideTags); ot != nil {
+			if otv, err := ot.Value.Value(nil); err == nil {
+				extraField.OverrideTags = otv.(string)
+			}
+		}
+
+		if d := efd.Arguments.ForName(DirArgDescription); d != nil {
+			if dv, err := d.Value.Value(nil); err == nil {
+				extraField.Description = dv.(string)
+			}
+		}
+
+		extraFieldName := ""
+		if fn := efd.Arguments.ForName(DirArgName); fn != nil {
+			if fnv, err := fn.Value.Value(nil); err == nil {
+				extraFieldName = fnv.(string)
+			}
+		}
+
+		// First copy, then modify map entry.
+		typeMapEntry := c.Models[schemaType.Name]
+
+		if extraFieldName == "" {
+			// Embeddable fields
+			typeMapEntry.EmbedExtraFields = append(
+				typeMapEntry.EmbedExtraFields,
+				extraField,
+			)
+		} else {
+			// Regular fields
+			if typeMapEntry.ExtraFields == nil {
+				typeMapEntry.ExtraFields = make(map[string]ModelExtraField)
+			}
+			typeMapEntry.ExtraFields[extraFieldName] = extraField
+		}
+
+		// Copy back modified map entry
+		c.Models[schemaType.Name] = typeMapEntry
+	}
+
+	return nil
+}
+
+func (c *Config) injectGoEnumDirectives(schemaType *ast.Definition) {
+	if schemaType.Kind != ast.Enum || strings.HasPrefix(schemaType.Name, "__") {
+		return
+	}
+
+	values := make(map[string]EnumValue)
+
+	for _, value := range schemaType.EnumValues {
+		if directive := value.Directives.ForName(DirGoEnum); directive != nil {
+			if arg := directive.Arguments.ForName(DirArgValue); arg != nil {
+				if v, err := arg.Value.Value(nil); err == nil {
+					values[value.Name] = EnumValue{
+						Value: v.(string),
+					}
+				}
+			}
+		}
+	}
+
+	if len(values) > 0 {
+		model := c.Models[schemaType.Name]
+		model.EnumValues = values
+		c.Models[schemaType.Name] = model
+	}
 }
 
 type TypeMapEntry struct {
@@ -518,10 +661,21 @@ type TypeMapField struct {
 	// restrictions.
 	Type string `yaml:"type"`
 
-	Resolver        bool   `yaml:"resolver"`
-	FieldName       string `yaml:"fieldName"`
-	Omittable       *bool  `yaml:"omittable"`
-	GeneratedMethod string `yaml:"-"`
+	Resolver            bool   `yaml:"resolver"`
+	FieldName           string `yaml:"fieldName"`
+	Omittable           *bool  `yaml:"omittable"`
+	GeneratedMethod     string `yaml:"-"`
+	AutoBindGetterHaser *bool  `yaml:"autoBindGetterHaser"`
+
+	// Batch enables batch resolver generation for this field.
+	// When true, a batch resolver method (e.g., PostsBatch) will be generated
+	// that accepts multiple parent objects and returns ([]T, error) for all of them
+	// in a single call, reducing N+1 query problems. For partial failures, return
+	// a graphql.BatchErrors implementation as the error.
+	Batch bool `yaml:"batch,omitempty"`
+	// ForceGenerate forces the field to be generated in the model struct
+	// even when OmitResolverFields is enabled and the field has forceResolver: true.
+	ForceGenerate bool `yaml:"forceGenerate"`
 }
 
 type EnumValue struct {
@@ -575,12 +729,7 @@ func (a *StringList) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 func (a StringList) Has(file string) bool {
-	for _, existing := range a {
-		if existing == file {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(a, file)
 }
 
 func (c *Config) check() error {
@@ -646,11 +795,6 @@ func (c *Config) check() error {
 		if c.Federation.ImportPath() != c.Exec.ImportPath() {
 			return errors.New("federation and exec must be in the same package")
 		}
-	}
-	if c.Federated {
-		return errors.New(
-			"federated has been removed, instead use\nfederation:\n    filename: path/to/federated.go",
-		)
 	}
 
 	for importPath, pkg := range fileList {
@@ -724,7 +868,7 @@ func (tm TypeMap) ReferencedPackages() []string {
 				continue
 			}
 			pkg, _ := code.PkgAndType(model)
-			if pkg == "" || inStrSlice(pkgs, pkg) {
+			if pkg == "" || slices.Contains(pkgs, pkg) {
 				continue
 			}
 			pkgs = append(pkgs, code.QualifyPackagePath(pkg))
@@ -762,16 +906,6 @@ type DirectiveConfig struct {
 	// func(ctx context.Context, obj any, next graphql.Resolver[, directive arguments if any]) (res
 	// any, err error)
 	Implementation *string
-}
-
-func inStrSlice(haystack []string, needle string) bool {
-	for _, v := range haystack {
-		if needle == v {
-			return true
-		}
-	}
-
-	return false
 }
 
 // findCfg searches for the config file in this directory and all parents up the tree
@@ -981,4 +1115,24 @@ func abs(path string) string {
 		panic(err)
 	}
 	return filepath.ToSlash(absPath)
+}
+
+func newNotApplicableError(directive, argument string, pos ast.Position) error {
+	return fmt.Errorf(
+		"argument '%s' for directive @%s (src: %s, line: %d) not applicable for user-defined models",
+		argument,
+		directive,
+		pos.Src.Name,
+		pos.Line,
+	)
+}
+
+func newCannotBeEmptyError(directive, argument string, pos ast.Position) error {
+	return fmt.Errorf(
+		"argument '%s' for directive @%s (src: %s, line: %d) cannot by empty",
+		argument,
+		directive,
+		pos.Src.Name,
+		pos.Line,
+	)
 }

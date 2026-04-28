@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"go/types"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +61,9 @@ type Options struct {
 
 	// Packages cache, you can find me on config.Config
 	Packages *code.Packages
+
+	// PruneOptions configures import pruning and formatting behavior.
+	PruneOptions imports.PruneOptions
 }
 
 var (
@@ -78,9 +83,7 @@ func Render(cfg Options) error {
 	CurrentImports = &Imports{packages: cfg.Packages, destDir: filepath.Dir(cfg.Filename)}
 
 	funcs := Funcs()
-	for n, f := range cfg.Funcs {
-		funcs[n] = f
-	}
+	maps.Copy(funcs, cfg.Funcs)
 
 	t := template.New("").Funcs(funcs)
 	t, err := parseTemplates(cfg, t)
@@ -88,16 +91,25 @@ func Render(cfg Options) error {
 		return err
 	}
 
-	roots := make([]string, 0, len(t.Templates()))
-	for _, templ := range t.Templates() {
-		// templates that end with _.gotpl are special files we don't want to include
-		if strings.HasSuffix(templ.Name(), "_.gotpl") ||
-			// filter out templates added with {{ template xxx }} syntax inside the template file
-			!strings.HasSuffix(templ.Name(), ".gotpl") {
-			continue
+	var roots []string
+	if cfg.Template != "" {
+		// When a primary Template string is provided, only execute it.
+		// TemplateFS files are parsed solely to make their named templates available
+		// (e.g. callDirective, queryDirectives from directives.gotpl) but must
+		// not be executed as additional roots.
+		roots = []string{"template.gotpl"}
+	} else {
+		roots = make([]string, 0, len(t.Templates()))
+		for _, templ := range t.Templates() {
+			name := templ.Name()
+			// templates that end with _.gotpl are special files we don't want to include
+			if strings.HasSuffix(name, "_.gotpl") ||
+				// filter out templates added with {{ template xxx }} syntax inside the template file
+				!strings.HasSuffix(name, ".gotpl") {
+				continue
+			}
+			roots = append(roots, name)
 		}
-
-		roots = append(roots, templ.Name())
 	}
 
 	// then execute all the important looking ones in order, adding them to the same file
@@ -154,8 +166,7 @@ func Render(cfg Options) error {
 	}
 	CurrentImports = nil
 
-	err = write(cfg.Filename, result.Bytes(), cfg.Packages)
-	if err != nil {
+	if err = write(cfg.Filename, result.Bytes(), cfg.Packages, cfg.PruneOptions); err != nil {
 		return err
 	}
 
@@ -169,6 +180,15 @@ func parseTemplates(cfg Options, t *template.Template) (*template.Template, erro
 		t, err = t.New("template.gotpl").Parse(cfg.Template)
 		if err != nil {
 			return nil, fmt.Errorf("error with provided template: %w", err)
+		}
+		// Also parse TemplateFS so that named templates defined there (e.g.
+		// callDirective, queryDirectives from directives.gotpl) are available
+		// to the primary template. Render only executes "template.gotpl", so
+		// the TemplateFS files contribute named templates but no top-level output.
+		if cfg.TemplateFS != nil {
+			if t, err = t.ParseFS(cfg.TemplateFS, "*.gotpl"); err != nil {
+				return nil, fmt.Errorf("locating templates: %w", err)
+			}
 		}
 		return t, nil
 	}
@@ -340,27 +360,27 @@ func goModelName(primaryToGoFunc func(string) string, parts []string) string {
 		}
 
 		applyToGoFunc = func(parts []string) string {
-			var out string
 			switch len(parts) {
 			case 0:
 				return ""
 			case 1:
 				return primaryToGoFunc(parts[0])
 			default:
-				out = primaryToGoFunc(parts[0])
+				var out strings.Builder
+				out.WriteString(primaryToGoFunc(parts[0]))
+				for _, p := range parts[1:] {
+					out.WriteString(ToGo(p))
+				}
+				return out.String()
 			}
-			for _, p := range parts[1:] {
-				out = fmt.Sprintf("%s%s", out, ToGo(p))
-			}
-			return out
 		}
 
 		applyValidGoName = func(parts []string) string {
-			var out string
+			var out strings.Builder
 			for _, p := range parts {
-				out = fmt.Sprintf("%s%s", out, replaceInvalidCharacters(p))
+				out.WriteString(replaceInvalidCharacters(p))
 			}
-			return out
+			return out.String()
 		}
 	)
 
@@ -596,10 +616,8 @@ var keywords = []string{
 
 // sanitizeKeywords prevents collisions with go keywords for arguments to resolver functions
 func sanitizeKeywords(name string) string {
-	for _, k := range keywords {
-		if name == k {
-			return name + "Arg"
-		}
+	if slices.Contains(keywords, name) {
+		return name + "Arg"
 	}
 	return name
 }
@@ -611,7 +629,7 @@ func rawQuote(s string) string {
 func notNil(field string, data any) bool {
 	v := reflect.ValueOf(data)
 
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
@@ -703,24 +721,25 @@ func render(filename string, tpldata any) (*bytes.Buffer, error) {
 	return buf, t.Execute(buf, tpldata)
 }
 
-func write(filename string, b []byte, packages *code.Packages) error {
+func write(filename string, b []byte, packages *code.Packages, opts imports.PruneOptions) error {
 	err := os.MkdirAll(filepath.Dir(filename), 0o755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	formatted, err := imports.Prune(filename, b, packages)
+	formatted, err := imports.Prune(filename, b, packages, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gofmt failed on %s: %s\n", filepath.Base(filename), err.Error())
 		formatted = b
 	}
 
-	err = os.WriteFile(filename, formatted, 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to write %s: %w", filename, err)
+	// Skip write if content is unchanged - preserves mtime for Go build cache
+	existing, readErr := os.ReadFile(filename)
+	if readErr == nil && bytes.Equal(existing, formatted) {
+		return nil
 	}
 
-	return nil
+	return os.WriteFile(filename, formatted, 0o644)
 }
 
 var pkgReplacer = strings.NewReplacer(

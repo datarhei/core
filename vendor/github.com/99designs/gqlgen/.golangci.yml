@@ -50,10 +50,10 @@ linters:
     - govet
     - ineffassign
     - misspell
+    - modernize
     - nakedret
     - nolintlint
     - perfsprint
-    - prealloc
     - reassign
     - revive
     - staticcheck
@@ -65,6 +65,7 @@ linters:
     - usestdlibvars
     - usetesting
     - wastedassign
+#    - prealloc # disabled because it is a huge pain
   settings:
     errcheck:
       exclude-functions:
@@ -91,6 +92,9 @@ linters:
         - shadow
         - unusedwrite
       enable-all: true
+    modernize:
+      disable:
+        - any
     perfsprint:
       int-conversion: false
       err-error: false
