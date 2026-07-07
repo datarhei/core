@@ -198,6 +198,8 @@ func (s *server) disconnect() {
 	for _, ch := range s.channels {
 		ch.Close()
 	}
+
+	s.channels = make(map[string]*channel)
 }
 
 func (s *server) Close() {
