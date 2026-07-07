@@ -80,7 +80,7 @@ type Server interface {
 	// ListenAndServe starts the RTMPS server
 	ListenAndServeTLS(certFile, keyFile string) error
 
-	// Restart restarts the RTMP server
+	// Disconnect disconnects all current RTMP sessions
 	Disconnect()
 
 	// Close stops the RTMP server and closes all connections
