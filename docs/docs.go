@@ -5826,6 +5826,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v3/srt/disconnect": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Disconnect all SRT sessions",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Disconnect all SRT sessions",
+                "operationId": "srt-3-disconnect",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/widget/process/{id}": {
             "get": {
                 "description": "Fetch minimal statistics about a process, which is not protected by any auth.",

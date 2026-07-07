@@ -56,7 +56,10 @@ type Server interface {
 	// ListenAndServe starts the SRT server
 	ListenAndServe() error
 
-	// Close stops the RTMP server and closes all connections
+	// Disconnect disconnects all current SRT sessions
+	Disconnect()
+
+	// Close stops the SRT server and closes all connections
 	Close()
 
 	// Channels return a list of currently publishing streams
@@ -143,6 +146,17 @@ func (s *server) ListenAndServe() error {
 	go s.srtlogListener(ctx)
 
 	return s.server.ListenAndServe()
+}
+
+func (s *server) Disconnect() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for _, ch := range s.channels {
+		ch.Close()
+	}
+
+	s.channels = make(map[string]*channel)
 }
 
 func (s *server) Close() {

@@ -80,3 +80,18 @@ func (srth *SRTHandler) unmarshalChannel(ss srt.Channel) api.SRTChannel {
 
 	return s
 }
+
+// Disconnect disconnects all SRT sessions
+// @Summary Disconnect all SRT sessions
+// @Description Disconnect all SRT sessions
+// @Tags v16.?.?
+// @ID srt-3-disconnect
+// @Produce json
+// @Success 200 {string} string
+// @Security ApiKeyAuth
+// @Router /api/v3/srt/disconnect [put]
+func (srth *SRTHandler) Disconnect(c echo.Context) error {
+	srth.srt.Disconnect()
+
+	return c.JSON(http.StatusOK, "OK")
+}

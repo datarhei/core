@@ -6887,6 +6887,22 @@ paths:
       summary: List all publishing SRT treams
       tags:
       - v16.9.0
+  /api/v3/srt/disconnect:
+    put:
+      description: Disconnect all SRT sessions
+      operationId: srt-3-disconnect
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Disconnect all SRT sessions
+      tags:
+      - v16.?.?
   /api/v3/widget/process/{id}:
     get:
       description: Fetch minimal statistics about a process, which is not protected

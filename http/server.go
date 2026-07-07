@@ -730,6 +730,10 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 SRT
 	if s.v3handler.srt != nil {
 		v3.GET("/srt", s.v3handler.srt.ListChannels)
+
+		if !s.readOnly {
+			v3.PUT("/srt/disconnect", s.v3handler.srt.Disconnect)
+		}
 	}
 
 	// v3 Config
