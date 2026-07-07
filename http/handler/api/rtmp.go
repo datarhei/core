@@ -46,6 +46,21 @@ func (rtmph *RTMPHandler) ListChannels(c echo.Context) error {
 	return c.JSON(http.StatusOK, list)
 }
 
+// Disconnect disconnects all sessions
+// @Summary Disconnect all sessions
+// @Description Disconnect all sessions.
+// @Tags v16.?.?
+// @ID rtmp-3-disconnect
+// @Produce json
+// @Success 200 {string} string
+// @Security ApiKeyAuth
+// @Router /api/v3/rtmp/disconnect [put]
+func (rtmph *RTMPHandler) Disconnect(c echo.Context) error {
+	rtmph.rtmp.Disconnect()
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // Play plays a RTMP stream over HTTP
 // @Summary Plays a RTMP stream over HTTP
 // @Description Plays a RTMP stream over HTTP

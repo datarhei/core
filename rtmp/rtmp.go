@@ -32,6 +32,7 @@ import (
 // ErrServerClosed is returned by ListenAndServe (or ListenAndServeTLS) if the server
 // has been closed regularly with the Close() function.
 var ErrServerClosed = rtmp.ErrServerClosed
+var ErrServerRestart = errors.New("restarting server")
 
 func init() {
 	format.RegisterAll()
@@ -79,6 +80,9 @@ type Server interface {
 	// ListenAndServe starts the RTMPS server
 	ListenAndServeTLS(certFile, keyFile string) error
 
+	// Restart restarts the RTMP server
+	Disconnect()
+
 	// Close stops the RTMP server and closes all connections
 	Close()
 
@@ -92,6 +96,10 @@ type Server interface {
 
 // server is an implementation of the Server interface
 type server struct {
+	addr      string
+	tlsAddr   string
+	tlsConfig *tls.Config
+
 	// Configuration parameter taken from the Config
 	app       string
 	token     string
@@ -138,6 +146,8 @@ func New(config Config) (Server, error) {
 		s.collector = session.NewNullCollector()
 	}
 
+	s.addr = config.Addr
+
 	s.server = &rtmp.Server{
 		Addr:          config.Addr,
 		HandlePlay:    s.handlePlay,
@@ -145,6 +155,9 @@ func New(config Config) (Server, error) {
 	}
 
 	if len(config.TLSAddr) != 0 {
+		s.tlsAddr = config.TLSAddr
+		s.tlsConfig = config.TLSConfig.Clone()
+
 		s.tlsServer = &rtmp.Server{
 			Addr:          config.TLSAddr,
 			TLSConfig:     config.TLSConfig.Clone(),
@@ -173,6 +186,20 @@ func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
 	return s.tlsServer.ListenAndServeTLS(certFile, keyFile)
 }
 
+func (s *server) Disconnect() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.disconnect()
+}
+
+func (s *server) disconnect() {
+	// Close all channels
+	for _, ch := range s.channels {
+		ch.Close()
+	}
+}
+
 func (s *server) Close() {
 	// Stop listening
 	s.server.Close()
@@ -184,10 +211,7 @@ func (s *server) Close() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// Close all channels
-	for _, ch := range s.channels {
-		ch.Close()
-	}
+	s.disconnect()
 }
 
 // Channels returns the list of streams that are publishing currently, excluding proxied channels

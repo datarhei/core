@@ -4715,14 +4715,14 @@ paths:
         required: true
         type: string
       - description: Select only the report with that created_at date. Unix timestamp,
-          leave empty for any. In combination with exited_at it denotes a range or
+          leave empty for any. In combination with exited_at it denotes a range of
           reports.
         format: int64
         in: query
         name: created_at
         type: integer
       - description: Select only the report with that exited_at date. Unix timestamp,
-          leave empty for any. In combination with created_at it denotes a range or
+          leave empty for any. In combination with created_at it denotes a range of
           reports.
         format: int64
         in: query
@@ -6459,14 +6459,14 @@ paths:
         required: true
         type: string
       - description: Select only the report with that created_at date. Unix timestamp,
-          leave empty for any. In combination with exited_at it denotes a range or
+          leave empty for any. In combination with exited_at it denotes a range of
           reports.
         format: int64
         in: query
         name: created_at
         type: integer
       - description: Select only the report with that exited_at date. Unix timestamp,
-          leave empty for any. In combination with created_at it denotes a range or
+          leave empty for any. In combination with created_at it denotes a range of
           reports.
         format: int64
         in: query
@@ -6729,6 +6729,22 @@ paths:
       summary: List all publishing RTMP streams
       tags:
       - v16.7.2
+  /api/v3/rtmp/disconnect:
+    put:
+      description: Disconnect all sessions.
+      operationId: rtmp-3-disconnect
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Disconnect all sessions
+      tags:
+      - v16.?.?
   /api/v3/session:
     get:
       description: Get a summary of all active and past sessions of the given collector.

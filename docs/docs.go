@@ -2603,14 +2603,14 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports.",
+                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range of reports.",
                         "name": "created_at",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
+                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports.",
                         "name": "exited_at",
                         "in": "query"
                     },
@@ -5287,14 +5287,14 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range or reports.",
+                        "description": "Select only the report with that created_at date. Unix timestamp, leave empty for any. In combination with exited_at it denotes a range of reports.",
                         "name": "created_at",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range or reports.",
+                        "description": "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports.",
                         "name": "exited_at",
                         "in": "query"
                     },
@@ -5572,6 +5572,32 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/api.RTMPChannel"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/rtmp/disconnect": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Disconnect all sessions.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "Disconnect all sessions",
+                "operationId": "rtmp-3-disconnect",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }

@@ -721,6 +721,10 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 RTMP
 	if s.v3handler.rtmp != nil {
 		v3.GET("/rtmp", s.v3handler.rtmp.ListChannels)
+
+		if !s.readOnly {
+			v3.PUT("/rtmp/disconnect", s.v3handler.rtmp.Disconnect)
+		}
 	}
 
 	// v3 SRT
