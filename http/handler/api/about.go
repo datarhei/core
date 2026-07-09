@@ -14,15 +14,17 @@ import (
 // The AboutHandler type provides handler functions for retrieving details
 // about the API version and build infos.
 type AboutHandler struct {
-	restream restream.Restreamer
-	auths    []string
+	restream     restream.Restreamer
+	auths        []string
+	totpRequired func() bool
 }
 
 // NewAbout returns a new About type
-func NewAbout(restream restream.Restreamer, auths []string) *AboutHandler {
+func NewAbout(restream restream.Restreamer, auths []string, totpRequired func() bool) *AboutHandler {
 	return &AboutHandler{
-		restream: restream,
-		auths:    auths,
+		restream:     restream,
+		auths:        auths,
+		totpRequired: totpRequired,
 	}
 }
 
@@ -37,11 +39,17 @@ func NewAbout(restream restream.Restreamer, auths []string) *AboutHandler {
 func (p *AboutHandler) About(c echo.Context) error {
 	createdAt := p.restream.CreatedAt()
 
+	totpRequired := false
+	if p.totpRequired != nil {
+		totpRequired = p.totpRequired()
+	}
+
 	about := api.About{
-		App:       app.Name,
-		Name:      p.restream.Name(),
-		Auths:     p.auths,
-		ID:        p.restream.ID(),
+		App:          app.Name,
+		Name:         p.restream.Name(),
+		Auths:        p.auths,
+		TOTPRequired: totpRequired,
+		ID:           p.restream.ID(),
 		CreatedAt: createdAt.Format(time.RFC3339),
 		Uptime:    uint64(time.Since(createdAt).Seconds()),
 		Version: api.Version{

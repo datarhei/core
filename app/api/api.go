@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/auth/totp"
 	"github.com/datarhei/core/v16/config"
 	configstore "github.com/datarhei/core/v16/config/store"
 	configvars "github.com/datarhei/core/v16/config/vars"
@@ -81,6 +82,7 @@ type api struct {
 	mainserver    *gohttp.Server
 	sidecarserver *gohttp.Server
 	httpjwt       jwt.JWT
+	totp          *totp.Store
 	update        update.Checker
 	replacer      replace.Replacer
 
@@ -582,6 +584,7 @@ func (a *api) start() error {
 	}
 
 	var store restreamstore.Store = nil
+	var totpStore *totp.Store = nil
 
 	{
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
@@ -598,7 +601,19 @@ func (a *api) start() error {
 		if err != nil {
 			return err
 		}
+
+		if cfg.API.Auth.Enable {
+			totpStore, err = totp.NewStore(totp.Config{
+				Filesystem: fs,
+				Issuer:     cfg.Name,
+			})
+			if err != nil {
+				return fmt.Errorf("unable to create TOTP store: %w", err)
+			}
+		}
 	}
+
+	a.totp = totpStore
 
 	restream, err := restream.New(restream.Config{
 		ID:           cfg.ID,
@@ -630,13 +645,21 @@ func (a *api) start() error {
 			Realm:         app.Name,
 			Secret:        secret,
 			SkipLocalhost: cfg.API.Auth.DisableLocalhost,
+			TOTP:          totpStore,
+			TOTPRequired: func() bool {
+				if totpStore != nil {
+					return totpStore.Enrolled()
+				}
+
+				return false
+			},
 		})
 
 		if err != nil {
 			return fmt.Errorf("unable to create JWT provider: %w", err)
 		}
 
-		if validator, err := jwt.NewLocalValidator(cfg.API.Auth.Username, cfg.API.Auth.Password); err == nil {
+		if validator, err := jwt.NewLocalValidator(cfg.API.Auth.Username, cfg.API.Auth.Password, totpStore); err == nil {
 			if err := httpjwt.AddValidator(app.Name, validator); err != nil {
 				return fmt.Errorf("unable to add local JWT validator: %w", err)
 			}
@@ -1014,8 +1037,10 @@ func (a *api) start() error {
 		},
 		RTMP:     a.rtmpserver,
 		SRT:      a.srtserver,
-		JWT:      a.httpjwt,
-		Config:   a.config.store,
+		JWT:          a.httpjwt,
+		TOTP:         a.totp,
+		TOTPUsername: cfg.API.Auth.Username,
+		Config:       a.config.store,
 		Sessions: a.sessions,
 		Router:   router,
 		ReadOnly: cfg.API.ReadOnly,

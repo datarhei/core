@@ -16,3 +16,14 @@
 *.flv
 
 .VSCodeCounter
+
+# Local runtime data (default db.dir when running ./core from the repo)
+config/config.json
+config/db.json
+config/totp.json
+config/totp_trust.json
+config/v1.json
+config/sessions.json
+config/db.*.json
+config/cert/
+config/sessions/
