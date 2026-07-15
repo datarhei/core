@@ -42,17 +42,9 @@ func GetToken(u *url.URL) (string, string, bool) {
 }
 
 func SplitPath(path string) []string {
-	pathElements := strings.Split(filepath.Clean(path), "/")
-
-	if len(pathElements) == 0 {
-		return pathElements
-	}
-
-	if len(pathElements[0]) == 0 {
-		pathElements = pathElements[1:]
-	}
-
-	return pathElements
+	return strings.FieldsFunc(filepath.Clean(path), func(r rune) bool {
+		return r == '/'
+	})
 }
 
 func RemovePathPrefix(path, prefix string) (string, string) {
