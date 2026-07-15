@@ -200,7 +200,7 @@ func ParseDeprecatedStreamId(streamid string) (StreamInfo, error) {
 		case "m":
 			si.Mode = value
 		case "r":
-			si.Resource = value
+			si.Resource = filepath.Join("/", value)
 		case "token":
 			si.Token = value
 		default:

@@ -20,7 +20,7 @@ func TestParse(t *testing.T) {
 	si, err := u.StreamInfo()
 	require.NoError(t, err)
 	require.Equal(t, "publish", si.Mode)
-	require.Equal(t, "123456", si.Resource)
+	require.Equal(t, "/123456", si.Resource)
 	require.Equal(t, "bla", si.Token)
 
 	require.Equal(t, srturl, u.String())
@@ -37,7 +37,7 @@ func TestParse(t *testing.T) {
 	si, err = u.StreamInfo()
 	require.NoError(t, err)
 	require.Equal(t, "publish", si.Mode)
-	require.Equal(t, "123456", si.Resource)
+	require.Equal(t, "/123456", si.Resource)
 	require.Equal(t, "bla", si.Token)
 
 	require.Equal(t, srturl, u.String())
@@ -45,18 +45,18 @@ func TestParse(t *testing.T) {
 
 func TestParseStreamId(t *testing.T) {
 	streamids := map[string]StreamInfo{
-		"":                                      {Mode: "request"},
-		"bla":                                   {Mode: "request", Resource: "bla"},
-		"bla,token=foobar":                      {Mode: "request", Resource: "bla,token=foobar"},
-		"bla,token:foobar":                      {Mode: "request", Resource: "bla", Token: "foobar"},
-		"bla,token:foobar,mode:publish":         {Mode: "publish", Resource: "bla", Token: "foobar"},
+		"":                                      {Mode: "request", Resource: "/"},
+		"bla":                                   {Mode: "request", Resource: "/bla"},
+		"bla,token=foobar":                      {Mode: "request", Resource: "/bla,token=foobar"},
+		"bla,token:foobar":                      {Mode: "request", Resource: "/bla", Token: "foobar"},
+		"bla,token:foobar,mode:publish":         {Mode: "publish", Resource: "/bla", Token: "foobar"},
 		"#!:":                                   {Mode: "request"},
 		"#!:key=value":                          {Mode: "request"},
 		"#!:m=publish":                          {Mode: "publish"},
-		"#!:r=123456789":                        {Mode: "request", Resource: "123456789"},
+		"#!:r=123456789":                        {Mode: "request", Resource: "/123456789"},
 		"#!:token=foobar":                       {Mode: "request", Token: "foobar"},
 		"#!:token=foo,bar":                      {Mode: "request", Token: "foo"},
-		"#!:m=publish,r=123456789,token=foobar": {Mode: "publish", Resource: "123456789", Token: "foobar"},
+		"#!:m=publish,r=123456789,token=foobar": {Mode: "publish", Resource: "/123456789", Token: "foobar"},
 	}
 
 	for streamid, wantsi := range streamids {
