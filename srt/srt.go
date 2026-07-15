@@ -177,6 +177,7 @@ type Connection struct {
 
 type Channel struct {
 	Name        string                // Resource
+	Proxy       bool                  // Whether this is a proxied channel
 	SocketId    uint32                // Socketid
 	Subscriber  []uint32              // List of subscribed sockedids
 	Connections map[uint32]Connection // Map from socketid to connection
@@ -193,6 +194,7 @@ func (s *server) Channels() []Channel {
 		socketId := ch.publisher.conn.SocketId()
 		channel := Channel{
 			Name:        id,
+			Proxy:       ch.isProxy,
 			SocketId:    socketId,
 			Subscriber:  []uint32{},
 			Connections: map[uint32]Connection{},
@@ -307,7 +309,7 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 
 	if req.Version() == 4 {
 		si.Mode = "publish"
-		si.Resource = client.String()
+		si.Resource = "/" + client.String()
 
 		if len(s.passphrase) != 0 {
 			req.SetPassphrase(s.passphrase)
@@ -369,10 +371,8 @@ func (s *server) handleConnect(req srt.ConnRequest) srt.ConnType {
 	}
 
 	if !s.iam.Enforce(identity, domain, "srt", resource, action) {
-		if !s.iam.Enforce(identity, domain, "srt", filepath.Join("/", resource), action) {
-			s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
-			return srt.REJECT
-		}
+		s.log(identity, "CONNECT", "FORBIDDEN", si.Resource, "access denied", client)
+		return srt.REJECT
 	}
 
 	return mode
@@ -389,9 +389,9 @@ func (s *server) publish(conn srt.Conn, isProxy bool) error {
 	si, _ := url.ParseStreamId(streamId)
 	identity, _ := s.findIdentityFromToken(si.Token)
 
-	// Check if this stream is already published on the cluster
-	if s.proxy != nil {
-		_, err := s.proxy.MediaGetURL("rtmp", si.Resource)
+	// Check if this stream is already published on the cluster, but don't abort if we want to proxy it
+	if !isProxy && s.proxy != nil {
+		_, err := s.proxy.MediaGetURL("srt", si.Resource)
 		if err == nil {
 			s.log(identity, "PUBLISH", "CONFLICT", si.Resource, "already publishing", client)
 			conn.Close()
@@ -572,17 +572,9 @@ func (s *server) findIdentityFromToken(key string) (string, error) {
 }
 
 func splitPath(path string) []string {
-	pathElements := strings.Split(filepath.Clean(path), "/")
-
-	if len(pathElements) == 0 {
-		return pathElements
-	}
-
-	if len(pathElements[0]) == 0 {
-		pathElements = pathElements[1:]
-	}
-
-	return pathElements
+	return strings.FieldsFunc(filepath.Clean(path), func(r rune) bool {
+		return r == '/'
+	})
 }
 
 func (s *server) findDomainFromPlaypath(path string) string {
@@ -608,9 +600,13 @@ func (s *server) Events() (<-chan event.Event, event.CancelFunc, error) {
 
 func (s *server) MediaList() []string {
 	channels := s.Channels()
-	list := make([]string, 0, len(channels))
+	list := []string{}
 
 	for _, channel := range channels {
+		if channel.Proxy {
+			continue
+		}
+
 		list = append(list, channel.Name)
 	}
 

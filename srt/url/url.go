@@ -3,6 +3,7 @@ package url
 import (
 	"fmt"
 	neturl "net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -150,7 +151,7 @@ func ParseStreamId(streamid string) (StreamInfo, error) {
 		idEnd = len(streamid)
 	}
 
-	si.Resource = streamid[:idEnd]
+	si.Resource = filepath.Join("/", streamid[:idEnd])
 	if token, ok := results["token"]; ok {
 		si.Token = token
 	}
