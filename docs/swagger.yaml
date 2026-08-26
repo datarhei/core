@@ -1987,8 +1987,35 @@ definitions:
     type: object
   api.RTMPChannel:
     properties:
+      is_proxy:
+        type: boolean
       name:
         type: string
+      publisher:
+        $ref: '#/definitions/api.RTMPConnection'
+      subscriber:
+        items:
+          $ref: '#/definitions/api.RTMPConnection'
+        type: array
+    type: object
+  api.RTMPChannelName:
+    properties:
+      name:
+        type: string
+    type: object
+  api.RTMPConnection:
+    properties:
+      created_at:
+        format: int64
+        type: integer
+      remote:
+        type: string
+      rx_bytes:
+        format: uint64
+        type: integer
+      tx_bytes:
+        format: uint64
+        type: integer
     type: object
   api.SRTChannel:
     properties:
@@ -2011,6 +2038,19 @@ definitions:
           type: integer
         type: array
     type: object
+  api.SRTChannelX:
+    properties:
+      is_proxy:
+        type: boolean
+      name:
+        type: string
+      publisher:
+        $ref: '#/definitions/api.SRTConnectionX'
+      subscriber:
+        items:
+          $ref: '#/definitions/api.SRTConnectionX'
+        type: array
+    type: object
   api.SRTConnection:
     properties:
       log:
@@ -2021,6 +2061,22 @@ definitions:
         type: object
       stats:
         $ref: '#/definitions/api.SRTStatistics'
+    type: object
+  api.SRTConnectionX:
+    properties:
+      created_at:
+        format: int64
+        type: integer
+      remote:
+        type: string
+      rx_bytes:
+        format: uint64
+        type: integer
+      stats:
+        $ref: '#/definitions/api.SRTStatistics'
+      tx_bytes:
+        format: uint64
+        type: integer
     type: object
   api.SRTLog:
     properties:
@@ -6722,13 +6778,31 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.RTMPChannel'
+              $ref: '#/definitions/api.RTMPChannelName'
             type: array
       security:
       - ApiKeyAuth: []
       summary: List all publishing RTMP streams
       tags:
       - v16.7.2
+  /api/v3/rtmp/channels:
+    get:
+      description: List all currently publishing RTMP streams and their subscriber
+      operationId: rtmp-3-list-all-channels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.RTMPChannel'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all publishing RTMP streams
+      tags:
+      - v16.?.?
   /api/v3/rtmp/disconnect:
     put:
       description: Disconnect all sessions.
@@ -6887,6 +6961,27 @@ paths:
       summary: List all publishing SRT treams
       tags:
       - v16.9.0
+  /api/v3/srt/channels:
+    get:
+      description: List all currently publishing SRT streams and their subscribers.
+        This endpoint is EXPERIMENTAL and may change in future.
+      operationId: srt-3-list-allchannels
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              items:
+                $ref: '#/definitions/api.SRTChannelX'
+              type: array
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all publishing SRT treams
+      tags:
+      - v16.?.?
   /api/v3/srt/disconnect:
     put:
       description: Disconnect all SRT sessions

@@ -14,6 +14,7 @@ import (
 type client struct {
 	conn      connection
 	id        string
+	remote    net.Addr
 	createdAt time.Time
 
 	txbytes uint64
@@ -24,10 +25,11 @@ type client struct {
 	cancel context.CancelFunc
 }
 
-func newClient(conn connection, id string, collector session.Collector) *client {
+func newClient(conn connection, id string, remote net.Addr, collector session.Collector) *client {
 	c := &client{
 		conn:      conn,
 		id:        id,
+		remote:    remote,
 		createdAt: time.Now(),
 
 		collector: collector,
@@ -97,7 +99,7 @@ func newChannel(conn connection, playPath, reference string, remote net.Addr, st
 	ch := &channel{
 		path:       playPath,
 		reference:  reference,
-		publisher:  newClient(conn, playPath, collector),
+		publisher:  newClient(conn, playPath, remote, collector),
 		subscriber: make(map[string]*client),
 		collector:  collector,
 		streams:    streams,
@@ -133,25 +135,26 @@ func (ch *channel) Close() {
 	ch.queue.Close()
 }
 
-func (ch *channel) AddSubscriber(conn connection, addr string, playPath, identity string) string {
-	ip, _, _ := net.SplitHostPort(addr)
+func (ch *channel) AddSubscriber(conn connection, addr net.Addr, playPath, identity string) string {
+	id := addr.String()
+	ip, _, _ := net.SplitHostPort(id)
 
-	client := newClient(conn, addr, ch.collector)
+	client := newClient(conn, id, addr, ch.collector)
 
 	if ch.collector.IsCollectableIP(ip) {
 		extra := map[string]interface{}{
 			"name":   identity,
 			"method": "play",
 		}
-		ch.collector.RegisterAndActivate(addr, ch.reference, playPath, addr)
-		ch.collector.Extra(addr, extra)
+		ch.collector.RegisterAndActivate(id, ch.reference, playPath, id)
+		ch.collector.Extra(id, extra)
 	}
 
 	ch.lock.Lock()
-	ch.subscriber[addr] = client
+	ch.subscriber[id] = client
 	ch.lock.Unlock()
 
-	return addr
+	return id
 }
 
 func (ch *channel) RemoveSubscriber(id string) {

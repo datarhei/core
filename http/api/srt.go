@@ -62,8 +62,8 @@ type SRTStatistics struct {
 	PktRcvAvgBelatedTime uint64  `json:"pkt_recv_avg_belated_time_ms" format:"uint64"` // Accumulated difference between the current time and the time-to-play of a packet that is received late
 }
 
-// Unmarshal converts the SRT statistics into API representation
-func (s *SRTStatistics) Unmarshal(ss *gosrt.Statistics) {
+// Marshal converts the SRT statistics into API representation
+func (s *SRTStatistics) Marshal(ss *gosrt.Statistics) {
 	s.MsTimeStamp = ss.MsTimeStamp
 
 	s.PktSent = ss.Accumulated.PktSent
@@ -134,4 +134,19 @@ type SRTChannel struct {
 	Subscriber  []uint32                 `json:"subscriber"`
 	Connections map[uint32]SRTConnection `json:"connections"`
 	Log         map[string][]SRTLog      `json:"log"`
+}
+
+type SRTChannelX struct {
+	Name       string           `json:"name"`
+	IsProxy    bool             `json:"is_proxy"`
+	Publisher  SRTConnectionX   `json:"publisher"`
+	Subscriber []SRTConnectionX `json:"subscriber"`
+}
+
+type SRTConnectionX struct {
+	Remote    string        `json:"remote"`
+	CreatedAt int64         `json:"created_at" format:"int64"`
+	RxBytes   uint64        `json:"rx_bytes" format:"uint64"`
+	TxBytes   uint64        `json:"tx_bytes" format:"uint64"`
+	Stats     SRTStatistics `json:"stats"`
 }

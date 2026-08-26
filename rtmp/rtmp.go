@@ -86,12 +86,30 @@ type Server interface {
 	// Close stops the RTMP server and closes all connections
 	Close()
 
-	// Channels return a list of currently publishing streams
+	// Channels returns a list of currently publishing streams
 	Channels() []string
 
+	// Connection returns a list of all publishing streams and their connections
+	Connections() []Channel
+
+	// PlayFLV muxes a stream to FLV for HTTP+FLV streaming
 	PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error)
 
 	event.MediaSource
+}
+
+type Channel struct {
+	Path       string
+	IsProxy    bool
+	Publisher  Connection
+	Subscriber []Connection
+}
+
+type Connection struct {
+	Remote    string
+	CreatedAt time.Time
+	RxBytes   uint64
+	TxBytes   uint64
 }
 
 // server is an implementation of the Server interface
@@ -229,6 +247,40 @@ func (s *server) Channels() []string {
 		}
 
 		channels = append(channels, key)
+	}
+
+	return channels
+}
+
+// Connections returns the list of all connections that are currently publishing and subscribing
+func (s *server) Connections() []Channel {
+	channels := []Channel{}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	for _, ch := range s.channels {
+		channel := Channel{
+			Path:    ch.path,
+			IsProxy: ch.isProxy,
+			Publisher: Connection{
+				Remote:    ch.publisher.remote.String(),
+				CreatedAt: ch.publisher.createdAt,
+				RxBytes:   ch.publisher.conn.RxBytes(),
+				TxBytes:   ch.publisher.conn.TxBytes(),
+			},
+		}
+
+		for _, sub := range ch.subscriber {
+			channel.Subscriber = append(channel.Subscriber, Connection{
+				Remote:    sub.remote.String(),
+				CreatedAt: sub.createdAt,
+				RxBytes:   sub.conn.RxBytes(),
+				TxBytes:   sub.conn.TxBytes(),
+			})
+		}
+
+		channels = append(channels, channel)
 	}
 
 	return channels
@@ -381,7 +433,7 @@ func (s *server) handlePlay(conn *rtmp.Conn) {
 		Demuxer: cursor,
 	}
 
-	id := ch.AddSubscriber(conn, remote.String(), playpath, identity)
+	id := ch.AddSubscriber(conn, remote, playpath, identity)
 
 	// Transfer the data, blocks until done
 	avutil.CopyFile(conn, demuxer)
@@ -615,7 +667,7 @@ func (s *server) PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error) {
 
 	conn := newConnectionFromMuxer(muxer)
 
-	id := ch.AddSubscriber(conn, remote.String(), playpath, identity)
+	id := ch.AddSubscriber(conn, remote, playpath, identity)
 
 	go func() {
 		defer w.Close()

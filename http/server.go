@@ -721,6 +721,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 RTMP
 	if s.v3handler.rtmp != nil {
 		v3.GET("/rtmp", s.v3handler.rtmp.ListChannels)
+		v3.GET("/rtmp/channels", s.v3handler.rtmp.ListAllChannels)
 
 		if !s.readOnly {
 			v3.PUT("/rtmp/disconnect", s.v3handler.rtmp.Disconnect)
@@ -730,6 +731,7 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 	// v3 SRT
 	if s.v3handler.srt != nil {
 		v3.GET("/srt", s.v3handler.srt.ListChannels)
+		v3.GET("/srt/channels", s.v3handler.srt.ListAllChannels)
 
 		if !s.readOnly {
 			v3.PUT("/srt/disconnect", s.v3handler.srt.Disconnect)

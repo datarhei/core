@@ -2,6 +2,7 @@ package rtmp
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/datarhei/joy4/av"
 )
@@ -18,8 +19,8 @@ type conn struct {
 	muxer   av.MuxCloser
 	demuxer av.DemuxCloser
 
-	txbytes uint64
-	rxbytes uint64
+	txbytes atomic.Uint64
+	rxbytes atomic.Uint64
 }
 
 // Make sure that conn implements the connection interface
@@ -50,18 +51,18 @@ func (f *fakeMuxCloser) Close() error {
 }
 
 func (c *conn) TxBytes() uint64 {
-	return c.txbytes
+	return c.txbytes.Load()
 }
 
 func (c *conn) RxBytes() uint64 {
-	return c.rxbytes
+	return c.rxbytes.Load()
 }
 
 func (c *conn) ReadPacket() (av.Packet, error) {
 	if c.demuxer != nil {
 		p, err := c.demuxer.ReadPacket()
 		if err == nil {
-			c.rxbytes += uint64(len(p.Data))
+			c.rxbytes.Add(uint64(len(p.Data)))
 		}
 
 		return p, err
@@ -82,7 +83,7 @@ func (c *conn) WritePacket(p av.Packet) error {
 	if c.muxer != nil {
 		err := c.muxer.WritePacket(p)
 		if err == nil {
-			c.txbytes += uint64(len(p.Data))
+			c.txbytes.Add(uint64(len(p.Data)))
 		}
 
 		return err

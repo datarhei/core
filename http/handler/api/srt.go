@@ -57,7 +57,7 @@ func (srth *SRTHandler) unmarshalChannel(ss srt.Channel) api.SRTChannel {
 	for k, v := range ss.Connections {
 		c := s.Connections[k]
 		c.Log = make(map[string][]api.SRTLog)
-		c.Stats.Unmarshal(&v.Stats)
+		c.Stats.Marshal(&v.Stats)
 
 		for lk, lv := range ss.Log {
 			s.Log[lk] = make([]api.SRTLog, len(lv))
@@ -79,6 +79,52 @@ func (srth *SRTHandler) unmarshalChannel(ss srt.Channel) api.SRTChannel {
 	}
 
 	return s
+}
+
+// ListAllChannels lists all currently publishing SRT streams
+// @Summary List all publishing SRT treams
+// @Description List all currently publishing SRT streams and their subscribers. This endpoint is EXPERIMENTAL and may change in future.
+// @Tags v16.?.?
+// @ID srt-3-list-allchannels
+// @Produce json
+// @Success 200 {array} []api.SRTChannelX
+// @Security ApiKeyAuth
+// @Router /api/v3/srt/channels [get]
+func (srth *SRTHandler) ListAllChannels(c echo.Context) error {
+	channels := srth.srt.Connections()
+
+	list := []api.SRTChannelX{}
+
+	for _, ch := range channels {
+		channel := api.SRTChannelX{
+			Name:    ch.Path,
+			IsProxy: ch.IsProxy,
+			Publisher: api.SRTConnectionX{
+				Remote:    ch.Publisher.Remote,
+				CreatedAt: ch.Publisher.CreatedAt.Unix(),
+				RxBytes:   ch.Publisher.RxBytes,
+				TxBytes:   ch.Publisher.TxBytes,
+			},
+		}
+
+		channel.Publisher.Stats.Marshal(&ch.Publisher.Stats)
+
+		for _, sub := range ch.Subscriber {
+			conn := api.SRTConnectionX{
+				Remote:    sub.Remote,
+				CreatedAt: sub.CreatedAt.Unix(),
+				RxBytes:   sub.RxBytes,
+				TxBytes:   sub.TxBytes,
+			}
+			conn.Stats.Marshal(&sub.Stats)
+
+			channel.Subscriber = append(channel.Subscriber, conn)
+		}
+
+		list = append(list, channel)
+	}
+
+	return c.JSON(http.StatusOK, list)
 }
 
 // Disconnect disconnects all SRT sessions

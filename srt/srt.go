@@ -65,6 +65,9 @@ type Server interface {
 	// Channels return a list of currently publishing streams
 	Channels() []Channel
 
+	// Connection returns a list of all publishing streams and their connections
+	Connections() []ChannelX
+
 	event.MediaSource
 }
 
@@ -287,6 +290,60 @@ func (s *server) srtlogListener(ctx context.Context) {
 			s.srtlogLock.Unlock()
 		}
 	}
+}
+
+type ChannelX struct {
+	Path       string
+	IsProxy    bool
+	Publisher  ConnectionX
+	Subscriber []ConnectionX
+}
+
+type ConnectionX struct {
+	Remote    string
+	CreatedAt time.Time
+	RxBytes   uint64
+	TxBytes   uint64
+	Stats     srt.Statistics
+}
+
+func (s *server) Connections() []ChannelX {
+	channels := []ChannelX{}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	stats := srt.Statistics{}
+
+	for id, ch := range s.channels {
+		ch.publisher.conn.Stats(&stats)
+		channel := ChannelX{
+			Path:    id,
+			IsProxy: ch.isProxy,
+			Publisher: ConnectionX{
+				Remote:    ch.publisher.conn.RemoteAddr().String(),
+				CreatedAt: ch.publisher.createdAt,
+				RxBytes:   stats.Accumulated.ByteRecv,
+				TxBytes:   stats.Accumulated.ByteSent,
+				Stats:     stats,
+			},
+		}
+
+		for _, sub := range ch.subscriber {
+			sub.conn.Stats(&stats)
+			channel.Subscriber = append(channel.Subscriber, ConnectionX{
+				Remote:    sub.conn.RemoteAddr().String(),
+				CreatedAt: sub.createdAt,
+				RxBytes:   stats.Accumulated.ByteRecv,
+				TxBytes:   stats.Accumulated.ByteSent,
+				Stats:     stats,
+			})
+		}
+
+		channels = append(channels, channel)
+	}
+
+	return channels
 }
 
 func (s *server) log(who, handler, action, resource, message string, client net.Addr) {

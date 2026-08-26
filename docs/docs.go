@@ -5570,6 +5570,35 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
+                                "$ref": "#/definitions/api.RTMPChannelName"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/rtmp/channels": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all currently publishing RTMP streams and their subscriber",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List all publishing RTMP streams",
+                "operationId": "rtmp-3-list-all-channels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
                                 "$ref": "#/definitions/api.RTMPChannel"
                             }
                         }
@@ -5819,6 +5848,38 @@ const docTemplate = `{
                                 "type": "array",
                                 "items": {
                                     "$ref": "#/definitions/api.SRTChannel"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/srt/channels": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all currently publishing SRT streams and their subscribers. This endpoint is EXPERIMENTAL and may change in future.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.?.?"
+                ],
+                "summary": "List all publishing SRT treams",
+                "operationId": "srt-3-list-allchannels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/api.SRTChannelX"
                                 }
                             }
                         }
@@ -8925,8 +8986,48 @@ const docTemplate = `{
         "api.RTMPChannel": {
             "type": "object",
             "properties": {
+                "is_proxy": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
+                },
+                "publisher": {
+                    "$ref": "#/definitions/api.RTMPConnection"
+                },
+                "subscriber": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.RTMPConnection"
+                    }
+                }
+            }
+        },
+        "api.RTMPChannelName": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.RTMPConnection": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "remote": {
+                    "type": "string"
+                },
+                "rx_bytes": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "tx_bytes": {
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },
@@ -8962,6 +9063,26 @@ const docTemplate = `{
                 }
             }
         },
+        "api.SRTChannelX": {
+            "type": "object",
+            "properties": {
+                "is_proxy": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "publisher": {
+                    "$ref": "#/definitions/api.SRTConnectionX"
+                },
+                "subscriber": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.SRTConnectionX"
+                    }
+                }
+            }
+        },
         "api.SRTConnection": {
             "type": "object",
             "properties": {
@@ -8976,6 +9097,29 @@ const docTemplate = `{
                 },
                 "stats": {
                     "$ref": "#/definitions/api.SRTStatistics"
+                }
+            }
+        },
+        "api.SRTConnectionX": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "remote": {
+                    "type": "string"
+                },
+                "rx_bytes": {
+                    "type": "integer",
+                    "format": "uint64"
+                },
+                "stats": {
+                    "$ref": "#/definitions/api.SRTStatistics"
+                },
+                "tx_bytes": {
+                    "type": "integer",
+                    "format": "uint64"
                 }
             }
         },

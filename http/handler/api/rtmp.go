@@ -29,18 +29,59 @@ func NewRTMP(rtmp rtmp.Server) *RTMPHandler {
 // @Tags v16.7.2
 // @ID rtmp-3-list-channels
 // @Produce json
-// @Success 200 {array} api.RTMPChannel
+// @Success 200 {array} api.RTMPChannelName
 // @Security ApiKeyAuth
 // @Router /api/v3/rtmp [get]
 func (rtmph *RTMPHandler) ListChannels(c echo.Context) error {
 	channels := rtmph.rtmp.Channels()
 
-	list := []api.RTMPChannel{}
+	list := []api.RTMPChannelName{}
 
 	for _, c := range channels {
-		list = append(list, api.RTMPChannel{
+		list = append(list, api.RTMPChannelName{
 			Name: c,
 		})
+	}
+
+	return c.JSON(http.StatusOK, list)
+}
+
+// ListAllChannels lists all currently publishing RTMP streams
+// @Summary List all publishing RTMP streams
+// @Description List all currently publishing RTMP streams and their subscriber
+// @Tags v16.?.?
+// @ID rtmp-3-list-all-channels
+// @Produce json
+// @Success 200 {array} api.RTMPChannel
+// @Security ApiKeyAuth
+// @Router /api/v3/rtmp/channels [get]
+func (rtmph *RTMPHandler) ListAllChannels(c echo.Context) error {
+	channels := rtmph.rtmp.Connections()
+
+	list := []api.RTMPChannel{}
+
+	for _, ch := range channels {
+		channel := api.RTMPChannel{
+			Name:    ch.Path,
+			IsProxy: ch.IsProxy,
+			Publisher: api.RTMPConnection{
+				Remote:    ch.Publisher.Remote,
+				CreatedAt: ch.Publisher.CreatedAt.Unix(),
+				RxBytes:   ch.Publisher.RxBytes,
+				TxBytes:   ch.Publisher.TxBytes,
+			},
+		}
+
+		for _, sub := range ch.Subscriber {
+			channel.Subscriber = append(channel.Subscriber, api.RTMPConnection{
+				Remote:    sub.Remote,
+				CreatedAt: sub.CreatedAt.Unix(),
+				RxBytes:   sub.RxBytes,
+				TxBytes:   sub.TxBytes,
+			})
+		}
+
+		list = append(list, channel)
 	}
 
 	return c.JSON(http.StatusOK, list)
