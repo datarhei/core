@@ -21,7 +21,7 @@ type session struct {
 
 	location string
 	peer     string
-	extra    map[string]interface{}
+	extra    *SessionExtra
 
 	stale    *time.Timer
 	timeout  time.Duration
@@ -57,7 +57,7 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 
 	s.location = ""
 	s.peer = ""
-	s.extra = map[string]interface{}{}
+	s.extra = &SessionExtra{}
 
 	s.rxBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
 	s.txBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
@@ -140,10 +140,8 @@ func (s *session) Activate() bool {
 	return true
 }
 
-func (s *session) Extra(extra map[string]interface{}) {
-	s.extra = extra
-
-	s.logger = s.logger.WithField("extra", extra)
+func (s *session) Extra() *SessionExtra {
+	return s.extra
 }
 
 func (s *session) Ingress(size int64) bool {
@@ -267,4 +265,75 @@ func (s *session) ticker(ctx context.Context) {
 
 func (s *session) Cancel() {
 	s.close()
+}
+
+type SessionExtra struct {
+	data map[string]any
+
+	lock sync.Mutex
+}
+
+func (se *SessionExtra) Set(key string, value any) {
+	se.lock.Lock()
+	defer se.lock.Unlock()
+
+	if len(se.data) == 0 {
+		se.data = map[string]any{}
+	}
+
+	se.data[key] = value
+}
+
+func (se *SessionExtra) SetAll(data map[string]any) {
+	se.lock.Lock()
+	defer se.lock.Unlock()
+
+	if len(se.data) == 0 {
+		se.data = map[string]any{}
+	}
+
+	for k, v := range data {
+		se.data[k] = v
+	}
+}
+
+func (se *SessionExtra) Get(key string) (any, bool) {
+	se.lock.Lock()
+	defer se.lock.Unlock()
+
+	if len(se.data) == 0 {
+		return nil, false
+	}
+
+	value, ok := se.data[key]
+
+	return value, ok
+}
+
+func (se *SessionExtra) GetAll() map[string]any {
+	se.lock.Lock()
+	defer se.lock.Unlock()
+
+	data := map[string]any{}
+
+	if len(se.data) == 0 {
+		return data
+	}
+
+	for k, v := range se.data {
+		data[k] = v
+	}
+
+	return data
+}
+
+func (se *SessionExtra) Delete(key string) {
+	se.lock.Lock()
+	defer se.lock.Unlock()
+
+	if len(se.data) == 0 {
+		return
+	}
+
+	delete(se.data, key)
 }

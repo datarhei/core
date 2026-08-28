@@ -103,7 +103,7 @@ func newChannel(conn srt.Conn, resource string, isProxy bool, identity string, c
 			"method": "publish",
 		}
 		collector.RegisterAndActivate(resource, resource, resource, addr)
-		collector.Extra(resource, extra)
+		collector.Extra(resource).SetAll(extra)
 	}
 
 	return ch
@@ -130,7 +130,7 @@ func (ch *channel) AddSubscriber(conn srt.Conn, resource, identity string) strin
 			"method": "play",
 		}
 		ch.collector.RegisterAndActivate(addr, resource, resource, addr)
-		ch.collector.Extra(addr, extra)
+		ch.collector.Extra(addr).SetAll(extra)
 	}
 
 	ch.lock.Lock()

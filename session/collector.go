@@ -82,7 +82,7 @@ type Collector interface {
 	RegisterAndActivate(id, reference, location, peer string)
 
 	// Add arbitrary extra data to a session
-	Extra(id string, extra map[string]interface{})
+	Extra(id string) *SessionExtra
 
 	// Unregister cancels a session prematurely.
 	Unregister(id string)
@@ -379,7 +379,7 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, histo
 				ClosedAt:     sess.closedAt,
 				Location:     sess.location,
 				Peer:         sess.peer,
-				Extra:        sess.extra,
+				Extra:        sess.extra.GetAll(),
 				RxBytes:      sess.rxBytes,
 				RxBitrate:    sess.RxBitrate(),
 				TopRxBitrate: sess.TopRxBitrate(),
@@ -621,16 +621,16 @@ func (c *collector) Close(id string) bool {
 	return true
 }
 
-func (c *collector) Extra(id string, extra map[string]interface{}) {
+func (c *collector) Extra(id string) *SessionExtra {
 	c.lock.session.RLock()
 	sess, ok := c.sessions[id]
 	c.lock.session.RUnlock()
 
 	if !ok {
-		return
+		return nil
 	}
 
-	sess.Extra(extra)
+	return sess.Extra()
 }
 
 func (c *collector) Ingress(id string, size int64) {
@@ -883,7 +883,7 @@ func (c *collector) Active() []Session {
 			CreatedAt:    sess.createdAt,
 			Location:     sess.location,
 			Peer:         sess.peer,
-			Extra:        sess.extra,
+			Extra:        sess.extra.GetAll(),
 			RxBytes:      sess.rxBytes,
 			RxBitrate:    sess.RxBitrate(),
 			TopRxBitrate: sess.TopRxBitrate(),
@@ -966,7 +966,7 @@ func (n *nullCollector) Register(id, reference, location, peer string)          
 func (n *nullCollector) Activate(id string) bool                                  { return false }
 func (n *nullCollector) Close(id string) bool                                     { return true }
 func (n *nullCollector) RegisterAndActivate(id, reference, location, peer string) {}
-func (n *nullCollector) Extra(id string, extra map[string]interface{})            {}
+func (n *nullCollector) Extra(id string) *SessionExtra                            { return nil }
 func (n *nullCollector) Unregister(id string)                                     {}
 func (n *nullCollector) Ingress(id string, size int64)                            {}
 func (n *nullCollector) Egress(id string, size int64)                             {}

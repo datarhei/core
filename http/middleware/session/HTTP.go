@@ -43,7 +43,7 @@ func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface
 	res.Writer = w
 
 	h.httpCollector.RegisterAndActivate(id, "", location, referrer)
-	h.httpCollector.Extra(id, data)
+	h.httpCollector.Extra(id).SetAll(data)
 
 	defer func() {
 		buffer := mem.Get()
@@ -55,7 +55,7 @@ func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface
 
 		h.httpCollector.Egress(id, w.size+headerSize(res.Header(), buffer))
 		data["code"] = res.Status
-		h.httpCollector.Extra(id, data)
+		h.httpCollector.Extra(id).SetAll(data)
 
 		h.httpCollector.Close(id)
 

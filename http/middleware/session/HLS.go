@@ -60,7 +60,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 				// Register a new session
 				reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 				h.hlsIngressCollector.RegisterAndActivate(path, reference, path, ip)
-				h.hlsIngressCollector.Extra(path, data)
+				h.hlsIngressCollector.Extra(path).SetAll(data)
 			}
 
 			buffer := mem.Get()
@@ -158,7 +158,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 
 				// Register a new session
 				h.hlsEgressCollector.Register(sessionID, reference, path, referrer)
-				h.hlsEgressCollector.Extra(sessionID, data)
+				h.hlsEgressCollector.Extra(sessionID).SetAll(data)
 
 				// Give the new session an initial top bitrate
 				h.hlsEgressCollector.SessionSetTopEgressBitrate(sessionID, streamBitrate)

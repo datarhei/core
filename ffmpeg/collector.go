@@ -33,8 +33,8 @@ func (w *wrappedCollector) RegisterAndActivate(id, reference, location, peer str
 	w.Collector.RegisterAndActivate(w.prefix+id, w.reference, location, peer)
 }
 
-func (w *wrappedCollector) Extra(id string, extra map[string]interface{}) {
-	w.Collector.Extra(w.prefix+id, extra)
+func (w *wrappedCollector) Extra(id string) *session.SessionExtra {
+	return w.Collector.Extra(w.prefix + id)
 }
 
 func (w *wrappedCollector) Unregister(id string) {

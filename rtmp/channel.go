@@ -118,7 +118,7 @@ func newChannel(conn connection, playPath, reference string, remote net.Addr, st
 			"method": "publish",
 		}
 		collector.RegisterAndActivate(ch.path, ch.reference, ch.path, addr)
-		collector.Extra(ch.path, extra)
+		collector.Extra(ch.path).SetAll(extra)
 	}
 
 	return ch
@@ -147,7 +147,7 @@ func (ch *channel) AddSubscriber(conn connection, addr net.Addr, playPath, ident
 			"method": "play",
 		}
 		ch.collector.RegisterAndActivate(id, ch.reference, playPath, id)
-		ch.collector.Extra(id, extra)
+		ch.collector.Extra(id).SetAll(extra)
 	}
 
 	ch.lock.Lock()
