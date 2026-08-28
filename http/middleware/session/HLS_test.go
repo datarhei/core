@@ -5,11 +5,62 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/datarhei/core/v16/mem"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHLSRewriteMaster(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/master.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("8pfhCNqTnxSsbdoA3jnWxs", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/master_with_session.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
+func TestHLSRewriteMasterWithoutSession(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/master.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("", u, buffer)
+
+	re := regexp.MustCompile(`session=([0-9A-Za-z]+)`)
+
+	matches := re.FindAllStringSubmatch(buffer.String(), -1)
+
+	require.Equal(t, 2, len(matches))
+	require.Equal(t, matches[0][1], matches[1][1])
+}
 
 func TestHLSSegmentReaderTS(t *testing.T) {
 	data, err := os.ReadFile("./fixtures/segments_v6.txt")

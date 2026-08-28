@@ -206,7 +206,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 
 		buffer := mem.Get()
 
-		// Rewrite the data befor sending it to the client
+		// Rewrite the data before sending it to the client
 		rewriter.rewriteHLS(sessionID, c.Request().URL, buffer)
 
 		res.Header().Set("Cache-Control", "private")
@@ -312,6 +312,11 @@ func (g *sessionRewriter) Write(data []byte) (int, error) {
 
 func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *mem.Buffer) {
 	isMaster := false
+	hasSession := len(sessionID) != 0
+
+	if !hasSession {
+		sessionID = shortuuid.New()
+	}
 
 	// Find all URLS in the .m3u8 and add the session ID to the query string
 	scanner := bufio.NewScanner(g.buffer.Reader())
@@ -377,7 +382,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 				loop = true
 			}
 
-			q.Set("session", shortuuid.New())
+			q.Set("session", sessionID)
 
 			isMaster = true
 		} else {
@@ -398,9 +403,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 	}
 
 	// If this is not a master manifest and there isn't a session ID, we add a new session ID.
-	if !isMaster && len(sessionID) == 0 {
-		sessionID = shortuuid.New()
-
+	if !isMaster && !hasSession {
 		buffer.Reset()
 
 		buffer.WriteString("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=1024\n")
