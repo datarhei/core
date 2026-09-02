@@ -21,7 +21,8 @@ type session struct {
 
 	location string
 	peer     string
-	extra    *SessionExtra
+	extra    *SessionData
+	userdata *SessionData
 
 	stale    *time.Timer
 	timeout  time.Duration
@@ -57,7 +58,8 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 
 	s.location = ""
 	s.peer = ""
-	s.extra = &SessionExtra{}
+	s.extra = &SessionData{}
+	s.userdata = &SessionData{}
 
 	s.rxBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
 	s.txBitrate, _ = average.NewSMA(averageWindow, averageGranularity)
@@ -138,10 +140,6 @@ func (s *session) Activate() bool {
 	go s.ticker(ctx)
 
 	return true
-}
-
-func (s *session) Extra() *SessionExtra {
-	return s.extra
 }
 
 func (s *session) Ingress(size int64) bool {
@@ -267,13 +265,27 @@ func (s *session) Cancel() {
 	s.close()
 }
 
-type SessionExtra struct {
+func (s *session) Extra() *SessionData {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.extra
+}
+
+func (s *session) UserData() *SessionData {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.userdata
+}
+
+type SessionData struct {
 	data map[string]any
 
 	lock sync.Mutex
 }
 
-func (se *SessionExtra) Set(key string, value any) {
+func (se *SessionData) Set(key string, value any) {
 	se.lock.Lock()
 	defer se.lock.Unlock()
 
@@ -284,7 +296,7 @@ func (se *SessionExtra) Set(key string, value any) {
 	se.data[key] = value
 }
 
-func (se *SessionExtra) SetAll(data map[string]any) {
+func (se *SessionData) SetAll(data map[string]any) {
 	se.lock.Lock()
 	defer se.lock.Unlock()
 
@@ -297,7 +309,7 @@ func (se *SessionExtra) SetAll(data map[string]any) {
 	}
 }
 
-func (se *SessionExtra) Get(key string) (any, bool) {
+func (se *SessionData) Get(key string) (any, bool) {
 	se.lock.Lock()
 	defer se.lock.Unlock()
 
@@ -310,7 +322,7 @@ func (se *SessionExtra) Get(key string) (any, bool) {
 	return value, ok
 }
 
-func (se *SessionExtra) GetAll() map[string]any {
+func (se *SessionData) GetAll() map[string]any {
 	se.lock.Lock()
 	defer se.lock.Unlock()
 
@@ -327,7 +339,7 @@ func (se *SessionExtra) GetAll() map[string]any {
 	return data
 }
 
-func (se *SessionExtra) Delete(key string) {
+func (se *SessionData) Delete(key string) {
 	se.lock.Lock()
 	defer se.lock.Unlock()
 

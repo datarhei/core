@@ -9392,7 +9392,7 @@
                 },
                 "extra": {
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 },
                 "id": {
                     "type": "string"
@@ -9405,6 +9405,10 @@
                 },
                 "remote": {
                     "type": "string"
+                },
+                "userdata": {
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },

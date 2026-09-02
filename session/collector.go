@@ -15,20 +15,21 @@ import (
 
 // Session represents an active session
 type Session struct {
-	Collector    string                 `json:"collector"`
-	ID           string                 `json:"id"`
-	Reference    string                 `json:"reference"`
-	CreatedAt    time.Time              `json:"created_at"`
-	ClosedAt     time.Time              `json:"closed_at"`
-	Location     string                 `json:"local"`
-	Peer         string                 `json:"remote"`
-	Extra        map[string]interface{} `json:"extra"`
-	RxBytes      uint64                 `json:"rx_bytes"`
-	RxBitrate    float64                `json:"rx_bitrate"`     // bit/s
-	TopRxBitrate float64                `json:"rx_top_bitrate"` // bit/s
-	TxBytes      uint64                 `json:"tx_bytes"`
-	TxBitrate    float64                `json:"tx_bitrate"`     // bit/s
-	TopTxBitrate float64                `json:"tx_top_bitrate"` // bit/s
+	Collector    string         `json:"collector"`
+	ID           string         `json:"id"`
+	Reference    string         `json:"reference"`
+	CreatedAt    time.Time      `json:"created_at"`
+	ClosedAt     time.Time      `json:"closed_at"`
+	Location     string         `json:"local"`
+	Peer         string         `json:"remote"`
+	Extra        map[string]any `json:"extra"`
+	UserData     map[string]any `json:"userdata,omitempty"`
+	RxBytes      uint64         `json:"rx_bytes"`
+	RxBitrate    float64        `json:"rx_bitrate"`     // bit/s
+	TopRxBitrate float64        `json:"rx_top_bitrate"` // bit/s
+	TxBytes      uint64         `json:"tx_bytes"`
+	TxBitrate    float64        `json:"tx_bitrate"`     // bit/s
+	TopTxBitrate float64        `json:"tx_top_bitrate"` // bit/s
 }
 
 // Summary is a summary over all current and past sessions.
@@ -82,7 +83,10 @@ type Collector interface {
 	RegisterAndActivate(id, reference, location, peer string)
 
 	// Add arbitrary extra data to a session
-	Extra(id string) *SessionExtra
+	Extra(id string) *SessionData
+
+	// UserData return arbitrary user data stored with this session
+	UserData(id string) *SessionData
 
 	// Unregister cancels a session prematurely.
 	Unregister(id string)
@@ -380,6 +384,7 @@ func newCollector(id string, sessionsCh chan<- Session, logger log.Logger, histo
 				Location:     sess.location,
 				Peer:         sess.peer,
 				Extra:        sess.extra.GetAll(),
+				UserData:     nil, // This is not forwarded on purpose
 				RxBytes:      sess.rxBytes,
 				RxBitrate:    sess.RxBitrate(),
 				TopRxBitrate: sess.TopRxBitrate(),
@@ -621,7 +626,7 @@ func (c *collector) Close(id string) bool {
 	return true
 }
 
-func (c *collector) Extra(id string) *SessionExtra {
+func (c *collector) Extra(id string) *SessionData {
 	c.lock.session.RLock()
 	sess, ok := c.sessions[id]
 	c.lock.session.RUnlock()
@@ -631,6 +636,18 @@ func (c *collector) Extra(id string) *SessionExtra {
 	}
 
 	return sess.Extra()
+}
+
+func (c *collector) UserData(id string) *SessionData {
+	c.lock.session.RLock()
+	sess, ok := c.sessions[id]
+	c.lock.session.RUnlock()
+
+	if !ok {
+		return nil
+	}
+
+	return sess.UserData()
 }
 
 func (c *collector) Ingress(id string, size int64) {
@@ -884,6 +901,7 @@ func (c *collector) Active() []Session {
 			Location:     sess.location,
 			Peer:         sess.peer,
 			Extra:        sess.extra.GetAll(),
+			UserData:     sess.userdata.GetAll(),
 			RxBytes:      sess.rxBytes,
 			RxBitrate:    sess.RxBitrate(),
 			TopRxBitrate: sess.TopRxBitrate(),
@@ -966,7 +984,8 @@ func (n *nullCollector) Register(id, reference, location, peer string)          
 func (n *nullCollector) Activate(id string) bool                                  { return false }
 func (n *nullCollector) Close(id string) bool                                     { return true }
 func (n *nullCollector) RegisterAndActivate(id, reference, location, peer string) {}
-func (n *nullCollector) Extra(id string) *SessionExtra                            { return nil }
+func (n *nullCollector) Extra(id string) *SessionData                             { return nil }
+func (n *nullCollector) UserData(id string) *SessionData                          { return nil }
 func (n *nullCollector) Unregister(id string)                                     {}
 func (n *nullCollector) Ingress(id string, size int64)                            {}
 func (n *nullCollector) Egress(id string, size int64)                             {}

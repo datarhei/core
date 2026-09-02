@@ -2330,7 +2330,7 @@ definitions:
         format: int64
         type: integer
       extra:
-        additionalProperties: true
+        additionalProperties: {}
         type: object
       id:
         type: string
@@ -2340,6 +2340,9 @@ definitions:
         type: string
       remote:
         type: string
+      userdata:
+        additionalProperties: {}
+        type: object
     type: object
   api.SessionPeers:
     properties:

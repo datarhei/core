@@ -9399,7 +9399,7 @@ const docTemplate = `{
                 },
                 "extra": {
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 },
                 "id": {
                     "type": "string"
@@ -9412,6 +9412,10 @@ const docTemplate = `{
                 },
                 "remote": {
                     "type": "string"
+                },
+                "userdata": {
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },

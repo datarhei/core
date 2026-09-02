@@ -3,12 +3,17 @@ package session
 
 import (
 	"bufio"
+	"bytes"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	urlpath "path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
@@ -34,7 +39,7 @@ func (h *handler) handleHLSIngress(c echo.Context, _ string, data map[string]int
 	path := req.URL.Path
 
 	isM3U8 := strings.HasSuffix(path, ".m3u8")
-	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
+	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".m4s")
 
 	if isM3U8 {
 		// Read out the path of the .ts files and look them up in the ts-map.
@@ -120,7 +125,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	sessionID := c.QueryParam("session")
 
 	isM3U8 := strings.HasSuffix(path, ".m3u8")
-	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
+	isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".m4s")
 
 	rewrite := false
 
@@ -188,6 +193,8 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		res.Writer = rewriter
 	}
 
+	start := time.Now()
+
 	err := next(c)
 
 	// Restore the original writer
@@ -196,6 +203,11 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	if err != nil {
 		return err
 	}
+
+	duration := time.Since(start)
+
+	variants := []variant{}
+	segments := map[string]hlsSegment{}
 
 	if rewrite {
 		if res.Status < 200 || res.Status >= 300 {
@@ -207,7 +219,30 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		buffer := mem.Get()
 
 		// Rewrite the data before sending it to the client
-		rewriter.rewriteHLS(sessionID, c.Request().URL, buffer)
+		newSessionID := rewriter.rewriteHLS(sessionID, c.Request().URL, buffer)
+		if newSessionID != sessionID {
+			sessionID = newSessionID
+
+			streamBitrate := h.hlsIngressCollector.SessionTopIngressBitrate(path) * 2.0 // Multiply by 2 to cover the initial peak
+
+			// Create new session
+			referrer := req.Header.Get("Referer")
+			if u, err := url.Parse(referrer); err == nil {
+				referrer = u.Host
+			}
+
+			reference := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+
+			// Register a new session
+			h.hlsEgressCollector.Register(sessionID, reference, path, referrer)
+			h.hlsEgressCollector.Extra(sessionID).SetAll(data)
+
+			// Give the new session an initial top bitrate
+			h.hlsEgressCollector.SessionSetTopEgressBitrate(sessionID, streamBitrate)
+		}
+
+		variants = parseVariants(path, buffer)
+		segments = parseSegments(buffer)
 
 		res.Header().Set("Cache-Control", "private")
 		res.Write(buffer.Bytes())
@@ -215,6 +250,110 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		mem.Put(buffer)
 		mem.Put(rewriter.buffer)
 	}
+
+	if len(sessionID) == 0 {
+		return nil
+	}
+
+	var sdata *hlsSessionData = nil
+	if x, ok := h.hlsEgressCollector.UserData(sessionID).Get("hlsstats"); ok {
+		if data, ok := x.(*hlsSessionData); ok {
+			sdata = data
+		}
+	}
+
+	if sdata == nil {
+		sdata = newHLSSessionData()
+	}
+
+	if len(sdata.Variants) == 0 {
+		if len(variants) != 0 {
+			for _, v := range variants {
+				sdata.Variants[v.file] = hlsSessionVariant{
+					Active:     false,
+					Switches:   0,
+					Bandwidth:  v.bandwidth,
+					Resolution: v.resolution,
+					Codecs:     v.codecs,
+				}
+			}
+		}
+	}
+
+	if len(variants) != 0 {
+		// This is a master file. No further processing needed
+		h.hlsEgressCollector.UserData(sessionID).Set("hlsstats", sdata)
+		return nil
+	}
+
+	if isM3U8 {
+		if variant, ok := sdata.Variants[path]; ok {
+			for key, variant := range sdata.Variants {
+				if key == path {
+					continue
+				}
+
+				variant.Active = false
+				sdata.Variants[key] = variant
+			}
+
+			if !variant.Active {
+				variant.Active = true
+				variant.Switches++
+			}
+
+			sdata.Variants[path] = variant
+		}
+
+		sdata.Segments.segments = mergeSegments(sdata.Segments.segments, segments)
+	}
+
+	sdata.HTTPStatus[res.Status]++
+
+	if isSegment {
+		path = filepath.Base(path)
+
+		sdata.Segments.Last = time.Now()
+		sdata.Segments.Requested++
+		segment, ok := sdata.Segments.segments[path]
+		if ok {
+			if segment.sequence-sdata.Segments.lastSequence > 1 {
+				sdata.Segments.SequenceGaps++
+			}
+
+			sdata.Segments.lastSequence = segment.sequence
+
+			if segment.requested {
+				sdata.Segments.Retries++
+			} else {
+				segment.requested = true
+				sdata.Segments.segments[path] = segment
+			}
+
+			if duration > segment.duration {
+				sdata.Segments.TooSlow++
+			}
+		} else {
+			if res.Status > 400 {
+				sdata.Segments.Failed++
+			} else {
+				sdata.Segments.TooLate++
+			}
+		}
+
+		bitrate := float64(res.Size) * 8 / duration.Seconds()
+		if bitrate < sdata.Bandwidth.Min {
+			sdata.Bandwidth.Min = bitrate
+		}
+
+		if bitrate > sdata.Bandwidth.Max {
+			sdata.Bandwidth.Max = bitrate
+		}
+
+		sdata.Bandwidth.Avg = sdata.Bandwidth.Avg*0.85 + bitrate*0.15
+	}
+
+	h.hlsEgressCollector.UserData(sessionID).Set("hlsstats", sdata)
 
 	if isM3U8 || isSegment {
 		if res.Status >= 200 && res.Status < 300 {
@@ -232,6 +371,79 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	}
 
 	return nil
+}
+
+func mergeSegments(have, fresh map[string]hlsSegment) map[string]hlsSegment {
+	lowestListedSequence := uint64(math.MaxUint64)
+
+	// Add the new segments to the map
+	for path, s := range fresh {
+		if s.sequence < lowestListedSequence {
+			lowestListedSequence = s.sequence
+		}
+
+		if _, ok := have[path]; ok {
+			continue
+		}
+
+		have[path] = s
+	}
+
+	// Remove all segments that have a lower sequence than
+	// the lowest listed sequence.
+	for path, s := range have {
+		if s.sequence < lowestListedSequence {
+			delete(have, path)
+		}
+	}
+
+	return have
+}
+
+type hlsSegment struct {
+	duration  time.Duration
+	sequence  uint64
+	requested bool
+}
+
+type hlsSessionVariant struct {
+	Active     bool   `json:"active"`
+	Switches   uint64 `json:"switches"`
+	Bandwidth  uint64 `json:"bandwidth_bits"`
+	Resolution string `json:"resolution"`
+	Codecs     string `json:"codecs"`
+}
+
+type hlsSessionData struct {
+	Variants map[string]hlsSessionVariant `json:"hls_variants"`
+	Segments struct {
+		segments     map[string]hlsSegment
+		lastSequence uint64
+		Requested    uint64    `json:"requests"`
+		Failed       uint64    `json:"failed"`
+		TooSlow      uint64    `json:"too_slow"`
+		Retries      uint64    `json:"retries"`
+		TooLate      uint64    `json:"too_late"`
+		SequenceGaps uint64    `json:"sequence_gaps"`
+		Last         time.Time `json:"last"`
+	} `json:"hls_segments"`
+	HTTPStatus map[int]uint64 `json:"http_status"`
+	Bandwidth  struct {
+		Min float64 `json:"min"`
+		Max float64 `json:"max"`
+		Avg float64 `json:"avg"`
+	} `json:"bandwidth_tx_bits"`
+}
+
+func newHLSSessionData() *hlsSessionData {
+	data := &hlsSessionData{}
+
+	data.Variants = map[string]hlsSessionVariant{}
+	data.Segments.segments = map[string]hlsSegment{}
+	data.HTTPStatus = map[int]uint64{}
+	data.Bandwidth.Min = math.MaxFloat64
+
+	return data
 }
 
 type segmentReader struct {
@@ -284,7 +496,7 @@ func (r *segmentReader) getSegments(dir string) []string {
 		}
 
 		// Ignore anything that doesn't end in .ts
-		if !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
+		if !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") && !strings.HasSuffix(u.Path, ".m4s") {
 			continue
 		}
 
@@ -310,7 +522,161 @@ func (g *sessionRewriter) Write(data []byte) (int, error) {
 	return g.buffer.Write(data)
 }
 
-func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *mem.Buffer) {
+func parseSegments(buffer *mem.Buffer) map[string]hlsSegment {
+	var reSequence *regexp.Regexp
+	isSegment := false
+	segments := map[string]hlsSegment{}
+	duration := time.Duration(0)
+
+	scanner := bufio.NewScanner(buffer.Reader())
+	for scanner.Scan() {
+		byteline := scanner.Bytes()
+
+		if len(byteline) == 0 {
+			continue
+		}
+
+		if !isSegment {
+			after, found := bytes.CutPrefix(byteline, []byte("#EXTINF:"))
+			if !found {
+				continue
+			}
+
+			isSegment = true
+
+			before, _, _ := bytes.Cut(after, []byte(","))
+
+			if f, err := strconv.ParseFloat(string(before), 64); err == nil {
+				duration = time.Duration(f * float64(time.Second))
+			}
+		} else {
+			if byteline[0] == '#' {
+				continue
+			}
+
+			s := hlsSegment{
+				duration: duration,
+			}
+
+			before, _, _ := bytes.Cut(byteline, []byte("?"))
+			name := filepath.Base(string(before))
+			if reSequence == nil {
+				reSequence = regexp.MustCompile(`([0-9]+)\.`)
+			}
+			matches := reSequence.FindStringSubmatch(name)
+			if len(matches) > 1 {
+				if x, err := strconv.ParseUint(matches[1], 10, 64); err == nil {
+					s.sequence = x
+				}
+			}
+			segments[name] = s
+
+			isSegment = false
+			duration = time.Duration(0)
+		}
+	}
+
+	return segments
+}
+
+type variant struct {
+	file       string
+	bandwidth  uint64
+	resolution string
+	codecs     string
+}
+
+func parseVariants(path string, buffer *mem.Buffer) []variant {
+	isVariant := false
+	var vari variant
+	variants := []variant{}
+
+	dir := filepath.Dir(path)
+
+	scanner := bufio.NewScanner(buffer.Reader())
+	for scanner.Scan() {
+		byteline := scanner.Bytes()
+
+		if len(byteline) == 0 {
+			continue
+		}
+
+		if !isVariant {
+			after, found := bytes.CutPrefix(byteline, []byte("#EXT-X-STREAM-INF:"))
+			if !found {
+				continue
+			}
+
+			isVariant = true
+
+			kvs := parseKeyValueBytes(after)
+
+			bandwidth, _ := strconv.ParseUint(kvs["BANDWIDTH"], 10, 64)
+
+			vari = variant{
+				bandwidth:  bandwidth,
+				resolution: kvs["RESOLUTION"],
+				codecs:     kvs["CODECS"],
+			}
+		} else {
+			before, _, _ := bytes.Cut(byteline, []byte("?"))
+			vari.file = filepath.Join(dir, string(before))
+			variants = append(variants, vari)
+			isVariant = false
+		}
+	}
+
+	return variants
+}
+
+// parseKeyValueBytes parses a comma-separated byte array of key=value pairs into a map[string]string.
+// Quoted values (e.g. CODECS="avc1.42c01f,mp4a.40.2") preserve internal commas and are returned unquoted.
+func parseKeyValueBytes(b []byte) map[string]string {
+	result := make(map[string]string)
+	inQuotes := false
+	start := 0
+
+	for i := 0; i < len(b); i++ {
+		switch b[i] {
+		case '"':
+			inQuotes = !inQuotes
+		case ',':
+			if !inQuotes {
+				parsePair(b[start:i], result)
+				start = i + 1
+			}
+		}
+	}
+
+	if start < len(b) {
+		parsePair(b[start:], result)
+	}
+
+	return result
+}
+
+func parsePair(pair []byte, result map[string]string) {
+	s := strings.TrimSpace(string(pair))
+	if s == "" {
+		return
+	}
+
+	key, value, found := strings.Cut(s, "=")
+	if !found {
+		return
+	}
+
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+
+	if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+		value = value[1 : len(value)-1]
+	}
+
+	result[key] = value
+}
+
+func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buffer *mem.Buffer) string {
 	isMaster := false
 	hasSession := len(sessionID) != 0
 
@@ -399,7 +765,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 	}
 
 	if err := scanner.Err(); err != nil {
-		return
+		return sessionID
 	}
 
 	// If this is not a master manifest and there isn't a session ID, we add a new session ID.
@@ -414,4 +780,6 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 
 		buffer.WriteString(urlpath.Base(requestURL.Path) + "?" + q.Encode())
 	}
+
+	return sessionID
 }

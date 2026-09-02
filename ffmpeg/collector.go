@@ -33,7 +33,7 @@ func (w *wrappedCollector) RegisterAndActivate(id, reference, location, peer str
 	w.Collector.RegisterAndActivate(w.prefix+id, w.reference, location, peer)
 }
 
-func (w *wrappedCollector) Extra(id string) *session.SessionExtra {
+func (w *wrappedCollector) Extra(id string) *session.SessionData {
 	return w.Collector.Extra(w.prefix + id)
 }
 

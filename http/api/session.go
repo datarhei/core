@@ -21,16 +21,17 @@ type SessionPeers struct {
 
 // Session represents an active session
 type Session struct {
-	ID        string                 `json:"id"`
-	Reference string                 `json:"reference"`
-	CreatedAt int64                  `json:"created_at" format:"int64"`
-	Location  string                 `json:"local"`
-	Peer      string                 `json:"remote"`
-	Extra     map[string]interface{} `json:"extra"`
-	RxBytes   uint64                 `json:"bytes_rx" format:"uint64"`
-	TxBytes   uint64                 `json:"bytes_tx" format:"uint64"`
-	RxBitrate json.Number            `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	TxBitrate json.Number            `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	ID        string         `json:"id"`
+	Reference string         `json:"reference"`
+	CreatedAt int64          `json:"created_at" format:"int64"`
+	Location  string         `json:"local"`
+	Peer      string         `json:"remote"`
+	Extra     map[string]any `json:"extra"`
+	UserData  map[string]any `json:"userdata"`
+	RxBytes   uint64         `json:"bytes_rx" format:"uint64"`
+	TxBytes   uint64         `json:"bytes_tx" format:"uint64"`
+	RxBitrate json.Number    `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	TxBitrate json.Number    `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 }
 
 func (s *Session) Unmarshal(sess session.Session) {
@@ -40,6 +41,7 @@ func (s *Session) Unmarshal(sess session.Session) {
 	s.Location = sess.Location
 	s.Peer = sess.Peer
 	s.Extra = sess.Extra
+	s.UserData = sess.UserData
 	s.RxBytes = sess.RxBytes
 	s.TxBytes = sess.TxBytes
 	s.RxBitrate = json.ToNumber(sess.RxBitrate / 1024)

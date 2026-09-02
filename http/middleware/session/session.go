@@ -104,7 +104,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			data["ip"] = ip
 
 			isM3U8 := strings.HasSuffix(path, ".m3u8")
-			isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4")
+			isSegment := strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".m4s")
 
 			if isM3U8 || isSegment {
 				return h.handleHLS(c, ctxuser, data, next)
