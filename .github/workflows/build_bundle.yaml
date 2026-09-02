@@ -14,7 +14,7 @@ jobs:
             coreversion: ${{ steps.core.outputs.version }}
         steps:
             - name: Checkout core repo
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
               with:
                   repository: datarhei/core
                   path: ./core
@@ -70,13 +70,13 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
               with:
                   ref: ${{ matrix.branch }}
 
             - name: Docker meta
               id: meta
-              uses: docker/metadata-action@v5
+              uses: docker/metadata-action@v6
               with:
                   images: |
                       datarhei/core
@@ -102,7 +102,7 @@ jobs:
                   password: ${{ secrets.DOCKER_PASSWORD }}
 
             - name: Build Multi-Arch
-              uses: docker/build-push-action@v5
+              uses: docker/build-push-action@v7
               with:
                   builder: ${{ steps.buildx.outputs.name }}
                   context: .
