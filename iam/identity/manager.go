@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"uuid"
 
 	"github.com/datarhei/core/v16/log"
+	"github.com/datarhei/core/v16/uuid"
+
 	jwtgo "github.com/golang-jwt/jwt/v5"
 )
 
@@ -506,7 +507,7 @@ func (im *identityManager) CreateJWT(nameOrAlias string) (string, string, error)
 		"iat":    now.Unix(),
 		"exp":    accessExpires.Unix(),
 		"exi":    uint64(accessExpires.Sub(now).Seconds()),
-		"jti":    uuid.New().String(),
+		"jti":    uuid.New(),
 	})
 
 	// Generate encoded access token
@@ -523,7 +524,7 @@ func (im *identityManager) CreateJWT(nameOrAlias string) (string, string, error)
 		"iat":    now.Unix(),
 		"exp":    refreshExpires.Unix(),
 		"exi":    uint64(refreshExpires.Sub(now).Seconds()),
-		"jti":    uuid.New().String(),
+		"jti":    uuid.New(),
 	})
 
 	// Generate encoded refresh token

@@ -17,7 +17,7 @@ import (
 
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
-	"github.com/lithammer/shortuuid/v5"
+	"github.com/datarhei/core/v16/uuid"
 
 	"github.com/labstack/echo/v4"
 )
@@ -682,7 +682,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 	hasSession := len(sessionID) != 0
 
 	if !hasSession {
-		sessionID = shortuuid.New()
+		sessionID = uuid.NewShort()
 	}
 
 	// Find all URLS in the .m3u8 and add the session ID to the query string

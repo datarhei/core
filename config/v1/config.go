@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"time"
-	"uuid"
 
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
@@ -12,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/math/rand"
 	"github.com/datarhei/core/v16/slices"
+	"github.com/datarhei/core/v16/uuid"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
 )
@@ -116,7 +116,7 @@ func (d *Config) Clone() *Config {
 func (d *Config) init() {
 	d.vars.Register(value.NewInt64(&d.Version, version), "version", "", nil, "Configuration file layout version", true, false)
 	d.vars.Register(value.NewTime(&d.CreatedAt, time.Now()), "created_at", "", nil, "Configuration file creation time", false, false)
-	d.vars.Register(value.NewString(&d.ID, uuid.New().String()), "id", "CORE_ID", nil, "ID for this instance", true, false)
+	d.vars.Register(value.NewString(&d.ID, uuid.New()), "id", "CORE_ID", nil, "ID for this instance", true, false)
 	d.vars.Register(value.NewString(&d.Name, haikunator.New().Haikunate()), "name", "CORE_NAME", nil, "A human readable name for this instance", false, false)
 	d.vars.Register(value.NewMustAddress(&d.Address, ":8080"), "address", "CORE_ADDRESS", nil, "HTTP listening address", false, false)
 	d.vars.Register(value.NewBool(&d.CheckForUpdates, true), "update_check", "CORE_UPDATE_CHECK", nil, "Check for updates and send anonymized data", false, false)

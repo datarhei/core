@@ -15,10 +15,10 @@ import (
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/session"
+	"github.com/datarhei/core/v16/uuid"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/lithammer/shortuuid/v5"
 )
 
 type Config struct {
@@ -73,7 +73,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		httpCollector:       config.HTTPCollector,
 		hlsEgressCollector:  config.HLSEgressCollector,
 		hlsIngressCollector: config.HLSIngressCollector,
-		reSessionID:         regexp.MustCompile(`^[` + regexp.QuoteMeta(shortuuid.DefaultAlphabet) + `]{22}$`),
+		reSessionID:         regexp.MustCompile(`^[` + regexp.QuoteMeta(uuid.DefaultShortAlphabet) + `]{22}$`),
 		rxsegments:          make(map[string]int64),
 	}
 

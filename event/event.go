@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lithammer/shortuuid/v5"
+	"github.com/datarhei/core/v16/uuid"
+
 	"golang.org/x/time/rate"
 )
 
@@ -152,7 +153,7 @@ func (w *PubSub) Subscribe() (<-chan Event, CancelFunc) {
 
 	w.subscriberLock.Lock()
 	for {
-		id = shortuuid.New()
+		id = uuid.NewShort()
 		if _, ok := w.subscriber[id]; !ok {
 			w.subscriber[id] = l
 			break

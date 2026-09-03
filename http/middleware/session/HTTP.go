@@ -4,8 +4,9 @@ import (
 	"net/url"
 
 	"github.com/datarhei/core/v16/mem"
+	"github.com/datarhei/core/v16/uuid"
+
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/shortuuid/v5"
 )
 
 func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
@@ -28,7 +29,7 @@ func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface
 		referrer = u.Host
 	}
 
-	id := shortuuid.New()
+	id := uuid.NewShort()
 
 	reader := req.Body
 	r := &bodysizeReader{

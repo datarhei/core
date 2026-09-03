@@ -7,8 +7,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/restream/app"
-
-	"github.com/lithammer/shortuuid/v5"
+	"github.com/datarhei/core/v16/uuid"
 )
 
 type ProcessID struct {
@@ -268,7 +267,7 @@ func (cfg *ProcessConfig) generateInputOutputIDs(ioconfig []ProcessConfigIO) {
 		}
 
 		for {
-			id := shortuuid.New()
+			id := uuid.NewShort()
 			if _, ok := ids[id]; !ok {
 				ioconfig[i].ID = id
 				break

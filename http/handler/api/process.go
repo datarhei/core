@@ -15,9 +15,9 @@ import (
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/uuid"
 
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/shortuuid/v5"
 )
 
 // The ProcessHandler type provides functions to interact with a Restreamer instance
@@ -53,7 +53,7 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 	ctxuser := util.DefaultContext(c, "user", "")
 
 	process := api.ProcessConfig{
-		ID:        shortuuid.New(),
+		ID:        uuid.NewShort(),
 		Owner:     ctxuser,
 		Type:      "ffmpeg",
 		Autostart: true,

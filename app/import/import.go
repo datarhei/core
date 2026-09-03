@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"uuid"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
@@ -22,6 +21,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/store"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
+	"github.com/datarhei/core/v16/uuid"
 )
 
 type storeDataV1 struct {
@@ -394,7 +394,7 @@ func importConfigFromEnvironment() importConfig {
 	initV1Environment()
 
 	c := importConfig{
-		id:               uuid.New().String(),
+		id:               uuid.New(),
 		snapshotInterval: importSnapshotInterval(getV1Environment("RS_SNAPSHOT_INTERVAL"), 0),
 
 		inputstream:  getV1Environment("RS_INPUTSTREAM"),
@@ -497,7 +497,7 @@ type importConfigAudio struct {
 
 func importV1(fs fs.Filesystem, path string, cfg importConfig) (store.Data, error) {
 	if len(cfg.id) == 0 {
-		cfg.id = uuid.New().String()
+		cfg.id = uuid.New()
 	}
 
 	r := store.NewData()
