@@ -5,6 +5,7 @@ import (
 	"context"
 	"net"
 	"time"
+	"uuid"
 
 	"github.com/datarhei/core/v16/config/copy"
 	"github.com/datarhei/core/v16/config/value"
@@ -14,7 +15,6 @@ import (
 	"github.com/datarhei/core/v16/slices"
 
 	haikunator "github.com/atrox/haikunatorgo/v2"
-	"github.com/google/uuid"
 )
 
 /*

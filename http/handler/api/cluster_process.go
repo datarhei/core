@@ -16,7 +16,7 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/lithammer/shortuuid/v5"
 )
 
 // ProcessList returns the list of processes running on all nodes of the cluster

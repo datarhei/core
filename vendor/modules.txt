@@ -251,8 +251,6 @@ github.com/hashicorp/raft
 # github.com/hashicorp/raft-boltdb/v2 v2.3.1
 ## explicit; go 1.20
 github.com/hashicorp/raft-boltdb/v2
-# github.com/iancoleman/orderedmap v0.2.0
-## explicit
 # github.com/invopop/jsonschema v0.14.0
 ## explicit; go 1.24
 github.com/invopop/jsonschema
@@ -299,9 +297,9 @@ github.com/lestrrat-go/strftime
 # github.com/libdns/libdns v1.1.1
 ## explicit; go 1.18
 github.com/libdns/libdns
-# github.com/lithammer/shortuuid/v4 v4.2.0
-## explicit; go 1.21
-github.com/lithammer/shortuuid/v4
+# github.com/lithammer/shortuuid/v5 v5.0.0
+## explicit; go 1.27
+github.com/lithammer/shortuuid/v5
 # github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e
 ## explicit; go 1.21
 github.com/lufia/plan9stats

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/lithammer/shortuuid/v5"
 	"golang.org/x/time/rate"
 )
 

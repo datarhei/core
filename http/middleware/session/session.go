@@ -15,10 +15,10 @@ import (
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/session"
-	"github.com/lithammer/shortuuid/v4"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/lithammer/shortuuid/v5"
 )
 
 type Config struct {

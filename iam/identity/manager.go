@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/datarhei/core/v16/log"
 	jwtgo "github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type Manager interface {

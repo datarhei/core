@@ -17,7 +17,7 @@ import (
 
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/lithammer/shortuuid/v5"
 
 	"github.com/labstack/echo/v4"
 )

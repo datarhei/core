@@ -17,7 +17,7 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/lithammer/shortuuid/v5"
 )
 
 // The ProcessHandler type provides functions to interact with a Restreamer instance

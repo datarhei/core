@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/ffmpeg"
@@ -21,8 +22,6 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/restream/store"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
-
-	"github.com/google/uuid"
 )
 
 type storeDataV1 struct {

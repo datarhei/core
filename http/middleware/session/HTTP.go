@@ -5,7 +5,7 @@ import (
 
 	"github.com/datarhei/core/v16/mem"
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/lithammer/shortuuid/v5"
 )
 
 func (h *handler) handleHTTP(c echo.Context, _ string, data map[string]interface{}, next echo.HandlerFunc) error {
