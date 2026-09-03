@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func inStep(val int, s string, bounds []int) (bool, error) {
+func inStep(val int, s string, bounds []int, isWeekDay bool) (bool, error) {
 	parts := strings.Split(s, "/")
 	step, err := strconv.Atoi(parts[1])
 	if err != nil {
@@ -42,10 +42,24 @@ func inStep(val int, s string, bounds []int) (bool, error) {
 		return false, fmt.Errorf("step '%s' out of bounds(%d, %d)", parts[0], bounds[0], bounds[1])
 	}
 
+	if isWeekDay {
+		// 7 is an alias for Sunday (0), same as inRange. A leading 7 ("7/step")
+		// starts the sequence at Sunday, so normalize it to 0.
+		if start == 7 && end != 7 {
+			start = 0
+		}
+		// time.Weekday() reports Sunday as 0, but a step whose range ends at 7
+		// (e.g. "4-7/3") expresses it as 7. Sunday is due if either form lands
+		// on the step, and checking both keeps "0-7/2" (0 already in range) working.
+		if val == 0 {
+			return inStepRange(0, start, end, step) || inStepRange(7, start, end, step), nil
+		}
+	}
+
 	return inStepRange(val, start, end, step), nil
 }
 
-func inRange(val int, s string, bounds []int) (bool, error) {
+func inRange(val int, s string, bounds []int, isWeekDay bool) (bool, error) {
 	parts := strings.Split(s, "-")
 	start, err := strconv.Atoi(parts[0])
 	if err != nil {
@@ -57,7 +71,27 @@ func inRange(val int, s string, bounds []int) (bool, error) {
 		return false, err
 	}
 
-	if end < start || start < bounds[0] || end > bounds[1] {
+	if start < bounds[0] || start > bounds[1] || end < bounds[0] || end > bounds[1] {
+		return false, fmt.Errorf("range '%s' out of bounds(%d, %d)", s, bounds[0], bounds[1])
+	}
+
+	if isWeekDay {
+		// 7 is an alias for Sunday (0). A leading 7 in a range ("7-y",
+		// y != 7) means Sunday through y, so normalize start 7 -> 0.
+		// A trailing 7 ("x-7") is preserved because "0-7" legitimately
+		// represents the whole week, while "x-7" (x > 0) includes Sunday
+		// after Saturday. Since val = ref.Weekday() is always 0..6, when
+		// the range ends at 7 we normalize Sunday (val == 0) to 7 so that
+		// the standard inclusive range check works for all cases.
+		if start == 7 && end != 7 {
+			start = 0
+		}
+		if end == 7 && val == 0 {
+			val = 7
+		}
+	}
+
+	if end < start {
 		return false, fmt.Errorf("range '%s' out of bounds(%d, %d)", s, bounds[0], bounds[1])
 	}
 

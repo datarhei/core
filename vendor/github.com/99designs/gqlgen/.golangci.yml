@@ -19,6 +19,7 @@ formatters:
         - codegen/testserver/followschema/resolver.go
         - codegen/testserver/singlefile/resolver.go
         - codegen/testserver/usefunctionsyntaxforexecutioncontext/resolver.go
+        - codegen/testserver/subscriptioncontextfield/resolver.go
         - generated
   enable:
     - golines
@@ -178,10 +179,6 @@ linters:
       - linters:
           - staticcheck
         path: codegen/testserver/generated_test.go
-        text: SA1019
-      - linters:
-          - staticcheck
-        path: plugin/modelgen/models_test.go
         text: SA1019
     paths:
       - bin

@@ -11,15 +11,52 @@ import (
 )
 
 type ResolverConfig struct {
-	Filename            string         `yaml:"filename,omitempty"`
-	FilenameTemplate    string         `yaml:"filename_template,omitempty"`
-	Package             string         `yaml:"package,omitempty"`
-	Type                string         `yaml:"type,omitempty"`
-	Layout              ResolverLayout `yaml:"layout,omitempty"`
-	DirName             string         `yaml:"dir"`
-	OmitTemplateComment bool           `yaml:"omit_template_comment,omitempty"`
-	ResolverTemplate    string         `yaml:"resolver_template,omitempty"`
-	PreserveResolver    bool           `yaml:"preserve_resolver,omitempty"`
+	Filename            string              `yaml:"filename,omitempty"`
+	FilenameTemplate    string              `yaml:"filename_template,omitempty"`
+	Package             string              `yaml:"package,omitempty"`
+	Type                string              `yaml:"type,omitempty"`
+	Layout              ResolverLayout      `yaml:"layout,omitempty"`
+	DirName             string              `yaml:"dir"`
+	Batch               ResolverBatchConfig `yaml:"batch,omitempty"`
+	OmitTemplateComment bool                `yaml:"omit_template_comment,omitempty"`
+	ResolverTemplate    string              `yaml:"resolver_template,omitempty"`
+	PreserveResolver    bool                `yaml:"preserve_resolver,omitempty"`
+
+	// OmitResolverEmbedding declares the per-object resolver types with a named
+	// "r" field instead of embedding the root resolver, which speeds up
+	// compilation on large schemas.
+	//
+	// Enabling this is a source-breaking change for a project's own resolver
+	// bodies: dependencies are reached as "r.r.myService" rather than
+	// "r.myService".
+	OmitResolverEmbedding bool `yaml:"omit_resolver_embedding,omitempty"`
+}
+
+// ResolverBatchConfig enables batch resolver generation for resolver fields as if they
+// had @goField(batch: true). Root types (Query, Mutation, Subscription), input objects,
+// and introspection types (__*) are always excluded. When federation is enabled, federation
+// _Service and Entity are also excluded. Global batch does not convert struct-bound fields
+// into resolvers. Individual fields can opt out with @goField(batch: false).
+type ResolverBatchConfig struct {
+	Enabled bool
+}
+
+func (b *ResolverBatchConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	var enabled bool
+	if err := unmarshal(&enabled); err == nil {
+		b.Enabled = enabled
+		return nil
+	}
+
+	var long struct {
+		Enabled bool `yaml:"enabled"`
+	}
+	if err := unmarshal(&long); err != nil {
+		return err
+	}
+
+	b.Enabled = long.Enabled
+	return nil
 }
 
 type ResolverLayout string

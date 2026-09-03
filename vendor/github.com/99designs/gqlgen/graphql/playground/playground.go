@@ -156,6 +156,48 @@ var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
 {{- if .EnablePluginExplorer}}
       plugins.push(GraphiQLPluginExplorer.explorerPlugin());
 {{- end}}
+{{- if .PersistStateInURL }}
+      // Parse URL parameters.
+      const parameters = Object.fromEntries(
+        new URLSearchParams(window.location.search)
+      );
+
+      function updateURL() {
+        const searchParams = new URLSearchParams();
+
+        Object.entries(parameters).forEach(([key, value]) => {
+          if (value) {
+            searchParams.set(key, value);
+          }
+        });
+
+        history.replaceState(
+          null,
+          '',
+          '?' + searchParams.toString(),
+        );
+      }
+
+      function onEditQuery(query) {
+        parameters.query = query;
+        updateURL();
+      }
+
+      function onEditVariables(variables) {
+        parameters.variables = variables;
+        updateURL();
+      }
+
+      function onEditHeaders(headers) {
+        parameters.headers = headers;
+        updateURL();
+      }
+
+      function onEditOperationName(operationName) {
+        parameters.operationName = operationName;
+        updateURL();
+      }
+{{- end }}
 
       const fetcher = GraphiQL.createFetcher({ url, subscriptionUrl, headers: fetcherHeaders });
       ReactDOM.render(
@@ -163,9 +205,27 @@ var page = template.Must(template.New("graphiql").Parse(`<!DOCTYPE html>
           fetcher: fetcher,
           isHeadersEditorEnabled: true,
           shouldPersistHeaders: true,
-		  headers: JSON.stringify(uiHeaders, null, 2),
-		  plugins: plugins,
-          storage: new PrefixedStorage('{{.StoragePrefix}}')
+{{- if .PersistStateInURL }}
+          query: parameters.query,
+          variables: parameters.variables,
+          operationName: parameters.operationName,
+
+          headers:
+            parameters.headers ??
+            (uiHeaders
+              ? JSON.stringify(uiHeaders, null, 2)
+              : undefined),
+
+          onEditQuery: onEditQuery,
+          onEditVariables: onEditVariables,
+          onEditHeaders: onEditHeaders,
+          onEditOperationName: onEditOperationName,
+{{- else }}
+          headers: JSON.stringify(uiHeaders, null, 2),
+{{- end }}
+          plugins: plugins,
+          storage: new PrefixedStorage('{{.StoragePrefix}}'),
+          inputValueDeprecation: true
         }),
         document.getElementById('graphiql'),
       );
@@ -182,6 +242,7 @@ type GraphiqlConfig struct {
 	UiHeaders            map[string]string
 	EndpointIsAbsolute   bool
 	SubscriptionEndpoint string
+	PersistStateInURL    bool
 	JsUrl                template.URL
 	JsSRI                string
 	CssUrl               template.URL
@@ -207,6 +268,15 @@ func WithGraphiqlFetcherHeaders(headers map[string]string) GraphiqlConfigOption 
 func WithGraphiqlUiHeaders(headers map[string]string) GraphiqlConfigOption {
 	return func(config *GraphiqlConfig) {
 		config.UiHeaders = headers
+	}
+}
+
+// WithGraphiqlPersistStateInURL enables loading GraphiQL state from URL
+// parameters and keeps the URL synchronized as the query, variables,
+// headers, and operation name change.
+func WithGraphiqlPersistStateInURL(enable bool) GraphiqlConfigOption {
+	return func(config *GraphiqlConfig) {
+		config.PersistStateInURL = enable
 	}
 }
 

@@ -13,7 +13,7 @@ type Glob interface {
 
 type globber struct {
 	pattern string
-	glob    glob.Glob
+	glob    *glob.Pattern
 }
 
 func MustCompile(pattern string, separators ...rune) Glob {
@@ -54,7 +54,7 @@ func IsPattern(pattern string) bool {
 }
 
 // Match returns whether the name matches the glob pattern, also considering
-// one or several optionnal separator. An error is only returned if the pattern
+// one or several optional separator. An error is only returned if the pattern
 // is invalid.
 func Match(pattern, name string, separators ...rune) (bool, error) {
 	g, err := Compile(pattern, separators...)

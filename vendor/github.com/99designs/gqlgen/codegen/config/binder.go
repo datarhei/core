@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"slices"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -93,8 +94,8 @@ func (b *Binder) InstantiateType(orig types.Type, targs []types.Type) (types.Typ
 }
 
 var (
-	MapType       = types.NewMap(types.Typ[types.String], types.Universe.Lookup("any").Type())
-	InterfaceType = types.Universe.Lookup("any").Type()
+	MapType       = types.NewMap(types.Typ[types.String], templates.AnyType)
+	InterfaceType = templates.AnyType
 )
 
 func (b *Binder) DefaultUserObject(name string) (types.Type, error) {
@@ -187,11 +188,33 @@ func indexDefs(pkg *packages.Package) map[string]types.Object {
 	return res
 }
 
+// PointerTo registers and returns a reference to the pointer type of ref. ref
+// stays registered; use ReplaceWithPointer when the caller replaces ref with
+// the returned reference.
 func (b *Binder) PointerTo(ref *TypeReference) *TypeReference {
 	newRef := *ref
 	newRef.GO = types.NewPointer(ref.GO)
 	b.References = append(b.References, &newRef)
 	return &newRef
+}
+
+// RemoveRef unregisters ref, so that no marshaler or unmarshaler is emitted for
+// it. Use it when a reference has been superseded by another one and is no
+// longer reachable from any field, argument or directive. It is a no-op if ref
+// was never registered.
+func (b *Binder) RemoveRef(ref *TypeReference) {
+	b.References = slices.DeleteFunc(b.References, func(r *TypeReference) bool {
+		return r == ref
+	})
+}
+
+// ReplaceWithPointer registers and returns a reference to the pointer type of
+// ref, and unregisters ref itself. Use it instead of PointerTo when the pointer
+// reference replaces ref rather than being needed alongside it.
+func (b *Binder) ReplaceWithPointer(ref *TypeReference) *TypeReference {
+	newRef := b.PointerTo(ref)
+	b.RemoveRef(ref)
+	return newRef
 }
 
 // TypeReference is used by args and field types. The Definition can refer to both input and output
@@ -564,7 +587,7 @@ func (b *Binder) CopyModifiersFromAst(t *ast.Type, base types.Type) types.Type {
 	}
 
 	var isInterface bool
-	if named, ok := base.(*types.Named); ok {
+	if named, ok := types.Unalias(base).(*types.Named); ok {
 		_, isInterface = named.Underlying().(*types.Interface)
 	}
 

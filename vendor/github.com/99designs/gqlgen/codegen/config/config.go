@@ -49,6 +49,7 @@ type Config struct {
 	OmitPanicHandler                     bool                       `yaml:"omit_panic_handler,omitempty"`
 	OmitEnumJSONMarshalers               bool                       `yaml:"omit_enum_json_marshalers,omitempty"`
 	UseFunctionSyntaxForExecutionContext bool                       `yaml:"use_function_syntax_for_execution_context,omitempty"`
+	SubscriptionContextField             bool                       `yaml:"subscription_context_field,omitempty"`
 	// If this is set to true, argument directives that
 	// decorate a field with a null value will still be called.
 	//
@@ -108,12 +109,13 @@ func (c *Config) GetPruneOptions() imports.PruneOptions {
 }
 
 const (
-	DirGoModel         = "goModel"
-	DirGoExtraField    = "goExtraField"
-	DirGoField         = "goField"
-	DirGoTag           = "goTag"
-	DirGoEnum          = "goEnum"
-	DirInlineArguments = "inlineArguments"
+	DirGoModel             = "goModel"
+	DirGoExtraField        = "goExtraField"
+	DirGoField             = "goField"
+	DirGoTag               = "goTag"
+	DirGoEnum              = "goEnum"
+	DirInlineArguments     = "inlineArguments"
+	DirSubscriptionContext = "subscriptionContext"
 
 	DirArgName                = "name"
 	DirArgModel               = "model"
@@ -330,6 +332,8 @@ func CompleteConfig(config *Config) error {
 
 	config.GoInitialisms.setInitialisms()
 
+	config.resolveModelBatchDefaults()
+
 	return nil
 }
 
@@ -352,6 +356,8 @@ func (c *Config) Init() error {
 	if err != nil {
 		return err
 	}
+
+	c.applyGlobalBatchResolverDefaults()
 
 	c.Packages.LoadAll(c.packageList()...)
 
@@ -397,6 +403,7 @@ func (c *Config) injectTypesFromSchema() error {
 		DirGoTag,
 		DirGoEnum,
 		DirInlineArguments,
+		DirSubscriptionContext,
 	} {
 		c.Directives[d] = DirectiveConfig{SkipRuntime: true}
 	}
@@ -502,7 +509,9 @@ func (c *Config) injectGoFieldDirectives(schemaType *ast.Definition) error {
 
 		if arg := fd.Arguments.ForName(DirArgBatch); arg != nil {
 			if k, err := arg.Value.Value(nil); err == nil {
-				typeMapFieldEntry.Batch = k.(bool)
+				if val, ok := k.(bool); ok {
+					typeMapFieldEntry.Batch = &val
+				}
 			}
 		}
 
@@ -534,6 +543,80 @@ func (c *Config) injectGoFieldDirectives(schemaType *ast.Definition) error {
 	}
 
 	return nil
+}
+
+// resolveModelBatchDefaults runs during config load (before schema injection) and
+// defaults yaml-configured fields to batch=false when global batch is disabled.
+func (c *Config) resolveModelBatchDefaults() {
+	if c.Resolver.Batch.Enabled {
+		return
+	}
+	for typeName, entry := range c.Models {
+		for fieldName, field := range entry.Fields {
+			if field.Batch != nil {
+				continue
+			}
+			batch := false
+			field.Batch = &batch
+			entry.Fields[fieldName] = field
+		}
+		c.Models[typeName] = entry
+	}
+}
+
+// applyGlobalBatchResolverDefaults runs after schema injection and enables batch for
+// resolver fields that have no explicit batch setting when global batch is enabled.
+func (c *Config) applyGlobalBatchResolverDefaults() {
+	if !c.Resolver.Batch.Enabled {
+		return
+	}
+	for typeName, entry := range c.Models {
+		supportsBatch := true
+		if schemaType := c.Schema.Types[typeName]; schemaType != nil {
+			supportsBatch = c.TypeSupportsBatchResolver(typeName, schemaType)
+		}
+		for fieldName, field := range entry.Fields {
+			if field.Batch != nil {
+				continue
+			}
+			if !field.Resolver {
+				continue
+			}
+			batch := supportsBatch
+			field.Batch = &batch
+			entry.Fields[fieldName] = field
+		}
+		c.Models[typeName] = entry
+	}
+}
+
+// BatchResolverUnsupportedReason explains why batch resolvers may not be enabled for
+// fields on the given type, or returns "" if they may.
+//
+// A batch resolver groups sibling parent objects and hands them to user code, so it only
+// makes sense for types that have sibling parents and that the user resolves themselves.
+func (c *Config) BatchResolverUnsupportedReason(
+	typeName string,
+	schemaType *ast.Definition,
+) string {
+	switch {
+	case c.IsRoot(schemaType):
+		return "root types are resolved once per operation, so there are no sibling parents to batch"
+	case schemaType.Kind == ast.InputObject:
+		return "input objects are arguments rather than resolved output types"
+	case strings.HasPrefix(typeName, "__"):
+		return "introspection types are resolved by gqlgen itself, not by user resolvers"
+	case c.Federation.IsDefined() && (typeName == "_Service" || typeName == "Entity"):
+		return "federation built-in types are resolved by gqlgen itself, not by user resolvers"
+	}
+	return ""
+}
+
+// TypeSupportsBatchResolver reports whether batch resolvers may be enabled for fields
+// on the given type. See [Config.BatchResolverUnsupportedReason] for why a type may not
+// support them.
+func (c *Config) TypeSupportsBatchResolver(typeName string, schemaType *ast.Definition) bool {
+	return c.BatchResolverUnsupportedReason(typeName, schemaType) == ""
 }
 
 func (c *Config) injectGoExtraFieldDirectives(schemaType *ast.Definition) error {
@@ -672,7 +755,7 @@ type TypeMapField struct {
 	// that accepts multiple parent objects and returns ([]T, error) for all of them
 	// in a single call, reducing N+1 query problems. For partial failures, return
 	// a graphql.BatchErrors implementation as the error.
-	Batch bool `yaml:"batch,omitempty"`
+	Batch *bool `yaml:"batch,omitempty"`
 	// ForceGenerate forces the field to be generated in the model struct
 	// even when OmitResolverFields is enabled and the field has forceResolver: true.
 	ForceGenerate bool `yaml:"forceGenerate"`

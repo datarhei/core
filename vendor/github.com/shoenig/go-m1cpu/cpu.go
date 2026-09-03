@@ -144,10 +144,17 @@ package m1cpu
 //   return global_brand;
 // }
 import "C"
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
-func init() {
-	C.initialize()
+var initOnce sync.Once
+
+func ensureInitialized() {
+	initOnce.Do(func() {
+		C.initialize()
+	})
 }
 
 // IsAppleSilicon returns true on this platform.
@@ -157,31 +164,37 @@ func IsAppleSilicon() bool {
 
 // PCoreHZ returns the max frequency in Hertz of the P-Core of an Apple Silicon CPU.
 func PCoreHz() uint64 {
+	ensureInitialized()
 	return toHz(uint64(C.pCoreClock()))
 }
 
 // ECoreHZ returns the max frequency in Hertz of the E-Core of an Apple Silicon CPU.
 func ECoreHz() uint64 {
+	ensureInitialized()
 	return toHz(uint64(C.eCoreClock()))
 }
 
 // PCoreGHz returns the max frequency in Gigahertz of the P-Core of an Apple Silicon CPU.
 func PCoreGHz() float64 {
+	ensureInitialized()
 	return toGhz(uint64(C.pCoreClock()))
 }
 
 // ECoreGHz returns the max frequency in Gigahertz of the E-Core of an Apple Silicon CPU.
 func ECoreGHz() float64 {
+	ensureInitialized()
 	return toGhz(uint64(C.eCoreClock()))
 }
 
 // PCoreCount returns the number of physical P (performance) cores.
 func PCoreCount() int {
+	ensureInitialized()
 	return int(C.pCoreCount())
 }
 
 // ECoreCount returns the number of physical E (efficiency) cores.
 func ECoreCount() int {
+	ensureInitialized()
 	return int(C.eCoreCount())
 }
 
@@ -192,6 +205,7 @@ func ECoreCount() int {
 // - L1 data cache
 // - L2 cache
 func PCoreCache() (int, int, int) {
+	ensureInitialized()
 	return int(C.pCoreL1InstCacheSize()),
 		int(C.pCoreL1DataCacheSize()),
 		int(C.pCoreL2CacheSize())
@@ -204,6 +218,7 @@ func PCoreCache() (int, int, int) {
 // - L1 data cache
 // - L2 cache
 func ECoreCache() (int, int, int) {
+	ensureInitialized()
 	return int(C.eCoreL1InstCacheSize()),
 		int(C.eCoreL1DataCacheSize()),
 		int(C.eCoreL2CacheSize())
@@ -211,6 +226,7 @@ func ECoreCache() (int, int, int) {
 
 // ModelName returns the model name of the CPU.
 func ModelName() string {
+	ensureInitialized()
 	return C.GoString(C.modelName())
 }
 
