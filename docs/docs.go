@@ -7590,6 +7590,87 @@ const docTemplate = `{
                 }
             }
         },
+        "api.HLSSessionData": {
+            "type": "object",
+            "properties": {
+                "bandwidth_tx_bits": {
+                    "type": "object",
+                    "properties": {
+                        "avg": {
+                            "type": "number"
+                        },
+                        "max": {
+                            "type": "number"
+                        },
+                        "min": {
+                            "type": "number"
+                        }
+                    }
+                },
+                "hls_segments": {
+                    "type": "object",
+                    "properties": {
+                        "failed": {
+                            "type": "integer"
+                        },
+                        "last": {
+                            "type": "integer"
+                        },
+                        "requests": {
+                            "type": "integer"
+                        },
+                        "retries": {
+                            "type": "integer"
+                        },
+                        "sequence_gaps": {
+                            "type": "integer"
+                        },
+                        "too_late": {
+                            "type": "integer"
+                        },
+                        "too_slow": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "hls_variants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.HLSSessionVariant"
+                    }
+                },
+                "http_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            }
+        },
+        "api.HLSSessionVariant": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "bandwidth_bits": {
+                    "type": "integer"
+                },
+                "codecs": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "resolution": {
+                    "type": "string"
+                },
+                "switches": {
+                    "type": "integer"
+                }
+            }
+        },
         "api.IAMAuth0Tenant": {
             "type": "object",
             "properties": {
@@ -9401,6 +9482,9 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": {}
                 },
+                "hls": {
+                    "$ref": "#/definitions/api.HLSSessionData"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -9412,10 +9496,6 @@ const docTemplate = `{
                 },
                 "remote": {
                     "type": "string"
-                },
-                "userdata": {
-                    "type": "object",
-                    "additionalProperties": {}
                 }
             }
         },

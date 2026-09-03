@@ -1,7 +1,10 @@
 package api
 
 import (
+	"maps"
+
 	"github.com/datarhei/core/v16/encoding/json"
+	mwsession "github.com/datarhei/core/v16/http/middleware/session"
 	"github.com/datarhei/core/v16/session"
 )
 
@@ -21,17 +24,17 @@ type SessionPeers struct {
 
 // Session represents an active session
 type Session struct {
-	ID        string         `json:"id"`
-	Reference string         `json:"reference"`
-	CreatedAt int64          `json:"created_at" format:"int64"`
-	Location  string         `json:"local"`
-	Peer      string         `json:"remote"`
-	Extra     map[string]any `json:"extra"`
-	UserData  map[string]any `json:"userdata"`
-	RxBytes   uint64         `json:"bytes_rx" format:"uint64"`
-	TxBytes   uint64         `json:"bytes_tx" format:"uint64"`
-	RxBitrate json.Number    `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	TxBitrate json.Number    `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	ID        string          `json:"id"`
+	Reference string          `json:"reference"`
+	CreatedAt int64           `json:"created_at" format:"int64"`
+	Location  string          `json:"local"`
+	Peer      string          `json:"remote"`
+	Extra     map[string]any  `json:"extra"`
+	RxBytes   uint64          `json:"bytes_rx" format:"uint64"`
+	TxBytes   uint64          `json:"bytes_tx" format:"uint64"`
+	RxBitrate json.Number     `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	TxBitrate json.Number     `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
+	HLS       *HLSSessionData `json:"hls"`
 }
 
 func (s *Session) Unmarshal(sess session.Session) {
@@ -41,11 +44,78 @@ func (s *Session) Unmarshal(sess session.Session) {
 	s.Location = sess.Location
 	s.Peer = sess.Peer
 	s.Extra = sess.Extra
-	s.UserData = sess.UserData
 	s.RxBytes = sess.RxBytes
 	s.TxBytes = sess.TxBytes
 	s.RxBitrate = json.ToNumber(sess.RxBitrate / 1024)
 	s.TxBitrate = json.ToNumber(sess.TxBitrate / 1024)
+	s.HLS = nil
+
+	hlsstats, ok := sess.UserData["hlsstats"]
+	if !ok {
+		return
+	}
+
+	data, ok := hlsstats.(*mwsession.HLSSessionData)
+	if !ok {
+		return
+	}
+
+	hls := &HLSSessionData{}
+	hls.Segments.Requested = data.Segments.Requested
+	hls.Segments.Failed = data.Segments.Failed
+	hls.Segments.TooSlow = data.Segments.TooSlow
+	hls.Segments.Retries = data.Segments.Retries
+	hls.Segments.TooLate = data.Segments.TooLate
+	hls.Segments.SequenceGaps = data.Segments.SequenceGaps
+	hls.Segments.Last = data.Segments.Last.Unix()
+
+	hls.Bandwidth.Min = data.Bandwidth.Min
+	hls.Bandwidth.Max = data.Bandwidth.Max
+	hls.Bandwidth.Avg = data.Bandwidth.Avg
+
+	hls.HTTPStatus = map[int]uint64{}
+	maps.Copy(hls.HTTPStatus, data.HTTPStatus)
+
+	for path, variant := range data.Variants {
+		hls.Variants = append(hls.Variants, HLSSessionVariant{
+			Path:       path,
+			Active:     variant.Active,
+			Switches:   variant.Switches,
+			Bandwidth:  variant.Bandwidth,
+			Resolution: variant.Resolution,
+			Codecs:     variant.Codecs,
+		})
+	}
+
+	s.HLS = hls
+}
+
+type HLSSessionVariant struct {
+	Path       string `json:"path"`
+	Active     bool   `json:"active"`
+	Switches   uint64 `json:"switches"`
+	Bandwidth  uint64 `json:"bandwidth_bits"`
+	Resolution string `json:"resolution"`
+	Codecs     string `json:"codecs"`
+}
+
+type HLSSessionData struct {
+	Variants []HLSSessionVariant `json:"hls_variants"`
+	Segments struct {
+		Requested    uint64 `json:"requests"`
+		Failed       uint64 `json:"failed"`
+		TooSlow      uint64 `json:"too_slow"`
+		Retries      uint64 `json:"retries"`
+		TooLate      uint64 `json:"too_late"`
+		SequenceGaps uint64 `json:"sequence_gaps"`
+		Last         int64  `json:"last"`
+	} `json:"hls_segments"`
+	HTTPStatus map[int]uint64 `json:"http_status"`
+	Bandwidth  struct {
+		Min float64 `json:"min"`
+		Max float64 `json:"max"`
+		Avg float64 `json:"avg"`
+	} `json:"bandwidth_tx_bits"`
 }
 
 // SessionSummaryActive represents the currently active sessions

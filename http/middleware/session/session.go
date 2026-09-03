@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/datarhei/core/v16/glob"
-	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/mem"
 	"github.com/datarhei/core/v16/net"
@@ -92,7 +92,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			data, err := verifySession(util.DefaultContext[interface{}](c, "session", nil), path, referrer)
 			if err != nil {
-				return api.Err(http.StatusForbidden, "", "verifying session failed: %s", err.Error())
+				return errors.Err(http.StatusForbidden, "", "verifying session failed: %s", err.Error())
 			}
 
 			data["name"] = ctxuser

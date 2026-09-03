@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/errors"
 
 	"github.com/labstack/echo/v4"
 )
@@ -16,7 +16,7 @@ func HTTPErrorHandler(err error, c echo.Context) {
 	var details []string
 	message := ""
 
-	if he, ok := err.(api.Error); ok {
+	if he, ok := err.(errors.Error); ok {
 		code = he.Code
 		message = he.Message
 		details = he.Details
@@ -48,7 +48,7 @@ func HTTPErrorHandler(err error, c echo.Context) {
 		if c.Request().Method == http.MethodHead {
 			c.NoContent(code)
 		} else {
-			c.JSON(code, api.Error{
+			c.JSON(code, errors.Error{
 				Code:    code,
 				Message: message,
 				Details: details,

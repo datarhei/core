@@ -25,9 +25,10 @@ import (
 func (h *handler) handleHLS(c echo.Context, ctxuser string, data map[string]interface{}, next echo.HandlerFunc) error {
 	req := c.Request()
 
-	if req.Method == "PUT" || req.Method == "POST" {
+	switch req.Method {
+	case "PUT", "POST":
 		return h.handleHLSIngress(c, ctxuser, data, next)
-	} else if req.Method == "GET" || req.Method == "HEAD" {
+	case "GET", "HEAD":
 		return h.handleHLSEgress(c, ctxuser, data, next)
 	}
 
@@ -255,9 +256,9 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		return nil
 	}
 
-	var sdata *hlsSessionData = nil
+	var sdata *HLSSessionData = nil
 	if x, ok := h.hlsEgressCollector.UserData(sessionID).Get("hlsstats"); ok {
-		if data, ok := x.(*hlsSessionData); ok {
+		if data, ok := x.(*HLSSessionData); ok {
 			sdata = data
 		}
 	}
@@ -269,7 +270,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	if len(sdata.Variants) == 0 {
 		if len(variants) != 0 {
 			for _, v := range variants {
-				sdata.Variants[v.file] = hlsSessionVariant{
+				sdata.Variants[v.file] = HLSSessionVariant{
 					Active:     false,
 					Switches:   0,
 					Bandwidth:  v.bandwidth,
@@ -406,7 +407,7 @@ type hlsSegment struct {
 	requested bool
 }
 
-type hlsSessionVariant struct {
+type HLSSessionVariant struct {
 	Active     bool   `json:"active"`
 	Switches   uint64 `json:"switches"`
 	Bandwidth  uint64 `json:"bandwidth_bits"`
@@ -414,8 +415,8 @@ type hlsSessionVariant struct {
 	Codecs     string `json:"codecs"`
 }
 
-type hlsSessionData struct {
-	Variants map[string]hlsSessionVariant `json:"hls_variants"`
+type HLSSessionData struct {
+	Variants map[string]HLSSessionVariant `json:"hls_variants"`
 	Segments struct {
 		segments     map[string]hlsSegment
 		lastSequence uint64
@@ -435,10 +436,10 @@ type hlsSessionData struct {
 	} `json:"bandwidth_tx_bits"`
 }
 
-func newHLSSessionData() *hlsSessionData {
-	data := &hlsSessionData{}
+func newHLSSessionData() *HLSSessionData {
+	data := &HLSSessionData{}
 
-	data.Variants = map[string]hlsSessionVariant{}
+	data.Variants = map[string]HLSSessionVariant{}
 	data.Segments.segments = map[string]hlsSegment{}
 	data.HTTPStatus = map[int]uint64{}
 	data.Bandwidth.Min = math.MaxFloat64

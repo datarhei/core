@@ -1043,6 +1043,59 @@ definitions:
         items: {}
         type: array
     type: object
+  api.HLSSessionData:
+    properties:
+      bandwidth_tx_bits:
+        properties:
+          avg:
+            type: number
+          max:
+            type: number
+          min:
+            type: number
+        type: object
+      hls_segments:
+        properties:
+          failed:
+            type: integer
+          last:
+            type: integer
+          requests:
+            type: integer
+          retries:
+            type: integer
+          sequence_gaps:
+            type: integer
+          too_late:
+            type: integer
+          too_slow:
+            type: integer
+        type: object
+      hls_variants:
+        items:
+          $ref: '#/definitions/api.HLSSessionVariant'
+        type: array
+      http_status:
+        additionalProperties:
+          format: int64
+          type: integer
+        type: object
+    type: object
+  api.HLSSessionVariant:
+    properties:
+      active:
+        type: boolean
+      bandwidth_bits:
+        type: integer
+      codecs:
+        type: string
+      path:
+        type: string
+      resolution:
+        type: string
+      switches:
+        type: integer
+    type: object
   api.IAMAuth0Tenant:
     properties:
       audience:
@@ -2332,6 +2385,8 @@ definitions:
       extra:
         additionalProperties: {}
         type: object
+      hls:
+        $ref: '#/definitions/api.HLSSessionData'
       id:
         type: string
       local:
@@ -2340,9 +2395,6 @@ definitions:
         type: string
       remote:
         type: string
-      userdata:
-        additionalProperties: {}
-        type: object
     type: object
   api.SessionPeers:
     properties:

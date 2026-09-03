@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -111,7 +112,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			if config.IAM == nil {
-				return api.Err(http.StatusForbidden, "Forbidden", "IAM is not provided")
+				return apierrors.Err(http.StatusForbidden, "Forbidden", "IAM is not provided")
 			}
 
 			isAPISuperuser := false
@@ -141,7 +142,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 						if config.WaitAfterFailedLogin {
 							time.Sleep(5 * time.Second)
 						}
-						return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+						return apierrors.Err(http.StatusForbidden, "Forbidden", "%s", err)
 					}
 
 					if identity == nil {
@@ -150,13 +151,13 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 							if config.WaitAfterFailedLogin {
 								time.Sleep(5 * time.Second)
 							}
-							return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+							return apierrors.Err(http.StatusForbidden, "Forbidden", "%s", err)
 						}
 					}
 				} else {
 					identity, err = mw.findIdentityFromJWT(c)
 					if err != nil {
-						return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+						return apierrors.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
 					}
 
 					if identity != nil {
@@ -166,7 +167,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 								if config.WaitAfterFailedLogin {
 									time.Sleep(5 * time.Second)
 								}
-								return api.Err(http.StatusForbidden, "Forbidden", "invalid token")
+								return apierrors.Err(http.StatusForbidden, "Forbidden", "invalid token")
 							}
 						} else {
 							usefor, _ := c.Get("usefor").(string)
@@ -174,7 +175,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 								if config.WaitAfterFailedLogin {
 									time.Sleep(5 * time.Second)
 								}
-								return api.Err(http.StatusForbidden, "Forbidden", "invalid token")
+								return apierrors.Err(http.StatusForbidden, "Forbidden", "invalid token")
 							}
 						}
 					}
@@ -189,7 +190,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			} else {
 				identity, err = mw.findIdentityFromSession(c)
 				if err != nil {
-					return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+					return apierrors.Err(http.StatusForbidden, "Forbidden", "%s", err)
 				}
 
 				if identity == nil {
@@ -197,7 +198,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 					if err != nil {
 						if err == ErrAuthRequired {
 							c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
-							return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+							return apierrors.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
 						} else {
 							if config.WaitAfterFailedLogin {
 								time.Sleep(5 * time.Second)
@@ -205,12 +206,12 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 							switch err {
 							case ErrBadRequest:
-								return api.Err(http.StatusBadRequest, "Bad request", "%s", err)
+								return apierrors.Err(http.StatusBadRequest, "Bad request", "%s", err)
 							case ErrUnauthorized:
 								c.Response().Header().Set(echo.HeaderWWWAuthenticate, "Basic realm="+realm)
-								return api.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
+								return apierrors.Err(http.StatusUnauthorized, "Unauthorized", "%s", err)
 							default:
-								return api.Err(http.StatusForbidden, "Forbidden", "%s", err)
+								return apierrors.Err(http.StatusForbidden, "Forbidden", "%s", err)
 							}
 						}
 					}
@@ -241,7 +242,7 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			}
 
 			if !config.IAM.Enforce(username, domain, rtype, resource, action) {
-				return api.Err(http.StatusForbidden, "Forbidden", "access denied")
+				return apierrors.Err(http.StatusForbidden, "Forbidden", "access denied")
 			}
 
 			return next(c)

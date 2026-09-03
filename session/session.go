@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 
@@ -304,9 +305,7 @@ func (se *SessionData) SetAll(data map[string]any) {
 		se.data = map[string]any{}
 	}
 
-	for k, v := range data {
-		se.data[k] = v
-	}
+	maps.Copy(se.data, data)
 }
 
 func (se *SessionData) Get(key string) (any, bool) {
@@ -332,9 +331,7 @@ func (se *SessionData) GetAll() map[string]any {
 		return data
 	}
 
-	for k, v := range se.data {
-		data[k] = v
-	}
+	maps.Copy(data, se.data)
 
 	return data
 }
