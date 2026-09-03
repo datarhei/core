@@ -34,7 +34,7 @@ type Session struct {
 	TxBytes   uint64          `json:"bytes_tx" format:"uint64"`
 	RxBitrate json.Number     `json:"bandwidth_rx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
 	TxBitrate json.Number     `json:"bandwidth_tx_kbit" swaggertype:"number" jsonschema:"type=number"` // kbit/s
-	HLS       *HLSSessionData `json:"hls"`
+	HLS       *HLSSessionData `json:"hls,omitempty"`
 }
 
 func (s *Session) Unmarshal(sess session.Session) {
@@ -76,6 +76,7 @@ func (s *Session) Unmarshal(sess session.Session) {
 	hls.HTTPStatus = map[int]uint64{}
 	maps.Copy(hls.HTTPStatus, data.HTTPStatus)
 
+	hls.Variants = []HLSSessionVariant{}
 	for path, variant := range data.Variants {
 		hls.Variants = append(hls.Variants, HLSSessionVariant{
 			Path:       path,

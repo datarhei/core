@@ -10,6 +10,7 @@ import (
 	"github.com/datarhei/core/v16/cluster"
 	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/labstack/echo/v4"
 )
@@ -21,7 +22,7 @@ import (
 // @ID cluster-3-get-nodes
 // @Produce json
 // @Success 200 {array} api.ClusterNode
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node [get]
 func (h *ClusterHandler) NodeList(c echo.Context) error {
@@ -52,7 +53,7 @@ func (h *ClusterHandler) NodeList(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNode
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id} [get]
 func (h *ClusterHandler) NodeGet(c echo.Context) error {
@@ -76,7 +77,7 @@ func (h *ClusterHandler) NodeGet(c echo.Context) error {
 		return c.JSON(http.StatusOK, h.marshalClusterNode(node))
 	}
 
-	return api.Err(http.StatusNotFound, "", "node not found")
+	return apierrors.Err(http.StatusNotFound, "", "node not found")
 }
 
 // NodeGetVersion returns the proxy node version with the given ID
@@ -87,7 +88,7 @@ func (h *ClusterHandler) NodeGet(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.AboutVersion
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/version [get]
 func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
@@ -95,7 +96,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	v := peer.CoreAbout()
@@ -120,7 +121,7 @@ func (h *ClusterHandler) NodeGetVersion(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNodeFiles
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/files [get]
 func (h *ClusterHandler) NodeGetMedia(c echo.Context) error {
@@ -128,7 +129,7 @@ func (h *ClusterHandler) NodeGetMedia(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	files := api.ClusterNodeFiles{
@@ -165,7 +166,7 @@ func (h *ClusterHandler) NodeGetMedia(c echo.Context) error {
 // @Param sort query string false "none, name, size, lastmod"
 // @Param order query string false "asc, desc"
 // @Success 200 {array} api.FileInfo
-// @Success 500 {object} api.Error
+// @Success 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs/{storage} [get]
 func (h *ClusterHandler) NodeFSListFiles(c echo.Context) error {
@@ -177,12 +178,12 @@ func (h *ClusterHandler) NodeFSListFiles(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	files, err := peer.Core().FilesystemList(name, pattern)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "retrieving file list: %s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "retrieving file list: %s", err.Error())
 	}
 
 	var sortFunc func(i, j int) bool
@@ -225,7 +226,7 @@ func (h *ClusterHandler) NodeFSListFiles(c echo.Context) error {
 // @Param filepath path string true "Path to file"
 // @Success 200 {file} byte
 // @Success 301 {string} string
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [get]
 // @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [head]
@@ -236,16 +237,16 @@ func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	file, err := peer.Core().FilesystemGetFile(storage, path, 0)
 	if err != nil {
-		if apierr, ok := err.(api.Error); ok {
-			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		if apierr, ok := err.(apierrors.Error); ok {
+			return apierrors.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
 		}
 
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	defer file.Close()
@@ -270,7 +271,7 @@ func (h *ClusterHandler) NodeFSGetFile(c echo.Context) error {
 // @Param filepath path string true "Path to file"
 // @Param data body []byte true "File data"
 // @Success 201 {string} string
-// @Failure 400 {object} api.Error
+// @Failure 400 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [put]
 func (h *ClusterHandler) NodeFSPutFile(c echo.Context) error {
@@ -280,18 +281,18 @@ func (h *ClusterHandler) NodeFSPutFile(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	req := c.Request()
 
 	err = peer.Core().FilesystemPutFile(storage, path, req.Body)
 	if err != nil {
-		if apierr, ok := err.(api.Error); ok {
-			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		if apierr, ok := err.(apierrors.Error); ok {
+			return apierrors.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
 		}
 
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusCreated, nil)
@@ -306,8 +307,8 @@ func (h *ClusterHandler) NodeFSPutFile(c echo.Context) error {
 // @Produce json
 // @Param config body api.FilesystemOperation true "Filesystem operation"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs [put]
 func (h *ClusterHandler) NodeFSFileOperation(c echo.Context) error {
@@ -315,21 +316,21 @@ func (h *ClusterHandler) NodeFSFileOperation(c echo.Context) error {
 	operation := api.FilesystemOperation{}
 
 	if err := util.ShouldBindJSON(c, &operation); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	err = peer.Core().FilesystemOperation(operation.Operation, operation.Target, operation.Source, operation.RateLimit)
 	if err != nil {
-		if apierr, ok := err.(api.Error); ok {
-			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		if apierr, ok := err.(apierrors.Error); ok {
+			return apierrors.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
 		}
 
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, nil)
@@ -345,7 +346,7 @@ func (h *ClusterHandler) NodeFSFileOperation(c echo.Context) error {
 // @Param storage path string true "Name of the filesystem"
 // @Param filepath path string true "Path to file"
 // @Success 200 {string} string
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/fs/{storage}/{filepath} [delete]
 func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
@@ -355,16 +356,16 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	err = peer.Core().FilesystemDeleteFile(storage, path)
 	if err != nil {
-		if apierr, ok := err.(api.Error); ok {
-			return api.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
+		if apierr, ok := err.(apierrors.Error); ok {
+			return apierrors.Err(apierr.Code, "", "%s", strings.Join(apierr.Details, "\n"))
 		}
 
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, nil)
@@ -385,8 +386,8 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 // @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Success 200 {array} api.Process
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/process [get]
 func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
@@ -406,7 +407,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "node not found: %s", err.Error())
 	}
 
 	procs, err := peer.Core().ProcessList(node.ProcessListOptions{
@@ -419,7 +420,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 		DomainPattern: domainpattern,
 	})
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "node not available: %s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "node not available: %s", err.Error())
 	}
 
 	processes := []api.Process{}
@@ -443,7 +444,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 // @Produce json
 // @Param id path string true "Node ID"
 // @Success 200 {object} api.ClusterNodeState
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/state [get]
 func (h *ClusterHandler) NodeGetState(c echo.Context) error {
@@ -462,7 +463,7 @@ func (h *ClusterHandler) NodeGetState(c echo.Context) error {
 	}
 
 	if len(state) == 0 {
-		return api.Err(http.StatusNotFound, "", "node not found")
+		return apierrors.Err(http.StatusNotFound, "", "node not found")
 	}
 
 	nodes := h.cluster.Store().NodeList()
@@ -486,9 +487,9 @@ func (h *ClusterHandler) NodeGetState(c echo.Context) error {
 // @Param id path string true "Node ID"
 // @Param config body api.ClusterNodeState true "State"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/node/{id}/state [put]
 func (h *ClusterHandler) NodeSetState(c echo.Context) error {
@@ -507,23 +508,23 @@ func (h *ClusterHandler) NodeSetState(c echo.Context) error {
 	}
 
 	if !found {
-		return api.Err(http.StatusNotFound, "", "node not found")
+		return apierrors.Err(http.StatusNotFound, "", "node not found")
 	}
 
 	state := api.ClusterNodeState{}
 
 	if err := util.ShouldBindJSON(c, &state); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if state.State == "leave" {
 		err := h.cluster.Leave("", id)
 		if err != nil {
 			if errors.Is(err, cluster.ErrUnknownNode) {
-				return api.Err(http.StatusNotFound, "", "node not found")
+				return apierrors.Err(http.StatusNotFound, "", "node not found")
 			}
 
-			return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+			return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 		}
 
 		return c.JSON(http.StatusOK, "OK")
@@ -532,9 +533,9 @@ func (h *ClusterHandler) NodeSetState(c echo.Context) error {
 	err := h.cluster.NodeSetState("", id, state.State)
 	if err != nil {
 		if errors.Is(err, cluster.ErrUnsupportedNodeState) {
-			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 		}
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

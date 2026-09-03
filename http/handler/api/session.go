@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/session"
@@ -92,9 +93,9 @@ func (s *SessionHandler) Active(c echo.Context) error {
 // @Param username path string true "Username"
 // @Param config body []api.SessionTokenRequest true "Token request"
 // @Success 200 {array} api.SessionTokenRequest
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/session/token/{username} [put]
 func (s *SessionHandler) CreateToken(c echo.Context) error {
@@ -102,19 +103,19 @@ func (s *SessionHandler) CreateToken(c echo.Context) error {
 
 	identity, err := s.iam.GetVerifier(username)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	request := []api.SessionTokenRequest{}
 
 	if err := util.ShouldBindJSONValidation(c, &request, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, r := range request {
 		err := c.Validate(r)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 

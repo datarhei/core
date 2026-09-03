@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/node"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/restream/app"
@@ -177,7 +178,7 @@ func (h *ClusterHandler) Healthy(c echo.Context) error {
 // @ID cluster-3-transfer-leadership
 // @Produce json
 // @Success 200 {string} string
-// @Failure 500 {object} api.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/transfer/{id} [put]
 func (h *ClusterHandler) TransferLeadership(c echo.Context) error {
@@ -196,7 +197,7 @@ func (h *ClusterHandler) TransferLeadership(c echo.Context) error {
 // @Produce json
 // @Param nodeid body api.ClusterNodeID true "Node ID"
 // @Success 200 {string} string
-// @Failure 500 {object} api.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/leave [put]
 func (h *ClusterHandler) Leave(c echo.Context) error {
@@ -211,17 +212,17 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 
 	if len(body) != 0 {
 		if err := json.Unmarshal(body, &nodeid); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err).Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err).Error())
 		}
 	}
 
 	err = h.cluster.Leave("", nodeid.ID)
 	if err != nil {
 		if errors.Is(err, cluster.ErrUnknownNode) {
-			return api.Err(http.StatusNotFound, "", "node not found")
+			return apierrors.Err(http.StatusNotFound, "", "node not found")
 		}
 
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -239,7 +240,7 @@ func (h *ClusterHandler) Leave(c echo.Context) error {
 func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 	r, err := h.cluster.Snapshot("")
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "failed to retrieve snapshot: %w", err)
+		return apierrors.Err(http.StatusInternalServerError, "", "failed to retrieve snapshot: %w", err)
 	}
 
 	defer r.Close()
@@ -255,20 +256,20 @@ func (h *ClusterHandler) GetSnapshot(c echo.Context) error {
 // @Produce json
 // @Param reallocations body api.ClusterProcessReallocate true "Process reallocations"
 // @Success 200 {string} string
-// @Failure 500 {object} api.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/reallocation [put]
 func (h *ClusterHandler) Reallocation(c echo.Context) error {
 	reallocations := []api.ClusterProcessReallocate{}
 
 	if err := util.ShouldBindJSONValidation(c, &reallocations, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, r := range reallocations {
 		err := c.Validate(r)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 
@@ -285,7 +286,7 @@ func (h *ClusterHandler) Reallocation(c echo.Context) error {
 
 	err := h.cluster.ProcessesRelocate("", relocations)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -303,7 +304,7 @@ func (h *ClusterHandler) Reallocation(c echo.Context) error {
 func (h *ClusterHandler) Deployments(c echo.Context) error {
 	deployments, err := h.cluster.Deployments()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	marshal := func(processes []cluster.DeploymentsProcess) []api.ClusterDeploymentsProcess {

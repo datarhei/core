@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/restream/app"
@@ -64,12 +65,12 @@ func (h *ClusterHandler) StoreGetProcess(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to read this process", ctxuser)
 	}
 
 	p, _, err := h.cluster.Store().ProcessGet(pid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	process := api.Process{}
@@ -152,8 +153,8 @@ func (h *ClusterHandler) StoreListIdentities(c echo.Context) error {
 // @ID cluster-3-db-get-identity
 // @Produce json
 // @Success 200 {object} api.IAMUser
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/db/user/{name} [get]
 func (h *ClusterHandler) StoreGetIdentity(c echo.Context) error {
@@ -162,7 +163,7 @@ func (h *ClusterHandler) StoreGetIdentity(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", name, "read") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to access this user")
+		return apierrors.Err(http.StatusForbidden, "", "Not allowed to access this user")
 	}
 
 	var updatedAt time.Time
@@ -171,7 +172,7 @@ func (h *ClusterHandler) StoreGetIdentity(c echo.Context) error {
 	if name != "$anon" {
 		user := h.cluster.Store().IAMIdentityGet(name)
 		if len(user.Users) == 0 {
-			return api.Err(http.StatusNotFound, "")
+			return apierrors.Err(http.StatusNotFound, "")
 		}
 
 		updatedAt, iamuser = user.UpdatedAt, user.Users[0]

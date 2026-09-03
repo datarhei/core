@@ -912,18 +912,6 @@ definitions:
         type: string
       type: array
     type: object
-  api.Error:
-    properties:
-      code:
-        format: int
-        type: integer
-      details:
-        items:
-          type: string
-        type: array
-      message:
-        type: string
-    type: object
   api.FileInfo:
     properties:
       core_id:
@@ -3132,6 +3120,18 @@ definitions:
       uptime:
         type: integer
     type: object
+  errors.Error:
+    properties:
+      code:
+        format: int
+        type: integer
+      details:
+        items:
+          type: string
+        type: array
+      message:
+        type: string
+    type: object
   value.Auth0Tenant:
     properties:
       audience:
@@ -3269,7 +3269,7 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       summary: Create a JWT
   /api/login/refresh:
     get:
@@ -3287,7 +3287,7 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Refresh a JWT
@@ -3497,11 +3497,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List of identities in the cluster
@@ -3608,7 +3608,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List all files on a filesystem
@@ -3667,7 +3667,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Reload identities and policies
@@ -3722,11 +3722,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new identiy
@@ -3756,11 +3756,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Delete an identity by its name
@@ -3784,11 +3784,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Identity in IAM
@@ -3825,19 +3825,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace an existing user
@@ -3879,19 +3879,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace policies of an user
@@ -3918,7 +3918,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Leave the cluster gracefully
@@ -3940,7 +3940,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List of proxy nodes in the cluster
@@ -3966,7 +3966,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List a proxy node by its ID
@@ -3992,7 +3992,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List the resources of a proxy node by its ID
@@ -4021,11 +4021,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: File operations between filesystems
@@ -4071,7 +4071,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List all files on a filesystem on a node
@@ -4107,7 +4107,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Remove a file from a filesystem on a node
@@ -4147,7 +4147,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem on a node
@@ -4187,7 +4187,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem on a node
@@ -4233,7 +4233,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem on a node
@@ -4297,11 +4297,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List of processes in the cluster on a node
@@ -4327,7 +4327,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the state of a node with the given ID
@@ -4358,15 +4358,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Set the state of a node with the given ID
@@ -4392,7 +4392,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List a proxy node by its ID
@@ -4475,11 +4475,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new process
@@ -4509,11 +4509,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Delete a process by its ID
@@ -4548,11 +4548,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List a process by its ID
@@ -4589,15 +4589,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace an existing process
@@ -4635,15 +4635,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Issue a command to a process in the cluster
@@ -4674,19 +4674,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the configuration of a process
@@ -4721,15 +4721,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Retrieve JSON metadata stored with a process under a key
@@ -4770,15 +4770,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata with a process under the given key
@@ -4809,7 +4809,7 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Probe a process in the cluster
@@ -4853,19 +4853,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the report of a process
@@ -4895,19 +4895,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the state of a process
@@ -4941,15 +4941,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Probe a process in the cluster
@@ -4976,7 +4976,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Issue reallocation requests of processes
@@ -5012,7 +5012,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Transfer the leadership to another node
@@ -5057,7 +5057,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
@@ -5196,11 +5196,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: File operations between filesystems
@@ -5335,7 +5335,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Remove a file from a filesystem
@@ -5370,7 +5370,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem
@@ -5405,7 +5405,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Fetch a file from a filesystem
@@ -5450,7 +5450,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a file to a filesystem
@@ -5505,15 +5505,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new user
@@ -5543,19 +5543,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Delete an user by its name
@@ -5584,11 +5584,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List an user by its name
@@ -5625,19 +5625,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace an existing user
@@ -5679,19 +5679,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace policies of an user
@@ -5740,19 +5740,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Retrieve JSON metadata from a key
@@ -5783,19 +5783,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata under the given key
@@ -5841,7 +5841,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Query the collected metrics
@@ -5925,19 +5925,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add a new process
@@ -5971,19 +5971,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Delete a process by its ID
@@ -6018,19 +6018,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: List a process by its ID
@@ -6067,19 +6067,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Replace an existing process
@@ -6117,19 +6117,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Issue a command to a process
@@ -6160,19 +6160,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the configuration of a process
@@ -6207,19 +6207,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Retrieve JSON metadata stored with a process under a key
@@ -6260,19 +6260,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Add JSON metadata with a process under the given key
@@ -6319,11 +6319,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Upload an error frame
@@ -6355,11 +6355,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Encode the errorframe
@@ -6398,11 +6398,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the last keyframe
@@ -6434,11 +6434,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Close the current input stream
@@ -6469,11 +6469,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the current playout status
@@ -6514,11 +6514,11 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Switch to a new stream
@@ -6549,11 +6549,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Probe a known process
@@ -6597,19 +6597,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the logs of a process
@@ -6646,19 +6646,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Set the report history a process
@@ -6688,19 +6688,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Get the state of a process
@@ -6729,11 +6729,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Probe a process config
@@ -6762,11 +6762,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Validate a process config
@@ -6816,7 +6816,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Search log history of all processes
@@ -6949,15 +6949,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       security:
       - ApiKeyAuth: []
       summary: Request access tokens
@@ -7074,7 +7074,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       summary: Fetch minimal statistics about a process
       tags:
       - v16.7.2
@@ -7133,15 +7133,15 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/api.Error'
+            $ref: '#/definitions/errors.Error'
       summary: Plays a RTMP stream over HTTP
       tags:
       - v16.?.?

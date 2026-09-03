@@ -9,6 +9,7 @@ import (
 	cfgvars "github.com/datarhei/core/v16/config/vars"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 
 	"github.com/labstack/echo/v4"
 )
@@ -53,7 +54,7 @@ func (p *ConfigHandler) Get(c echo.Context) error {
 // @Produce json
 // @Param config body api.SetConfig true "Restreamer configuration"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
+// @Failure 400 {object} apierrors.Error
 // @Failure 409 {object} api.ConfigError
 // @Security ApiKeyAuth
 // @Router /api/v3/config [put]
@@ -64,11 +65,11 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if err := json.Unmarshal(body, &version); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
 	}
 
 	cfg := p.store.Get()
@@ -84,11 +85,11 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 		v1SetConfig := api.NewSetConfigV1(cfg)
 
 		if err := json.Unmarshal(body, &v1SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
 		}
 
 		if err := c.Validate(v1SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 
 		// Merge it into the current config
@@ -98,11 +99,11 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 		v2SetConfig := api.NewSetConfigV2(cfg)
 
 		if err := json.Unmarshal(body, &v2SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
 		}
 
 		if err := c.Validate(v2SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 
 		// Merge it into the current config
@@ -111,17 +112,17 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 		v3SetConfig := api.NewSetConfig(cfg)
 
 		if err := json.Unmarshal(body, &v3SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", json.FormatError(body, err))
 		}
 
 		if err := c.Validate(v3SetConfig); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 
 		// Merge it into the current config
 		v3SetConfig.MergeTo(cfg)
 	} else {
-		return api.Err(http.StatusBadRequest, "", "invalid config version: %d", version.Version)
+		return apierrors.Err(http.StatusBadRequest, "", "invalid config version: %d", version.Version)
 	}
 
 	cfg.CreatedAt = time.Now()
@@ -152,12 +153,12 @@ func (p *ConfigHandler) Set(c echo.Context) error {
 
 	// Save the new config
 	if err := p.store.Set(cfg); err != nil {
-		return api.Err(http.StatusBadRequest, "", "failed to store config: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "failed to store config: %s", err.Error())
 	}
 
 	// Set the new and merged config as active config
 	if err := p.store.SetActive(mergedConfig); err != nil {
-		return api.Err(http.StatusBadRequest, "", "failed to activate config: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "failed to activate config: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

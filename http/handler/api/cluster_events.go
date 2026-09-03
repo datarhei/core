@@ -9,6 +9,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 
 	"github.com/labstack/echo/v4"
@@ -30,7 +31,7 @@ func (h *ClusterHandler) LogEvents(c echo.Context) error {
 	filters := api.LogEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return errors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	filter := map[string]*api.LogEventFilter{}
@@ -39,7 +40,7 @@ func (h *ClusterHandler) LogEvents(c echo.Context) error {
 		f := f
 
 		if err := f.Compile(); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid filter: %s: %s", f.Component, err.Error())
+			return errors.Err(http.StatusBadRequest, "", "invalid filter: %s: %s", f.Component, err.Error())
 		}
 
 		component := strings.ToLower(f.Component)
@@ -67,7 +68,7 @@ func (h *ClusterHandler) LogEvents(c echo.Context) error {
 
 	evts, cancel, err := h.proxy.LogEvents()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return errors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 	defer cancel()
 
@@ -183,7 +184,7 @@ func (h *ClusterHandler) ProcessEvents(c echo.Context) error {
 	filters := api.ProcessEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return errors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	filter := []*api.ProcessEventFilter{}
@@ -192,7 +193,7 @@ func (h *ClusterHandler) ProcessEvents(c echo.Context) error {
 		f := f
 
 		if err := f.Compile(); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid filter: %s", err.Error())
+			return errors.Err(http.StatusBadRequest, "", "invalid filter: %s", err.Error())
 		}
 
 		filter = append(filter, &f)
@@ -208,7 +209,7 @@ func (h *ClusterHandler) ProcessEvents(c echo.Context) error {
 
 	evts, cancel, err := h.proxy.ProcessEvents()
 	if err != nil {
-		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+		return errors.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
 	}
 	defer cancel()
 

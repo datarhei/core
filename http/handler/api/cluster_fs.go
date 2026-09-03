@@ -20,7 +20,7 @@ import (
 // @Param sort query string false "none, name, size, lastmod"
 // @Param order query string false "asc, desc"
 // @Success 200 {array} api.FileInfo
-// @Success 500 {object} api.Error
+// @Success 500 {object} errors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/fs/{storage} [get]
 func (h *ClusterHandler) FilesystemListFiles(c echo.Context) error {

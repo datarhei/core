@@ -14,6 +14,7 @@ import (
 
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/io/fs"
@@ -41,7 +42,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 	file := h.FS.Filesystem.Open(path)
 	if file == nil {
-		return api.Err(http.StatusNotFound, "", "file not found: %s", path)
+		return apierrors.Err(http.StatusNotFound, "", "file not found: %s", path)
 	}
 
 	stat, _ := file.Stat()
@@ -54,7 +55,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 			file = h.FS.Filesystem.Open(path)
 			if file == nil {
-				return api.Err(http.StatusNotFound, "", "file not found: %s", path)
+				return apierrors.Err(http.StatusNotFound, "", "file not found: %s", path)
 			}
 
 			stat, _ = file.Stat()
@@ -90,7 +91,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	if len(ifRange) != 0 {
 		ifTime, err := time.Parse("Mon, 02 Jan 2006 15:04:05 MST", ifRange)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "%s", err)
+			return apierrors.Err(http.StatusBadRequest, "", "%s", err)
 		}
 
 		if ifTime.Unix() != stat.ModTime().Unix() {
@@ -102,17 +103,17 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	if len(byteRange) != 0 {
 		ranges, err := parseRange(byteRange, stat.Size())
 		if err != nil {
-			return api.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
+			return apierrors.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
 		}
 
 		if len(ranges) > 1 {
-			return api.Err(http.StatusNotImplemented, "", "multipart range requests are not supported")
+			return apierrors.Err(http.StatusNotImplemented, "", "multipart range requests are not supported")
 		}
 
 		if len(ranges) == 1 {
 			_, err := file.Seek(ranges[0].start, io.SeekStart)
 			if err != nil {
-				return api.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
+				return apierrors.Err(http.StatusRequestedRangeNotSatisfiable, "", "%s", err.Error())
 			}
 
 			c.Response().Header().Set("Content-Range", ranges[0].contentRange(stat.Size()))
@@ -137,7 +138,7 @@ func (h *FSHandler) PutFile(c echo.Context) error {
 
 	_, created, err := h.FS.Filesystem.WriteFileReader(path, req.Body, -1)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	if h.FS.Cache != nil {
@@ -179,7 +180,7 @@ func (h *FSHandler) DeleteFile(c echo.Context) error {
 	}
 
 	if size < 0 {
-		return api.Err(http.StatusNotFound, "", "file not found: %s", path)
+		return apierrors.Err(http.StatusNotFound, "", "file not found: %s", path)
 	}
 
 	return c.String(http.StatusOK, "Deleted: "+path)
@@ -193,7 +194,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 	modifiedEnd := util.DefaultQuery(c, "lastmod_end", "")
 
 	if len(pattern) == 0 {
-		return api.Err(http.StatusBadRequest, "", "a glob pattern is required")
+		return apierrors.Err(http.StatusBadRequest, "", "a glob pattern is required")
 	}
 
 	path := "/"
@@ -209,20 +210,20 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 	}
 
 	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
 	} else {
 		options.SizeMin = x
 	}
 
 	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
 	} else {
 		options.SizeMax = x
 	}
 
 	if len(modifiedStart) != 0 {
 		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			options.ModifiedStart = &t
@@ -231,7 +232,7 @@ func (h *FSHandler) DeleteFiles(c echo.Context) error {
 
 	if len(modifiedEnd) != 0 {
 		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
 		} else {
 			t := time.Unix(x+1, 0)
 			options.ModifiedEnd = &t
@@ -278,20 +279,20 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	if x, err := strconv.ParseInt(sizeMin, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "size_min: %s", err.Error())
 	} else {
 		options.SizeMin = x
 	}
 
 	if x, err := strconv.ParseInt(sizeMax, 10, 64); err != nil {
-		return api.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "size_max: %s", err.Error())
 	} else {
 		options.SizeMax = x
 	}
 
 	if len(modifiedStart) != 0 {
 		if x, err := strconv.ParseInt(modifiedStart, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "lastmod_start: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			options.ModifiedStart = &t
@@ -300,7 +301,7 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 
 	if len(modifiedEnd) != 0 {
 		if x, err := strconv.ParseInt(modifiedEnd, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "lastmod_end: %s", err.Error())
 		} else {
 			t := time.Unix(x+1, 0)
 			options.ModifiedEnd = &t

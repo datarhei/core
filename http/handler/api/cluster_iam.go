@@ -6,6 +6,7 @@ import (
 
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/iam/policy"
@@ -22,8 +23,8 @@ import (
 // @Param config body api.IAMUser true "Identity"
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user [post]
 func (h *ClusterHandler) IAMIdentityAdd(c echo.Context) error {
@@ -34,31 +35,31 @@ func (h *ClusterHandler) IAMIdentityAdd(c echo.Context) error {
 	user := api.IAMUser{}
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies := user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
+		return apierrors.Err(http.StatusForbidden, "", "Not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
+			return apierrors.Err(http.StatusForbidden, "", "Not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "", "Only superusers can add superusers")
+		return apierrors.Err(http.StatusForbidden, "", "Only superusers can add superusers")
 	}
 
 	if err := h.cluster.IAMIdentityAdd("", iamuser); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 
 	if err := h.cluster.IAMPoliciesSet("", iamuser.Name, iampolicies); err != nil {
-		return api.Err(http.StatusBadRequest, "", "Invalid policies: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "Invalid policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, user)
@@ -75,10 +76,10 @@ func (h *ClusterHandler) IAMIdentityAdd(c echo.Context) error {
 // @Param domain query string false "Domain of the acting user"
 // @Param user body api.IAMUser true "User definition"
 // @Success 200 {object} api.IAMUser
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [put]
 func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
@@ -88,7 +89,7 @@ func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
-		return api.Err(http.StatusForbidden, "", "not allowed to modify this user")
+		return apierrors.Err(http.StatusForbidden, "", "not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -97,7 +98,7 @@ func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "user not found: %s", err.Error())
+			return apierrors.Err(http.StatusNotFound, "", "user not found: %s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -111,35 +112,35 @@ func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
 	user.Marshal(iamuser, iampolicies)
 
 	if err := util.ShouldBindJSON(c, &user); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	iamuser, iampolicies = user.Unmarshal()
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", iamuser.Name, "write") {
-		return api.Err(http.StatusForbidden, "", "not allowed to create user '%s'", iamuser.Name)
+		return apierrors.Err(http.StatusForbidden, "", "not allowed to create user '%s'", iamuser.Name)
 	}
 
 	for _, p := range iampolicies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
+			return apierrors.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "", "only superusers can modify superusers")
+		return apierrors.Err(http.StatusForbidden, "", "only superusers can modify superusers")
 	}
 
 	if name != "$anon" {
 		err = h.cluster.IAMIdentityUpdate("", name, iamuser)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 		}
 	}
 
 	err = h.cluster.IAMPoliciesSet("", iamuser.Name, iampolicies)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, user)
@@ -156,10 +157,10 @@ func (h *ClusterHandler) IAMIdentityUpdate(c echo.Context) error {
 // @Param domain query string false "Domain of the acting user"
 // @Param user body []api.IAMPolicy true "Policy definitions"
 // @Success 200 {array} api.IAMPolicy
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name}/policy [put]
 func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
@@ -169,7 +170,7 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
-		return api.Err(http.StatusForbidden, "", "not allowed to modify this user")
+		return apierrors.Err(http.StatusForbidden, "", "not allowed to modify this user")
 	}
 
 	var iamuser identity.User
@@ -178,7 +179,7 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "unknown identity: %s", err.Error())
+			return apierrors.Err(http.StatusNotFound, "", "unknown identity: %s", err.Error())
 		}
 	} else {
 		iamuser = identity.User{
@@ -189,13 +190,13 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 	policies := []api.IAMPolicy{}
 
 	if err := util.ShouldBindJSONValidation(c, &policies, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	for _, p := range policies {
 		err := c.Validate(p)
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 		}
 	}
 
@@ -203,7 +204,7 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 
 	for _, p := range policies {
 		if !h.iam.Enforce(ctxuser, p.Domain, "iam", iamuser.Name, "write") {
-			return api.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
+			return apierrors.Err(http.StatusForbidden, "", "not allowed to write policy: %v", p)
 		}
 
 		accessPolicies = append(accessPolicies, policy.Policy{
@@ -216,15 +217,15 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "", "only superusers can modify superusers")
+		return apierrors.Err(http.StatusForbidden, "", "only superusers can modify superusers")
 	}
 
 	err = h.cluster.IAMPoliciesSet("", name, accessPolicies)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return api.Err(http.StatusNotFound, "", "set policies: %s", err.Error())
+			return apierrors.Err(http.StatusNotFound, "", "set policies: %s", err.Error())
 		}
-		return api.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "set policies: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, policies)
@@ -237,18 +238,18 @@ func (h *ClusterHandler) IAMIdentityUpdatePolicies(c echo.Context) error {
 // @ID cluster-3-iam-reload
 // @Produce json
 // @Success 200 {string} string
-// @Success 500 {object} api.Error
+// @Success 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/reload [get]
 func (h *ClusterHandler) IAMReload(c echo.Context) error {
 	err := h.iam.ReloadIndentities()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "reload identities: %w", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "reload identities: %w", err.Error())
 	}
 
 	err = h.iam.ReloadPolicies()
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "reload policies: %w", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "reload policies: %w", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -311,8 +312,8 @@ func (h *ClusterHandler) IAMIdentityList(c echo.Context) error {
 // @Produce json
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {object} api.IAMUser
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [get]
 func (h *ClusterHandler) IAMIdentityGet(c echo.Context) error {
@@ -321,7 +322,7 @@ func (h *ClusterHandler) IAMIdentityGet(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", name, "read") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to access this user")
+		return apierrors.Err(http.StatusForbidden, "", "Not allowed to access this user")
 	}
 
 	var iamuser identity.User
@@ -330,7 +331,7 @@ func (h *ClusterHandler) IAMIdentityGet(c echo.Context) error {
 	if name != "$anon" {
 		iamuser, err = h.iam.GetIdentity(name)
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "%s", err.Error())
+			return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 		}
 
 		if ctxuser != iamuser.Name {
@@ -398,8 +399,8 @@ func (h *ClusterHandler) IAMPolicyList(c echo.Context) error {
 // @Param name path string true "Identity name"
 // @Param domain query string false "Domain of the acting user"
 // @Success 200 {string} string
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/iam/user/{name} [delete]
 func (h *ClusterHandler) IAMIdentityRemove(c echo.Context) error {
@@ -409,20 +410,20 @@ func (h *ClusterHandler) IAMIdentityRemove(c echo.Context) error {
 	name := util.PathParam(c, "name")
 
 	if !h.iam.Enforce(ctxuser, domain, "iam", name, "write") {
-		return api.Err(http.StatusForbidden, "", "Not allowed to delete this user")
+		return apierrors.Err(http.StatusForbidden, "", "Not allowed to delete this user")
 	}
 
 	iamuser, err := h.iam.GetIdentity(name)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	if !superuser && iamuser.Superuser {
-		return api.Err(http.StatusForbidden, "", "Only superusers can remove superusers")
+		return apierrors.Err(http.StatusForbidden, "", "Only superusers can remove superusers")
 	}
 
 	if err := h.cluster.IAMIdentityRemove("", name); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid identity: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

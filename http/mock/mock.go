@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/datarhei/core/v16/encoding/json"
-	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/errorhandler"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/validator"
 
 	"github.com/invopop/jsonschema"
@@ -34,7 +34,7 @@ type Response struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Raw     []byte
-	Data    interface{}
+	Data    any
 }
 
 func Request(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, data io.Reader) *Response {
@@ -90,7 +90,7 @@ func CheckResponse(t require.TestingT, res *http.Response) *Response {
 	}
 
 	if response.Code != http.StatusOK {
-		if err, ok := response.Data.(api.Error); ok {
+		if err, ok := response.Data.(apierrors.Error); ok {
 			response.Message = err.Message
 		}
 	}
@@ -98,7 +98,7 @@ func CheckResponse(t require.TestingT, res *http.Response) *Response {
 	return response
 }
 
-func Validate(t require.TestingT, datatype, data interface{}) bool {
+func Validate(t require.TestingT, datatype, data any) bool {
 	schema, err := jsonschema.Reflect(datatype).MarshalJSON()
 	require.NoError(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/rtmp"
 
@@ -110,15 +111,15 @@ func (rtmph *RTMPHandler) Disconnect(c echo.Context) error {
 // @Produce video/x-flv
 // @Produce json
 // @Success 200 {file} byte
-// @Success 403 {object} api.Error
-// @Success 404 {object} api.Error
-// @Success 500 {object} api.Error
+// @Success 403 {object} apierrors.Error
+// @Success 404 {object} apierrors.Error
+// @Success 500 {object} apierrors.Error
 // @Router /rtmp/{path} [get]
 func (rtmph *RTMPHandler) Play(c echo.Context) error {
 	path := util.PathWildcardParam(c)
 	addr, err := net.ResolveIPAddr("ip", c.RealIP())
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	u := c.Request().URL
@@ -136,7 +137,7 @@ func (rtmph *RTMPHandler) Play(c echo.Context) error {
 				status = http.StatusNotFound
 			}
 
-			return api.Err(status, "", "%s", err.Error())
+			return apierrors.Err(status, "", "%s", err.Error())
 		} else {
 			return err
 		}

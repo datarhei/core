@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
@@ -218,8 +219,8 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 // @Param domain query string false "Process domain"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [get]
 func (h *ClusterHandler) ProcessGet(c echo.Context) error {
@@ -229,7 +230,7 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.NewProcessID(id, domain)
@@ -237,7 +238,7 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	// Check the store for the process
 	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	process := api.Process{}
@@ -247,7 +248,7 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 	if len(nodeid) != 0 {
 		process, err = h.proxy.ProcessGet(nodeid, pid, filter.Slice())
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+			return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 	}
 
@@ -263,10 +264,10 @@ func (h *ClusterHandler) ProcessGet(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/config [get]
 func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
@@ -275,7 +276,7 @@ func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.NewProcessID(id, domain)
@@ -283,7 +284,7 @@ func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
 	// Check the store for the process
 	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	process := api.Process{}
@@ -293,7 +294,7 @@ func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
 	if len(nodeid) != 0 {
 		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"config"})
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+			return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 	}
 
@@ -309,10 +310,10 @@ func (h *ClusterHandler) ProcessGetConfig(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessState
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/state [get]
 func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
@@ -321,7 +322,7 @@ func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.NewProcessID(id, domain)
@@ -329,7 +330,7 @@ func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
 	// Check the store for the process
 	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	process := api.Process{}
@@ -339,7 +340,7 @@ func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
 	if len(nodeid) != 0 {
 		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"state"})
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+			return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 	}
 
@@ -357,10 +358,10 @@ func (h *ClusterHandler) ProcessGetState(c echo.Context) error {
 // @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports."
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessState
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/report [get]
 func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
@@ -375,7 +376,7 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 
 	if len(createdUnix) != 0 {
 		if x, err := strconv.ParseInt(createdUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
 		} else {
 			createdAt = &x
 		}
@@ -383,14 +384,14 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 
 	if len(exitedUnix) != 0 {
 		if x, err := strconv.ParseInt(exitedUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
 		} else {
 			exitedAt = &x
 		}
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.NewProcessID(id, domain)
@@ -398,7 +399,7 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 	// Check the store for the process
 	p, nodeid, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	process := api.Process{}
@@ -408,7 +409,7 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 	if len(nodeid) != 0 {
 		process, err = h.proxy.ProcessGet(nodeid, pid, []string{"report"})
 		if err != nil {
-			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+			return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 	}
 
@@ -448,7 +449,7 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 	}
 
 	if len(entries) == 0 {
-		return api.Err(http.StatusNotFound, "", "No matching reports found")
+		return apierrors.Err(http.StatusNotFound, "", "No matching reports found")
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -478,8 +479,8 @@ func (h *ClusterHandler) ProcessGetReport(c echo.Context) error {
 // @Produce json
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [post]
 func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
@@ -493,25 +494,25 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
+		return apierrors.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
+		return apierrors.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
 	}
 
 	config, metadata := process.Marshal()
 
 	if err := h.cluster.ProcessAdd("", config); err != nil {
-		return api.Err(http.StatusBadRequest, "", "adding process config: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "adding process config: %s", err.Error())
 	}
 
 	for key, value := range metadata {
@@ -532,9 +533,9 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [put]
 func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
@@ -552,35 +553,35 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	pid := process.ProcessID()
 
 	current, _, err := h.cluster.ProcessGet("", pid, false)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+		return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 	}
 
 	// Prefill the config with the current values
 	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process", ctxuser)
 	}
 
 	config, metadata := process.Marshal()
 
 	if err := h.cluster.ProcessUpdate("", pid, config, force == "restart"); err != nil {
 		if err == restream.ErrUnknownProcess {
-			return api.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
+			return apierrors.Err(http.StatusNotFound, "", "process not found: %s in domain '%s'", pid.ID, pid.Domain)
 		}
 
-		return api.Err(http.StatusBadRequest, "", "process can't be updated: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "process can't be updated: %s", err.Error())
 	}
 
 	pid = process.ProcessID()
@@ -603,9 +604,9 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param command body api.Command true "Process command"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/command [put]
 func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
@@ -614,13 +615,13 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	var command api.Command
 
 	if err := util.ShouldBindJSON(c, &command); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	pid := app.ProcessID{
@@ -634,14 +635,14 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 	case "restart":
 	case "reload":
 	default:
-		return api.Err(http.StatusBadRequest, "", "unknown command provided. known commands are: start, stop, reload, restart")
+		return apierrors.Err(http.StatusBadRequest, "", "unknown command provided. known commands are: start, stop, reload, restart")
 	}
 
 	if err := h.cluster.ProcessSetCommand("", pid, command.Command); err != nil {
-		if cerr, ok := err.(api.Error); ok {
+		if cerr, ok := err.(apierrors.Error); ok {
 			return cerr
 		}
-		return api.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "command failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
@@ -658,9 +659,9 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/metadata/{key} [put]
 func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
@@ -670,17 +671,17 @@ func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
+		return apierrors.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	pid := app.ProcessID{
@@ -689,7 +690,7 @@ func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
 	}
 
 	if err := h.cluster.ProcessSetMetadata("", pid, key, data); err != nil {
-		return api.Err(http.StatusNotFound, "", "setting metadata failed: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "setting metadata failed: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -705,9 +706,9 @@ func (h *ClusterHandler) ProcessSetMetadata(c echo.Context) error {
 // @Param key path string true "Key for data store"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/metadata/{key} [get]
 func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
@@ -717,7 +718,7 @@ func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.ProcessID{
@@ -727,7 +728,7 @@ func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
 
 	data, err := h.cluster.ProcessGetMetadata("", pid, key)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, data)
@@ -742,7 +743,7 @@ func (h *ClusterHandler) ProcessGetMetadata(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.Probe
-// @Failure 403 {object} api.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id}/probe [get]
 func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
@@ -751,7 +752,7 @@ func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	pid := app.ProcessID{
@@ -781,9 +782,9 @@ func (h *ClusterHandler) ProcessProbe(c echo.Context) error {
 // @Param config body api.ProcessConfig true "Process config"
 // @Param coreid query string false "Core to execute the probe on"
 // @Success 200 {object} api.Probe
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/probe [post]
 func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
@@ -798,30 +799,30 @@ func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write this process in domain %s", ctxuser, process.Domain)
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
+		return apierrors.Err(http.StatusBadRequest, "", "unsupported process type: supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 {
-		return api.Err(http.StatusBadRequest, "", "At least one input must be defined")
+		return apierrors.Err(http.StatusBadRequest, "", "At least one input must be defined")
 	}
 
 	if process.Limits.CPU <= 0 || process.Limits.Memory == 0 {
-		return api.Err(http.StatusBadRequest, "", "Resource limit must be defined")
+		return apierrors.Err(http.StatusBadRequest, "", "Resource limit must be defined")
 	}
 
 	config, _ := process.Marshal()
 
 	coreid = h.proxy.FindNodeForResources(coreid, config.LimitCPU, config.LimitMemory)
 	if len(coreid) == 0 {
-		return api.Err(http.StatusInternalServerError, "", "Not enough resources available to execute probe")
+		return apierrors.Err(http.StatusInternalServerError, "", "Not enough resources available to execute probe")
 	}
 
 	probe, _ := h.proxy.ProcessProbeConfig(coreid, config)
@@ -838,8 +839,8 @@ func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [delete]
 func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
@@ -848,7 +849,7 @@ func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to write the process in domain: %s", ctxuser, domain)
 	}
 
 	pid := app.ProcessID{
@@ -857,7 +858,7 @@ func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
 	}
 
 	if err := h.cluster.ProcessRemove("", pid); err != nil {
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")

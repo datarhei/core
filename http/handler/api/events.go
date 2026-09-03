@@ -13,6 +13,7 @@ import (
 	"github.com/datarhei/core/v16/event"
 	"github.com/datarhei/core/v16/glob"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/slices"
 
@@ -83,7 +84,7 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 	filters := api.LogEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	filter := map[string]*api.LogEventFilter{}
@@ -92,7 +93,7 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 		f := f
 
 		if err := f.Compile(); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid filter: %s: %s", f.Component, err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid filter: %s: %s", f.Component, err.Error())
 		}
 
 		component := strings.ToLower(f.Component)
@@ -120,7 +121,7 @@ func (h *EventsHandler) LogEvents(c echo.Context) error {
 
 	evts, cancel, err := h.logs.Events()
 	if err != nil {
-		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+		return apierrors.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
 	}
 	defer cancel()
 
@@ -229,7 +230,7 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 		var err error
 		compiledPattern, err = glob.Compile(pattern, '/')
 		if err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid pattern: %w", err)
+			return apierrors.Err(http.StatusBadRequest, "", "invalid pattern: %w", err)
 		}
 	}
 
@@ -251,12 +252,12 @@ func (h *EventsHandler) MediaEvents(c echo.Context) error {
 	h.lock.Unlock()
 
 	if !ok {
-		return api.Err(http.StatusNotFound, "", "media source not found")
+		return apierrors.Err(http.StatusNotFound, "", "media source not found")
 	}
 
 	evts, cancel, err := mediaSource.Events()
 	if err != nil {
-		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+		return apierrors.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
 	}
 	defer cancel()
 
@@ -362,7 +363,7 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 	filters := api.ProcessEventFilters{}
 
 	if err := util.ShouldBindJSON(c, &filters); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	filter := []*api.ProcessEventFilter{}
@@ -371,7 +372,7 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 		f := f
 
 		if err := f.Compile(); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid filter: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid filter: %s", err.Error())
 		}
 
 		filter = append(filter, &f)
@@ -387,7 +388,7 @@ func (h *EventsHandler) ProcessEvents(c echo.Context) error {
 
 	evts, cancel, err := h.process.Events()
 	if err != nil {
-		return api.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
+		return apierrors.Err(http.StatusNotImplemented, "", "events are not implemented for this server")
 	}
 	defer cancel()
 

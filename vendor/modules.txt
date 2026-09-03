@@ -47,6 +47,9 @@ github.com/armon/go-metrics
 # github.com/atrox/haikunatorgo/v2 v2.0.1
 ## explicit
 github.com/atrox/haikunatorgo/v2
+# github.com/bahlo/generic-list-go v0.2.0
+## explicit; go 1.18
+github.com/bahlo/generic-list-go
 # github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c
 ## explicit
 github.com/benburkert/openpgp/aes/keywrap
@@ -56,6 +59,9 @@ github.com/beorn7/perks/quantile
 # github.com/boltdb/bolt v1.3.1
 ## explicit
 github.com/boltdb/bolt
+# github.com/buger/jsonparser v1.6.1
+## explicit; go 1.13
+github.com/buger/jsonparser
 # github.com/caddyserver/certmagic v0.25.3
 ## explicit; go 1.25.0
 github.com/caddyserver/certmagic
@@ -247,9 +253,8 @@ github.com/hashicorp/raft
 github.com/hashicorp/raft-boltdb/v2
 # github.com/iancoleman/orderedmap v0.2.0
 ## explicit
-github.com/iancoleman/orderedmap
-# github.com/invopop/jsonschema v0.4.0
-## explicit; go 1.16
+# github.com/invopop/jsonschema v0.14.0
+## explicit; go 1.24
 github.com/invopop/jsonschema
 # github.com/joho/godotenv v1.5.1
 ## explicit; go 1.12
@@ -338,6 +343,9 @@ github.com/minio/minio-go/v7/pkg/tags
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
+# github.com/pb33f/ordered-map/v2 v2.3.1
+## explicit; go 1.24
+github.com/pb33f/ordered-map/v2
 # github.com/philhofer/fwd v1.2.0
 ## explicit; go 1.20
 github.com/philhofer/fwd
@@ -502,6 +510,11 @@ go.yaml.in/yaml/v2
 # go.yaml.in/yaml/v3 v3.0.4
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
+# go.yaml.in/yaml/v4 v4.0.0-rc.6
+## explicit; go 1.18
+go.yaml.in/yaml/v4
+go.yaml.in/yaml/v4/internal/libyaml
+go.yaml.in/yaml/v4/plugin/limit
 # golang.org/x/crypto v0.52.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/acme

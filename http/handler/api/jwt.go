@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/iam"
 
 	"github.com/labstack/echo/v4"
@@ -27,17 +28,17 @@ func NewJWT(iam iam.IAM) *JWTHandler {
 // @Produce json
 // @Param user body api.Login true "User definition"
 // @Success 200 {object} api.JWT
-// @Failure 403 {object} api.Error
+// @Failure 403 {object} apierrors.Error
 // @Router /api/login [post]
 func (j *JWTHandler) Login(c echo.Context) error {
 	subject, ok := c.Get("user").(string)
 	if !ok {
-		return api.Err(http.StatusForbidden, "Invalid user")
+		return apierrors.Err(http.StatusForbidden, "Invalid user")
 	}
 
 	at, rt, err := j.iam.CreateJWT(subject)
 	if err != nil {
-		return api.Err(http.StatusForbidden, "", "failed to create JWT: %s", err)
+		return apierrors.Err(http.StatusForbidden, "", "failed to create JWT: %s", err)
 	}
 
 	return c.JSON(http.StatusOK, api.JWT{
@@ -53,18 +54,18 @@ func (j *JWTHandler) Login(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Success 200 {object} api.JWTRefresh
-// @Failure 403 {object} api.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/login/refresh [get]
 func (j *JWTHandler) Refresh(c echo.Context) error {
 	subject, ok := c.Get("user").(string)
 	if !ok {
-		return api.Err(http.StatusForbidden, "", "invalid token")
+		return apierrors.Err(http.StatusForbidden, "", "invalid token")
 	}
 
 	at, _, err := j.iam.CreateJWT(subject)
 	if err != nil {
-		return api.Err(http.StatusForbidden, "", "failed to create JWT: %s", err.Error())
+		return apierrors.Err(http.StatusForbidden, "", "failed to create JWT: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, api.JWTRefresh{

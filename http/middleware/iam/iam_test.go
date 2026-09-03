@@ -11,6 +11,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	"github.com/datarhei/core/v16/http/errors"
 	apihandler "github.com/datarhei/core/v16/http/handler/api"
 	"github.com/datarhei/core/v16/http/validator"
 	"github.com/datarhei/core/v16/iam"
@@ -93,7 +94,7 @@ func TestNoIAM(t *testing.T) {
 	err := h(c)
 	require.Error(t, err)
 
-	he := err.(api.Error)
+	he := err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 }
 
@@ -117,7 +118,7 @@ func TestBasicAuth(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he := err.(api.Error)
+	he := err.(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 
@@ -134,25 +135,25 @@ func TestBasicAuth(t *testing.T) {
 	// Invalid credentials
 	auth = basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar:invalid-password"))
 	req.Header.Set(echo.HeaderAuthorization, auth)
-	he = h(c).(api.Error)
+	he = h(c).(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 
 	// Invalid base64 string
 	auth = basic + " invalidString"
 	req.Header.Set(echo.HeaderAuthorization, auth)
-	he = h(c).(api.Error)
+	he = h(c).(errors.Error)
 	require.Equal(t, http.StatusBadRequest, he.Code)
 
 	// Missing Authorization header
 	req.Header.Del(echo.HeaderAuthorization)
-	he = h(c).(api.Error)
+	he = h(c).(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 
 	// Invalid Authorization header
 	auth = base64.StdEncoding.EncodeToString([]byte("invalid"))
 	req.Header.Set(echo.HeaderAuthorization, auth)
-	he = h(c).(api.Error)
+	he = h(c).(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 }
 
@@ -180,14 +181,14 @@ func TestBasicAuthEncoding(t *testing.T) {
 	// Invalid encoded credentials
 	auth = basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar%32:secret"))
 	req.Header.Set(echo.HeaderAuthorization, auth)
-	he := h(c).(api.Error)
+	he := h(c).(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 
 	// Invalid credentials
 	auth = basic + " " + base64.StdEncoding.EncodeToString([]byte("foobar:2:secret"))
 	req.Header.Set(echo.HeaderAuthorization, auth)
-	he = h(c).(api.Error)
+	he = h(c).(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 }
@@ -245,7 +246,7 @@ func TestBasicAuthDomain(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he := err.(api.Error)
+	he := err.(errors.Error)
 	require.Equal(t, http.StatusUnauthorized, he.Code)
 	require.Equal(t, basic+` realm=datarhei-core`, res.Header().Get(echo.HeaderWWWAuthenticate))
 
@@ -298,7 +299,7 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he := err.(api.Error)
+	he := err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	// Wrong password
@@ -317,7 +318,7 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he = err.(api.Error)
+	he = err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	// Wrong username
@@ -336,7 +337,7 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he = err.(api.Error)
+	he = err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	// Correct credentials
@@ -370,7 +371,7 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he = err.(api.Error)
+	he = err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	// With invalid JWT
@@ -395,14 +396,14 @@ func TestAPILoginAndRefresh(t *testing.T) {
 	err = h(c)
 	require.Error(t, err)
 
-	he = err.(api.Error)
+	he = err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	req.Header.Set(echo.HeaderAuthorization, "Bearer "+jwt.AccessToken)
 	err = h(c)
 	require.Error(t, err)
 
-	he = err.(api.Error)
+	he = err.(errors.Error)
 	require.Equal(t, http.StatusForbidden, he.Code)
 
 	req.Header.Set(echo.HeaderAuthorization, "Bearer "+jwt.RefreshToken)

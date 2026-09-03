@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
@@ -40,14 +41,14 @@ func NewWidget(config WidgetConfig) *WidgetHandler {
 // @Produce json
 // @Param id path string true "ID of a process"
 // @Success 200 {object} api.WidgetProcess
-// @Failure 404 {object} api.Error
+// @Failure 404 {object} apierrors.Error
 // @Router /api/v3/widget/process/{id} [get]
 func (w *WidgetHandler) Get(c echo.Context) error {
 	id := util.PathParam(c, "id")
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if w.restream == nil {
-		return api.Err(http.StatusNotFound, "", "Unknown process ID")
+		return apierrors.Err(http.StatusNotFound, "", "Unknown process ID")
 	}
 
 	tid := app.ProcessID{
@@ -57,12 +58,12 @@ func (w *WidgetHandler) Get(c echo.Context) error {
 
 	process, err := w.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	state, err := w.restream.GetProcessState(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process ID: %s", err.Error())
 	}
 
 	data := api.WidgetProcess{

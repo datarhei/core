@@ -9,6 +9,7 @@ import (
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/playout"
 	"github.com/datarhei/core/v16/restream/app"
@@ -25,8 +26,8 @@ import (
 // @Param id path string true "Process ID"
 // @Param inputid path string true "Process Input ID"
 // @Success 200 {object} api.PlayoutStatus
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/status [get]
 func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
@@ -36,7 +37,7 @@ func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -46,14 +47,14 @@ func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/status"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -61,7 +62,7 @@ func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	if response.StatusCode == http.StatusOK {
@@ -69,7 +70,7 @@ func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 
 		err := json.Unmarshal(data, &status)
 		if err != nil {
-			return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+			return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 		}
 
 		apistatus := api.PlayoutStatus{}
@@ -93,8 +94,8 @@ func (h *ProcessHandler) PlayoutStatus(c echo.Context) error {
 // @Param inputid path string true "Process Input ID"
 // @Param name path string true "Any filename with an extension of .jpg or .png"
 // @Success 200 {file} byte
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/keyframe/{name} [get]
 func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
@@ -105,7 +106,7 @@ func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -115,7 +116,7 @@ func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/keyframe/last."
@@ -128,7 +129,7 @@ func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -136,7 +137,7 @@ func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -152,8 +153,8 @@ func (h *ProcessHandler) PlayoutKeyframe(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param inputid path string true "Process Input ID"
 // @Success 204 {string} string
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/encode [get]
 func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
@@ -163,7 +164,7 @@ func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -173,14 +174,14 @@ func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/errorframe/encode"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -188,7 +189,7 @@ func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -207,8 +208,8 @@ func (h *ProcessHandler) PlayoutEncodeErrorframe(c echo.Context) error {
 // @Param name path string true "Any filename with a suitable extension"
 // @Param image body []byte true "Image to be used a error frame"
 // @Success 204 {string} string
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/errorframe/{name} [post]
 func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
@@ -218,7 +219,7 @@ func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -228,19 +229,19 @@ func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
 	}
 
 	path := "/v1/errorframe.jpg"
 
 	response, err := h.request(http.MethodPut, addr, path, "application/octet-stream", data)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -248,7 +249,7 @@ func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
 	// Read the whole response
 	data, err = io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -263,8 +264,8 @@ func (h *ProcessHandler) PlayoutSetErrorframe(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param inputid path string true "Process Input ID"
 // @Success 200 {string} string
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/reopen [get]
 func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
@@ -274,7 +275,7 @@ func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "write") {
-		return api.Err(http.StatusForbidden, "Forbidden")
+		return apierrors.Err(http.StatusForbidden, "Forbidden")
 	}
 
 	tid := app.ProcessID{
@@ -284,14 +285,14 @@ func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	path := "/v1/reopen"
 
 	response, err := h.request(http.MethodGet, addr, path, "", nil)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -299,7 +300,7 @@ func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
 	// Read the whole response
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)
@@ -317,8 +318,8 @@ func (h *ProcessHandler) PlayoutReopenInput(c echo.Context) error {
 // @Param inputid path string true "Process Input ID"
 // @Param url body string true "URL of the new stream"
 // @Success 204 {string} string
-// @Failure 404 {object} api.Error
-// @Failure 500 {object} api.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 500 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/playout/{inputid}/stream [put]
 func (h *ProcessHandler) PlayoutSetStream(c echo.Context) error {
@@ -328,7 +329,7 @@ func (h *ProcessHandler) PlayoutSetStream(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(user, domain, "process:", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -338,19 +339,19 @@ func (h *ProcessHandler) PlayoutSetStream(c echo.Context) error {
 
 	addr, err := h.restream.GetPlayout(tid, inputid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "unknown process or input: %s", err.Error())
 	}
 
 	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "failed to read request body: %s", err.Error())
 	}
 
 	path := "/v1/stream"
 
 	response, err := h.request(http.MethodPut, addr, path, "text/plain", data)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	defer response.Body.Close()
@@ -358,7 +359,7 @@ func (h *ProcessHandler) PlayoutSetStream(c echo.Context) error {
 	// Read the whole response
 	data, err = io.ReadAll(response.Body)
 	if err != nil {
-		return api.Err(http.StatusInternalServerError, "", "%s", err.Error())
+		return apierrors.Err(http.StatusInternalServerError, "", "%s", err.Error())
 	}
 
 	return c.Blob(response.StatusCode, response.Header.Get("content-type"), data)

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/monitor"
 	"github.com/datarhei/core/v16/monitor/metric"
@@ -67,14 +68,14 @@ func (r *MetricsHandler) Describe(c echo.Context) error {
 // @Produce json
 // @Param config body api.MetricsQuery true "Metrics query"
 // @Success 200 {object} api.MetricsResponse
-// @Failure 400 {object} api.Error
+// @Failure 400 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metrics [post]
 func (r *MetricsHandler) Metrics(c echo.Context) error {
 	var query api.MetricsQuery
 
 	if err := util.ShouldBindJSON(c, &query); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	patterns := []metric.Pattern{}

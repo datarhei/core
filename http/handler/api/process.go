@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/http/api"
+	apierrors "github.com/datarhei/core/v16/http/errors"
 	"github.com/datarhei/core/v16/http/handler/util"
 	"github.com/datarhei/core/v16/iam"
 	"github.com/datarhei/core/v16/restream"
@@ -42,10 +43,10 @@ func NewProcess(restream restream.Restreamer, iam iam.IAM) *ProcessHandler {
 // @Produce json
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process [post]
 func (h *ProcessHandler) Add(c echo.Context) error {
@@ -59,19 +60,19 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process, check the domain and process ID")
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to write this process, check the domain and process ID")
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
+		return apierrors.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
-		return api.Err(http.StatusBadRequest, "", "at least one input and one output need to be defined")
+		return apierrors.Err(http.StatusBadRequest, "", "at least one input and one output need to be defined")
 	}
 
 	config, metadata := process.Marshal()
@@ -196,10 +197,10 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param filter query string false "Comma separated list of fields (config, state, report, metadata) to be part of the output. If empty, all fields will be part of the output"
 // @Success 200 {object} api.Process
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [get]
 func (h *ProcessHandler) Get(c echo.Context) error {
@@ -209,7 +210,7 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -235,10 +236,10 @@ func (h *ProcessHandler) Get(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param purge query string false "Whether to purge files"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [delete]
 func (h *ProcessHandler) Delete(c echo.Context) error {
@@ -258,7 +259,7 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	if err := h.restream.StopProcess(tid); err != nil {
@@ -283,10 +284,10 @@ func (h *ProcessHandler) Delete(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id} [put]
 func (h *ProcessHandler) Update(c echo.Context) error {
@@ -304,7 +305,7 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
 	}
 
 	tid := app.ProcessID{
@@ -314,18 +315,18 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 
 	current, err := h.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "")
+		return apierrors.Err(http.StatusNotFound, "")
 	}
 
 	// Prefill the config with the current values
 	process.Unmarshal(current.Config, nil)
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", process.ID)
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", process.ID)
 	}
 
 	config, metadata := process.Marshal()
@@ -359,10 +360,10 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param command body api.Command true "Process command"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/command [put]
 func (h *ProcessHandler) Command(c echo.Context) error {
@@ -371,13 +372,13 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	var command api.Command
 
 	if err := util.ShouldBindJSON(c, &command); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -396,7 +397,7 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 	case "reload":
 		err = h.restream.ReloadProcess(tid)
 	default:
-		return api.Err(http.StatusBadRequest, "", "unknown command provided: known commands are: start, stop, reload, restart")
+		return apierrors.Err(http.StatusBadRequest, "", "unknown command provided: known commands are: start, stop, reload, restart")
 	}
 
 	if err != nil {
@@ -415,10 +416,10 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessConfig
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/config [get]
 func (h *ProcessHandler) GetConfig(c echo.Context) error {
@@ -427,7 +428,7 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -455,10 +456,10 @@ func (h *ProcessHandler) GetConfig(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessState
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/state [get]
 func (h *ProcessHandler) GetState(c echo.Context) error {
@@ -467,7 +468,7 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -497,10 +498,10 @@ func (h *ProcessHandler) GetState(c echo.Context) error {
 // @Param exited_at query int64 false "Select only the report with that exited_at date. Unix timestamp, leave empty for any. In combination with created_at it denotes a range of reports."
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.ProcessReport
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [get]
 func (h *ProcessHandler) GetReport(c echo.Context) error {
@@ -515,7 +516,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 
 	if len(createdUnix) != 0 {
 		if x, err := strconv.ParseInt(createdUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid created_at unix timestamp: %s", err.Error())
 		} else {
 			createdAt = &x
 		}
@@ -523,14 +524,14 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 
 	if len(exitedUnix) != 0 {
 		if x, err := strconv.ParseInt(exitedUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid exited_at unix timestamp: %s", err.Error())
 		} else {
 			exitedAt = &x
 		}
 	}
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -580,7 +581,7 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 	}
 
 	if len(entries) == 0 {
-		return api.Err(http.StatusNotFound, "", "No matching reports found")
+		return apierrors.Err(http.StatusNotFound, "", "No matching reports found")
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -612,10 +613,10 @@ func (h *ProcessHandler) GetReport(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param report body api.ProcessReport true "Process report"
 // @Success 200 {string} string
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/report [put]
 func (h *ProcessHandler) SetReport(c echo.Context) error {
@@ -624,7 +625,7 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 	id := util.PathParam(c, "id")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to write this process: %s", id)
 	}
 
 	tid := app.ProcessID{
@@ -635,7 +636,7 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 	report := api.ProcessReport{}
 
 	if err := util.ShouldBindJSON(c, &report); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	appreport := report.Marshal()
@@ -659,7 +660,7 @@ func (h *ProcessHandler) SetReport(c echo.Context) error {
 // @Param from query int64 false "Search range of when the report has been exited, older than this value. Unix timestamp, leave empty for any"
 // @Param to query int64 false "Search range of when the report has been exited, younger than this value. Unix timestamp, leave empty for any"
 // @Success 200 {array} api.ProcessReportSearchResult
-// @Failure 400 {object} api.Error
+// @Failure 400 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/report/process [get]
 func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
@@ -674,7 +675,7 @@ func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 
 	if len(fromUnix) != 0 {
 		if x, err := strconv.ParseInt(fromUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			from = &t
@@ -683,7 +684,7 @@ func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 
 	if len(toUnix) != 0 {
 		if x, err := strconv.ParseInt(toUnix, 10, 64); err != nil {
-			return api.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
+			return apierrors.Err(http.StatusBadRequest, "", "invalid search range: %s", err.Error())
 		} else {
 			t := time.Unix(x, 0)
 			to = &t
@@ -720,8 +721,8 @@ func (h *ProcessHandler) SearchReportHistory(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.Probe
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/probe [get]
 func (h *ProcessHandler) Probe(c echo.Context) error {
@@ -730,7 +731,7 @@ func (h *ProcessHandler) Probe(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -740,7 +741,7 @@ func (h *ProcessHandler) Probe(c echo.Context) error {
 
 	process, err := h.restream.GetProcess(tid)
 	if err != nil {
-		return api.Err(http.StatusNotFound, "")
+		return apierrors.Err(http.StatusNotFound, "")
 	}
 
 	probe := h.restream.Probe(process.Config, 20*time.Second)
@@ -760,8 +761,8 @@ func (h *ProcessHandler) Probe(c echo.Context) error {
 // @Produce json
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.Probe
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/probe [post]
 func (h *ProcessHandler) ProbeConfig(c echo.Context) error {
@@ -773,19 +774,19 @@ func (h *ProcessHandler) ProbeConfig(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to probe this process, check the domain and process ID")
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to probe this process, check the domain and process ID")
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
+		return apierrors.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
 	}
 
 	if len(process.Input) == 0 {
-		return api.Err(http.StatusBadRequest, "", "At least one input must be defined")
+		return apierrors.Err(http.StatusBadRequest, "", "At least one input must be defined")
 	}
 
 	config, _ := process.Marshal()
@@ -807,8 +808,8 @@ func (h *ProcessHandler) ProbeConfig(c echo.Context) error {
 // @Produce json
 // @Param config body api.ProcessConfig true "Process config"
 // @Success 200 {object} api.Probe
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/validate [post]
 func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
@@ -820,22 +821,22 @@ func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
 	}
 
 	if err := util.ShouldBindJSON(c, &process); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if !h.iam.Enforce(ctxuser, process.Domain, "process", process.ID, "write") {
-		return api.Err(http.StatusForbidden, "", "You are not allowed to validate this process, check the domain and process ID")
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to validate this process, check the domain and process ID")
 	}
 
 	if process.Type != "ffmpeg" {
-		return api.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
+		return apierrors.Err(http.StatusBadRequest, "", "unsupported process type, supported process types are: ffmpeg")
 	}
 
 	config, _ := process.Marshal()
 
 	err := h.restream.Validate(config)
 	if err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid config: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid config: %s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, process)
@@ -851,10 +852,10 @@ func (h *ProcessHandler) ValidateConfig(c echo.Context) error {
 // @Param key path string true "Key for data store"
 // @Param domain query string false "Process domain"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [get]
 func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
@@ -864,7 +865,7 @@ func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "read") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	tid := app.ProcessID{
@@ -891,10 +892,10 @@ func (h *ProcessHandler) GetProcessMetadata(c echo.Context) error {
 // @Param domain query string false "Process domain"
 // @Param data body api.Metadata true "Arbitrary JSON data. The null value will remove the key and its contents"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/process/{id}/metadata/{key} [put]
 func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
@@ -904,17 +905,17 @@ func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
 	domain := util.DefaultQuery(c, "domain", "")
 
 	if !h.iam.Enforce(ctxuser, domain, "process", id, "write") {
-		return api.Err(http.StatusForbidden, "")
+		return apierrors.Err(http.StatusForbidden, "")
 	}
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
+		return apierrors.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	tid := app.ProcessID{
@@ -937,10 +938,10 @@ func (h *ProcessHandler) SetProcessMetadata(c echo.Context) error {
 // @Produce json
 // @Param key path string true "Key for data store"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [get]
 func (h *ProcessHandler) GetMetadata(c echo.Context) error {
@@ -963,23 +964,23 @@ func (h *ProcessHandler) GetMetadata(c echo.Context) error {
 // @Param key path string true "Key for data store"
 // @Param data body api.Metadata true "Arbitrary JSON data"
 // @Success 200 {object} api.Metadata
-// @Failure 400 {object} api.Error
-// @Failure 403 {object} api.Error
-// @Failure 404 {object} api.Error
-// @Failure 409 {object} api.Error
+// @Failure 400 {object} apierrors.Error
+// @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
+// @Failure 409 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/metadata/{key} [put]
 func (h *ProcessHandler) SetMetadata(c echo.Context) error {
 	key := util.PathParam(c, "key")
 
 	if len(key) == 0 {
-		return api.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
+		return apierrors.Err(http.StatusBadRequest, "", "invalid key: the key must not be of length 0")
 	}
 
 	var data api.Metadata
 
 	if err := util.ShouldBindJSONValidation(c, &data, false); err != nil {
-		return api.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
 	}
 
 	if err := h.restream.SetMetadata(key, data); err != nil {
@@ -1139,16 +1140,16 @@ func (h *ProcessHandler) getProcess(id app.ProcessID, filter filter) (api.Proces
 
 func (h *ProcessHandler) apiErrorFromError(err error) error {
 	if errors.Is(err, restream.ErrUnknownProcess) {
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	} else if errors.Is(err, restream.ErrProcessExists) {
-		return api.Err(http.StatusConflict, "", "%s", err.Error())
+		return apierrors.Err(http.StatusConflict, "", "%s", err.Error())
 	} else if errors.Is(err, restream.ErrInvalidProcessConfig) {
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	} else if errors.Is(err, restream.ErrMetadataKeyNotFound) {
-		return api.Err(http.StatusNotFound, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	} else if errors.Is(err, restream.ErrMetadataKeyRequired) {
-		return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
-	return api.Err(http.StatusBadRequest, "", "%s", err.Error())
+	return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 }
