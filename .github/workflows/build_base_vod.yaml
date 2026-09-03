@@ -28,7 +28,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v7
               with:
-                  ref: 8636d0657fde1bfc8220030dd0c21ca154517b35
+                  ref: da6848cf6d83e53b895d659e8ea87e98f04c26c1
 
             - name: Docker meta
               id: meta
