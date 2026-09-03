@@ -28,7 +28,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v7
               with:
-                  ref: ${{ matrix.branch }}
+                  ref: 8636d0657fde1bfc8220030dd0c21ca154517b35
 
             - name: Docker meta
               id: meta
