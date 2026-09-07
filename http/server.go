@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	cfgstore "github.com/datarhei/core/v16/config/store"
+	"github.com/datarhei/core/v16/auth/totp"
 	"github.com/datarhei/core/v16/http/cache"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	"github.com/datarhei/core/v16/http/fs"
@@ -87,6 +88,8 @@ type Config struct {
 	RTMP          rtmp.Server
 	SRT           srt.Server
 	JWT           jwt.JWT
+	TOTP          *totp.Store
+	TOTPUsername  string
 	Config        cfgstore.Store
 	Cache         cache.Cacher
 	Sessions      session.RegistryReader
@@ -124,6 +127,7 @@ type server struct {
 		session   *api.SessionHandler
 		widget    *api.WidgetHandler
 		resources *api.MetricsHandler
+		totp      *api.TOTPHandler
 	}
 
 	middleware struct {
@@ -216,11 +220,19 @@ func NewServer(config Config) (Server, error) {
 		s.handler.about = api.NewAbout(
 			config.Restream,
 			[]string{},
+			nil,
 		)
 	} else {
 		s.handler.about = api.NewAbout(
 			config.Restream,
 			config.JWT.Validators(),
+			func() bool {
+				if config.TOTP != nil {
+					return config.TOTP.Enrolled()
+				}
+
+				return false
+			},
 		)
 	}
 
@@ -271,6 +283,13 @@ func NewServer(config Config) (Server, error) {
 	if config.Config != nil {
 		s.v3handler.config = api.NewConfig(
 			config.Config,
+		)
+	}
+
+	if config.JWT != nil && config.TOTP != nil && len(config.TOTPUsername) != 0 {
+		s.v3handler.totp = api.NewTOTP(
+			config.TOTP,
+			config.TOTPUsername,
 		)
 	}
 
@@ -646,6 +665,14 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 
 	// v3 Log
 	v3.GET("/log", s.v3handler.log.Log)
+
+	// v3 TOTP
+	if s.v3handler.totp != nil {
+		v3.GET("/auth/totp", s.v3handler.totp.Status)
+		v3.POST("/auth/totp/setup", s.v3handler.totp.Setup)
+		v3.POST("/auth/totp/enable", s.v3handler.totp.Enable)
+		v3.DELETE("/auth/totp", s.v3handler.totp.Disable)
+	}
 
 	// v3 Metrics
 	v3.GET("/metrics", s.v3handler.resources.Describe)

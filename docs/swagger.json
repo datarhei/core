@@ -201,6 +201,154 @@
                 }
             }
         },
+        "/api/v3/auth/totp": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns whether TOTP is enabled or pending setup",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.16.0"
+                ],
+                "summary": "TOTP enrollment status",
+                "operationId": "totp-status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPStatus"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Disable TOTP after confirming with a valid authenticator code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.16.0"
+                ],
+                "summary": "Disable TOTP",
+                "operationId": "totp-disable",
+                "parameters": [
+                    {
+                        "description": "TOTP confirmation code",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPDisable"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/auth/totp/enable": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Confirm TOTP enrollment with a code from the authenticator app",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.16.0"
+                ],
+                "summary": "Enable TOTP",
+                "operationId": "totp-enable",
+                "parameters": [
+                    {
+                        "description": "TOTP confirmation code",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPEnable"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v3/auth/totp/setup": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Generate a TOTP secret and otpauth URI for the authenticator app",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v16.16.0"
+                ],
+                "summary": "Start TOTP enrollment",
+                "operationId": "totp-setup",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TOTPSetup"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/api.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v3/config": {
             "get": {
                 "security": [
@@ -2081,6 +2229,9 @@
                 "name": {
                     "type": "string"
                 },
+                "totp_required": {
+                    "type": "boolean"
+                },
                 "uptime_seconds": {
                     "type": "integer"
                 },
@@ -2732,6 +2883,9 @@
             ],
             "properties": {
                 "password": {
+                    "type": "string"
+                },
+                "totp_code": {
                     "type": "string"
                 },
                 "username": {
@@ -3460,7 +3614,8 @@
                 "publisher": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer"
+                        "type": "integer",
+                        "format": "int32"
                     }
                 },
                 "subscriber": {
@@ -3468,7 +3623,8 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "integer"
+                            "type": "integer",
+                            "format": "int32"
                         }
                     }
                 }
@@ -4660,6 +4816,50 @@
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "api.TOTPDisable": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.TOTPEnable": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.TOTPSetup": {
+            "type": "object",
+            "properties": {
+                "secret": {
+                    "type": "string"
+                },
+                "uri": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.TOTPStatus": {
+            "type": "object",
+            "properties": {
+                "enrolled": {
+                    "type": "boolean"
+                },
+                "pending": {
+                    "type": "boolean"
                 }
             }
         },

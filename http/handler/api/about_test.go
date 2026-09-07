@@ -19,7 +19,7 @@ func getDummyAboutRouter() (*echo.Echo, error) {
 		return nil, err
 	}
 
-	handler := NewAbout(rs, []string{})
+	handler := NewAbout(rs, []string{}, nil)
 
 	router.Add("GET", "/", handler.About)
 

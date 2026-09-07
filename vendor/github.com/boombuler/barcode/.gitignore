@@ -1,0 +1,5 @@
+.vscode/
+config/config.json
+config/db.json
+config/totp.json
+config/totp_trust.json

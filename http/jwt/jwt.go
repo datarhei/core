@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/datarhei/core/v16/app"
+	"github.com/datarhei/core/v16/auth/totp"
 	"github.com/datarhei/core/v16/http/api"
 
 	jwtgo "github.com/golang-jwt/jwt/v5"
@@ -22,6 +23,8 @@ type Config struct {
 	Realm         string
 	Secret        string
 	SkipLocalhost bool
+	TOTPRequired  func() bool
+	TOTP          *totp.Store
 }
 
 // JWT provides access to a JWT provider
@@ -47,6 +50,8 @@ type jwt struct {
 	realm             string
 	skipLocalhost     bool
 	secret            []byte
+	totpRequired      func() bool
+	totp              *totp.Store
 	accessValidFor    time.Duration
 	accessConfig      echojwt.Config
 	accessMiddleware  echo.MiddlewareFunc
@@ -65,6 +70,8 @@ func New(config Config) (JWT, error) {
 		realm:           config.Realm,
 		skipLocalhost:   config.SkipLocalhost,
 		secret:          []byte(config.Secret),
+		totpRequired:    config.TOTPRequired,
+		totp:            config.TOTP,
 		accessValidFor:  time.Minute * 10,
 		refreshValidFor: time.Hour * 24,
 	}
@@ -183,9 +190,15 @@ func (j *jwt) ClearValidators() {
 
 func (j *jwt) ErrorHandler(c echo.Context, err error) error {
 	if c.Request().URL.Path == "/api" {
+		totpRequired := false
+		if j.totpRequired != nil {
+			totpRequired = j.totpRequired()
+		}
+
 		return c.JSON(http.StatusOK, api.MinimalAbout{
-			App:   app.Name,
-			Auths: j.Validators(),
+			App:          app.Name,
+			Auths:        j.Validators(),
+			TOTPRequired: totpRequired,
 			Version: api.VersionMinimal{
 				Number: app.Version.MajorString(),
 			},
@@ -240,6 +253,12 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 	if ok {
 		if err != nil {
 			time.Sleep(5 * time.Second)
+
+			var verr ValidationError
+			if errors.As(err, &verr) {
+				return api.Err(http.StatusUnauthorized, verr.Err.Error(), verr.Detail)
+			}
+
 			return api.Err(http.StatusUnauthorized, "", "Invalid authorization credentials: %s", err.Error())
 		}
 	} else {
@@ -252,10 +271,21 @@ func (j *jwt) LoginHandler(c echo.Context) error {
 		return api.Err(http.StatusInternalServerError, "", "Failed to create JWT: %s", err.Error())
 	}
 
-	return c.JSON(http.StatusOK, api.JWT{
+	response := api.JWT{
 		AccessToken:  at,
 		RefreshToken: rt,
-	})
+	}
+
+	if login, ok := c.Get("login_request").(api.Login); ok {
+		if j.totp != nil && len(login.TOTPCode) > 0 &&
+			(login.RememberDevice == totp.Remember30Days || login.RememberDevice == totp.Remember1Year) {
+			if token, err := j.totp.IssueTrust(subject, login.RememberDevice); err == nil {
+				response.DeviceTrustToken = token
+			}
+		}
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // RefreshHandler returns a new refresh token
