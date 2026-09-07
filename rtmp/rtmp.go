@@ -80,8 +80,11 @@ type Server interface {
 	// ListenAndServe starts the RTMPS server
 	ListenAndServeTLS(certFile, keyFile string) error
 
-	// Disconnect disconnects all current RTMP sessions
-	Disconnect()
+	// Disconnect disconnects a specific RTMP sessions
+	Disconnect(path string)
+
+	// DisconnectAll disconnects all current RTMP sessions
+	DisconnectAll()
 
 	// Close stops the RTMP server and closes all connections
 	Close()
@@ -204,7 +207,24 @@ func (s *server) ListenAndServeTLS(certFile, keyFile string) error {
 	return s.tlsServer.ListenAndServeTLS(certFile, keyFile)
 }
 
-func (s *server) Disconnect() {
+func (s *server) Disconnect(path string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for key, ch := range s.channels {
+		if ch.path != path {
+			continue
+		}
+
+		ch.Close()
+
+		delete(s.channels, key)
+
+		break
+	}
+}
+
+func (s *server) DisconnectAll() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

@@ -5622,6 +5622,14 @@ const docTemplate = `{
                 ],
                 "summary": "Disconnect all sessions",
                 "operationId": "rtmp-3-disconnect",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "RTMP path to disconnect. Use '*' to disconnect all",
+                        "name": "path",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",

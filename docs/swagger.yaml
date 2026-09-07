@@ -6862,6 +6862,11 @@ paths:
     put:
       description: Disconnect all sessions.
       operationId: rtmp-3-disconnect
+      parameters:
+      - description: RTMP path to disconnect. Use '*' to disconnect all
+        in: query
+        name: path
+        type: string
       produces:
       - application/json
       responses:

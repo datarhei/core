@@ -94,11 +94,18 @@ func (rtmph *RTMPHandler) ListAllChannels(c echo.Context) error {
 // @Tags v16.?.?
 // @ID rtmp-3-disconnect
 // @Produce json
+// @Param path query string false "RTMP path to disconnect. Use '*' to disconnect all"
 // @Success 200 {string} string
 // @Security ApiKeyAuth
 // @Router /api/v3/rtmp/disconnect [put]
 func (rtmph *RTMPHandler) Disconnect(c echo.Context) error {
-	rtmph.rtmp.Disconnect()
+	path := util.DefaultQuery(c, "path", "")
+
+	if path == "*" {
+		rtmph.rtmp.DisconnectAll()
+	} else {
+		rtmph.rtmp.Disconnect(path)
+	}
 
 	return c.JSON(http.StatusOK, "OK")
 }
