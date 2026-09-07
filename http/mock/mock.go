@@ -47,6 +47,7 @@ func RequestEx(t require.TestingT, httpstatus int, router *echo.Echo, method, pa
 	if data != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
+	req.Header.Add("X-Real-IP", "192.168.1.173")
 	router.ServeHTTP(w, req)
 
 	var response *Response = nil
