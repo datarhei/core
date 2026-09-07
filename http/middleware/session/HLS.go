@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/datarhei/core/v16/mem"
@@ -257,7 +258,12 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	}
 
 	var sdata *HLSSessionData = nil
-	if x, ok := h.hlsEgressCollector.UserData(sessionID).Get("hlsstats"); ok {
+	userdata := h.hlsEgressCollector.UserData(sessionID)
+	if userdata == nil {
+		return nil
+	}
+
+	if x, ok := userdata.Get("hlsstats"); ok {
 		if data, ok := x.(*HLSSessionData); ok {
 			sdata = data
 		}
@@ -266,6 +272,9 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 	if sdata == nil {
 		sdata = newHLSSessionData()
 	}
+
+	sdata.Lock()
+	defer sdata.Unlock()
 
 	if len(sdata.Variants) == 0 {
 		if len(variants) != 0 {
@@ -408,32 +417,33 @@ type hlsSegment struct {
 }
 
 type HLSSessionVariant struct {
-	Active     bool   `json:"active"`
-	Switches   uint64 `json:"switches"`
-	Bandwidth  uint64 `json:"bandwidth_bits"`
-	Resolution string `json:"resolution"`
-	Codecs     string `json:"codecs"`
+	Active     bool
+	Switches   uint64
+	Bandwidth  uint64
+	Resolution string
+	Codecs     string
 }
 
 type HLSSessionData struct {
-	Variants map[string]HLSSessionVariant `json:"hls_variants"`
+	Variants map[string]HLSSessionVariant
 	Segments struct {
 		segments     map[string]hlsSegment
 		lastSequence uint64
-		Requested    uint64    `json:"requests"`
-		Failed       uint64    `json:"failed"`
-		TooSlow      uint64    `json:"too_slow"`
-		Retries      uint64    `json:"retries"`
-		TooLate      uint64    `json:"too_late"`
-		SequenceGaps uint64    `json:"sequence_gaps"`
-		Last         time.Time `json:"last"`
-	} `json:"hls_segments"`
-	HTTPStatus map[int]uint64 `json:"http_status"`
+		Requested    uint64
+		Failed       uint64
+		TooSlow      uint64
+		Retries      uint64
+		TooLate      uint64
+		SequenceGaps uint64
+		Last         time.Time
+	}
+	HTTPStatus map[int]uint64
 	Bandwidth  struct {
-		Min float64 `json:"min"`
-		Max float64 `json:"max"`
-		Avg float64 `json:"avg"`
-	} `json:"bandwidth_tx_bits"`
+		Min float64
+		Max float64
+		Avg float64
+	}
+	lock sync.Mutex
 }
 
 func newHLSSessionData() *HLSSessionData {
@@ -445,6 +455,14 @@ func newHLSSessionData() *HLSSessionData {
 	data.Bandwidth.Min = math.MaxFloat64
 
 	return data
+}
+
+func (s *HLSSessionData) Lock() {
+	s.lock.Lock()
+}
+
+func (s *HLSSessionData) Unlock() {
+	s.lock.Unlock()
 }
 
 type segmentReader struct {

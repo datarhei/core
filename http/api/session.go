@@ -60,6 +60,9 @@ func (s *Session) Unmarshal(sess session.Session) {
 		return
 	}
 
+	data.Lock()
+	defer data.Unlock()
+
 	hls := &HLSSessionData{}
 	hls.Segments.Requested = data.Segments.Requested
 	hls.Segments.Failed = data.Segments.Failed

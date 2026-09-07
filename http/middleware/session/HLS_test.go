@@ -2,14 +2,22 @@ package session
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"testing"
 	"time"
 
+	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/http/mock"
+	"github.com/datarhei/core/v16/io/fs"
 	"github.com/datarhei/core/v16/mem"
+	"github.com/datarhei/core/v16/net"
+	"github.com/datarhei/core/v16/session"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -360,4 +368,46 @@ source_beep_0_2284.ts`))
 			requested: false,
 		},
 	}, segments)
+}
+
+func getDummySessionRouter(t *testing.T) *echo.Echo {
+	router := mock.DummyEcho()
+
+	fs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	fs.WriteFile("/segment.ts", []byte("nothing"))
+
+	registry, _ := session.New(session.Config{})
+	registry.Register("foo", session.CollectorConfig{
+		Limiter: net.NewNullIPLimiter(),
+	})
+
+	collector := registry.Collector("foo")
+	//collector.RegisterAndActivate("foobar", "", "any", "any")
+
+	mw := NewWithConfig(Config{
+		HLSEgressCollector: collector,
+	})
+
+	router.Add("GET", "/*", func(c echo.Context) error {
+		path := util.PathWildcardParam(c)
+
+		file := fs.Open(path)
+		if file == nil {
+			return fmt.Errorf("file not found")
+		}
+
+		return c.Stream(http.StatusOK, "application/data", file)
+	}, mw)
+
+	return router
+}
+
+func TestUnknownSessionForSegment(t *testing.T) {
+	router := getDummySessionRouter(t)
+
+	response := mock.Request(t, http.StatusOK, router, "GET", "/segment.ts?session=3oRbQBp4WhQtwzkdyad4Wx", nil)
+
+	require.Equal(t, http.StatusOK, response.Code)
 }
