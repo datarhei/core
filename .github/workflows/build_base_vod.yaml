@@ -15,12 +15,12 @@ jobs:
                 include:
                     - os: alpine
                       os_version: "3.23"
-                      golang: golang:1.26-alpine3.23
+                      golang: golang:1.27-alpine3.23
                       platforms: linux/amd64,linux/arm64,linux/arm/v7
                       branch: vod
                     - os: ubuntu
                       os_version: "24.04"
-                      golang: golang:1.26-alpine3.23
+                      golang: golang:1.27-alpine3.23
                       platforms: linux/amd64
                       branch: vod
 
@@ -28,7 +28,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v7
               with:
-                  ref: da6848cf6d83e53b895d659e8ea87e98f04c26c1
+                  ref: ${{ matrix.branch }}
 
             - name: Docker meta
               id: meta
