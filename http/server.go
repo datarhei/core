@@ -60,6 +60,7 @@ import (
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
 
+	mwautohead "github.com/datarhei/core/v16/http/middleware/autohead"
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
 	mwcompress "github.com/datarhei/core/v16/http/middleware/compress"
 	mwcors "github.com/datarhei/core/v16/http/middleware/cors"
@@ -149,6 +150,7 @@ type server struct {
 	middleware struct {
 		iplimit    echo.MiddlewareFunc
 		log        echo.MiddlewareFunc
+		autohead   echo.MiddlewareFunc
 		cors       echo.MiddlewareFunc
 		cache      echo.MiddlewareFunc
 		hlsrewrite echo.MiddlewareFunc
@@ -397,6 +399,8 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		s.middleware.cors = middleware
 	}
 
+	s.middleware.autohead = mwautohead.New()
+
 	s.handler.graph = api.NewGraph(resolver.Resolver{
 		Restream:  config.Restream,
 		Monitor:   config.Metrics,
@@ -413,6 +417,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
 	s.router.Validator = validator.New()
 	s.router.Use(s.middleware.log)
+	s.router.Use(s.middleware.autohead)
 	s.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 			rows := strings.Split(string(stack), "\n")
