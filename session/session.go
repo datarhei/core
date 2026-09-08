@@ -79,10 +79,7 @@ func (s *session) Init(id, reference string, closeCallback func(*session), inact
 
 	s.running = true
 
-	pendingTimeout := inactive
-	if timeout < pendingTimeout {
-		pendingTimeout = timeout
-	}
+	pendingTimeout := min(timeout, inactive)
 
 	s.stale = time.AfterFunc(pendingTimeout, func() {
 		s.close()
