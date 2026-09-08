@@ -78,9 +78,9 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 
 	c.Response().Header().Set(echo.HeaderContentType, mimeType)
 	c.Response().Header().Set("Accept-Ranges", "bytes")
+	c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(stat.Size(), 10))
 
 	if c.Request().Method == "HEAD" {
-		c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(stat.Size(), 10))
 		return c.Blob(http.StatusOK, "application/data", nil)
 	}
 
@@ -117,6 +117,7 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 			}
 
 			c.Response().Header().Set("Content-Range", ranges[0].contentRange(stat.Size()))
+			c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(ranges[0].length, 10))
 			streamFile = &io.LimitedReader{
 				R: streamFile,
 				N: ranges[0].length,
