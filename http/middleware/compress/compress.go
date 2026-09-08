@@ -228,6 +228,11 @@ func (w *compressResponseWriter) WriteHeader(code int) {
 	w.Header().Del(echo.HeaderContentLength) // Issue #444
 
 	if !w.canCompress(w.Header().Get(echo.HeaderContentType)) {
+		// On Passthrough, re-add the content-length header
+		if len(w.headerContentLength) != 0 {
+			w.Header().Set(echo.HeaderContentLength, w.headerContentLength)
+		}
+
 		w.passThrough = true
 	}
 
