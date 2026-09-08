@@ -247,7 +247,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		segments = parseSegments(buffer)
 
 		res.Header().Set("Cache-Control", "private")
-		res.Header().Del("Content-Length")
+		res.Header().Set("Content-Length", strconv.Itoa(buffer.Len()))
 		res.Write(buffer.Bytes())
 
 		mem.Put(buffer)
