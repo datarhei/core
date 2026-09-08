@@ -247,6 +247,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		segments = parseSegments(buffer)
 
 		res.Header().Set("Cache-Control", "private")
+		res.Header().Del("Content-Length")
 		res.Write(buffer.Bytes())
 
 		mem.Put(buffer)
@@ -292,7 +293,8 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 
 	if len(variants) != 0 {
 		// This is a master file. No further processing needed
-		h.hlsEgressCollector.UserData(sessionID).Set("hlsstats", sdata)
+		userdata.Set("hlsstats", sdata)
+
 		return nil
 	}
 
@@ -363,7 +365,7 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		sdata.Bandwidth.Avg = sdata.Bandwidth.Avg*0.85 + bitrate*0.15
 	}
 
-	h.hlsEgressCollector.UserData(sessionID).Set("hlsstats", sdata)
+	userdata.Set("hlsstats", sdata)
 
 	if isM3U8 || isSegment {
 		if res.Status >= 200 && res.Status < 300 {
