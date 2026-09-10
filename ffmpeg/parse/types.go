@@ -2,6 +2,7 @@ package parse
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/datarhei/core/v16/encoding/json"
@@ -398,9 +399,15 @@ type ffmpegProcess struct {
 	output     []ffmpegProcessIO
 	mapping    ffmpegStreamMapping
 	hlsMapping []ffmpegHLSStreamMap
+
+	streamMapping StreamMapping
+
+	input2output map[int][]int
+	output2input map[int][]int
 }
 
-func (f *ffmpegProcess) ExportMapping() StreamMapping {
+func (f *ffmpegProcess) calculateMapping() {
+	// Flatten the output from ffmpeg
 	sm := StreamMapping{}
 
 	for _, graph := range f.mapping.Graphs {
@@ -467,25 +474,107 @@ func (f *ffmpegProcess) ExportMapping() StreamMapping {
 		sm.Mapping = append(sm.Mapping, m)
 	}
 
-	return sm
+	// Create mappings from the inputs to the outputs and vice versa
+	input2output := map[int][]int{}
+	output2input := map[int][]int{}
+
+	// Create a map from the GraphElement ID to the index in the array
+	mapping := map[string]int{}
+
+	for i, m := range sm.Mapping {
+		mapping[m.ID] = i
+	}
+
+	for _, m := range sm.Mapping {
+		if len(m.ID) == 0 {
+			continue
+		}
+
+		if m.Input == -1 {
+			continue
+		}
+
+		if m.Copy {
+			input2output[m.Input] = append(input2output[m.Input], m.Output)
+			continue
+		}
+
+		for _, outputid := range followGraph(sm.Graphs, m.ID, m.Index) {
+			i, ok := mapping[outputid]
+			if ok {
+				input2output[m.Input] = append(input2output[m.Input], sm.Mapping[i].Output)
+			}
+		}
+	}
+
+	for input, outputs := range input2output {
+		slices.Sort(outputs)
+
+		for _, output := range outputs {
+			output2input[output] = append(output2input[output], input)
+		}
+
+		input2output[input] = outputs
+	}
+
+	for output, inputs := range output2input {
+		slices.Sort(inputs)
+
+		output2input[output] = inputs
+	}
+
+	f.streamMapping = sm
+	f.input2output = input2output
+	f.output2input = output2input
+}
+
+func followGraph(elements []GraphElement, id string, index int) []string {
+	ids := []string{}
+
+	found := false
+	for _, e := range elements {
+		if e.Index != index {
+			continue
+		}
+
+		if e.ID != id {
+			continue
+		}
+
+		found = true
+
+		ids = append(ids, followGraph(elements, e.DstID, index)...)
+	}
+
+	if !found {
+		ids = append(ids, id)
+	}
+
+	return ids
 }
 
 func (p *ffmpegProcess) export() Progress {
 	progress := Progress{}
 
-	for _, io := range p.input {
+	for i, io := range p.input {
 		aio := io.export()
+		if i < len(p.input2output) {
+			aio.IOMap = slices.Clone(p.input2output[i])
+		}
 
 		progress.Input = append(progress.Input, aio)
 	}
 
-	for _, io := range p.output {
+	for i, io := range p.output {
 		aio := io.export()
+		if i < len(p.output2input) {
+			aio.IOMap = slices.Clone(p.output2input[i])
+		}
 
 		progress.Output = append(progress.Output, aio)
 	}
 
-	progress.Mapping = p.ExportMapping()
+	progress.Mapping = p.streamMapping
 
 	for _, hlsmapping := range p.hlsMapping {
 		progress.Output = applyHLSMapping(progress.Output, hlsmapping)
@@ -508,7 +597,7 @@ func applyHLSMapping(output []ProgressIO, hlsMapping ffmpegHLSStreamMap) []Progr
 
 		pivot = i
 
-	bla:
+	variants:
 		for _, variant := range hlsMapping.Variants {
 			for s, stream := range variant.Streams {
 				if io.Stream != uint64(stream) {
@@ -527,7 +616,7 @@ func applyHLSMapping(output []ProgressIO, hlsMapping ffmpegHLSStreamMap) []Progr
 					maxVariantIndex = io.Index
 				}
 
-				break bla
+				break variants
 			}
 		}
 
@@ -574,6 +663,7 @@ type ProgressIOTee struct {
 type ProgressIO struct {
 	URL     string
 	Address string
+	IOMap   []int
 
 	// General
 	Index     uint64
@@ -662,7 +752,7 @@ type AVstream struct {
 	Duplicating    bool
 	GOP            string
 	Mode           string
-	Debug          interface{}
+	Debug          any
 	Swap           AVStreamSwap
 	Codec          string
 	Profile        int

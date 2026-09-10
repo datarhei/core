@@ -283,6 +283,20 @@ func (p *parser) Parse(line []byte) uint64 {
 			return 0
 		}
 
+		if isFFmpegMapping {
+			p.lock.progress.Lock()
+			defer p.lock.progress.Unlock()
+
+			if err := p.parseFFmpegMapping(bytes.TrimPrefix(msg, []byte("ffmpeg.mapping:"))); err != nil {
+				p.logger.WithFields(log.Fields{
+					"line":  line,
+					"error": err,
+				}).Error().Log("Failed parsing mapping")
+			}
+
+			return 0
+		}
+
 		if isFFmpegOutputs {
 			p.lock.progress.Lock()
 			defer p.lock.progress.Unlock()
@@ -298,6 +312,8 @@ func (p *parser) Parse(line []byte) uint64 {
 				p.lock.prelude.Lock()
 				p.prelude.done = true
 				p.lock.prelude.Unlock()
+
+				p.process.calculateMapping()
 			}
 
 			return 0
@@ -313,21 +329,11 @@ func (p *parser) Parse(line []byte) uint64 {
 			p.lock.prelude.Lock()
 			p.prelude.done = true
 			p.lock.prelude.Unlock()
+
+			p.lock.progress.Lock()
+			p.process.calculateMapping()
+			p.lock.progress.Unlock()
 		}
-	}
-
-	if isFFmpegMapping {
-		p.lock.progress.Lock()
-		defer p.lock.progress.Unlock()
-
-		if err := p.parseFFmpegMapping(bytes.TrimPrefix(msg, []byte("ffmpeg.mapping:"))); err != nil {
-			p.logger.WithFields(log.Fields{
-				"line":  line,
-				"error": err,
-			}).Error().Log("Failed parsing mapping")
-		}
-
-		return 0
 	}
 
 	if !isDefaultProgress && !isFFmpegProgress && !isAVstreamProgress {
@@ -485,6 +491,7 @@ func (p *parser) Parse(line []byte) uint64 {
 		input := event.ProcessProgressInput{
 			ID:      "",
 			URL:     io.URL,
+			IOMap:   io.IOMap,
 			Type:    io.Type,
 			Bitrate: io.Bitrate,
 			FPS:     io.FPS,
@@ -510,6 +517,7 @@ func (p *parser) Parse(line []byte) uint64 {
 		evt.Output = append(evt.Output, event.ProcessProgressOutput{
 			ID:      "",
 			URL:     io.URL,
+			IOMap:   io.IOMap,
 			Type:    io.Type,
 			Bitrate: io.Bitrate,
 			FPS:     io.FPS,

@@ -1,6 +1,7 @@
 package event
 
 import (
+	"slices"
 	"time"
 
 	"github.com/datarhei/core/v16/global"
@@ -54,6 +55,7 @@ func NewProcessProgressEvent(progress *ProcessProgress) *ProcessEvent {
 type ProcessProgressInput struct {
 	ID       string
 	URL      string
+	IOMap    []int
 	Type     string
 	Bitrate  float64
 	FPS      float64
@@ -64,6 +66,7 @@ func (p *ProcessProgressInput) Clone() ProcessProgressInput {
 	c := ProcessProgressInput{
 		ID:       p.ID,
 		URL:      p.URL,
+		IOMap:    slices.Clone(p.IOMap),
 		Type:     p.Type,
 		Bitrate:  p.Bitrate,
 		FPS:      p.FPS,
@@ -98,6 +101,7 @@ func (p *ProcessProgressInputAVstream) Clone() ProcessProgressInputAVstream {
 type ProcessProgressOutput struct {
 	ID      string
 	URL     string
+	IOMap   []int
 	Type    string
 	Bitrate float64
 	FPS     float64
@@ -108,6 +112,7 @@ func (p *ProcessProgressOutput) Clone() ProcessProgressOutput {
 	c := ProcessProgressOutput{
 		ID:      p.ID,
 		URL:     p.URL,
+		IOMap:   slices.Clone(p.IOMap),
 		Type:    p.Type,
 		Bitrate: p.Bitrate,
 		FPS:     p.FPS,

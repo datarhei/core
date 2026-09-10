@@ -1653,6 +1653,10 @@ definitions:
         type: number
       id:
         type: string
+      iomap:
+        items:
+          type: integer
+        type: array
       type:
         type: string
     type: object
@@ -1679,6 +1683,10 @@ definitions:
         type: number
       id:
         type: string
+      iomap:
+        items:
+          type: integer
+        type: array
       q:
         type: number
       type:
@@ -1957,6 +1965,10 @@ definitions:
         description: General
         format: uint64
         type: integer
+      iomap:
+        items:
+          type: integer
+        type: array
       keyframe:
         format: uint64
         type: integer

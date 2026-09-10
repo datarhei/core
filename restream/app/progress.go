@@ -1,6 +1,10 @@
 package app
 
-import "github.com/datarhei/core/v16/ffmpeg/parse"
+import (
+	"slices"
+
+	"github.com/datarhei/core/v16/ffmpeg/parse"
+)
 
 type ProgressIOFramerate struct {
 	Min     float64
@@ -22,6 +26,7 @@ type ProgressIO struct {
 	ID      string
 	URL     string // The original URL as reported by ffmpeg
 	Address string // A possibly modified URL
+	IOMap   []int
 
 	// General
 	Index     uint64
@@ -64,6 +69,7 @@ type ProgressIO struct {
 func (p *ProgressIO) UnmarshalParser(pp *parse.ProgressIO) {
 	p.URL = pp.URL
 	p.Address = pp.Address
+	p.IOMap = slices.Clone(pp.IOMap)
 	p.Index = pp.Index
 	p.Stream = pp.Stream
 	p.Format = pp.Format

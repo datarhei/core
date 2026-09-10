@@ -8506,6 +8506,12 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "iomap": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "type": {
                     "type": "string"
                 }
@@ -8545,6 +8551,12 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "iomap": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "q": {
                     "type": "number"
@@ -8953,6 +8965,12 @@ const docTemplate = `{
                     "description": "General",
                     "type": "integer",
                     "format": "uint64"
+                },
+                "iomap": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "keyframe": {
                     "type": "integer",

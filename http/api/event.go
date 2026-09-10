@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -243,6 +244,7 @@ func (e *ProcessEventRaw) Clone() event.Event {
 
 type ProcessProgressInput struct {
 	ID       string                       `json:"id"`
+	IOMap    []int                        `json:"iomap"`
 	Type     string                       `json:"type"`
 	Bitrate  json.Number                  `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS      json.Number                  `json:"fps" swaggertype:"number" jsonschema:"type=number"`
@@ -298,6 +300,7 @@ func (p *ProcessProgressInputAVstream) Unmarshal(e event.ProcessProgressInputAVs
 
 type ProcessProgressOutput struct {
 	ID      string      `json:"id"`
+	IOMap   []int       `json:"iomap"`
 	Type    string      `json:"type"`
 	Bitrate json.Number `json:"bitrate" swaggertype:"number" jsonschema:"type=number"`
 	FPS     json.Number `json:"fps" swaggertype:"number" jsonschema:"type=number"`
@@ -336,6 +339,7 @@ func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 	for _, io := range e.Input {
 		x := ProcessProgressInput{
 			ID:      io.ID,
+			IOMap:   slices.Clone(io.IOMap),
 			Type:    io.Type,
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),
@@ -348,6 +352,7 @@ func (p *ProcessProgress) Unmarshal(e *event.ProcessProgress) {
 	for _, io := range e.Output {
 		p.Output = append(p.Output, ProcessProgressOutput{
 			ID:      io.ID,
+			IOMap:   slices.Clone(io.IOMap),
 			Type:    io.Type,
 			Bitrate: json.ToNumber(io.Bitrate),
 			FPS:     json.ToNumber(io.FPS),

@@ -25,6 +25,7 @@ type ProgressIOTee struct {
 type ProgressIO struct {
 	ID      string `json:"id" jsonschema:"minLength=1"`
 	Address string `json:"address" jsonschema:"minLength=1"`
+	IOMap   []int  `json:"iomap"`
 
 	// General
 	Index     uint64              `json:"index" format:"uint64"`
@@ -72,6 +73,7 @@ func (i *ProgressIO) Unmarshal(io *app.ProgressIO) {
 
 	i.ID = io.ID
 	i.Address = io.Address
+	i.IOMap = io.IOMap
 	i.Index = io.Index
 	i.Stream = io.Stream
 	i.Format = io.Format
