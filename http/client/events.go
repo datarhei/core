@@ -42,6 +42,8 @@ func (r *restclient) LogEvents(ctx context.Context, filters api.LogEventFilters)
 
 			ch <- data
 		}
+
+		_ = scanner.Err()
 	}(stream, channel)
 
 	return channel, nil
@@ -122,6 +124,8 @@ func (r *restclient) ProcessEvents(ctx context.Context, filters api.ProcessEvent
 
 			ch <- data
 		}
+
+		_ = scanner.Err()
 	}(stream, channel)
 
 	return channel, nil
