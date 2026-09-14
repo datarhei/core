@@ -256,8 +256,7 @@ func (m *manager) TLSConfig() *tls.Config {
 			tls.X25519,
 			tls.CurveP256,
 		},
-		CipherSuites:             preferredDefaultCipherSuites(),
-		PreferServerCipherSuites: true,
+		CipherSuites: preferredDefaultCipherSuites(),
 	}
 }
 
