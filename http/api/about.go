@@ -2,13 +2,14 @@ package api
 
 // About is some general information about the API
 type About struct {
-	App       string   `json:"app"`
-	Auths     []string `json:"auths"`
-	Name      string   `json:"name"`
-	ID        string   `json:"id"`
-	CreatedAt string   `json:"created_at"`
-	Uptime    uint64   `json:"uptime_seconds"`
-	Version   Version  `json:"version"`
+	App          string   `json:"app"`
+	Auths        []string `json:"auths"`
+	TOTPRequired bool     `json:"totp_required"`
+	Name         string   `json:"name"`
+	ID           string   `json:"id"`
+	CreatedAt    string   `json:"created_at"`
+	Uptime       uint64   `json:"uptime_seconds"`
+	Version      Version  `json:"version"`
 }
 
 // Version is some information about the binary
@@ -23,9 +24,10 @@ type Version struct {
 
 // MinimalAbout is the minimal information about the API
 type MinimalAbout struct {
-	App     string         `json:"app"`
-	Auths   []string       `json:"auths"`
-	Version VersionMinimal `json:"version"`
+	App          string         `json:"app"`
+	Auths        []string       `json:"auths"`
+	TOTPRequired bool           `json:"totp_required"`
+	Version      VersionMinimal `json:"version"`
 }
 
 type VersionMinimal struct {

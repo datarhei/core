@@ -23,15 +23,23 @@ type Validator interface {
 	Cancel()
 }
 
+type TOTPAuth interface {
+	Enrolled() bool
+	Validate(code string) bool
+	TrustValid(token, username string) bool
+}
+
 type localValidator struct {
 	username string
 	password string
+	totp     TOTPAuth
 }
 
-func NewLocalValidator(username, password string) (Validator, error) {
+func NewLocalValidator(username, password string, totpValidator TOTPAuth) (Validator, error) {
 	v := &localValidator{
 		username: username,
 		password: password,
+		totp:     totpValidator,
 	}
 
 	return v, nil
@@ -49,9 +57,27 @@ func (v *localValidator) Validate(c echo.Context) (bool, string, error) {
 	}
 
 	if login.Username != v.username || login.Password != v.password {
-		return true, "", fmt.Errorf("invalid username or password")
+		return true, "", ValidationError{Detail: "invalid_credentials", Err: errInvalidCredentials}
 	}
 
+	if v.totp != nil && v.totp.Enrolled() {
+		if v.totp.TrustValid(login.DeviceTrustToken, v.username) {
+			c.Set("login_request", login)
+			return true, v.username, nil
+		}
+
+		if len(login.TOTPCode) == 0 {
+			c.Set("login_request", login)
+			return true, "", ValidationError{Detail: "totp_required", Err: errTOTPRequired}
+		}
+
+		if !v.totp.Validate(login.TOTPCode) {
+			c.Set("login_request", login)
+			return true, "", ValidationError{Detail: "totp_invalid", Err: errTOTPInvalid}
+		}
+	}
+
+	c.Set("login_request", login)
 	return true, v.username, nil
 }
 

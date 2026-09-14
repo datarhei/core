@@ -60,6 +60,8 @@ definitions:
         type: string
       name:
         type: string
+      totp_required:
+        type: boolean
       uptime_seconds:
         type: integer
       version:
@@ -490,6 +492,8 @@ definitions:
   api.Login:
     properties:
       password:
+        type: string
+      totp_code:
         type: string
       username:
         type: string
@@ -990,11 +994,13 @@ definitions:
         type: object
       publisher:
         additionalProperties:
+          format: int32
           type: integer
         type: object
       subscriber:
         additionalProperties:
           items:
+            format: int32
             type: integer
           type: array
         type: object
@@ -1856,6 +1862,34 @@ definitions:
       name:
         type: string
     type: object
+  api.TOTPDisable:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  api.TOTPEnable:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  api.TOTPSetup:
+    properties:
+      secret:
+        type: string
+      uri:
+        type: string
+    type: object
+  api.TOTPStatus:
+    properties:
+      enrolled:
+        type: boolean
+      pending:
+        type: boolean
+    type: object
   api.Version:
     properties:
       arch:
@@ -2070,6 +2104,99 @@ paths:
           schema:
             type: string
       summary: Swagger UI for this API
+  /api/v3/auth/totp:
+    delete:
+      consumes:
+      - application/json
+      description: Disable TOTP after confirming with a valid authenticator code
+      operationId: totp-disable
+      parameters:
+      - description: TOTP confirmation code
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/api.TOTPDisable'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TOTPStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Disable TOTP
+      tags:
+      - v16.16.0
+    get:
+      description: Returns whether TOTP is enabled or pending setup
+      operationId: totp-status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TOTPStatus'
+      security:
+      - ApiKeyAuth: []
+      summary: TOTP enrollment status
+      tags:
+      - v16.16.0
+  /api/v3/auth/totp/enable:
+    post:
+      consumes:
+      - application/json
+      description: Confirm TOTP enrollment with a code from the authenticator app
+      operationId: totp-enable
+      parameters:
+      - description: TOTP confirmation code
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/api.TOTPEnable'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TOTPStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Enable TOTP
+      tags:
+      - v16.16.0
+  /api/v3/auth/totp/setup:
+    post:
+      description: Generate a TOTP secret and otpauth URI for the authenticator app
+      operationId: totp-setup
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TOTPSetup'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Start TOTP enrollment
+      tags:
+      - v16.16.0
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration

@@ -22,6 +22,7 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.0.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/minio/minio-go/v7 v7.0.70
+	github.com/pquerna/otp v1.4.0
 	github.com/prep/average v0.0.0-20200506183628-d26c465f48c3
 	github.com/prometheus/client_golang v1.19.1
 	github.com/puzpuzpuz/xsync/v3 v3.1.0
@@ -40,6 +41,7 @@ require (
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
