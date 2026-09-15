@@ -62,6 +62,14 @@ type compressResponseWriter struct {
 	passThrough         bool
 }
 
+type noCompressResponseWriter struct {
+	http.ResponseWriter
+	hasHeader   bool
+	wroteHeader bool
+	wroteBody   bool
+	code        int
+}
+
 type Level int
 
 const (
@@ -213,11 +221,71 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				}()
 
 				res.Writer = grw
+			} else {
+				rw := res.Writer
+
+				grw := &noCompressResponseWriter{
+					ResponseWriter: rw,
+				}
+
+				defer func() {
+					res.Writer = rw
+				}()
+
+				res.Writer = grw
 			}
 
 			return next(c)
 		}
 	}
+}
+
+func (w *noCompressResponseWriter) WriteHeader(code int) {
+	w.hasHeader = true
+
+	// Delay writing of the header until we know if we'll actually compress the response
+	w.code = code
+}
+
+func (w *noCompressResponseWriter) Write(b []byte) (int, error) {
+	w.wroteBody = true
+
+	if !w.hasHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if !w.wroteHeader {
+		w.ResponseWriter.WriteHeader(w.code)
+		w.wroteHeader = true
+	}
+
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *noCompressResponseWriter) Flush() {
+	if !w.hasHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if !w.wroteHeader {
+		w.ResponseWriter.WriteHeader(w.code)
+		w.wroteHeader = true
+	}
+
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (w *noCompressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return w.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+func (w *noCompressResponseWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := w.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 func (w *compressResponseWriter) WriteHeader(code int) {
