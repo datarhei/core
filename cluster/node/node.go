@@ -179,7 +179,9 @@ func (n *Node) About() About {
 	}
 
 	a.Name = n.coreAbout.Name
-	a.HostNames = slices.Copy(n.config.Host.Name)
+	if n.config != nil {
+		a.HostNames = slices.Copy(n.config.Host.Name)
+	}
 	a.Error = n.nodeLastErr
 	a.LastContact = n.nodeLastContact
 	if time.Since(a.LastContact) > maxLastContact {
