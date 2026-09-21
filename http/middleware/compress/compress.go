@@ -49,25 +49,16 @@ type Compressor interface {
 type compressResponseWriter struct {
 	Compressor
 	http.ResponseWriter
-	hasHeader           bool
-	wroteHeader         bool
-	wroteBody           bool
-	minLength           int
-	minLengthExceeded   bool
-	buffer              *mem.Buffer
-	code                int
-	headerContentLength string
-	scheme              string
-	contentTypes        []string
-	passThrough         bool
-}
-
-type noCompressResponseWriter struct {
-	http.ResponseWriter
-	hasHeader   bool
-	wroteHeader bool
-	wroteBody   bool
-	code        int
+	hasHeader         bool
+	wroteHeader       bool
+	wroteBody         bool
+	minLength         int
+	minLengthExceeded bool
+	buffer            *mem.Buffer
+	code              int
+	scheme            string
+	contentTypes      []string
+	passThrough       bool
 }
 
 type Level int
@@ -203,10 +194,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 							// If the minimum content length hasn't exceeded, write the uncompressed response
 							res.Writer = rw
 							if grw.wroteHeader {
-								// Restore Content-Length header in case it was deleted
-								if len(grw.headerContentLength) != 0 {
-									grw.Header().Set(echo.HeaderContentLength, grw.headerContentLength)
-								}
 								grw.ResponseWriter.WriteHeader(grw.code)
 							}
 							grw.buffer.WriteTo(rw)
@@ -221,18 +208,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				}()
 
 				res.Writer = grw
-			} else {
-				rw := res.Writer
-
-				grw := &noCompressResponseWriter{
-					ResponseWriter: rw,
-				}
-
-				defer func() {
-					res.Writer = rw
-				}()
-
-				res.Writer = grw
 			}
 
 			return next(c)
@@ -240,67 +215,12 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 	}
 }
 
-func (w *noCompressResponseWriter) WriteHeader(code int) {
-	w.hasHeader = true
-
-	// Delay writing of the header until we know if we'll actually compress the response
-	w.code = code
-}
-
-func (w *noCompressResponseWriter) Write(b []byte) (int, error) {
-	w.wroteBody = true
-
-	if !w.hasHeader {
-		w.WriteHeader(http.StatusOK)
-	}
-
-	if !w.wroteHeader {
-		w.ResponseWriter.WriteHeader(w.code)
-		w.wroteHeader = true
-	}
-
-	return w.ResponseWriter.Write(b)
-}
-
-func (w *noCompressResponseWriter) Flush() {
-	if !w.hasHeader {
-		w.WriteHeader(http.StatusOK)
-	}
-
-	if !w.wroteHeader {
-		w.ResponseWriter.WriteHeader(w.code)
-		w.wroteHeader = true
-	}
-
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-func (w *noCompressResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return w.ResponseWriter.(http.Hijacker).Hijack()
-}
-
-func (w *noCompressResponseWriter) Push(target string, opts *http.PushOptions) error {
-	if p, ok := w.ResponseWriter.(http.Pusher); ok {
-		return p.Push(target, opts)
-	}
-	return http.ErrNotSupported
-}
-
 func (w *compressResponseWriter) WriteHeader(code int) {
 	if code == http.StatusNoContent { // Issue #489
 		w.Header().Del(echo.HeaderContentEncoding)
 	}
-	w.headerContentLength = w.Header().Get(echo.HeaderContentLength)
-	w.Header().Del(echo.HeaderContentLength) // Issue #444
 
 	if !w.canCompress(w.Header().Get(echo.HeaderContentType)) {
-		// On Passthrough, re-add the content-length header
-		if len(w.headerContentLength) != 0 {
-			w.Header().Set(echo.HeaderContentLength, w.headerContentLength)
-		}
-
 		w.passThrough = true
 	}
 
@@ -354,6 +274,7 @@ func (w *compressResponseWriter) Write(b []byte) (int, error) {
 			// The minimum length is exceeded, add Content-Encoding header and write the header
 			w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
 			w.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
+			w.Header().Del(echo.HeaderContentLength)
 			if w.hasHeader {
 				w.ResponseWriter.WriteHeader(w.code)
 				w.wroteHeader = true
@@ -391,6 +312,7 @@ func (w *compressResponseWriter) Flush() {
 		w.minLengthExceeded = true
 		w.Header().Set(echo.HeaderContentEncoding, w.scheme) // Issue #806
 		w.Header().Add(echo.HeaderVary, echo.HeaderAcceptEncoding)
+		w.Header().Del(echo.HeaderContentLength)
 		if w.hasHeader {
 			w.ResponseWriter.WriteHeader(w.code)
 			w.wroteHeader = true

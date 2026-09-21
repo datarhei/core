@@ -247,8 +247,9 @@ func (h *handler) handleHLSEgress(c echo.Context, _ string, data map[string]inte
 		segments = parseSegments(buffer)
 
 		res.Header().Set("Cache-Control", "private")
-		res.Header().Del("Content-Length")
-		//res.Header().Set("Content-Length", strconv.Itoa(buffer.Len()))
+		res.Header().Set("Content-Length", strconv.Itoa(buffer.Len()))
+
+		res.WriteHeader(rewriter.code)
 		res.Write(buffer.Bytes())
 
 		mem.Put(buffer)
@@ -537,6 +538,11 @@ func (r *segmentReader) getSegments(dir string) []string {
 type sessionRewriter struct {
 	http.ResponseWriter
 	buffer *mem.Buffer
+	code   int
+}
+
+func (g *sessionRewriter) WriteHeader(code int) {
+	g.code = code
 }
 
 func (g *sessionRewriter) Write(data []byte) (int, error) {
@@ -718,8 +724,45 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 			continue
 		}
 
-		// Write comments unmodified
+		// Write most comments unmodified
 		if byteline[0] == '#' {
+			// The init segment also needs the session and all other additional query parameter
+			if after, found := bytes.CutPrefix(byteline, []byte("#EXT-X-MAP:")); found {
+				kvs := parseKeyValueBytes(after)
+				if value, ok := kvs["URI"]; ok {
+					if u, err := url.Parse(value); err == nil {
+						q := url.Values{}
+
+						for key, values := range requestURL.Query() {
+							for _, value := range values {
+								q.Add(key, value)
+							}
+						}
+
+						for key, values := range u.Query() {
+							for _, value := range values {
+								q.Set(key, value)
+							}
+						}
+
+						q.Set("session", sessionID)
+
+						u.RawQuery = q.Encode()
+
+						buffer.WriteString("#EXT-X-MAP:")
+
+						kvs["URI"] = u.String()
+
+						for k, v := range kvs {
+							buffer.WriteString(k + "=\"" + v + "\"")
+						}
+
+						buffer.WriteByte('\n')
+						continue
+					}
+				}
+			}
+
 			buffer.Write(byteline)
 			buffer.WriteByte('\n')
 			continue
@@ -733,7 +776,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 		}
 
 		// Write anything that doesn't end in .m3u8 or .ts unmodified
-		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") {
+		if !strings.HasSuffix(u.Path, ".m3u8") && !strings.HasSuffix(u.Path, ".ts") && !strings.HasSuffix(u.Path, ".mp4") && !strings.HasSuffix(u.Path, ".m4s") {
 			buffer.Write(byteline)
 			buffer.WriteByte('\n')
 			continue
@@ -756,7 +799,7 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 		loop := false
 
 		// If this is a master manifest (i.e. an m3u8 which contains references to other m3u8), then
-		// we give each substream an own session ID if they don't have already.
+		// we give each substream the same session ID if they don't have already.
 		if strings.HasSuffix(u.Path, ".m3u8") {
 			// Check if we're referring to ourselves. This will cause an infinite loop
 			// and has to be stopped.

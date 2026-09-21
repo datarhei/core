@@ -168,6 +168,30 @@ func TestHLSRewriteTS(t *testing.T) {
 	require.Equal(t, data, buffer.Bytes())
 }
 
+func TestHLSRewriteTSAndToken(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v6.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8?token=foobar")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/segments_v6_with_session_and_token.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
 func TestHLSRewriteMP4(t *testing.T) {
 	data, err := os.ReadFile("./fixtures/segments_v7.txt")
 	require.NoError(t, err)
@@ -187,6 +211,78 @@ func TestHLSRewriteMP4(t *testing.T) {
 	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
 
 	data, err = os.ReadFile("./fixtures/segments_v7_with_session.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
+func TestHLSRewriteMP4WithToken(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v7.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8?token=foobar")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/segments_v7_with_session_and_token.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
+func TestHLSRewriteM4S(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v7_m4s.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/segments_v7_m4s_with_session.txt")
+	require.NoError(t, err)
+
+	require.Equal(t, data, buffer.Bytes())
+}
+
+func TestHLSRewriteM4SWithToken(t *testing.T) {
+	data, err := os.ReadFile("./fixtures/segments_v7_m4s.txt")
+	require.NoError(t, err)
+
+	br := &sessionRewriter{
+		buffer: &mem.Buffer{},
+	}
+
+	_, err = br.Write(data)
+	require.NoError(t, err)
+
+	u, err := url.Parse("http://example.com/test.m3u8?token=foobar")
+	require.NoError(t, err)
+
+	buffer := &mem.Buffer{}
+
+	br.rewriteHLS("oT5GV8eWBbRAh4aib5egoK", u, buffer)
+
+	data, err = os.ReadFile("./fixtures/segments_v7_m4s_with_session_and_token.txt")
 	require.NoError(t, err)
 
 	require.Equal(t, data, buffer.Bytes())
