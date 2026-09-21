@@ -768,7 +768,7 @@ func BenchmarkAllProcesses(b *testing.B) {
 	}
 
 	for b.Loop() {
-		response := mock.RequestEx(b, http.StatusOK, router, "GET", "/", nil, false)
+		response := mock.RequestEx(b, http.StatusOK, router, "GET", "/", nil, nil, false)
 		require.Equal(b, response.Code, 200)
 	}
 }

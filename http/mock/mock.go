@@ -33,21 +33,29 @@ func DummyEcho() *echo.Echo {
 type Response struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Header  http.Header
 	Raw     []byte
 	Data    any
 }
 
 func Request(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, data io.Reader) *Response {
-	return RequestEx(t, httpstatus, router, method, path, data, true)
+	return RequestEx(t, httpstatus, router, method, path, nil, data, true)
 }
 
-func RequestEx(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, data io.Reader, checkResponse bool) *Response {
+func RequestEx(t require.TestingT, httpstatus int, router *echo.Echo, method, path string, header http.Header, data io.Reader, checkResponse bool) *Response {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(method, path, data)
-	if data != nil {
+
+	if header != nil {
+		req.Header = header.Clone()
+	}
+
+	if data != nil && len(req.Header.Get("Content-Type")) == 0 {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	req.Header.Add("X-Real-IP", "192.168.1.173")
+	if len(req.Header.Get("X-Real-IP")) == 0 {
+		req.Header.Add("X-Real-IP", "192.168.1.173")
+	}
 	router.ServeHTTP(w, req)
 
 	var response *Response = nil
@@ -57,6 +65,8 @@ func RequestEx(t require.TestingT, httpstatus int, router *echo.Echo, method, pa
 	} else {
 		response = CheckResponseMinimal(t, w.Result())
 	}
+
+	response.Header = w.Header().Clone()
 
 	require.Equal(t, httpstatus, w.Code, string(response.Raw))
 
