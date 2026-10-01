@@ -3,8 +3,8 @@ package parse
 import (
 	"errors"
 	"slices"
+	"strconv"
 	"time"
-	"uuid"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/process"
@@ -436,7 +436,7 @@ func (f *ffmpegProcess) calculateMapping() {
 		}
 	}
 
-	for _, fm := range f.mapping.Mapping {
+	for j, fm := range f.mapping.Mapping {
 		m := GraphMapping{
 			Input:  -1,
 			Output: -1,
@@ -447,7 +447,7 @@ func (f *ffmpegProcess) calculateMapping() {
 		}
 
 		if len(m.ID) == 0 {
-			m.ID = uuid.New().String()
+			m.ID = "mapping_" + strconv.Itoa(j)
 		}
 
 		if len(m.Name) == 0 {

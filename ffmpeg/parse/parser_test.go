@@ -1435,6 +1435,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  0,
 				Name:   "graph 0 input from stream 0:0",
 				Copy:   false,
+				ID:     "mapping_0",
 			},
 			{
 				Input:  2,
@@ -1442,6 +1443,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  1,
 				Name:   "graph_1_in_2_0",
 				Copy:   false,
+				ID:     "mapping_1",
 			},
 			{
 				Input:  2,
@@ -1449,6 +1451,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  2,
 				Name:   "graph_2_in_2_0",
 				Copy:   false,
+				ID:     "mapping_2",
 			},
 			{
 				Input:  -1,
@@ -1456,6 +1459,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  0,
 				Name:   "out_0_0",
 				Copy:   false,
+				ID:     "mapping_3",
 			},
 			{
 				Input:  1,
@@ -1463,6 +1467,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  -1,
 				Name:   "",
 				Copy:   true,
+				ID:     "mapping_4",
 			},
 			{
 				Input:  -1,
@@ -1470,6 +1475,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  1,
 				Name:   "out_0_2",
 				Copy:   false,
+				ID:     "mapping_5",
 			},
 			{
 				Input:  -1,
@@ -1477,6 +1483,7 @@ func TestParserHLSStreamMappingWithGraph(t *testing.T) {
 				Index:  2,
 				Name:   "out_0_3",
 				Copy:   false,
+				ID:     "mapping_6",
 			},
 		},
 	}, progress.Mapping)
