@@ -628,9 +628,9 @@ func applyHLSMapping(output []ProgressIO, hlsMapping ffmpegHLSStreamMap) []Progr
 		output[i] = io
 	}
 
-	offset := maxVariantIndex - minVariantIndex
+	if maxVariantIndex >= minVariantIndex {
+		offset := maxVariantIndex - minVariantIndex
 
-	if offset > 0 {
 		pivot++
 
 		// Fix all following index values
