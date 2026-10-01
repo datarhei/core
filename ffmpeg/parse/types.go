@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"time"
+	"uuid"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/process"
@@ -443,6 +444,10 @@ func (f *ffmpegProcess) calculateMapping() {
 			ID:     fm.Graph.ID,
 			Name:   fm.Graph.Name,
 			Copy:   fm.Copy,
+		}
+
+		if len(m.ID) == 0 {
+			m.ID = uuid.New().String()
 		}
 
 		if len(m.Name) == 0 {
