@@ -602,6 +602,10 @@ func (c *CIFHandshake) Unmarshal(data []byte) error {
 	pivot := data[48:]
 
 	for {
+		if len(pivot) < 4 {
+			return fmt.Errorf("invalid extension length")
+		}
+
 		extensionType := CtrlSubType(binary.BigEndian.Uint16(pivot[0:]))
 		extensionLength := int(binary.BigEndian.Uint16(pivot[2:])) * 4
 
