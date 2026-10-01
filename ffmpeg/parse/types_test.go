@@ -145,3 +145,51 @@ func TestCalculateMappingInputOutputMoreComplex(t *testing.T) {
 		require.Equal(t, uint64(0), o.Index)
 	}
 }
+
+func TestCalculateMappingInputOutputOtherComplex(t *testing.T) {
+	inputline := []byte(`[{"url":"rtmp://localhost:1935/c61cba4f-68a3-488e-b2e4-ffb8e182794f/syltmix/c61cba4f-68a3-488e-b2e4-ffb8e182794f:token","format":"flv","index":0,"stream":0,"type":"video","codec":"h264","coder":"h264","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":578,"level":40,"disposition":[],"fps":25.000000,"pix_fmt":"yuv420p","width":1920,"height":1080},{"url":"rtmp://localhost:1935/c61cba4f-68a3-488e-b2e4-ffb8e182794f/syltmix/c61cba4f-68a3-488e-b2e4-ffb8e182794f:token","format":"flv","index":0,"stream":1,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"disposition":[],"sample_fmt":"fltp","sampling_hz":44100,"layout":"stereo","channels":2},{"url":"playout:rtmp://localhost:1935/c61cba4f-68a3-488e-b2e4-ffb8e182794f/audio_playlist_97fe71d5-c36d-4f34-b11c-ae05b94e6567/c61cba4f-68a3-488e-b2e4-ffb8e182794f:token","format":"playout","index":1,"stream":0,"type":"audio","codec":"aac","coder":"aac","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":1,"level":-99,"disposition":[],"sample_fmt":"fltp","sampling_hz":48000,"layout":"stereo","channels":2}]`)
+	outputline := []byte(`[{"url":"[select=v\\\\:0,a\\\\:0:f=flv:flvflags=no_duration_filesize]/dev/null|[select=v\\\\:0,a\\\\:0:f=flv:flvflags=no_duration_filesize]/dev/null","format":"tee","index":0,"stream":0,"type":"video","codec":"h264","coder":"copy","bitrate_kbps":0,"duration_sec":0.000000,"language":"und","profile":578,"level":40,"disposition":[],"fps":25.000000,"pix_fmt":"yuv420p","width":1920,"height":1080,"tee":[{"id":"","address":"/dev/null","format":"flv","fifo_enabled":true},{"id":"","address":"/dev/null","format":"flv","fifo_enabled":true}]},{"url":"[select=v\\\\:0,a\\\\:0:f=flv:flvflags=no_duration_filesize]/dev/null|[select=v\\\\:0,a\\\\:0:f=flv:flvflags=no_duration_filesize]/dev/null","format":"tee","index":0,"stream":1,"type":"audio","codec":"aac","coder":"libfdk_aac","bitrate_kbps":192,"duration_sec":0.000000,"language":"und","profile":-99,"level":-99,"disposition":[],"sample_fmt":"s16","sampling_hz":48000,"layout":"stereo","channels":2,"tee":[{"id":"","address":"/dev/null","format":"flv","fifo_enabled":true},{"id":"","address":"/dev/null","format":"flv","fifo_enabled":true}]}]`)
+	mappingline := []byte(`{"graphs":[{"index":0,"graph":[{"src_id":"7f0b78003080","src_name":"Parsed_anull_0","src_filter":"anull","dst_id":"7f0b78004bc0","dst_name":"auto_aresample_0","dst_filter":"aresample","inpad":"default","outpad":"default","timebase":"1/48000","type":"audio","format":"fltp","sampling_hz":48000,"layout":"stereo"},{"src_id":"7f0b78003380","src_name":"graph_-1_in_1:0","src_filter":"abuffer","dst_id":"7f0b78003080","dst_name":"Parsed_anull_0","dst_filter":"anull","inpad":"default","outpad":"default","timebase":"1/48000","type":"audio","format":"fltp","sampling_hz":48000,"layout":"stereo"},{"src_id":"7f0b78003cc0","src_name":"format_out_#0:1","src_filter":"aformat","dst_id":"7f0b78003a80","dst_name":"out_#0:1","dst_filter":"abuffersink","inpad":"default","outpad":"default","timebase":"1/48000","type":"audio","format":"s16","sampling_hz":48000,"layout":"stereo"},{"src_id":"7f0b78004bc0","src_name":"auto_aresample_0","src_filter":"aresample","dst_id":"7f0b78003cc0","dst_name":"format_out_#0:1","dst_filter":"aformat","inpad":"default","outpad":"default","timebase":"1/48000","type":"audio","format":"s16","sampling_hz":48000,"layout":"stereo"}]}],"mapping":[{"input":{"index":1,"stream":0},"graph":{"index":0,"id":"7f0b78003380","name":"graph_-1_in_1:0"},"output":null},{"input":{"index":0,"stream":0},"output":{"index":0,"stream":0},"copy":true},{"input":null,"graph":{"index":0,"id":"7f0b78003a80","name":"out_#0:1"},"output":{"index":0,"stream":1}}]}`)
+
+	mapping := ffmpegStreamMapping{}
+
+	err := json.Unmarshal(mappingline, &mapping)
+	require.Nil(t, err)
+
+	input := []ffmpegProcessIO{}
+
+	err = json.Unmarshal(inputline, &input)
+	require.Nil(t, err)
+
+	output := []ffmpegProcessIO{}
+
+	err = json.Unmarshal(outputline, &output)
+	require.Nil(t, err)
+
+	process := ffmpegProcess{
+		input:   input,
+		output:  output,
+		mapping: mapping,
+	}
+
+	process.calculateMapping()
+
+	require.Equal(t, map[int][]int{
+		0: {0},
+		2: {1},
+	}, process.input2output)
+
+	require.Equal(t, map[int][]int{
+		0: {0},
+		1: {2},
+	}, process.output2input)
+
+	export := process.export()
+
+	require.Equal(t, process.input2output[0], export.Input[0].IOMap)
+	require.Equal(t, []int([]int(nil)), export.Input[1].IOMap)
+	require.Equal(t, process.input2output[2], export.Input[2].IOMap)
+
+	require.Equal(t, process.output2input[0], export.Output[0].IOMap)
+	require.Equal(t, process.output2input[1], export.Output[1].IOMap)
+}

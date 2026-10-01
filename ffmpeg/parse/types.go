@@ -563,7 +563,7 @@ func (p *ffmpegProcess) export() Progress {
 
 	for i, io := range p.input {
 		aio := io.export()
-		if i < len(p.input2output) {
+		if _, ok := p.input2output[i]; ok {
 			aio.IOMap = slices.Clone(p.input2output[i])
 		}
 
@@ -572,7 +572,7 @@ func (p *ffmpegProcess) export() Progress {
 
 	for i, io := range p.output {
 		aio := io.export()
-		if i < len(p.output2input) {
+		if _, ok := p.output2input[i]; ok {
 			aio.IOMap = slices.Clone(p.output2input[i])
 		}
 
