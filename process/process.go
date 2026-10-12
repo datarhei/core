@@ -1049,11 +1049,16 @@ func (p *process) waiter() {
 	enableReconnect := true
 
 	if err := p.cmd.Wait(); err != nil {
+		// Send error message to the parser
+		p.parser.Parse([]byte("process exited with error: " + err.Error()))
+
 		// The process exited abnormally, i.e. the return code is non-zero or a signal
 		// has been raised.
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			// The process exited and the status can be examined
 			status := exiterr.Sys().(syscall.WaitStatus)
+
+			p.parser.Parse(fmt.Appendf(nil, "exit error details: exited=%v signaled=%v status=%d, signal=%d", status.Exited(), status.Signaled(), status.ExitStatus(), int(status.Signal())))
 
 			p.debuglogger.WithFields(log.Fields{
 				"exited":      status.Exited(),
@@ -1095,6 +1100,8 @@ func (p *process) waiter() {
 			p.logger.WithError(err).Debug().Log("Killed")
 			state = stateKilled
 		}
+	} else {
+		p.parser.Parse([]byte("process exited without error"))
 	}
 
 	p.setState(state)

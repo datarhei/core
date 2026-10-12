@@ -700,6 +700,8 @@ func (p *parser) parseAVstreamProgress(line []byte) error {
 }
 
 func (p *parser) Stop(state string, pusage process.Usage) {
+	p.Parse([]byte("finishing state: " + state))
+
 	usage := Usage{}
 
 	usage.CPU.NCPU = pusage.CPU.NCPU
