@@ -103,7 +103,7 @@ func (r *restclient) FilesystemAddFile(storage, path string, data io.Reader) err
 		path = "/" + path
 	}
 
-	_, err := r.call("PUT", "/v3/fs/"+url.PathEscape(storage)+path, nil, nil, "application/data", data)
+	_, err := r.stream(context.Background(), "PUT", "/v3/fs/"+url.PathEscape(storage)+path, nil, nil, "application/data", data)
 
 	return err
 }
@@ -122,7 +122,7 @@ func (r *restclient) FilesystemOperation(operation, dst, src string, ratelimit u
 	e := json.NewEncoder(buf)
 	e.Encode(p)
 
-	_, err := r.call("PUT", "/v3/fs", nil, nil, "application/json", buf.Reader())
+	_, err := r.stream(context.Background(), "PUT", "/v3/fs", nil, nil, "application/json", buf.Reader())
 
 	return err
 }
