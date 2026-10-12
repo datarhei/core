@@ -3,7 +3,7 @@
 #EXT-X-TARGETDURATION:2
 #EXT-X-MEDIA-SEQUENCE:684789
 #EXT-X-INDEPENDENT-SEGMENTS
-#EXT-X-MAP:URI="0_init.mp4?foo=bar&session=oT5GV8eWBbRAh4aib5egoK&token=foobar"
+#EXT-X-MAP:URI="0_init.mp4?foo=bar&session=oT5GV8eWBbRAh4aib5egoK&token=foobar",BYTERANGE="720@0"
 #EXTINF:2.000000,
 #EXT-X-PROGRAM-DATE-TIME:2026-09-19T19:22:12.455+0000
 0_684789.m4s?foo=bar&session=oT5GV8eWBbRAh4aib5egoK&token=foobar

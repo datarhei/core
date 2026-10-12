@@ -753,8 +753,12 @@ func (g *sessionRewriter) rewriteHLS(sessionID string, requestURL *url.URL, buff
 
 						kvs["URI"] = u.String()
 
+						buffer.WriteString("URI=\"" + kvs["URI"] + "\"")
+
+						delete(kvs, "URI")
+
 						for k, v := range kvs {
-							buffer.WriteString(k + "=\"" + v + "\"")
+							buffer.WriteString("," + k + "=\"" + v + "\"")
 						}
 
 						buffer.WriteByte('\n')
