@@ -38,6 +38,7 @@ type UpdateProcessRequest struct {
 
 type SetProcessCommandRequest struct {
 	Command string `json:"order"`
+	Reason  string `json:"reason"`
 }
 
 type SetProcessMetadataRequest struct {

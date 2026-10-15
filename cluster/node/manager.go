@@ -624,13 +624,13 @@ func (p *Manager) ProcessReportSet(nodeid string, id app.ProcessID, report *app.
 	return node.Core().ProcessReportSet(id, report)
 }
 
-func (p *Manager) ProcessCommand(nodeid string, id app.ProcessID, command string) error {
+func (p *Manager) ProcessCommand(nodeid string, id app.ProcessID, command, reason string) error {
 	node, err := p.NodeGet(nodeid)
 	if err != nil {
 		return err
 	}
 
-	return node.Core().ProcessCommand(id, command)
+	return node.Core().ProcessCommand(id, command, reason)
 }
 
 func (p *Manager) ProcessProbe(nodeid string, id app.ProcessID) (api.Probe, error) {

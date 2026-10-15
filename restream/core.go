@@ -47,8 +47,11 @@ type Restreamer interface {
 	UpdateProcess(id app.ProcessID, config *app.Config, force bool) error                                             // Update a process
 	StartProcess(id app.ProcessID) error                                                                              // Start a process
 	StopProcess(id app.ProcessID) error                                                                               // Stop a process
+	StopProcessWithReason(id app.ProcessID, reason string) error                                                      // Stop a process
 	RestartProcess(id app.ProcessID) error                                                                            // Restart a process
+	RestartProcessWithReason(id app.ProcessID, reason string) error                                                   // Restart a process
 	ReloadProcess(id app.ProcessID) error                                                                             // Reload a process
+	ReloadProcessWithReason(id app.ProcessID, reason string) error                                                    // Reload a process
 	GetProcess(id app.ProcessID) (*app.Process, error)                                                                // Get a process
 	GetProcessState(id app.ProcessID) (*app.State, error)                                                             // Get the state of a process
 	GetProcessReport(id app.ProcessID) (*app.Report, error)                                                           // Get the logs of a process
@@ -225,7 +228,7 @@ func (r *restream) Stop() {
 			wg.Add(1)
 			go func(t *task) {
 				defer wg.Done()
-				t.Kill()
+				t.Kill("Shutting down restreamer")
 				t.parser.Destroy()
 			}(t)
 
@@ -272,8 +275,8 @@ func (r *restream) filesystemObserver(ctx context.Context, fs fs.Filesystem, int
 						return true
 					}
 
-					r.logger.Warn().WithField("id", id).Log("Shutting down because filesystem is full")
-					t.Stop()
+					r.logger.Warn().WithField("id", id).Log("Stopping because filesystem is full")
+					t.Stop("Filesystem is full")
 
 					return true
 				})
@@ -1275,7 +1278,7 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 
 	t.process.Order.Set(order)
 
-	if err := task.Stop(); err != nil {
+	if err := task.Stop("Updating process config"); err != nil {
 		t.Destroy()
 		return fmt.Errorf("stop process: %w", err)
 	}
@@ -1429,13 +1432,17 @@ func (r *restream) startProcess(task *task) error {
 }
 
 func (r *restream) StopProcess(id app.ProcessID) error {
+	return r.StopProcessWithReason(id, "")
+}
+
+func (r *restream) StopProcessWithReason(id app.ProcessID, reason string) error {
 	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
 	defer r.tasks.Unlock(id)
 
-	err := r.stopProcess(task)
+	err := r.stopProcess(task, reason)
 
 	if err != nil {
 		return err
@@ -1446,9 +1453,9 @@ func (r *restream) StopProcess(id app.ProcessID) error {
 	return nil
 }
 
-func (r *restream) stopProcess(task *task) error {
+func (r *restream) stopProcess(task *task, reason string) error {
 	// TODO: aufpassen mit nProc und nil error. In task.Stop() noch einen error einführen, falls der process nicht läuft.
-	err := task.Stop()
+	err := task.Stop(reason)
 	if err != nil {
 		return err
 	}
@@ -1459,29 +1466,37 @@ func (r *restream) stopProcess(task *task) error {
 }
 
 func (r *restream) RestartProcess(id app.ProcessID) error {
+	return r.RestartProcessWithReason(id, "")
+}
+
+func (r *restream) RestartProcessWithReason(id app.ProcessID, reason string) error {
 	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
 	defer r.tasks.Unlock(id)
 
-	return r.restartProcess(task)
+	return r.restartProcess(task, reason)
 }
 
-func (r *restream) restartProcess(task *task) error {
-	task.Restart()
+func (r *restream) restartProcess(task *task, reason string) error {
+	task.Restart(reason)
 
 	return nil
 }
 
 func (r *restream) ReloadProcess(id app.ProcessID) error {
+	return r.ReloadProcessWithReason(id, "")
+}
+
+func (r *restream) ReloadProcessWithReason(id app.ProcessID, reason string) error {
 	task, ok := r.tasks.LoadAndLock(id)
 	if !ok {
 		return ErrUnknownProcess
 	}
 	defer r.tasks.Unlock(id)
 
-	err := r.reloadProcess(task)
+	err := r.reloadProcess(task, reason)
 
 	if err != nil {
 		return err
@@ -1492,7 +1507,7 @@ func (r *restream) ReloadProcess(id app.ProcessID) error {
 	return nil
 }
 
-func (r *restream) reloadProcess(task *task) error {
+func (r *restream) reloadProcess(task *task, reason string) error {
 	cleanupPatterns, err := r.compileCleanup(task.ResolvedConfig())
 	if err != nil {
 		return err
@@ -1513,7 +1528,7 @@ func (r *restream) reloadProcess(task *task) error {
 
 	t.process.Order.Set(order)
 
-	if err := task.Stop(); err != nil {
+	if err := task.Stop(reason); err != nil {
 		t.Destroy()
 		return fmt.Errorf("stop process: %w", err)
 	}

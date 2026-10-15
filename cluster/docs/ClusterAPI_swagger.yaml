@@ -252,6 +252,8 @@ definitions:
     properties:
       order:
         type: string
+      reason:
+        type: string
     type: object
   client.SetProcessMetadataRequest:
     properties:
@@ -753,6 +755,8 @@ definitions:
         additionalProperties: {}
         type: object
       order:
+        type: string
+      orderReason:
         type: string
       updatedAt:
         type: string

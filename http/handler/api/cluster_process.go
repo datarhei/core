@@ -639,7 +639,7 @@ func (h *ClusterHandler) ProcessSetCommand(c echo.Context) error {
 		return apierrors.Err(http.StatusBadRequest, "", "unknown command provided. known commands are: start, stop, reload, restart")
 	}
 
-	if err := h.cluster.ProcessSetCommand("", pid, command.Command); err != nil {
+	if err := h.cluster.ProcessSetCommand("", pid, command.Command, command.Reason); err != nil {
 		if cerr, ok := err.(apierrors.Error); ok {
 			return cerr
 		}

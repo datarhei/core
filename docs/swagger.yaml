@@ -445,6 +445,8 @@ definitions:
         - restart
         - reload
         type: string
+      reason:
+        type: string
     required:
     - command
     type: object

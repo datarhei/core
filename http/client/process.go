@@ -138,13 +138,14 @@ func (r *restclient) ProcessDelete(id app.ProcessID, purge bool) error {
 	return err
 }
 
-func (r *restclient) ProcessCommand(id app.ProcessID, command string) error {
+func (r *restclient) ProcessCommand(id app.ProcessID, command, reason string) error {
 	buf := mem.Get()
 	defer mem.Put(buf)
 
 	e := json.NewEncoder(buf)
 	e.Encode(api.Command{
 		Command: command,
+		Reason:  reason,
 	})
 
 	query := &url.Values{}

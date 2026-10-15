@@ -465,6 +465,7 @@ type processOpStart struct {
 type processOpStop struct {
 	nodeid    string
 	processid app.ProcessID
+	reason    string
 }
 
 type processOpAdd struct {
@@ -571,7 +572,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.manager.ProcessCommand(v.nodeid, v.config.ProcessID(), "start")
+			err = c.manager.ProcessCommand(v.nodeid, v.config.ProcessID(), "start", "")
 			if err != nil {
 				opErr = processOpError{
 					processid: v.config.ProcessID(),
@@ -656,7 +657,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		// Transfer report with best effort, it's ok if it fails.
-		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop")
+		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop", fmt.Sprintf("Moving process to node %s", v.toNodeid))
 		if err == nil {
 			process, err := c.manager.ProcessGet(v.fromNodeid, v.config.ProcessID(), []string{"report"})
 			if err != nil {
@@ -686,7 +687,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		if v.order == "start" {
-			err = c.manager.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start")
+			err = c.manager.ProcessCommand(v.toNodeid, v.config.ProcessID(), "start", "")
 			if err != nil {
 				//opErr = processOpError{
 				//	processid: v.config.ProcessID(),
@@ -726,7 +727,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"tonodeid":   v.toNodeid,
 		}).Log("Moving process")
 	case processOpStart:
-		err := c.manager.ProcessCommand(v.nodeid, v.processid, "start")
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "start", "")
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -749,7 +750,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			"nodeid":    v.nodeid,
 		}).Log("Starting process")
 	case processOpStop:
-		err := c.manager.ProcessCommand(v.nodeid, v.processid, "stop")
+		err := c.manager.ProcessCommand(v.nodeid, v.processid, "stop", v.reason)
 		if err != nil {
 			opErr = processOpError{
 				processid: v.processid,
@@ -758,6 +759,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 			logger.Info().WithError(err).WithFields(log.Fields{
 				"processid": v.processid,
 				"nodeid":    v.nodeid,
+				"reason":    v.reason,
 			}).Log("Stopping process")
 			break
 		}
@@ -770,6 +772,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		logger.Info().WithFields(log.Fields{
 			"processid": v.processid,
 			"nodeid":    v.nodeid,
+			"reason":    v.reason,
 		}).Log("Stopping process")
 	case processOpReject:
 		opErr = processOpError(v)

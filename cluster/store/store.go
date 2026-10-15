@@ -41,13 +41,14 @@ type Store interface {
 }
 
 type Process struct {
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Config    *app.Config
-	Order     string
-	Metadata  map[string]any
-	Error     string
-	Force     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Config      *app.Config
+	Order       string
+	OrderReason string
+	Metadata    map[string]any
+	Error       string
+	Force       bool
 }
 
 type Users struct {
@@ -122,8 +123,9 @@ type CommandUnsetRelocateProcess struct {
 }
 
 type CommandSetProcessOrder struct {
-	ID    app.ProcessID
-	Order string
+	ID     app.ProcessID
+	Order  string
+	Reason string
 }
 
 type CommandSetProcessMetadata struct {

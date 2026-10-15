@@ -1641,6 +1641,9 @@
             "properties": {
                 "order": {
                     "type": "string"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },
@@ -2388,6 +2391,9 @@
                     "additionalProperties": {}
                 },
                 "order": {
+                    "type": "string"
+                },
+                "orderReason": {
                     "type": "string"
                 },
                 "updatedAt": {

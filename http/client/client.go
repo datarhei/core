@@ -68,7 +68,7 @@ type RestClient interface {
 	Process(id app.ProcessID, filter []string) (api.Process, error)                           // GET /v3/process/{id}
 	ProcessUpdate(id app.ProcessID, p *app.Config, metadata map[string]any, force bool) error // PUT /v3/process/{id}
 	ProcessDelete(id app.ProcessID, purge bool) error                                         // DELETE /v3/process/{id}
-	ProcessCommand(id app.ProcessID, command string) error                                    // PUT /v3/process/{id}/command
+	ProcessCommand(id app.ProcessID, command, reason string) error                            // PUT /v3/process/{id}/command
 	ProcessProbe(id app.ProcessID) (api.Probe, error)                                         // GET /v3/process/{id}/probe
 	ProcessProbeConfig(config *app.Config) (api.Probe, error)                                 // POST /v3/process/probe
 	ProcessValidateConfig(p *app.Config) error                                                // POST /v3/process/validate

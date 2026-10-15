@@ -136,6 +136,7 @@ func (s *store) setProcessOrder(cmd CommandSetProcessOrder) error {
 	}
 
 	p.Order = cmd.Order
+	p.OrderReason = cmd.Reason
 	p.UpdatedAt = time.Now()
 
 	s.data.Process[id] = p
@@ -205,13 +206,14 @@ func (s *store) ProcessList() []Process {
 
 	for _, p := range s.data.Process {
 		processes = append(processes, Process{
-			CreatedAt: p.CreatedAt,
-			UpdatedAt: p.UpdatedAt,
-			Config:    p.Config.Clone(),
-			Order:     p.Order,
-			Metadata:  p.Metadata,
-			Error:     p.Error,
-			Force:     p.Force,
+			CreatedAt:   p.CreatedAt,
+			UpdatedAt:   p.UpdatedAt,
+			Config:      p.Config.Clone(),
+			Order:       p.Order,
+			OrderReason: p.OrderReason,
+			Metadata:    p.Metadata,
+			Error:       p.Error,
+			Force:       p.Force,
 		})
 	}
 
@@ -234,12 +236,13 @@ func (s *store) ProcessGet(id app.ProcessID) (Process, string, error) {
 	}
 
 	return Process{
-		CreatedAt: process.CreatedAt,
-		UpdatedAt: process.UpdatedAt,
-		Config:    process.Config.Clone(),
-		Order:     process.Order,
-		Metadata:  maps.Clone(process.Metadata),
-		Error:     process.Error,
+		CreatedAt:   process.CreatedAt,
+		UpdatedAt:   process.UpdatedAt,
+		Config:      process.Config.Clone(),
+		Order:       process.Order,
+		OrderReason: process.OrderReason,
+		Metadata:    maps.Clone(process.Metadata),
+		Error:       process.Error,
 	}, nodeid, nil
 }
 

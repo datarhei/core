@@ -1648,6 +1648,9 @@ const docTemplateClusterAPI = `{
             "properties": {
                 "order": {
                     "type": "string"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },
@@ -2395,6 +2398,9 @@ const docTemplateClusterAPI = `{
                     "additionalProperties": {}
                 },
                 "order": {
+                    "type": "string"
+                },
+                "orderReason": {
                     "type": "string"
                 },
                 "updatedAt": {

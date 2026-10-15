@@ -62,7 +62,7 @@ type Cluster interface {
 	ProcessGet(origin string, id app.ProcessID, stale bool) (store.Process, string, error)
 	ProcessRemove(origin string, id app.ProcessID) error
 	ProcessUpdate(origin string, id app.ProcessID, config *app.Config, force bool) error
-	ProcessSetCommand(origin string, id app.ProcessID, order string) error
+	ProcessSetCommand(origin string, id app.ProcessID, command, reason string) error
 	ProcessSetMetadata(origin string, id app.ProcessID, key string, data interface{}) error
 	ProcessGetMetadata(origin string, id app.ProcessID, key string) (interface{}, error)
 	ProcessesRelocate(origin string, relocations map[app.ProcessID]string) error

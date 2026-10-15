@@ -47,7 +47,7 @@ func TestProcess(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Eventually(t, func() bool {
 		return p.Status().State == "killed"
@@ -104,7 +104,7 @@ func TestReconnectProcess(t *testing.T) {
 
 	require.Greater(t, p.Status().Reconnect, time.Duration(0))
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "finished", p.Status().State)
 }
@@ -126,7 +126,7 @@ func TestStaleProcess(t *testing.T) {
 		return p.Status().State == "killed"
 	}, 10*time.Second, 500*time.Millisecond)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "killed", p.Status().State)
 }
@@ -157,7 +157,7 @@ func TestStaleReconnectProcess(t *testing.T) {
 		return p.Status().State == "killed"
 	}, 10*time.Second, 500*time.Millisecond)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "killed", p.Status().State)
 }
@@ -182,7 +182,7 @@ func TestNonExistingProcess(t *testing.T) {
 
 	require.Negative(t, p.Status().Reconnect)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "failed", p.Status().State)
 }
@@ -207,7 +207,7 @@ func TestNonExistingReconnectProcess(t *testing.T) {
 
 	require.Greater(t, p.Status().Reconnect, time.Duration(0))
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "failed", p.Status().State)
 }
@@ -229,7 +229,7 @@ func TestProcessFailed(t *testing.T) {
 		return p.Status().State == "failed"
 	}, 10*time.Second, 500*time.Millisecond)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Equal(t, "failed", p.Status().State)
 }
@@ -259,7 +259,7 @@ func TestFFmpegWaitStop(t *testing.T) {
 	}, 10*time.Second, 500*time.Millisecond)
 
 	start := time.Now()
-	err = p.Stop(true)
+	err = p.Stop(true, "")
 	require.NoError(t, err)
 
 	require.Greater(t, time.Since(start), 2*time.Second)
@@ -288,7 +288,7 @@ func TestFFmpegKill(t *testing.T) {
 		return p.Status().State == "running"
 	}, 10*time.Second, 500*time.Millisecond)
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Eventually(t, func() bool {
 		return p.Status().State == "finished"
@@ -318,7 +318,7 @@ func TestProcessForceKill(t *testing.T) {
 
 	start := time.Now()
 
-	p.Stop(false)
+	p.Stop(false, "")
 
 	require.Eventually(t, func() bool {
 		return p.Status().State == "finishing"

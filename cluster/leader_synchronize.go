@@ -226,6 +226,7 @@ func synchronize(wish map[string]string, want []store.Process, have []node.Proce
 				opStack = append(opStack, processOpStop{
 					nodeid:    haveP.NodeID,
 					processid: haveP.Config.ProcessID(),
+					reason:    wantP.OrderReason,
 				})
 
 				// Release the resources.

@@ -492,7 +492,7 @@ func (n *Core) ProcessAdd(config *app.Config, metadata map[string]interface{}) e
 	return client.ProcessAdd(config, metadata)
 }
 
-func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
+func (n *Core) ProcessCommand(id app.ProcessID, command, reason string) error {
 	n.lock.RLock()
 	client := n.client
 	n.lock.RUnlock()
@@ -501,7 +501,7 @@ func (n *Core) ProcessCommand(id app.ProcessID, command string) error {
 		return ErrNoPeer
 	}
 
-	return client.ProcessCommand(id, command)
+	return client.ProcessCommand(id, command, reason)
 }
 
 func (n *Core) ProcessDelete(id app.ProcessID, purge bool) error {

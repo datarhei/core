@@ -391,11 +391,11 @@ func (h *ProcessHandler) Command(c echo.Context) error {
 	case "start":
 		err = h.restream.StartProcess(tid)
 	case "stop":
-		err = h.restream.StopProcess(tid)
+		err = h.restream.StopProcessWithReason(tid, command.Reason)
 	case "restart":
-		err = h.restream.RestartProcess(tid)
+		err = h.restream.RestartProcessWithReason(tid, command.Reason)
 	case "reload":
-		err = h.restream.ReloadProcess(tid)
+		err = h.restream.ReloadProcessWithReason(tid, command.Reason)
 	default:
 		return apierrors.Err(http.StatusBadRequest, "", "unknown command provided: known commands are: start, stop, reload, restart")
 	}

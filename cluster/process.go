@@ -81,17 +81,18 @@ func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Con
 	return c.applyCommand(cmd)
 }
 
-func (c *cluster) ProcessSetCommand(origin string, id app.ProcessID, command string) error {
+func (c *cluster) ProcessSetCommand(origin string, id app.ProcessID, command, reason string) error {
 	if command == "start" || command == "stop" {
 		if !c.IsRaftLeader() {
-			return c.forwarder.ProcessSetCommand(origin, id, command)
+			return c.forwarder.ProcessSetCommand(origin, id, command, reason)
 		}
 
 		cmd := &store.Command{
 			Operation: store.OpSetProcessOrder,
 			Data: &store.CommandSetProcessOrder{
-				ID:    id,
-				Order: command,
+				ID:     id,
+				Order:  command,
+				Reason: reason,
 			},
 		}
 
@@ -103,7 +104,7 @@ func (c *cluster) ProcessSetCommand(origin string, id app.ProcessID, command str
 		return fmt.Errorf("the process '%s' is not registered with any node: %w", id.String(), err)
 	}
 
-	return c.manager.ProcessCommand(nodeid, id, command)
+	return c.manager.ProcessCommand(nodeid, id, command, reason)
 }
 
 func (c *cluster) ProcessesRelocate(origin string, relocations map[app.ProcessID]string) error {

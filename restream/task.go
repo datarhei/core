@@ -84,26 +84,26 @@ func (t *task) Start() error {
 	return nil
 }
 
-func (t *task) Stop() error {
+func (t *task) Stop(reason string) error {
 	t.process.Order.Set("stop")
 
-	t.ffmpeg.Stop(true)
+	t.ffmpeg.Stop(true, reason)
 
 	return nil
 }
 
 // Kill stops a process without changing the tasks order
-func (t *task) Kill() {
-	t.ffmpeg.Stop(true)
+func (t *task) Kill(reason string) {
+	t.ffmpeg.Stop(true, reason)
 }
 
-func (t *task) Restart() error {
+func (t *task) Restart(reason string) error {
 	if t.process.Order.String() == "stop" {
 		return nil
 	}
 
 	if t.ffmpeg != nil {
-		t.ffmpeg.Stop(true)
+		t.ffmpeg.Stop(true, reason)
 		t.ffmpeg.Start()
 	}
 
@@ -336,7 +336,7 @@ func (t *task) Config() *app.Config {
 }
 
 func (t *task) Destroy() {
-	t.Stop()
+	t.Stop("")
 
 	t.parser.Destroy()
 }

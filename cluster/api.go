@@ -556,7 +556,7 @@ func (a *api) ProcessSetCommand(c echo.Context) error {
 
 	pid := app.ProcessID{ID: id, Domain: domain}
 
-	err := a.cluster.ProcessSetCommand(origin, pid, r.Command)
+	err := a.cluster.ProcessSetCommand(origin, pid, r.Command, r.Reason)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("id", pid).Log("Unable to set order")
 		return ErrFromClusterError(err)

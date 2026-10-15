@@ -53,13 +53,14 @@ func (f *Forwarder) ProcessUpdate(origin string, id app.ProcessID, config *app.C
 	return reconstructError(client.ProcessUpdate(origin, id, r))
 }
 
-func (f *Forwarder) ProcessSetCommand(origin string, id app.ProcessID, command string) error {
+func (f *Forwarder) ProcessSetCommand(origin string, id app.ProcessID, command, reason string) error {
 	if origin == "" {
 		origin = f.ID
 	}
 
 	r := apiclient.SetProcessCommandRequest{
 		Command: command,
+		Reason:  reason,
 	}
 
 	f.lock.RLock()

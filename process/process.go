@@ -39,7 +39,7 @@ type Process interface {
 
 	// Stop stops the process and will not let it restart
 	// automatically.
-	Stop(wait bool) error
+	Stop(wait bool, reason string) error
 
 	// Kill stops the process such that it will restart
 	// automatically if it is defined to do so. The reason will be written
@@ -774,12 +774,12 @@ func (p *process) start() error {
 }
 
 // Stop will stop the process and set the order to "stop"
-func (p *process) Stop(wait bool) error {
+func (p *process) Stop(wait bool, reason string) error {
 	if p.setOrder("stop") {
 		return nil
 	}
 
-	err := p.stop(wait, "", 0)
+	err := p.stop(wait, reason, 0)
 	if err != nil {
 		p.debuglogger.WithFields(log.Fields{
 			"state": p.getStateString(),

@@ -6709,6 +6709,9 @@ const docTemplate = `{
                         "restart",
                         "reload"
                     ]
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },
