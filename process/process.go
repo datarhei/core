@@ -1101,7 +1101,7 @@ func (p *process) waiter() {
 						exitLine = fmt.Append(exitLine, " Because of SIGHUP, the process will not reconnect automatically.")
 					}
 				case 11:
-					exitLine = fmt.Append(exitLine, " The process caused a segmentation fault (illegal instruction) in this configuration.")
+					exitLine = fmt.Append(exitLine, " The process caused a segmentation fault with this configuration.")
 				default:
 				}
 			} else {
@@ -1124,14 +1124,14 @@ func (p *process) waiter() {
 		exitLine = fmt.Append(exitLine, "The process exited by itself without error.")
 	}
 
+	p.parser.Parse(exitLine)
+
 	p.stopReasonLock.Lock()
 	if len(p.stopReason) != 0 {
-		exitLine = fmt.Appendf(exitLine, " Details: %s", p.stopReason)
+		p.parser.Parse(fmt.Appendf(nil, "Details: %s", p.stopReason))
 		p.stopReason = ""
 	}
 	p.stopReasonLock.Unlock()
-
-	p.parser.Parse(exitLine)
 
 	p.setState(state)
 	p.pid.Store(-1)
