@@ -23,6 +23,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/resources"
 
+	"golang.org/x/sys/unix"
 	"golang.org/x/time/rate"
 )
 
@@ -886,6 +887,7 @@ func (p *process) stop(wait bool, reason string, delayReconnect time.Duration) e
 	if err == nil {
 		p.killTimerLock.Lock()
 		p.killTimer = time.AfterFunc(5*time.Second, func() {
+			p.parser.Parse(fmt.Append(nil, "Aborting the process because a graceful shutdown didn't work."))
 			p.cmd.Process.Kill()
 			p.stdout.Close()
 		})
@@ -1030,13 +1032,6 @@ func (p *process) reader() {
 		p.parser.Parse([]byte(err.Error()))
 	}
 
-	p.stopReasonLock.Lock()
-	if len(p.stopReason) != 0 {
-		p.parser.Parse([]byte(p.stopReason))
-		p.stopReason = ""
-	}
-	p.stopReasonLock.Unlock()
-
 	// Wait for the process to finish
 	p.waiter()
 }
@@ -1048,17 +1043,16 @@ func (p *process) waiter() {
 	state := stateFinished
 	enableReconnect := true
 
-	if err := p.cmd.Wait(); err != nil {
-		// Send error message to the parser
-		p.parser.Parse([]byte("process exited with error: " + err.Error()))
+	exitLine := []byte{}
 
+	if err := p.cmd.Wait(); err != nil {
 		// The process exited abnormally, i.e. the return code is non-zero or a signal
 		// has been raised.
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			// The process exited and the status can be examined
 			status := exiterr.Sys().(syscall.WaitStatus)
 
-			p.parser.Parse(fmt.Appendf(nil, "exit error details: exited=%v signaled=%v status=%d, signal=%d", status.Exited(), status.Signaled(), status.ExitStatus(), int(status.Signal())))
+			p.parser.Parse(fmt.Appendf(nil, "Expert exit details: exited=%v signaled=%v status=%d, signal=%s (%d)", status.Exited(), status.Signaled(), status.ExitStatus(), unix.SignalName(status.Signal()), int(status.Signal())))
 
 			p.debuglogger.WithFields(log.Fields{
 				"exited":      status.Exited(),
@@ -1069,40 +1063,75 @@ func (p *process) waiter() {
 				"signal":      int(status.Signal()),
 			}).Debug().Log("Exited")
 
-			if int(status.Signal()) == 1 { // If ffmpeg has been killed with SIGHUP, it will disable a reconnect.
-				enableReconnect = false
-			}
-
 			if status.Exited() {
+				exitLine = fmt.Append(exitLine, "The process exited by itself")
+
 				if status.ExitStatus() == 255 {
 					// If ffmpeg has been killed with a SIGINT, SIGTERM, etc., then it exited normally,
 					// i.e. closing all stream properly such that all written data is sane.
 					p.logger.Info().Log("Finished")
 					state = stateFinished
+
+					exitLine = fmt.Append(exitLine, " gracefully without error, because it was ordered to do so by receiving a signal.")
+				} else if status.ExitStatus() == 123 {
+					// If ffmpeg was blocking and has received more than 3 signals, it makes a hard exit.
+					p.logger.Info().Log("Killed")
+					state = stateKilled
+
+					exitLine = fmt.Appendf(exitLine, " ungracefully, because it received several signals in a row. It can be assumed that any written data is not sane.")
 				} else {
 					// The process exited by itself with a non-zero return code
 					p.logger.Info().Log("Failed")
 					state = stateFailed
+
+					exitLine = fmt.Appendf(exitLine, " with an error and return code %d. Check the process report for errors.", status.ExitStatus())
 				}
 			} else if status.Signaled() {
 				// If ffmpeg has been killed the hard way, something went wrong and
 				// it can be assumed that any written data is not sane.
 				p.logger.Info().Log("Killed")
 				state = stateKilled
+
+				exitLine = fmt.Appendf(exitLine, "The process has been aborted by a signal (%s). It can be assumed that any written data is not sane.", unix.SignalName(status.Signal()))
+
+				switch int(status.Signal()) {
+				case 1:
+					enableReconnect = false
+					if p.getOrder() == "start" {
+						exitLine = fmt.Append(exitLine, " Because of SIGHUP, the process will not reconnect automatically.")
+					}
+				case 11:
+					exitLine = fmt.Append(exitLine, " The process caused a segmentation fault (illegal instruction) in this configuration.")
+				default:
+				}
 			} else {
-				// The process exited because of something else (e.g. coredump, ...)
+				// The process exited because of something else
 				p.logger.Info().Log("Killed")
 				state = stateKilled
+
+				exitLine = fmt.Append(exitLine, "The process got killed neither by itself, nor by a signal.")
 			}
 		} else {
+			// Send error message to the parser
+			exitLine = fmt.Appendf(exitLine, "The process exited with error '%s'. Not further information is available.", err.Error())
+
 			// Some other error regarding I/O triggered during Wait()
 			p.logger.Info().Log("Killed")
 			p.logger.WithError(err).Debug().Log("Killed")
 			state = stateKilled
 		}
 	} else {
-		p.parser.Parse([]byte("process exited without error"))
+		exitLine = fmt.Append(exitLine, "The process exited by itself without error.")
 	}
+
+	p.stopReasonLock.Lock()
+	if len(p.stopReason) != 0 {
+		exitLine = fmt.Appendf(exitLine, " Details: %s", p.stopReason)
+		p.stopReason = ""
+	}
+	p.stopReasonLock.Unlock()
+
+	p.parser.Parse(exitLine)
 
 	p.setState(state)
 	p.pid.Store(-1)
