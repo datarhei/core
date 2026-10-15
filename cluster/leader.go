@@ -657,7 +657,7 @@ func (c *cluster) applyOp(op interface{}, logger log.Logger) processOpError {
 		}
 
 		// Transfer report with best effort, it's ok if it fails.
-		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop", fmt.Sprintf("Moving process to node %s", v.toNodeid))
+		err = c.manager.ProcessCommand(v.fromNodeid, v.config.ProcessID(), "stop", fmt.Sprintf("Moving process from node %s to node %s", v.fromNodeid, v.toNodeid))
 		if err == nil {
 			process, err := c.manager.ProcessGet(v.fromNodeid, v.config.ProcessID(), []string{"report"})
 			if err != nil {
