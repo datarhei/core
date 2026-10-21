@@ -129,10 +129,15 @@ func (rtmph *RTMPHandler) Play(c echo.Context) error {
 		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 
+	username, ok := c.Get("user").(string)
+	if !ok {
+		username = ""
+	}
+
 	u := c.Request().URL
 	u.Path = path
 
-	r, err := rtmph.rtmp.PlayFLV(addr, u)
+	r, err := rtmph.rtmp.PlayFLV(addr, u, username)
 	if err != nil {
 		rtmperr, ok := err.(*rtmp.PlayError)
 		if ok {

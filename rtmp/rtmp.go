@@ -96,7 +96,7 @@ type Server interface {
 	Connections() []Channel
 
 	// PlayFLV muxes a stream to FLV for HTTP+FLV streaming
-	PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error)
+	PlayFLV(remote net.Addr, u *url.URL, user string) (io.ReadCloser, error)
 
 	event.MediaSource
 }
@@ -655,7 +655,21 @@ func (s *server) MediaList() []string {
 	return s.Channels()
 }
 
-func (s *server) PlayFLV(remote net.Addr, u *url.URL) (io.ReadCloser, error) {
+func (s *server) PlayFLV(remote net.Addr, u *url.URL, user string) (io.ReadCloser, error) {
+	verifier, err := s.iam.GetVerifier(user)
+	if err == nil {
+		query := u.Query()
+		query.Del("token")
+
+		u.RawQuery = query.Encode()
+
+		token := verifier.GetServiceToken()
+
+		if p, err := url.JoinPath(u.EscapedPath(), token); err == nil {
+			u.Path = p
+		}
+	}
+
 	ch, identity, playpath, err := s.play(remote, u)
 	if err != nil {
 		return nil, err
