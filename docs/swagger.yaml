@@ -4520,12 +4520,12 @@ paths:
           description: OK
           schema:
             type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/errors.Error'
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/errors.Error'
       security:

@@ -840,8 +840,8 @@ func (h *ClusterHandler) ProcessProbeConfig(c echo.Context) error {
 // @Param id path string true "Process ID"
 // @Param domain query string false "Process domain"
 // @Success 200 {string} string
-// @Failure 400 {object} apierrors.Error
 // @Failure 403 {object} apierrors.Error
+// @Failure 404 {object} apierrors.Error
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process/{id} [delete]
 func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
@@ -859,7 +859,7 @@ func (h *ClusterHandler) ProcessDelete(c echo.Context) error {
 	}
 
 	if err := h.cluster.ProcessRemove("", pid); err != nil {
-		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
+		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	}
 
 	return c.JSON(http.StatusOK, "OK")
