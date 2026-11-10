@@ -683,6 +683,10 @@ func (a *api) start(ctx context.Context) error {
 				return err
 			}
 
+			// Check if there are already files created by IAM. This has to be checked
+			// before creating the IAM, because the IAM writes its files on creation.
+			isFirstStart := len(rfs.List("/", fs.ListOptions{Pattern: "/*.json"})) == 0
+
 			policyAdapter, err := iampolicy.NewJSONAdapter(rfs, "./policy.json", nil)
 			if err != nil {
 				return err
@@ -705,9 +709,9 @@ func (a *api) start(ctx context.Context) error {
 				return fmt.Errorf("iam: %w", err)
 			}
 
-			// Check if there are already file created by IAM. If not, create policies
-			// and users based on the config in order to mimic the behaviour before IAM.
-			if len(rfs.List("/", fs.ListOptions{Pattern: "/*.json"})) == 0 {
+			// If this is the first start, create policies and users based on
+			// the config in order to mimic the behaviour before IAM.
+			if isFirstStart {
 				policies := []iampolicy.Policy{
 					{
 						Name:     "$anon",
