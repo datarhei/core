@@ -260,6 +260,12 @@ func NewServer(config Config) (serverhandler.Server, error) {
 		mounts = append(mounts, fs.FS.Mountpoint)
 	}
 
+	if config.RTMP != nil {
+		if len(config.RTMPHTTPFLVMount) != 0 {
+			mounts = append(mounts, config.RTMPHTTPFLVMount)
+		}
+	}
+
 	s.middleware.iam = mwiam.NewWithConfig(mwiam.Config{
 		Skipper: func(c echo.Context) bool {
 			return config.IAMSkipper(c.RealIP())
@@ -416,6 +422,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s.router.JSONSerializer = &GoJSONSerializer{}
 	s.router.HTTPErrorHandler = errorhandler.HTTPErrorHandler
 	s.router.Validator = validator.New()
+	//s.router.IPExtractor = echo.ExtractIPDirect()
 	s.router.Use(s.middleware.log)
 	s.router.Use(s.middleware.autohead)
 	s.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
