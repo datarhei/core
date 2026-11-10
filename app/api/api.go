@@ -10,6 +10,7 @@ import (
 	gohttp "net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
+	mwalias "github.com/datarhei/core/v16/http/middleware/alias"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -1474,6 +1476,19 @@ func (a *api) start(ctx context.Context) error {
 		})
 	}
 
+	aliases := []mwalias.Rule{}
+	for _, a := range cfg.Storage.Aliases {
+		pattern, err := regexp.Compile(a.Pattern)
+		if err != nil {
+			return fmt.Errorf("invalid pattern for alias '%s': %w", a.Pattern, err)
+		}
+
+		aliases = append(aliases, mwalias.Rule{
+			Pattern: pattern,
+			Target:  a.Target,
+		})
+	}
+
 	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
 		LogBuffer:     a.log.buffer,
@@ -1520,6 +1535,7 @@ func (a *api) start(ctx context.Context) error {
 			MimeTypes: cfg.Compress.MimeTypes,
 			MinLength: cfg.Compress.MinLength,
 		},
+		Aliases: aliases,
 	}
 
 	if cfg.RTMP.HTTPFLV.Enable {

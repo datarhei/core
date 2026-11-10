@@ -60,6 +60,7 @@ import (
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
 
+	mwalias "github.com/datarhei/core/v16/http/middleware/alias"
 	mwautohead "github.com/datarhei/core/v16/http/middleware/autohead"
 	mwcache "github.com/datarhei/core/v16/http/middleware/cache"
 	mwcompress "github.com/datarhei/core/v16/http/middleware/compress"
@@ -109,6 +110,7 @@ type Config struct {
 	IAMSkipper       func(ip string) bool
 	Resources        resources.Resources
 	Compress         CompressConfig
+	Aliases          []mwalias.Rule
 }
 
 type CorsConfig struct {
@@ -213,7 +215,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 			httpfs.Mountpoint = "/" + httpfs.Mountpoint
 		}
 
-		if !strings.HasSuffix(httpfs.Mountpoint, "/") {
+		if httpfs.Mountpoint != "/" {
 			httpfs.Mountpoint = strings.TrimSuffix(httpfs.Mountpoint, "/")
 		}
 
@@ -443,6 +445,20 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	}
 
 	s.router.Use(s.middleware.iam)
+
+	// Aliases are applied after the IAM check, such that the IAM rules apply to the requested path
+	if len(config.Aliases) != 0 {
+		aliasMounts := []string{}
+		for _, filesystem := range s.filesystems {
+			aliasMounts = append(aliasMounts, filesystem.Mountpoint)
+		}
+
+		s.router.Use(mwalias.NewWithConfig(mwalias.Config{
+			Mounts: aliasMounts,
+			Rules:  config.Aliases,
+			Logger: s.logger.WithComponent("Alias"),
+		}))
+	}
 
 	s.router.Use(mwcompress.NewWithConfig(mwcompress.Config{
 		Level:        mwcompress.BestSpeed,
