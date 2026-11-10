@@ -1544,7 +1544,7 @@ func (a *api) start(ctx context.Context) error {
 			MimeTypes: cfg.Compress.MimeTypes,
 			MinLength: cfg.Compress.MinLength,
 		},
-		Aliaser: a.aliases,
+		Aliases: a.aliases,
 	}
 
 	if cfg.RTMP.HTTPFLV.Enable {

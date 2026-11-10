@@ -255,3 +255,58 @@ func TestConcurrency(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "/b/x.txt", target)
 }
+
+func TestSet(t *testing.T) {
+	memfs := newMemFS(t)
+	m := newManager(t, memfs)
+
+	require.NoError(t, m.Add(Rule{Pattern: "^/b/(.*)$", Target: "/a/$1"}))
+
+	require.NoError(t, m.Set([]Rule{
+		{Pattern: "^/d/(.*)$", Target: "/x/$1"},
+		{Pattern: "^/c/(.*)$", Target: "/y/$1"},
+	}))
+
+	expected := []Rule{
+		{Pattern: "^/d/(.*)$", Target: "/x/$1"},
+		{Pattern: "^/c/(.*)$", Target: "/y/$1"},
+	}
+
+	require.Equal(t, expected, m.List())
+
+	_, ok := m.Alias("/b/x.txt")
+	require.False(t, ok)
+
+	// Invalid rules or duplicates don't change anything
+	require.ErrorIs(t, m.Set([]Rule{
+		{Pattern: "^/e/(.*)$", Target: "/x/$1"},
+		{Pattern: "^/f/(.*$", Target: "/y/$1"},
+	}), ErrInvalid)
+
+	require.ErrorIs(t, m.Set([]Rule{
+		{Pattern: "^/e/(.*)$", Target: "/x/$1"},
+		{Pattern: "^/e/(.*)$", Target: "/y/$1"},
+	}), ErrExists)
+
+	require.Equal(t, expected, m.List())
+
+	// The rules are persisted
+	m = newManager(t, memfs)
+	require.Equal(t, expected, m.List())
+
+	// Remove all rules
+	require.NoError(t, m.Set(nil))
+	require.Empty(t, m.List())
+}
+
+func TestSetFailure(t *testing.T) {
+	ffs := &failingFS{Filesystem: newMemFS(t)}
+	m := newManager(t, ffs)
+
+	require.NoError(t, m.Add(Rule{Pattern: "^/b/(.*)$", Target: "/a/$1"}))
+
+	ffs.fail = true
+
+	require.Error(t, m.Set([]Rule{{Pattern: "^/c/(.*)$", Target: "/a/$1"}}))
+	require.Equal(t, []Rule{{Pattern: "^/b/(.*)$", Target: "/a/$1"}}, m.List())
+}

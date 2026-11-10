@@ -57,6 +57,9 @@ type Manager interface {
 
 	// List returns all rules in the order they are evaluated.
 	List() []Rule
+
+	// Set replaces all rules. The rules will be evaluated in the given order.
+	Set(rules []Rule) error
 }
 
 type Config struct {
@@ -234,6 +237,28 @@ func (m *manager) List() []Rule {
 	}
 
 	return rules
+}
+
+func (m *manager) Set(rules []Rule) error {
+	crules := make([]rule, 0, len(rules))
+
+	for i, r := range rules {
+		cr, err := compile(r)
+		if err != nil {
+			return fmt.Errorf("rule %d: %w", i, err)
+		}
+
+		if slices.ContainsFunc(crules, func(x rule) bool { return x.Pattern == r.Pattern }) {
+			return fmt.Errorf("rule %d: %w", i, ErrExists)
+		}
+
+		crules = append(crules, cr)
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.commit(crules)
 }
 
 // commit stores the rules and replaces the current rules only if storing was successful.

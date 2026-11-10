@@ -111,7 +111,7 @@ type Config struct {
 	IAMSkipper       func(ip string) bool
 	Resources        resources.Resources
 	Compress         CompressConfig
-	Aliaser          alias.Aliaser
+	Aliases          alias.Manager
 }
 
 type CorsConfig struct {
@@ -148,6 +148,7 @@ type server struct {
 		resources *api.MetricsHandler
 		cluster   *api.ClusterHandler
 		iam       *api.IAMHandler
+		alias     *api.AliasHandler
 	}
 
 	middleware struct {
@@ -288,6 +289,10 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s.handler.jwt = api.NewJWT(config.IAM)
 
 	s.v3handler.iam = api.NewIAM(config.IAM)
+
+	if config.Aliases != nil {
+		s.v3handler.alias = api.NewAlias(config.Aliases)
+	}
 
 	s.v3handler.log = api.NewLog(
 		config.LogBuffer,
@@ -448,7 +453,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s.router.Use(s.middleware.iam)
 
 	// Aliases are applied after the IAM check, such that the IAM rules apply to the requested path
-	if config.Aliaser != nil {
+	if config.Aliases != nil {
 		aliasMounts := []string{}
 		for _, filesystem := range s.filesystems {
 			aliasMounts = append(aliasMounts, filesystem.Mountpoint)
@@ -456,7 +461,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 		s.router.Use(mwalias.NewWithConfig(mwalias.Config{
 			Mounts:  aliasMounts,
-			Aliaser: config.Aliaser,
+			Aliaser: config.Aliases,
 			Logger:  s.logger.WithComponent("Alias"),
 		}))
 	}
@@ -665,6 +670,19 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/iam/user/:name", s.v3handler.iam.UpdateIdentity)
 			v3.PUT("/iam/user/:name/policy", s.v3handler.iam.UpdateIdentityPolicies)
 			v3.DELETE("/iam/user/:name", s.v3handler.iam.RemoveIdentity)
+		}
+	}
+
+	// v3 Alias
+	if s.v3handler.alias != nil {
+		v3.GET("/alias", s.v3handler.alias.List)
+		v3.GET("/alias/rule", s.v3handler.alias.Get)
+
+		if !s.readOnly {
+			v3.PUT("/alias", s.v3handler.alias.Set)
+			v3.POST("/alias", s.v3handler.alias.Add)
+			v3.PUT("/alias/rule", s.v3handler.alias.Update)
+			v3.DELETE("/alias/rule", s.v3handler.alias.Delete)
 		}
 	}
 

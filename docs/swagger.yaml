@@ -170,6 +170,20 @@ definitions:
       repository_commit:
         type: string
     type: object
+  api.Alias:
+    properties:
+      pattern:
+        description: Regular expression that is matched against the requested path.
+          It is the ID of the alias.
+        type: string
+      target:
+        description: Absolute path that will be served. Can reference capture groups
+          of the pattern with $1, ${1}, or ${name}.
+        type: string
+    required:
+    - pattern
+    - target
+    type: object
   api.ClusterAbout:
     properties:
       degraded:
@@ -3317,6 +3331,229 @@ paths:
           schema:
             type: string
       summary: Swagger UI for this API
+  /api/v3/alias:
+    get:
+      description: List all aliases in the order they are evaluated. The first matching
+        alias is applied.
+      operationId: alias-3-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Alias'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all aliases
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add an alias. The alias is appended to the list of aliases. Only
+        superusers are allowed to modify aliases.
+      operationId: alias-3-add
+      parameters:
+      - description: Alias
+        in: body
+        name: alias
+        required: true
+        schema:
+          $ref: '#/definitions/api.Alias'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add an alias
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace all aliases. The aliases are evaluated in the given order.
+        Only superusers are allowed to modify aliases.
+      operationId: alias-3-set
+      parameters:
+      - description: List of aliases
+        in: body
+        name: aliases
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.Alias'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Alias'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace all aliases
+      tags:
+      - v16.?.?
+  /api/v3/alias/rule:
+    delete:
+      description: Delete the alias with the given pattern. Only superusers are allowed
+        to modify aliases.
+      operationId: alias-3-delete
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an alias
+      tags:
+      - v16.?.?
+    get:
+      description: Get the alias with the given pattern
+      operationId: alias-3-get
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get an alias
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace the alias with the given pattern. The position of the alias
+        is kept. Only superusers are allowed to modify aliases.
+      operationId: alias-3-update
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      - description: Alias
+        in: body
+        name: alias
+        required: true
+        schema:
+          $ref: '#/definitions/api.Alias'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an alias
+      tags:
+      - v16.?.?
   /api/v3/cluster:
     get:
       description: List of nodes in the cluster
