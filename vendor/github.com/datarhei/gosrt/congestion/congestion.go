@@ -43,7 +43,7 @@ type Receiver interface {
 	// Flush flushes all queued packages.
 	Flush()
 
-	// Push pushed a recieved packet to the receiver queue.
+	// Push pushes a recieved packet to the receiver queue.
 	Push(pkt packet.Packet)
 
 	// Tick gets called from a connection in order to proceed with queued packets. The provided value for
@@ -92,21 +92,35 @@ type SendStats struct {
 
 // ReceiveStats are collected statistics from a reciever
 type ReceiveStats struct {
+	// The total number of received DATA packets, including retransmitted packets.
 	Pkt  uint64
 	Byte uint64
 
+	// The total number of unique original, retransmitted or recovered by the packet filter DATA packets, received in time.
 	PktUnique  uint64
 	ByteUnique uint64
 
+	// The total number of SRT DATA packets detected as presently missing (either reordered or lost).
 	PktLoss  uint64
 	ByteLoss uint64
 
+	// The total number of SRT DATA packets that were actually lost, i.e. not delivered.
+	PktLost uint64
+
+	// The total number of retransmitted packets registered at the receiver side.
 	PktRetrans  uint64
 	ByteRetrans uint64
 
+	// The number of packets received but ignored due to having arrived too late.
 	PktBelated  uint64
 	ByteBelated uint64
 
+	// The toal number of packets that arrived out of order, but still in time.
+	PktLate  uint64
+	ByteLate uint64
+
+	// The total number of dropped DATA packets and, as a result, not delivered to the upstream application. This includes packets
+	// that arrived too late, already received, or already ACKed.
 	PktDrop  uint64
 	ByteDrop uint64
 

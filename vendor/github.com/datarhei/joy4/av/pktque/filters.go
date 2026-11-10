@@ -2,7 +2,6 @@
 package pktque
 
 import (
-	"math"
 	"time"
 
 	"github.com/datarhei/joy4/av"
@@ -173,20 +172,20 @@ func (self *AVSync) check(i int) (start int64, end int64, correctable bool, corr
 
 // Make packets reading speed as same as walltime, effect like ffmpeg -re option.
 type Walltime struct {
+	started   bool
+	start     time.Time
 	firsttime int64
 }
 
 func (self *Walltime) ModifyPacket(pkt *av.Packet, streams []av.CodecData, videoidx int, audioidx int) (drop bool, err error) {
-	if pkt.Idx == 0 {
-		now := time.Now().Unix() * 1000
-		if self.firsttime == math.MinInt64 {
-			self.firsttime = now
-		}
-		pkttime := self.firsttime + pkt.Time
-		delta := pkttime - now
-		if delta > 0 {
-			time.Sleep(time.Duration(delta) * time.Millisecond)
-		}
+	if !self.started {
+		self.started = true
+		self.start = time.Now()
+		self.firsttime = pkt.Time
+	}
+	delta := time.Duration(pkt.Time-self.firsttime)*time.Millisecond - time.Since(self.start)
+	if delta > 0 {
+		time.Sleep(delta)
 	}
 	return
 }

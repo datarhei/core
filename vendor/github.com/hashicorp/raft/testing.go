@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -91,7 +91,7 @@ func (m *MockFSM) Snapshot() (FSMSnapshot, error) {
 func (m *MockFSM) Restore(inp io.ReadCloser) error {
 	m.Lock()
 	defer m.Unlock()
-	defer inp.Close()
+	defer func() { _ = inp.Close() }()
 	hd := codec.MsgpackHandle{}
 	dec := codec.NewDecoder(inp, &hd)
 
@@ -119,10 +119,10 @@ func (m *MockSnapshot) Persist(sink SnapshotSink) error {
 	hd := codec.MsgpackHandle{}
 	enc := codec.NewEncoder(sink, &hd)
 	if err := enc.Encode(m.logs[:m.maxIndex]); err != nil {
-		sink.Cancel()
+		_ = sink.Cancel()
 		return err
 	}
-	sink.Close()
+	_ = sink.Close()
 	return nil
 }
 
@@ -315,7 +315,7 @@ func (c *cluster) Close() {
 	}
 
 	for _, d := range c.dirs {
-		os.RemoveAll(d)
+		_ = os.RemoveAll(d)
 	}
 }
 
@@ -635,7 +635,7 @@ CHECK:
 		}
 
 		for idx := 0; idx < len(first.logs); idx++ {
-			if bytes.Compare(first.logs[idx], fsm.logs[idx]) != 0 {
+			if !bytes.Equal(first.logs[idx], fsm.logs[idx]) {
 				fsm.Unlock()
 				if time.Now().After(limit) {
 					t.Fatalf("FSM log mismatch at index %d", idx)
@@ -717,20 +717,22 @@ WAIT:
 
 // NOTE: This is exposed for middleware testing purposes and is not a stable API
 type MakeClusterOpts struct {
-	Peers           int
-	Bootstrap       bool
-	Conf            *Config
-	ConfigStoreFSM  bool
-	MakeFSMFunc     func() FSM
-	LongstopTimeout time.Duration
-	MonotonicLogs   bool
+	Peers              int
+	Bootstrap          bool
+	Conf               *Config
+	ConfigStoreFSM     bool
+	MakeFSMFunc        func() FSM
+	LongstopTimeout    time.Duration
+	MonotonicLogs      bool
+	CommitTrackingLogs bool
+	PropagateError     bool // If true, return errors instead of calling t.Fatal
 }
 
 // makeCluster will return a cluster with the given config and number of peers.
 // If bootstrap is true, the servers will know about each other before starting,
 // otherwise their transports will be wired up but they won't yet have configured
 // each other.
-func makeCluster(t *testing.T, opts *MakeClusterOpts) *cluster {
+func makeCluster(t *testing.T, opts *MakeClusterOpts) (*cluster, error) {
 	if opts.Conf == nil {
 		opts.Conf = inmemConfig(t)
 	}
@@ -756,6 +758,9 @@ func makeCluster(t *testing.T, opts *MakeClusterOpts) *cluster {
 	for i := 0; i < opts.Peers; i++ {
 		dir, err := os.MkdirTemp("", "raft")
 		if err != nil {
+			if opts.PropagateError {
+				return nil, fmt.Errorf("failed to create temp dir: %w", err)
+			}
 			t.Fatalf("err: %v", err)
 		}
 
@@ -807,6 +812,8 @@ func makeCluster(t *testing.T, opts *MakeClusterOpts) *cluster {
 
 		if opts.MonotonicLogs {
 			logs = &MockMonotonicLogStore{s: logs}
+		} else if opts.CommitTrackingLogs {
+			logs = NewInmemCommitTrackingStore()
 		}
 
 		peerConf := opts.Conf
@@ -816,44 +823,71 @@ func makeCluster(t *testing.T, opts *MakeClusterOpts) *cluster {
 		if opts.Bootstrap {
 			err := BootstrapCluster(peerConf, logs, store, snap, trans, configuration)
 			if err != nil {
+				if opts.PropagateError {
+					return nil, fmt.Errorf("BootstrapCluster failed: %w", err)
+				}
 				t.Fatalf("BootstrapCluster failed: %v", err)
 			}
 		}
 
 		raft, err := NewRaft(peerConf, c.fsms[i], logs, store, snap, trans)
 		if err != nil {
+			if opts.PropagateError {
+				return nil, fmt.Errorf("NewRaft failed: %w", err)
+			}
 			t.Fatalf("NewRaft failed: %v", err)
 		}
 
 		raft.RegisterObserver(NewObserver(c.observationCh, false, nil))
 		if err != nil {
+			if opts.PropagateError {
+				return nil, fmt.Errorf("RegisterObserver failed: %w", err)
+			}
 			t.Fatalf("RegisterObserver failed: %v", err)
 		}
 		c.rafts = append(c.rafts, raft)
 	}
 
-	return c
+	return c, nil
 }
 
 // NOTE: This is exposed for middleware testing purposes and is not a stable API
 func MakeCluster(n int, t *testing.T, conf *Config) *cluster {
-	return makeCluster(t, &MakeClusterOpts{
+	c, err := makeCluster(t, &MakeClusterOpts{
 		Peers:     n,
 		Bootstrap: true,
 		Conf:      conf,
 	})
+	if err != nil {
+		t.Fatalf("failed to make cluster: %v", err)
+	}
+	return c
 }
 
 // NOTE: This is exposed for middleware testing purposes and is not a stable API
 func MakeClusterNoBootstrap(n int, t *testing.T, conf *Config) *cluster {
-	return makeCluster(t, &MakeClusterOpts{
+	c, err := makeCluster(t, &MakeClusterOpts{
 		Peers: n,
 		Conf:  conf,
 	})
+	if err != nil {
+		t.Fatalf("failed to make cluster: %v", err)
+	}
+	return c
 }
 
 // NOTE: This is exposed for middleware testing purposes and is not a stable API
 func MakeClusterCustom(t *testing.T, opts *MakeClusterOpts) *cluster {
+	c, err := makeCluster(t, opts)
+	if err != nil {
+		t.Fatalf("failed to make cluster: %v", err)
+	}
+	return c
+}
+
+// NOTE: This is exposed for middleware testing purposes and is not a stable API
+func MakeClusterCustomWithErr(t *testing.T, opts *MakeClusterOpts) (*cluster, error) {
+	opts.PropagateError = true
 	return makeCluster(t, opts)
 }
 

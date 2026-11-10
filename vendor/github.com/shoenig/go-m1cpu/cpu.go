@@ -9,6 +9,7 @@ package m1cpu
 // #include <AvailabilityMacros.h>
 // #include <CoreFoundation/CoreFoundation.h>
 // #include <IOKit/IOKitLib.h>
+// #include <stdio.h>
 // #include <sys/sysctl.h>
 //
 // #if !defined(MAC_OS_VERSION_12_0) || MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_12_0
@@ -36,6 +37,9 @@ package m1cpu
 //  CFDataRef cfData = typeRef;
 //
 //  CFIndex size = CFDataGetLength(cfData);
+//  if (size < 8) {
+//    return 0;
+//  }
 //  UInt8 buf[size];
 //  CFDataGetBytes(cfData, CFRangeMake(0, size), buf);
 //
@@ -44,13 +48,13 @@ package m1cpu
 //  UInt8 b3 = buf[size-7];
 //  UInt8 b4 = buf[size-8];
 //
-//  UInt64 pCoreHz = 0x00000000FFFFFFFF & ((b1<<24) | (b2 << 16) | (b3 << 8) | (b4));
+//  UInt64 pCoreHz = ((UInt64)b1 << 24) | ((UInt64)b2 << 16) | ((UInt64)b3 << 8) | b4;
 //  return pCoreHz;
 // }
 //
 // int sysctl_int(const char * name) {
 //  int value = -1;
-//  size_t size = 8;
+//  size_t size = sizeof(value);
 //  sysctlbyname(name, &value, &size, NULL, 0);
 //  return value;
 // }
@@ -70,10 +74,18 @@ package m1cpu
 //   global_pCoreL2CacheSize = sysctl_int("hw.perflevel0.l2cachesize");
 //   global_eCoreL2CacheSize = sysctl_int("hw.perflevel1.l2cachesize");
 //   sysctl_string("machdep.cpu.brand_string", global_brand);
+// }
 //
+// void initializeClocks(int secondaryVoltageState) {
+//   char propertyName[BUFSIZE];
+//   snprintf(propertyName, sizeof(propertyName), "voltage-states%d-sram", secondaryVoltageState);
+//   CFStringRef secondaryProperty = CFStringCreateWithCString(kCFAllocatorDefault, propertyName, kCFStringEncodingUTF8);
 //   CFMutableDictionaryRef matching = IOServiceMatching("AppleARMIODevice");
-//   io_iterator_t  iter;
-//   IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter);
+//   io_iterator_t iter = 0;
+//   if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter) != KERN_SUCCESS) {
+//     CFRelease(secondaryProperty);
+//     return;
+//   }
 //
 //   io_object_t obj;
 //   while ((obj = IOIteratorNext(iter))) {
@@ -85,7 +97,7 @@ package m1cpu
 //     if (strncmp(name, "pmgr", BUFSIZE) == 0) {
 //       CFTypeRef pCoreRef = NULL, eCoreRef = NULL;
 //       pCoreRef = IORegistryEntryCreateCFProperty(obj, CFSTR("voltage-states5-sram"), kCFAllocatorDefault, 0);
-//       eCoreRef = IORegistryEntryCreateCFProperty(obj, CFSTR("voltage-states1-sram"), kCFAllocatorDefault, 0);
+//       eCoreRef = IORegistryEntryCreateCFProperty(obj, secondaryProperty, kCFAllocatorDefault, 0);
 //
 //       long long pCoreClock = getFrequency(pCoreRef);
 //       long long eCoreClock = getFrequency(eCoreRef);
@@ -94,10 +106,13 @@ package m1cpu
 //       global_eCoreClock = eCoreClock;
 //  	 if (pCoreRef) CFRelease(pCoreRef);
 //  	 if (eCoreRef) CFRelease(eCoreRef);
+//       IOObjectRelease(obj);
 //		 break;
 //     }
+//     IOObjectRelease(obj);
 //   }
 //   IOObjectRelease(iter);
+//   CFRelease(secondaryProperty);
 // }
 //
 // UInt64 eCoreClock() {
@@ -145,7 +160,6 @@ package m1cpu
 // }
 import "C"
 import (
-	"fmt"
 	"sync"
 )
 
@@ -154,6 +168,7 @@ var initOnce sync.Once
 func ensureInitialized() {
 	initOnce.Do(func() {
 		C.initialize()
+		C.initializeClocks(C.int(eCoreVoltageState(C.GoString(C.modelName()))))
 	})
 }
 
@@ -165,25 +180,25 @@ func IsAppleSilicon() bool {
 // PCoreHZ returns the max frequency in Hertz of the P-Core of an Apple Silicon CPU.
 func PCoreHz() uint64 {
 	ensureInitialized()
-	return toHz(uint64(C.pCoreClock()))
+	return toHz(uint64(C.pCoreClock()), ModelName())
 }
 
 // ECoreHZ returns the max frequency in Hertz of the E-Core of an Apple Silicon CPU.
 func ECoreHz() uint64 {
 	ensureInitialized()
-	return toHz(uint64(C.eCoreClock()))
+	return toHz(uint64(C.eCoreClock()), ModelName())
 }
 
 // PCoreGHz returns the max frequency in Gigahertz of the P-Core of an Apple Silicon CPU.
 func PCoreGHz() float64 {
 	ensureInitialized()
-	return toGhz(uint64(C.pCoreClock()))
+	return toGhz(uint64(C.pCoreClock()), ModelName())
 }
 
 // ECoreGHz returns the max frequency in Gigahertz of the E-Core of an Apple Silicon CPU.
 func ECoreGHz() float64 {
 	ensureInitialized()
-	return toGhz(uint64(C.eCoreClock()))
+	return toGhz(uint64(C.eCoreClock()), ModelName())
 }
 
 // PCoreCount returns the number of physical P (performance) cores.
@@ -228,21 +243,4 @@ func ECoreCache() (int, int, int) {
 func ModelName() string {
 	ensureInitialized()
 	return C.GoString(C.modelName())
-}
-
-func toHz(hz uint64) uint64 {
-	var gen int
-	// If this errors, fallback to default int value
-	fmt.Sscanf(ModelName(), "Apple M%", &gen)
-
-	// Starting with M4, Apple appears to report clock speed in Khz
-	// See https://github.com/exelban/stats/commit/3e056562b360c937b883725f14f3427d5401b6fe
-	if gen >= 4 {
-		return hz * 1000
-	}
-	return hz
-}
-
-func toGhz(hz uint64) float64 {
-	return float64(toHz(hz) / 1000000000)
 }

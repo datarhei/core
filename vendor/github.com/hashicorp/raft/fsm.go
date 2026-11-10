@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	hclog "github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-metrics/compat"
+	"github.com/hashicorp/go-metrics"
 )
 
 // FSM is implemented by clients to make use of the replicated log.
@@ -192,7 +192,7 @@ func (r *Raft) runFSM() {
 			req.respond(fmt.Errorf("failed to open snapshot %v: %v", req.ID, err))
 			return
 		}
-		defer source.Close()
+		defer func() { _ = source.Close() }()
 
 		snapLogger := r.logger.With(
 			"id", req.ID,

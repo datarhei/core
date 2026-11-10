@@ -462,7 +462,11 @@ func (req *connRequest) Accept() (Conn, error) {
 		req.handshake.SRTHS.SRTFlags.PERIODICNAK = true
 		req.handshake.SRTHS.SRTFlags.REXMITFLG = true
 		req.handshake.SRTHS.SRTFlags.STREAM = false
-		req.handshake.SRTHS.SRTFlags.PACKET_FILTER = false
+		req.handshake.SRTHS.SRTFlags.PACKET_FILTER = len(req.config.PacketFilter) > 0
+		if len(req.config.PacketFilter) > 0 {
+			req.handshake.HasFilter = true
+			req.handshake.PacketFilter = req.config.PacketFilter
+		}
 		req.handshake.SRTHS.RecvTSBPDDelay = recvTsbpdDelay
 		req.handshake.SRTHS.SendTSBPDDelay = sendTsbpdDelay
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2026
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -6,6 +6,7 @@ package raft
 import (
 	"bytes"
 	"container/list"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,7 +15,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/hashicorp/go-metrics/compat"
+	"github.com/hashicorp/go-metrics"
 )
 
 const (
@@ -1151,11 +1152,11 @@ func (r *Raft) restoreUserSnapshot(meta *SnapshotMeta, reader io.Reader) error {
 	}
 	n, err := io.Copy(sink, reader)
 	if err != nil {
-		sink.Cancel()
+		_ = sink.Cancel()
 		return fmt.Errorf("failed to write snapshot: %v", err)
 	}
 	if n != meta.Size {
-		sink.Cancel()
+		_ = sink.Cancel()
 		return fmt.Errorf("failed to write snapshot, size didn't match (%d != %d)", n, meta.Size)
 	}
 	if err := sink.Close(); err != nil {
@@ -1261,6 +1262,9 @@ func (r *Raft) dispatchLogs(applyLogs []*logFuture) {
 		logs[idx] = &applyLog.log
 		r.leaderState.inflight.PushBack(applyLog)
 	}
+
+	commitIndex := r.getCommitIndex()
+	r.tryStageCommitIndex(commitIndex)
 
 	// Write the log entry locally
 	if err := r.logs.StoreLogs(logs); err != nil {
@@ -1385,6 +1389,20 @@ func (r *Raft) prepareLog(l *Log, future *logFuture) *commitTuple {
 	return nil
 }
 
+// tryStageCommitIndex updates the commit index in persist store if restore committed logs is enabled and log store implements CommitTrackingLogStore.
+func (r *Raft) tryStageCommitIndex(commitIndex uint64) {
+	if !r.RestoreCommittedLogs {
+		return
+	}
+	store, ok := r.logs.(CommitTrackingLogStore)
+	if !ok {
+		return
+	}
+	if err := store.StageCommitIndex(commitIndex); err != nil {
+		r.logger.Error("failed to stage commit index in commit tracking log store", "index", commitIndex, "error", err)
+	}
+}
+
 // processRPC is called to handle an incoming RPC request. This must only be
 // called from the main thread.
 func (r *Raft) processRPC(rpc RPC) {
@@ -1408,7 +1426,7 @@ func (r *Raft) processRPC(rpc RPC) {
 		r.logger.Error("got unexpected command",
 			"command", hclog.Fmt("%#v", rpc.Command))
 
-		rpc.Respond(nil, fmt.Errorf(rpcUnexpectedCommandError))
+		rpc.Respond(nil, errors.New(rpcUnexpectedCommandError))
 	}
 }
 
@@ -1535,6 +1553,11 @@ func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
 		}
 
 		if n := len(newEntries); n > 0 {
+			// Stage the future commit index if possible
+			lastNewIndex := newEntries[len(newEntries)-1].Index
+			commitIndex := min(a.LeaderCommitIndex, lastNewIndex)
+			r.tryStageCommitIndex(commitIndex)
+
 			// Append the new entries
 			if err := r.logs.StoreLogs(newEntries); err != nil {
 				r.logger.Error("failed to append to logs", "error", err)
@@ -1627,9 +1650,9 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 	// vote!
 	var candidate ServerAddress
 	var candidateBytes []byte
-	if len(req.RPCHeader.Addr) > 0 {
-		candidate = r.trans.DecodePeer(req.RPCHeader.Addr)
-		candidateBytes = req.RPCHeader.Addr
+	if len(req.Addr) > 0 {
+		candidate = r.trans.DecodePeer(req.Addr)
+		candidateBytes = req.Addr
 	} else {
 		candidate = r.trans.DecodePeer(req.Candidate)
 		candidateBytes = req.Candidate
@@ -1734,7 +1757,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 
 // requestPreVote is invoked when we get a request Pre-Vote RPC call.
 func (r *Raft) requestPreVote(rpc RPC, req *RequestPreVoteRequest) {
-	defer metrics.MeasureSince([]string{"raft", "rpc", "requestVote"}, time.Now())
+	defer metrics.MeasureSince([]string{"raft", "rpc", "requestPreVote"}, time.Now())
 	r.observe(*req)
 
 	// Setup a response
@@ -1849,7 +1872,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 
 	// Save the current leader
 	if len(req.ID) > 0 {
-		r.setLeader(r.trans.DecodePeer(req.RPCHeader.Addr), ServerID(req.ID))
+		r.setLeader(r.trans.DecodePeer(req.Addr), ServerID(req.ID))
 	} else {
 		r.setLeader(r.trans.DecodePeer(req.Leader), ServerID(req.ID))
 	}
@@ -1886,7 +1909,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 	n, err := io.Copy(sink, countingRPCReader)
 	transferMonitor.StopAndWait()
 	if err != nil {
-		sink.Cancel()
+		_ = sink.Cancel()
 		r.logger.Error("failed to copy snapshot", "error", err)
 		rpcErr = err
 		return
@@ -1894,7 +1917,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 
 	// Check that we received it all
 	if n != req.Size {
-		sink.Cancel()
+		_ = sink.Cancel()
 		r.logger.Error("failed to receive whole snapshot",
 			"received", hclog.Fmt("%d / %d", n, req.Size))
 		rpcErr = fmt.Errorf("short read")
@@ -2018,7 +2041,7 @@ func (r *Raft) electSelf() <-chan *voteResult {
 				r.logger.Debug("voting for self", "term", req.Term, "id", r.localID)
 
 				// Persist a vote for ourselves
-				if err := r.persistVote(req.Term, req.RPCHeader.Addr); err != nil {
+				if err := r.persistVote(req.Term, req.Addr); err != nil {
 					r.logger.Error("failed to persist vote", "error", err)
 					return nil
 
@@ -2151,7 +2174,7 @@ func (r *Raft) setCurrentTerm(t uint64) {
 // that leader should be set only after updating the state.
 func (r *Raft) setState(state RaftState) {
 	r.setLeader("", "")
-	oldState := r.raftState.getState()
+	oldState := r.getState()
 	r.raftState.setState(state)
 	if oldState != state {
 		r.observe(state)

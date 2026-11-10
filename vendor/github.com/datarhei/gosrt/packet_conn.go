@@ -63,20 +63,31 @@ func (c *packetConn) readFromTo(buffer []byte) (int, net.Addr, net.IP, error) {
 	}
 }
 
-func (c *packetConn) writeToFrom(buffer []byte, remoteAddr net.Addr, localAddr net.Addr) {
+// writeToFrom sends buffer to remoteAddr, preferring to pin the source address
+// to localAddr so a multi-homed host answers from the address the peer used.
+//
+// Pinning is best-effort. On some platforms the ancillary-data send is rejected
+// for a destination whose family differs from the socket's -- notably an IPv4
+// destination on a dual-stack AF_INET6 socket on Darwin, where sendmsg returns
+// EINVAL. When that happens the packet is sent unpinned rather than dropped: an
+// unpinned reply reaches the peer on any single-homed host, whereas a dropped
+// one strands the handshake with no error anywhere.
+func (c *packetConn) writeToFrom(buffer []byte, remoteAddr net.Addr, localAddr net.Addr) error {
 	if localAddrUDP, ok := localAddr.(*net.UDPAddr); ok && localAddrUDP != nil {
 		if _, ok := remoteAddr.(*net.UDPAddr); ok {
 			// For IPv4 destinations use pc4 even on dual-stack sockets
 			if ip4 := localAddrUDP.IP.To4(); ip4 != nil && c.pc4 != nil {
-				c.pc4.WriteTo(buffer, &ipv4.ControlMessage{Src: ip4}, remoteAddr)
-				return
-			}
-			if c.pc6 != nil {
-				c.pc6.WriteTo(buffer, &ipv6.ControlMessage{Src: localAddrUDP.IP}, remoteAddr)
-				return
+				if _, err := c.pc4.WriteTo(buffer, &ipv4.ControlMessage{Src: ip4}, remoteAddr); err == nil {
+					return nil
+				}
+			} else if c.pc6 != nil {
+				if _, err := c.pc6.WriteTo(buffer, &ipv6.ControlMessage{Src: localAddrUDP.IP}, remoteAddr); err == nil {
+					return nil
+				}
 			}
 		}
 	}
 
-	c.WriteTo(buffer, remoteAddr)
+	_, err := c.WriteTo(buffer, remoteAddr)
+	return err
 }

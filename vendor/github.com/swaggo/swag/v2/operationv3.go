@@ -6,11 +6,36 @@ import (
 	"go/ast"
 	"log"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/sv-tools/openapi/spec"
 	"gopkg.in/yaml.v3"
+)
+
+type parsedDiscriminator struct {
+	propertyName string
+	mapping      map[string]string // nil when not specified
+}
+
+// MIME types recognized by ParseAcceptComment and fillRequestBody.
+const (
+	mimeTypeJSON          = "application/json"
+	mimeTypeXML           = "text/xml"
+	mimeTypePlain         = "text/plain"
+	mimeTypeMultipartForm = "multipart/form-data"
+	mimeTypeURLEncoded    = "application/x-www-form-urlencoded"
+	mimeTypePNG           = "image/png"
+	mimeTypeJPEG          = "image/jpeg"
+	mimeTypeGIF           = "image/gif"
+	mimeTypeOctetStream   = "application/octet-stream"
+	mimeTypePDF           = "application/pdf"
+	mimeTypeMSExcel       = "application/msexcel"
+	mimeTypeZip           = "application/zip"
+	mimeTypeDocx          = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	mimeTypeXlsx          = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	mimeTypePptx          = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
 
 // OperationV3 describes a single API operation on a path.
@@ -21,6 +46,7 @@ type OperationV3 struct {
 	spec.Operation
 	RouterProperties  []RouteProperties
 	responseMimeTypes []string
+	discriminatorInfo *parsedDiscriminator
 }
 
 // NewOperationV3 returns a new instance of OperationV3.
@@ -99,6 +125,8 @@ func (o *OperationV3) ParseComment(comment string, astFile *ast.File) error {
 		return o.ParseServerURLComment(lineRemainder)
 	case "@servers.description":
 		return o.ParseServerDescriptionComment(lineRemainder)
+	case discriminatorAttr:
+		return o.ParseDiscriminatorComment(lineRemainder)
 	default:
 		return o.ParseMetadata(attribute, lowerAttribute, lineRemainder)
 	}
@@ -173,18 +201,18 @@ func (o *OperationV3) ParseAcceptComment(commentLine string) error {
 		schema := spec.NewSchemaSpec()
 
 		switch value {
-		case "application/json", "multipart/form-data", "text/xml":
+		case mimeTypeJSON, mimeTypeMultipartForm, mimeTypeXML, mimeTypeURLEncoded:
 			schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
-		case "image/png",
-			"image/jpeg",
-			"image/gif",
-			"application/octet-stream",
-			"application/pdf",
-			"application/msexcel",
-			"application/zip",
-			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-			"application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		case mimeTypePNG,
+			mimeTypeJPEG,
+			mimeTypeGIF,
+			mimeTypeOctetStream,
+			mimeTypePDF,
+			mimeTypeMSExcel,
+			mimeTypeZip,
+			mimeTypeDocx,
+			mimeTypeXlsx,
+			mimeTypePptx:
 			schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
 			schema.Spec.Format = "binary"
 		default:
@@ -358,7 +386,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	param := createParameterV3(paramType, description, name, objectType, refType, required, enums, o.parser.collectionFormatInQuery)
 
 	switch paramType {
-	case "path", "header":
+	case "path":
 		switch objectType {
 		case ARRAY:
 			if !IsPrimitiveType(refType) {
@@ -367,7 +395,7 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		case OBJECT:
 			return fmt.Errorf("%s is not supported type for %s", refType, paramType)
 		}
-	case "query":
+	case "query", "header":
 		switch objectType {
 		case ARRAY:
 			if !IsPrimitiveType(refType) && !(refType == "file" && paramType == "formData") {
@@ -424,17 +452,49 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		}
 	case "body", "formData":
 		if objectType == PRIMITIVE {
-			schema := PrimitiveSchemaV3(refType)
+			var schema *spec.RefOrSpec[spec.Schema]
+			if paramType == "formData" && refType == "file" {
+				schema = spec.NewSchemaSpec()
+				schema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+				schema.Spec.Format = "binary"
+			} else {
+				schema = PrimitiveSchemaV3(refType)
+			}
 
 			err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
 			if err != nil {
 				return err
 			}
 
-			o.fillRequestBody(name, schema, required, description, true, paramType == "formData")
+			err = o.fillRequestBody(name, schema, required, description, true, paramType == "formData")
+			if err != nil {
+				return err
+			}
 
 			return nil
 
+		}
+
+		if paramType == "formData" && objectType == ARRAY && refType == "file" {
+			itemSchema := spec.NewSchemaSpec()
+			itemSchema.Spec.Type = &spec.SingleOrArray[string]{STRING}
+			itemSchema.Spec.Format = "binary"
+
+			schema := spec.NewSchemaSpec()
+			schema.Spec.Type = &spec.SingleOrArray[string]{ARRAY}
+			schema.Spec.Items = spec.NewBoolOrSchema(false, itemSchema)
+
+			err := o.parseParamAttributeForBody(commentLine, objectType, refType, schema.Spec)
+			if err != nil {
+				return err
+			}
+
+			err = o.fillRequestBody(name, schema, required, description, false, true)
+			if err != nil {
+				return err
+			}
+
+			return nil
 		}
 
 		schema, err := o.parseAPIObjectSchema(commentLine, objectType, refType, astFile)
@@ -446,7 +506,10 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 		if err != nil {
 			return err
 		}
-		o.fillRequestBody(name, schema, required, description, false, paramType == "formData")
+		err = o.fillRequestBody(name, schema, required, description, false, paramType == "formData")
+		if err != nil {
+			return err
+		}
 
 		return nil
 
@@ -468,21 +531,101 @@ func (o *OperationV3) ParseParamComment(commentLine string, astFile *ast.File) e
 	return nil
 }
 
-func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.Schema], required bool, description string, primitive, formData bool) {
-	if o.RequestBody == nil {
-		o.RequestBody = spec.NewRequestBodySpec()
-		o.RequestBody.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
+func isBinarySchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	if schema == nil || schema.Spec == nil {
+		return false
+	}
 
-		if primitive && !formData {
-			o.RequestBody.Spec.Spec.Content["text/plain"] = spec.NewMediaType()
-		} else if formData {
-			o.RequestBody.Spec.Spec.Content["application/x-www-form-urlencoded"] = spec.NewMediaType()
-		} else {
-			o.RequestBody.Spec.Spec.Content["application/json"] = spec.NewMediaType()
+	if schema.Spec.Format == "binary" {
+		return true
+	}
+
+	if schema.Spec.Type != nil && len(*schema.Spec.Type) == 1 && (*schema.Spec.Type)[0] == ARRAY &&
+		schema.Spec.Items != nil && schema.Spec.Items.Schema != nil && schema.Spec.Items.Schema.Spec != nil {
+		return schema.Spec.Items.Schema.Spec.Format == "binary"
+	}
+
+	return false
+}
+
+func (o *OperationV3) formDataContentType(schema *spec.RefOrSpec[spec.Schema]) string {
+	if o.RequestBody != nil && o.RequestBody.Spec != nil && o.RequestBody.Spec.Spec.Content != nil {
+		content := o.RequestBody.Spec.Spec.Content
+
+		if content[mimeTypeMultipartForm] != nil {
+			return mimeTypeMultipartForm
+		}
+
+		if content[mimeTypeURLEncoded] != nil {
+			return mimeTypeURLEncoded
 		}
 	}
 
+	if isBinarySchema(schema) {
+		return mimeTypeMultipartForm
+	}
+
+	return mimeTypeURLEncoded
+}
+
+func (o *OperationV3) fillRequestBody(
+	name string,
+	schema *spec.RefOrSpec[spec.Schema],
+	required bool,
+	description string,
+	primitive, formData bool,
+) error {
+	if o.RequestBody == nil {
+		o.RequestBody = spec.NewRequestBodySpec()
+		o.RequestBody.Spec.Spec.Content = make(map[string]*spec.Extendable[spec.MediaType])
+	}
+
+	contentType := mimeTypeJSON
+	if primitive && !formData {
+		contentType = mimeTypePlain
+	} else if formData {
+		contentType = o.formDataContentType(schema)
+	}
+
+	mediaType := o.RequestBody.Spec.Spec.Content[contentType]
+	if mediaType == nil {
+		mediaType = spec.NewMediaType()
+		o.RequestBody.Spec.Spec.Content[contentType] = mediaType
+	}
+
 	o.RequestBody.Spec.Spec.Required = required
+
+	if formData {
+		if description != "" && o.RequestBody.Spec.Spec.Description == "" {
+			o.RequestBody.Spec.Spec.Description = description
+		}
+
+		if mediaType.Spec.Schema == nil {
+			mediaType.Spec.Schema = spec.NewSchemaSpec()
+			mediaType.Spec.Schema.Spec.Type = &spec.SingleOrArray[string]{OBJECT}
+			mediaType.Spec.Schema.Spec.Properties = map[string]*spec.RefOrSpec[spec.Schema]{}
+		}
+
+		if mediaType.Spec.Schema.Ref != nil {
+			return fmt.Errorf("form request body schema cannot be a ref")
+		}
+
+		if mediaType.Spec.Schema.Spec.Properties == nil {
+			mediaType.Spec.Schema.Spec.Properties = map[string]*spec.RefOrSpec[spec.Schema]{}
+		}
+
+		if schema != nil && schema.Spec != nil && schema.Spec.Description == "" && description != "" {
+			schema.Spec.Description = description
+		}
+
+		mediaType.Spec.Schema.Spec.Properties[name] = schema
+		if required && !findInSlice(mediaType.Spec.Schema.Spec.Required, name) {
+			mediaType.Spec.Schema.Spec.Required =
+				append(mediaType.Spec.Schema.Spec.Required, name)
+		}
+
+		return nil
+	}
 
 	// Append description to existing description if this is not the first body
 	if o.RequestBody.Spec.Spec.Description != "" && description != "" {
@@ -491,19 +634,6 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 		o.RequestBody.Spec.Spec.Description = description
 	}
 
-	// Handle oneOf merging for request body schemas
-	contentType := "application/json"
-	if primitive && !formData {
-		contentType = "text/plain"
-	} else if formData {
-		contentType = "application/x-www-form-urlencoded"
-	}
-
-	mediaType := o.RequestBody.Spec.Spec.Content[contentType]
-	if mediaType == nil {
-		mediaType = spec.NewMediaType()
-		o.RequestBody.Spec.Spec.Content[contentType] = mediaType
-	}
 	if schema.Ref != nil {
 		schema.Ref.Summary = name
 		schema.Ref.Description = description
@@ -511,7 +641,7 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 	if schema.Spec != nil {
 		schema.Spec.Title = name
 	}
-	if mediaType.Spec.Schema == nil {
+	if mediaType.Spec.Schema == nil || isDefaultAcceptSchema(mediaType.Spec.Schema) {
 		mediaType.Spec.Schema = schema
 	} else if mediaType.Spec.Schema.Ref != nil || mediaType.Spec.Schema.Spec.OneOf == nil {
 		// If there's an existing schema that doesn't have oneOf, create a oneOf schema
@@ -522,6 +652,31 @@ func (o *OperationV3) fillRequestBody(name string, schema *spec.RefOrSpec[spec.S
 		// If there's already a oneOf schema, append to it
 		mediaType.Spec.Schema.Spec.OneOf = append(mediaType.Spec.Schema.Spec.OneOf, schema)
 	}
+
+	return nil
+}
+
+func isDefaultAcceptSchema(schema *spec.RefOrSpec[spec.Schema]) bool {
+	if schema == nil || schema.Ref != nil || schema.Spec == nil || schema.Spec.Type == nil {
+		return false
+	}
+
+	if len(*schema.Spec.Type) != 1 {
+		return false
+	}
+
+	schemaType := (*schema.Spec.Type)[0]
+	if schemaType != OBJECT && schemaType != STRING {
+		return false
+	}
+
+	base := spec.NewSchemaSpec()
+	base.Spec.Type = &spec.SingleOrArray[string]{schemaType}
+	if schema.Spec.Format != "" {
+		base.Spec.Format = schema.Spec.Format
+	}
+
+	return reflect.DeepEqual(base.Spec, schema.Spec)
 }
 
 func (o *OperationV3) parseParamAttribute(comment, objectType, schemaType string, param *spec.Parameter) error {
@@ -1270,4 +1425,88 @@ func (o *OperationV3) ParseCodeSample(attribute, _, lineRemainder string) error 
 
 	// Fallback into existing logic
 	return o.ParseMetadata(attribute, strings.ToLower(attribute), lineRemainder)
+}
+
+// ParseDiscriminatorComment parses the @Discriminator annotation.
+// Syntax: @Discriminator propertyName [key=ref,key=ref,...]
+func (o *OperationV3) ParseDiscriminatorComment(commentLine string) error {
+	if commentLine == "" {
+		return fmt.Errorf("@discriminator requires at least a propertyName")
+	}
+	parts := FieldsByAnySpace(commentLine, 2)
+	propertyName := parts[0]
+	var mapping map[string]string
+	if len(parts) == 2 {
+		parsed, err := parseDiscriminatorMapping(parts[1])
+		if err != nil {
+			return fmt.Errorf("@discriminator mapping: %w", err)
+		}
+		mapping = parsed
+	}
+	if o.discriminatorInfo != nil {
+		return fmt.Errorf("@discriminator already defined for this operation")
+	}
+	o.discriminatorInfo = &parsedDiscriminator{propertyName: propertyName, mapping: mapping}
+	return nil
+}
+
+func parseDiscriminatorMapping(raw string) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, entry := range strings.Split(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		kv := strings.SplitN(entry, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid mapping entry %q: expected key=ref", entry)
+		}
+		key, ref := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
+		if key == "" || ref == "" {
+			return nil, fmt.Errorf("invalid mapping entry %q: key and ref must not be empty", entry)
+		}
+		result[key] = ref
+	}
+	return result, nil
+}
+
+// ProcessDiscriminatorComment applies the parsed discriminator to any oneOf schemas in the operation's responses and request body.
+func (o *OperationV3) ProcessDiscriminatorComment() error {
+	if o.discriminatorInfo == nil {
+		return nil
+	}
+	d := buildDiscriminator(o.discriminatorInfo)
+	if o.Responses != nil {
+		for _, response := range o.Responses.Spec.Response {
+			applyDiscriminatorToContent(response.Spec.Spec.Content, d)
+		}
+		if o.Responses.Spec.Default != nil {
+			applyDiscriminatorToContent(o.Responses.Spec.Default.Spec.Spec.Content, d)
+		}
+	}
+	if o.RequestBody != nil {
+		applyDiscriminatorToContent(o.RequestBody.Spec.Spec.Content, d)
+	}
+	return nil
+}
+
+func buildDiscriminator(info *parsedDiscriminator) *spec.Discriminator {
+	d := spec.NewDiscriminator()
+	d.PropertyName = info.propertyName
+	if len(info.mapping) > 0 {
+		d.Mapping = info.mapping
+	}
+	return d
+}
+
+func applyDiscriminatorToContent(content map[string]*spec.Extendable[spec.MediaType], d *spec.Discriminator) {
+	for _, mediaType := range content {
+		if mediaType == nil || mediaType.Spec.Schema == nil {
+			continue
+		}
+		s := mediaType.Spec.Schema
+		if s.Spec != nil && len(s.Spec.OneOf) > 0 {
+			s.Spec.Discriminator = d
+		}
+	}
 }

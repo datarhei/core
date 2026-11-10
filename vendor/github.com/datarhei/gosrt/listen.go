@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	srtnet "github.com/datarhei/gosrt/net"
@@ -175,7 +176,15 @@ func Listen(network, address string, config Config) (Listener, error) {
 	}
 
 	lc := net.ListenConfig{
-		Control: ListenControl(config),
+		Control: func(network, address string, c syscall.RawConn) error {
+			if err := ListenControl(config)(network, address, c); err != nil {
+				return err
+			}
+			if config.ListenerControl != nil {
+				return config.ListenerControl(network, address, c)
+			}
+			return nil
+		},
 	}
 
 	network = "udp"
@@ -469,7 +478,12 @@ func (ln *listener) send(p packet.Packet) {
 	ln.log("packet:send:dump", func() string { return p.Dump() })
 
 	// Write the packet's contents to the wire
-	ln.pc.writeToFrom(buffer, p.Header().Addr, p.Header().LocalAddr)
+	if err := ln.pc.writeToFrom(buffer, p.Header().Addr, p.Header().LocalAddr); err != nil {
+		// Previously discarded. A send that fails here is invisible on both
+		// sides: the peer simply never hears back, and the handshake times out
+		// with nothing logged to explain it.
+		ln.log("packet:send:error", func() string { return "writing packet to the wire failed: " + err.Error() })
+	}
 
 	if p.Header().IsControlPacket {
 		// Control packets can be decommissioned because they will not be sent again (data packets might be retransferred)

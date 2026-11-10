@@ -188,6 +188,18 @@ func (v unpadded) Append(b []byte, t time.Time) []byte {
 	for i < len(s) && s[i] == ' ' {
 		i++
 	}
+	digits := i
+	if digits < len(s) && (s[digits] == '+' || s[digits] == '-') {
+		digits++
+	}
+	if digits == len(s) {
+		return append(b, s...)
+	}
+	for j := digits; j < len(s); j++ {
+		if s[j] < '0' || s[j] > '9' {
+			return append(b, s...)
+		}
+	}
 	s = s[i:]
 
 	// keep a leading sign, if any (e.g. the "+"/"-" of %z)
@@ -251,10 +263,22 @@ type combiningAppend struct {
 	prevCanCombine bool
 }
 
+// Joining alphabetic fragments can extend a time layout token or stop an
+// abbreviated name from being recognized (for example, Mon + day or Mon + x).
+func canCombineAtBoundary(left, right string) bool {
+	if len(left) == 0 || len(right) == 0 {
+		return true
+	}
+	isLetter := func(c byte) bool {
+		return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z'
+	}
+	return !isLetter(left[len(left)-1]) || !isLetter(right[0])
+}
+
 func (ca *combiningAppend) Append(w Appender) {
 	if ca.prevCanCombine {
 		prev, prevOK := ca.prev.(combiner)
-		if wc, ok := w.(combiner); ok && prevOK && wc.canCombine() {
+		if wc, ok := w.(combiner); ok && prevOK && wc.canCombine() && canCombineAtBoundary(prev.str(), wc.str()) {
 			ca.prev = prev.combine(wc)
 			ca.list[len(ca.list)-1] = ca.prev
 			return

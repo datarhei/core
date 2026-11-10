@@ -54,8 +54,9 @@ const (
 	AVC_NALU   = 1
 	AVC_EOS    = 2
 
-	FRAME_KEY   = 1
-	FRAME_INTER = 2
+	FRAME_KEY     = 1
+	FRAME_INTER   = 2
+	FRAME_COMMAND = 5
 
 	VIDEO_H264 = 7
 )
@@ -268,15 +269,28 @@ func (t *Tag) videoParseHeader(b []byte) (n int, err error) {
 		t.PacketType = t.CodecID
 		t.CodecID = 0
 
+		// the frame type is to be ignored for metadata (E-RTMP v1)
 		if t.PacketType != PKTTYPE_METADATA {
 			t.FrameType = t.FrameType & 0b0111
+		}
+
+		if t.PacketType != PKTTYPE_METADATA && t.FrameType == FRAME_COMMAND {
+			// a command frame has a command (UI8) instead of a FourCC and no video data (E-RTMP v2), the
+			// command is the first byte of the data
+			if len(b) < n+1 {
+				err = fmt.Errorf("videodata: parse invalid: not enough bytes for the video command")
+			}
+			return
 		}
 	}
 
 	if !t.IsExHeader {
-		if t.FrameType == FRAME_INTER || t.FrameType == FRAME_KEY {
+		if t.CodecID != VIDEO_H264 {
+			// other legacy codecs (e.g. Sorenson H.263, VP6) have no further header fields here
+			t.PacketType = PKTTYPE_CODED_FRAMES
+		} else if t.FrameType == FRAME_INTER || t.FrameType == FRAME_KEY {
 			if len(b) < n+4 {
-				err = fmt.Errorf("videodata: parse invalid: neither interframe nor keyframe")
+				err = fmt.Errorf("videodata: parse invalid: not enough bytes for the AVC header")
 				return
 			}
 			t.AVCPacketType = b[n]
@@ -308,8 +322,13 @@ func (t *Tag) videoParseHeader(b []byte) (n int, err error) {
 
 		t.CompositionTime = 0
 
-		if t.FourCC == FOURCC_HEVC {
+		// HEVC and VVC have a composition time offset with CodedFrames (E-RTMP v2)
+		if t.FourCC == FOURCC_HEVC || t.FourCC == FOURCC_VVC {
 			if t.PacketType == PKTTYPE_CODED_FRAMES {
+				if len(b) < n+3 {
+					err = fmt.Errorf("videodata: parse invalid: not enough bytes for the composition time")
+					return
+				}
 				t.CompositionTime = int64(pio.I24BE(b[n:]))
 				n += 3
 			}
@@ -321,20 +340,87 @@ func (t *Tag) videoParseHeader(b []byte) (n int, err error) {
 	return
 }
 
+// ParseColorInfo parses the data of a video packet of the type PKTTYPE_METADATA (E-RTMP), which is a
+// series of AMF encoded [name, value] pairs. It returns the value of the last "colorInfo" pair, or nil if
+// that pair resets the color info (undefined, null or an empty object). ok is false if there's no such pair.
+func ParseColorInfo(b []byte) (colorInfo AMFMap, ok bool) {
+	for len(b) > 0 {
+		name, n, err := ParseAMF0Val(b)
+		if err != nil {
+			return
+		}
+		b = b[n:]
+
+		val, n, err := ParseAMF0Val(b)
+		if err != nil {
+			return
+		}
+		b = b[n:]
+
+		if name, isString := name.(string); !isString || name != "colorInfo" {
+			continue
+		}
+
+		switch val := val.(type) {
+		case AMFMap:
+			colorInfo, ok = val, true
+			if len(val) == 0 {
+				colorInfo = nil
+			}
+		case nil:
+			colorInfo, ok = nil, true
+		}
+	}
+
+	return
+}
+
+// ColorInfoData returns the data of a video packet of the type PKTTYPE_METADATA (E-RTMP) with the color
+// info. A nil color info resets it, it is written as undefined.
+func ColorInfoData(colorInfo AMFMap) []byte {
+	if colorInfo == nil {
+		b := make([]byte, LenAMF0Val("colorInfo")+1)
+		n := FillAMF0Val(b, "colorInfo")
+		b[n] = undefinedmarker
+		return b
+	}
+
+	b := make([]byte, LenAMF0Val("colorInfo")+LenAMF0Val(colorInfo))
+	n := FillAMF0Val(b, "colorInfo")
+	FillAMF0Val(b[n:], colorInfo)
+	return b
+}
+
+// compositionTimeSI24 returns the composition time limited to the range of an SI24.
+func compositionTimeSI24(cts int64) int32 {
+	if cts > 0x7FFFFF {
+		return 0x7FFFFF
+	}
+	if cts < -0x800000 {
+		return -0x800000
+	}
+	return int32(cts)
+}
+
 func (t Tag) videoFillHeader(b []byte) (n int) {
 	if t.IsExHeader {
 		flags := t.FrameType<<4 | t.PacketType | 0b10000000
 		b[n] = flags
 		n++
+		if t.PacketType != PKTTYPE_METADATA && t.FrameType == FRAME_COMMAND {
+			// the command is the first byte of the data
+			return
+		}
 		b[n] = t.FourCC[0]
 		b[n+1] = t.FourCC[1]
 		b[n+2] = t.FourCC[2]
 		b[n+3] = t.FourCC[3]
 		n += 4
 
-		if t.FourCC == FOURCC_HEVC {
+		// HEVC and VVC have a composition time offset with CodedFrames (E-RTMP v2)
+		if t.FourCC == FOURCC_HEVC || t.FourCC == FOURCC_VVC {
 			if t.PacketType == PKTTYPE_CODED_FRAMES {
-				pio.PutI24BE(b[n:], int32(t.CompositionTime&0x7FFFFF))
+				pio.PutI24BE(b[n:], compositionTimeSI24(t.CompositionTime))
 				n += 3
 			}
 		}
@@ -342,10 +428,12 @@ func (t Tag) videoFillHeader(b []byte) (n int) {
 		flags := t.FrameType<<4 | t.CodecID
 		b[n] = flags
 		n++
-		b[n] = t.AVCPacketType
-		n++
-		pio.PutI24BE(b[n:], int32(t.CompositionTime&0x7FFFFF))
-		n += 3
+		if t.CodecID == VIDEO_H264 {
+			b[n] = t.AVCPacketType
+			n++
+			pio.PutI24BE(b[n:], compositionTimeSI24(t.CompositionTime))
+			n += 3
+		}
 	}
 
 	//fmt.Printf("videoFillHeader: PacketType: %d\n%s\n", t.PacketType, hex.Dump(b[:n]))

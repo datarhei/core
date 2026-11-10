@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/hashicorp/go-metrics/compat"
+	"github.com/hashicorp/go-metrics"
 )
 
 // saturationMetric measures the saturation (percentage of time spent working vs

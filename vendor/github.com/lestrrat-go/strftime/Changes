@@ -1,6 +1,17 @@
 Changes
 =======
 
+v1.2.1 - 28 Oct 2026
+[Bug fixes]
+  * Preserve non-numeric fields (e.g. `%-a`) when a no-padding flag is
+    used. (#108)
+  * Keep a literal that follows an abbreviated name (`%a`, `%b`, `%h`)
+    separate, so `%aday` formats as "Tueday" instead of "Tuesday". (#114)
+
+[Miscellaneous]
+  * Stop uploading coverage to codecov. (#113)
+  * Updated dependencies (testify, GitHub Actions, bench).
+
 v1.2.0 - 21 May 2026
 [New features]
   * Support a no-padding flag for numeric specifiers. A `-` (glibc) or `#`

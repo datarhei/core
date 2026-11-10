@@ -13,8 +13,13 @@ import (
 )
 
 type SPSInfo struct {
-	ProfileIdc                       uint
-	LevelIdc                         uint
+	ProfileIdc                       uint // general_profile_idc
+	LevelIdc                         uint // general_level_idc
+	ChromaFormatIdc                  uint
+	BitDepthLumaMinus8               uint
+	BitDepthChromaMinus8             uint
+	MaxSubLayersMinus1               uint // sps_max_sub_layers_minus1
+	TemporalIdNestingFlag            uint // sps_temporal_id_nesting_flag
 	CropLeft                         uint
 	CropRight                        uint
 	CropTop                          uint
@@ -209,9 +214,10 @@ func ParseSPS(sps []byte) (ctx SPSInfo, err error) {
 	if err != nil {
 		return
 	}
+	ctx.MaxSubLayersMinus1 = spsMaxSubLayersMinus1
 
 	// sps_temporal_id_nesting_flag
-	if _, err = br.ReadBit(); err != nil {
+	if ctx.TemporalIdNestingFlag, err = br.ReadBit(); err != nil {
 		return
 	}
 
@@ -230,6 +236,7 @@ func ParseSPS(sps []byte) (ctx SPSInfo, err error) {
 	if chroma_format_idc, err = br.ReadExponentialGolombCode(); err != nil {
 		return
 	}
+	ctx.ChromaFormatIdc = chroma_format_idc
 	if chroma_format_idc == 3 {
 		// separate_colour_plane_flag
 		if _, err = br.ReadBit(); err != nil {
@@ -307,12 +314,12 @@ func ParseSPS(sps []byte) (ctx SPSInfo, err error) {
 	ctx.Height = ctx.PicHeightInLumaSamples - ctx.CropTop - ctx.CropBottom
 
 	// bit_depth_luma_minus8
-	if _, err = br.ReadExponentialGolombCode(); err != nil {
+	if ctx.BitDepthLumaMinus8, err = br.ReadExponentialGolombCode(); err != nil {
 		return
 	}
 
 	// bit_depth_chroma_minus8
-	if _, err = br.ReadExponentialGolombCode(); err != nil {
+	if ctx.BitDepthChromaMinus8, err = br.ReadExponentialGolombCode(); err != nil {
 		return
 	}
 
@@ -377,26 +384,26 @@ func ParseSPS(sps []byte) (ctx SPSInfo, err error) {
 
 func parsePTL(br *bits.GolombBitReader, ctx *SPSInfo, maxSubLayersMinus1 uint) error {
 	var err error
-	var ptl SPSInfo
-	if ptl.generalProfileSpace, err = br.ReadBits(2); err != nil {
+	if ctx.generalProfileSpace, err = br.ReadBits(2); err != nil {
 		return err
 	}
-	if ptl.generalTierFlag, err = br.ReadBit(); err != nil {
+	if ctx.generalTierFlag, err = br.ReadBit(); err != nil {
 		return err
 	}
-	if ptl.generalProfileIDC, err = br.ReadBits(5); err != nil {
+	if ctx.generalProfileIDC, err = br.ReadBits(5); err != nil {
 		return err
 	}
-	if ptl.generalProfileCompatibilityFlags, err = br.ReadBits32(32); err != nil {
+	if ctx.generalProfileCompatibilityFlags, err = br.ReadBits32(32); err != nil {
 		return err
 	}
-	if ptl.generalConstraintIndicatorFlags, err = br.ReadBits64(48); err != nil {
+	if ctx.generalConstraintIndicatorFlags, err = br.ReadBits64(48); err != nil {
 		return err
 	}
-	if ptl.generalLevelIDC, err = br.ReadBits(8); err != nil {
+	if ctx.generalLevelIDC, err = br.ReadBits(8); err != nil {
 		return err
 	}
-	updatePTL(ctx, &ptl)
+	ctx.ProfileIdc = ctx.generalProfileIDC
+	ctx.LevelIdc = ctx.generalLevelIDC
 	if maxSubLayersMinus1 == 0 {
 		return nil
 	}
@@ -437,28 +444,6 @@ func parsePTL(br *bits.GolombBitReader, ctx *SPSInfo, maxSubLayersMinus1 uint) e
 		}
 	}
 	return nil
-}
-
-func updatePTL(ctx, ptl *SPSInfo) {
-	ctx.generalProfileSpace = ptl.generalProfileSpace
-
-	if ptl.generalTierFlag > ctx.generalTierFlag {
-		ctx.generalLevelIDC = ptl.generalLevelIDC
-
-		ctx.generalTierFlag = ptl.generalTierFlag
-	} else {
-		if ptl.generalLevelIDC > ctx.generalLevelIDC {
-			ctx.generalLevelIDC = ptl.generalLevelIDC
-		}
-	}
-
-	if ptl.generalProfileIDC > ctx.generalProfileIDC {
-		ctx.generalProfileIDC = ptl.generalProfileIDC
-	}
-
-	ctx.generalProfileCompatibilityFlags &= ptl.generalProfileCompatibilityFlags
-
-	ctx.generalConstraintIndicatorFlags &= ptl.generalConstraintIndicatorFlags
 }
 
 func nal2rbsp(nal []byte) []byte {
@@ -524,17 +509,28 @@ func NewCodecDataFromHEVCDecoderConfRecord(record []byte) (self CodecData, err e
 }
 
 func NewCodecDataFromVPSAndSPSAndPPS(vps, sps, pps []byte) (self CodecData, err error) {
-	recordinfo := HEVCDecoderConfRecord{}
-	recordinfo.HEVCProfileIndication = sps[3]
-	recordinfo.ProfileCompatibility = sps[4]
-	recordinfo.HEVCLevelIndication = sps[5]
-	recordinfo.SPS = [][]byte{sps}
-	recordinfo.PPS = [][]byte{pps}
-	recordinfo.VPS = [][]byte{vps}
-	recordinfo.LengthSizeMinusOne = 3
 	if self.SPSInfo, err = ParseSPS(sps); err != nil {
 		return
 	}
+	si := self.SPSInfo
+	recordinfo := HEVCDecoderConfRecord{
+		GeneralProfileSpace:              uint8(si.generalProfileSpace),
+		GeneralTierFlag:                  uint8(si.generalTierFlag),
+		GeneralProfileIDC:                uint8(si.generalProfileIDC),
+		GeneralProfileCompatibilityFlags: si.generalProfileCompatibilityFlags,
+		GeneralConstraintIndicatorFlags:  si.generalConstraintIndicatorFlags,
+		GeneralLevelIDC:                  uint8(si.generalLevelIDC),
+		ChromaFormatIDC:                  uint8(si.ChromaFormatIdc),
+		BitDepthLumaMinus8:               uint8(si.BitDepthLumaMinus8),
+		BitDepthChromaMinus8:             uint8(si.BitDepthChromaMinus8),
+		NumTemporalLayers:                uint8(si.MaxSubLayersMinus1 + 1),
+		TemporalIDNested:                 uint8(si.TemporalIdNestingFlag),
+		LengthSizeMinusOne:               3,
+		VPS:                              [][]byte{vps},
+		SPS:                              [][]byte{sps},
+		PPS:                              [][]byte{pps},
+	}
+	recordinfo.setIndications()
 	buf := make([]byte, recordinfo.Len())
 	recordinfo.Marshal(buf, self.SPSInfo)
 	self.RecordInfo = recordinfo
@@ -542,154 +538,172 @@ func NewCodecDataFromVPSAndSPSAndPPS(vps, sps, pps []byte) (self CodecData, err 
 	return
 }
 
+// HEVCDecoderConfRecord is the HEVCDecoderConfigurationRecord (hvcC) of ISO/IEC 14496-15, 8.3.3.1.
 type HEVCDecoderConfRecord struct {
+	// HEVCProfileIndication is general_profile_space, general_tier_flag and general_profile_idc as in
+	// the record (byte 1), ProfileCompatibility is the first byte of general_profile_compatibility_flags
+	// and HEVCLevelIndication is general_level_idc. They are set by Unmarshal and are not used by Marshal.
 	HEVCProfileIndication uint8
 	ProfileCompatibility  uint8
 	HEVCLevelIndication   uint8
-	LengthSizeMinusOne    uint8
-	VPS                   [][]byte
-	SPS                   [][]byte
-	PPS                   [][]byte
+
+	GeneralProfileSpace              uint8
+	GeneralTierFlag                  uint8
+	GeneralProfileIDC                uint8
+	GeneralProfileCompatibilityFlags uint32
+	GeneralConstraintIndicatorFlags  uint64 // 48 bits
+	GeneralLevelIDC                  uint8
+	MinSpatialSegmentationIDC        uint16
+	ParallelismType                  uint8
+	ChromaFormatIDC                  uint8
+	BitDepthLumaMinus8               uint8
+	BitDepthChromaMinus8             uint8
+	AvgFrameRate                     uint16
+	ConstantFrameRate                uint8
+	NumTemporalLayers                uint8
+	TemporalIDNested                 uint8
+	LengthSizeMinusOne               uint8
+
+	// the NAL units of the arrays of the types VPS, SPS and PPS; arrays of other types (e.g. SEI) are skipped
+	VPS [][]byte
+	SPS [][]byte
+	PPS [][]byte
 }
 
 var ErrDecconfInvalid = fmt.Errorf("hevcparser: HEVCDecoderConfRecord invalid")
 
+const hevcDecoderConfRecordHeaderLength = 23
+
+func (record *HEVCDecoderConfRecord) setIndications() {
+	record.HEVCProfileIndication = record.GeneralProfileSpace<<6 | record.GeneralTierFlag<<5 | record.GeneralProfileIDC
+	record.ProfileCompatibility = uint8(record.GeneralProfileCompatibilityFlags >> 24)
+	record.HEVCLevelIndication = record.GeneralLevelIDC
+}
+
 func (record *HEVCDecoderConfRecord) Unmarshal(b []byte) (n int, err error) {
-	if len(b) < 30 {
-		err = ErrDecconfInvalid
-		return
-	}
-	record.HEVCProfileIndication = b[1]
-	record.ProfileCompatibility = b[2]
-	record.HEVCLevelIndication = b[3]
-	record.LengthSizeMinusOne = b[4] & 0x03
-
-	vpscount := int(b[25] & 0x1f)
-	n += 26
-	for i := 0; i < vpscount; i++ {
-		if len(b) < n+2 {
-			err = ErrDecconfInvalid
-			return
-		}
-		vpslen := int(pio.U16BE(b[n:]))
-		n += 2
-
-		if len(b) < n+vpslen {
-			err = ErrDecconfInvalid
-			return
-		}
-		record.VPS = append(record.VPS, b[n:n+vpslen])
-		n += vpslen
-	}
-
-	if len(b) < n+1 {
+	if len(b) < hevcDecoderConfRecordHeaderLength {
 		err = ErrDecconfInvalid
 		return
 	}
 
-	n++
-	n++
+	record.GeneralProfileSpace = b[1] >> 6
+	record.GeneralTierFlag = (b[1] >> 5) & 0x01
+	record.GeneralProfileIDC = b[1] & 0x1f
+	record.GeneralProfileCompatibilityFlags = pio.U32BE(b[2:])
+	record.GeneralConstraintIndicatorFlags = uint64(pio.U16BE(b[6:]))<<32 | uint64(pio.U32BE(b[8:]))
+	record.GeneralLevelIDC = b[12]
+	record.MinSpatialSegmentationIDC = pio.U16BE(b[13:]) & 0x0fff
+	record.ParallelismType = b[15] & 0x03
+	record.ChromaFormatIDC = b[16] & 0x03
+	record.BitDepthLumaMinus8 = b[17] & 0x07
+	record.BitDepthChromaMinus8 = b[18] & 0x07
+	record.AvgFrameRate = pio.U16BE(b[19:])
+	record.ConstantFrameRate = b[21] >> 6
+	record.NumTemporalLayers = (b[21] >> 3) & 0x07
+	record.TemporalIDNested = (b[21] >> 2) & 0x01
+	record.LengthSizeMinusOne = b[21] & 0x03
+	record.setIndications()
 
-	spscount := int(b[n])
-	n++
+	record.VPS, record.SPS, record.PPS = nil, nil, nil
 
-	for i := 0; i < spscount; i++ {
-		if len(b) < n+2 {
+	numOfArrays := int(b[22])
+	n = hevcDecoderConfRecordHeaderLength
+
+	for i := 0; i < numOfArrays; i++ {
+		if len(b) < n+3 {
 			err = ErrDecconfInvalid
 			return
 		}
-		spslen := int(pio.U16BE(b[n:]))
-		n += 2
+		naluType := b[n] & 0x3f
+		numNalus := int(pio.U16BE(b[n+1:]))
+		n += 3
 
-		if len(b) < n+spslen {
-			err = ErrDecconfInvalid
-			return
+		for j := 0; j < numNalus; j++ {
+			if len(b) < n+2 {
+				err = ErrDecconfInvalid
+				return
+			}
+			naluLen := int(pio.U16BE(b[n:]))
+			n += 2
+
+			if len(b) < n+naluLen {
+				err = ErrDecconfInvalid
+				return
+			}
+			nalu := b[n : n+naluLen]
+			n += naluLen
+
+			switch naluType {
+			case NAL_UNIT_VPS:
+				record.VPS = append(record.VPS, nalu)
+			case NAL_UNIT_SPS:
+				record.SPS = append(record.SPS, nalu)
+			case NAL_UNIT_PPS:
+				record.PPS = append(record.PPS, nalu)
+			}
 		}
-		record.SPS = append(record.SPS, b[n:n+spslen])
-		n += spslen
 	}
 
-	n++
-	n++
-
-	ppscount := int(b[n])
-	n++
-
-	for i := 0; i < ppscount; i++ {
-		if len(b) < n+2 {
-			err = ErrDecconfInvalid
-			return
-		}
-		ppslen := int(pio.U16BE(b[n:]))
-		n += 2
-
-		if len(b) < n+ppslen {
-			err = ErrDecconfInvalid
-			return
-		}
-		record.PPS = append(record.PPS, b[n:n+ppslen])
-		n += ppslen
-	}
 	return
+}
+
+func (record HEVCDecoderConfRecord) arrays() [][][]byte {
+	arrays := [][][]byte{}
+	for _, nalus := range [][][]byte{record.VPS, record.SPS, record.PPS} {
+		if len(nalus) != 0 {
+			arrays = append(arrays, nalus)
+		}
+	}
+	return arrays
 }
 
 func (record HEVCDecoderConfRecord) Len() (n int) {
-	n = 23
-	for _, sps := range record.SPS {
-		n += 5 + len(sps)
-	}
-	for _, pps := range record.PPS {
-		n += 5 + len(pps)
-	}
-	for _, vps := range record.VPS {
-		n += 5 + len(vps)
+	n = hevcDecoderConfRecordHeaderLength
+	for _, nalus := range record.arrays() {
+		n += 3
+		for _, nalu := range nalus {
+			n += 2 + len(nalu)
+		}
 	}
 	return
 }
 
+// Marshal writes the record to b, which must have a length of at least Len(). The header fields are taken
+// from the record, si is not used.
 func (record HEVCDecoderConfRecord) Marshal(b []byte, si SPSInfo) (n int) {
-	b[0] = 1
-	b[1] = record.HEVCProfileIndication
-	b[2] = record.ProfileCompatibility
-	b[3] = record.HEVCLevelIndication
-	b[21] = 3
-	b[22] = 3
-	n += 23
-	b[n] = (record.VPS[0][0] >> 1) & 0x3f
-	n++
-	b[n] = byte(len(record.VPS) >> 8)
-	n++
-	b[n] = byte(len(record.VPS))
-	n++
-	for _, vps := range record.VPS {
-		pio.PutU16BE(b[n:], uint16(len(vps)))
-		n += 2
-		copy(b[n:], vps)
-		n += len(vps)
-	}
-	b[n] = (record.SPS[0][0] >> 1) & 0x3f
-	n++
-	b[n] = byte(len(record.SPS) >> 8)
-	n++
-	b[n] = byte(len(record.SPS))
-	n++
-	for _, sps := range record.SPS {
-		pio.PutU16BE(b[n:], uint16(len(sps)))
-		n += 2
-		copy(b[n:], sps)
-		n += len(sps)
-	}
-	b[n] = (record.PPS[0][0] >> 1) & 0x3f
-	n++
-	b[n] = byte(len(record.PPS) >> 8)
-	n++
-	b[n] = byte(len(record.PPS))
-	n++
-	for _, pps := range record.PPS {
-		pio.PutU16BE(b[n:], uint16(len(pps)))
-		n += 2
-		copy(b[n:], pps)
-		n += len(pps)
+	b[0] = 1 // configurationVersion
+	b[1] = record.GeneralProfileSpace<<6 | (record.GeneralTierFlag&0x01)<<5 | record.GeneralProfileIDC&0x1f
+	pio.PutU32BE(b[2:], record.GeneralProfileCompatibilityFlags)
+	pio.PutU16BE(b[6:], uint16(record.GeneralConstraintIndicatorFlags>>32))
+	pio.PutU32BE(b[8:], uint32(record.GeneralConstraintIndicatorFlags))
+	b[12] = record.GeneralLevelIDC
+	// the reserved bits are 1
+	pio.PutU16BE(b[13:], 0xf000|record.MinSpatialSegmentationIDC&0x0fff)
+	b[15] = 0xfc | record.ParallelismType&0x03
+	b[16] = 0xfc | record.ChromaFormatIDC&0x03
+	b[17] = 0xf8 | record.BitDepthLumaMinus8&0x07
+	b[18] = 0xf8 | record.BitDepthChromaMinus8&0x07
+	pio.PutU16BE(b[19:], record.AvgFrameRate)
+	b[21] = record.ConstantFrameRate<<6 | (record.NumTemporalLayers&0x07)<<3 | (record.TemporalIDNested&0x01)<<2 | record.LengthSizeMinusOne&0x03
+
+	arrays := record.arrays()
+	b[22] = uint8(len(arrays))
+	n = hevcDecoderConfRecordHeaderLength
+
+	for _, nalus := range arrays {
+		// array_completeness and the reserved bit are 0
+		b[n] = 0
+		if len(nalus[0]) != 0 {
+			b[n] = (nalus[0][0] >> 1) & 0x3f
+		}
+		pio.PutU16BE(b[n+1:], uint16(len(nalus)))
+		n += 3
+		for _, nalu := range nalus {
+			pio.PutU16BE(b[n:], uint16(len(nalu)))
+			n += 2
+			copy(b[n:], nalu)
+			n += len(nalu)
+		}
 	}
 	return
 }

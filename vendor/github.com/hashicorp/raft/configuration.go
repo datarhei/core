@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -50,10 +50,6 @@ type ConfigurationStore interface {
 	// written and the configuration value.
 	StoreConfiguration(index uint64, configuration Configuration)
 }
-
-type nopConfigurationStore struct{}
-
-func (s nopConfigurationStore) StoreConfiguration(_ uint64, _ Configuration) {}
 
 // ServerID is a unique string identifying a server for all time.
 type ServerID string

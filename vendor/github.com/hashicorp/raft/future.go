@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2013, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package raft
@@ -174,7 +174,7 @@ func (s *shutdownFuture) Error() error {
 	}
 	s.raft.waitShutdown()
 	if closeable, ok := s.raft.trans.(WithClose); ok {
-		closeable.Close()
+		_ = closeable.Close()
 	}
 	return nil
 }

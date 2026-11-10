@@ -116,6 +116,15 @@ var defaultSpecifications = map[byte]Appender{
 	'%': percent,
 }
 
+func isStandardNonNumericSpecification(b byte) bool {
+	switch b {
+	case '%', 'A', 'a', 'B', 'b', 'c', 'D', 'F', 'h', 'n', 'p', 'R', 'r', 'T', 't', 'v', 'X', 'x', 'Z':
+		return true
+	default:
+		return false
+	}
+}
+
 func populateDefaultSpecifications(ds SpecificationSet) {
 	for c, handler := range defaultSpecifications {
 		if err := ds.Set(c, handler); err != nil {

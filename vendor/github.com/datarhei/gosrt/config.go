@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 )
 
@@ -169,6 +171,11 @@ type Config struct {
 
 	// An implementation of the Logger interface
 	Logger Logger
+
+	// ListenerControl is called on the raw socket file descriptor after
+	// gosrt's built-in options (SO_REUSEADDR, IP_TOS, IP_TTL) are set
+	// but before the socket is bound. Same signature as net.ListenConfig.Control.
+	ListenerControl func(network, address string, c syscall.RawConn) error
 
 	// if a new IP starts sending data on an existing socket id, allow it
 	AllowPeerIpChange bool
@@ -694,7 +701,9 @@ func (c *Config) Validate() error {
 	}
 
 	if len(c.PacketFilter) != 0 {
-		return fmt.Errorf("config: PacketFilter are not supported")
+		if !strings.HasPrefix(strings.ToLower(c.PacketFilter), "fec") {
+			return fmt.Errorf("config: PacketFilter %s is not supported", c.PacketFilter)
+		}
 	}
 
 	if len(c.Passphrase) != 0 {

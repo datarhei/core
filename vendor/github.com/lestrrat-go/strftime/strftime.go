@@ -84,7 +84,7 @@ func compile(handler compileHandler, p string, ds SpecificationSet) error {
 			return fmt.Errorf("pattern compilation failed: %w", err)
 		}
 
-		if noPad {
+		if noPad && !isStandardNonNumericSpecification(p[specIdx]) {
 			specification = unpadded{inner: specification}
 		}
 

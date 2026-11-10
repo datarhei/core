@@ -73,6 +73,24 @@ type connResponse struct {
 //
 // In case of an error the returned Conn is nil and the error is non-nil.
 func Dial(network, address string, config Config) (Conn, error) {
+	return DialWithContext(context.Background(), network, address, config)
+}
+
+// DialWithContext connects to the address using the SRT protocol with the given config
+// and returns a Conn interface.
+//
+// The address is of the form "host:port".
+//
+// Example:
+//
+//	DialWithContext(context.Background(), "srt", "127.0.0.1:3000", DefaultConfig())
+//
+// In case of an error the returned Conn is nil and the error is non-nil.
+func DialWithContext(ctx context.Context, network, address string, config Config) (Conn, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("context must not be nil")
+	}
+
 	if network != "srt" {
 		return nil, fmt.Errorf("the network must be 'srt'")
 	}
@@ -93,7 +111,7 @@ func Dial(network, address string, config Config) (Conn, error) {
 		Control: DialControl(config),
 	}
 
-	conn, err := netdialer.Dial("udp", address)
+	conn, err := netdialer.DialContext(ctx, "udp", address)
 	if err != nil {
 		return nil, fmt.Errorf("failed dialing: %w", err)
 	}
@@ -110,11 +128,11 @@ func Dial(network, address string, config Config) (Conn, error) {
 	dl.remoteAddr = pc.RemoteAddr()
 
 	dl.conn = nil
-	dl.connChan = make(chan connResponse)
+	dl.connChan = make(chan connResponse, 1)
 
 	dl.rcvQueue = make(chan packet.Packet, 2048)
 
-	dl.doneChan = make(chan error)
+	dl.doneChan = make(chan error, 1)
 
 	dl.start = time.Now()
 
@@ -180,28 +198,41 @@ func Dial(network, address string, config Config) (Conn, error) {
 
 	dl.log("dial", func() string { return "waiting for response" })
 
-	timer := time.AfterFunc(dl.config.ConnectionTimeout, func() {
-		dl.connChan <- connResponse{
-			conn: nil,
-			err:  fmt.Errorf("connection timeout. server didn't respond"),
-		}
-	})
+	timer := time.NewTimer(dl.config.ConnectionTimeout)
+	defer timer.Stop()
 
 	// Wait for handshake to conclude
-	response := <-dl.connChan
-	if response.err != nil {
-		timer.Stop()
+	select {
+	case response := <-dl.connChan:
+		if err := ctx.Err(); err != nil {
+			dl.Close()
+			return nil, err
+		}
+
+		if response.err != nil {
+			dl.Close()
+			return nil, response.err
+		}
+
+		dl.connLock.Lock()
+		dl.conn = response.conn
+		dl.connLock.Unlock()
+
+		return dl, nil
+
+	case <-ctx.Done():
 		dl.Close()
-		return nil, response.err
+		return nil, ctx.Err()
+
+	case <-timer.C:
+		if err := ctx.Err(); err != nil {
+			dl.Close()
+			return nil, err
+		}
+
+		dl.Close()
+		return nil, fmt.Errorf("connection timeout. server didn't respond")
 	}
-
-	timer.Stop()
-
-	dl.connLock.Lock()
-	dl.conn = response.conn
-	dl.connLock.Unlock()
-
-	return dl, nil
 }
 
 func (dl *dialer) checkConnection() error {
@@ -378,7 +409,7 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 					PERIODICNAK:   true,
 					REXMITFLG:     true,
 					STREAM:        false,
-					PACKET_FILTER: false,
+					PACKET_FILTER: len(dl.config.PacketFilter) > 0,
 				},
 				RecvTSBPDDelay: uint16(dl.config.ReceiverLatency.Milliseconds()),
 				SendTSBPDDelay: uint16(dl.config.PeerLatency.Milliseconds()),
@@ -386,6 +417,11 @@ func (dl *dialer) handleHandshake(p packet.Packet) {
 
 			cif.HasSID = true
 			cif.StreamId = dl.config.StreamId
+
+			if len(dl.config.PacketFilter) > 0 {
+				cif.HasFilter = true
+				cif.PacketFilter = dl.config.PacketFilter
+			}
 
 			if dl.crypto != nil {
 				cif.HasKM = true

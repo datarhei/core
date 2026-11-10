@@ -332,19 +332,24 @@ func ParseSPS(data []byte) (self SPSInfo, err error) {
 		return
 	}
 
+	// 4:2:0 if not present
+	chroma_format_idc := uint(1)
+	var separate_colour_plane_flag uint
+
 	if self.ProfileIdc == 100 || self.ProfileIdc == 110 ||
 		self.ProfileIdc == 122 || self.ProfileIdc == 244 ||
 		self.ProfileIdc == 44 || self.ProfileIdc == 83 ||
-		self.ProfileIdc == 86 || self.ProfileIdc == 118 {
+		self.ProfileIdc == 86 || self.ProfileIdc == 118 ||
+		self.ProfileIdc == 128 || self.ProfileIdc == 138 ||
+		self.ProfileIdc == 139 || self.ProfileIdc == 134 ||
+		self.ProfileIdc == 135 {
 
-		var chroma_format_idc uint
 		if chroma_format_idc, err = r.ReadExponentialGolombCode(); err != nil {
 			return
 		}
 
 		if chroma_format_idc == 3 {
-			// residual_colour_transform_flag
-			if _, err = r.ReadBit(); err != nil {
+			if separate_colour_plane_flag, err = r.ReadBit(); err != nil {
 				return
 			}
 		}
@@ -368,7 +373,12 @@ func ParseSPS(data []byte) (self SPSInfo, err error) {
 		}
 
 		if seq_scaling_matrix_present_flag != 0 {
-			for i := 0; i < 8; i++ {
+			// 4:4:4 has scaling lists for the 8x8 blocks of the chroma components too
+			numScalingLists := 8
+			if chroma_format_idc == 3 {
+				numScalingLists = 12
+			}
+			for i := 0; i < numScalingLists; i++ {
 				var seq_scaling_list_present_flag uint
 				if seq_scaling_list_present_flag, err = r.ReadBit(); err != nil {
 					return
@@ -492,8 +502,22 @@ func ParseSPS(data []byte) (self SPSInfo, err error) {
 		}
 	}
 
-	self.Width = (self.MbWidth * 16) - self.CropLeft*2 - self.CropRight*2
-	self.Height = ((2 - frame_mbs_only_flag) * self.MbHeight * 16) - self.CropTop*2 - self.CropBottom*2
+	// the crop unit depends on the chroma format and whether the picture consists of fields (ISO/IEC
+	// 14496-10, 7.4.2.1.1): 2x2 for 4:2:0, 2x1 for 4:2:2, 1x1 for 4:4:4 and monochrome, the height
+	// doubled for fields
+	cropUnitX, cropUnitY := uint(1), uint(1)
+	if separate_colour_plane_flag == 0 {
+		switch chroma_format_idc {
+		case 1:
+			cropUnitX, cropUnitY = 2, 2
+		case 2:
+			cropUnitX = 2
+		}
+	}
+	cropUnitY *= 2 - frame_mbs_only_flag
+
+	self.Width = (self.MbWidth * 16) - (self.CropLeft+self.CropRight)*cropUnitX
+	self.Height = ((2 - frame_mbs_only_flag) * self.MbHeight * 16) - (self.CropTop+self.CropBottom)*cropUnitY
 
 	return
 }

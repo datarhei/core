@@ -21,6 +21,16 @@ import (
 
 func DummyEcho() *echo.Echo {
 	router := echo.New()
+	/*
+		_, proxyRange, _ := net.ParseCIDR("::/0") // replace with your proxy's address or CIDR
+
+		router.IPExtractor = echo.ExtractIPFromRealIPHeader(
+			echo.TrustLinkLocal(true),
+			echo.TrustLoopback(true),
+			echo.TrustPrivateNet(true),
+			echo.TrustIPRange(proxyRange),
+		)
+	*/
 	router.HideBanner = true
 	router.HidePort = true
 	router.HTTPErrorHandler = errorhandler.HTTPErrorHandler

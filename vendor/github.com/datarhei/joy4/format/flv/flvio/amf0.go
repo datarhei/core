@@ -53,27 +53,6 @@ func fillAMF0Number(b []byte, f float64) int {
 }
 
 const (
-	amf3undefinedmarker = iota
-	amf3nullmarker
-	amf3falsemarker
-	amf3truemarker
-	amf3integermarker
-	amf3doublemarker
-	amf3stringmarker
-	amf3xmldocmarker
-	amf3datemarker
-	amf3arraymarker
-	amf3objectmarker
-	amf3xmlmarker
-	amf3bytearraymarker
-	amf3vectorintmarker
-	amf3vectoruintmarker
-	amf3vectordoublemarker
-	amf3vectorobjectmarker
-	amf3dictionarymarker
-)
-
-const (
 	numbermarker = iota
 	booleanmarker
 	stringmarker
@@ -94,8 +73,20 @@ const (
 	avmplusobjectmarker
 )
 
+// amf0Value returns the AMF type for values of the same underlying type, e.g. AMFMap for a
+// map[string]interface{}.
+func amf0Value(val interface{}) interface{} {
+	switch val := val.(type) {
+	case map[string]interface{}:
+		return AMFMap(val)
+	case []interface{}:
+		return AMFArray(val)
+	}
+	return val
+}
+
 func LenAMF0Val(_val interface{}) (n int) {
-	switch val := _val.(type) {
+	switch val := amf0Value(_val).(type) {
 	case int8:
 		n += lenAMF0Number
 	case int16:
@@ -123,7 +114,7 @@ func LenAMF0Val(_val interface{}) (n int) {
 
 	case string:
 		u := len(val)
-		if u <= 65536 {
+		if u <= 0xFFFF { // the length of a string has 16 bits, of a long string 32 bits
 			n += 3
 		} else {
 			n += 5
@@ -162,13 +153,17 @@ func LenAMF0Val(_val interface{}) (n int) {
 
 	case nil:
 		n++
+
+	default:
+		// unsupported types are encoded as null, such that the message stays valid
+		n++
 	}
 
 	return
 }
 
 func FillAMF0Val(b []byte, _val interface{}) (n int) {
-	switch val := _val.(type) {
+	switch val := amf0Value(_val).(type) {
 	case int8:
 		n += fillAMF0Number(b[n:], float64(val))
 	case int16:
@@ -196,7 +191,7 @@ func FillAMF0Val(b []byte, _val interface{}) (n int) {
 
 	case string:
 		u := len(val)
-		if u <= 65536 {
+		if u <= 0xFFFF { // the length of a string has 16 bits, of a long string 32 bits
 			b[n] = stringmarker
 			n++
 			pio.PutU16BE(b[n:], uint16(u))
@@ -273,16 +268,28 @@ func FillAMF0Val(b []byte, _val interface{}) (n int) {
 	case nil:
 		b[n] = nullmarker
 		n++
+
+	default:
+		// unsupported types are encoded as null, such that the message stays valid
+		b[n] = nullmarker
+		n++
 	}
 
 	return
 }
 
+// MaxAMF0Depth is the maximum nesting depth of objects and arrays when parsing AMF0 values.
+const MaxAMF0Depth = 64
+
 func ParseAMF0Val(b []byte) (val interface{}, n int, err error) {
-	return parseAMF0Val(b, 0)
+	return parseAMF0Val(b, 0, 0)
 }
 
-func parseAMF0Val(b []byte, offset int) (val interface{}, n int, err error) {
+func parseAMF0Val(b []byte, offset int, depth int) (val interface{}, n int, err error) {
+	if depth > MaxAMF0Depth {
+		err = amf0ParseErr("depth", offset+n, err)
+		return
+	}
 	if len(b) < n+1 {
 		err = amf0ParseErr("marker", offset+n, err)
 		return
@@ -322,7 +329,22 @@ func parseAMF0Val(b []byte, offset int) (val interface{}, n int, err error) {
 		val = string(b[n : n+length])
 		n += length
 
-	case objectmarker:
+	case objectmarker, typedobjectmarker:
+		if marker == typedobjectmarker {
+			// the class name is followed by the properties as in an object, the class name is dropped
+			if len(b) < n+2 {
+				err = amf0ParseErr("typedobject.classname.length", offset+n, err)
+				return
+			}
+			length := int(pio.U16BE(b[n:]))
+			n += 2
+			if len(b) < n+length {
+				err = amf0ParseErr("typedobject.classname.body", offset+n, err)
+				return
+			}
+			n += length
+		}
+
 		obj := AMFMap{}
 		for {
 			if len(b) < n+2 {
@@ -344,7 +366,7 @@ func parseAMF0Val(b []byte, offset int) (val interface{}, n int, err error) {
 
 			var nval int
 			var oval interface{}
-			if oval, nval, err = parseAMF0Val(b[n:], offset+n); err != nil {
+			if oval, nval, err = parseAMF0Val(b[n:], offset+n, depth+1); err != nil {
 				err = amf0ParseErr("object.val", offset+n, err)
 				return
 			}
@@ -391,7 +413,7 @@ func parseAMF0Val(b []byte, offset int) (val interface{}, n int, err error) {
 
 			var nval int
 			var oval interface{}
-			if oval, nval, err = parseAMF0Val(b[n:], offset+n); err != nil {
+			if oval, nval, err = parseAMF0Val(b[n:], offset+n, depth+1); err != nil {
 				err = amf0ParseErr("array.val", offset+n, err)
 				return
 			}
@@ -421,10 +443,16 @@ func parseAMF0Val(b []byte, offset int) (val interface{}, n int, err error) {
 		count := int(pio.U32BE(b[n:]))
 		n += 4
 
+		// each value takes at least one byte (the marker)
+		if count > len(b)-n {
+			err = amf0ParseErr("strictarray.count", offset+n, err)
+			return
+		}
+
 		obj := make(AMFArray, count)
 		for i := 0; i < int(count); i++ {
 			var nval int
-			if obj[i], nval, err = parseAMF0Val(b[n:], offset+n); err != nil {
+			if obj[i], nval, err = parseAMF0Val(b[n:], offset+n, depth+1); err != nil {
 				err = amf0ParseErr("strictarray.val", offset+n, err)
 				return
 			}

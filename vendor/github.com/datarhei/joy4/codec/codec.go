@@ -61,3 +61,22 @@ func NewSpeexCodecData(sr int, cl av.ChannelLayout) SpeexCodecData {
 	codec.ChannelLayout_ = cl
 	return codec
 }
+
+type NellymoserCodecData struct {
+	fake.CodecData
+}
+
+func (self NellymoserCodecData) PacketDuration(data []byte) (time.Duration, error) {
+	// libavcodec/nellymoserdec.c
+	// a block of 64 bytes has 256 samples
+	return time.Duration(len(data)/64*256) * time.Second / time.Duration(self.SampleRate_), nil
+}
+
+func NewNellymoserCodecData(sr int, cl av.ChannelLayout) NellymoserCodecData {
+	codec := NellymoserCodecData{}
+	codec.CodecType_ = av.NELLYMOSER
+	codec.SampleFormat_ = av.S16
+	codec.SampleRate_ = sr
+	codec.ChannelLayout_ = cl
+	return codec
+}
