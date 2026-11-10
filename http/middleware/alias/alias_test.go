@@ -3,10 +3,11 @@ package alias
 import (
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"testing"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/http/handler/util"
+	"github.com/datarhei/core/v16/io/fs"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,26 @@ type result struct {
 	OuterPath string
 }
 
-func newRouter(rules []Rule) *echo.Echo {
+func newAliaser(t *testing.T, rules []alias.Rule) alias.Manager {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	aliaser, err := alias.New(alias.Config{
+		Filesystem: memfs,
+		Filepath:   "/aliases.json",
+	})
+	require.NoError(t, err)
+
+	for _, rule := range rules {
+		require.NoError(t, aliaser.Add(rule))
+	}
+
+	return aliaser
+}
+
+func newRouter(t *testing.T, rules []alias.Rule) (*echo.Echo, alias.Manager) {
+	aliaser := newAliaser(t, rules)
+
 	e := echo.New()
 
 	// Mimics the log middleware which sees the path after the handler returns.
@@ -33,8 +53,8 @@ func newRouter(rules []Rule) *echo.Echo {
 	})
 
 	e.Use(NewWithConfig(Config{
-		Mounts: []string{"/", "/memfs"},
-		Rules:  rules,
+		Mounts:  []string{"/", "/memfs"},
+		Aliaser: aliaser,
 	}))
 
 	handler := func(c echo.Context) error {
@@ -54,7 +74,7 @@ func newRouter(rules []Rule) *echo.Echo {
 
 	e.GET("/api/*", handler)
 
-	return e
+	return e, aliaser
 }
 
 func request(e *echo.Echo, method, target string) result {
@@ -73,11 +93,11 @@ func request(e *echo.Echo, method, target string) result {
 }
 
 func TestAlias(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
-		{Pattern: regexp.MustCompile(`^/memfs/b/x\.txt$`), Target: "/memfs/never.txt"},
-		{Pattern: regexp.MustCompile(`^/memfs/(?P<user>[^/]+)/shared/(.*)$`), Target: "/memfs/${user}-public/$2"},
-		{Pattern: regexp.MustCompile(`^/foo/(.*)$`), Target: "/bar/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
+		{Pattern: `^/memfs/b/x\.txt$`, Target: "/memfs/never.txt"},
+		{Pattern: `^/memfs/(?P<user>[^/]+)/shared/(.*)$`, Target: "/memfs/${user}-public/$2"},
+		{Pattern: `^/foo/(.*)$`, Target: "/bar/$1"},
 	})
 
 	r := request(e, http.MethodGet, "/memfs/b/x.txt?session=123&token=abc")
@@ -102,8 +122,8 @@ func TestAlias(t *testing.T) {
 }
 
 func TestAliasNoMatch(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
 	})
 
 	r := request(e, http.MethodGet, "/memfs/c/x.txt")
@@ -113,8 +133,8 @@ func TestAliasNoMatch(t *testing.T) {
 }
 
 func TestAliasMethods(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
 	})
 
 	for _, method := range []string{http.MethodPut, http.MethodDelete} {
@@ -126,8 +146,8 @@ func TestAliasMethods(t *testing.T) {
 }
 
 func TestAliasNonFilesystemRoute(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/api/(.*)$`), Target: "/api/v3/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/api/(.*)$`, Target: "/api/v3/$1"},
 	})
 
 	r := request(e, http.MethodGet, "/api/foo")
@@ -136,11 +156,11 @@ func TestAliasNonFilesystemRoute(t *testing.T) {
 }
 
 func TestAliasOtherMount(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/disk/$1"},
-		{Pattern: regexp.MustCompile(`^/foo/(.*)$`), Target: "/memfs/$1"},
-		{Pattern: regexp.MustCompile(`^/memfs/c/(.*)$`), Target: "/memfs/../$1"},
-		{Pattern: regexp.MustCompile(`^/memfs/d/(.*)$`), Target: "/memfs/a/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/disk/$1"},
+		{Pattern: `^/foo/(.*)$`, Target: "/memfs/$1"},
+		{Pattern: `^/memfs/c/(.*)$`, Target: "/memfs/../$1"},
+		{Pattern: `^/memfs/d/(.*)$`, Target: "/memfs/a/$1"},
 	})
 
 	// From /memfs to /
@@ -161,8 +181,8 @@ func TestAliasOtherMount(t *testing.T) {
 }
 
 func TestAliasEscaping(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
 	})
 
 	r := request(e, http.MethodGet, "/memfs/b/x%20y%2541.txt")
@@ -173,8 +193,8 @@ func TestAliasEscaping(t *testing.T) {
 }
 
 func TestAliasTrailingSlash(t *testing.T) {
-	e := newRouter([]Rule{
-		{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
 	})
 
 	r := request(e, http.MethodGet, "/memfs/b/dir/")
@@ -183,9 +203,55 @@ func TestAliasTrailingSlash(t *testing.T) {
 }
 
 func TestAliasNoRules(t *testing.T) {
-	e := newRouter(nil)
+	e, _ := newRouter(t, nil)
 
 	r := request(e, http.MethodGet, "/memfs/b/x.txt")
 	require.Equal(t, http.StatusOK, r.Status)
 	require.Equal(t, "/b/x.txt", r.Param)
+}
+
+func TestAliasDynamic(t *testing.T) {
+	e, aliaser := newRouter(t, nil)
+
+	r := request(e, http.MethodGet, "/memfs/b/x.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/b/x.txt", r.Param)
+
+	// A new rule applies to the next request
+	require.NoError(t, aliaser.Add(alias.Rule{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"}))
+
+	r = request(e, http.MethodGet, "/memfs/b/x.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/a/x.txt", r.Param)
+
+	// An updated rule applies to the next request
+	require.NoError(t, aliaser.Update(`^/memfs/b/(.*)$`, alias.Rule{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/c/$1"}))
+
+	r = request(e, http.MethodGet, "/memfs/b/x.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/c/x.txt", r.Param)
+
+	// A removed rule doesn't apply anymore
+	require.NoError(t, aliaser.Remove(`^/memfs/b/(.*)$`))
+
+	r = request(e, http.MethodGet, "/memfs/b/x.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/b/x.txt", r.Param)
+}
+
+func TestAliasNoAliaser(t *testing.T) {
+	e := echo.New()
+	e.Use(NewWithConfig(Config{
+		Mounts: []string{"/memfs"},
+	}))
+	e.GET("/memfs/*", func(c echo.Context) error {
+		return c.String(http.StatusOK, util.PathWildcardParam(c))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/memfs/b/x.txt", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "/b/x.txt", rec.Body.String())
 }

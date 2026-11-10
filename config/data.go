@@ -101,9 +101,8 @@ type Data struct {
 				Patterns []string `json:"patterns"`
 			} `json:"backup"`
 		} `json:"memory"`
-		S3      []value.S3Storage `json:"s3"`
-		Aliases []value.Alias     `json:"aliases"`
-		CORS    struct {
+		S3   []value.S3Storage `json:"s3"`
+		CORS struct {
 			Origins []string `json:"origins"`
 		} `json:"cors"`
 		MimeTypesFile string            `json:"mimetypes_file"`
@@ -315,7 +314,6 @@ func MergeV2toV3(data *Data, d *v2.Data) (*Data, error) {
 	data.Storage.Memory.Purge = d.Storage.Memory.Purge
 
 	data.Storage.S3 = []value.S3Storage{}
-	data.Storage.Aliases = []value.Alias{}
 
 	data.FFmpeg.Log.MaxMinimalHistory = 0
 

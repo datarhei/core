@@ -10,13 +10,13 @@ import (
 	gohttp "net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/app"
 	"github.com/datarhei/core/v16/autocert"
 	"github.com/datarhei/core/v16/cluster"
@@ -28,7 +28,6 @@ import (
 	"github.com/datarhei/core/v16/http"
 	"github.com/datarhei/core/v16/http/cache"
 	httpfs "github.com/datarhei/core/v16/http/fs"
-	mwalias "github.com/datarhei/core/v16/http/middleware/alias"
 	"github.com/datarhei/core/v16/http/router"
 	"github.com/datarhei/core/v16/iam"
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
@@ -101,6 +100,7 @@ type api struct {
 	resources       resources.Resources
 	cluster         cluster.Cluster
 	iam             iam.IAM
+	aliases         alias.Manager
 
 	errorChan chan error
 
@@ -1480,18 +1480,23 @@ func (a *api) start(ctx context.Context) error {
 		})
 	}
 
-	aliases := []mwalias.Rule{}
-	for _, a := range cfg.Storage.Aliases {
-		pattern, err := regexp.Compile(a.Pattern)
-		if err != nil {
-			return fmt.Errorf("invalid pattern for alias '%s': %w", a.Pattern, err)
-		}
-
-		aliases = append(aliases, mwalias.Rule{
-			Pattern: pattern,
-			Target:  a.Target,
-		})
+	aliasfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+		Root: cfg.DB.Dir,
+	})
+	if err != nil {
+		return err
 	}
+
+	aliases, err := alias.New(alias.Config{
+		Filesystem: aliasfs,
+		Filepath:   "/aliases.json",
+		Logger:     a.log.logger.core.WithComponent("Alias"),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to create alias manager: %w", err)
+	}
+
+	a.aliases = aliases
 
 	serverConfig := http.Config{
 		Logger:        a.log.logger.main,
@@ -1539,7 +1544,7 @@ func (a *api) start(ctx context.Context) error {
 			MimeTypes: cfg.Compress.MimeTypes,
 			MinLength: cfg.Compress.MinLength,
 		},
-		Aliases: aliases,
+		Aliaser: a.aliases,
 	}
 
 	if cfg.RTMP.HTTPFLV.Enable {
@@ -1911,6 +1916,9 @@ func (a *api) stop() {
 		a.restream.Stop()
 		a.restream = nil
 	}
+
+	// Release the alias manager
+	a.aliases = nil
 
 	if a.iam != nil {
 		a.iam.Close()

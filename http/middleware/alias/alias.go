@@ -15,22 +15,15 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/log"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
-
-// Rule describes an alias. If the request path matches Pattern, the path will be
-// replaced by Target. Target can reference capture groups of Pattern with $1, ${1}, or ${name}.
-type Rule struct {
-	Pattern *regexp.Regexp
-	Target  string
-}
 
 type Config struct {
 	// Skipper defines a function to skip middleware.
@@ -39,8 +32,9 @@ type Config struct {
 	// Mounts is the list of the mountpoints of the filesystems, e.g. "/", "/memfs".
 	Mounts []string
 
-	// Rules is the list of aliases. The first matching rule will be applied.
-	Rules []Rule
+	// Aliaser resolves the requested path to the target path. The aliaser is
+	// asked on every request, such that changes of the rules apply immediately.
+	Aliaser alias.Aliaser
 
 	Logger log.Logger
 }
@@ -48,7 +42,7 @@ type Config struct {
 var DefaultConfig = Config{
 	Skipper: middleware.DefaultSkipper,
 	Mounts:  []string{},
-	Rules:   []Rule{},
+	Aliaser: nil,
 	Logger:  nil,
 }
 
@@ -84,11 +78,9 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 		routes[mount+"/*"] = mount
 	}
 
-	rules := slices.Clone(config.Rules)
-
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if len(rules) == 0 || config.Skipper(c) {
+			if config.Aliaser == nil || config.Skipper(c) {
 				return next(c)
 			}
 
@@ -105,10 +97,12 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 			source := req.URL.Path
 
-			target, ok := resolve(rules, source)
+			target, ok := config.Aliaser.Alias(source)
 			if !ok {
 				return next(c)
 			}
+
+			target = cleanPath(target)
 
 			// The target must be on the same filesystem as the request has been routed to.
 			if findMount(mounts, target) != mount {
@@ -147,22 +141,6 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
-}
-
-// resolve returns the cleaned target path of the first rule that matches path.
-func resolve(rules []Rule, path string) (string, bool) {
-	for _, rule := range rules {
-		match := rule.Pattern.FindStringSubmatchIndex(path)
-		if match == nil {
-			continue
-		}
-
-		target := string(rule.Pattern.ExpandString(nil, rule.Target, path, match))
-
-		return cleanPath(target), true
-	}
-
-	return "", false
 }
 
 // cleanPath cleans the path and keeps a trailing slash.

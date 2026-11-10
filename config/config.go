@@ -128,7 +128,6 @@ func (d *Config) Clone() *Config {
 	data.Storage.Disk.Cache.Types.Allow = slices.Copy(d.Storage.Disk.Cache.Types.Allow)
 	data.Storage.Disk.Cache.Types.Block = slices.Copy(d.Storage.Disk.Cache.Types.Block)
 	data.Storage.S3 = slices.Copy(d.Storage.S3)
-	data.Storage.Aliases = slices.Copy(d.Storage.Aliases)
 	data.Storage.MimeTypes = copy.StringMap(d.Storage.MimeTypes)
 
 	data.FFmpeg.Access.Input.Allow = slices.Copy(d.FFmpeg.Access.Input.Allow)
@@ -261,9 +260,6 @@ func (d *Config) init() {
 
 	// Storage (S3)
 	d.vars.Register(value.NewS3StorageListValue(&d.Storage.S3, []value.S3Storage{}, "|"), "storage.s3", "CORE_STORAGE_S3", nil, "List of S3 storage URLS", false, false)
-
-	// Storage (Aliases)
-	d.vars.Register(value.NewAliasList(&d.Storage.Aliases, []value.Alias{}, " "), "storage.aliases", "CORE_STORAGE_ALIASES", nil, "List of path aliases (regexp->target), applied to GET and HEAD requests after authorization", false, false)
 
 	// Storage (CORS)
 	d.vars.Register(value.NewCORSOrigins(&d.Storage.CORS.Origins, []string{"*"}, ","), "storage.cors.origins", "CORE_STORAGE_CORS_ORIGINS", nil, "Allowed CORS origins for /memfs and /data", false, false)

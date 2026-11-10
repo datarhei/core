@@ -36,6 +36,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/cluster"
 	cfgstore "github.com/datarhei/core/v16/config/store"
 	"github.com/datarhei/core/v16/event"
@@ -110,7 +111,7 @@ type Config struct {
 	IAMSkipper       func(ip string) bool
 	Resources        resources.Resources
 	Compress         CompressConfig
-	Aliases          []mwalias.Rule
+	Aliaser          alias.Aliaser
 }
 
 type CorsConfig struct {
@@ -447,16 +448,16 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	s.router.Use(s.middleware.iam)
 
 	// Aliases are applied after the IAM check, such that the IAM rules apply to the requested path
-	if len(config.Aliases) != 0 {
+	if config.Aliaser != nil {
 		aliasMounts := []string{}
 		for _, filesystem := range s.filesystems {
 			aliasMounts = append(aliasMounts, filesystem.Mountpoint)
 		}
 
 		s.router.Use(mwalias.NewWithConfig(mwalias.Config{
-			Mounts: aliasMounts,
-			Rules:  config.Aliases,
-			Logger: s.logger.WithComponent("Alias"),
+			Mounts:  aliasMounts,
+			Aliaser: config.Aliaser,
+			Logger:  s.logger.WithComponent("Alias"),
 		}))
 	}
 

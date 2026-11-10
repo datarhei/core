@@ -4,10 +4,10 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/http/errorhandler"
 	httpfs "github.com/datarhei/core/v16/http/fs"
 	"github.com/datarhei/core/v16/http/handler"
@@ -86,9 +86,9 @@ func TestAliasWithIAM(t *testing.T) {
 	}))
 	e.Use(NewWithConfig(Config{
 		Mounts: []string{"/", "/memfs"},
-		Rules: []Rule{
-			{Pattern: regexp.MustCompile(`^/memfs/b/(.*)$`), Target: "/memfs/a/$1"},
-		},
+		Aliaser: newAliaser(t, []alias.Rule{
+			{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
+		}),
 	}))
 
 	g := e.Group("/memfs/*")
