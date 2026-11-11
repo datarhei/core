@@ -630,7 +630,18 @@ func (p *process) Start() error {
 	if p.scheduler != nil {
 		next, err := p.scheduler.Next()
 		if err != nil {
-			return err
+			// There's no next scheduled time, e.g. the point in time has passed. The
+			// order is set, but the process will not be started, same as if it would
+			// have finished.
+			p.debuglogger.WithFields(log.Fields{
+				"state": p.getStateString(),
+				"order": p.getOrder(),
+				"error": err,
+			}).Debug().Log("No next scheduled start")
+
+			p.reconnect(time.Duration(-1))
+
+			return nil
 		}
 
 		p.reconnect(next)

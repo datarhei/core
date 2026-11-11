@@ -645,3 +645,57 @@ func TestSetProcessNodeMap(t *testing.T) {
 	m := s.ProcessGetNodeMap()
 	require.Equal(t, m2, m)
 }
+
+func TestUpdateProcessAutostart(t *testing.T) {
+	s, err := createStore()
+	require.NoError(t, err)
+
+	err = s.addProcess(CommandAddProcess{
+		Config: &app.Config{
+			ID:          "foobar",
+			LimitCPU:    1,
+			LimitMemory: 1,
+			Autostart:   true,
+		},
+	})
+	require.NoError(t, err)
+
+	p, _, err := s.ProcessGet(app.ProcessID{ID: "foobar"})
+	require.NoError(t, err)
+	require.False(t, p.Config.Autostart)
+	require.Equal(t, "start", p.Order)
+
+	// Same ID
+	err = s.updateProcess(CommandUpdateProcess{
+		ID: app.ProcessID{ID: "foobar"},
+		Config: &app.Config{
+			ID:          "foobar",
+			LimitCPU:    1,
+			LimitMemory: 1,
+			Autostart:   true,
+		},
+	})
+	require.NoError(t, err)
+
+	p, _, err = s.ProcessGet(app.ProcessID{ID: "foobar"})
+	require.NoError(t, err)
+	require.False(t, p.Config.Autostart)
+	require.Equal(t, "start", p.Order)
+
+	// Different ID
+	err = s.updateProcess(CommandUpdateProcess{
+		ID: app.ProcessID{ID: "foobar"},
+		Config: &app.Config{
+			ID:          "foobaz",
+			LimitCPU:    1,
+			LimitMemory: 1,
+			Autostart:   true,
+		},
+	})
+	require.NoError(t, err)
+
+	p, _, err = s.ProcessGet(app.ProcessID{ID: "foobaz"})
+	require.NoError(t, err)
+	require.False(t, p.Config.Autostart)
+	require.Equal(t, "start", p.Order)
+}

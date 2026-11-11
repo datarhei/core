@@ -440,11 +440,52 @@ func TestProcessSchedulePointInTimeGone(t *testing.T) {
 	require.Equal(t, "finished", status.State)
 
 	err = p.Start()
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	status = p.Status()
 	require.Equal(t, "start", status.Order)
 	require.Equal(t, "finished", status.State)
+	require.Negative(t, status.Reconnect)
+
+	// Nothing will be started
+	time.Sleep(2 * time.Second)
+
+	status = p.Status()
+	require.Equal(t, "start", status.Order)
+	require.Equal(t, "finished", status.State)
+
+	err = p.Stop(false, "")
+	require.NoError(t, err)
+
+	status = p.Status()
+	require.Equal(t, "stop", status.Order)
+}
+
+func TestProcessScheduleCronNoNext(t *testing.T) {
+	// There's no 30th of February
+	s, err := NewScheduler("0 0 30 2 *")
+	require.NoError(t, err)
+
+	_, err = s.Next()
+	require.Error(t, err)
+
+	p, _ := New(Config{
+		Binary: "sleep",
+		Args: []string{
+			"5",
+		},
+		Reconnect: false,
+		Scheduler: s,
+		Resources: newResources(),
+	})
+
+	err = p.Start()
+	require.NoError(t, err)
+
+	status := p.Status()
+	require.Equal(t, "start", status.Order)
+	require.Equal(t, "finished", status.State)
+	require.Negative(t, status.Reconnect)
 }
 
 func TestProcessScheduleCron(t *testing.T) {

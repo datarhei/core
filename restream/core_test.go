@@ -180,6 +180,28 @@ func TestAutostartProcess(t *testing.T) {
 	rs.StopProcess(tid)
 }
 
+func TestAutostartProcessSchedulePast(t *testing.T) {
+	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
+	require.NoError(t, err)
+
+	process := getDummyProcess()
+	process.Autostart = true
+	process.Scheduler = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+
+	tid := app.ProcessID{ID: process.ID}
+
+	err = rs.AddProcess(process)
+	require.NoError(t, err)
+
+	state, err := rs.GetProcessState(tid)
+	require.NoError(t, err)
+	require.Equal(t, "start", state.Order)
+	require.Equal(t, "finished", state.State)
+	require.Negative(t, state.Reconnect)
+
+	require.NoError(t, rs.StopProcess(tid))
+}
+
 func TestAddInvalidProcess(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)

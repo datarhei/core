@@ -73,6 +73,9 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", srcid, ErrNotFound)
 	}
 
+	// The order is stored separately and it is not changed by an update.
+	cmd.Config.Autostart = false
+
 	if srcid == dstid {
 		p.UpdatedAt = time.Now()
 		p.Config = cmd.Config
