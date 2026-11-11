@@ -192,6 +192,24 @@ func TestAliasEscaping(t *testing.T) {
 	require.Equal(t, "/memfs/b/x y%41.txt", r.OuterPath)
 }
 
+func TestAliasEscapingRawPath(t *testing.T) {
+	e, _ := newRouter(t, []alias.Rule{
+		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},
+	})
+
+	// The encoded slash makes the router match on the raw path
+	r := request(e, http.MethodGet, "/memfs/b/x%2Fy%2520z.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/a/x/y%20z.txt", r.Param)
+	require.Equal(t, "/memfs/a/x/y%20z.txt", r.Path)
+	require.Equal(t, "/memfs/b/x/y%20z.txt", r.OuterPath)
+
+	// Without alias
+	r = request(e, http.MethodGet, "/memfs/c/x%2Fy%2520z.txt")
+	require.Equal(t, http.StatusOK, r.Status)
+	require.Equal(t, "/c/x/y%20z.txt", r.Param)
+}
+
 func TestAliasTrailingSlash(t *testing.T) {
 	e, _ := newRouter(t, []alias.Rule{
 		{Pattern: `^/memfs/b/(.*)$`, Target: "/memfs/a/$1"},

@@ -51,8 +51,16 @@ func PathWildcardParam(c echo.Context) string {
 	return "/" + PathParam(c, "*")
 }
 
+// PathParam returns the decoded value of the path parameter with the given name.
+// Echo matches the route on the raw path only if it is set, i.e. if it differs from
+// the default encoding of the path (e.g. if it contains %2F). Otherwise the route has
+// been matched on the decoded path and the parameter is already decoded.
 func PathParam(c echo.Context, name string) string {
 	param := c.Param(name)
+
+	if len(c.Request().URL.RawPath) == 0 {
+		return param
+	}
 
 	param, err := url.PathUnescape(param)
 	if err != nil {

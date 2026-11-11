@@ -13,7 +13,6 @@ package alias
 
 import (
 	"net/http"
-	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -133,9 +132,9 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			req.URL.Path = target
 			req.URL.RawPath = ""
 
-			// The wildcard parameter is the escaped path without the mountpoint and without the leading slash.
-			u := url.URL{Path: strings.TrimPrefix(target, mount+"/")}
-			values[index] = u.EscapedPath()
+			// The raw path is not set, so the wildcard parameter is the decoded path without
+			// the mountpoint and without the leading slash, same as echo would set it.
+			values[index] = strings.TrimPrefix(target, mount+"/")
 			c.SetParamValues(values...)
 
 			return next(c)

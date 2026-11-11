@@ -271,6 +271,48 @@ func TestFilesystemsListLastmod(t *testing.T) {
 	require.ElementsMatch(t, []string{"/b", "/c"}, files)
 }
 
+func TestFilesystemsEscaping(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/",
+			AllowWrite: true,
+			Filesystem: memfs,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	files := map[string]string{
+		"/foo/a%20b.txt":       "/a b.txt",
+		"/foo/a%2520b.txt":     "/a%20b.txt",
+		"/foo/a%25b.txt":       "/a%b.txt",
+		"/foo/a+b.txt":         "/a+b.txt",
+		"/foo/d%2Fa%2520b.txt": "/d/a%20b.txt",
+	}
+
+	for path, name := range files {
+		mock.Request(t, http.StatusCreated, router, "PUT", path, strings.NewReader(name))
+		_, err := memfs.Stat(name)
+		require.NoError(t, err, path)
+
+		response := mock.Request(t, http.StatusOK, router, "GET", path, nil)
+		require.Equal(t, name, string(response.Raw), path)
+	}
+
+	require.Equal(t, len(files), len(memfs.List("/", fs.ListOptions{})))
+
+	for path := range files {
+		mock.Request(t, http.StatusOK, router, "DELETE", path, nil)
+	}
+
+	require.Equal(t, 0, len(memfs.List("/", fs.ListOptions{})))
+}
+
 func TestFilesystemsListGlob(t *testing.T) {
 	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
 	require.NoError(t, err)
