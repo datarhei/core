@@ -433,13 +433,7 @@ func NewServer(config Config) (serverhandler.Server, error) {
 	//s.router.IPExtractor = echo.ExtractIPDirect()
 	s.router.Use(s.middleware.log)
 	s.router.Use(s.middleware.autohead)
-	s.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
-		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			rows := strings.Split(string(stack), "\n")
-			s.logger.Error().WithField("stack", rows).Log("recovered from a panic")
-			return nil
-		},
-	}))
+	s.router.Use(newRecoverMiddleware(s.logger))
 
 	s.router.HideBanner = true
 	s.router.HidePort = true
@@ -902,4 +896,16 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.POST("/events/media/:type", s.v3handler.events.MediaEvents)
 		v3.POST("/events/process", s.v3handler.events.ProcessEvents)
 	}
+}
+
+// newRecoverMiddleware returns a middleware that recovers from a panic in a handler. The
+// panic is logged and a 500 without any details about the panic is sent.
+func newRecoverMiddleware(logger log.Logger) echo.MiddlewareFunc {
+	return middleware.RecoverWithConfig(middleware.RecoverConfig{
+		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
+			rows := strings.Split(string(stack), "\n")
+			logger.Error().WithError(err).WithField("stack", rows).Log("recovered from a panic")
+			return echo.NewHTTPError(http.StatusInternalServerError)
+		},
+	})
 }

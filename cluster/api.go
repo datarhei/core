@@ -87,13 +87,7 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.Use(mwlog.NewWithConfig(mwlog.Config{
 		Logger: a.logger,
 	}))
-	a.router.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
-		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			rows := strings.Split(string(stack), "\n")
-			a.logger.Error().WithField("stack", rows).Log("Recovered from a panic")
-			return nil
-		},
-	}))
+	a.router.Use(newRecoverMiddleware(a.logger))
 	a.router.Logger.SetOutput(httplog.NewWrapper(a.logger))
 
 	// Swagger API documentation router group
@@ -1269,6 +1263,18 @@ func ErrFromClusterError(err error) Error {
 	}
 
 	return Err(status, "", "%s", err.Error())
+}
+
+// newRecoverMiddleware returns a middleware that recovers from a panic in a handler. The
+// panic is logged and the error is passed on to the error handler, such that a 500 is sent.
+func newRecoverMiddleware(logger log.Logger) echo.MiddlewareFunc {
+	return middleware.RecoverWithConfig(middleware.RecoverConfig{
+		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
+			rows := strings.Split(string(stack), "\n")
+			logger.Error().WithError(err).WithField("stack", rows).Log("Recovered from a panic")
+			return fmt.Errorf("recovered from a panic: %w", err)
+		},
+	})
 }
 
 // ErrorHandler is a genral handler for echo handler errors
