@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -268,6 +269,49 @@ func TestFilesystemsListLastmod(t *testing.T) {
 	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?lastmod_start="+strconv.FormatInt(b.Unix(), 10)+"&lastmod_end="+strconv.FormatInt(c.Unix(), 10), nil))
 	require.Equal(t, 2, len(files))
 	require.ElementsMatch(t, []string{"/b", "/c"}, files)
+}
+
+func TestFilesystemsListGlob(t *testing.T) {
+	memfs, err := fs.NewMemFilesystem(fs.MemConfig{})
+	require.NoError(t, err)
+
+	memfs.WriteFileReader("/a+b.txt", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/a b.txt", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/a%20b.txt", strings.NewReader("a"), -1)
+	memfs.WriteFileReader("/c.txt", strings.NewReader("a"), -1)
+
+	filesystems := []httpfs.FS{
+		{
+			Name:       "foo",
+			Mountpoint: "/foo",
+			AllowWrite: true,
+			Filesystem: memfs,
+		},
+	}
+
+	router, err := getDummyFilesystemsRouter(filesystems)
+	require.NoError(t, err)
+
+	getNames := func(r *mock.Response) []string {
+		files := []api.FilesystemInfo{}
+		err := json.Unmarshal(r.Raw, &files)
+		require.NoError(t, err)
+
+		names := []string{}
+		for _, f := range files {
+			names = append(names, f.Name)
+		}
+		return names
+	}
+
+	files := getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?glob="+url.QueryEscape("/a+b*"), nil))
+	require.ElementsMatch(t, []string{"/a+b.txt"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?glob="+url.QueryEscape("/a b*"), nil))
+	require.ElementsMatch(t, []string{"/a b.txt"}, files)
+
+	files = getNames(mock.Request(t, http.StatusOK, router, "GET", "/foo?glob="+url.QueryEscape("/a%20b*"), nil))
+	require.ElementsMatch(t, []string{"/a%20b.txt"}, files)
 }
 
 func TestFilesystemsDeleteFiles(t *testing.T) {

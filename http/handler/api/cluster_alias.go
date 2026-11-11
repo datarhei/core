@@ -124,9 +124,9 @@ func (h *ClusterHandler) AliasAdd(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/alias/rule [get]
 func (h *ClusterHandler) AliasGet(c echo.Context) error {
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	r, err := h.cluster.Store().AliasGet(pattern)
@@ -162,9 +162,9 @@ func (h *ClusterHandler) AliasUpdate(c echo.Context) error {
 		return err
 	}
 
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	a := api.Alias{}
@@ -199,9 +199,9 @@ func (h *ClusterHandler) AliasRemove(c echo.Context) error {
 		return err
 	}
 
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	if err := h.cluster.AliasRemove("", pattern); err != nil {

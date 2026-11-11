@@ -135,9 +135,9 @@ func (h *AliasHandler) Add(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v3/alias/rule [get]
 func (h *AliasHandler) Get(c echo.Context) error {
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	r, err := h.aliases.Get(pattern)
@@ -173,9 +173,9 @@ func (h *AliasHandler) Update(c echo.Context) error {
 		return err
 	}
 
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	a := api.Alias{}
@@ -210,9 +210,9 @@ func (h *AliasHandler) Delete(c echo.Context) error {
 		return err
 	}
 
-	pattern, err := patternParam(c)
-	if err != nil {
-		return err
+	pattern := util.DefaultQuery(c, "pattern", "")
+	if len(pattern) == 0 {
+		return apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
 	}
 
 	if err := h.aliases.Remove(pattern); err != nil {
@@ -228,17 +228,6 @@ func checkSuperuser(c echo.Context) error {
 	}
 
 	return nil
-}
-
-func patternParam(c echo.Context) (string, error) {
-	// QueryParam already decodes the value. Don't decode it again, because
-	// a pattern may contain characters like "+" or "%".
-	pattern := c.QueryParam("pattern")
-	if len(pattern) == 0 {
-		return "", apierrors.Err(http.StatusBadRequest, "", "the pattern is missing")
-	}
-
-	return pattern, nil
 }
 
 func aliasError(err error) error {

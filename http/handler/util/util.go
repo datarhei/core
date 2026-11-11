@@ -62,15 +62,12 @@ func PathParam(c echo.Context, name string) string {
 	return param
 }
 
+// DefaultQuery returns the value of the query parameter with the given name. The value
+// is already decoded. If the value is empty, the default value is returned.
 func DefaultQuery(c echo.Context, name, defValue string) string {
 	param := c.QueryParam(name)
 
 	if len(param) == 0 {
-		return defValue
-	}
-
-	param, err := url.QueryUnescape(param)
-	if err != nil {
 		return defValue
 	}
 

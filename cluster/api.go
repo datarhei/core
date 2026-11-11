@@ -856,8 +856,7 @@ func (a *api) AliasAdd(c echo.Context) error {
 // @Failure 508 {object} Error
 // @Router /v1/alias/rule [put]
 func (a *api) AliasUpdate(c echo.Context) error {
-	// QueryParam already decodes the value, don't decode it again.
-	pattern := c.QueryParam("pattern")
+	pattern := util.DefaultQuery(c, "pattern", "")
 
 	r := client.UpdateAliasRequest{}
 
@@ -902,8 +901,7 @@ func (a *api) AliasUpdate(c echo.Context) error {
 // @Failure 508 {object} Error
 // @Router /v1/alias/rule [delete]
 func (a *api) AliasRemove(c echo.Context) error {
-	// QueryParam already decodes the value, don't decode it again.
-	pattern := c.QueryParam("pattern")
+	pattern := util.DefaultQuery(c, "pattern", "")
 
 	origin := c.Request().Header.Get("X-Cluster-Origin")
 
