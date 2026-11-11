@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/autocert"
 	clusterautocert "github.com/datarhei/core/v16/cluster/autocert"
 	apiclient "github.com/datarhei/core/v16/cluster/client"
@@ -81,6 +82,12 @@ type Cluster interface {
 	KVGet(origin, key string, stale bool) (string, time.Time, error)
 
 	NodeSetState(origin, id, state string) error
+
+	Aliases() (alias.Manager, error)
+	AliasAdd(origin string, rule alias.Rule) error
+	AliasUpdate(origin, pattern string, rule alias.Rule) error
+	AliasRemove(origin, pattern string) error
+	AliasesSet(origin string, rules []alias.Rule) error
 
 	Manager() *clusternode.Manager
 	CertManager() autocert.Manager

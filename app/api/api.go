@@ -1480,23 +1480,33 @@ func (a *api) start(ctx context.Context) error {
 		})
 	}
 
-	aliasfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
-		Root: cfg.DB.Dir,
-	})
-	if err != nil {
-		return err
-	}
+	if a.cluster != nil {
+		// In cluster mode the aliases are stored in the cluster DB.
+		aliases, err := a.cluster.Aliases()
+		if err != nil {
+			return fmt.Errorf("unable to create alias manager: %w", err)
+		}
 
-	aliases, err := alias.New(alias.Config{
-		Filesystem: aliasfs,
-		Filepath:   "/aliases.json",
-		Logger:     a.log.logger.core.WithComponent("Alias"),
-	})
-	if err != nil {
-		return fmt.Errorf("unable to create alias manager: %w", err)
-	}
+		a.aliases = aliases
+	} else {
+		aliasfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
+			Root: cfg.DB.Dir,
+		})
+		if err != nil {
+			return err
+		}
 
-	a.aliases = aliases
+		aliases, err := alias.New(alias.Config{
+			Filesystem: aliasfs,
+			Filepath:   "/aliases.json",
+			Logger:     a.log.logger.core.WithComponent("Alias"),
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create alias manager: %w", err)
+		}
+
+		a.aliases = aliases
+	}
 
 	serverConfig := http.Config{
 		Logger:        a.log.logger.main,

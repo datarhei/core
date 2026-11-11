@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/iam/identity"
 	"github.com/datarhei/core/v16/iam/policy"
@@ -37,6 +38,9 @@ type Store interface {
 	KVSList(prefix string) map[string]Value
 	KVSGetValue(key string) (Value, error)
 
+	AliasList() Aliases
+	AliasGet(pattern string) (alias.Rule, error)
+
 	NodeList() map[string]Node
 }
 
@@ -59,6 +63,11 @@ type Users struct {
 type Policies struct {
 	UpdatedAt time.Time
 	Policies  []policy.Policy
+}
+
+type Aliases struct {
+	UpdatedAt time.Time
+	Rules     []alias.Rule
 }
 
 type Value struct {
@@ -93,6 +102,10 @@ const (
 	OpSetKV                Operation = "setKV"
 	OpUnsetKV              Operation = "unsetKV"
 	OpSetNodeState         Operation = "setNodeState"
+	OpAddAlias             Operation = "addAlias"
+	OpUpdateAlias          Operation = "updateAlias"
+	OpRemoveAlias          Operation = "removeAlias"
+	OpSetAliases           Operation = "setAliases"
 )
 
 type Command struct {
@@ -186,6 +199,23 @@ type CommandSetNodeState struct {
 	State  string
 }
 
+type CommandAddAlias struct {
+	Rule alias.Rule
+}
+
+type CommandUpdateAlias struct {
+	Pattern string
+	Rule    alias.Rule
+}
+
+type CommandRemoveAlias struct {
+	Pattern string
+}
+
+type CommandSetAliases struct {
+	Rules []alias.Rule
+}
+
 type storeData struct {
 	Version            uint64
 	Process            map[string]Process // processid -> process
@@ -208,6 +238,8 @@ type storeData struct {
 	KVS map[string]Value
 
 	Nodes map[string]Node
+
+	Aliases Aliases
 }
 
 func (s *storeData) init() {
@@ -225,12 +257,14 @@ func (s *storeData) init() {
 	s.Locks = map[string]time.Time{}
 	s.KVS = map[string]Value{}
 	s.Nodes = map[string]Node{}
+	s.Aliases.UpdatedAt = now
+	s.Aliases.Rules = []alias.Rule{}
 }
 
 // store implements a raft.FSM
 type store struct {
-	lock     sync.RWMutex
-	callback func(op Operation)
+	lock      sync.RWMutex
+	callbacks []func(op Operation)
 
 	logger log.Logger
 
@@ -284,8 +318,8 @@ func (s *store) Apply(entry *raft.Log) interface{} {
 	}
 
 	s.lock.RLock()
-	if s.callback != nil {
-		s.callback(c.Operation)
+	for _, callback := range s.callbacks {
+		callback(c.Operation)
 	}
 	s.lock.RUnlock()
 
@@ -459,6 +493,38 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.setNodeState(cmd)
+	case OpAddAlias:
+		cmd := CommandAddAlias{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.addAlias(cmd)
+	case OpUpdateAlias:
+		cmd := CommandUpdateAlias{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.updateAlias(cmd)
+	case OpRemoveAlias:
+		cmd := CommandRemoveAlias{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.removeAlias(cmd)
+	case OpSetAliases:
+		cmd := CommandSetAliases{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.setAliases(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -467,11 +533,13 @@ func (s *store) applyCommand(c Command) error {
 	return err
 }
 
+// OnApply registers a function that is called after a command has been applied.
+// Multiple functions can be registered.
 func (s *store) OnApply(fn func(op Operation)) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.callback = fn
+	s.callbacks = append(s.callbacks, fn)
 }
 
 func (s *store) Snapshot() (raft.FSMSnapshot, error) {
@@ -497,9 +565,10 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 		s.logger.Info().Log("Snapshot restored")
 
 		s.lock.RLock()
-		if s.callback != nil {
-			s.callback(OpAddIdentity)
-			s.callback(OpSetPolicies)
+		for _, callback := range s.callbacks {
+			callback(OpAddIdentity)
+			callback(OpSetPolicies)
+			callback(OpSetAliases)
 		}
 		s.lock.RUnlock()
 	}()
@@ -556,6 +625,10 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 		}
 
 		data.Policies.Policies[name] = policies
+	}
+
+	if data.Aliases.Rules == nil {
+		data.Aliases.Rules = []alias.Rule{}
 	}
 
 	if data.Version == 0 {

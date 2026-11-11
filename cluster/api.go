@@ -135,6 +135,11 @@ func NewAPI(config APIConfig) (API, error) {
 
 	a.router.PUT("/v1/node/:id/state", a.NodeSetState)
 
+	a.router.POST("/v1/alias", a.AliasAdd)
+	a.router.PUT("/v1/alias", a.AliasesSet)
+	a.router.PUT("/v1/alias/rule", a.AliasUpdate)
+	a.router.DELETE("/v1/alias/rule", a.AliasRemove)
+
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
 	a.router.GET("/v1/core/skills", a.CoreSkills)
@@ -794,6 +799,168 @@ func (a *api) IAMIdentityRemove(c echo.Context) error {
 	return c.JSON(http.StatusOK, "OK")
 }
 
+// AliasAdd adds an alias to the cluster DB
+// @Summary Add an alias
+// @Description Add an alias to the cluster DB. The alias is appended to the list of aliases.
+// @Tags v1.0.0
+// @ID cluster-1-add-alias
+// @Accept json
+// @Produce json
+// @Param data body client.AddAliasRequest true "Alias"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 409 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/alias [post]
+func (a *api) AliasAdd(c echo.Context) error {
+	r := client.AddAliasRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("alias", r.Rule).Log("Add alias request")
+
+	err := a.cluster.AliasAdd(origin, r.Rule)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("alias", r.Rule).Log("Unable to add alias")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// AliasUpdate replaces an alias in the cluster DB
+// @Summary Replace an alias
+// @Description Replace the alias with the given pattern in the cluster DB. The position of the alias is kept.
+// @Tags v1.0.0
+// @ID cluster-1-update-alias
+// @Accept json
+// @Produce json
+// @Param pattern query string true "Pattern of the alias"
+// @Param data body client.UpdateAliasRequest true "Alias"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 404 {object} Error
+// @Failure 409 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/alias/rule [put]
+func (a *api) AliasUpdate(c echo.Context) error {
+	// QueryParam already decodes the value, don't decode it again.
+	pattern := c.QueryParam("pattern")
+
+	r := client.UpdateAliasRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithFields(log.Fields{
+		"pattern": pattern,
+		"alias":   r.Rule,
+	}).Log("Update alias request")
+
+	err := a.cluster.AliasUpdate(origin, pattern, r.Rule)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithFields(log.Fields{
+			"pattern": pattern,
+			"alias":   r.Rule,
+		}).Log("Unable to update alias")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// AliasRemove removes an alias from the cluster DB
+// @Summary Remove an alias
+// @Description Remove the alias with the given pattern from the cluster DB
+// @Tags v1.0.0
+// @ID cluster-1-remove-alias
+// @Produce json
+// @Param pattern query string true "Pattern of the alias"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 404 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/alias/rule [delete]
+func (a *api) AliasRemove(c echo.Context) error {
+	// QueryParam already decodes the value, don't decode it again.
+	pattern := c.QueryParam("pattern")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("pattern", pattern).Log("Remove alias request")
+
+	err := a.cluster.AliasRemove(origin, pattern)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("pattern", pattern).Log("Unable to remove alias")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// AliasesSet replaces all aliases in the cluster DB
+// @Summary Replace all aliases
+// @Description Replace all aliases in the cluster DB. The aliases are evaluated in the given order.
+// @Tags v1.0.0
+// @ID cluster-1-set-aliases
+// @Accept json
+// @Produce json
+// @Param data body client.SetAliasesRequest true "List of aliases"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 409 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/alias [put]
+func (a *api) AliasesSet(c echo.Context) error {
+	r := client.SetAliasesRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("aliases", r.Rules).Log("Set aliases request")
+
+	err := a.cluster.AliasesSet(origin, r.Rules)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("aliases", r.Rules).Log("Unable to set aliases")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
 // CoreAPIAddress returns the Core API address and login of this node
 // @Summary Core API address and login
 // @Description Core API address and login of this node
@@ -1099,6 +1266,8 @@ func ErrFromClusterError(err error) Error {
 		status = http.StatusNotFound
 	} else if errors.Is(err, store.ErrBadRequest) {
 		status = http.StatusBadRequest
+	} else if errors.Is(err, store.ErrConflict) {
+		status = http.StatusConflict
 	}
 
 	return Err(status, "", "%s", err.Error())

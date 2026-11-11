@@ -14,6 +14,8 @@ func reconstructError(err error) error {
 			err = fmt.Errorf("%s%w", err.Error(), store.ErrBadRequest)
 		case 404:
 			err = fmt.Errorf("%s%w", err.Error(), store.ErrNotFound)
+		case 409:
+			err = fmt.Errorf("%s%w", err.Error(), store.ErrConflict)
 		}
 	}
 

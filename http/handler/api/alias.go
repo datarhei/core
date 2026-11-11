@@ -243,7 +243,7 @@ func patternParam(c echo.Context) (string, error) {
 
 func aliasError(err error) error {
 	switch {
-	case errors.Is(err, alias.ErrInvalid):
+	case errors.Is(err, alias.ErrInvalid), errors.Is(err, alias.ErrReadOnly):
 		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	case errors.Is(err, alias.ErrExists):
 		return apierrors.Err(http.StatusConflict, "", "%s", err.Error())

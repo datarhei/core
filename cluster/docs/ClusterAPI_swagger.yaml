@@ -1,5 +1,16 @@
 basePath: /
 definitions:
+  alias.Rule:
+    properties:
+      pattern:
+        description: Pattern is a regular expression that is matched against the path.
+        type: string
+      target:
+        description: |-
+          Target is the path the matching path is replaced with. It can reference
+          capture groups of the pattern with $1, ${1}, or ${name}.
+        type: string
+    type: object
   app.Config:
     properties:
       autostart:
@@ -191,6 +202,11 @@ definitions:
         description: Number of CPU on this node
         type: number
     type: object
+  client.AddAliasRequest:
+    properties:
+      rule:
+        $ref: '#/definitions/alias.Rule'
+    type: object
   client.AddIdentityRequest:
     properties:
       identity:
@@ -229,6 +245,13 @@ definitions:
           type: string
         type: object
     type: object
+  client.SetAliasesRequest:
+    properties:
+      rules:
+        items:
+          $ref: '#/definitions/alias.Rule'
+        type: array
+    type: object
   client.SetKVRequest:
     properties:
       key:
@@ -258,6 +281,11 @@ definitions:
   client.SetProcessMetadataRequest:
     properties:
       metadata: {}
+    type: object
+  client.UpdateAliasRequest:
+    properties:
+      rule:
+        $ref: '#/definitions/alias.Rule'
     type: object
   client.UpdateIdentityRequest:
     properties:
@@ -1091,6 +1119,181 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: The cluster version
+      tags:
+      - v1.0.0
+  /v1/alias:
+    post:
+      consumes:
+      - application/json
+      description: Add an alias to the cluster DB. The alias is appended to the list
+        of aliases.
+      operationId: cluster-1-add-alias
+      parameters:
+      - description: Alias
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.AddAliasRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add an alias
+      tags:
+      - v1.0.0
+    put:
+      consumes:
+      - application/json
+      description: Replace all aliases in the cluster DB. The aliases are evaluated
+        in the given order.
+      operationId: cluster-1-set-aliases
+      parameters:
+      - description: List of aliases
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.SetAliasesRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Replace all aliases
+      tags:
+      - v1.0.0
+  /v1/alias/rule:
+    delete:
+      description: Remove the alias with the given pattern from the cluster DB
+      operationId: cluster-1-remove-alias
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove an alias
+      tags:
+      - v1.0.0
+    put:
+      consumes:
+      - application/json
+      description: Replace the alias with the given pattern in the cluster DB. The
+        position of the alias is kept.
+      operationId: cluster-1-update-alias
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      - description: Alias
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.UpdateAliasRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Replace an alias
       tags:
       - v1.0.0
   /v1/barrier/{name}:

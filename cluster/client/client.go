@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/datarhei/core/v16/alias"
 	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/config"
 	"github.com/datarhei/core/v16/encoding/json"
@@ -74,6 +75,18 @@ type SetKVRequest struct {
 type GetKVResponse struct {
 	Value     string    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AddAliasRequest struct {
+	Rule alias.Rule `json:"rule"`
+}
+
+type UpdateAliasRequest struct {
+	Rule alias.Rule `json:"rule"`
+}
+
+type SetAliasesRequest struct {
+	Rules []alias.Rule `json:"rules"`
 }
 
 type AboutResponse struct {

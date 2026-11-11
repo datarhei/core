@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/datarhei/core/v16/alias"
+	clusteralias "github.com/datarhei/core/v16/cluster/alias"
+	"github.com/datarhei/core/v16/cluster/store"
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/http/api"
 	"github.com/datarhei/core/v16/http/mock"
@@ -186,4 +188,37 @@ func TestAliasNoSuperuser(t *testing.T) {
 	require.Equal(t, []api.Alias{
 		{Pattern: "^/memfs/b/(.+)$", Target: "/memfs/a/$1"},
 	}, aliasList(t, router))
+}
+
+func TestAliasReadOnly(t *testing.T) {
+	s, err := store.NewStore(store.Config{})
+	require.NoError(t, err)
+
+	aliases, err := clusteralias.New(s, nil)
+	require.NoError(t, err)
+
+	router := mock.DummyEcho()
+	router.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("superuser", true)
+			return next(c)
+		}
+	})
+
+	handler := NewAlias(aliases)
+
+	router.Add("GET", "/", handler.List)
+	router.Add("PUT", "/", handler.Set)
+	router.Add("POST", "/", handler.Add)
+	router.Add("PUT", "/rule", handler.Update)
+	router.Add("DELETE", "/rule", handler.Delete)
+
+	a := api.Alias{Pattern: "^/memfs/c/(.+)$", Target: "/memfs/a/$1"}
+
+	mock.Request(t, http.StatusBadRequest, router, "POST", "/", aliasBody(t, a))
+	mock.Request(t, http.StatusBadRequest, router, "PUT", "/", aliasBody(t, []api.Alias{a}))
+	mock.Request(t, http.StatusBadRequest, router, "PUT", rulePath(a.Pattern), aliasBody(t, a))
+	mock.Request(t, http.StatusBadRequest, router, "DELETE", rulePath(a.Pattern), nil)
+
+	require.Equal(t, []api.Alias{}, aliasList(t, router))
 }

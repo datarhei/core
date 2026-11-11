@@ -3570,6 +3570,229 @@ paths:
       summary: List of nodes in the cluster
       tags:
       - v16.?.?
+  /api/v3/cluster/alias:
+    get:
+      description: List all aliases in the cluster in the order they are evaluated.
+        The first matching alias is applied.
+      operationId: cluster-3-alias-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Alias'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all aliases in the cluster
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add an alias to the cluster. The alias is appended to the list
+        of aliases. Only superusers are allowed to modify aliases.
+      operationId: cluster-3-alias-add
+      parameters:
+      - description: Alias
+        in: body
+        name: alias
+        required: true
+        schema:
+          $ref: '#/definitions/api.Alias'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add an alias to the cluster
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace all aliases in the cluster. The aliases are evaluated in
+        the given order. Only superusers are allowed to modify aliases.
+      operationId: cluster-3-alias-set
+      parameters:
+      - description: List of aliases
+        in: body
+        name: aliases
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/api.Alias'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.Alias'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace all aliases in the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/alias/rule:
+    delete:
+      description: Delete the alias with the given pattern from the cluster. Only
+        superusers are allowed to modify aliases.
+      operationId: cluster-3-alias-delete
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an alias from the cluster
+      tags:
+      - v16.?.?
+    get:
+      description: Get the alias with the given pattern from the cluster
+      operationId: cluster-3-alias-get
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get an alias from the cluster
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace the alias with the given pattern in the cluster. The position
+        of the alias is kept. Only superusers are allowed to modify aliases.
+      operationId: cluster-3-alias-update
+      parameters:
+      - description: Pattern of the alias
+        in: query
+        name: pattern
+        required: true
+        type: string
+      - description: Alias
+        in: body
+        name: alias
+        required: true
+        schema:
+          $ref: '#/definitions/api.Alias'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Alias'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace an alias in the cluster
+      tags:
+      - v16.?.?
   /api/v3/cluster/db/kv:
     get:
       description: List of KV in the cluster DB

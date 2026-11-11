@@ -825,6 +825,9 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityGet)
 		v3.GET("/cluster/iam/policies", s.v3handler.cluster.IAMPolicyList)
 
+		v3.GET("/cluster/alias", s.v3handler.cluster.AliasList)
+		v3.GET("/cluster/alias/rule", s.v3handler.cluster.AliasGet)
+
 		v3.GET("/cluster/process", s.v3handler.cluster.ProcessList)
 		v3.GET("/cluster/process/:id", s.v3handler.cluster.ProcessGet)
 		v3.GET("/cluster/process/:id/config", s.v3handler.cluster.ProcessGetConfig)
@@ -873,6 +876,11 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.PUT("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityUpdate)
 			v3.PUT("/cluster/iam/user/:name/policy", s.v3handler.cluster.IAMIdentityUpdatePolicies)
 			v3.DELETE("/cluster/iam/user/:name", s.v3handler.cluster.IAMIdentityRemove)
+
+			v3.PUT("/cluster/alias", s.v3handler.cluster.AliasesSet)
+			v3.POST("/cluster/alias", s.v3handler.cluster.AliasAdd)
+			v3.PUT("/cluster/alias/rule", s.v3handler.cluster.AliasUpdate)
+			v3.DELETE("/cluster/alias/rule", s.v3handler.cluster.AliasRemove)
 		}
 	}
 

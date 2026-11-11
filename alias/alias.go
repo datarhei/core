@@ -20,6 +20,7 @@ var (
 	ErrNotFound = errors.New("alias not found")
 	ErrExists   = errors.New("alias already exists")
 	ErrInvalid  = errors.New("invalid alias")
+	ErrReadOnly = errors.New("aliases are read-only")
 )
 
 // Rule is an alias rule. The pattern is the ID of the rule.
@@ -137,20 +138,92 @@ func compile(r Rule) (rule, error) {
 	}, nil
 }
 
+// Validate checks whether the rule is valid.
+func Validate(r Rule) error {
+	_, err := compile(r)
+	return err
+}
+
+// compileAll compiles all rules. It fails if any rule is invalid or if a pattern
+// is used more than once.
+func compileAll(rules []Rule) ([]rule, error) {
+	crules := make([]rule, 0, len(rules))
+
+	for i, r := range rules {
+		cr, err := compile(r)
+		if err != nil {
+			return nil, fmt.Errorf("rule %d: %w", i, err)
+		}
+
+		if slices.ContainsFunc(crules, func(x rule) bool { return x.Pattern == r.Pattern }) {
+			return nil, fmt.Errorf("rule %d: %w", i, ErrExists)
+		}
+
+		crules = append(crules, cr)
+	}
+
+	return crules, nil
+}
+
+// match returns the target path of the first rule that matches the path.
+func match(rules []rule, path string) (string, bool) {
+	for _, r := range rules {
+		m := r.regexp.FindStringSubmatchIndex(path)
+		if m == nil {
+			continue
+		}
+
+		return string(r.regexp.ExpandString(nil, r.Target, path, m)), true
+	}
+
+	return "", false
+}
+
+// Ruleset is an immutable list of compiled rules.
+type Ruleset struct {
+	rules []rule
+}
+
+// Compile validates and compiles the rules. It fails if any rule is invalid or if
+// a pattern is used more than once. The rules will be evaluated in the given order.
+func Compile(rules []Rule) (*Ruleset, error) {
+	crules, err := compileAll(rules)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Ruleset{rules: crules}, nil
+}
+
+// Alias returns the target path of the first rule that matches the path.
+// If no rule matches, false is returned.
+func (s *Ruleset) Alias(path string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+
+	return match(s.rules, path)
+}
+
+// Rules returns the rules in the order they are evaluated.
+func (s *Ruleset) Rules() []Rule {
+	if s == nil {
+		return []Rule{}
+	}
+
+	rules := make([]Rule, 0, len(s.rules))
+	for _, r := range s.rules {
+		rules = append(rules, r.Rule)
+	}
+
+	return rules
+}
+
 func (m *manager) Alias(path string) (string, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	for _, r := range m.rules {
-		match := r.regexp.FindStringSubmatchIndex(path)
-		if match == nil {
-			continue
-		}
-
-		return string(r.regexp.ExpandString(nil, r.Target, path, match)), true
-	}
-
-	return "", false
+	return match(m.rules, path)
 }
 
 func (m *manager) index(pattern string) int {
@@ -240,19 +313,9 @@ func (m *manager) List() []Rule {
 }
 
 func (m *manager) Set(rules []Rule) error {
-	crules := make([]rule, 0, len(rules))
-
-	for i, r := range rules {
-		cr, err := compile(r)
-		if err != nil {
-			return fmt.Errorf("rule %d: %w", i, err)
-		}
-
-		if slices.ContainsFunc(crules, func(x rule) bool { return x.Pattern == r.Pattern }) {
-			return fmt.Errorf("rule %d: %w", i, ErrExists)
-		}
-
-		crules = append(crules, cr)
+	crules, err := compileAll(rules)
+	if err != nil {
+		return err
 	}
 
 	m.lock.Lock()

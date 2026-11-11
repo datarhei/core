@@ -310,3 +310,47 @@ func TestSetFailure(t *testing.T) {
 	require.Error(t, m.Set([]Rule{{Pattern: "^/c/(.*)$", Target: "/a/$1"}}))
 	require.Equal(t, []Rule{{Pattern: "^/b/(.*)$", Target: "/a/$1"}}, m.List())
 }
+
+func TestValidate(t *testing.T) {
+	require.NoError(t, Validate(Rule{Pattern: "^/memfs/b/(.+)$", Target: "/memfs/a/$1"}))
+	require.ErrorIs(t, Validate(Rule{Pattern: "", Target: "/memfs/a"}), ErrInvalid)
+	require.ErrorIs(t, Validate(Rule{Pattern: "^/memfs/b/(.+$", Target: "/memfs/a/$1"}), ErrInvalid)
+	require.ErrorIs(t, Validate(Rule{Pattern: "^/memfs/b/(.+)$", Target: "memfs/a/$1"}), ErrInvalid)
+}
+
+func TestCompile(t *testing.T) {
+	rules := []Rule{
+		{Pattern: "^/memfs/b/(.+)$", Target: "/memfs/a/$1"},
+		{Pattern: "^/memfs/(.+)$", Target: "/memfs/x/$1"},
+	}
+
+	s, err := Compile(rules)
+	require.NoError(t, err)
+	require.Equal(t, rules, s.Rules())
+
+	target, ok := s.Alias("/memfs/b/x.txt")
+	require.True(t, ok)
+	require.Equal(t, "/memfs/a/x.txt", target)
+
+	target, ok = s.Alias("/memfs/c/x.txt")
+	require.True(t, ok)
+	require.Equal(t, "/memfs/x/c/x.txt", target)
+
+	_, ok = s.Alias("/disk/x.txt")
+	require.False(t, ok)
+
+	s, err = Compile(nil)
+	require.NoError(t, err)
+	require.Equal(t, []Rule{}, s.Rules())
+
+	_, err = Compile([]Rule{rules[0], {Pattern: "(", Target: "/x"}})
+	require.ErrorIs(t, err, ErrInvalid)
+
+	_, err = Compile([]Rule{rules[0], rules[1], rules[0]})
+	require.ErrorIs(t, err, ErrExists)
+
+	var nilset *Ruleset
+	_, ok = nilset.Alias("/memfs/b/x.txt")
+	require.False(t, ok)
+	require.Equal(t, []Rule{}, nilset.Rules())
+}

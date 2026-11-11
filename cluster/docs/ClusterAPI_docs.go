@@ -77,6 +77,264 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "/v1/alias": {
+            "put": {
+                "description": "Replace all aliases in the cluster DB. The aliases are evaluated in the given order.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Replace all aliases",
+                "operationId": "cluster-1-set-aliases",
+                "parameters": [
+                    {
+                        "description": "List of aliases",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.SetAliasesRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Add an alias to the cluster DB. The alias is appended to the list of aliases.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Add an alias",
+                "operationId": "cluster-1-add-alias",
+                "parameters": [
+                    {
+                        "description": "Alias",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.AddAliasRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/alias/rule": {
+            "put": {
+                "description": "Replace the alias with the given pattern in the cluster DB. The position of the alias is kept.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Replace an alias",
+                "operationId": "cluster-1-update-alias",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern of the alias",
+                        "name": "pattern",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Alias",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.UpdateAliasRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove the alias with the given pattern from the cluster DB",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Remove an alias",
+                "operationId": "cluster-1-remove-alias",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pattern of the alias",
+                        "name": "pattern",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/barrier/{name}": {
             "get": {
                 "description": "Has the barrier already has been passed",
@@ -1282,6 +1540,19 @@ const docTemplateClusterAPI = `{
         }
     },
     "definitions": {
+        "alias.Rule": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "description": "Pattern is a regular expression that is matched against the path.",
+                    "type": "string"
+                },
+                "target": {
+                    "description": "Target is the path the matching path is replaced with. It can reference\ncapture groups of the pattern with $1, ${1}, or ${name}.",
+                    "type": "string"
+                }
+            }
+        },
         "app.Config": {
             "type": "object",
             "properties": {
@@ -1553,6 +1824,14 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "client.AddAliasRequest": {
+            "type": "object",
+            "properties": {
+                "rule": {
+                    "$ref": "#/definitions/alias.Rule"
+                }
+            }
+        },
         "client.AddIdentityRequest": {
             "type": "object",
             "properties": {
@@ -1613,6 +1892,17 @@ const docTemplateClusterAPI = `{
                 }
             }
         },
+        "client.SetAliasesRequest": {
+            "type": "object",
+            "properties": {
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/alias.Rule"
+                    }
+                }
+            }
+        },
         "client.SetKVRequest": {
             "type": "object",
             "properties": {
@@ -1658,6 +1948,14 @@ const docTemplateClusterAPI = `{
             "type": "object",
             "properties": {
                 "metadata": {}
+            }
+        },
+        "client.UpdateAliasRequest": {
+            "type": "object",
+            "properties": {
+                "rule": {
+                    "$ref": "#/definitions/alias.Rule"
+                }
             }
         },
         "client.UpdateIdentityRequest": {
