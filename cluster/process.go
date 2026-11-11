@@ -12,8 +12,12 @@ func (c *cluster) ProcessAdd(origin string, config *app.Config) error {
 		return c.forwarder.ProcessAdd(origin, config)
 	}
 
-	nodeid := c.manager.GetRandomNode()
-	err := c.manager.ProcessValidateConfig(nodeid, config)
+	nodeid, err := c.manager.GetRandomNode()
+	if err != nil {
+		return err
+	}
+
+	err = c.manager.ProcessValidateConfig(nodeid, config)
 	if err != nil {
 		return err
 	}
@@ -63,8 +67,12 @@ func (c *cluster) ProcessUpdate(origin string, id app.ProcessID, config *app.Con
 		return c.forwarder.ProcessUpdate(origin, id, config, force)
 	}
 
-	nodeid := c.manager.GetRandomNode()
-	err := c.manager.ProcessValidateConfig(nodeid, config)
+	nodeid, err := c.manager.GetRandomNode()
+	if err != nil {
+		return err
+	}
+
+	err = c.manager.ProcessValidateConfig(nodeid, config)
 	if err != nil {
 		return err
 	}

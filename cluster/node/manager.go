@@ -42,6 +42,7 @@ type Manager struct {
 }
 
 var ErrNodeNotFound = errors.New("node not found")
+var ErrNoNodes = errors.New("no nodes available")
 
 func NewManager(config ManagerConfig) (*Manager, error) {
 	p := &Manager{
@@ -519,7 +520,9 @@ func (p *Manager) FindNodeForResources(nodeid string, cpu float64, memory uint64
 	return ""
 }
 
-func (p *Manager) GetRandomNode() string {
+// GetRandomNode returns the ID of a randomly chosen node. It returns
+// ErrNoNodes if no node is registered.
+func (p *Manager) GetRandomNode() (string, error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -528,7 +531,11 @@ func (p *Manager) GetRandomNode() string {
 		nodes = append(nodes, nodeid)
 	}
 
-	return nodes[rand.IntN(len(p.nodes))]
+	if len(nodes) == 0 {
+		return "", ErrNoNodes
+	}
+
+	return nodes[rand.IntN(len(nodes))], nil
 }
 
 func (p *Manager) ProcessList(options client.ProcessListOptions) []api.Process {
