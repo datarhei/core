@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"regexp/syntax"
 	"slices"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/io/fs"
@@ -72,6 +74,7 @@ type Config struct {
 type rule struct {
 	Rule
 	regexp *regexp.Regexp
+	prefix string // Literal prefix every matching path starts with, may be empty
 }
 
 type manager struct {
@@ -135,7 +138,48 @@ func compile(r Rule) (rule, error) {
 	return rule{
 		Rule:   r,
 		regexp: re,
+		prefix: literalPrefix(r.Pattern),
 	}, nil
+}
+
+// literalPrefix returns the literal prefix of a pattern that is anchored at the beginning
+// of the text, e.g. "/memfs/" for "^/memfs/(.*)$". Every path that matches the pattern
+// starts with this prefix. If the pattern is not anchored or doesn't start with a literal,
+// an empty string is returned.
+func literalPrefix(pattern string) string {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return ""
+	}
+
+	re = re.Simplify()
+
+	subs := []*syntax.Regexp{re}
+	if re.Op == syntax.OpConcat {
+		subs = re.Sub
+	}
+
+	// Only "^" without the multiline flag anchors at the beginning of the path.
+	if len(subs) == 0 || subs[0].Op != syntax.OpBeginText {
+		return ""
+	}
+
+	prefix := strings.Builder{}
+
+	for _, sub := range subs[1:] {
+		if sub.Op != syntax.OpLiteral || sub.Flags&syntax.FoldCase != 0 {
+			break
+		}
+
+		prefix.WriteString(string(sub.Rune))
+	}
+
+	// The regexp matches invalid UTF-8 in the path as U+FFFD, a prefix check would not.
+	if strings.ContainsRune(prefix.String(), utf8.RuneError) {
+		return ""
+	}
+
+	return prefix.String()
 }
 
 // Validate checks whether the rule is valid.
@@ -170,6 +214,10 @@ func compileAll(rules []Rule) ([]rule, error) {
 // match returns the target path of the first rule that matches the path.
 func match(rules []rule, path string) (string, bool) {
 	for _, r := range rules {
+		if !strings.HasPrefix(path, r.prefix) {
+			continue
+		}
+
 		m := r.regexp.FindStringSubmatchIndex(path)
 		if m == nil {
 			continue

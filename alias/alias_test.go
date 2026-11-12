@@ -3,6 +3,7 @@ package alias
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"sync"
 	"testing"
 
@@ -417,6 +418,73 @@ func BenchmarkMatch(b *testing.B) {
 					match(rules, c.path)
 				}
 			})
+		}
+	}
+}
+
+func TestLiteralPrefix(t *testing.T) {
+	tests := []struct {
+		pattern string
+		prefix  string
+	}{
+		{`^/memfs/stream7/(.*)\.m3u8$`, "/memfs/stream7/"},
+		{`^/memfs/foo\.txt$`, "/memfs/foo.txt"},
+		{`\A/memfs/(.*)$`, "/memfs/"},
+		{`^/memfs/a+`, "/memfs/"},
+		{`^/memfs/a*`, "/memfs/"},
+		{`^/memfs/(a|b)`, "/memfs/"},
+		{`^(/memfs)/a`, ""},
+		{`^`, ""},
+		{`^.*`, ""},
+		{`/memfs/(.*)$`, ""},
+		{`.*^/memfs/`, ""},
+		{`(?m)^/memfs/`, ""},
+		{`(?i)^/memfs/`, ""},
+		{`^/memfs/(?i)abc`, "/memfs/"},
+		{`^/mem|^/data`, ""},
+		{`^/memfs/\x{FFFD}`, ""},
+		{`^/memfs/ä/`, "/memfs/ä/"},
+	}
+
+	for _, test := range tests {
+		require.Equal(t, test.prefix, literalPrefix(test.pattern), test.pattern)
+	}
+}
+
+func TestMatchPrefix(t *testing.T) {
+	patterns := []string{
+		`^/memfs/a/(.*)$`,
+		`^/memfs/a+/x$`,
+		`(?i)^/MEMFS/b/(.*)$`,
+		`(?m)^/memfs/c/(.*)$`,
+		`/memfs/d/(.*)$`,
+		`^/memfs/e/x\.txt$`,
+		`^/memfs/\x{FFFD}/(.*)$`,
+	}
+
+	paths := []string{
+		"/memfs/a/x.txt",
+		"/memfs/aaa/x",
+		"/memfs/b/x.txt",
+		"/memfs/B/x.txt",
+		"/foo\n/memfs/c/x.txt",
+		"/foo/memfs/d/x.txt",
+		"/memfs/e/x.txt",
+		"/memfs/e/x.txt/",
+		"/memfs/\xff/x.txt",
+		"/memfs/f/x.txt",
+	}
+
+	for _, pattern := range patterns {
+		cr, err := compile(Rule{Pattern: pattern, Target: "/x/$1"})
+		require.NoError(t, err)
+
+		re := regexp.MustCompile(pattern)
+
+		for _, path := range paths {
+			want := re.FindStringSubmatchIndex(path) != nil
+			_, ok := match([]rule{cr}, path)
+			require.Equal(t, want, ok, "pattern %q, path %q", pattern, path)
 		}
 	}
 }
