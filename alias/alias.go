@@ -148,6 +148,7 @@ func Validate(r Rule) error {
 // is used more than once.
 func compileAll(rules []Rule) ([]rule, error) {
 	crules := make([]rule, 0, len(rules))
+	seen := make(map[string]struct{}, len(rules))
 
 	for i, r := range rules {
 		cr, err := compile(r)
@@ -155,10 +156,11 @@ func compileAll(rules []Rule) ([]rule, error) {
 			return nil, fmt.Errorf("rule %d: %w", i, err)
 		}
 
-		if slices.ContainsFunc(crules, func(x rule) bool { return x.Pattern == r.Pattern }) {
+		if _, ok := seen[r.Pattern]; ok {
 			return nil, fmt.Errorf("rule %d: %w", i, ErrExists)
 		}
 
+		seen[r.Pattern] = struct{}{}
 		crules = append(crules, cr)
 	}
 
@@ -384,7 +386,8 @@ func (m *manager) load() error {
 		return fmt.Errorf("unsupported version %d of aliases in %s, expected %d", d.Version, m.filepath, version)
 	}
 
-	rules := []rule{}
+	rules := make([]rule, 0, len(d.Rules))
+	seen := make(map[string]struct{}, len(d.Rules))
 
 	for _, r := range d.Rules {
 		cr, err := compile(r)
@@ -393,11 +396,12 @@ func (m *manager) load() error {
 			continue
 		}
 
-		if slices.ContainsFunc(rules, func(x rule) bool { return x.Pattern == r.Pattern }) {
+		if _, ok := seen[r.Pattern]; ok {
 			m.logger.Warn().WithField("pattern", r.Pattern).Log("Ignoring duplicate alias")
 			continue
 		}
 
+		seen[r.Pattern] = struct{}{}
 		rules = append(rules, cr)
 	}
 

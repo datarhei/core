@@ -388,14 +388,8 @@ func benchmarkPath(i int) (string, string) {
 
 func BenchmarkMatch(b *testing.B) {
 	for _, n := range []int{1, 10, 100, 1000, 10000, 100000, 1000000} {
-		// The rules are compiled individually, because the check for duplicate patterns
-		// in compileAll is too slow for this number of rules.
-		rules := make([]rule, 0, n)
-		for _, r := range benchmarkRules(n) {
-			cr, err := compile(r)
-			require.NoError(b, err)
-			rules = append(rules, cr)
-		}
+		rules, err := compileAll(benchmarkRules(n))
+		require.NoError(b, err)
 
 		firstPath, firstTarget := benchmarkPath(0)
 		lastPath, lastTarget := benchmarkPath(n - 1)
