@@ -15,18 +15,31 @@ still linear in the number of rules (`BenchmarkMatch`: about 3 ms for 1000000 ru
 - Call `MatchString` first and `FindStringSubmatchIndex` only on a match. Small gain for rules
   without a literal prefix.
 
-## Restrict alias patterns
+## Glob syntax for alias patterns
 
-Alias patterns are full regular expressions. The prefix pre-check in `match()` only helps
-patterns that are anchored at the beginning and case-sensitive, and `(?m)^…` also matches after
-a newline in a decoded path. Idea: `compile()` (`alias/alias.go`) only accepts patterns that
+Replace the regular expressions of alias patterns with the glob syntax that IAM resources use
+(`glob` package, `github.com/gobwas/glob` with `/` as separator), e.g.
+`/memfs/live/*.m3u8` → `/memfs/live/$1_main.m3u8`. Aliases are not released yet, so no stored
+rules need to be migrated as long as this is done before the next release.
 
-- are anchored at the beginning: the parsed pattern (`regexp/syntax`) is `OpBeginText` or an
-  `OpConcat` that starts with `OpBeginText` (`^` or `\A`). This also rejects a top-level
-  alternation like `^/a|/b`, which has to be written as `^(?:/a|/b)`.
-- contain no flags: every `(?…` group is rejected except `(?:`, `(?P<name>` and `(?<name>`.
-  A small scanner has to skip escaped characters and character classes (`\(`, `[(?i)]`).
+- Validate the pattern with `glob.Compile(pattern, '/')`. This catches structural errors like an
+  unclosed `{`.
+- Translate the tokens of `syntax.NewLexer` (exported by gobwas/glob) to a regular expression
+  that is anchored with `^…$`:
+  - `Text` → `regexp.QuoteMeta`;
+  - `*` → `([^/]*)`, `**` → `(.*)`, `?` → `([^/])`;
+  - `[…]` / `[!…]` → `([…])` / `([^…])`;
+  - `{a,b}` → `(a|b)`.
+  The rest of `alias` stays as it is (`match()`, `ExpandString`, prefix pre-check).
+- Every wildcard and every `{…}` group is a capture group, numbered from the left in the order
+  they open. The target references them with `$1` or `${1}`. Named references are not available.
+- Check that the target only references existing groups (`$n` with n ≤ `NumSubexp()`). Today
+  `ExpandString` silently replaces unknown references with an empty string.
+- Match the semantics of gobwas/glob exactly, e.g. whether `[!…]` and `?` match `/`. Add a
+  test that compares the translated regexp with `glob.Match` for a set of patterns and paths.
+- The prefix pre-check then applies to every pattern, because the literal prefix is everything up
+  to the first wildcard (`glob.Prefix`). That also simplifies the prefix index above.
+- Update the doc comments of `alias.Rule` and `api.Alias`, then regenerate the swagger files.
 
-Every pattern then gets the prefix pre-check, and it prepares the prefix index above. Aliases
-are not released yet, so no stored rules need to be migrated as long as this is done before the
-next release. `load()` and the cluster aliaser already skip invalid stored rules with a warning.
+Downside: less expressive than regular expressions, e.g. no `\d+`, no repetition counts, and no
+optional parts other than `{a,}`.
