@@ -354,3 +354,75 @@ func TestCompile(t *testing.T) {
 	require.False(t, ok)
 	require.Equal(t, []Rule{}, nilset.Rules())
 }
+
+// benchmarkRules returns n rules. Most rules have a capture group, every fourth rule
+// is a literal-only pattern.
+func benchmarkRules(n int) []Rule {
+	rules := make([]Rule, 0, n)
+
+	for i := range n {
+		if i%4 == 3 {
+			rules = append(rules, Rule{
+				Pattern: fmt.Sprintf(`^/memfs/foo%d\.txt$`, i),
+				Target:  fmt.Sprintf("/memfs/bar%d.txt", i),
+			})
+		} else {
+			rules = append(rules, Rule{
+				Pattern: fmt.Sprintf(`^/memfs/stream%d/(.*)\.m3u8$`, i),
+				Target:  fmt.Sprintf("/memfs/stream%d/${1}_main.m3u8", i),
+			})
+		}
+	}
+
+	return rules
+}
+
+// benchmarkPath returns a path that matches the i-th rule of benchmarkRules and its target.
+func benchmarkPath(i int) (string, string) {
+	if i%4 == 3 {
+		return fmt.Sprintf("/memfs/foo%d.txt", i), fmt.Sprintf("/memfs/bar%d.txt", i)
+	}
+
+	return fmt.Sprintf("/memfs/stream%d/live.m3u8", i), fmt.Sprintf("/memfs/stream%d/live_main.m3u8", i)
+}
+
+func BenchmarkMatch(b *testing.B) {
+	for _, n := range []int{1, 10, 100, 1000, 10000, 100000, 1000000} {
+		// The rules are compiled individually, because the check for duplicate patterns
+		// in compileAll is too slow for this number of rules.
+		rules := make([]rule, 0, n)
+		for _, r := range benchmarkRules(n) {
+			cr, err := compile(r)
+			require.NoError(b, err)
+			rules = append(rules, cr)
+		}
+
+		firstPath, firstTarget := benchmarkPath(0)
+		lastPath, lastTarget := benchmarkPath(n - 1)
+
+		cases := []struct {
+			name   string
+			path   string
+			target string
+			ok     bool
+		}{
+			{"nomatch", "/memfs/abc/segment_123.ts", "", false},
+			{"first", firstPath, firstTarget, true},
+			{"last", lastPath, lastTarget, true},
+		}
+
+		for _, c := range cases {
+			b.Run(fmt.Sprintf("rules=%d/%s", n, c.name), func(b *testing.B) {
+				target, ok := match(rules, c.path)
+				require.Equal(b, c.ok, ok)
+				require.Equal(b, c.target, target)
+
+				b.ReportAllocs()
+
+				for b.Loop() {
+					match(rules, c.path)
+				}
+			})
+		}
+	}
+}
