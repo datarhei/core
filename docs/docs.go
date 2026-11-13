@@ -3979,6 +3979,12 @@ const docTemplate = `{
                         "name": "filepath",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Download the file with this name (sets the Content-Disposition header)",
+                        "name": "filename",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -4146,6 +4152,12 @@ const docTemplate = `{
                         "name": "filepath",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Download the file with this name (sets the Content-Disposition header)",
+                        "name": "filename",
+                        "in": "query"
                     }
                 ],
                 "responses": {

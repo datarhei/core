@@ -579,6 +579,10 @@ func (s *server) setRoutes() {
 
 		if filesystem.Cache != nil {
 			mwcache := mwcache.NewWithConfig(mwcache.Config{
+				// Downloads with a filename get a Content-Disposition header that is not cached.
+				Skipper: func(c echo.Context) bool {
+					return len(c.QueryParam("filename")) != 0
+				},
 				Cache: filesystem.Cache,
 			})
 			fs.Use(mwcache)

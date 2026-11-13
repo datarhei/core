@@ -5829,6 +5829,11 @@ paths:
         name: filepath
         required: true
         type: string
+      - description: Download the file with this name (sets the Content-Disposition
+          header)
+        in: query
+        name: filename
+        type: string
       produces:
       - application/data
       - application/json
@@ -5863,6 +5868,11 @@ paths:
         in: path
         name: filepath
         required: true
+        type: string
+      - description: Download the file with this name (sets the Content-Disposition
+          header)
+        in: query
+        name: filename
         type: string
       produces:
       - application/data

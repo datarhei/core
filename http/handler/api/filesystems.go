@@ -42,6 +42,7 @@ func NewFS(filesystems map[string]FSConfig) *FSHandler {
 // @Produce json
 // @Param storage path string true "Name of the filesystem"
 // @Param filepath path string true "Path to file"
+// @Param filename query string false "Download the file with this name (sets the Content-Disposition header)"
 // @Success 200 {file} byte
 // @Success 301 {string} string
 // @Failure 404 {object} apierrors.Error

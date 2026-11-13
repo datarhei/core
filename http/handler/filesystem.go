@@ -36,6 +36,7 @@ func NewFS(fs httpfs.FS) *FSHandler {
 
 func (h *FSHandler) GetFile(c echo.Context) error {
 	path := util.PathWildcardParam(c)
+	filename := util.DefaultQuery(c, "filename", "")
 
 	mimeType := c.Response().Header().Get(echo.HeaderContentType)
 	c.Response().Header().Del(echo.HeaderContentType)
@@ -79,6 +80,10 @@ func (h *FSHandler) GetFile(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderContentType, mimeType)
 	c.Response().Header().Set("Accept-Ranges", "bytes")
 	c.Response().Header().Set(echo.HeaderContentLength, strconv.FormatInt(stat.Size(), 10))
+
+	if len(filename) != 0 {
+		c.Response().Header().Set(echo.HeaderContentDisposition, contentDisposition(filename))
+	}
 
 	if c.Request().Method == "HEAD" {
 		return c.Blob(http.StatusOK, "application/data", nil)
@@ -347,6 +352,43 @@ func (h *FSHandler) ListFiles(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, fileinfos)
+}
+
+// contentDisposition returns the value of a Content-Disposition header for downloading
+// a file with the given name. The name is encoded as defined in RFC 8187, invalid UTF-8
+// is replaced by U+FFFD.
+func contentDisposition(filename string) string {
+	filename = strings.ToValidUTF8(filename, "\uFFFD")
+
+	const hex = "0123456789ABCDEF"
+
+	encoded := strings.Builder{}
+	encoded.Grow(len(filename) * 3)
+
+	for i := 0; i < len(filename); i++ {
+		b := filename[i]
+
+		if isAttrChar(b) {
+			encoded.WriteByte(b)
+			continue
+		}
+
+		encoded.WriteByte('%')
+		encoded.WriteByte(hex[b>>4])
+		encoded.WriteByte(hex[b&0x0F])
+	}
+
+	return "attachment; filename*=UTF-8''" + encoded.String()
+}
+
+// isAttrChar returns whether the byte is an attr-char as defined in RFC 8187.
+func isAttrChar(b byte) bool {
+	switch {
+	case 'a' <= b && b <= 'z', 'A' <= b && b <= 'Z', '0' <= b && b <= '9':
+		return true
+	}
+
+	return strings.IndexByte("!#$&+-.^_`|~", b) != -1
 }
 
 // From: github.com/golang/go/net/http/fs.go@7dc9fcb

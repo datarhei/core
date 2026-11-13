@@ -98,3 +98,54 @@ func TestCache(t *testing.T) {
 	require.Equal(t, 200, rec.Result().StatusCode)
 	require.Equal(t, "SKIP ONLYGET", rec.Result().Header.Get("x-cache"))
 }
+
+func TestCacheSkipper(t *testing.T) {
+	c, err := cache.NewLRUCache(cache.LRUConfig{
+		TTL:             300 * time.Second,
+		MaxSize:         0,
+		MaxFileSize:     16,
+		AllowExtensions: []string{".js"},
+		Logger:          nil,
+	})
+	require.NoError(t, err)
+
+	calls := 0
+
+	handler := NewWithConfig(Config{
+		Skipper: func(c echo.Context) bool {
+			return len(c.QueryParam("filename")) != 0
+		},
+		Cache: c,
+	})(func(c echo.Context) error {
+		calls++
+		return c.String(http.StatusOK, "test")
+	})
+
+	e := echo.New()
+
+	request := func(target string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		rec := httptest.NewRecorder()
+		require.NoError(t, handler(e.NewContext(req, rec)))
+		return rec
+	}
+
+	for i := 1; i <= 2; i++ {
+		rec := request("/found.js?filename=foo.js")
+		require.Equal(t, "test", rec.Body.String())
+		require.Empty(t, rec.Header().Get("X-Cache"))
+		require.Equal(t, i, calls)
+	}
+
+	rec := request("/found.js")
+	require.Equal(t, "MISS", rec.Header().Get("X-Cache"))
+	require.Equal(t, 3, calls)
+
+	rec = request("/found.js")
+	require.Equal(t, "HIT", rec.Header().Get("X-Cache")[:3])
+	require.Equal(t, 3, calls)
+
+	rec = request("/found.js?filename=foo.js")
+	require.Empty(t, rec.Header().Get("X-Cache"))
+	require.Equal(t, 4, calls)
+}
