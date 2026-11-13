@@ -134,6 +134,10 @@ func NewAPI(config APIConfig) (API, error) {
 	a.router.PUT("/v1/alias/rule", a.AliasUpdate)
 	a.router.DELETE("/v1/alias/rule", a.AliasRemove)
 
+	a.router.POST("/v1/zone", a.ZoneAdd)
+	a.router.PUT("/v1/zone/:id", a.ZoneUpdate)
+	a.router.DELETE("/v1/zone/:id", a.ZoneRemove)
+
 	a.router.GET("/v1/core", a.CoreAPIAddress)
 	a.router.GET("/v1/core/config", a.CoreConfig)
 	a.router.GET("/v1/core/skills", a.CoreSkills)
@@ -947,6 +951,126 @@ func (a *api) AliasesSet(c echo.Context) error {
 	err := a.cluster.AliasesSet(origin, r.Rules)
 	if err != nil {
 		a.logger.Debug().WithError(err).WithField("aliases", r.Rules).Log("Unable to set aliases")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// ZoneAdd adds a zone to the cluster DB
+// @Summary Add a zone
+// @Description Add a zone to the cluster DB
+// @Tags v1.0.0
+// @ID cluster-1-add-zone
+// @Accept json
+// @Produce json
+// @Param data body client.AddZoneRequest true "Zone"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 409 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/zone [post]
+func (a *api) ZoneAdd(c echo.Context) error {
+	r := client.AddZoneRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("zone", r.Zone).Log("Add zone request")
+
+	err := a.cluster.ZoneAdd(origin, r.Zone)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("zone", r.Zone).Log("Unable to add zone")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// ZoneUpdate replaces the limits of a zone in the cluster DB
+// @Summary Replace the limits of a zone
+// @Description Replace the limits of the zone with the given ID in the cluster DB
+// @Tags v1.0.0
+// @ID cluster-1-update-zone
+// @Accept json
+// @Produce json
+// @Param id path string true "Zone ID"
+// @Param data body client.UpdateZoneRequest true "Zone"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 404 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/zone/{id} [put]
+func (a *api) ZoneUpdate(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	r := client.UpdateZoneRequest{}
+
+	if err := util.ShouldBindJSON(c, &r); err != nil {
+		return Err(http.StatusBadRequest, "", "invalid JSON: %s", err.Error())
+	}
+
+	if r.Zone.ID != id {
+		return Err(http.StatusBadRequest, "", "the ID of the zone doesn't match the ID in the path")
+	}
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("zone", r.Zone).Log("Update zone request")
+
+	err := a.cluster.ZoneUpdate(origin, r.Zone)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("zone", r.Zone).Log("Unable to update zone")
+		return ErrFromClusterError(err)
+	}
+
+	return c.JSON(http.StatusOK, "OK")
+}
+
+// ZoneRemove removes a zone from the cluster DB
+// @Summary Remove a zone
+// @Description Remove the zone with the given ID from the cluster DB. A zone with processes can't be removed.
+// @Tags v1.0.0
+// @ID cluster-1-remove-zone
+// @Produce json
+// @Param id path string true "Zone ID"
+// @Param X-Cluster-Origin header string false "Origin ID of request"
+// @Success 200 {string} string
+// @Failure 400 {object} Error
+// @Failure 404 {object} Error
+// @Failure 409 {object} Error
+// @Failure 500 {object} Error
+// @Failure 508 {object} Error
+// @Router /v1/zone/{id} [delete]
+func (a *api) ZoneRemove(c echo.Context) error {
+	id := util.PathParam(c, "id")
+
+	origin := c.Request().Header.Get("X-Cluster-Origin")
+
+	if origin == a.id {
+		return Err(http.StatusLoopDetected, "", "breaking circuit")
+	}
+
+	a.logger.Debug().WithField("id", id).Log("Remove zone request")
+
+	err := a.cluster.ZoneRemove(origin, id)
+	if err != nil {
+		a.logger.Debug().WithError(err).WithField("id", id).Log("Unable to remove zone")
 		return ErrFromClusterError(err)
 	}
 

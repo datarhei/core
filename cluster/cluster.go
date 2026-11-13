@@ -30,6 +30,7 @@ import (
 	"github.com/datarhei/core/v16/net"
 	"github.com/datarhei/core/v16/resources"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/zone"
 )
 
 type Cluster interface {
@@ -88,6 +89,11 @@ type Cluster interface {
 	AliasUpdate(origin, pattern string, rule alias.Rule) error
 	AliasRemove(origin, pattern string) error
 	AliasesSet(origin string, rules []alias.Rule) error
+
+	Zones() (zone.Manager, error)
+	ZoneAdd(origin string, z zone.Zone) error
+	ZoneUpdate(origin string, z zone.Zone) error
+	ZoneRemove(origin, id string) error
 
 	Manager() *clusternode.Manager
 	CertManager() autocert.Manager

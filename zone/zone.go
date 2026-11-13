@@ -108,9 +108,9 @@ const DefaultID = "$default"
 
 var idPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-// normalizeID returns the ID of the default zone for an empty ID, e.g. of a process
+// NormalizeID returns the ID of the default zone for an empty ID, e.g. of a process
 // without a zone.
-func normalizeID(id string) string {
+func NormalizeID(id string) string {
 	if len(id) == 0 {
 		return DefaultID
 	}
@@ -181,6 +181,28 @@ func ClaimFromConfig(config *app.Config) *Claim {
 		Zone:      config.Zone,
 		Resources: ResourcesFromConfig(config),
 	}
+}
+
+// Usage returns the resources the processes with the given configs claim in the zone and
+// the number of these processes. Configs of processes in other zones are ignored. Pass the
+// configs in a deterministic order if the result must be the same everywhere, because the
+// sum of floating point numbers depends on the order.
+func Usage(id string, configs []*app.Config) (Resources, int) {
+	id = NormalizeID(id)
+
+	usage := Resources{}
+	processes := 0
+
+	for _, config := range configs {
+		if NormalizeID(config.Zone) != id {
+			continue
+		}
+
+		usage = usage.Add(ResourcesFromConfig(config))
+		processes++
+	}
+
+	return usage, processes
 }
 
 // Info is a zone with its current usage.
@@ -374,7 +396,7 @@ func (m *manager) Acquire(prev, next *Claim) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	id := normalizeID(next.Zone)
+	id := NormalizeID(next.Zone)
 
 	z, ok := m.zones[id]
 	if !ok {
@@ -382,7 +404,7 @@ func (m *manager) Acquire(prev, next *Claim) error {
 	}
 
 	claimed := Resources{}
-	if prev != nil && normalizeID(prev.Zone) == id {
+	if prev != nil && NormalizeID(prev.Zone) == id {
 		claimed = prev.Resources
 	}
 
@@ -415,7 +437,7 @@ func (m *manager) Register(c *Claim) {
 
 // register adds the claim to the usage of its zone. The write lock must be held.
 func (m *manager) register(c *Claim) {
-	id := normalizeID(c.Zone)
+	id := NormalizeID(c.Zone)
 
 	u := m.usage[id]
 	u.resources = u.resources.Add(c.Resources)
@@ -425,7 +447,7 @@ func (m *manager) register(c *Claim) {
 
 // release removes the claim from the usage of its zone. The write lock must be held.
 func (m *manager) release(c *Claim) {
-	id := normalizeID(c.Zone)
+	id := NormalizeID(c.Zone)
 
 	u, ok := m.usage[id]
 	if !ok {

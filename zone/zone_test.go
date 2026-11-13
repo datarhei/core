@@ -71,6 +71,38 @@ func TestClaimFromConfig(t *testing.T) {
 	require.Equal(t, &Claim{Zone: "a", Resources: Resources{CPU: 10, Memory: 20}}, c)
 }
 
+func TestNormalizeID(t *testing.T) {
+	require.Equal(t, DefaultID, NormalizeID(""))
+	require.Equal(t, DefaultID, NormalizeID(DefaultID))
+	require.Equal(t, "a", NormalizeID("a"))
+}
+
+func TestUsage(t *testing.T) {
+	configs := []*app.Config{
+		{Zone: "a", LimitCPU: 10, LimitMemory: 1},
+		{Zone: "b", LimitCPU: 20},
+		{Zone: "a", LimitCPU: 30, LimitMemory: 2},
+		{Zone: "", LimitCPU: 40},
+		{Zone: DefaultID, LimitCPU: 50},
+	}
+
+	usage, n := Usage("a", configs)
+	require.Equal(t, Resources{CPU: 40, Memory: 3}, usage)
+	require.Equal(t, 2, n)
+
+	usage, n = Usage(DefaultID, configs)
+	require.Equal(t, Resources{CPU: 90}, usage)
+	require.Equal(t, 2, n)
+
+	usage, n = Usage("", configs)
+	require.Equal(t, Resources{CPU: 90}, usage)
+	require.Equal(t, 2, n)
+
+	usage, n = Usage("x", configs)
+	require.Equal(t, Resources{}, usage)
+	require.Equal(t, 0, n)
+}
+
 func TestResourcesAddSub(t *testing.T) {
 	a := Resources{CPU: 10, Memory: 20, GPUUsage: 30, GPUEncoder: 40, GPUDecoder: 50, GPUMemory: 60}
 	b := Resources{CPU: 1, Memory: 2, GPUUsage: 3, GPUEncoder: 4, GPUDecoder: 5, GPUMemory: 6}

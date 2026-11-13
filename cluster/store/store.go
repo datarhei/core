@@ -12,6 +12,7 @@ import (
 	"github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/zone"
 
 	"github.com/hashicorp/raft"
 )
@@ -40,6 +41,9 @@ type Store interface {
 
 	AliasList() Aliases
 	AliasGet(pattern string) (alias.Rule, error)
+
+	ZoneList() []zone.Info
+	ZoneGet(id string) (zone.Info, error)
 
 	NodeList() map[string]Node
 }
@@ -106,6 +110,9 @@ const (
 	OpUpdateAlias          Operation = "updateAlias"
 	OpRemoveAlias          Operation = "removeAlias"
 	OpSetAliases           Operation = "setAliases"
+	OpAddZone              Operation = "addZone"
+	OpUpdateZone           Operation = "updateZone"
+	OpRemoveZone           Operation = "removeZone"
 )
 
 type Command struct {
@@ -216,6 +223,18 @@ type CommandSetAliases struct {
 	Rules []alias.Rule
 }
 
+type CommandAddZone struct {
+	Zone zone.Zone
+}
+
+type CommandUpdateZone struct {
+	Zone zone.Zone
+}
+
+type CommandRemoveZone struct {
+	ID string
+}
+
 type storeData struct {
 	Version            uint64
 	Process            map[string]Process // processid -> process
@@ -240,6 +259,8 @@ type storeData struct {
 	Nodes map[string]Node
 
 	Aliases Aliases
+
+	Zones map[string]zone.Zone // zoneid -> zone
 }
 
 func (s *storeData) init() {
@@ -259,6 +280,7 @@ func (s *storeData) init() {
 	s.Nodes = map[string]Node{}
 	s.Aliases.UpdatedAt = now
 	s.Aliases.Rules = []alias.Rule{}
+	s.Zones = map[string]zone.Zone{}
 }
 
 // store implements a raft.FSM
@@ -525,6 +547,30 @@ func (s *store) applyCommand(c Command) error {
 		}
 
 		err = s.setAliases(cmd)
+	case OpAddZone:
+		cmd := CommandAddZone{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.addZone(cmd)
+	case OpUpdateZone:
+		cmd := CommandUpdateZone{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.updateZone(cmd)
+	case OpRemoveZone:
+		cmd := CommandRemoveZone{}
+		err = decodeCommand(&cmd, c.Data)
+		if err != nil {
+			break
+		}
+
+		err = s.removeZone(cmd)
 	default:
 		s.logger.Warn().WithField("operation", c.Operation).Log("Unknown operation")
 		err = fmt.Errorf("unknown operation: %s", c.Operation)
@@ -569,6 +615,7 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 			callback(OpAddIdentity)
 			callback(OpSetPolicies)
 			callback(OpSetAliases)
+			callback(OpUpdateZone)
 		}
 		s.lock.RUnlock()
 	}()
@@ -629,6 +676,10 @@ func (s *store) Restore(snapshot io.ReadCloser) error {
 
 	if data.Aliases.Rules == nil {
 		data.Aliases.Rules = []alias.Rule{}
+	}
+
+	if data.Zones == nil {
+		data.Zones = map[string]zone.Zone{}
 	}
 
 	if data.Version == 0 {

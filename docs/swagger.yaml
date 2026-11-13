@@ -5538,6 +5538,182 @@ paths:
       summary: Transfer the leadership to another node
       tags:
       - v16.?.?
+  /api/v3/cluster/zone:
+    get:
+      description: List all zones in the cluster with their limits and current usage.
+      operationId: cluster-3-zone-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ZoneInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all zones in the cluster
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add a zone to the cluster. Only superusers are allowed to modify
+        zones.
+      operationId: cluster-3-zone-add
+      parameters:
+      - description: Zone
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/api.Zone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Zone'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a zone to the cluster
+      tags:
+      - v16.?.?
+  /api/v3/cluster/zone/{id}:
+    delete:
+      description: Delete the zone with the given ID from the cluster. A zone with
+        processes and the default zone can't be deleted. Only superusers are allowed
+        to modify zones.
+      operationId: cluster-3-zone-delete
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a zone from the cluster
+      tags:
+      - v16.?.?
+    get:
+      description: Get the zone with the given ID from the cluster with its limits
+        and current usage
+      operationId: cluster-3-zone-get
+      parameters:
+      - description: Zone ID, $default for the default zone
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ZoneInfo'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a zone from the cluster
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace the limits of the zone with the given ID in the cluster.
+        The limits apply to processes that are added or updated afterwards. Only superusers
+        are allowed to modify zones.
+      operationId: cluster-3-zone-update
+      parameters:
+      - description: Zone ID, $default for the default zone
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Zone
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/api.Zone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Zone'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace the limits of a zone in the cluster
+      tags:
+      - v16.?.?
   /api/v3/config:
     get:
       description: Retrieve the currently active Restreamer configuration

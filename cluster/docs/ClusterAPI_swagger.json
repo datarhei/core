@@ -1530,6 +1530,207 @@
                     }
                 }
             }
+        },
+        "/v1/zone": {
+            "post": {
+                "description": "Add a zone to the cluster DB",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Add a zone",
+                "operationId": "cluster-1-add-zone",
+                "parameters": [
+                    {
+                        "description": "Zone",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.AddZoneRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/zone/{id}": {
+            "put": {
+                "description": "Replace the limits of the zone with the given ID in the cluster DB",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Replace the limits of a zone",
+                "operationId": "cluster-1-update-zone",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Zone ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Zone",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/client.UpdateZoneRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Remove the zone with the given ID from the cluster DB. A zone with processes can't be removed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "v1.0.0"
+                ],
+                "summary": "Remove a zone",
+                "operationId": "cluster-1-remove-zone",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Zone ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Origin ID of request",
+                        "name": "X-Cluster-Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    },
+                    "508": {
+                        "description": "Loop Detected",
+                        "schema": {
+                            "$ref": "#/definitions/cluster.Error"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1644,6 +1845,10 @@
                     "description": "seconds",
                     "type": "integer",
                     "format": "int64"
+                },
+                "zone": {
+                    "description": "Zone of the process, empty for the default zone",
+                    "type": "string"
                 }
             }
         },
@@ -1841,6 +2046,14 @@
                 }
             }
         },
+        "client.AddZoneRequest": {
+            "type": "object",
+            "properties": {
+                "zone": {
+                    "$ref": "#/definitions/zone.Zone"
+                }
+            }
+        },
         "client.GetProcessResponse": {
             "type": "object",
             "properties": {
@@ -1967,6 +2180,14 @@
                 },
                 "force": {
                     "type": "boolean"
+                }
+            }
+        },
+        "client.UpdateZoneRequest": {
+            "type": "object",
+            "properties": {
+                "zone": {
+                    "$ref": "#/definitions/zone.Zone"
                 }
             }
         },
@@ -3133,6 +3354,46 @@
                 "username": {
                     "description": "Deprecated, use IAM",
                     "type": "string"
+                }
+            }
+        },
+        "zone.Resources": {
+            "type": "object",
+            "properties": {
+                "cpu_usage": {
+                    "description": "percent 0-100*ncpu",
+                    "type": "number"
+                },
+                "gpu_decoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "gpu_encoder": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "gpu_memory_bytes": {
+                    "description": "bytes",
+                    "type": "integer"
+                },
+                "gpu_usage": {
+                    "description": "percent 0-100",
+                    "type": "number"
+                },
+                "memory_bytes": {
+                    "description": "bytes",
+                    "type": "integer"
+                }
+            }
+        },
+        "zone.Zone": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "limits": {
+                    "$ref": "#/definitions/zone.Resources"
                 }
             }
         }

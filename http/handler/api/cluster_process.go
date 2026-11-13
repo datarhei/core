@@ -510,6 +510,10 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 		return apierrors.Err(http.StatusBadRequest, "", "At least one input and one output need to be defined")
 	}
 
+	if !canAccessZone(h.iam, ctxuser, process.Domain, process.Zone, "write") {
+		return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to add processes to the zone: %s", ctxuser, process.Zone)
+	}
+
 	config, metadata := process.Marshal()
 
 	if err := h.cluster.ProcessAdd("", config); err != nil {
@@ -576,6 +580,18 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	}
 
 	config, metadata := process.Marshal()
+
+	// Moving a process to another zone requires the permission to write to both zones, each
+	// in the domain the process is in respectively will be in.
+	if config.Zone != current.Config.Zone {
+		if !canAccessZone(h.iam, ctxuser, current.Config.Domain, current.Config.Zone, "write") {
+			return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to remove processes from the zone: %s", ctxuser, current.Config.Zone)
+		}
+
+		if !canAccessZone(h.iam, ctxuser, config.Domain, config.Zone, "write") {
+			return apierrors.Err(http.StatusForbidden, "", "API user %s is not allowed to add processes to the zone: %s", ctxuser, config.Zone)
+		}
+	}
 
 	if err := h.cluster.ProcessUpdate("", pid, config, force == "restart"); err != nil {
 		if err == restream.ErrUnknownProcess {

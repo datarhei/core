@@ -845,6 +845,9 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 		v3.GET("/cluster/alias", s.v3handler.cluster.AliasList)
 		v3.GET("/cluster/alias/rule", s.v3handler.cluster.AliasGet)
 
+		v3.GET("/cluster/zone", s.v3handler.cluster.ZoneList)
+		v3.GET("/cluster/zone/:id", s.v3handler.cluster.ZoneGet)
+
 		v3.GET("/cluster/process", s.v3handler.cluster.ProcessList)
 		v3.GET("/cluster/process/:id", s.v3handler.cluster.ProcessGet)
 		v3.GET("/cluster/process/:id/config", s.v3handler.cluster.ProcessGetConfig)
@@ -898,6 +901,10 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.POST("/cluster/alias", s.v3handler.cluster.AliasAdd)
 			v3.PUT("/cluster/alias/rule", s.v3handler.cluster.AliasUpdate)
 			v3.DELETE("/cluster/alias/rule", s.v3handler.cluster.AliasRemove)
+
+			v3.POST("/cluster/zone", s.v3handler.cluster.ZoneAdd)
+			v3.PUT("/cluster/zone/:id", s.v3handler.cluster.ZoneUpdate)
+			v3.DELETE("/cluster/zone/:id", s.v3handler.cluster.ZoneRemove)
 		}
 	}
 

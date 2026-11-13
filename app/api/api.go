@@ -1200,6 +1200,10 @@ func (a *api) start(ctx context.Context) error {
 
 	var store restreamstore.Store = nil
 
+	// In cluster mode the zone limits are checked by the cluster, the restreamer of a node
+	// only applies what the cluster decided and doesn't check any zone limits.
+	var restreamZones zone.Manager = nil
+
 	if !cfg.Cluster.Enable {
 		fs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 			Root: cfg.DB.Dir,
@@ -1216,7 +1220,6 @@ func (a *api) start(ctx context.Context) error {
 			return err
 		}
 
-		// In cluster mode the zones are checked by the cluster.
 		zones, err := zone.New(zone.Config{
 			Filesystem: fs,
 			Filepath:   "/zones.json",
@@ -1227,6 +1230,7 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		a.zones = zones
+		restreamZones = zones
 	}
 
 	restream, err := restream.New(restream.Config{
@@ -1239,7 +1243,7 @@ func (a *api) start(ctx context.Context) error {
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
 		Resources:    a.resources,
-		Zones:        a.zones,
+		Zones:        restreamZones,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 
@@ -1503,6 +1507,15 @@ func (a *api) start(ctx context.Context) error {
 		}
 
 		a.aliases = aliases
+
+		// In cluster mode the zones are stored in the cluster DB and the zone limits are
+		// checked by the cluster. This read-only zone manager is only used for the API.
+		zones, err := a.cluster.Zones()
+		if err != nil {
+			return fmt.Errorf("unable to create zone manager: %w", err)
+		}
+
+		a.zones = zones
 	} else {
 		aliasfs, err := fs.NewRootedDiskFilesystem(fs.RootedDiskConfig{
 			Root: cfg.DB.Dir,

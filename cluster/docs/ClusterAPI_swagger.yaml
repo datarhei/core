@@ -81,6 +81,9 @@ definitions:
         description: seconds
         format: int64
         type: integer
+      zone:
+        description: Zone of the process, empty for the default zone
+        type: string
     type: object
   app.ConfigIO:
     properties:
@@ -217,6 +220,11 @@ definitions:
       config:
         $ref: '#/definitions/app.Config'
     type: object
+  client.AddZoneRequest:
+    properties:
+      zone:
+        $ref: '#/definitions/zone.Zone'
+    type: object
   client.GetProcessResponse:
     properties:
       nodeid:
@@ -298,6 +306,11 @@ definitions:
         $ref: '#/definitions/app.Config'
       force:
         type: boolean
+    type: object
+  client.UpdateZoneRequest:
+    properties:
+      zone:
+        $ref: '#/definitions/zone.Zone'
     type: object
   cluster.Error:
     properties:
@@ -1072,6 +1085,34 @@ definitions:
       username:
         description: Deprecated, use IAM
         type: string
+    type: object
+  zone.Resources:
+    properties:
+      cpu_usage:
+        description: percent 0-100*ncpu
+        type: number
+      gpu_decoder:
+        description: percent 0-100
+        type: number
+      gpu_encoder:
+        description: percent 0-100
+        type: number
+      gpu_memory_bytes:
+        description: bytes
+        type: integer
+      gpu_usage:
+        description: percent 0-100
+        type: number
+      memory_bytes:
+        description: bytes
+        type: integer
+    type: object
+  zone.Zone:
+    properties:
+      id:
+        type: string
+      limits:
+        $ref: '#/definitions/zone.Resources'
     type: object
 info:
   contact:
@@ -2099,6 +2140,142 @@ paths:
           schema:
             $ref: '#/definitions/cluster.Error'
       summary: Transfer leadership
+      tags:
+      - v1.0.0
+  /v1/zone:
+    post:
+      consumes:
+      - application/json
+      description: Add a zone to the cluster DB
+      operationId: cluster-1-add-zone
+      parameters:
+      - description: Zone
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.AddZoneRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Add a zone
+      tags:
+      - v1.0.0
+  /v1/zone/{id}:
+    delete:
+      description: Remove the zone with the given ID from the cluster DB. A zone with
+        processes can't be removed.
+      operationId: cluster-1-remove-zone
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Remove a zone
+      tags:
+      - v1.0.0
+    put:
+      consumes:
+      - application/json
+      description: Replace the limits of the zone with the given ID in the cluster
+        DB
+      operationId: cluster-1-update-zone
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Zone
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/client.UpdateZoneRequest'
+      - description: Origin ID of request
+        in: header
+        name: X-Cluster-Origin
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/cluster.Error'
+        "508":
+          description: Loop Detected
+          schema:
+            $ref: '#/definitions/cluster.Error'
+      summary: Replace the limits of a zone
       tags:
       - v1.0.0
 swagger: "2.0"

@@ -23,6 +23,10 @@ func (s *store) addProcess(cmd CommandAddProcess) error {
 		return fmt.Errorf("the process with the ID '%s' already exists%w", id, ErrBadRequest)
 	}
 
+	if err := s.zoneCheck(nil, cmd.Config); err != nil {
+		return err
+	}
+
 	order := "stop"
 	if cmd.Config.Autostart {
 		order = "start"
@@ -71,6 +75,10 @@ func (s *store) updateProcess(cmd CommandUpdateProcess) error {
 	p, ok := s.data.Process[srcid]
 	if !ok {
 		return fmt.Errorf("the process with the ID '%s' doesn't exists%w", srcid, ErrNotFound)
+	}
+
+	if err := s.zoneCheck(p.Config, cmd.Config); err != nil {
+		return err
 	}
 
 	// The order is stored separately and it is not changed by an update.

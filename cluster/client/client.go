@@ -16,6 +16,7 @@ import (
 	iamidentity "github.com/datarhei/core/v16/iam/identity"
 	iampolicy "github.com/datarhei/core/v16/iam/policy"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/zone"
 )
 
 type JoinRequest struct {
@@ -87,6 +88,14 @@ type UpdateAliasRequest struct {
 
 type SetAliasesRequest struct {
 	Rules []alias.Rule `json:"rules"`
+}
+
+type AddZoneRequest struct {
+	Zone zone.Zone `json:"zone"`
+}
+
+type UpdateZoneRequest struct {
+	Zone zone.Zone `json:"zone"`
 }
 
 type AboutResponse struct {
