@@ -48,9 +48,26 @@ optional parts other than `{a,}`.
 
 The global `autohead` middleware (`http/middleware/autohead/autohead.go`) turns every HEAD
 request into a GET with a writer that discards the body. `GetFile` (`http/handler/filesystem.go`)
-then streams the whole file, although it handles HEAD itself and only needs `Stat()`. For a large
-file on disk or S3 this reads the whole file for nothing. `autohead` should be skipped for the
-filesystem routes (and the `/api/v3/fs/:storage/*` route).
+then streams the whole file. For a large file on disk or S3 this reads the whole file for nothing.
+
+`autohead` is needed, because some middleware changes the body, and HEAD has to report the same
+headers (e.g. `Content-Length`) as GET:
+
+- `.m3u8`: `hlsrewrite` (disk only) rewrites the paths, and the session middleware
+  (`handleHLSEgress`) adds the session IDs and sets a new `Content-Length`.
+- Content types in `compress.mimetypes` with `Accept-Encoding` and at least `compress.min_length`
+  bytes: the compress middleware compresses the body, removes `Content-Length` and adds
+  `Content-Encoding`.
+
+Other files, e.g. segments (`.ts`, `.mp4`, `.m4s`), videos and images, are not changed, and the
+size from `Stat()` would be correct. Simply skipping `autohead` for the filesystem routes is
+therefore wrong. Possible directions:
+
+- `autohead` skips paths that are not `.m3u8` and whose content type (from the mime middleware)
+  is not compressible. This duplicates the conditions of the other middlewares.
+- HEAD goes to `GetFile` directly, and only the middlewares that change the body (hlsrewrite,
+  session for `.m3u8`, compress) turn HEAD into GET internally, and only if they would change
+  the body. Each middleware knows its own conditions, but three middlewares have to be changed.
 
 ## memfs copies the file data on every open
 
