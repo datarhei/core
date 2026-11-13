@@ -72,6 +72,7 @@ type Config struct {
 	Reference      string
 	Owner          string
 	Domain         string
+	Zone           string // Zone of the process, empty for the default zone
 	Binary         string
 	FFVersion      string
 	Input          []ConfigIO
@@ -104,6 +105,7 @@ func (config *Config) Clone() *Config {
 		Reference:      config.Reference,
 		Owner:          config.Owner,
 		Domain:         config.Domain,
+		Zone:           config.Zone,
 		Binary:         config.Binary,
 		FFVersion:      config.FFVersion,
 		Reconnect:      config.Reconnect,
@@ -177,6 +179,7 @@ func (config *Config) Hash() []byte {
 	b.WriteString(config.Reference)
 	b.WriteString(config.Owner)
 	b.WriteString(config.Domain)
+	b.WriteString(config.Zone)
 	b.WriteString(config.Binary)
 	b.WriteString(config.Scheduler)
 	b.WriteString(strings.Join(config.Options, ","))

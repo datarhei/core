@@ -1535,6 +1535,9 @@ definitions:
         - ffmpeg
         - ""
         type: string
+      zone:
+        description: Zone of the process, "$default" or empty for the default zone
+        type: string
     required:
     - input
     - output
@@ -3146,6 +3149,49 @@ definitions:
         format: uint64
         type: integer
       uptime:
+        type: integer
+    type: object
+  api.Zone:
+    properties:
+      id:
+        type: string
+      limits:
+        $ref: '#/definitions/api.ZoneResources'
+    type: object
+  api.ZoneInfo:
+    properties:
+      id:
+        type: string
+      limits:
+        $ref: '#/definitions/api.ZoneResources'
+      processes:
+        description: Number of processes in this zone
+        format: uint64
+        type: integer
+      usage:
+        $ref: '#/definitions/api.ZoneResources'
+    type: object
+  api.ZoneResources:
+    properties:
+      cpu_usage:
+        description: percent 0-100*ncpu
+        type: number
+      gpu_decoder:
+        description: percent 0-100
+        type: number
+      gpu_encoder:
+        description: percent 0-100
+        type: number
+      gpu_memory_mbytes:
+        description: megabytes
+        format: uint64
+        type: integer
+      gpu_usage:
+        description: percent 0-100
+        type: number
+      memory_mbytes:
+        description: megabytes
+        format: uint64
         type: integer
     type: object
   errors.Error:
@@ -7567,6 +7613,179 @@ paths:
       summary: Fetch minimal statistics about a process
       tags:
       - v16.7.2
+  /api/v3/zone:
+    get:
+      description: List all zones with their limits and current usage.
+      operationId: zone-3-list
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ZoneInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List all zones
+      tags:
+      - v16.?.?
+    post:
+      consumes:
+      - application/json
+      description: Add a zone. Only superusers are allowed to modify zones.
+      operationId: zone-3-add
+      parameters:
+      - description: Zone
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/api.Zone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Zone'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a zone
+      tags:
+      - v16.?.?
+  /api/v3/zone/{id}:
+    delete:
+      description: Delete the zone with the given ID. A zone with processes and the
+        default zone can't be deleted. Only superusers are allowed to modify zones.
+      operationId: zone-3-delete
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a zone
+      tags:
+      - v16.?.?
+    get:
+      description: Get the zone with the given ID with its limits and current usage
+      operationId: zone-3-get
+      parameters:
+      - description: Zone ID, $default for the default zone
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ZoneInfo'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a zone
+      tags:
+      - v16.?.?
+    put:
+      consumes:
+      - application/json
+      description: Replace the limits of the zone with the given ID. The limits apply
+        to processes that are added or updated afterwards. Only superusers are allowed
+        to modify zones.
+      operationId: zone-3-update
+      parameters:
+      - description: Zone ID, $default for the default zone
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Zone
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/api.Zone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Zone'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/errors.Error'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/errors.Error'
+      security:
+      - ApiKeyAuth: []
+      summary: Replace the limits of a zone
+      tags:
+      - v16.?.?
   /metrics:
     get:
       description: Prometheus metrics

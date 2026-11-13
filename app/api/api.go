@@ -53,6 +53,7 @@ import (
 	"github.com/datarhei/core/v16/srt"
 	srturl "github.com/datarhei/core/v16/srt/url"
 	"github.com/datarhei/core/v16/update"
+	"github.com/datarhei/core/v16/zone"
 
 	"github.com/google/gops/agent"
 	"github.com/lestrrat-go/strftime"
@@ -101,6 +102,7 @@ type api struct {
 	cluster         cluster.Cluster
 	iam             iam.IAM
 	aliases         alias.Manager
+	zones           zone.Manager
 
 	errorChan chan error
 
@@ -1213,6 +1215,18 @@ func (a *api) start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
+		// In cluster mode the zones are checked by the cluster.
+		zones, err := zone.New(zone.Config{
+			Filesystem: fs,
+			Filepath:   "/zones.json",
+			Logger:     a.log.logger.core.WithComponent("Zone"),
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create zone manager: %w", err)
+		}
+
+		a.zones = zones
 	}
 
 	restream, err := restream.New(restream.Config{
@@ -1225,6 +1239,7 @@ func (a *api) start(ctx context.Context) error {
 		FFmpeg:       a.ffmpeg,
 		MaxProcesses: cfg.FFmpeg.MaxProcesses,
 		Resources:    a.resources,
+		Zones:        a.zones,
 		Logger:       a.log.logger.core.WithComponent("Process"),
 	})
 
@@ -1555,6 +1570,7 @@ func (a *api) start(ctx context.Context) error {
 			MinLength: cfg.Compress.MinLength,
 		},
 		Aliases: a.aliases,
+		Zones:   a.zones,
 	}
 
 	if cfg.RTMP.HTTPFLV.Enable {
@@ -1929,6 +1945,7 @@ func (a *api) stop() {
 
 	// Release the alias manager
 	a.aliases = nil
+	a.zones = nil
 
 	if a.iam != nil {
 		a.iam.Close()

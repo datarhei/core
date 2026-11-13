@@ -67,6 +67,24 @@ func TestConfigHash(t *testing.T) {
 	require.False(t, bytes.Equal(hash1, hash2))
 }
 
+func TestConfigHashZone(t *testing.T) {
+	config := &Config{
+		ID:     "id",
+		Domain: "domain",
+	}
+
+	hash1 := config.Hash()
+
+	config.Zone = "foobar"
+	hash2 := config.Hash()
+
+	require.False(t, bytes.Equal(hash1, hash2))
+
+	clone := config.Clone()
+	require.Equal(t, "foobar", clone.Zone)
+	require.True(t, config.Equal(clone))
+}
+
 func TestConfigIOHash(t *testing.T) {
 	io1 := ConfigIO{
 		ID:      "0",

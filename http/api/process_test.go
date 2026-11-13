@@ -145,3 +145,29 @@ func TestProcessConfig(t *testing.T) {
 
 	require.Equal(t, &original, restored)
 }
+
+func TestProcessConfigZone(t *testing.T) {
+	original := app.Config{
+		ID:   "foobar",
+		Zone: "",
+	}
+
+	// The default zone is shown as "$default" and stored as empty zone
+	p := ProcessConfig{}
+	p.Unmarshal(&original, nil)
+	require.Equal(t, "$default", p.Zone)
+
+	restored, _ := p.Marshal()
+	require.Equal(t, "", restored.Zone)
+
+	p.Zone = ""
+	restored, _ = p.Marshal()
+	require.Equal(t, "", restored.Zone)
+
+	original.Zone = "foobar"
+	p.Unmarshal(&original, nil)
+	require.Equal(t, "foobar", p.Zone)
+
+	restored, _ = p.Marshal()
+	require.Equal(t, "foobar", restored.Zone)
+}

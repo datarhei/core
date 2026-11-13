@@ -93,6 +93,7 @@ func TestStoreLoad(t *testing.T) {
 				Reference: "refref",
 				Owner:     "you",
 				Domain:    "domain",
+				Zone:      "zone",
 				FFVersion: "^5.1.4",
 				Input:     []app.ConfigIO{},
 				Output:    []app.ConfigIO{},

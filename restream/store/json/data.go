@@ -79,6 +79,7 @@ type ProcessConfig struct {
 	Reference      string            `json:"reference"`
 	Owner          string            `json:"owner"`
 	Domain         string            `json:"domain"`
+	Zone           string            `json:"zone,omitempty"`
 	Binary         string            `json:"binary"`
 	FFVersion      string            `json:"ffversion"`
 	Input          []ProcessConfigIO `json:"input"`
@@ -128,6 +129,7 @@ func (p *ProcessConfig) Marshal(a *app.Config) {
 	p.Reference = a.Reference
 	p.Owner = a.Owner
 	p.Domain = a.Domain
+	p.Zone = a.Zone
 	p.Binary = a.Binary
 	p.FFVersion = a.FFVersion
 	p.Options = slices.Clone(a.Options)
@@ -165,6 +167,7 @@ func (p *ProcessConfig) Unmarshal() *app.Config {
 		Reference:      p.Reference,
 		Owner:          p.Owner,
 		Domain:         p.Domain,
+		Zone:           p.Zone,
 		Binary:         p.Binary,
 		FFVersion:      p.FFVersion,
 		Input:          []app.ConfigIO{},

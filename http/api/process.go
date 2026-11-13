@@ -8,6 +8,7 @@ import (
 	"github.com/datarhei/core/v16/encoding/json"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/uuid"
+	"github.com/datarhei/core/v16/zone"
 )
 
 type ProcessID struct {
@@ -170,6 +171,7 @@ type ProcessConfig struct {
 	ID             string                 `json:"id"`
 	Owner          string                 `json:"owner"`
 	Domain         string                 `json:"domain"`
+	Zone           string                 `json:"zone"` // Zone of the process, "$default" or empty for the default zone
 	Binary         string                 `json:"binary"`
 	Type           string                 `json:"type" validate:"oneof='ffmpeg' ''" jsonschema:"enum=ffmpeg,enum="`
 	Reference      string                 `json:"reference"`
@@ -193,6 +195,7 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 		ID:             cfg.ID,
 		Owner:          cfg.Owner,
 		Domain:         cfg.Domain,
+		Zone:           cfg.Zone,
 		Binary:         cfg.Binary,
 		Reference:      cfg.Reference,
 		Options:        slices.Clone(cfg.Options),
@@ -247,6 +250,11 @@ func (cfg *ProcessConfig) Marshal() (*app.Config, map[string]interface{}) {
 
 	}
 
+	// The default zone is stored as empty zone.
+	if p.Zone == zone.DefaultID {
+		p.Zone = ""
+	}
+
 	return p, cfg.Metadata
 }
 
@@ -285,6 +293,10 @@ func (cfg *ProcessConfig) Unmarshal(c *app.Config, metadata map[string]interface
 	cfg.ID = c.ID
 	cfg.Owner = c.Owner
 	cfg.Domain = c.Domain
+	cfg.Zone = c.Zone
+	if len(cfg.Zone) == 0 {
+		cfg.Zone = zone.DefaultID
+	}
 	cfg.Binary = c.Binary
 	cfg.Reference = c.Reference
 	cfg.Type = "ffmpeg"

@@ -61,6 +61,16 @@ func TestResourcesFromConfig(t *testing.T) {
 	require.Equal(t, Resources{CPU: 10, Memory: 20, GPUUsage: 30, GPUEncoder: 40, GPUDecoder: 50, GPUMemory: 60}, r)
 }
 
+func TestClaimFromConfig(t *testing.T) {
+	c := ClaimFromConfig(&app.Config{
+		Zone:        "a",
+		LimitCPU:    10,
+		LimitMemory: 20,
+	})
+
+	require.Equal(t, &Claim{Zone: "a", Resources: Resources{CPU: 10, Memory: 20}}, c)
+}
+
 func TestResourcesAddSub(t *testing.T) {
 	a := Resources{CPU: 10, Memory: 20, GPUUsage: 30, GPUEncoder: 40, GPUDecoder: 50, GPUMemory: 60}
 	b := Resources{CPU: 1, Memory: 2, GPUUsage: 3, GPUEncoder: 4, GPUDecoder: 5, GPUMemory: 6}

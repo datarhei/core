@@ -24,6 +24,7 @@ import (
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/rewrite"
 	"github.com/datarhei/core/v16/restream/store"
+	"github.com/datarhei/core/v16/zone"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -78,6 +79,7 @@ type Config struct {
 	FFmpeg       ffmpeg.FFmpeg
 	MaxProcesses int64
 	Resources    resources.Resources
+	Zones        zone.Manager // Optional, checks the zone limits of the processes
 	Logger       log.Logger
 }
 
@@ -100,6 +102,8 @@ type restream struct {
 
 	resources       resources.Resources
 	enableSoftLimit bool
+
+	zones zone.Manager
 
 	lock sync.RWMutex
 
@@ -124,6 +128,7 @@ func New(config Config) (Restreamer, error) {
 		tasks:     NewStorage(),
 		metadata:  map[string]interface{}{},
 		events:    event.NewPubSub(),
+		zones:     config.Zones,
 	}
 
 	if r.logger == nil {
@@ -484,6 +489,14 @@ func (r *restream) load() error {
 	})
 	r.tasks = tasks
 
+	// The existing processes claim their resources regardless of the zone limits.
+	if r.zones != nil {
+		r.tasks.Range(func(_ app.ProcessID, t *task) bool {
+			r.zones.Register(zone.ClaimFromConfig(t.Config()))
+			return true
+		})
+	}
+
 	r.metadata = data.Metadata
 
 	return nil
@@ -544,16 +557,28 @@ func (r *restream) AddProcess(config *app.Config) error {
 		return err
 	}
 
+	claim := zone.ClaimFromConfig(config)
+
+	if r.zones != nil {
+		if err := r.zones.Acquire(nil, claim); err != nil {
+			t.Destroy()
+			return err
+		}
+	}
+
 	_, ok := r.tasks.LoadOrStore(tid, t)
 	if ok {
 		t.Destroy()
+		r.releaseZone(claim)
 		return ErrProcessExists
 	}
 
 	// set filesystem cleanup rules
 	patterns, err := r.compileCleanup(t.ResolvedConfig())
 	if err != nil {
+		r.tasks.LoadAndDelete(tid)
 		t.Destroy()
+		r.releaseZone(claim)
 		return err
 	}
 	r.setCleanup(tid, patterns)
@@ -562,12 +587,22 @@ func (r *restream) AddProcess(config *app.Config) error {
 	if err != nil {
 		r.tasks.LoadAndDelete(tid)
 		t.Destroy()
+		r.releaseZone(claim)
 		return err
 	}
 
 	r.save()
 
 	return nil
+}
+
+// releaseZone releases the resources the process claimed in its zone.
+func (r *restream) releaseZone(claim *zone.Claim) {
+	if r.zones == nil {
+		return
+	}
+
+	r.zones.Release(claim)
 }
 
 // createTask creates a new task based on a process config.
@@ -1278,8 +1313,25 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 
 	t.process.Order.Set(order)
 
+	prevClaim := zone.ClaimFromConfig(task.Config())
+	nextClaim := zone.ClaimFromConfig(config)
+
+	if r.zones != nil {
+		if err := r.zones.Acquire(prevClaim, nextClaim); err != nil {
+			t.Destroy()
+			return err
+		}
+	}
+
 	if err := task.Stop("Updating process config"); err != nil {
 		t.Destroy()
+
+		// Restore the previous claim, regardless of the zone limits.
+		if r.zones != nil {
+			r.zones.Release(nextClaim)
+			r.zones.Register(prevClaim)
+		}
+
 		return fmt.Errorf("stop process: %w", err)
 	}
 
@@ -1396,6 +1448,8 @@ func (r *restream) deleteProcess(task *task, purge bool) error {
 	r.unsetCleanup(task.ID(), purge)
 
 	r.tasks.LoadAndDelete(task.ID())
+
+	r.releaseZone(zone.ClaimFromConfig(task.Config()))
 
 	task.Destroy()
 

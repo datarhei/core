@@ -175,6 +175,14 @@ type Claim struct {
 	Resources Resources
 }
 
+// ClaimFromConfig returns the claim of a process with this config.
+func ClaimFromConfig(config *app.Config) *Claim {
+	return &Claim{
+		Zone:      config.Zone,
+		Resources: ResourcesFromConfig(config),
+	}
+}
+
 // Info is a zone with its current usage.
 type Info struct {
 	Zone

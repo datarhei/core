@@ -17,6 +17,8 @@ import (
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/uuid"
 
+	"github.com/datarhei/core/v16/zone"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -73,6 +75,10 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 
 	if len(process.Input) == 0 || len(process.Output) == 0 {
 		return apierrors.Err(http.StatusBadRequest, "", "at least one input and one output need to be defined")
+	}
+
+	if !canAccessZone(h.iam, ctxuser, process.Domain, process.Zone, "write") {
+		return apierrors.Err(http.StatusForbidden, "", "You are not allowed to add processes to the zone: %s", process.Zone)
 	}
 
 	config, metadata := process.Marshal()
@@ -330,6 +336,18 @@ func (h *ProcessHandler) Update(c echo.Context) error {
 	}
 
 	config, metadata := process.Marshal()
+
+	// Moving a process to another zone requires the permission to write to both zones, each
+	// in the domain the process is in respectively will be in.
+	if config.Zone != current.Config.Zone {
+		if !canAccessZone(h.iam, ctxuser, current.Config.Domain, current.Config.Zone, "write") {
+			return apierrors.Err(http.StatusForbidden, "", "You are not allowed to remove processes from the zone: %s", current.Config.Zone)
+		}
+
+		if !canAccessZone(h.iam, ctxuser, config.Domain, config.Zone, "write") {
+			return apierrors.Err(http.StatusForbidden, "", "You are not allowed to add processes to the zone: %s", config.Zone)
+		}
+	}
 
 	if err := h.restream.UpdateProcess(tid, config, force == "restart"); err != nil {
 		return h.apiErrorFromError(err)
@@ -1148,6 +1166,9 @@ func (h *ProcessHandler) apiErrorFromError(err error) error {
 	} else if errors.Is(err, restream.ErrMetadataKeyNotFound) {
 		return apierrors.Err(http.StatusNotFound, "", "%s", err.Error())
 	} else if errors.Is(err, restream.ErrMetadataKeyRequired) {
+		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
+	} else if errors.Is(err, zone.ErrExceeded) || errors.Is(err, zone.ErrNotFound) {
+		// An unknown zone is an invalid process config, not a missing resource.
 		return apierrors.Err(http.StatusBadRequest, "", "%s", err.Error())
 	}
 

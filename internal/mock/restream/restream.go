@@ -15,9 +15,15 @@ import (
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/rewrite"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
+	"github.com/datarhei/core/v16/zone"
 )
 
 func New(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer) (restream.Restreamer, error) {
+	return NewWithZones(portrange, validatorIn, validatorOut, replacer, nil)
+}
+
+// NewWithZones returns a restreamer that checks the zone limits of the processes with the given zone manager.
+func NewWithZones(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer, zones zone.Manager) (restream.Restreamer, error) {
 	binary, err := testhelper.BuildBinary("ffmpeg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
@@ -90,6 +96,7 @@ func New(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, r
 		Filesystems: []fs.Filesystem{memfs},
 		Rewrite:     rewriter,
 		Resources:   resources,
+		Zones:       zones,
 	})
 	if err != nil {
 		return nil, err

@@ -22,12 +22,18 @@ import (
 	rfs "github.com/datarhei/core/v16/restream/fs"
 	"github.com/datarhei/core/v16/restream/replace"
 	"github.com/datarhei/core/v16/restream/rewrite"
+	"github.com/datarhei/core/v16/restream/store"
+	"github.com/datarhei/core/v16/zone"
 	"github.com/lestrrat-go/strftime"
 
 	"github.com/stretchr/testify/require"
 )
 
 func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer, limits bool) (Restreamer, error) {
+	return getDummyRestreamerWithZones(portrange, validatorIn, validatorOut, replacer, limits, nil, nil)
+}
+
+func getDummyRestreamerWithZones(portrange net.Portranger, validatorIn, validatorOut ffmpeg.Validator, replacer replace.Replacer, limits bool, store store.Store, zones zone.Manager) (Restreamer, error) {
 	binary, err := testhelper.BuildBinary("ffmpeg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to build helper program: %w", err)
@@ -96,6 +102,8 @@ func getDummyRestreamer(portrange net.Portranger, validatorIn, validatorOut ffmp
 		Filesystems: []fs.Filesystem{memfs},
 		Rewrite:     rewriter,
 		Resources:   res,
+		Store:       store,
+		Zones:       zones,
 	})
 	if err != nil {
 		return nil, err

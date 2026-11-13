@@ -60,6 +60,7 @@ import (
 	"github.com/datarhei/core/v16/rtmp"
 	"github.com/datarhei/core/v16/session"
 	"github.com/datarhei/core/v16/srt"
+	"github.com/datarhei/core/v16/zone"
 
 	mwalias "github.com/datarhei/core/v16/http/middleware/alias"
 	mwautohead "github.com/datarhei/core/v16/http/middleware/autohead"
@@ -112,6 +113,7 @@ type Config struct {
 	Resources        resources.Resources
 	Compress         CompressConfig
 	Aliases          alias.Manager
+	Zones            zone.Manager
 }
 
 type CorsConfig struct {
@@ -149,6 +151,7 @@ type server struct {
 		cluster   *api.ClusterHandler
 		iam       *api.IAMHandler
 		alias     *api.AliasHandler
+		zone      *api.ZoneHandler
 	}
 
 	middleware struct {
@@ -292,6 +295,10 @@ func NewServer(config Config) (serverhandler.Server, error) {
 
 	if config.Aliases != nil {
 		s.v3handler.alias = api.NewAlias(config.Aliases)
+	}
+
+	if config.Zones != nil {
+		s.v3handler.zone = api.NewZone(config.Zones)
 	}
 
 	s.v3handler.log = api.NewLog(
@@ -681,6 +688,18 @@ func (s *server) setRoutesV3(v3 *echo.Group) {
 			v3.POST("/alias", s.v3handler.alias.Add)
 			v3.PUT("/alias/rule", s.v3handler.alias.Update)
 			v3.DELETE("/alias/rule", s.v3handler.alias.Delete)
+		}
+	}
+
+	// v3 Zone
+	if s.v3handler.zone != nil {
+		v3.GET("/zone", s.v3handler.zone.List)
+		v3.GET("/zone/:id", s.v3handler.zone.Get)
+
+		if !s.readOnly {
+			v3.POST("/zone", s.v3handler.zone.Add)
+			v3.PUT("/zone/:id", s.v3handler.zone.Update)
+			v3.DELETE("/zone/:id", s.v3handler.zone.Delete)
 		}
 	}
 
