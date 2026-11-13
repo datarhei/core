@@ -43,3 +43,19 @@ rules need to be migrated as long as this is done before the next release.
 
 Downside: less expressive than regular expressions, e.g. no `\d+`, no repetition counts, and no
 optional parts other than `{a,}`.
+
+## HEAD requests to filesystems read the whole file
+
+The global `autohead` middleware (`http/middleware/autohead/autohead.go`) turns every HEAD
+request into a GET with a writer that discards the body. `GetFile` (`http/handler/filesystem.go`)
+then streams the whole file, although it handles HEAD itself and only needs `Stat()`. For a large
+file on disk or S3 this reads the whole file for nothing. `autohead` should be skipped for the
+filesystem routes (and the `/api/v3/fs/:storage/*` route).
+
+## memfs copies the file data on every open
+
+`Open()` of the memory filesystem calls `LoadAndCopy` (`io/fs/mem_storage.go`), which copies the
+file's data into a new buffer for every request. Each running download of a large file holds
+another copy until it finishes. The copy is probably there because the buffers are pooled
+(`mem.Get`/`mem.Put`) and can be reused after the file is overwritten or removed. Sharing the
+data read-only would need reference counting of the buffers.
