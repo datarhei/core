@@ -3,6 +3,7 @@ package cache
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,4 +149,88 @@ func TestCacheSkipper(t *testing.T) {
 	rec = request("/found.js?filename=foo.js")
 	require.Empty(t, rec.Header().Get("X-Cache"))
 	require.Equal(t, 4, calls)
+}
+
+func TestCachePassthrough(t *testing.T) {
+	c, err := cache.NewLRUCache(cache.LRUConfig{
+		TTL:         300 * time.Second,
+		MaxSize:     0,
+		MaxFileSize: 16,
+		Logger:      nil,
+	})
+	require.NoError(t, err)
+
+	chunk := []byte(strings.Repeat("x", 10))
+
+	var rec *httptest.ResponseRecorder
+
+	handler := NewWithConfig(Config{
+		Cache: c,
+	})(func(c echo.Context) error {
+		res := c.Response()
+
+		switch c.Request().URL.Path {
+		case "/withlength.js":
+			res.Header().Set(echo.HeaderContentLength, "1000")
+			res.WriteHeader(http.StatusOK)
+
+			for i := 0; i < 100; i++ {
+				res.Write(chunk)
+				// Every chunk has to be sent immediately
+				require.Equal(t, (i+1)*len(chunk), rec.Body.Len())
+			}
+		case "/withoutlength.js":
+			res.WriteHeader(http.StatusOK)
+
+			res.Write(chunk)
+			// The first chunk can still be cached and is buffered
+			require.Equal(t, 0, rec.Body.Len())
+
+			for i := 1; i < 100; i++ {
+				res.Write(chunk)
+				// The limit is exceeded, every chunk is sent immediately
+				require.Equal(t, (i+1)*len(chunk), rec.Body.Len())
+			}
+		case "/notfound.js":
+			res.Header().Set("X-Foobar", "foobar")
+			res.WriteHeader(http.StatusNotFound)
+			res.Write(chunk)
+			require.Equal(t, len(chunk), rec.Body.Len())
+		}
+
+		return nil
+	})
+
+	e := echo.New()
+
+	request := func(target string) {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		rec = httptest.NewRecorder()
+		require.NoError(t, handler(e.NewContext(req, rec)))
+	}
+
+	for i := 0; i < 2; i++ {
+		request("/withlength.js")
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, 1000, rec.Body.Len())
+		require.Equal(t, "SKIP TOOBIG", rec.Header().Get("X-Cache"))
+		require.Equal(t, "1000", rec.Header().Get(echo.HeaderContentLength))
+
+		request("/withoutlength.js")
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Equal(t, 1000, rec.Body.Len())
+		require.Equal(t, "SKIP TOOBIG", rec.Header().Get("X-Cache"))
+
+		request("/notfound.js")
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.Equal(t, string(chunk), rec.Body.String())
+		require.Equal(t, "SKIP NOTOK", rec.Header().Get("X-Cache"))
+		require.Equal(t, "foobar", rec.Header().Get("X-Foobar"))
+	}
+
+	obj, _, _ := c.Get("/withlength.js")
+	require.Nil(t, obj)
+
+	obj, _, _ = c.Get("/withoutlength.js")
+	require.Nil(t, obj)
 }

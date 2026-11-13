@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/datarhei/core/v16/http/cache"
@@ -79,6 +80,8 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 				w := &cacheWriter{
 					header: writer.Header().Clone(),
 					body:   mem.Get(),
+					writer: writer,
+					cache:  config.Cache,
 				}
 				res.Writer = w
 
@@ -88,6 +91,11 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 
 				// Restore original writer
 				res.Writer = writer
+
+				// The response has already been sent to the client, because it will not be cached.
+				if w.passthrough {
+					return nil
+				}
 
 				// Copy only the headers that will be cached as well
 				copyCacheHeaders(res.Header(), w.header, config.Headers)
@@ -168,10 +176,17 @@ type cacheObject struct {
 	header http.Header
 }
 
+// cacheWriter buffers the response as long as it can be cached. As soon as it is clear
+// that the response will not be cached, the buffered data is written to the original
+// writer and the rest of the response is passed through.
 type cacheWriter struct {
 	code   int
 	header http.Header
 	body   *mem.Buffer
+
+	writer      http.ResponseWriter // The original writer
+	cache       cache.Cacher
+	passthrough bool
 }
 
 func (w *cacheWriter) Header() http.Header {
@@ -184,8 +199,69 @@ func (w *cacheWriter) Header() http.Header {
 
 func (w *cacheWriter) WriteHeader(code int) {
 	w.code = code
+
+	if w.passthrough {
+		return
+	}
+
+	if code != http.StatusOK {
+		w.startPassthrough("SKIP NOTOK")
+		return
+	}
+
+	if length, err := strconv.ParseUint(w.header.Get(echo.HeaderContentLength), 10, 64); err == nil {
+		if !w.cache.IsSizeCacheable(length) {
+			w.startPassthrough("SKIP TOOBIG")
+		}
+	}
 }
 
 func (w *cacheWriter) Write(body []byte) (int, error) {
-	return w.body.Write(body)
+	if w.passthrough {
+		return w.writer.Write(body)
+	}
+
+	n, err := w.body.Write(body)
+	if err != nil {
+		return n, err
+	}
+
+	if !w.cache.IsSizeCacheable(uint64(w.body.Len())) {
+		if err := w.startPassthrough("SKIP TOOBIG"); err != nil {
+			return 0, err
+		}
+	}
+
+	return n, nil
+}
+
+// startPassthrough sends the headers and the buffered data to the original writer.
+// All further data is written directly to the original writer.
+func (w *cacheWriter) startPassthrough(reason string) error {
+	w.passthrough = true
+
+	header := w.writer.Header()
+	clear(header)
+
+	for key, values := range w.header {
+		header[key] = values
+	}
+
+	header.Set("X-Cache", reason)
+
+	code := w.code
+	if code == 0 {
+		code = http.StatusOK
+	}
+
+	w.writer.WriteHeader(code)
+
+	body := w.body
+	w.body = nil
+
+	defer mem.Put(body)
+
+	_, err := w.writer.Write(body.Bytes())
+
+	return err
 }
