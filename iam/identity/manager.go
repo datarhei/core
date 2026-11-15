@@ -209,6 +209,11 @@ func (im *identityManager) createIdentity(u User) (*identity, error) {
 	u = u.clone()
 	identity := u.marshalIdentity()
 
+	// The realm and the secret never change. They are set here, such that looking up an
+	// identity doesn't modify it.
+	identity.jwtRealm = im.jwtRealm
+	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
+
 	if len(identity.user.Auth.API.Auth0.User) != 0 {
 		auth0Key := identity.user.Auth.API.Auth0.Tenant.key()
 
@@ -400,9 +405,6 @@ func (im *identityManager) getIdentity(nameOrAlias string) (*identity, error) {
 	if identity == nil {
 		return nil, fmt.Errorf("identity not found")
 	}
-
-	identity.jwtRealm = im.jwtRealm
-	identity.jwtKeyFunc = func(*jwtgo.Token) (interface{}, error) { return im.jwtSecret, nil }
 
 	return identity, nil
 }

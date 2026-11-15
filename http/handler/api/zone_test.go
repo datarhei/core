@@ -324,13 +324,7 @@ func TestZoneProcess(t *testing.T) {
 
 func TestZoneProcessList(t *testing.T) {
 	zones := newZoneManager(t, zone.Zone{ID: "a"}, zone.Zone{ID: "b"})
-
-	// The processes are listed by a user without an identity. Listing them as a superuser
-	// triggers a data race in the identity manager while enforcing the policies in parallel.
-	i := newZoneIAM(t)
-	i.AddPolicy("alice", "$none", []string{"process"}, "**", []string{"read"})
-
-	router := getDummyZoneProcessRouter(t, zones, i)
+	router := getDummyZoneProcessRouter(t, zones, newZoneIAM(t))
 
 	for _, p := range []api.ProcessConfig{
 		zoneProcess(t, "p1", "", "a", 10),
@@ -342,7 +336,7 @@ func TestZoneProcessList(t *testing.T) {
 	}
 
 	list := func(query string) []string {
-		rec := zoneRequest(t, router, "alice", "GET", "/?filter=config&"+query, nil)
+		rec := zoneRequest(t, router, "foobar", "GET", "/?filter=config&"+query, nil)
 		require.Equal(t, http.StatusOK, rec.Code)
 
 		processes := []api.Process{}

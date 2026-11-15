@@ -1,9 +1,11 @@
 package identity
 
 import (
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -821,4 +823,70 @@ func TestList(t *testing.T) {
 
 	users = im.List()
 	require.Equal(t, 2, len(users))
+}
+
+func TestGetVerifierConcurrent(t *testing.T) {
+	adapter, err := createAdapter()
+	require.NoError(t, err)
+
+	im, err := New(Config{
+		Adapter:   adapter,
+		Superuser: User{Name: "foobar"},
+		JWTRealm:  "test-realm",
+		JWTSecret: "abc123",
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+
+	err = im.Create(User{Name: "foobaz"})
+	require.NoError(t, err)
+
+	// The identities can verify JWTs without having been looked up before. The JWT is
+	// created by another manager, because creating a JWT looks up the identity.
+	identity, err := im.GetDefaultVerifier()
+	require.NoError(t, err)
+
+	other, err := New(Config{
+		Adapter:   adapter,
+		Superuser: User{Name: "foobar"},
+		JWTRealm:  "test-realm",
+		JWTSecret: "abc123",
+		Logger:    nil,
+	})
+	require.NoError(t, err)
+
+	access, _, err := other.CreateJWT("foobar")
+	require.NoError(t, err)
+
+	ok, err := identity.VerifyJWT(access)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	wg := sync.WaitGroup{}
+
+	for range 8 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for _, name := range []string{"foobar", "foobaz"} {
+				identity, err := im.GetVerifier(name)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				access, _, err := im.CreateJWT(name)
+				if !assert.NoError(t, err) {
+					return
+				}
+
+				ok, err := identity.VerifyJWT(access)
+				assert.NoError(t, err)
+				assert.True(t, ok)
+			}
+		}()
+	}
+
+	wg.Wait()
 }
