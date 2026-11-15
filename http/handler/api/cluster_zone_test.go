@@ -255,3 +255,28 @@ func TestZoneReadOnly(t *testing.T) {
 	rec = zoneRequest(t, router, "foobar", "DELETE", "/zone/a", nil)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+func TestClusterZoneFilterStoreProcesses(t *testing.T) {
+	processes := []store.Process{
+		{Config: &app.Config{ID: "p1", Zone: "a"}},
+		{Config: &app.Config{ID: "p2", Zone: "ab"}},
+		{Config: &app.Config{ID: "p3", Zone: ""}},
+		{Config: &app.Config{ID: "x4", Zone: "a"}},
+	}
+
+	h := &ClusterHandler{}
+
+	ids := func(idpattern, zonepattern string) []string {
+		list := []string{}
+		for _, p := range h.getFilteredStoreProcesses(processes, nil, "", idpattern, "", "", "", zonepattern) {
+			list = append(list, p.Config.ID)
+		}
+		return list
+	}
+
+	require.ElementsMatch(t, []string{"p1", "p2", "p3", "x4"}, ids("", ""))
+	require.ElementsMatch(t, []string{"p1", "x4"}, ids("", "a"))
+	require.ElementsMatch(t, []string{"p1", "p2", "x4"}, ids("", "a*"))
+	require.ElementsMatch(t, []string{"p3"}, ids("", zone.DefaultID))
+	require.ElementsMatch(t, []string{"p1", "p2"}, ids("p*", "a*"))
+}

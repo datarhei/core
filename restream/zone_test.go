@@ -228,3 +228,39 @@ func TestZoneLog(t *testing.T) {
 	require.NoError(t, rs.UpdateProcess(app.ProcessID{ID: "p1"}, getZoneProcess("p1", "b", 10), false))
 	require.Equal(t, []any{"a", "b"}, zoneLogs(buffer.Events(), "p1", "Created"))
 }
+
+func TestZoneGetProcessIDs(t *testing.T) {
+	zones := newZoneManager(t, zone.Zone{ID: "a"}, zone.Zone{ID: "ab"}, zone.Zone{ID: "b"})
+
+	rs, err := getDummyRestreamerWithZones(nil, nil, nil, nil, false, nil, zones)
+	require.NoError(t, err)
+
+	require.NoError(t, rs.AddProcess(getZoneProcess("p1", "a", 10)))
+	require.NoError(t, rs.AddProcess(getZoneProcess("p2", "ab", 10)))
+	require.NoError(t, rs.AddProcess(getZoneProcess("p3", "b", 10)))
+	require.NoError(t, rs.AddProcess(getZoneProcess("x4", "", 10)))
+
+	ids := func(idpattern, zonepattern string) []string {
+		list := []string{}
+		for _, id := range rs.GetProcessIDs(idpattern, "", "", "", zonepattern) {
+			list = append(list, id.ID)
+		}
+		return list
+	}
+
+	require.ElementsMatch(t, []string{"p1", "p2", "p3", "x4"}, ids("", ""))
+	require.ElementsMatch(t, []string{"p1"}, ids("", "a"))
+	require.ElementsMatch(t, []string{"p1", "p2"}, ids("", "a*"))
+	require.ElementsMatch(t, []string{"x4"}, ids("", zone.DefaultID))
+	require.ElementsMatch(t, []string{"p1", "p2", "p3", "x4"}, ids("", "*"))
+	require.ElementsMatch(t, []string{}, ids("", "x"))
+
+	// Intersected with the other patterns
+	require.ElementsMatch(t, []string{"p1", "p2"}, ids("p*", "a*"))
+	require.ElementsMatch(t, []string{}, ids("x*", "a*"))
+
+	// The process matches the new zone after an update
+	require.NoError(t, rs.UpdateProcess(app.ProcessID{ID: "p1"}, getZoneProcess("p1", "b", 10), false))
+	require.ElementsMatch(t, []string{"p2"}, ids("", "a*"))
+	require.ElementsMatch(t, []string{"p1", "p3"}, ids("", "b"))
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/process"
 	"github.com/datarhei/core/v16/restream/app"
+	"github.com/datarhei/core/v16/zone"
 )
 
 type task struct {
@@ -19,6 +20,7 @@ type task struct {
 	owner     string          // Owner of the process
 	domain    string          // Domain of the process
 	reference string          // reference of the process
+	zone      string          // Zone of the process, normalized
 	process   *app.Process    // The process definition
 	config    *app.Config     // Process config with replaced static placeholders
 	command   []string        // The actual command parameter for ffmpeg
@@ -38,6 +40,7 @@ func NewTask(process *app.Process, logger log.Logger) *task {
 		owner:     process.Owner,
 		domain:    process.Domain,
 		reference: process.Reference,
+		zone:      zone.NormalizeID(process.Config.Zone),
 		process:   process,
 		config:    process.Config.Clone(),
 		playout:   map[string]int{},
@@ -341,7 +344,7 @@ func (t *task) Destroy() {
 	t.parser.Destroy()
 }
 
-func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
+func (t *task) Match(id, reference, owner, domain, zone glob.Glob) bool {
 	count := 0
 	matches := 0
 
@@ -369,6 +372,13 @@ func (t *task) Match(id, reference, owner, domain glob.Glob) bool {
 	if domain != nil {
 		count++
 		if match := domain.Match(t.domain); match {
+			matches++
+		}
+	}
+
+	if zone != nil {
+		count++
+		if match := zone.Match(t.zone); match {
 			matches++
 		}
 	}

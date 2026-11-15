@@ -4805,6 +4805,12 @@ paths:
         in: query
         name: domainpattern
         type: string
+      - description: Glob pattern for process zone, $default for processes without
+          a zone. If empty all IDs will be returned. Intersected with results from
+          other pattern matches.
+        in: query
+        name: zonepattern
+        type: string
       produces:
       - application/json
       responses:
@@ -4958,6 +4964,12 @@ paths:
           Intersected with results from other pattern matches.
         in: query
         name: domainpattern
+        type: string
+      - description: Glob pattern for process zone, $default for processes without
+          a zone. If empty all IDs will be returned. Intersected with results from
+          other pattern matches.
+        in: query
+        name: zonepattern
         type: string
       produces:
       - application/json
@@ -6594,6 +6606,12 @@ paths:
           Intersected with results from other pattern matches.
         in: query
         name: domainpattern
+        type: string
+      - description: Glob pattern for process zone, $default for processes without
+          a zone. If empty all IDs will be returned. Intersected with results from
+          other pattern matches.
+        in: query
+        name: zonepattern
         type: string
       produces:
       - application/json

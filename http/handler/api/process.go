@@ -114,6 +114,7 @@ func (h *ProcessHandler) Add(c echo.Context) error {
 // @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param zonepattern query string false "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/process [get]
@@ -128,8 +129,9 @@ func (h *ProcessHandler) GetAll(c echo.Context) error {
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
+	zonepattern := util.DefaultQuery(c, "zonepattern", "")
 
-	ids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern)
+	ids := h.restream.GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern, zonepattern)
 
 	if len(wantids) != 0 {
 		filteredIds := []app.ProcessID{}

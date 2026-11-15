@@ -385,6 +385,7 @@ func (h *ClusterHandler) NodeFSDeleteFile(c echo.Context) error {
 // @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param zonepattern query string false "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Success 200 {array} api.Process
 // @Failure 404 {object} apierrors.Error
 // @Failure 500 {object} apierrors.Error
@@ -404,6 +405,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
+	zonepattern := util.DefaultQuery(c, "zonepattern", "")
 
 	peer, err := h.proxy.NodeGet(id)
 	if err != nil {
@@ -418,6 +420,7 @@ func (h *ClusterHandler) NodeListProcesses(c echo.Context) error {
 		RefPattern:    refpattern,
 		OwnerPattern:  ownerpattern,
 		DomainPattern: domainpattern,
+		ZonePattern:   zonepattern,
 	})
 	if err != nil {
 		return apierrors.Err(http.StatusInternalServerError, "", "node not available: %s", err.Error())

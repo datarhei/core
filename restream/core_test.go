@@ -502,31 +502,31 @@ func TestGetProcess(t *testing.T) {
 	_, err = rs.GetProcess(tid4)
 	require.Equal(t, nil, err)
 
-	list := rs.GetProcessIDs("", "", "", "")
+	list := rs.GetProcessIDs("", "", "", "", "")
 	require.Len(t, list, 4)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "bar_bbb_2"}, {ID: "foo_ccc_3"}, {ID: "bar_ddd_4"}}, list)
 
-	list = rs.GetProcessIDs("foo_*", "", "", "")
+	list = rs.GetProcessIDs("foo_*", "", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
 
-	list = rs.GetProcessIDs("bar_*", "", "", "")
+	list = rs.GetProcessIDs("bar_*", "", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
 
-	list = rs.GetProcessIDs("*_bbb_*", "", "", "")
+	list = rs.GetProcessIDs("*_bbb_*", "", "", "", "")
 	require.Len(t, list, 1)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}}, list)
 
-	list = rs.GetProcessIDs("", "foo_*", "", "")
+	list = rs.GetProcessIDs("", "foo_*", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "foo_aaa_1"}, {ID: "foo_ccc_3"}}, list)
 
-	list = rs.GetProcessIDs("", "bar_*", "", "")
+	list = rs.GetProcessIDs("", "bar_*", "", "", "")
 	require.Len(t, list, 2)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}, {ID: "bar_ddd_4"}}, list)
 
-	list = rs.GetProcessIDs("", "*_bbb_*", "", "")
+	list = rs.GetProcessIDs("", "*_bbb_*", "", "", "")
 	require.Len(t, list, 1)
 	require.ElementsMatch(t, []app.ProcessID{{ID: "bar_bbb_2"}}, list)
 }
@@ -1746,7 +1746,7 @@ func BenchmarkGetProcessIDs(b *testing.B) {
 	}
 
 	for b.Loop() {
-		ids := rs.GetProcessIDs("", "", "", "")
+		ids := rs.GetProcessIDs("", "", "", "", "")
 		require.NotEmpty(b, ids)
 		require.Equal(b, 1000, len(ids))
 	}

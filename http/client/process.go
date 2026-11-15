@@ -19,6 +19,7 @@ type ProcessListOptions struct {
 	RefPattern    string
 	OwnerPattern  string
 	DomainPattern string
+	ZonePattern   string
 }
 
 func (p *ProcessListOptions) Query() *url.Values {
@@ -30,6 +31,7 @@ func (p *ProcessListOptions) Query() *url.Values {
 	values.Set("refpattern", p.RefPattern)
 	values.Set("ownerpattern", p.OwnerPattern)
 	values.Set("domainpattern", p.DomainPattern)
+	values.Set("zonepattern", p.ZonePattern)
 
 	return values
 }

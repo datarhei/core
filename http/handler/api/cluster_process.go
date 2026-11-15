@@ -16,6 +16,7 @@ import (
 	"github.com/datarhei/core/v16/restream"
 	"github.com/datarhei/core/v16/restream/app"
 	"github.com/datarhei/core/v16/uuid"
+	"github.com/datarhei/core/v16/zone"
 
 	"github.com/labstack/echo/v4"
 )
@@ -33,6 +34,7 @@ import (
 // @Param refpattern query string false "Glob pattern for process references. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param ownerpattern query string false "Glob pattern for process owners. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Param domainpattern query string false "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches."
+// @Param zonepattern query string false "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches."
 // @Success 200 {array} api.Process
 // @Security ApiKeyAuth
 // @Router /api/v3/cluster/process [get]
@@ -47,6 +49,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	refpattern := util.DefaultQuery(c, "refpattern", "")
 	ownerpattern := util.DefaultQuery(c, "ownerpattern", "")
 	domainpattern := util.DefaultQuery(c, "domainpattern", "")
+	zonepattern := util.DefaultQuery(c, "zonepattern", "")
 
 	procs := h.proxy.ProcessList(node.ProcessListOptions{
 		ID:            wantids,
@@ -56,6 +59,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 		RefPattern:    refpattern,
 		OwnerPattern:  ownerpattern,
 		DomainPattern: domainpattern,
+		ZonePattern:   zonepattern,
 	})
 
 	pmap := map[app.ProcessID]api.Process{}
@@ -83,7 +87,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	// Here we have to add those processes that are in the cluster DB and couldn't be deployed
 	{
 		processes := h.cluster.Store().ProcessList()
-		filtered := h.getFilteredStoreProcesses(processes, wantids, reference, idpattern, refpattern, ownerpattern, domainpattern)
+		filtered := h.getFilteredStoreProcesses(processes, wantids, reference, idpattern, refpattern, ownerpattern, domainpattern, zonepattern)
 
 		for _, p := range filtered {
 			if !h.iam.Enforce(ctxuser, p.Config.Domain, "process", p.Config.ID, "read") {
@@ -124,7 +128,7 @@ func (h *ClusterHandler) ProcessList(c echo.Context) error {
 	return c.JSON(http.StatusOK, processes)
 }
 
-func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, reference, idpattern, refpattern, ownerpattern, domainpattern string) []store.Process {
+func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wantids []string, reference, idpattern, refpattern, ownerpattern, domainpattern, zonepattern string) []store.Process {
 	filtered := []store.Process{}
 
 	count := 0
@@ -133,6 +137,7 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 	var refglob glob.Glob
 	var ownerglob glob.Glob
 	var domainglob glob.Glob
+	var zoneglob glob.Glob
 
 	if len(idpattern) != 0 {
 		count++
@@ -152,6 +157,11 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 	if len(domainpattern) != 0 {
 		count++
 		domainglob, _ = glob.Compile(domainpattern)
+	}
+
+	if len(zonepattern) != 0 {
+		count++
+		zoneglob, _ = glob.Compile(zonepattern)
 	}
 
 	for _, t := range processes {
@@ -176,6 +186,12 @@ func (h *ClusterHandler) getFilteredStoreProcesses(processes []store.Process, wa
 
 		if domainglob != nil {
 			if match := domainglob.Match(t.Config.Domain); match {
+				matches++
+			}
+		}
+
+		if zoneglob != nil {
+			if match := zoneglob.Match(zone.NormalizeID(t.Config.Zone)); match {
 				matches++
 			}
 		}

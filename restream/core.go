@@ -43,7 +43,7 @@ type Restreamer interface {
 	GetMetadata(key string) (interface{}, error)    // Get previously set general metadata
 
 	AddProcess(config *app.Config) error                                                                              // Add a new process
-	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID                          // Get a list of process IDs based on patterns for ID and reference
+	GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern, zonepattern string) []app.ProcessID             // Get a list of process IDs based on patterns for ID, reference, owner, domain, and zone
 	DeleteProcess(id app.ProcessID, purge bool) error                                                                 // Delete a process
 	UpdateProcess(id app.ProcessID, config *app.Config, force bool) error                                             // Update a process
 	StartProcess(id app.ProcessID) error                                                                              // Start a process
@@ -1365,11 +1365,12 @@ func (r *restream) updateProcess(task *task, config *app.Config, force bool) err
 	return nil
 }
 
-func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern string) []app.ProcessID {
+func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpattern, zonepattern string) []app.ProcessID {
 	var idglob glob.Glob = nil
 	var refglob glob.Glob = nil
 	var ownerglob glob.Glob = nil
 	var domainglob glob.Glob = nil
+	var zoneglob glob.Glob = nil
 
 	if len(idpattern) != 0 {
 		idglob, _ = glob.Compile(idpattern)
@@ -1387,9 +1388,13 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 		domainglob, _ = glob.Compile(domainpattern)
 	}
 
+	if len(zonepattern) != 0 {
+		zoneglob, _ = glob.Compile(zonepattern)
+	}
+
 	var ids []app.ProcessID
 
-	if idglob == nil && refglob == nil && ownerglob == nil && domainglob == nil {
+	if idglob == nil && refglob == nil && ownerglob == nil && domainglob == nil && zoneglob == nil {
 		ids = make([]app.ProcessID, 0, r.tasks.Size())
 
 		r.tasks.Range(func(id app.ProcessID, t *task) bool {
@@ -1401,7 +1406,7 @@ func (r *restream) GetProcessIDs(idpattern, refpattern, ownerpattern, domainpatt
 		ids = []app.ProcessID{}
 
 		r.tasks.Range(func(id app.ProcessID, t *task) bool {
-			if !t.Match(idglob, refglob, ownerglob, domainglob) {
+			if !t.Match(idglob, refglob, ownerglob, domainglob, zoneglob) {
 				return true
 			}
 
@@ -1644,7 +1649,7 @@ func (r *restream) SetProcessReport(id app.ProcessID, report *app.Report) error 
 func (r *restream) SearchProcessLogHistory(idpattern, refpattern, state string, from, to *time.Time) []app.ReportHistorySearchResult {
 	result := []app.ReportHistorySearchResult{}
 
-	ids := r.GetProcessIDs(idpattern, refpattern, "", "")
+	ids := r.GetProcessIDs(idpattern, refpattern, "", "", "")
 
 	for _, id := range ids {
 		task, ok := r.tasks.LoadUnsafe(id)

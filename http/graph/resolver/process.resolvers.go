@@ -17,7 +17,7 @@ import (
 // Processes is the resolver for the processes field.
 func (r *queryResolver) Processes(ctx context.Context, idpattern *string, refpattern *string, domainpattern *string) ([]*models.Process, error) {
 	user, _ := ctx.Value(GraphKey("user")).(string)
-	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, "", *domainpattern)
+	ids := r.Restream.GetProcessIDs(*idpattern, *refpattern, "", *domainpattern, "")
 
 	procs := []*models.Process{}
 

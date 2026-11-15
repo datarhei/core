@@ -2401,6 +2401,12 @@ const docTemplate = `{
                         "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "domainpattern",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "zonepattern",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2627,6 +2633,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "domainpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "zonepattern",
                         "in": "query"
                     }
                 ],
@@ -5105,6 +5117,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Glob pattern for process domain. If empty all IDs will be returned. Intersected with results from other pattern matches.",
                         "name": "domainpattern",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Glob pattern for process zone, $default for processes without a zone. If empty all IDs will be returned. Intersected with results from other pattern matches.",
+                        "name": "zonepattern",
                         "in": "query"
                     }
                 ],

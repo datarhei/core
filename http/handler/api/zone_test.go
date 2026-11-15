@@ -222,6 +222,7 @@ func getDummyZoneProcessRouter(t *testing.T, zones zone.Manager, i iam.IAM) *ech
 	router := mock.DummyEcho()
 	router.Use(withUser)
 
+	router.GET("/", handler.GetAll)
 	router.POST("/", handler.Add)
 	router.PUT("/:id", handler.Update)
 
@@ -319,4 +320,46 @@ func TestZoneProcess(t *testing.T) {
 	// An update without a zone change needs no zone permission
 	rec = zoneRequest(t, router, "alice", "PUT", "/p7?domain=foo", zoneProcess(t, "p7", "foo", "b", 20))
 	require.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestZoneProcessList(t *testing.T) {
+	zones := newZoneManager(t, zone.Zone{ID: "a"}, zone.Zone{ID: "b"})
+
+	// The processes are listed by a user without an identity. Listing them as a superuser
+	// triggers a data race in the identity manager while enforcing the policies in parallel.
+	i := newZoneIAM(t)
+	i.AddPolicy("alice", "$none", []string{"process"}, "**", []string{"read"})
+
+	router := getDummyZoneProcessRouter(t, zones, i)
+
+	for _, p := range []api.ProcessConfig{
+		zoneProcess(t, "p1", "", "a", 10),
+		zoneProcess(t, "p2", "", "b", 10),
+		zoneProcess(t, "p3", "", "", 10),
+	} {
+		rec := zoneRequest(t, router, "foobar", "POST", "/", p)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	list := func(query string) []string {
+		rec := zoneRequest(t, router, "alice", "GET", "/?filter=config&"+query, nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		processes := []api.Process{}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &processes))
+
+		ids := []string{}
+		for _, p := range processes {
+			ids = append(ids, p.ID)
+		}
+
+		return ids
+	}
+
+	require.ElementsMatch(t, []string{"p1", "p2", "p3"}, list(""))
+	require.ElementsMatch(t, []string{"p1"}, list("zonepattern=a"))
+	require.ElementsMatch(t, []string{"p3"}, list("zonepattern=$default"))
+	require.ElementsMatch(t, []string{"p1", "p2"}, list("zonepattern=[ab]"))
+	require.ElementsMatch(t, []string{"p2"}, list("zonepattern=b&idpattern=p*"))
+	require.ElementsMatch(t, []string{}, list("zonepattern=b&idpattern=x*"))
 }
