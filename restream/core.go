@@ -280,7 +280,7 @@ func (r *restream) filesystemObserver(ctx context.Context, fs fs.Filesystem, int
 						return true
 					}
 
-					r.logger.Warn().WithField("id", id).Log("Stopping because filesystem is full")
+					t.logger.Warn().Log("Stopping because filesystem is full")
 					t.Stop("Filesystem is full")
 
 					return true
@@ -338,11 +338,10 @@ func (r *restream) resourceObserver(ctx context.Context, rsc resources.Resources
 					limitGPU = limitGPUs[gpuindex]
 				}
 				if t.Limit(limitCPU, limitMemory, limitGPU) {
-					r.logger.Debug().WithFields(log.Fields{
+					t.logger.Debug().WithFields(log.Fields{
 						"limit_cpu":    limitCPU,
 						"limit_memory": limitMemory,
 						"limit_gpu":    limitGPU,
-						"id":           id,
 					}).Log("Limiting process CPU, memory, and GPU consumption")
 				}
 
@@ -384,6 +383,7 @@ func (r *restream) load() error {
 				"owner":     p.Process.Owner,
 				"domain":    p.Process.Domain,
 				"reference": p.Process.Reference,
+				"zone":      zone.NormalizeID(p.Process.Config.Zone),
 			}))
 
 			t.ImportMetadata(p.Metadata)
@@ -640,6 +640,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		"owner":     process.Owner,
 		"reference": process.Reference,
 		"domain":    process.Domain,
+		"zone":      zone.NormalizeID(config.Zone),
 	}))
 
 	resolveStaticPlaceholders(t.config, r.replace)
@@ -767,6 +768,7 @@ func (r *restream) compileCleanup(config *app.Config) (map[string][]rfs.Pattern,
 	logger := r.logger.WithFields(log.Fields{
 		"id":     config.ID,
 		"domain": config.Domain,
+		"zone":   zone.NormalizeID(config.Zone),
 	})
 
 	for _, output := range config.Output {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/datarhei/core/v16/io/fs"
+	"github.com/datarhei/core/v16/log"
 	"github.com/datarhei/core/v16/restream/app"
 	jsonstore "github.com/datarhei/core/v16/restream/store/json"
 	"github.com/datarhei/core/v16/zone"
@@ -190,4 +191,40 @@ func TestZoneLoadProcesses(t *testing.T) {
 
 	err = rs.AddProcess(getZoneProcess("p4", "a", 1))
 	require.ErrorIs(t, err, zone.ErrExceeded)
+}
+
+// zoneLogs returns the zones of all log entries of the process with the given ID
+// and the given message.
+func zoneLogs(events []*log.Event, id, message string) []any {
+	zones := []any{}
+
+	for _, e := range events {
+		if e.Data["id"] != id || e.Message != message {
+			continue
+		}
+
+		zones = append(zones, e.Data["zone"])
+	}
+
+	return zones
+}
+
+func TestZoneLog(t *testing.T) {
+	zones := newZoneManager(t, zone.Zone{ID: "a"}, zone.Zone{ID: "b"})
+
+	rs, err := getDummyRestreamerWithZones(nil, nil, nil, nil, false, nil, zones)
+	require.NoError(t, err)
+
+	buffer := log.NewBufferWriter(log.Linfo, 100)
+	rs.(*restream).logger = log.New("Process").WithOutput(buffer)
+
+	require.NoError(t, rs.AddProcess(getZoneProcess("p1", "a", 10)))
+	require.NoError(t, rs.AddProcess(getZoneProcess("p2", "", 10)))
+
+	require.Equal(t, []any{"a"}, zoneLogs(buffer.Events(), "p1", "Created"))
+	require.Equal(t, []any{zone.DefaultID}, zoneLogs(buffer.Events(), "p2", "Created"))
+
+	// The process logs with the new zone after an update
+	require.NoError(t, rs.UpdateProcess(app.ProcessID{ID: "p1"}, getZoneProcess("p1", "b", 10), false))
+	require.Equal(t, []any{"a", "b"}, zoneLogs(buffer.Events(), "p1", "Created"))
 }
