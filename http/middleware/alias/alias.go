@@ -137,6 +137,9 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			values[index] = strings.TrimPrefix(target, mount+"/")
 			c.SetParamValues(values...)
 
+			// Add the original path to the context
+			c.Set("alias", source)
+
 			return next(c)
 		}
 	}

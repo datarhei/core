@@ -88,9 +88,14 @@ func NewWithConfig(config Config) echo.MiddlewareFunc {
 			req := c.Request()
 
 			path := req.URL.Path
+			// Use the original path before the alias has been resolved
+			originalpath := util.DefaultContext(c, "alias", "")
+			if len(originalpath) == 0 {
+				originalpath = path
+			}
 			referrer := req.Header.Get("Referer")
 
-			data, err := verifySession(util.DefaultContext[interface{}](c, "session", nil), path, referrer)
+			data, err := verifySession(util.DefaultContext[interface{}](c, "session", nil), originalpath, referrer)
 			if err != nil {
 				return errors.Err(http.StatusForbidden, "", "verifying session failed: %s", err.Error())
 			}
