@@ -540,6 +540,8 @@ func (h *ClusterHandler) ProcessAdd(c echo.Context) error {
 		h.cluster.ProcessSetMetadata("", config.ProcessID(), key, value)
 	}
 
+	process.Zone = zone.NormalizeID(process.Zone)
+
 	return c.JSON(http.StatusOK, process)
 }
 
@@ -622,6 +624,8 @@ func (h *ClusterHandler) ProcessUpdate(c echo.Context) error {
 	for key, value := range metadata {
 		h.cluster.ProcessSetMetadata("", pid, key, value)
 	}
+
+	process.Zone = zone.NormalizeID(process.Zone)
 
 	return c.JSON(http.StatusOK, process)
 }

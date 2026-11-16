@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/datarhei/core/v16/cluster"
@@ -279,4 +280,39 @@ func TestClusterZoneFilterStoreProcesses(t *testing.T) {
 	require.ElementsMatch(t, []string{"p1", "p2", "x4"}, ids("", "a*"))
 	require.ElementsMatch(t, []string{"p3"}, ids("", zone.DefaultID))
 	require.ElementsMatch(t, []string{"p1", "p2"}, ids("p*", "a*"))
+}
+
+func TestClusterZoneProcessResponse(t *testing.T) {
+	router, c := getDummyClusterZoneRouter(t, newZoneIAM(t))
+
+	require.NoError(t, c.ZoneAdd("", zone.Zone{ID: "a"}))
+
+	zoneOf := func(rec *httptest.ResponseRecorder) string {
+		t.Helper()
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+		process := api.ProcessConfig{}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &process))
+
+		return process.Zone
+	}
+
+	storedZone := func(id string) string {
+		t.Helper()
+
+		p, _, err := c.Store().ProcessGet(app.ProcessID{ID: id})
+		require.NoError(t, err)
+
+		return p.Config.Zone
+	}
+
+	require.Equal(t, zone.DefaultID, zoneOf(zoneRequest(t, router, "foobar", "POST", "/process", clusterZoneProcess(t, "p1", "", "", 10))))
+	require.Equal(t, "", storedZone("p1"))
+
+	require.Equal(t, "a", zoneOf(zoneRequest(t, router, "foobar", "POST", "/process", clusterZoneProcess(t, "p2", "", "a", 10))))
+	require.Equal(t, "a", storedZone("p2"))
+
+	require.Equal(t, zone.DefaultID, zoneOf(zoneRequest(t, router, "foobar", "PUT", "/process/p2", clusterZoneProcess(t, "p2", "", "", 10))))
+	require.Equal(t, "", storedZone("p2"))
 }
