@@ -985,6 +985,19 @@ func TestAddressReference(t *testing.T) {
 	require.Equal(t, nil, err, "should resolve reference")
 }
 
+// getStartConfig returns the config of the process as it would be resolved for a start
+func getStartConfig(t *testing.T, r *restream, id string) *app.Config {
+	t.Helper()
+
+	task, ok := r.tasks.LoadUnsafe(app.ProcessID{ID: id})
+	require.True(t, ok)
+
+	config, err := r.resolveStartConfig(r.tasks, task.config, "0")
+	require.NoError(t, err)
+
+	return config
+}
+
 func TestTeeAddressReference(t *testing.T) {
 	rs, err := getDummyRestreamer(nil, nil, nil, nil, false)
 	require.NoError(t, err)
@@ -1018,17 +1031,14 @@ func TestTeeAddressReference(t *testing.T) {
 
 	r := rs.(*restream)
 
-	task, ok := r.tasks.LoadUnsafe(app.ProcessID{ID: "process2"})
-	require.True(t, ok)
-	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
+	require.Equal(t, "http://example.com/live.m3u8", getStartConfig(t, r, "process2").Input[0].Address)
+	require.Equal(t, "http://example.com/live.m3u8", getStartConfig(t, r, "process3").Input[0].Address)
+	require.Equal(t, "rtmp://example.com/live.stream?token=123", getStartConfig(t, r, "process4").Input[0].Address)
 
-	task, ok = r.tasks.LoadUnsafe(app.ProcessID{ID: "process3"})
+	// The task keeps the reference, it is resolved at every start
+	task, ok := r.tasks.LoadUnsafe(app.ProcessID{ID: "process4"})
 	require.True(t, ok)
-	require.Equal(t, "http://example.com/live.m3u8", task.config.Input[0].Address)
-
-	task, ok = r.tasks.LoadUnsafe(app.ProcessID{ID: "process4"})
-	require.True(t, ok)
-	require.Equal(t, "rtmp://example.com/live.stream?token=123", task.config.Input[0].Address)
+	require.Equal(t, "#process:output=out:source=rtmp", task.config.Input[0].Address)
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -1331,6 +1341,13 @@ func TestReplacer(t *testing.T) {
 
 	resolveStaticPlaceholders(process, replacer)
 
+	// The placeholders for accessing the filesystems, RTMP, and SRT are left for the process start
+	require.Equal(t, "input:in_314159265359_refref_process:314159265359_reference:refref_diskfs:{diskfs}/disk.txt_memfs:{memfs}/mem.txt_fsdisk:{fs:disk}/fsdisk.txt_fsmem:{fs:mem}/fsmem.txt_rtmp:{rtmp,name=pmtr}_srt:{srt,name=trs}_rtmp:{rtmp,name=$inputid}_hwdevice:{hwdevice}", process.Input[0].Address)
+	require.Equal(t, "memfs:{memfs}/mem.txt", process.Output[0].Options[8])
+	require.Equal(t, "{fs:mem}/foobar_in_mem_aswell.txt", process.Options[5])
+
+	resolveAccessPlaceholders(process, replacer)
+
 	wantprocess := &app.Config{
 		ID:        "314159265359",
 		Reference: "refref",
@@ -1631,7 +1648,13 @@ func TestProcessReplacer(t *testing.T) {
 	task, ok := rs.tasks.LoadUnsafe(app.ProcessID{ID: "314159265359"})
 	require.True(t, ok)
 
-	require.Equal(t, process, task.config)
+	// The placeholders for accessing the filesystems, RTMP, and SRT are resolved at process start
+	require.Contains(t, task.config.Input[0].Address, "memfs:{memfs}/mem.txt")
+
+	config := task.config.Clone()
+	resolveAccessPlaceholders(config, rs.replace)
+
+	require.Equal(t, process, config)
 
 	err = rsi.StartProcess(app.ProcessID{ID: "314159265359"})
 	require.NoError(t, err)

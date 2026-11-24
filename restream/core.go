@@ -416,20 +416,13 @@ func (r *restream) load() error {
 			t.logger.Warn().WithError(err).Log("")
 		}
 
-		err := r.resolveAddresses(tasks, t.config)
+		// Validate config with all placeholders and references resolved. However, we need to take
+		// care that the config with the task keeps its dynamic placeholders for process starts.
+		config, err := r.resolveStartConfig(tasks, t.config, "0")
 		if err != nil {
 			t.logger.Warn().WithError(err).Log("Ignoring")
 			return true
 		}
-
-		// Validate config with all placeholders replaced. However, we need to take care
-		// that the config with the task keeps its dynamic placeholders for process starts.
-		config := t.config.Clone()
-		resolveDynamicPlaceholder(config, r.replace, map[string]string{
-			"hwdevice": "0",
-		}, map[string]string{
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		})
 
 		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
@@ -645,20 +638,13 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 
 	resolveStaticPlaceholders(t.config, r.replace)
 
-	err := r.resolveAddresses(r.tasks, t.config)
-	if err != nil {
-		return nil, err
-	}
-
 	{
-		// Validate config with all placeholders replaced. However, we need to take care
-		// that the config with the task keeps its dynamic placeholders for process starts.
-		config := t.config.Clone()
-		resolveDynamicPlaceholder(config, r.replace, map[string]string{
-			"hwdevice": "0",
-		}, map[string]string{
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		})
+		// Validate config with all placeholders and references resolved. However, we need to take
+		// care that the config with the task keeps its dynamic placeholders for process starts.
+		config, err := r.resolveStartConfig(r.tasks, t.config, "0")
+		if err != nil {
+			return nil, err
+		}
 
 		t.usesDisk, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
@@ -666,7 +652,7 @@ func (r *restream) createTask(config *app.Config) (*task, error) {
 		}
 	}
 
-	err = r.setPlayoutPorts(t)
+	err := r.setPlayoutPorts(t)
 	if err != nil {
 		return nil, err
 	}
@@ -740,25 +726,43 @@ func (r *restream) onBeforeStart(cfg *app.Config) func([]string) ([]string, erro
 			return []string{}, fmt.Errorf("process with the ID '%s' not found", cfg.ProcessID())
 		}
 
-		config := cfg.Clone()
-
-		if selectedGPU == -1 && hasPlaceholder(config, r.replace, "hwdevice") {
+		if selectedGPU == -1 && hasPlaceholder(cfg, r.replace, "hwdevice") {
 			return []string{}, fmt.Errorf("no hwdevice found, either not available or no resources requested")
 		}
 
-		resolveDynamicPlaceholder(config, r.replace, map[string]string{
-			"hwdevice": fmt.Sprintf("%d", selectedGPU),
-		}, map[string]string{
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		})
+		config, err := r.resolveStartConfig(r.tasks, cfg, fmt.Sprintf("%d", selectedGPU))
+		if err != nil {
+			return []string{}, err
+		}
 
-		_, err := validateConfig(config, r.fs.list, r.ffmpeg)
+		_, err = validateConfig(config, r.fs.list, r.ffmpeg)
 		if err != nil {
 			return []string{}, err
 		}
 
 		return config.CreateCommand(), nil
 	}
+}
+
+// resolveStartConfig returns a copy of the config with all placeholders and references resolved
+// that have to be resolved at every process start. The static placeholders must have been resolved
+// before. The references are resolved with the processes in tasks.
+func (r *restream) resolveStartConfig(tasks *Storage, cfg *app.Config, hwdevice string) (*app.Config, error) {
+	config := cfg.Clone()
+
+	resolveAccessPlaceholders(config, r.replace)
+
+	if err := r.resolveAddresses(tasks, config); err != nil {
+		return nil, err
+	}
+
+	resolveDynamicPlaceholder(config, r.replace, map[string]string{
+		"hwdevice": hwdevice,
+	}, map[string]string{
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+
+	return config, nil
 }
 
 func (r *restream) compileCleanup(config *app.Config) (map[string][]rfs.Pattern, error) {
@@ -1160,7 +1164,11 @@ func (r *restream) resolveAddress(tasks *Storage, id, address string) (string, e
 
 	teeOptions := regexp.MustCompile(`^\[[^\]]*\]`)
 
-	for _, x := range t.config.Output {
+	// The outputs of the referenced process with its current credentials
+	config := t.config.Clone()
+	resolveAccessPlaceholders(config, r.replace)
+
+	for _, x := range config.Output {
 		if x.ID != matches["output"] {
 			continue
 		}
@@ -1671,17 +1679,11 @@ func (r *restream) Probe(config *app.Config, timeout time.Duration) app.Probe {
 
 	resolveStaticPlaceholders(config, r.replace)
 
-	err := r.resolveAddresses(r.tasks, config)
+	config, err := r.resolveStartConfig(r.tasks, config, "0")
 	if err != nil {
 		probe.Log = append(probe.Log, err.Error())
 		return probe
 	}
-
-	resolveDynamicPlaceholder(config, r.replace, map[string]string{
-		"hwdevice": "0",
-	}, map[string]string{
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
 
 	_, err = validateConfig(config, r.fs.list, r.ffmpeg)
 	if err != nil {
@@ -1840,21 +1842,14 @@ func (r *restream) GetMetadata(key string) (interface{}, error) {
 	return data, nil
 }
 
-// resolveStaticPlaceholders replaces all placeholders in the config. The config will be modified in place.
+// resolveStaticPlaceholders replaces the placeholders in the config that don't change during the
+// lifetime of a process. The config will be modified in place.
 func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 	vars := map[string]string{
 		"processid": config.ID,
 		"owner":     config.Owner,
 		"reference": config.Reference,
 		"domain":    config.Domain,
-	}
-
-	for i, option := range config.Options {
-		// Replace any known placeholders
-		option = r.Replace(option, "diskfs", "", vars, config, "global")
-		option = r.Replace(option, "fs:*", "", vars, config, "global")
-
-		config.Options[i] = option
 	}
 
 	// Resolving the given inputs
@@ -1870,11 +1865,6 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 		input.Address = r.Replace(input.Address, "processid", config.ID, vars, config, "input")
 		input.Address = r.Replace(input.Address, "domain", config.Domain, vars, config, "input")
 		input.Address = r.Replace(input.Address, "reference", config.Reference, vars, config, "input")
-		input.Address = r.Replace(input.Address, "diskfs", "", vars, config, "input")
-		input.Address = r.Replace(input.Address, "memfs", "", vars, config, "input")
-		input.Address = r.Replace(input.Address, "fs:*", "", vars, config, "input")
-		input.Address = r.Replace(input.Address, "rtmp", "", vars, config, "input")
-		input.Address = r.Replace(input.Address, "srt", "", vars, config, "input")
 
 		for j, option := range input.Options {
 			// Replace any known placeholders
@@ -1882,9 +1872,6 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 			option = r.Replace(option, "processid", config.ID, vars, config, "input")
 			option = r.Replace(option, "domain", config.Domain, vars, config, "input")
 			option = r.Replace(option, "reference", config.Reference, vars, config, "input")
-			option = r.Replace(option, "diskfs", "", vars, config, "input")
-			option = r.Replace(option, "memfs", "", vars, config, "input")
-			option = r.Replace(option, "fs:*", "", vars, config, "input")
 
 			input.Options[j] = option
 		}
@@ -1907,11 +1894,6 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 		output.Address = r.Replace(output.Address, "processid", config.ID, vars, config, "output")
 		output.Address = r.Replace(output.Address, "domain", config.Domain, vars, config, "output")
 		output.Address = r.Replace(output.Address, "reference", config.Reference, vars, config, "output")
-		output.Address = r.Replace(output.Address, "diskfs", "", vars, config, "output")
-		output.Address = r.Replace(output.Address, "memfs", "", vars, config, "output")
-		output.Address = r.Replace(output.Address, "fs:*", "", vars, config, "output")
-		output.Address = r.Replace(output.Address, "rtmp", "", vars, config, "output")
-		output.Address = r.Replace(output.Address, "srt", "", vars, config, "output")
 
 		for j, option := range output.Options {
 			// Replace any known placeholders
@@ -1919,9 +1901,6 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 			option = r.Replace(option, "processid", config.ID, vars, config, "output")
 			option = r.Replace(option, "domain", config.Domain, vars, config, "output")
 			option = r.Replace(option, "reference", config.Reference, vars, config, "output")
-			option = r.Replace(option, "diskfs", "", vars, config, "output")
-			option = r.Replace(option, "memfs", "", vars, config, "output")
-			option = r.Replace(option, "fs:*", "", vars, config, "output")
 
 			output.Options[j] = option
 		}
@@ -1934,6 +1913,70 @@ func resolveStaticPlaceholders(config *app.Config, r replace.Replacer) {
 			cleanup.Pattern = r.Replace(cleanup.Pattern, "reference", config.Reference, vars, config, "output")
 
 			output.Cleanup[j] = cleanup
+		}
+
+		delete(vars, "outputid")
+
+		config.Output[i] = output
+	}
+}
+
+// resolveAccessPlaceholders replaces the placeholders for accessing the filesystems, RTMP, and SRT. Their
+// values contain the credentials of the owner of the process, which can be changed in the IAM anytime.
+// They are replaced at every process start, such that a restart uses the current credentials. The static
+// placeholders must have been replaced before. The config will be modified in place.
+func resolveAccessPlaceholders(config *app.Config, r replace.Replacer) {
+	vars := map[string]string{
+		"processid": config.ID,
+		"owner":     config.Owner,
+		"reference": config.Reference,
+		"domain":    config.Domain,
+	}
+
+	for i, option := range config.Options {
+		option = r.Replace(option, "diskfs", "", vars, config, "global")
+		option = r.Replace(option, "fs:*", "", vars, config, "global")
+
+		config.Options[i] = option
+	}
+
+	for i, input := range config.Input {
+		vars["inputid"] = input.ID
+
+		input.Address = r.Replace(input.Address, "diskfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "memfs", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "fs:*", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "rtmp", "", vars, config, "input")
+		input.Address = r.Replace(input.Address, "srt", "", vars, config, "input")
+
+		for j, option := range input.Options {
+			option = r.Replace(option, "diskfs", "", vars, config, "input")
+			option = r.Replace(option, "memfs", "", vars, config, "input")
+			option = r.Replace(option, "fs:*", "", vars, config, "input")
+
+			input.Options[j] = option
+		}
+
+		delete(vars, "inputid")
+
+		config.Input[i] = input
+	}
+
+	for i, output := range config.Output {
+		vars["outputid"] = output.ID
+
+		output.Address = r.Replace(output.Address, "diskfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "memfs", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "fs:*", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "rtmp", "", vars, config, "output")
+		output.Address = r.Replace(output.Address, "srt", "", vars, config, "output")
+
+		for j, option := range output.Options {
+			option = r.Replace(option, "diskfs", "", vars, config, "output")
+			option = r.Replace(option, "memfs", "", vars, config, "output")
+			option = r.Replace(option, "fs:*", "", vars, config, "output")
+
+			output.Options[j] = option
 		}
 
 		delete(vars, "outputid")
@@ -2050,16 +2093,10 @@ func (r *restream) Validate(config *app.Config) error {
 
 	resolveStaticPlaceholders(cfg, r.replace)
 
-	err := r.resolveAddresses(r.tasks, cfg)
+	cfg, err := r.resolveStartConfig(r.tasks, cfg, "0")
 	if err != nil {
 		return err
 	}
-
-	resolveDynamicPlaceholder(cfg, r.replace, map[string]string{
-		"hwdevice": "0",
-	}, map[string]string{
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-	})
 
 	_, err = validateConfig(cfg, r.fs.list, r.ffmpeg)
 	if err != nil {
